@@ -10,17 +10,16 @@
  *   - at desktop widths the accessible name stays identical to the visible
  *     label (WCAG 2.5.3 Label-in-Name).
  *
- * Rendering strategy: the api client mock REJECTS, so Tabs mounts its
- * hardcoded fallback department set (6 tabs) deterministically — no
- * backend in the loop (same pattern as UserModal.rolePayload.test.tsx,
- * where useTranslation is identity-mocked, so t(key) -> key).
+ * Rendering strategy: the API mock supplies a configured six-profile
+ * fixture deterministically — no backend in the loop (same identity-mocked
+ * translation convention as UserModal.rolePayload.test.tsx).
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../api/client', () => ({
   api: {
-    get: vi.fn().mockRejectedValue(new Error('offline — fallback tabs expected')),
+    get: vi.fn(),
   },
 }));
 
@@ -30,10 +29,62 @@ vi.mock('../../../i18n/useTranslation', () => ({
 
 import Tabs, { doctorTabButtonIdFor, tabButtonIdFor } from '../Tabs';
 import { toDoctorId } from '../../../types/domain/branded';
+import { api } from '../../../api/client';
+
+const STANDARD_PROFILES = [
+  { key: 'cardiology', title: 'Cardiologist', title_ru: 'misc.mt_kardiolog', icon: 'Heart', color: 'var(--mac-error)', queue_tags: ['cardiology'] },
+  { key: 'ecg', title: 'ECG', title_ru: 'misc.mt_ekg', icon: 'Activity', color: 'var(--mac-accent-purple)', queue_tags: ['ecg'] },
+  { key: 'dermatology', title: 'Dermatologist', title_ru: 'misc.mt_dermatolog', icon: 'UserCheck', color: 'var(--mac-warning)', queue_tags: ['dermatology'] },
+  { key: 'stomatology', title: 'Dentist', title_ru: 'misc.mt_stomatolog', icon: 'Smile', color: 'var(--mac-accent)', queue_tags: ['stomatology'] },
+  { key: 'lab', title: 'Laboratory', title_ru: 'misc.mt_laboratoriya', icon: 'FlaskConical', color: 'var(--mac-success)', queue_tags: ['lab'] },
+  { key: 'procedures', title: 'Procedures', title_ru: 'misc.mt_protsedury', icon: 'Syringe', color: 'var(--mac-accent-purple)', queue_tags: ['procedures'] },
+];
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(api.get).mockResolvedValue({
+    data: { success: true, source: 'database', profiles: STANDARD_PROFILES },
+  });
+});
 
 afterEach(() => cleanup());
 
 describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1)', () => {
+  it('keeps a successful empty profile catalog empty and notifies the parent', async () => {
+    const onProfilesLoaded = vi.fn();
+    vi.mocked(api.get).mockResolvedValueOnce({
+      data: { success: true, source: 'database', profiles: [] },
+    });
+
+    render(<Tabs onProfilesLoaded={onProfilesLoaded} />);
+
+    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onProfilesLoaded).toHaveBeenCalledWith([]));
+    expect(document.querySelectorAll('.tab-button.department')).toHaveLength(0);
+  });
+
+  it('does not invent department tabs after an initial API failure', async () => {
+    const onProfilesLoaded = vi.fn();
+    vi.mocked(api.get).mockRejectedValueOnce(new Error('offline'));
+
+    render(<Tabs onProfilesLoaded={onProfilesLoaded} />);
+
+    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(document.querySelectorAll('.tab-button.department')).toHaveLength(0));
+    expect(onProfilesLoaded).not.toHaveBeenCalled();
+  });
+
+  it('does not treat a malformed profile response as a configured empty catalog', async () => {
+    const onProfilesLoaded = vi.fn();
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { success: true } });
+
+    render(<Tabs onProfilesLoaded={onProfilesLoaded} />);
+
+    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(document.querySelectorAll('.tab-button.department')).toHaveLength(0));
+    expect(onProfilesLoaded).not.toHaveBeenCalled();
+  });
+
   it('all-departments button resolves an accessible name equal to its visible label source', async () => {
     render(<Tabs />);
 
@@ -51,7 +102,7 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
   it('every department tab carries a non-empty aria-label equal to its visible label', async () => {
     render(<Tabs />);
 
-    // Fallback set mounts after the mocked api rejection (6 departments).
+    // The six configured fixture profiles load from the API mock.
     await waitFor(() => {
       expect(document.querySelectorAll('.tab-button.department').length).toBe(6);
     });
@@ -145,8 +196,8 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
   // and may contain whitespace ("general medicine") — aria-describedby is
   // an IDREF list, so the generated id must be whitespace-free and must
   // still resolve in-button. The whitespace key arrives through the API
-  // path (mockResolvedValueOnce overrides the rejection default), since
-  // the offline fallback set only contains clean keys.
+  // path (mockResolvedValueOnce overrides the standard fixture), since the
+  // test exercises a whitespace-bearing key not present in that fixture.
   it('department key with whitespace: describedby id stays a valid single IDREF', async () => {
     const { api } = await import('../../../api/client');
     vi.mocked(api.get).mockResolvedValueOnce({

@@ -125,9 +125,9 @@ describe('Tabs — RQ-27.a silent revalidation on return to the session', () => 
     await waitFor(() => {
       expect(profilesCallCount()).toBe(2);
     });
-    // A failed revalidation must not blank the strip (existing success-only
-    // replace semantics; the offline fallback set is the documented path).
-    expect(container.querySelectorAll('.tab-button.department').length).toBeGreaterThan(0);
+    // A failed revalidation keeps the last successful backend list intact.
+    expect(container.querySelectorAll('.tab-button.department')).toHaveLength(before);
+    expect(container.querySelector('[data-tab="cardio"]')).not.toBeNull();
   });
 
   it('does not revalidate while the document is hidden', async () => {
@@ -218,8 +218,8 @@ describe('Tabs — RQ-27.a silent revalidation on return to the session', () => 
     await waitFor(() => {
       expect(profilesCallCount()).toBe(2);
     });
-    // Success-path-only reset: a failed refresh (fallback set) must not
-    // deselect the user's tab.
+    // Success-path-only reset: a failed refresh must not deselect the user's
+    // tab or replace the last successful list.
     expect(onTabChange).not.toHaveBeenCalled();
   });
 

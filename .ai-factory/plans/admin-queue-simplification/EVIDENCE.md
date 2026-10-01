@@ -359,3 +359,129 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
 - PR state after the body edit: HEAD remains `e18d2e2ced3e36c950fc3bc44439d7554c02d7ce`, state OPEN/CLEAN, `reviewDecision` empty, and no GitHub reviews recorded. The body edit triggered `Recommend PR lifecycle state` run [36817506788](https://github.com/drsapaev/final/actions/runs/36817506788), which passed. `gh pr checks 3540` exits 0; all completed checks passed and the documented path-aware jobs remain skipped. No merge was performed.
 - Tier 2 remains DEFERRED and unpassed. The user has acknowledged the deferral; code re-review of the corrected P1 is still required. T03 stays PR_OPEN, and T04 must not start until this PR cycle closes.
 - Local PostgreSQL/staging rerun for T03.1 was not performed; the local 12-test run used the isolated SQLite fixture. The GitHub backend job exercised its PostgreSQL setup and concurrency/smoke stages.
+
+## T03 merge checkpoint — 2026-10-01T10:59:28+05:00
+
+- PR: [#3540](https://github.com/drsapaev/final/pull/3540), merged at `2026-10-01T05:41:43Z` as `1e781da72bd927926b538b139a6c251cd09848b5`.
+- Review: the user approved follow-up code commit `e18d2e2c` with P0/P1/P2 all zero; the confirmed clinic-day P1 is closed. The GitHub PR object has no formal review event; the user-provided review verdict was the approval source.
+- Merge gates: PR body records the Tier 2 deferral, its reason/evidence/owner/resume condition and the user's acknowledgment. PR Required Gate, PR Review Quality Gate, Lifecycle Recommendation and current-head CI passed. The live PR body gate passed 19/19 after the final description update.
+- Current-head CI: [run 36817929227](https://github.com/drsapaev/final/actions/runs/36817929227) passed on PR HEAD `c81b49c81397ebf01d0c76f91b340a799cc94ddb`; description-only follow-up checks [36820861934](https://github.com/drsapaev/final/actions/runs/36820861934) and [36820861998](https://github.com/drsapaev/final/actions/runs/36820861998) passed. Path-aware skips remain skips, including separate integration tests, Docker, k6, staging/production readiness, DAST, metadata and Supabase Preview.
+- Tier 2 status: DEFERRED and unpassed. User acceptance of this PR-specific deferral satisfied the formal acknowledgment gate; it does not establish coverage or change future Tier 2 requirements.
+- Cleanup/sync: remote T03 branch deleted after `gh pr merge --delete-branch` merged remotely but failed during local branch cleanup because `main` is checked out in `C:\final`. The production checkout was clean and only this Codex task was active; `C:\final` was fast-forwarded from `967bd398c` to merge commit `1e781da72`. The old T03 worktree remains preserved with local continuation documents and QA scratch; none were included in the merge.
+- Result: T03 = MERGED. T04 may start from the fresh `origin/main` worktree below.
+
+## T04 pre-work — 2026-10-01T10:59:28+05:00
+
+- Plan/task: T04, remove runtime restoration of built-in profiles for empty/error reads; user instruction remains “Продолжай реализации плана”.
+- Base / current commit: `1e781da72bd927926b538b139a6c251cd09848b5`; branch `codex/aqs-T04-empty-profiles`; worktree `C:\final\_wt_aqs_t04_empty_profiles`.
+- Environment: clean Windows worktree on the local host; no runtime service or database was started.
+- Canonical anchors: `get_queue_profiles` and `get_queue_profiles_public` in `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`; `Tabs.loadQueueProfiles` in `frontend/src/components/navigation/Tabs.tsx`; explicit initial catalog seed in `backend/alembic/versions/0055_queue_resource_provisioning.py`.
+- Original behavior observed: both GET functions return built-in defaults when the query yields no rows and also return defaults as `success: true` after any read exception. `Tabs.tsx` throws for a valid empty list and catches both cases by rendering six hardcoded tabs. Alembic revision 0055 explicitly provisions the initial catalog; the revision is reference-only and will not change.
+- Execution mode: advisory_gate (GPT-6 UI/API exception; no schema, auth/RBAC, ownership/fairness, or admission behavior change). A known-root agent-gate call returned `mode=execute`, `handoff_required=true`, `gate_misroute=false`, `result=narrow_override`, `override_used=true`, but only named the endpoint and `py_compile`; per AGENTS.md advisory rules this output is context, not an edit allowlist or blocker. Manual T04 scope remains the plan-defined endpoint/UI/tests below.
+- First-touch allowlist: `_queue_profiles.py`; `Tabs.tsx`; new backend unit tests for empty/error admin and public reads; `backend/tests/unit/test_stack_trace_exposure.py` to retire its fallback-marker expectation; focused `Tabs.a11y.test.tsx` and `Tabs.focusRefresh.test.tsx`; this progress/evidence ledger.
+- Denied scope: Alembic/model/schema changes; seed/provisioning changes; profile create/update/delete; RBAC; queue ownership/eligibility, admission, join, token and clinical lifecycle; route registry; unrelated wizard fallback behavior.
+- Validation target: red-first tests for empty admin/public result and safe read failure; focused backend pytest and Tabs Vitest; `py_compile`; frontend scoped lint/type check as needed; `git diff --check`.
+- Result: pre-work only; no application or test files changed yet. Targeted baseline tests — NOT_RUN. Stop if implementation requires any denied path or cannot preserve the current response field names and role guards.
+- Next exact action: add the declared regression tests, run them against the unchanged implementation to record the expected red result, then remove only runtime read fallbacks and the Tabs hardcoded fallback.
+
+## T04 validation — 2026-10-01T11:30:11+05:00
+
+- Commit under test: implementation commit `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`, based on `1e781da72bd927926b538b139a6c251cd09848b5`; branch `codex/aqs-T04-empty-profiles`; worktree `C:\final\_wt_aqs_t04_empty_profiles`.
+- Environment: isolated Windows worktree. Backend unit tests used fake profile sessions and a non-routable PostgreSQL-shaped `DATABASE_URL`; no database connection or application service was started. Frontend dependencies were restored with `npm ci` from the existing lockfile; no package manifest or lockfile changed.
+- Execution mode: `advisory_gate`; canonical anchors, allowlist, denied paths and gate outcome are recorded in T04 pre-work above.
+- Allowed paths: `_queue_profiles.py`, `Tabs.tsx`, focused Tabs and WorklistView tabpanel tests, new profile read-contract unit tests, `test_stack_trace_exposure.py`, `PROGRESS.md` and `EVIDENCE.md`. The WorklistView test was added only after full-suite evidence showed its mock expected the removed fallback; migration 0055 and all denied areas remain unchanged.
+- Original failure: red-first backend tests showed both empty admin/public reads returned `source: fallback`, and both read exceptions returned a successful fallback response instead of raising HTTP 500. The original stack-trace source checks also failed on Windows default text decoding; they now read UTF-8 explicitly.
+- Changes: empty profile queries now retain the database response shape with an empty list; admin/public read exceptions go through `_raise_registrar_internal_error` and return a safe 500; `Tabs` accepts a valid empty list, validates the response list shape, retains its last successful list on errors and has no hardcoded direction fallback. Tests use an explicit six-profile API fixture and cover empty, failed, and malformed responses.
+- Validation commands and results:
+  - `scripts/run_backend_pytest.ps1 tests/unit/test_queue_profiles_read_contract.py tests/unit/test_stack_trace_exposure.py -q` — PASS, 13 passed, 1 warning (using the non-routable URL above).
+  - `npm run test -- --run src/components/navigation/__tests__/Tabs.a11y.test.tsx src/components/navigation/__tests__/Tabs.focusRefresh.test.tsx` — PASS, 23 passed.
+  - `npx eslint src/components/navigation/Tabs.tsx src/components/navigation/__tests__/Tabs.a11y.test.tsx src/components/navigation/__tests__/Tabs.focusRefresh.test.tsx` — PASS, 0 errors, 2 warnings for existing unused `theme` and `dynamicDepartments` props.
+  - `npm run type-check -- --pretty false` — PASS.
+  - `npm run build` — PASS; build reports existing dependency annotation and CSS property warnings.
+  - `scripts/run_python.ps1 -PythonArgs @('-m','py_compile',...)` for the three backend source/test files — PASS.
+  - `ruff check` on the endpoint and backend tests — PASS; `ruff format --check` for the new backend test — PASS.
+  - Local full changed-file `ruff format --check` — reports a formatting difference in `test_stack_trace_exposure.py` after pinned Black 24.10 formatted it; the local Ruff is 0.16.8, while pre-commit uses Ruff 0.7.4. The pinned pre-commit Ruff-format and Black hooks both passed on the successful retry.
+  - `git diff --check` — PASS.
+- Commit-hook reconciliation: first `git commit` attempt did not create a commit. Large-file, merge-conflict, private-key, branch-guard, gitleaks and Ruff lint hooks passed; end-of-file, Ruff format and Black hooks applied formatting-only changes in the already allowed backend files. The local ESLint hook failed because `.pre-commit-config.yaml` changes directory into `frontend` but passes repository-root-prefixed paths. The same scoped ESLint command passed directly with 0 errors. Retry skipped only `eslint`; both pinned formatter hooks and all remaining hooks passed. Commit `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82` was created.
+- Scope check: no schema/migration/seed, profile write, auth/RBAC, queue admission, join/token, ownership/eligibility, route registry or production change. No package manifest changed. The full profile endpoint formatting backlog remains outside T04's safe patch slice.
+- Result: local status `VALIDATED`; implementation commit recorded, PR not yet opened. No staging/browser E2E was run for this read-contract change.
+- Next exact action: update the dependent WorklistView tabpanel test with a concrete profile API fixture; rerun it and the full frontend suite before opening the PR.
+
+## T04 full-suite finding — 2026-10-01T11:37:53+05:00
+
+- Commit under test: `ad768a2443108bf1435ba8eb5a8de6da9144b0bb` (documentation checkpoint; runtime change is `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`).
+- Validation: `npm run test:run` — FAIL, 310 test files passed and 1 failed; 2,879 tests passed and 1 failed. The failure is `src/pages/registrar/views/__tests__/WorklistView.tabpanel.test.tsx`, which expects six department tabs from an API mock that always rejects. `Tabs` correctly renders zero departments after that failure under the new contract.
+- Scope decision: add only `frontend/src/pages/registrar/views/__tests__/WorklistView.tabpanel.test.tsx` to T04. It directly asserts that the tabpanel label points to a tab rendered by `Tabs`; its fixture must now supply an explicit backend profile, since hardcoded fallback departments no longer exist.
+- Stop/scope review: this remains the same T04 consumer/test contract; no runtime behavior, endpoint, route, role, or queue eligibility change is requested. All denied areas remain untouched.
+- Next exact action before editing: replace the test's blanket rejected `api.get` mock with a successful one-profile `ecg` response and change the expected department count from six to one; run that file and the complete Vitest suite.
+
+## T04 final validation — 2026-10-01T12:35:56+05:00
+
+- Commit under test: final validation checkpoint `4c50520f9eacda38b0eae226d950ea9d21bfbdfc`, including the dependent WorklistView test and this evidence update; runtime implementation `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`; branch `codex/aqs-T04-empty-profiles`; base `1e781da72bd927926b538b139a6c251cd09848b5`.
+- Environment: Windows worktree with Node `v24.15.0`; WSL Ubuntu 24.04 staging project remained stopped. `18001`, `55432`, and `18080` had no listeners. No production endpoint or data was used. Linux browser validation ran from an isolated copy at `/home/drsapaev/aqs-frontend` on WSL ext4, with Node `v24.15.0`, Playwright `1.63.0`, and the matching Linux Chromium 153.0.8010.12; package manifests and lockfiles were unchanged.
+- Actual changed paths: `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`; `backend/tests/unit/test_queue_profiles_read_contract.py`; `backend/tests/unit/test_stack_trace_exposure.py`; `frontend/src/components/navigation/Tabs.tsx`; `frontend/src/components/navigation/__tests__/Tabs.a11y.test.tsx`; `frontend/src/components/navigation/__tests__/Tabs.focusRefresh.test.tsx`; `frontend/src/pages/registrar/views/__tests__/WorklistView.tabpanel.test.tsx`; this plan's `PROGRESS.md` and `EVIDENCE.md`.
+- Original failure and correction: the first full Vitest run found one dependent tabpanel test that expected six fallback tabs after its API mock rejected. That fixture now defaults to an explicit empty database catalog and supplies one `ecg` profile for its selected-tab linkage case. Focused result after restoring Windows dependencies: 21/21 passed.
+- Tier 1 validation:
+  - `scripts/run_backend_pytest.ps1 tests/unit/test_queue_profiles_read_contract.py tests/unit/test_stack_trace_exposure.py -q` — PASS, 13 passed, 1 warning.
+  - `npm run test:run -- --reporter=dot` — PASS, 311 test files and 2,880 tests passed.
+  - `npm run type-check -- --pretty false` — PASS.
+  - `npm run lint:check` — PASS, exit 0, 0 errors, 3,514 warnings.
+  - `npm run check-theme` — PASS.
+  - `npm run audit:icon-controls` — PASS, 406 files scanned, 0 findings.
+  - `npm run build` — PASS; this ran after the application-source changes, and the only later source-tree change was the dependent test fixture.
+  - Six standalone Chromium specs from `docs/AGENTS_UI.md` §13 — PASS, 86/86 tests in 4.0 minutes. Command in the isolated WSL copy: `npx playwright test --config=.tmp-playwright-windows.config.ts --project=chromium e2e/registrar-time.spec.ts e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts`. The temporary config used local Vite servers on 5173 and 5199 and Linux snapshot baselines; it was not committed. The initial Windows attempt exposed the repository config's POSIX-only second-server command and missing Win32 snapshot baselines; 46 tests passed there, while 40 visual assertions could not find Win32 snapshots. The full equivalent suite then passed on Linux baselines. Generated untracked Win32 snapshots were removed.
+  - `npx eslint src/pages/registrar/views/__tests__/WorklistView.tabpanel.test.tsx` — PASS; earlier scoped ESLint for `Tabs` passed with 0 errors and 2 existing warnings.
+  - Backend `py_compile`, Ruff lint, pinned Ruff-format and Black hooks — PASS. The configured local ESLint pre-commit hook has a path mismatch after `cd frontend`; equivalent direct scoped lint and full `lint:check` passed. The implementation and final test/evidence commit attempts both reproduced that hook-only path failure; the retry skips only `eslint`, with all other hooks enabled.
+  - `git diff --check` — PASS after final test and evidence edits.
+- Tier 2 — DEFERRED, NOT RUN; reviewer acknowledgment is pending. Original requirement: when isolated backend infrastructure and QA credentials are available, run backend-dependent `auth-flow`, `payment-system`, `queue-system`, `admin-navigation`, `panel-qa-admin-live` and related specs. Reason: T00 verified the isolated staging project is stopped; the current local staging ports remain closed and no staging QA credentials were established. The known backend port `18000` is production and was intentionally not used. Evidence: all 86 Tier 1 browser checks and fake-session read-contract unit tests passed; none of the backend-dependent specs ran. Owner/workstream: queue-admin T04 workstream. Resume condition: start isolated synthetic staging from this worktree, confirm disposable PostgreSQL and QA credentials, then run the listed specs against the exact PR head. Headline impact: Tier 2 coverage remains 0% credited; T00–T03 remain 4/19 merged milestones (21.1%), and T04 adds 5.3 percentage points only after merge. The PR reviewer acknowledgment checkbox must stay unchecked until a reviewer accepts this deferral.
+- Scope check: no schema/migration/seed, profile write, auth/RBAC, queue admission, join/token, ownership/eligibility, route registry, production, or deployment change. No snapshot baseline, package manifest, or lockfile change.
+- Result: local status `VALIDATED`; Tier 1 is PASS, Tier 2 is DEFERRED and unpassed. PR not yet opened; no merge or deployment performed.
+- Next exact action: commit the dependent test and evidence checkpoint, push the branch, open the T04 PR with the Tier 2 deferral fields, run the PR-body gate and wait for GitHub CI and review. Do not merge until the reviewer formally acknowledges the deferral.
+
+## T04 stale integration assertion — 2026-10-01T12:44:02+05:00
+
+- Commit under review: `516a66d86f1102d2b2940b6e2f69340c015bb8cd`; branch `codex/aqs-T04-empty-profiles`; no push or PR yet.
+- Discovery: final source/test search found `backend/tests/integration/test_specialty_canonicalization.py::test_queue_profiles_response_carries_canonical_settings_key`, which asserts fallback defaults are returned when the catalog table is empty. This test directly contradicts T04's adopted behavior. A separate database-backed test in the same file already verifies the canonical `settings_key` mapping.
+- Canonical anchor: admin GET `/queues/profiles` in `_queue_profiles.py`; empty database query now returns `success: true`, `profiles: []`, and `source: "database"`.
+- Pre-edit observation: the obsolete integration assertion has not yet been run against this branch; targeted result is `NOT_RUN` pending the fixture update. Frontend Tier 1 results above remain valid; this discovery does not change runtime code.
+- First-touch scope update: add `backend/tests/integration/test_specialty_canonicalization.py` to replace the stale fallback assertion with an empty-catalog contract regression, and `backend/tests/integration/test_rq16b_direction_entry_methods.py` for a comment-only clarification of the removed endpoint fallback reference. No other assertion or fixture in the latter file changes. Continue to deny schema/migrations, profile writers, RBAC, queue admission/join/token behavior, QR ownership/eligibility, route registry and unrelated UI behavior.
+- Stop condition: stop if the focused integration test requires changing production paths, seed behavior, schema, queue ownership, or admission semantics.
+- Next exact action: correct the cross-reference comment, assert an empty profiles list and database source for the empty catalog, run the focused backend integration case using `scripts/run_backend_pytest.ps1`, run `git diff --check`, then update final T04 evidence before push.
+
+## T04 integration follow-up — 2026-10-01T12:51:52+05:00
+
+- Commit under test: `77783b8a1d7c54843b3b47a257e5a45d10439a2f`, including the focused integration-test changes and evidence update; runtime code remains `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`.
+- Red result: `scripts/run_backend_pytest.ps1 tests/integration/test_specialty_canonicalization.py -k queue_profiles_response_carries_canonical_settings_key -q` — FAIL as expected because it asserted fallback profiles while the actual empty database response had `profiles == []`.
+- Change: renamed that test to `test_queue_profiles_empty_catalog_stays_empty` and asserted `success is True`, `profiles == []`, and `source == "database"`. The existing `test_queue_profiles_db_path_settings_key_canonical` remains separate and unchanged, preserving the real database contract. Clarified one `test_rq16b_direction_entry_methods.py` docstring that had described the removed public-read fallback as a current condition; no assertion or fixture changed there.
+- Validation environment: Python 3.11.9 on Windows; `DATABASE_URL` was set to a non-routable PostgreSQL-shaped URL solely for application import. The `db_session` test fixture uses its isolated temporary SQLite database; no PostgreSQL service, staging, or production data was accessed.
+- Validation commands and results:
+  - `scripts/run_backend_pytest.ps1 tests/unit/test_queue_profiles_read_contract.py tests/unit/test_stack_trace_exposure.py -q` — PASS, 13 passed, 1 warning.
+  - `scripts/run_backend_pytest.ps1 tests/integration/test_specialty_canonicalization.py -k 'queue_profiles_empty_catalog_stays_empty or queue_profiles_db_path_settings_key_canonical' -q` — PASS, 2 passed, 64 deselected, 1 warning.
+  - `git diff --check` — PASS.
+- Commit-hook reconciliation: the first commit attempt passed Ruff and Ruff-format, then pinned Black 24.10 reformatted the two touched integration files and aborted the commit. The same two focused integration tests passed after formatting. Retry passed Ruff, Ruff-format, Black, gitleaks, whitespace, branch and secret hooks; no hook was skipped.
+- Actual additional paths: `backend/tests/integration/test_specialty_canonicalization.py`; comment-only clarification in `backend/tests/integration/test_rq16b_direction_entry_methods.py`; this plan's `PROGRESS.md` and `EVIDENCE.md`.
+- Scope check: no runtime changes after `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`; no schema, seed, profile write, auth/RBAC, queue admission, QR selection, route, or production changes.
+- Result: local status `VALIDATED`; Tier 1 frontend evidence from `T04 final validation` remains current because this follow-up changes only backend tests and documentation. Tier 2 remains `DEFERRED`, not run, and needs reviewer acknowledgment as recorded above. PR not yet opened.
+- Next exact action: commit the final commit-reference update in the ledger, push the branch, create the PR, run body checks/GitHub CI, and leave Tier 2 acknowledgment pending for a reviewer.
+
+## T04 PR open — 2026-10-01T13:04:04+05:00
+
+- PR: [#3541](https://github.com/drsapaev/final/pull/3541), title `fix(queue): preserve empty profile catalogs`, branch `codex/aqs-T04-empty-profiles`, base `main` at `1e781da72bd927926b538b139a6c251cd09848b5`, PR head at creation `560860f724bf87874ed474bbe50cb5db1a245dd3`.
+- State: OPEN, not a draft; GitHub reported merge state `BLOCKED`, no review decision, and required checks were still running at the first snapshot. No merge or deployment was performed.
+- PR body gate: `scripts/run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py','--body-file','.t04-pr-body.md','--author','drsapaev')` — PASS, 19 gate tests and both sample bodies passed; the T04 body passed. The temporary body file was removed after PR creation.
+- Completed checks in the first GitHub snapshot: Hardcoded Russian Text Detector, GitGuardian, Locale Key Parity, PR Review Quality Gate, Recommend PR lifecycle state, Regression Audit Gate, gitleaks, secret scan, and CI Scope — PASS.
+- Pending at first snapshot: Analyze (actions/javascript-typescript/python), Frontend build, code quality, Backend tests, documentation generation, Context Boundary Integrity, Frontend E2E, Frontend unit tests, Frontend lint report, Python formatting report, and security scan. These are not treated as passed.
+- Skipped at first snapshot: Notify on failure, Telegram Mini App Release Gate, Metadata checks, Supabase Preview, classify-and-route, and Nightly DAST. Skipped jobs are not passes.
+- Tier 2: NOT RUN / deferred, with reason, evidence, owner, resume condition, headline impact, and an unchecked reviewer-acknowledgment field in the PR body. The user has not yet acknowledged T04's deferral; their earlier acknowledgment applied only to PR #3540.
+- Artifact: PR #3541 is attached to this Codex task.
+- Next exact action: wait for current-head checks and review, fix any red check in this PR, and ask the reviewer to acknowledge the Tier 2 deferral before merge.
+
+## T04 PR checks complete — 2026-10-01T13:17:16+05:00
+
+- Commit under test: PR head `560860f724bf87874ed474bbe50cb5db1a245dd3` (same head as PR creation).
+- Environment: GitHub Actions; PR #3541, branch `codex/aqs-T04-empty-profiles`.
+- Result: all checks applicable to this PR head completed successfully, including Backend tests, Frontend E2E, Frontend build, Frontend lint, Frontend unit tests, Frontend-Backend Parity, Context Boundary Integrity, Code Quality, documentation generation, CodeQL, gitleaks, GitGuardian, security scan, PR Required Gate, and the formatting, locale, regression, and scope gates.
+- Skipped checks: metadata, Supabase Preview, Telegram Mini App Release Gate, nightly DAST, Docker build, integration tests, k6 load tests, and staging/production readiness reports. These were skipped by workflow scope/conditions and are not reported as passes.
+- PR state: OPEN, `mergeStateStatus=CLEAN`, no review decision or latest review recorded. No merge or deployment was performed.
+- Tier 2: NOT RUN / deferred. The PR body lists its reason, evidence, owner, resume condition, and headline impact; reviewer-acknowledgment checkbox remains unchecked. The approval of Tier 2 deferral for PR #3540 does not acknowledge the separate T04 deferral.
+- Next exact action: commit and push this documentation checkpoint, recheck the resulting PR head's applicable checks, then obtain explicit reviewer acknowledgment of T04's Tier 2 deferral before merge.

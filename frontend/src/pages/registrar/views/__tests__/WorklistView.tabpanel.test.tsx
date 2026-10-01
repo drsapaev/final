@@ -13,11 +13,11 @@
  * These tests pin the resolved wiring (plan §RQ-19, S-16).
  */
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../api/client', () => ({
   api: {
-    get: vi.fn().mockRejectedValue(new Error('offline — fallback tabs expected')),
+    get: vi.fn(),
   },
 }));
 
@@ -41,8 +41,15 @@ vi.mock('../../../../components/ui/macos', () => ({
 import WorklistView from '../WorklistView';
 import Tabs, { doctorTabButtonIdFor, tabButtonIdFor } from '../../../../components/navigation/Tabs';
 import { toDoctorId } from '../../../../types/domain/branded';
+import { api } from '../../../../api/client';
 
 afterEach(() => cleanup());
+
+beforeEach(() => {
+  vi.mocked(api.get).mockResolvedValue({
+    data: { success: true, source: 'database', profiles: [] },
+  });
+});
 
 const baseProps = {
   activeTab: 'cardiology' as string | null,
@@ -88,6 +95,23 @@ describe('RQ-19 — worklist tabpanel wiring', () => {
   });
 
   it('Tabs + WorklistView agree: the panel labelledby resolves to the actual selected tab button', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({
+      data: {
+        success: true,
+        source: 'database',
+        profiles: [
+          {
+            key: 'ecg',
+            title: 'ECG',
+            title_ru: 'ЭКГ',
+            queue_tags: ['ecg'],
+            icon: 'Activity',
+            color: 'var(--mac-accent-purple)',
+          },
+        ],
+      },
+    });
+
     render(
       <>
         <Tabs activeTab="ecg" />
@@ -95,9 +119,9 @@ describe('RQ-19 — worklist tabpanel wiring', () => {
       </>,
     );
 
-    // Fallback set mounts after the mocked api rejection (6 departments).
+    // This contract needs only the backend-owned selected ECG tab.
     await waitFor(() => {
-      expect(document.querySelectorAll('.tab-button.department').length).toBe(6);
+      expect(document.querySelectorAll('.tab-button.department').length).toBe(1);
     });
 
     const panel = screen.getByRole('tabpanel');
