@@ -9,8 +9,8 @@ Current status: VALIDATED
 Worktree: `C:\final\_wt_aqs_t05_settings_cache`
 Branch: `codex/aqs-T05-settings-cache`
 Base commit: `ecc14b05411c7e7b54efca2966416cd6a69df37c`
-Current commit: `ecc14b05411c7e7b54efca2966416cd6a69df37c` + uncommitted T05 changes
-Last updated: 2026-10-01T15:19:53+05:00
+Current commit: `47276d178972226b0bcf561bdf8fa26a6940b913` (T05 implementation; locally validated)
+Last updated: 2026-10-01T15:24:31+05:00
 
 > **Возобновлено пользователем 2026-10-01:** «Продолжай реализации плана». T03 завершён: PR #3540 слит после исправления P1 и code-review verdict APPROVE. Tier 2 для #3540 остаётся принятым deferral, не пройденным тестовым набором.
 
@@ -21,7 +21,7 @@ Last updated: 2026-10-01T15:19:53+05:00
 | T02 | MERGED | `codex/aqs-T02-queue-settings-state` / [PR #3538](https://github.com/drsapaev/final/pull/3538) | `b4ba6320797f056da19bbdc5cc672b3a97d2091e` | `EVIDENCE.md#t02` |
 | T03 | MERGED | `codex/aqs-T03-cabinet-read` / [PR #3540](https://github.com/drsapaev/final/pull/3540) | `1e781da72bd927926b538b139a6c251cd09848b5` | `EVIDENCE.md#t03-merge-checkpoint` |
 | T04 | MERGED | `codex/aqs-T04-empty-profiles` / [PR #3541](https://github.com/drsapaev/final/pull/3541) | `ecc14b05411c7e7b54efca2966416cd6a69df37c` | `EVIDENCE.md#t04-merge-checkpoint` |
-| T05 | VALIDATED | `codex/aqs-T05-settings-cache` | | `EVIDENCE.md#t05-precommit-checkpoint` |
+| T05 | VALIDATED | `codex/aqs-T05-settings-cache` | | `EVIDENCE.md#t05-implementation-commit` |
 | T06 | PLANNED | | | |
 | T07 | PLANNED | | | |
 | T08 | PLANNED | | | |
@@ -48,11 +48,11 @@ Last updated: 2026-10-01T15:19:53+05:00
 - Completed for T05 so far: the regression failed before the runtime patch because a new-day queue still used `07:00` after the saved clinic setting changed to `08:00`. Implemented a task-local settings snapshot keyed by service instance and DB session; nested queue/token commands share it and each new command gets a fresh snapshot. Queue creation now passes that same snapshot into `effective_day_start_number()` for its `start_number`. Removed both duplicate `_cached_settings` initializers and the two integration-test cache-reset workarounds. The regression writes/updates real `ClinicSettings` rows, verifies existing queue time/number snapshots stay fixed, and verifies the next day's queue uses the updated time and start number.
 - Validation run: focused backend tests PASS (24 passed, 1 warning); `py_compile` PASS; Ruff scoped to touched files with pre-existing C416 ignored PASS; Black `--check` on the regression and changed CRUD helper PASS; applicable pre-commit hooks PASS; `git diff --check` PASS. Full commands and limitations are in `EVIDENCE.md#t05-initial-validation`, `#t05-scope-refinement-validation`, and `#t05-precommit-checkpoint`.
 - Environment/limitations: tests ran on Python 3.11.9 with their own isolated SQLite fixture. Staging Compose is stopped (no containers); disposable PostgreSQL was not available/used, so PostgreSQL integration files whose fixture requires that server are `NOT_RUN`. No production data was queried. Full-file Black check reports legacy formatting drift in five touched files; broad formatting-only churn (more than 1,000 diff lines reported) was not applied. Ordinary Ruff still reports two pre-existing C416 findings in unrelated `_operations.py` expressions; the new imports/code pass when those are excluded.
-- Changed but not fully verified: local implementation and focused checks are verified; PostgreSQL integration checks and remote PR checks have not run. Final source review and commit remain.
-- Remaining: commit and push T05, open its PR, then wait for review/CI before starting T06.
+- Changed but not fully verified: the committed implementation and focused local checks are verified. PostgreSQL integration/staging checks remain `NOT_RUN`; remote PR checks and review are pending.
+- Remaining: push T05, open its draft PR, then complete current-head checks and review. Do not start T06 until T05 is green, merged, and the worktree/branch are synchronized.
 - Blocker: no implementation blocker. PostgreSQL integration validation is unavailable because staging is stopped; record it as `NOT_RUN`, not PASS. Stop if review shows the command boundary must move into endpoint-wide orchestration.
-- Next exact action: stage only the nine declared T05 paths, commit with the documented formatter-hook skips, push `codex/aqs-T05-settings-cache`, and open a draft PR.
-- Checks to rerun after the next change: commit hooks will rerun the applicable non-formatter hooks; after PR creation, inspect current-head CI and code review.
+- Next exact action: push `codex/aqs-T05-settings-cache` and open a draft PR; update this ledger with its URL/head after creation.
+- Checks to rerun after the next change: after PR creation, inspect current-head CI and code review; rerun local checks only if source changes.
 
 ## Checkpoint rules for the next agent
 

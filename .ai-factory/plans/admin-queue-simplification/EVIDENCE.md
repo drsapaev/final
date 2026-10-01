@@ -557,3 +557,12 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
 - Final recheck after end-of-file normalization: focused backend suite — PASS, 24 passed, 1 warning; Ruff with `--ignore C416` — PASS; Black on the new regression and changed CRUD helper — PASS; `py_compile` — PASS; `git diff --check` — PASS; second pre-commit run — PASS for all applicable non-formatter hooks.
 - Result: local T05 validation is `VALIDATED`; PostgreSQL integration and remote PR checks remain `NOT_RUN`/pending as recorded above.
 - Next exact action: stage only the nine declared T05 paths, commit with the documented formatter-hook skips, push `codex/aqs-T05-settings-cache`, and open the T05 draft PR.
+
+## T05 implementation commit — 2026-10-01T15:22:43+05:00
+
+- Commit: `47276d178972226b0bcf561bdf8fa26a6940b913` (`fix(queue): refresh settings per command`), based on `ecc14b05411c7e7b54efca2966416cd6a69df37c`.
+- Branch/worktree: `codex/aqs-T05-settings-cache`, `C:\final\_wt_aqs_t05_settings_cache`.
+- Scope: exactly the nine intended tracked paths listed in T05 validation; no additional file was staged. The temporary pre-commit environment remains untracked local worktree scratch and is not part of the commit.
+- Commit hooks: applicable hooks passed; `ruff`, `ruff-format`, and `black` skipped with the documented baseline-drift reasons. The local hook invoked the repository's existing backend venv; no package was installed there.
+- State: commit is local and validated, not yet pushed; no PR has been created. `PROGRESS.md` records T05 `VALIDATED` and this implementation SHA.
+- Next exact action: push the branch, create a draft PR, then update the plan ledger with the PR URL and current head.
