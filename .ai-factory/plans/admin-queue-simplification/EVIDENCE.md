@@ -384,9 +384,9 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
 - Result: pre-work only; no application or test files changed yet. Targeted baseline tests — NOT_RUN. Stop if implementation requires any denied path or cannot preserve the current response field names and role guards.
 - Next exact action: add the declared regression tests, run them against the unchanged implementation to record the expected red result, then remove only runtime read fallbacks and the Tabs hardcoded fallback.
 
-## T04 validation — 2026-10-01T11:25:40+05:00
+## T04 validation — 2026-10-01T11:30:11+05:00
 
-- Commit under test: uncommitted changes on base `1e781da72bd927926b538b139a6c251cd09848b5`; branch `codex/aqs-T04-empty-profiles`; worktree `C:\final\_wt_aqs_t04_empty_profiles`.
+- Commit under test: implementation commit `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`, based on `1e781da72bd927926b538b139a6c251cd09848b5`; branch `codex/aqs-T04-empty-profiles`; worktree `C:\final\_wt_aqs_t04_empty_profiles`.
 - Environment: isolated Windows worktree. Backend unit tests used fake profile sessions and a non-routable PostgreSQL-shaped `DATABASE_URL`; no database connection or application service was started. Frontend dependencies were restored with `npm ci` from the existing lockfile; no package manifest or lockfile changed.
 - Execution mode: `advisory_gate`; canonical anchors, allowlist, denied paths and gate outcome are recorded in T04 pre-work above.
 - Allowed paths: `_queue_profiles.py`, `Tabs.tsx`, the two focused Tabs tests, new profile read-contract unit tests, `test_stack_trace_exposure.py`, `PROGRESS.md` and `EVIDENCE.md`. Actual tracked changes are confined to these paths; migration 0055 and all denied areas are unchanged.
@@ -400,9 +400,9 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
   - `npm run build` — PASS; build reports existing dependency annotation and CSS property warnings.
   - `scripts/run_python.ps1 -PythonArgs @('-m','py_compile',...)` for the three backend source/test files — PASS.
   - `ruff check` on the endpoint and backend tests — PASS; `ruff format --check` for the new backend test — PASS.
-  - Local full changed-file `ruff format --check` — still reports `test_stack_trace_exposure.py` after pinned Black 24.10 formatted it; the local Ruff is 0.16.8, while pre-commit uses Ruff 0.7.4. Local Ruff format passes for `_queue_profiles.py` and the new contract test. The pinned formatter hooks must be rechecked on retry after staging their edits.
+  - Local full changed-file `ruff format --check` — reports a formatting difference in `test_stack_trace_exposure.py` after pinned Black 24.10 formatted it; the local Ruff is 0.16.8, while pre-commit uses Ruff 0.7.4. The pinned pre-commit Ruff-format and Black hooks both passed on the successful retry.
   - `git diff --check` — PASS.
-- Commit-hook reconciliation: first `git commit` attempt did not create a commit. Large-file, merge-conflict, private-key, branch-guard, gitleaks and Ruff lint hooks passed; end-of-file, Ruff format and Black hooks applied automatic formatting. The local ESLint hook failed because `.pre-commit-config.yaml` changes directory into `frontend` but passes repository-root-prefixed paths. The same scoped ESLint command passed directly with 0 errors. On retry, skip only `eslint` (already run directly); keep both pinned formatter hooks and all remaining hooks enabled.
+- Commit-hook reconciliation: first `git commit` attempt did not create a commit. Large-file, merge-conflict, private-key, branch-guard, gitleaks and Ruff lint hooks passed; end-of-file, Ruff format and Black hooks applied formatting-only changes in the already allowed backend files. The local ESLint hook failed because `.pre-commit-config.yaml` changes directory into `frontend` but passes repository-root-prefixed paths. The same scoped ESLint command passed directly with 0 errors. Retry skipped only `eslint`; both pinned formatter hooks and all remaining hooks passed. Commit `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82` was created.
 - Scope check: no schema/migration/seed, profile write, auth/RBAC, queue admission, join/token, ownership/eligibility, route registry or production change. No package manifest changed. The full profile endpoint formatting backlog remains outside T04's safe patch slice.
-- Result: local status `VALIDATED`; commit is pending hook reconciliation, PR not yet opened. No staging/browser E2E was run for this read-contract change.
-- Next exact action: stage the hook-generated formatting-only changes, retry commit with only the directly-verified but path-broken local `eslint` hook skipped, confirm pinned formatting hooks and all remaining hooks pass, then open PR and monitor required checks.
+- Result: local status `VALIDATED`; implementation commit recorded, PR not yet opened. No staging/browser E2E was run for this read-contract change.
+- Next exact action: push the branch, open PR, then monitor required checks and address code-related failures in the same PR.

@@ -9,8 +9,8 @@ Current status: VALIDATED
 Worktree: `C:\final\_wt_aqs_t04_empty_profiles`
 Branch: `codex/aqs-T04-empty-profiles`
 Base commit: `1e781da72bd927926b538b139a6c251cd09848b5`
-Current commit: `1e781da72bd927926b538b139a6c251cd09848b5`
-Last updated: 2026-10-01T11:25:40+05:00
+Current commit: `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82` (T04 implementation)
+Last updated: 2026-10-01T11:30:11+05:00
 
 > **Возобновлено пользователем 2026-10-01:** «Продолжай реализации плана». T03 завершён: PR #3540 слит после исправления P1 и code-review verdict APPROVE. Tier 2 для #3540 остаётся принятым deferral, не пройденным тестовым набором.
 
@@ -44,10 +44,10 @@ Last updated: 2026-10-01T11:25:40+05:00
 - Execution mode: `advisory_gate` under the GPT-6 UI/API exception. The known-root `agent_gate` run returned only `_queue_profiles.py` plus `py_compile` (`gate_misroute=false`, `result=narrow_override`, `override_used=true`); this output is advisory and does not replace the manually declared task scope.
 - T04 first-touch scope: the two profile read functions, the `Tabs.tsx` fallback and its focused tests, backend read-contract tests, the obsolete static fallback-marker assertion, and this progress/evidence ledger. Denied: schema/migrations, profile writes, role/RBAC changes, queue admission/join/token logic, QR ownership/eligibility, route registry, and unrelated wizard fallbacks.
 - Completed for T04: fresh worktree from `origin/main` at `1e781da72`; canonical/legacy and seed paths inspected; red-first backend tests reproduced the fallback/error behavior; endpoint and UI fixes added; backend/frontend focused tests, TypeScript, scoped ESLint and production build passed. Exact results are in `EVIDENCE.md#t04-validation`.
-- Changed but not fully verified: the pre-commit format hooks applied formatting-only changes in the two backend files. The local Ruff 0.16.8 format-check still requests changes in legacy `test_stack_trace_exposure.py` after pinned Black 24.10 formatted it; endpoint and new test pass the local Ruff check. The pinned pre-commit format hooks still need a clean retry after staging their edits. The frontend ESLint hook's configured `cd frontend` command retained repository-root file paths; equivalent scoped ESLint passed directly. Frontend lint has two warnings on existing unused `theme` and `dynamicDepartments` props.
-- Remaining: final diff/scope review, commit the validated slice, open the T04 PR and complete its checks/review cycle.
+- Changed but not fully verified: pre-commit formatter hooks applied formatting-only changes in the two backend files; all pinned formatter hooks then passed on retry. The local Ruff 0.16.8 formatter still requests a different layout for legacy `test_stack_trace_exposure.py` after pinned Black 24.10 formatting; the pinned hook result is authoritative for this commit. The local frontend ESLint hook's configured `cd frontend` command retained repository-root file paths; equivalent scoped ESLint passed directly and the hook was skipped on commit retry. Frontend lint has two warnings on existing unused `theme` and `dynamicDepartments` props.
+- Remaining: push the validated branch, open the T04 PR and complete its checks/review cycle.
 - Blocker: none. Stop if the fix requires changing a join/admission contract, auth/RBAC, or seeding behavior beyond migration 0055.
-- Next exact action: review the full diff against the T04 allowlist, then commit and open the PR. After any code change, rerun focused backend pytest, focused Tabs Vitest, `py_compile`, scoped frontend lint/type-check as indicated, and `git diff --check`.
+- Next exact action: push commit `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82` and open the T04 PR. After any code change, rerun focused backend pytest, focused Tabs Vitest, `py_compile`, scoped frontend lint/type-check as indicated, and `git diff --check`.
 - The previous T03 worktree remains locally preserved with its separate documentation and QA scratch; it is not part of T04. Do not delete or overwrite those files during this task.
 
 ## Checkpoint rules for the next agent
