@@ -2,6 +2,8 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
+Current plan: version 1.1. The user resumed implementation on 2026-10-01; the active task is closing T03 only. Start with [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md); historical entries keep their original state/SHA. Do not infer the required #3540 Tier 2 acknowledgment from approval of #3538.
+
 ## T00 — 2026-09-30
 
 - Commit under test: `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be` (`origin/main` fetched from `07ea63368989290318212635a7ab3a3bc2ed756d`).
@@ -276,3 +278,45 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Remaining limitation: PR #3540's formal Tier 2 deferral acknowledgment is still unchecked. The user's latest approval/deferral statement referred to frontend-only PR #3538, already merged, so it has not been copied to this separate PR.
 - PR: [#3540](https://github.com/drsapaev/final/pull/3540), open; head `2945d33e6c3ae1df500a4f098dbcf3b7dc5156d9`.
 - Merge commit: pending.
+
+## T03 read-only current-head reconciliation — 2026-10-01
+
+- Observed commit: local and GitHub PR HEAD `ae696ad1e3d018bfe81ed870bc7b24b16c6182a1`; base `b4ba6320797f056da19bbdc5cc672b3a97d2091e`. This is the later evidence-checkpoint commit, after code follow-up `2945d33`.
+- Environment: isolated worktree `C:\final\_wt_aqs_t03_cabinet_read`, branch `codex/aqs-T03-cabinet-read`; GitHub Actions results inspected read-only. Initial worktree status was clean.
+- Validation commands: `git status --short`; `git branch --show-current`; `git rev-parse HEAD`; `gh pr view 3540 --json state,headRefOid,baseRefOid,mergedAt,mergeCommit,url`; `gh pr checks 3540`.
+- Result: PR #3540 OPEN, no merge commit/mergedAt. Tier 1 PASS on the observed HEAD. Principal [CI run 36780232204](https://github.com/drsapaev/final/actions/runs/36780232204): Backend tests 9m12s, Frontend E2E 13m23s, Frontend unit 2m22s, build 38s, lint/type 1m40s, parity 19s, Code Quality 5m56s, OpenAPI/docs 1m37s, PR Required Gate; CodeQL, gitleaks, locale, role integrity, context boundary and standalone security checks also PASS. The earlier Lab timeout did not recur in this complete run.
+- Path-aware skipped checks remain skipped: separate integration-test job, Docker build, k6 load, staging/production readiness, unified security job, nightly DAST, metadata, Supabase Preview. Separate security scan passed; do not relabel the skipped unified job PASS.
+- Remaining limitation: Tier 2 backend-dependent E2E, synthetic first-content timing and final local test-only PG rerun remain NOT_RUN. No runtime test was rerun during this documentation request. Prior #3538 approval is not an applicable #3540 acknowledgment.
+- Scope check: only git/GitHub/source reading; no PR edits/reviews/comments, merge, environment startup or production access. Implementation/merge now paused by the user's latest instruction.
+
+## Plan 1.1 documentation checkpoint — 2026-10-01T07:16:11+05:00
+
+- User request: update the plan in more detail, preserve agent continuation, and do not start implementation. This is a documentation update, not a completed runtime task or a new merge.
+- Base/HEAD: `ae696ad1e3d018bfe81ed870bc7b24b16c6182a1`. Documents are local uncommitted changes, not part of the PR HEAD or its CI proof.
+- Execution mode: plan; persistence uses direct_execute, no risky runtime domain. Gate not needed for docs-only scope.
+- Canonical anchors: existing main plan, PROGRESS, DECISIONS, EVIDENCE; source/test/runbook anchors were read for the future task briefs. Application code is reference-only.
+- Allowed and actual changed paths: `.ai-factory/plans/codex-admin-queue-simplification.md`; `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`; `DECISIONS.md`; `EVIDENCE.md`; new `RESUME.md` in that directory.
+- Denied paths: application/frontend/backend/test code, generated API artifacts, migrations, AGENTS/shared skills/config, other plans/roadmap, production settings/data.
+- Original defect: main plan still claimed runtime had not started and ended with T00 as the first task; task briefs lacked enough source/validation/continuation detail, and branch-based plan discovery could pick another filename.
+- Changes: version 1.1/current-state correction; detailed T00–T18 briefs with dependencies/source/steps/tests/stops/logging; future sub-PR slices; writer/constructor inventory and known hazards; conditional T03 closure then T04; explicit user hold; linked RESUME and exact plan-path selection; durable checkpoint requirements; rollout/rollback and ten separate staging checks with truthful NOT_RUN.
+- Read-only peer review: profile/lifecycle, queue runtime/transaction and UI/resume paths audited separately; necessary wording fixes incorporated for shared constructor calculation, old-writer prohibition, canonical alias anchors and incoming POST publication intent. No delegated edits or test execution.
+- Validation commands/results: `git diff --check` — PASS; `git diff --name-only` plus `git status --short` and `git ls-files --modified --others --exclude-standard` — PASS for the exact five-file docs allowlist, including untracked RESUME; PowerShell static check of all five Markdown relative file links — PASS; unique ordered task headings T00–T18 — PASS; approved T04–T18 dependencies and preserved T00–T02 MERGED/T03 PR_OPEN/T04–T18 PLANNED registry — PASS. Final read-only GitHub reconciliation confirms unchanged `ae696ad1` and OPEN #3540; production checkout remains clean on main at `967bd398`, behind origin/main by one commit, and was not synced or changed. Runtime/backend/frontend/browser checks — NOT_RUN because user explicitly paused implementation.
+- Relevant output/artifact: five saved documents in this worktree; static-check output in the task transcript. Historical EVIDENCE entries retained.
+- Remaining limitation: local documentation has not been committed/pushed; preserve it before worktree/branch cleanup. No merge, runtime patch, next PR cycle, rollout or feature-flag activation performed. T03 remains PR_OPEN and T04–T18 remain PLANNED.
+- Next exact action: review/use the updated documents. After explicit resume, follow RESUME, reconcile actual git/PR/CI, preserve docs and close T03 under applicable gates before beginning T04.
+
+## T03 synthetic staging and Tier 2 reconciliation — 2026-10-01T08:27:12+05:00
+
+- User instruction: “Продолжай реализации плана”. This resumes the active plan at T03; it does not authorize bypassing the Tier 2 review gate or starting T04 before T03 closes.
+- Commit under test: code HEAD `ae696ad1e3d018bfe81ed870bc7b24b16c6182a1`; branch `codex/aqs-T03-cabinet-read`; PR #3540 remains open. Tier 1 is green on that code HEAD; principal run [36780232204](https://github.com/drsapaev/final/actions/runs/36780232204). No runtime changes were made after that HEAD.
+- Environment: isolated synthetic Compose project `aqs_t03_20261001`; backend/UI/PostgreSQL/Redis/worker were healthy. It used loopback-only ports 18101, 18180, and 55542. It was separate from the other worktree's staging project and from production. No production database or patient data was accessed.
+- T03 browser smoke: PASS on `/admin/queue-cabinet-management`; the API/UI returned 3 rows with typed owner values; omitted day resolved to clinic-local today. Latest first-content timings: cold 2,071 ms, repeated navigation 953 ms. Earlier same-screen run was 2,589/1,013 ms; latest is the current evidence. Synthetic data only.
+- Backend-dependent suite evidence: `queue-system.spec.ts` — 9 passed, 1 failed. The first test stopped on a non-unique `locator('text=Очередь')` matching 14 elements (strict-mode failure). This is a test selector failure; it is not counted as a T03 product pass.
+- Generic admin-panel probe: failed because existing `panel-qa-admin-live` expects `/admin?section=patients` to show “Управление пациентами”, while the current route renders the admin dashboard. This is a stale route/selector expectation; the separate direct T03 screen smoke passed.
+- `auth-flow`, `payment-system`, and `admin-navigation`: NOT_RUN. Existing Admin/Cashier flows redirect to mandatory TOTP setup/challenge and these specs are not 2FA-aware. TOTP enrollment was completed for synthetic accounts through the normal flow; MFA was not disabled or bypassed.
+- Tier 2 result: **DEFERRED pending required reviewer acknowledgment**, not completed. The targeted T03 browser smoke is positive evidence, but shared Tier 2 suite coverage is incomplete and includes the selector/route failures above. The earlier user APPROVE/deferral statement applied to #3538 only.
+- Required deferral record in PR: original requirement — execute the backend-dependent E2E listed in `docs/AGENTS_UI.md` §13; reason — 2FA-incompatible/stale generic probes and one ambiguous selector prevent a valid clean suite result; evidence — T03-specific browser PASS, queue suite 9/10 with selector failure, admin panel stale route failure, three suites NOT_RUN; owner — queue-admin T03 workstream; resume condition — update/align generic QA selectors and 2FA fixtures, then rerun Tier 2 against synthetic staging; headline impact — T03 remains PR_OPEN and receives no completion credit while this gate is deferred (merged tasks remain 3/19 (15.8%; T03 adds 5.3 percentage points when merged)).
+- PR state/review snapshot: `gh pr view 3540` reports OPEN/MERGEABLE and no reviews or review decision; the deferral acknowledgment checkbox remains unchecked. Do not merge or mark it on behalf of a reviewer.
+- Scope: browser config/spec/compose override and synthetic auth artifacts were temporary validation helpers only; they are not part of the T03 runtime diff and must be removed after the staging project is stopped. No production operations were performed.
+- Remaining: update PR body and ledger with this evidence; pass the body gate and diff check; obtain the formal reviewer decision; only then finish the T03 PR cycle. Tier 2 and formal acknowledgment are not passed.
+- Cleanup result: `docker compose ... -p aqs_t03_20261001 down -v --remove-orphans` completed after verifying this unique project label on all three volumes. A follow-up `docker ps -a` and volume-label query showed no remaining containers or volumes for that project. Automatic review blocked deletion of the exact temporary auth/session and browser files in the worktree (`blocked by policy`); those files remain local, are ignored/untracked, and were not included in the PR. No alternate deletion method was attempted.
