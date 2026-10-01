@@ -1,234 +1,554 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 1.0
-**Дата:** 30 сентября 2026, Asia/Tashkent
-**Основание аудита:** `main`, commit `07ea63368989290318212635a7ab3a3bc2ed756d`.
-**Исполнительная база T00:** `origin/main`, commit `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
-**Статус:** выполнение начато с T00; runtime-изменения не начаты.
-**Журнал продолжения:** `admin-queue-simplification/PROGRESS.md`, `DECISIONS.md`, `EVIDENCE.md`.
+**Версия:** 1.2 — подробные карточки этапов, восстановленный вход RESUME и checkpoint после T05.
+**Создан:** 30 сентября 2026. **Обновлён:** 1 октября 2026, Asia/Tashkent.
+**Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
+**Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
+**Последний подтверждённый runtime merge:** `fd53206f03b0361de6fc345f53b2bacf4195845c`, PR #3543 / T05.
+**Документальный checkpoint:** `C:\final\_wt_aqs_t05_closure`, ветка `codex/aqs-T05-closure`; runtime-патчи в этом цикле отсутствуют.
 
-## 1. Цель и конечная навигация
+> **T00–T05 — MERGED; T06–T18 — PLANNED.** Пользователь возобновил реализацию 2026-10-01. По его отдельному поручению решить staging gate для #3543 принят ограниченный deferral T05 и выполнен merge. Следующий runtime-этап — T06 из свежего `origin/main`, с обязательным DB gate и disposable PostgreSQL proof.
+> Deferral не является PASS, не наследуется следующими PR и не отменяет T18 или pre-deploy runbook. В текущем документальном цикле T06 не начинается.
 
-Согласовать реальные правила очереди, устранить ошибочные состояния интерфейса и собрать понятный процесс настройки направления. Администратор должен видеть услуги, исполнителей, кабинеты, доступность записи и причины несоответствий в одном контексте.
+**Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
+**Текущая точка:** [PROGRESS.md](admin-queue-simplification/PROGRESS.md).
+**Решения:** [DECISIONS.md](admin-queue-simplification/DECISIONS.md).
+**Доказательства:** [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
 
-- **«Направления и очереди»** — `/admin/setup-directions`, основной раздел настройки.
-- **«Общие правила очереди»** — `/admin/queue-settings`.
-- Каталог услуг остаётся самостоятельной задачей.
-- Старые адреса профилей и кабинетов остаются совместимыми входами.
+Подробная версия 1.1 ранее осталась незакоммиченной в worktree T03. Версия 1.2 восстанавливает её карточки и согласует статус с подтверждёнными merge T03–T05. Исходный локальный diff T03 не изменён. Исторические evidence сохраняются; решение по T05 и восстановление документов записаны отдельными checkpoint. Docs-only CI не подтверждает runtime/staging-приёмку.
 
-## 2. Решения пользователя и инварианты
+## 1. Цель и границы
+
+Согласовать реальные правила очереди и собрать понятный процесс настройки направления. Администратор видит услуги, исполнителей, кабинеты, доступность записи и конкретные причины несоответствий в одном контексте.
+
+Конечная навигация:
+
+- «Направления и очереди» — `/admin/setup-directions`, основной раздел.
+- «Общие правила очереди» — `/admin/queue-settings`.
+- Каталог услуг остаётся самостоятельной рабочей задачей.
+- `/admin/services?servicesTab=queue-profiles` и `/admin/queue-cabinet-management` остаются совместимыми входами.
+
+Не входят: перенос владельца очереди, объединение очередей, перенумерация, изменение клинического lifecycle, новая ролевая система, новая сущность `Direction`, отдельный BFF-сервис и таблица прогресса настройки.
+
+### Settings
+
+- Testing: yes — целевые проверки этапа, обязательные PG/контрактные проверки и синтетическая браузерная приёмка.
+- Logging: standard — безопасные IDs/причины отказа; без PHI, токенов и полных payload.
+- Docs: yes — checkpoint/evidence и операторские инструкции входят в PR соответствующего поведения.
+- Runtime context: production Windows `C:\final`, backend `18000`; dev frontend `5173`; isolated WSL staging backend `18001`, frontend `18080`, PostgreSQL `55432`. Изоляцию проверять фактически, не только по номеру порта.
+
+### Roadmap Linkage
+
+Milestone: `none`. Продолжение согласованного отдельного плана. Общий roadmap не меняется; документ хранит собственные этапы и доказательства.
+
+## 2. Решения пользователя и канонический контракт
 
 | ID | Решение | Обязательное поведение |
 |---|---|---|
-| D1 | Лимит — успешные онлайн-записи за день | Отмена, завершение и неявка лимит не освобождают; регистратура учитывается отдельно. |
-| D2 | Обычная смена кабинета действует на будущие очереди | Очередь дня меняется отдельной командой с preview и аудитом. |
-| D3 | Время окончания закрывает самозапись | Новые онлайн-записи запрещены; обслуживание существующих пациентов продолжается. |
-| D4 | Общая вкладка разных направлений — внутренний обзор | Пациент записывается отдельно через конкретное направление. |
-| D5 | Новые направления публикуются явно | Сначала настройка и проверка, затем отдельное действие «Опубликовать». |
+| D1 | Лимит — успешные онлайн-записи за день | Отмена, завершение и неявка не освобождают лимит. Регистратура учитывается отдельно. |
+| D2 | Обычная смена кабинета действует на будущие очереди | Созданные очереди не меняются; сегодняшнее назначение — отдельная preview/apply-команда с аудитом. |
+| D3 | Время окончания закрывает самозапись | Новые онлайн-записи запрещены; существующие пациенты обслуживаются. |
+| D4 | Общая вкладка разных направлений — внутренний обзор | Пациент записывается через конкретное направление. |
+| D5 | Новые направления публикуются явно | Настройка и проверка, затем «Опубликовать». |
 
-Уточнения: квота применяется к канонической дневной очереди (врач + день + тег либо ресурс + день). Replay уже зафиксированного результата квоту повторно не расходует. Служебное копирование, перенос и добавление услуги не являются новой самостоятельной онлайн-записью. Нулевой лимит запрещает новые онлайн-записи. Ручное раннее закрытие сохраняется. Настройки не переписывают snapshot созданной дневной очереди. Неработающие параметры отделений не подключаются автоматически. Значение стартового номера `1` сохраняет действующий смысл наследования и должно быть подписано в UI.
+Уточнения реализации:
 
-Сохранять контракт `.ai-factory/plans/registrar-queue-remediation/DIRECTION_CONTRACT.md`:
+1. Квота принадлежит канонической дневной очереди: врач + день + тег либо ресурс + день. Doctor ID и resource ID типизированы и не смешиваются.
+2. Replay уже зафиксированного результата не расходует квоту. Служебное копирование, перенос и добавление услуги не являются новой самостоятельной онлайн-записью.
+3. Нулевой лимит запрещает новые онлайн-записи; он не заменяется default. Отсутствующее значение и ноль различаются.
+4. Внутри команды использовать согласованный snapshot defaults. Новые настройки не переписывают параметры созданной дневной очереди.
+5. Раннее ручное закрытие сохраняется. Cutoff — настроенное окончание либо уже выполненное раннее закрытие; существующие записи остаются обслуживаемыми.
+6. Неработающие параметры отделений не подключать к runtime автоматически. Стартовый номер `1` сохраняет существующий смысл наследования; UI объясняет его.
+7. Legacy historical online count неизвестен. Миграционный технический `0` не является доказанным количеством выдач.
+8. Существующие `is_active=false` сохраняются: прежнюю причину отключения нельзя восстановить по догадке.
+9. Частичный результат многокомпонентной записи сохраняет действующий контракт. Не вводить общее «всё или ничего» для всех путей.
 
-1. `Doctor`, `QueueResource`, `QueueProfile` и `DailyQueue` остаются разными сущностями.
-2. У очереди один владелец — врач или ресурс. Профиль может быть обзором нескольких очередей без собственной нумерации.
-3. Кабинет — место обслуживания.
-4. Не переписывать выданные номера, `queue_time`, историю, статусы и клинические записи.
-5. Сохранять общий QR клиники, постоянные адреса, TTL, ограничения доступа и replay-контракт.
-6. Сохранять частичный результат многокомпонентной записи там, где он уже является контрактом.
+Инварианты из [DIRECTION_CONTRACT.md](registrar-queue-remediation/DIRECTION_CONTRACT.md) и [ADR-001](../../docs/adr/ADR-001-queue-ownership-and-specialty-architecture.md):
 
-Не входят: перенос владельца, перенумерация, изменение клинического lifecycle, новая ролевая система, новая сущность `Direction`, отдельный BFF и таблица прогресса настройки.
+- `Doctor`, `QueueResource`, `QueueProfile`, `DailyQueue` остаются разными сущностями.
+- У очереди ровно один владелец: врач или ресурс. Профиль может агрегировать очереди и не получает собственную нумерацию.
+- Кабинет — место обслуживания. Default владельца и кабинет snapshot дневной очереди — разные факты.
+- Выданные номера, `queue_time`, история, статусы пациентов и клинические записи не переписываются.
+- Общий QR клиники, постоянные адреса, TTL, ограничения доступа, токены и идемпотентность сохраняются.
 
-## 3. Процесс выполнения и сохранение прогресса
+Новые продуктовые решения записывать в DECISIONS с источником авторизации. Технический выбор не выдавать за решение пользователя.
 
-Каждая задача Txx — отдельный небольшой PR. Если потребуется разбить её, использовать подзадачи Txx.1 и Txx.2 с теми же целями и зависимостями. На каждый цикл: прочитать план и `PROGRESS.md`; проверить фактические HEAD/diff/PR и свежий `origin/main`; создать собственный worktree `codex/aqs-Txx-<topic>`; записать scope gate до редактирования; воспроизвести исходное поведение; сделать узкое изменение; выполнить целевые проверки и `git diff --check`; записать evidence; открыть PR; исправить красные проверки в том же PR; начинать следующий цикл после зелёного merge и синхронизации базы.
+## 3. Фактическое состояние и ближайший шаг
 
-Главный checkout `C:\final` — production surface. В нём нельзя переключать ветки, делать rebase или создавать scratch-файлы. Для миграций, квоты, допустимости записи, публикации и queue commands обязателен `gate` (или `gate_known_root_cause`) через `ai/langgraph/scripts/run_agent_gate.ps1` из собственного worktree. Для UI выбирать режим по `AGENTS.md`. Перед изменениями назвать canonical anchors, разрешённые и запрещённые пути, validation и stop conditions.
+| Этап | Фактическое состояние | Подтверждение |
+|---|---|---|
+| T00 | MERGED | #3536, `bae927f5c88010808d9091e7f47d09bbfdfa1005` |
+| T01 | MERGED | #3537, `967bd398c14bce4b835bd5be1205532387e2a909` |
+| T02 | MERGED | #3538, `b4ba6320797f056da19bbdc5cc672b3a97d2091e` |
+| T03 | MERGED | [#3540](https://github.com/drsapaev/final/pull/3540), `1e781da72bd927926b538b139a6c251cd09848b5` |
+| T04 | MERGED | [#3541](https://github.com/drsapaev/final/pull/3541), `ecc14b05411c7e7b54efca2966416cd6a69df37c` |
+| T05 | MERGED | [#3543](https://github.com/drsapaev/final/pull/3543), `fd53206f03b0361de6fc345f53b2bacf4195845c` |
+| T06–T18 | PLANNED | Runtime-реализация этих этапов не начата |
 
-Статусы: `PLANNED → IN_PROGRESS → VALIDATED → PR_OPEN → MERGED`; дополнительный `BLOCKED` требует причины. `VALIDATED` означает только локальные проверки. Пропущенная обязательная проверка — `NOT_RUN`, этап не закрывается. Код без evidence не считается завершённым. Не присваивать себе и не откатывать изменения другого агента.
+Для #3543 проверен актуальный HEAD `c04f41021bef5f8c306b9668cbb1c4b9afef2cc1`: применимые Backend tests, Code Quality, parity, Context Boundary, PR Required Gate, security и PR Review Quality Gate — PASS. [Backend CI run 36851998918](https://github.com/drsapaev/final/actions/runs/36851998918). Path-aware skipped frontend/integration/staging jobs не считать PASS. На merged tree T05 целевые backend tests повторены: 24 passed, 1 warning. Локальные PG integration и synthetic staging/browser/cold-repeat timing — NOT_RUN.
 
-`PROGRESS.md` — текущая точка продолжения и точный следующий шаг; `DECISIONS.md` — решения пользователя отдельно от канонического контракта и технического выбора; `EVIDENCE.md` — проверяемый журнал по каждому этапу. После существенной проверки и перед передачей обновлять checkpoint. Не сохранять в документах секреты, PHI, токены или полные сетевые payload. При возобновлении сверять журнал с реальным git/PR состоянием.
+T03 завершён после исправления omitted-day Sync на `clinic_today(db)` и отдельного code APPROVE пользователя; T04 — после отдельного явного deferral/merge authorization пользователя. Для T05 пользователь делегировал выбор между deferral и staging до merge. Принят отдельный deferral #3543: command-local settings без schema/API/ownership/admission-policy изменений, целевые regressions и применимые CI PASS; isolated synthetic staging остановлен. Это техническое решение агента по явному поручению пользователя, а не выдуманный GitHub approval от автора. Полные поля deferral и оставшееся покрытие — DECISIONS/EVIDENCE.
 
-## 4. Этапы
+**Сейчас:** закрыть docs-only checkpoint, чтобы main содержал подробный план и правдивую точку продолжения. **Следующий runtime-патч — T06**: сверить свежий main, constructors/identity/текущий Alembic head, определить безопасный срез T06.1 и mandatory gate; подтвердить disposable PG до проверки миграции. При недоступности обязательной среды зафиксировать BLOCKED зависимого среза. T00–T05 повторно не выполнять.
 
-### T00. Закрепить документ и исходное состояние
+## 4. Правила исполнения и постоянная память
 
-**Зависимости:** нет. **Область:** только документы нового плана.
+### Вход в каждую сессию
 
-Сохранить план, решения, начальный реестр T00–T18 и evidence. Зафиксировать свежую базу, а `07ea633...` оставить ссылкой на audit baseline. Проверить доступность synthetic staging/disposable PostgreSQL. Составить полный список admission writers: QR, постоянный адрес, token, GraphQL, Telegram и совместимые API. Зафиксировать конфигурационные случаи: самостоятельный профиль, неоднозначный родитель, смешанный публичный профиль, заранее созданная будущая очередь. Получать только необходимые конфигурационные факты и агрегаты; production не менять.
+1. Прочитать RESUME, этот план, PROGRESS, DECISIONS и последние evidence текущего этапа.
+2. Проверить последнюю авторизацию пользователя; пауза сохраняется после compaction и смены агента.
+3. Сверить worktree, branch, HEAD, diff, PR state/head/review/checks. При расхождении сначала восстановить checkpoint; не повторять выполненное.
+4. Для нового PR получить свежий `origin/main`; работать в собственном worktree с `codex/aqs-Txx-<topic>`. Если текущий PR уже открыт, сначала продолжить его цикл; не создавать дубликат.
+5. Перед первым edit записать execution mode, причину, risky domain, canonical anchors, reference-only, first-touch allowlist, denied paths, baseline, проверки и первый stop condition.
 
-**Приёмка:** следующий исполнитель находит каждый этап, зависимости, canonical anchors и точный первый шаг; недоступные среды помечены явно.
+Все пути карточек ниже относительны корню **собственного worktree**. Исходные anchors проверены чтением на историческом `ae696ad1`; T05 факты сверены на merged tree `fd53206f`. Перед каждым этапом перепроверять на свежем main: это anchors, а не разрешение менять весь каталог. Новые policy/read DTO файлы помечены как проектируемые; точный путь записать до первого edit.
 
-### T01. Исправить взаимодействие с формой профиля
+### PR-цикл и статусы
 
-**Зависимости:** T00. **Область:** `QueueProfilesManager.tsx`, целевые тесты и необходимые стили.
+Цикл: baseline → узкий patch → целевые проверки → `git diff --check` → evidence → PR → исправление красных checks в том же PR → проверка актуального HEAD/review → допустимый merge → merge SHA → синхронизация базы → следующий этап.
 
-Исправить canonical `Select` value; заменить самодельный overlay существующим `Dialog`; обеспечить пробел/Enter, Escape, focus trap/return; исправить внутренние кнопки и labels; проверить допустимый hex для всех presets. Не менять бизнес-смысл профилей.
+| Статус | Что доказано |
+|---|---|
+| PLANNED | Работа не начата; anchors и критерии есть в карточке. |
+| IN_PROGRESS | Baseline и boundaries записаны; изменение выполняется. |
+| VALIDATED | Обязательные локальные проверки с SHA/evidence выполнены. Это не merge. |
+| PR_OPEN | PR открыт; актуальные CI/review/ограничения записаны отдельно. |
+| MERGED | GitHub подтверждает merge и точный merge SHA. |
+| BLOCKED | Конкретный блокер, затронутые зависимости и путь разблокировки записаны. |
 
-**Приёмка:** фильтр не скрывает строки из-за event object; форма не закрывается при вводе; кнопки работают; presets проходят API-контракт.
+Пользовательская пауза — отдельное execution permission, не BLOCKED всех задач. `NOT_RUN` не равен FAIL или PASS. Обязательную проверку нельзя закрыть молча; допустимый PR-level deferral фиксирует область/причину/подтверждение, но не заменяет обязательный PG proof или pre-deploy runbook.
 
-### T02. Защитить загрузку и черновик общих настроек
+Каждый Txx — небольшой PR. При большом blast radius использовать Txx.1/Txx.2 с отдельными PR; родительский этап закрыть после всех подэтапов. Следующий PR-цикл не начинать при красном, неслитом или неразрешённом текущем PR. Доменная независимость не разрешает обход порядка. Изменение порядка при BLOCKED — явный checkpoint с причиной после закрытия текущего цикла, сохраняя зависимости.
 
-**Зависимости:** T00. **Область:** `QueueSettings.tsx` и целевые UI-тесты.
+Главный checkout `C:\final` — production surface. Не переключать ветки, не rebase, не хранить scratch, не запускать production из worktree. Не затирать чужой diff. Не удалять worktree, пока локальные документы/изменения не сохранены.
 
-Разделить loading/error/loaded/saving; запретить save до успешного GET; защитить несохранённый ввод от refresh, навигации и позднего ответа. Удалить неподдерживаемый `dev_mode_enabled` и имитацию «Теста QR»; оставить read-only проверку действующих настроек. До T07 явно помечать cutoff как не подключённый. Убрать выдуманные диапазоны номеров и fallback квоты `1`.
+### Execution modes
 
-**Приёмка:** сбой GET не вызывает PUT дефолтов; поздний save не затирает новый ввод; успех подтверждает выполненное действие.
+- Узкие UI/read-only API для GPT-6: по актуальному AGENTS, обычно `advisory_gate`; вручную определить безопасный срез.
+- Схема, квота, допустимость записи, публикация и queue commands: обязательный `gate`/`gate_known_root_cause`, `ai/langgraph/scripts/run_agent_gate.ps1` **из worktree**.
+- DB/Alembic всегда mandatory gate; confirmed root → `--known-root-cause`; misroute исправлять по AGENTS, не обходить без основания.
+- Документальное обновление 1.2: `direct_execute`, только план/журналы; нового runtime gate не требуется. Повтор T05 tests на merged tree записан отдельно от проверок docs-only diff.
 
-### T03. Согласовать чтение кабинетов
+### Checkpoint и evidence
 
-**Зависимости:** T00. **Область:** cabinet endpoint/service/repository, `queue_read_repository`, `queue_domain_service`, `QueueCabinetManagement.tsx`.
+PROGRESS — краткая актуальная точка продолжения. DECISIONS разделяет решения пользователя, canonical contract и технический выбор. EVIDENCE — append-only история; ранний FAIL не стирать после исправления.
 
-По умолчанию показывать дату клиники; одной выборкой согласовать строки, фильтры и статистику; отдельно отдавать кабинет snapshot очереди и текущий default владельца; возвращать typed owner/resource ID/name. Не считать исторический snapshot ошибкой из-за нового default. API error показывать как ошибку с retry.
+После значимой проверки, перед завершением, compaction или передачей записать:
 
-**Приёмка:** отображение совпадает с фильтром и счётчиком; ресурс не выглядит врачом; история не содержит ложных предупреждений.
+```text
+Task/subtask; plan version/path; authorization/pause;
+worktree/branch/base/actual HEAD; staged/unstaged paths;
+canonical anchors; allowed/denied paths; mode/gate;
+original failure/baseline; commands; PASS/FAIL/NOT_RUN and tested SHA;
+CI run/PR/review state; scope check; limitation/blocker;
+next exact action; checks to rerun after next change.
+```
 
-### T04. Убрать восстановление стандартных профилей при пустом результате
+Для aif-implement всегда явный `@<absolute plan path>`: branch stem может обнаружить другой план. RESUME содержит условный будущий запуск. Не дублировать canonical plan ради имени ветки и не менять shared skills/config.
 
-**Зависимости:** T00. **Область:** profiles read endpoints, `Tabs.tsx`, целевые тесты.
+## 5. Порядок и зависимости
 
-Пустой каталог возвращать пустым. Ошибку чтения не выдавать за `success:true` со стандартными профилями. Удалить frontend fallback. Начальная установка выполняется явным provisioning/seed, без runtime-восстановления.
+Стандартный порядок — T00 → T01 → … → T18, один закрытый PR-цикл за раз.
 
-**Приёмка:** отключение всех профилей переживает перезагрузку; ошибка БД не создаёт ложные вкладки.
+| Этап | Зависимости | Результат |
+|---|---|---|
+| T00 | нет | Документы, baseline, inventory |
+| T01 / T02 / T03 / T04 / T05 / T10 | T00 | Узкие исправления соответствующего слоя |
+| T06 | T00, T05 | Legacy-safe schema/creation snapshot |
+| T07 | T05, T06 | Единое окно v1 |
+| T08 | T06, T07 | Атомарная квота, покрытие writers |
+| T09 | T03 | Безопасная смена сегодняшнего кабинета |
+| T11 | T04, T10 | Ручная активность/effective parent policy |
+| T12 | T10, T11 | Hidden-by-default/явная публикация |
+| T13 | T03, T11, T12 | Canonical Admin read contract |
+| T14 | T13 | UI на backend facts |
+| T15 | T14 | Контекст настройки в URL |
+| T16 | T09, T14, T15 | Навигация/совместимые входы |
+| T17 | T10, T11, T12, T15 | Точные bulk/CSV результаты |
+| T18 | T01–T17 | Полная синтетическая приёмка |
 
-### T05. Устранить постоянный кэш настроек сервиса очередей
+### Commit Plan
 
-**Зависимости:** T00. **Область:** `queue_svc/_core.py`, singleton wrapper и целевые тесты.
+Каждый PR содержит code/test/docs checkpoints; разные Txx в один commit не объединять. Подэтапы T06/T08/T09/T13 — ниже. После T04–T05, T06–T08, T09–T12, T13–T16 и T17–T18 сверить сквозные dependencies/evidence; это не разрешение на rollout.
 
-Загружать defaults в начале новой команды и держать единый snapshot внутри команды. Существующие дневные snapshots не менять; не полагаться на рестарт backend или инвалидацию одного процесса.
+## 6. Карточки этапов
 
-**Приёмка:** тот же экземпляр сервиса видит новые defaults после сохранения; ранее созданная очередь сохраняет snapshot.
+### T00. Документ и исходное состояние — MERGED
 
-### T06. Подготовить сохраняемую политику новых дневных очередей
+**Зависимости:** нет. **PR:** #3536. **Область:** документы плана.
 
-**Зависимости:** T00, T05. **Область:** `DailyQueue`, новая Alembic revision, canonical creation policy/constructors.
+Сохранены baseline, решения, реестр и admission-writer inventory. Staging был остановлен, disposable PG не проверялся; production data/config не запрашивались. Inventory/ограничения — EVIDENCE/T00. Это исторический этап, повторно не начинать.
 
-Добавить `policy_version` (`legacy` или `daily_online_issuances_v1`) и `online_issued_count` (`>= 0`, CHECK). Старые строки мигрировать в `legacy` с техническим `0`; это не доказывает отсутствие выдач. Не backfill-ить по `source`. Все constructors получать значения из общей backend policy. Флаг `QUEUE_POLICY_V2_CREATION_ENABLED` по умолчанию false управляет созданием новых v1 очередей, но не выключает правила уже созданной v1. Не PATCH-ить counter/version обычными admin-командами. Не переводить старые или заранее созданные очереди автоматически. Новые таблицы не вводить.
+При возобновлении проверить среду для текущего этапа; старая недоступность не доказывает сегодняшнее состояние. Synthetic fixtures: standalone/dangling/conflicting parent, mixed public profile, future legacy queue, inactive row той же identity.
 
-**Приёмка:** данные/ownership сохранены; старые строки остаются legacy; новые v1 получают правильный snapshot и нулевой счётчик. Проверить один Alembic head, heads/history, upgrade на disposable PostgreSQL, ограничения и совместимость схемы со старым writer.
+### T01. Форма профиля — MERGED
 
-### T07. Согласовать окно онлайн-записи
+**Зависимости:** T00. **PR:** #3537.
+**Anchors:** `frontend/src/components/admin/QueueProfilesManager.tsx`, `queueProfileColors.ts`, `admin.css`; `frontend/src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx`.
 
-**Зависимости:** T05, T06. **Область:** canonical policy, QR service, REST/GraphQL adapters, metadata/report и auto-close service.
+Выполнены Select value, Dialog, keyboard/focus, buttons/labels и hex presets. Business semantics не менялись. Сохранить regressions при T17; не возвращать overlay/event-object обработку. Локальные/CI results — EVIDENCE/T01. Live QA/cold-repeat timing остаются сценариями T18.
 
-Для v1 окно `[start, end)` в часовом поясе клиники. Существующая очередь использует snapshot; ещё не созданная — свежие defaults для проверки и создания. Сохранять ручное раннее закрытие. После cutoff запрещать новую запись, продолжая обслуживание существующих. Отказ не зависит от scheduler. Убрать фиксированное `07:00` и display-only cutoff. Проверять `HH:MM`, требовать `start < end`, отклонять интервал через полночь. Не менять контракт будущих дат. Legacy отображать как legacy без скрытого переключения.
+### T02. Загрузка и черновик настроек — MERGED
 
-**Приёмка:** availability, report и join одинаково трактуют время; существующий snapshot не меняется.
+**Зависимости:** T00. **PR:** #3538.
+**Anchors:** `frontend/src/components/admin/QueueSettings.tsx`, `__tests__/QueueSettings.effective.test.tsx`; `frontend/src/stores/auth.ts` и focused tests.
 
-### T08. Реализовать дневной лимит успешных онлайн-выдач
+Выполнены truthful loading/error/saving, save после successful GET, stale response guard, persisted draft base/owner metadata, logout isolation, dirty status при вводе во время save, defensive storage; удалены fake QR test/dev mode/диапазоны. Review fixes/CI записаны. Tier 2 deferral применялся к этому frontend-only PR; отложенные tests не стали PASS.
 
-**Зависимости:** T06, T07. **Область:** admission service, quota read contract и все writers из T00.
+Сохранить draft guards при T07/T14. Blank max_per_day пока не команда удаления override: backend не имеет explicit unset semantics. Не превращать blank в zero/inherited fallback. При необходимости отдельный unset контракт согласовать вне текущего среза.
 
-В рамках существующей транзакции: проверить replay/claim; взять locks в согласованном порядке; заблокировать дневную очередь; проверить окно и `online_issued_count < max_online_entries`; создать новую онлайн-запись, увеличить counter и зафиксировать результат. Rollback/replay квоту не расходуют. Cancel/served/no-show/delete отдельной записи/staff transfer не уменьшают её. Staff derivative с унаследованным `source="online"` не увеличивает. Считать только на окончательной границе самостоятельного онлайн-admission. Для partial result учитывать только реально committed элементы.
+### T03. Согласованное чтение кабинетов — MERGED
 
-Не позволять online writer создавать новую очередь с нулевой квотой при наличии активной или неактивной строки той же дневной identity. Запретить обычный сброс counter, смену identity и удаление используемой v1 очереди. Не объединять конфликтующие очереди автоматически.
+**Зависимости:** T00. **PR:** #3540. **Режим:** advisory_gate, read-only API/UI.
+**Anchors:** `backend/app/api/v1/endpoints/queue_cabinet_management.py`; `services/queue_cabinet_management_api_service.py`; `repositories/queue_cabinet_management_api_repository.py`; `repositories/queue_read_repository.py`; `services/queue_domain_service.py`; `frontend/src/components/admin/QueueCabinetManagement.tsx`.
+**Tests:** `backend/tests/unit/test_queue_cabinet_management_api_service.py`; `backend/tests/integration/test_admin_linkage_cleanup.py`; focused cabinet frontend test/generated API parity.
 
-**Приёмка:** два конкурентных запроса на последнее место дают одну новую выдачу; adapters согласованы; счётчик нельзя обнулить заменой очереди.
+Реализованы clinic-local day при omitted GET, typed owner/default/day cabinet, согласованные фильтры/счётчики, informational snapshot/default difference, retry/stale response protection. Review выявил cross-day Sync при omitted day; follow-up `e18d2e2c` исправил backend default на тот же `clinic_today(db)` и добавил divergent clinic/host date regression. Пользователь подтвердил закрытие P1 и code APPROVE. Schema/admission/ownership не менялись.
 
-### T09. Ввести безопасную смену сегодняшнего кабинета
+**Закрытие:** PR #3540 MERGED в `1e781da72bd927926b538b139a6c251cd09848b5`. Tier 2 принят отдельно, отложенные staging specs/timing остаются NOT_RUN. История CI/OpenAPI исправлений и точные проверки — EVIDENCE/T03. Не возобновлять старый PR_OPEN checklist и не повторять уже исправленный Sync defect как новую задачу T09.
 
-**Зависимости:** T03. **Область:** cabinet command API/service/repository и UI.
+### T04. Правдивый пустой каталог профилей — MERGED
 
-Разделить сохранение owner default и смену конкретной очереди дня. Read-only preview и apply по явным `queue_id`: preview даёт старый/новый кабинет, owner, day, число затронутых ожидающих; apply принимает expected old values и причину. Под lock перепроверять данные; stale preview даёт `409` без частичного применения; изменение и аудит в одной транзакции; повтор той же команды идемпотентен. Действовать только на сегодняшние очереди. Блокировать перенос очередей с вызванным пациентом или активным клиническим исполнением.
+**Зависимости:** T00; следующий цикл после T03. **Режим:** advisory_gate; eligibility writer → stop/new gate slice.
+**First-touch candidates:** `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`: `get_queue_profiles`, `get_queue_profiles_public`; `frontend/src/components/navigation/Tabs.tsx`: `loadQueueProfiles`; focused GET/Tabs tests.
+**Reference-only:** `backend/app/models/queue_profile.py:INITIAL_QUEUE_PROFILES`, явный seed/provisioning.
 
-**Приёмка:** прошлые/будущие очереди, defaults, номера и статусы не меняются; отказ аудита откатывает назначение.
+**Закрытие:** #3541 MERGED в `ecc14b05411c7e7b54efca2966416cd6a69df37c`. Empty admin/public catalog и DB failure разделены; Tabs не восстанавливает hardcoded profiles и сохраняет последний успешный список при failed refresh. Пользователь явно принял отдельный Tier 2 deferral и разрешил merge на `b59fff8a`. Regression/CI/evidence — журнал T04; staging не стал PASS. Ниже сохранены исходные требования, а не новые невыполненные этапы.
 
-### T10. Защитить используемые профильные связи
+1. Зафиксировать backend empty/exception → standard profiles и frontend rejected GET → fallback.
+2. Пустой настроенный каталог возвращает successful empty list. Ошибка — API error по existing exception contract, без success:true/defaults.
+3. Удалить runtime fallback Tabs; truthful empty/error/retry. GET не создаёт профили, seed constants сохраняются.
+4. `Tabs.a11y.test.tsx`/`Tabs.focusRefresh.test.tsx` сейчас содержат fallback assumptions: заменить fixtures successful API catalog, сохранить a11y/focus проверки.
 
-**Зависимости:** T00. **Область:** profiles API и lifecycle tests.
+**Validation:** empty table/all inactive/all hidden/DB failure/retry/reload после disable-all; focused GET/Vitest, type-check, scoped lint, parity при DTO change.
+**Приёмка:** reload не восстанавливает standard tabs; error не маскируется empty.
+**Denied/stop:** defaults creation, lifecycle/publication/parent change, широкий Tabs refactor.
+**Evidence/logs:** до/после safe responses и tests/SHA; safe ERROR чтения, без per-profile INFO.
 
-Обычный PUT отклоняет изменение `queue_tags` (включая значимый порядок) и `department_key` используемого профиля. Использование включает услуги, очереди, записи и активный публичный адрес. Presentation fields и архивирование остаются доступны. Preview сравнивает старую и предлагаемую конфигурацию. PUT повторно проверяет зависимости до изменения любых полей. Смешанное запрещённое изменение отклоняется целиком.
+### T05. Fresh defaults без постоянного кэша — MERGED
 
-**Приёмка:** смена tags не обходит delete guard; устаревший preview не даёт разрешения; история и адрес сохраняются.
+**Зависимости:** T00. **Режим:** gate_known_root_cause: settings влияют на admission; root `_core.py`.
+**Anchors:** `backend/app/services/queue_svc/_core.py:CoreMixin._load_queue_settings` и command settings context; settings-consuming commands в `queue_svc/_operations.py`; `backend/app/crud/queue_resource_routing.py:effective_day_start_number`; `backend/app/crud/clinic.py:get_queue_settings`.
+**Reference-only:** `services/queue_service.py` singleton shim, `queue_svc/_helpers.py`, composed service `queue_svc/__init__.py`. Дублирующие `_cached_settings` initializers удалены в T05; не считать их текущим API.
 
-### T11. Согласовать ручное состояние и доступность отделения
+**Закрытие:** #3543 MERGED в `fd53206f03b0361de6fc345f53b2bacf4195845c`, 2026-10-01T16:24:40+05:00. ContextVar snapshot keyed by service + DB session: nested commands переиспользуют его, следующая команда перечитывает defaults, finally освобождает контекст. Creation передаёт тот же settings mapping в расчёт start number; существующий snapshot сохраняется. Runtime commit `47276d17`, reviewed PR HEAD `c04f4102`; merged tree совпадает с ним. На merge повторён focused suite: 24 passed, 1 warning. Кандидаты PG/effective-report ниже не отмечать PASS без отдельного запуска. Локальные PG integration и synthetic staging/browser NOT_RUN; ограниченный deferral принят агентом по отдельному поручению пользователя и закреплён в DECISIONS/EVIDENCE.
 
-**Зависимости:** T04, T10. **Область:** shared profile policy, department lifecycle writer, все list/selection/join/public address consumers.
+1. Same service instance: A → сохранение B → новая команда ошибочно использует A; regression до patch.
+2. Fresh defaults в начале новой команды, coherent snapshot внутри неё. Mutable «current command defaults» в singleton не вводить: параллельные команды не перезаписывают snapshots друг друга.
+3. Проверить обе `_cached_settings` и command consumers; wrappers менять только по evidence, restart/process-only invalidation не решение.
+4. Existing DailyQueue сохраняет свои snapshot values; не подключать неработающие department defaults.
 
-Сделать `is_active` сохраняемой настройкой профиля; department off/on не перезаписывает его. Effective availability вычисляет backend с учётом родителя. Сохранить все существующие `false`: их прежняя причина неизвестна. Загружать родителей пакетно. Разрешать явный `department_key`; учитывать documented own-key convention для собственных профилей; разные явный и convention parents — blocking conflict; отсутствующий явный parent — conflict; отсутствие обеих ссылок означает самостоятельный профиль. Повторно проверять прямой join, выданный token и постоянный адрес. Существующие пациенты остаются обслуживаемыми.
+**Validation:** `test_effective_queue_settings_report.py`, `test_rq13b_daily_queue_snapshot_pg.py`, `test_queue_time_window.py`; same-instance/concurrent-command regression.
+**Приёмка:** следующая команда видит B без restart, старая очередь сохраняет A.
+**Stop:** snapshot/ownership change, premature window/quota semantics.
+**Evidence/logs:** command boundary/snapshot passing; safe ERROR load failure, без per-read INFO.
 
-**Приёмка:** включение отделения не отменяет ручной архив; parent off нельзя обойти альтернативным путём.
+### T06. Сохраняемая политика новых дневных очередей
 
-### T12. Закрепить явную публикацию и внутренние обзоры
+**Зависимости:** T00, T05. **Режим:** mandatory gate, DB/Alembic.
+**Anchors:** `backend/app/models/online_queue.py:DailyQueue`; `backend/app/crud/queue_resource_routing.py:effective_day_start_number`, `resource_queue_defaults`, registry locks.
+**Reference-only revisions:** `backend/alembic/versions/0063_queue_resource_contract.py`, `0067_daily_queue_start_number_snapshot.py`; applied revisions не менять.
 
-**Зависимости:** T10, T11. **Область:** profile create/update, автоматические constructors отделений, public resolver и contract tests.
+Срезы: **T06.1** model/new revision/legacy-safe schema; **T06.2** shared calculation/runtime constructors. Создание v1 выключено до всех обязательных proof.
 
-Новые профили (включая автоматические) создавать с `show_on_qr_page=false`. Публикация — отдельная команда существующего update API с backend revalidation готовности и однозначности. Повторно проверять реактивацию профиля с сохранённым publish intent. Разрешать несколько врачей одного направления; смешанный профиль разных самостоятельных направлений — внутренний overview; несколько услуг одного однозначного исполнителя допустимы. Alias/tag matching выполнять существующими backend rules. Существующие неоднозначные public bindings не переназначать: диагностировать и блокировать новую запись через неоднозначную цель. Не менять автоматически уже выданные адреса.
+1. `policy_version`: legacy/daily_online_issuances_v1; `online_issued_count`: integer CHECK >=0. Existing rows legacy + technical 0, без source backfill.
+2. Сохранить owner XOR/identity constraints; revision от единственного актуального head, non-destructive upgrade.
+3. Common backend creation calculator — **новый проектируемый module**; existing queue_policy.py нет. Path/ownership записать до edit; новая business entity не нужна.
+4. Все активные runtime DailyQueue constructors получают version/counter и snapshot parameters через общий backend calculation: `queue_svc/_operations.py`, `crud/online_queue.py`, `graphql/mutations.py`, `repositories/queue_api_repository.py`, `queue_limits_repository.py`, `visit_confirmation_repository.py`. Классифицировать seed/`force_majeure_service.py`/`migration_service.py` live/offline/legacy; доказать их безопасную совместимость, не переписывать вслепую.
+5. `QUEUE_POLICY_V2_CREATION_ENABLED=false` default: только new rows. Flag off не отменяет правила existing v1. Version/count недоступны ordinary admin PATCH.
+6. Старые/future queues автоматически не переводить; start_number=1 inheritance через existing helper.
 
-**Приёмка:** новый профиль не появляется в QR без publish; overview не выбирает первый совпавший ресурс.
+**Validation:** heads/history/single head, disposable PG upgrade/data/ownership, negative count rejected, v1 zero/snapshot, constructor parity общего calculation, old-writer expanded-schema compatibility до активации, flag new rows only. SQLite PG не заменяет.
+**Stop:** multi-head/destructive upgrade/no required PG/unknown constructor ownership.
+**Evidence/logs:** revision chain, safe synthetic aggregates, constructor classification, INFO существенного создания без patient payload.
 
-### T13. Добавить канонический административный read contract
+### T07. Единое окно онлайн-записи
 
-**Зависимости:** T03, T11, T12. **Область:** typed directions endpoint, Pydantic schema, service/repository, OpenAPI tests.
+**Зависимости:** T05, T06. **Режим:** mandatory gate.
+**Anchors:** `queue_svc/_operations.py:check_queue_time_window`, `_unbookable_doctor_ids`, `_pick_least_loaded_doctor`; `qr_queue/_queue_ops.py:_check_online_time_restrictions`; `qr_queue/_sessions.py`; `graphql/mutations.py:_join_queue_impl`; `services/queue_auto_close.py`; `crud/clinic.py` settings/effective report.
 
-Добавить `GET /api/v1/queue/admin/directions` (Admin). DTO включает профиль и сохранённые настройки, mode `booking`/`overview`, configuration state/reasons, typed booking targets, public availability/address existence, allowed next actions, unassigned tags/services/resources. Отдельно описывать обычную booking eligibility и auto-precreate eligibility. Не требовать `Service.doctor_id` для направления с несколькими врачами. GET не создаёт очереди/адреса/tokens/sessions. Не включать PHI. Action kinds и typed entity refs вместо произвольных frontend URL.
+1. V1 `[start,end)` по clinic timezone: existing queue snapshot; no queue → fresh command defaults и то же creation calculation.
+2. Убрать fixed 07:00/disabled end check/расхождение queue_end_hour-auto_close_time. Metadata/selection/join используют одну policy.
+3. Canonical HH:MM validation/start<end; overnight interval отклонить понятно.
+4. Manual earlier close сохраняется; join отказывает независимо от scheduler. Existing patient service не закрывается.
+5. Future-date contract сохранить; legacy явно старой policy, без hidden conversion. После integration убрать из T02 только устаревший cutoff hint; draft guards сохранить.
 
-**Приёмка:** contract отражает настоящую eligibility; inactive resource с активной очередью не теряется; empty state правдив; числовые ID типов не смешиваются.
+**Validation:** before/exact start, before/exact end, manual earlier/no scheduler, UTC-clinic mismatch, no row/existing snapshot, defaults update, invalid start/end, legacy/future-date parity. `test_queue_time_window.py`, `test_effective_queue_settings_report.py`, snapshot/QR/token/GraphQL suites. `auto_close_time_is_display_only` менять вместе с v1 contract; legacy report остаётся truthful.
+**Stop:** overnight/clinical lifecycle/silent legacy conversion.
+**Evidence/logs:** совпадение availability/join для каждого boundary; safe WARN refusal/ERROR failure, anonymous diagnostics не расширять.
 
-### T14. Перевести setup screen на backend facts
+### T08. Дневная квота успешных онлайн-выдач
 
-**Зависимости:** T13. **Область:** `AdminSetupDirections`, API adapter и целевые тесты.
+**Зависимости:** T06, T07. **Режим:** mandatory gate, locking/admission.
+**Anchors:** `services/queue_domain_service.py:allocate_ticket`; `queue_svc/_operations.py:join_queue_with_token`, `check_queue_limits`, `get_next_queue_number`, batch prelocks; `services/queue_claim_service.py`; `crud/queue_resource_routing.py` claim/registry locks.
 
-Убрать frontend-решения об eligibility, owner axis и alias policy. Раздельно показывать конфигурацию, public entry и очереди выбранного дня. Backend next actions ведут к соответствующему редактору. Для ресурса без врача не предлагать создать врача. Базовый список не ждёт QR-запросы каждого профиля; QR загружать при раскрытии; QR error не скрывает таблицу; поздний ответ не заменяет свежий.
+Срезы: **T08.1** v1 quota/identity; **T08.2** adapters/reports; **T08.3** PG concurrency/replay/partial proof. V1 не включать при неполном покрытии; facade-only change GraphQL не покрывает.
 
-**Приёмка:** нет ложной готовности и решений backend-owned логики в UI.
+V1 transaction contract:
 
-### T15. Заменить фиктивный мастер сохраняемым контекстом
+1. Existing replay/claim проверить до новой admission; replay работает и когда новых мест нет.
+2. Existing sorted claim/tag locks, затем daily queue lock до quota check; fairness/number allocation сохраняются.
+3. Window/effective eligibility/count<max; zero не подменяется `or DEFAULT`.
+4. Independent online entry + counter + replay result в одной existing transaction. Caller-owned flush/commit сохранять, hidden independent commit не вводить.
+5. Rollback/replay не increment; cancellation/served/no-show/deletion/transfer не decrement. Staff derivative source=online не increment. Partial batch — только committed successes.
 
-**Зависимости:** T14. **Область:** основной экран, существующие editor hosts и routing adapters.
+Таблица coverage обязательна: mounted/active?, admission function, transaction owner, locks, policy/counter, replay proof, test/SHA.
 
-Убрать безусловные «Далее»/«Завершить». Показать карточки направления с конкретными недостающими действиями. Сохранять выбор профиля/раздела/дня в URL. Для каталога/пользователей передавать typed return context; после возврата перечитывать backend facts. Не создавать второй doctor onboarding и не записывать локальные completion flags. Переиспользовать редакторы профиля и ресурса поэтапно.
+| Путь | Anchor и proof |
+|---|---|
+| QR session | `api/v1/endpoints/qr_queue/_join.py`, `services/qr_queue/_sessions.py`; start/probe не issuance, final commit/replay trace |
+| Permanent address | `qr_queue/_directions.py` → session; address/TTL/access сохранить |
+| Legacy token | `api/v1/endpoints/queue.py`; direct token join |
+| Compatibility online | `api/v1/endpoints/online_queue_new.py` → façade; real join/boundary |
+| GraphQL | `graphql/mutations.py:_join_queue_impl` directly inserts/commits; explicit integration |
+| Telegram candidate | `api/v1/endpoints/telegram_bot.py` → `services/telegram/bot.py:_handle_queue_callback`; calls missing join_queue, hardcodes specialist/window. Active/reachable contract сначала доказать |
+| Staff/derivatives | registrar wizard/_today_queues, batch patient/queue, visit confirmation, transfer/clone; source не является proof online issuance |
 
-**Приёмка:** переходы, сохранение, возврат, reload и back/forward сохраняют контекст; completion определяется фактами.
+Identity guard: искать active/inactive same doctor/day/tag или resource/day. Partial active uniqueness недостаточна. Не создавать zero-count replacement; ordinary commands не reset counter/identity/delete used v1; conflicting queues не merge автоматически.
 
-### T16. Собрать навигацию и совместимые входы
+**Validation:** independent PG sessions last-slot → ровно одна issuance; response-loss replay/rollback; statuses/deletion; desk/source-online clone/transfer; partial result; inactive recreate; tags; identical doctor/resource numeric IDs. Existing allocator characterization/concurrency, claim/QR/GraphQL boundary/integration suites; meaningful new PG race proof, не mocks вместо locks.
+**Reporting:** queue length/issued/remaining/version раздельно; v1 remaining=max(0,max-count); legacy count unknown.
+**Stop:** active writer bypass/reset/no required PG/Telegram требует другого product contract. Допустим bounded adapter slice, не общий bot rewrite.
+**Evidence/logs:** writer coverage/transaction proof; safe WARN quota/identity, ERROR transaction, без tokens/patients.
 
-**Зависимости:** T09, T14, T15. **Область:** `routeRegistry.ts`, `AdminServices`, page adapters и route tests.
+### T09. Безопасная смена сегодняшнего кабинета
 
-`/admin/setup-directions` — «Направления и очереди»; `/admin/queue-settings` — «Общие правила очереди»; `/admin/queue-cabinet-management` открывает «Очереди сегодня»; `/admin/services?servicesTab=queue-profiles` открывает управление профилями в общем контексте. Каталог услуг сохраняется. Не перенаправлять весь `/admin/services`. Неизвестный query value даёт безопасный стартовый экран. Согласовать query/state/back-forward.
+**Зависимости:** T03. **Режим:** mandatory gate, command/audit.
+**Anchors:** `services/queue_cabinet_management_api_service.py`; `repositories/queue_cabinet_management_api_repository.py`; `api/v1/endpoints/queue_cabinet_management.py`; `frontend/src/components/admin/QueueCabinetManagement.tsx`; existing `models/audit.py:AuditLog`.
+**Reference-only:** T03 read, `crud/clinic.py:update_doctor`, `services/audit_service.py`; resource default writer найти до allowlist.
 
-**Приёмка:** все четыре исходных URL ведут к нужной функции с правами Admin и корректной навигацией.
+Срезы: **T09.1** preview/DTO; **T09.2** locked apply/strict audit/replay; **T09.3** UI/containment legacy bulk/sync.
 
-### T17. Согласовать массовые операции и CSV
+1. Разделить owner default save и explicit queue-ID clinic-today apply; history/future/defaults не затрагивать.
+2. Read-only preview: typed owner/day/old-new/waiting count. Apply: expected old state/reason/stable command replay identity по project pattern; форму записать до edit.
+3. Под locks повторить day/owner/cabinet/safety checks. Stale →409, no partial apply; called patient/active clinical execution блокируют перенос.
+4. Change+mandatory audit атомарно. Existing log_audit_event independently commits/swallow errors; этот helper контракт не выполняет. Narrow strict audit insertion в existing table в command transaction; unrelated callers не переписывать.
+5. Identical replay не duplicate change/audit. Legacy update/bulk/sync не обходят safeguards. Omitted-day Sync уже переведён на clinic_today в T03; проверить остальные writers и containment, не повторяя закрытый дефект.
 
-**Зависимости:** T10–T12, T15. **Область:** profile manager, CSV helpers и focused tests.
+**Validation:** today only/yesterday-future-defaults-numbers-status untouched; stale atomic409; audit-failure rollback; replay; resources/waiting count/called block/legacy bypass. Cabinet service/Admin linkage/resource tests + new PG commands/UI.
+**Stop:** called/active transfer, audit cannot atomic, unknown write ownership.
+**Evidence/logs:** actor/typed target/old-new/reason/request ID; INFO change/WARN refusal/ERROR failure; operator procedure default vs today.
 
-Показывать результат по строкам; после partial отказа читать актуальное состояние; различать выполненное/отказанное/не начатое; повторять только неудачные/не начатые после revalidation. Использовать impact preview и structured errors. Импорт новых профилей создаёт unpublished записи; намерение из CSV выполнять отдельным действием после проверки. Экспорт сохраняет поддерживаемые поля.
+### T10. Используемые связи профиля
 
-**Приёмка:** partial success правдиво показан; CSV не публикует новое направление автоматически.
+**Зависимости:** T00. **Режим:** mandatory gate.
+**Anchors:** `registrar_integration/_queue_profiles.py`: canonical tags/link counts/preview/update/delete; `models/queue_direction_public_address.py`.
 
-### T18. Проверить полный административный сценарий
+1. Зафиксировать PUT bypass delete guard. Usage=services/queues/entries/active public address; helper адрес пока не учитывает.
+2. Used profile: запрещены queue_tags/significant order/department_key change. Presentation/archive разрешены; порядок не потерять через сортировку.
+3. Preview old/proposed config без mutations; PUT revalidate dependencies до первого setattr, stale preview не разрешение.
+4. Mixed PUT с forbidden binding reject целиком; safe structured impact errors.
 
-**Зависимости:** T01–T17. **Область:** целевые E2E/QA и evidence.
+**Validation:** `backend/tests/integration/test_queue_profile_lifecycle.py`: tags/order/department, unused edit, presentation/archive, address-only usage, stale preview, atomic mixed reject, history/address preserved.
+**Stop:** owner transfer/address rebind/unknown canonical alias equality.
+**Evidence/logs:** field/usage impact, safe WARN refusal/INFO change/audit по existing command contract; lifecycle T11/T12 не менять здесь.
 
-На synthetic staging пройти: новое направление с несколькими врачами одной специальности; направление без врача; исправление неполного направления; publish/hide/archive; department off/on; defaults и snapshot очереди дня; отдельную смену сегодняшнего кабинета; конкуренцию за последний слот; потерю ответа и replay; старые URL. Проверить клавиатуру, формы, ошибки, empty states, локали, холодную и повторную загрузку фактических строк и viewport 375/768/1280/1920 px.
+### T11. Ручная активность и родитель
 
-**Приёмка:** сценарии подтверждены на commit; ограничения и `NOT_RUN` перечислены явно.
+**Зависимости:** T04, T10. **Режим:** mandatory gate.
+**Anchors:** `admin_departments/_helpers.py:_department_linked_profiles`, `_sync_department_active_to_profiles`; `_crud.py` lifecycle writers; `queue_svc/_core.py` visibility; `qr_queue/_specialists.py`. Shared backend profile policy — проектируемый module.
 
-## 5. Контракты, тесты и evidence
+1. is_active сохраняет manual intent; department off/on его не меняет. Preexisting false сохранить без угадывания.
+2. Parent: explicit department_key/ documented own-key; обе разные→conflict; missing explicit→conflict; neither→standalone. OR-связь не доказательство корректности.
+3. Effective availability backend; batch parent read/no N+1; reasons distinguish manual archive/parent off/dangling/conflict.
+4. List/selection/direct join/old token/permanent address/batch resolution используют policy; existing patients serviceable. Consumers `_operations.py`, `_sessions.py`, `_tokens.py`, `_directions.py`; shims reference-only.
 
-Минимальные контракты: typed admin directions GET; profiles read разделяет empty/error и возвращает effective state/reasons; profiles update защищает используемые связи и транзакционно повторяет publish/activation checks; cabinet read разделяет owner default и day snapshot; cabinet preview/apply использует явные queue IDs, expected state, reason и атомарный audit; queue availability/report раздельно показывает длину, онлайн-выдачи и остаток.
+**Validation:** lifecycle single/bulk off-on, manual archive, all false preserved, standalone/dangling/conflict, query bound, off-parent direct/token/address refusal. Existing lifecycle, `test_qr_selection_join_visibility.py`, `test_qr_token_path_owner_eligibility.py`, `test_rq16d_public_direction_runtime.py`.
+Old mutation tests менять с контрактом, history guards сохранять.
+**Stop:** automatic repair/historical intent inference/unknown parent policy.
+**Evidence/logs:** persisted vs effective before-after; WARN conflict/INFO department change; reads не пишут state/per-row logs.
 
-Для v1: `online_bookings_remaining = max(0, max_online_entries - online_issued_count)`. Для legacy достоверный count неизвестен; technical zero нельзя выдавать за доказанную квоту. OpenAPI указывает required/nullable/enums/typed owner. Admin errors безопасно возвращают code/details; anonymous QR сохраняет ограничение раскрытия причин.
+### T12. Явная публикация и обзор
 
-Обязательные сценарии: форма Select/keyboard/focus/presets; GET failure не позволяет PUT; чтение/сохранение настроек без restart при сохранении day snapshot; границы окна и timezone/manual close/no scheduler; quota race/replay/rollback/cancel/served/no-show/desk/clone/transfer/partial result; защита identity и одинаковых numeric ID; профили empty/parent off-on/manual archive/dangling/conflicting parent/used tags; publish/reactivation/overview/direct join/old token; cabinet filtering/history/stale preview/audit rollback/resource parity; четыре URL/query/back-forward; миграция single-head/PG-upgrade/legacy/v1/check constraint.
+**Зависимости:** T10, T11. **Режим:** mandatory gate.
+**Anchors:** `_queue_profiles.py` create/update; `admin_departments/_helpers.py:_ensure_department_integrations`; `models/queue_profile.py`; `_operations.py` direction resolve/join; `crud/queue_resource_routing.py` resource routing. Alias/tag vocabulary: `backend/app/core/specialties.py` (`expand_queue_tags`, `canonical_specialty`, `specialty_variants`); QR normalization/constants: `queue_svc/_core.py`/`_base.py`.
 
-Переиспользовать существующие тесты effective settings, snapshots, resource runtime, profile lifecycle, queue time window и cabinet service. Тесты прежнего ошибочного контракта менять только вместе с новым поведением. Запускать из worktree. Backend launcher — из worktree (или `REPO_PYTHON` на локальный интерпретатор). Frontend — targeted Vitest/type-check/scoped lint/build; не использовать `npm run lint` с `--fix` как проверку.
+1. Manual/automatic new profiles show_on_qr_page=false, model/request defaults согласованы. Входящий POST show_on_qr_page=true от старого UI/CSV не создаёт опубликованный профиль: backend отклоняет либо явно откладывает намерение до отдельного publish action. Конкретный совместимый response contract закрепить до edit. Existing profiles mass-hide не делать.
+2. Explicit publish через existing update, readiness/target checks внутри transaction; reactivation с saved publication intent revalidates.
+3. Multiple doctors одной specialty и services одного однозначного owner допустимы. Mixed independent directions overview; booking через first resource не разрешать.
+4. direction_resolves_to_bookable_surface сегодня принимает первый resource: boolean не готовая uniqueness policy. Existing backend aliases, не React duplicate.
+5. Existing ambiguous public configs diagnostic/block new admissions включая token/address; addresses/bindings не reassign.
 
-В evidence указывать команды, конкретный результат и непроверенные области. Логи: INFO — важное admin изменение с безопасными entity IDs; WARN — ожидаемый отказ/stale; ERROR — сбой без raw tokens/query strings/patient payload. Audit command сохраняет actor/target/old-new/reason/request ID в той же транзакции. Обновлять операторскую документацию в PR поведения. Не переписывать общий roadmap и исторические DevBrain evidence.
+**Validation:** both hidden constructors/POST с incoming publication=true/publish/reactivation atomic refusals/same-direction doctors/mixed overview/token/address parity. Department create atomicity, QR visibility/rq16b-c-d/resource suites; old addresses unchanged.
+**Stop:** требуется product target choice/rebind/owner merge.
+**Evidence/logs:** saved intent vs effective availability, safe INFO publish-hide-archive/WARN refusal; no runtime repair.
 
-## 6. Rollout, откат и блокировки
+### T13. Canonical Admin directions GET
 
-Последовательность: UI-правдивые состояния; schema expand с legacy defaults и выключенным созданием v1; обновление всех admission writers и проверка общей транзакционной границы; lifecycle/publish/read contract; единый UI/compatibility; синтетическая проверка; включение v1 оператором после завершения рабочего дня. Старые writers нельзя запускать вместе с v1 rows. До включения подтвердить обновление всех процессов/adapters. Будущие legacy очереди остаются legacy и получают явно документированный путь обслуживания.
+**Зависимости:** T03, T11, T12. **Режим:** advisory_gate read-only после policy stages.
+**Новый endpoint:** GET /api/v1/queue/admin/directions, Admin only. Endpoint/schema/service/repository ещё отсутствуют; exact paths выбрать после grounding.
+**Existing references:** `api/v1/endpoints/qr_queue/_directions.py`; `_operations.py` primitives; `services/appointment_eligibility.py`; `crud/queue_resource_routing.py`; `repositories/queue_read_repository.py`; `services/queue_domain_service.py`.
 
-До появления v1 rows можно откатить runtime, сохранив расширенную схему. После появления v1 можно выключить создание новых v1, соблюдая правила существующих. Запрещён rollback на writer, игнорирующий counter/version. UI rollback сохраняет совместимые API/URL. Не удалять counter/version, не делать data-losing downgrade и не переназначать профили/адреса/bindings автоматически.
+Срезы при необходимости T13.1 DTO/contract, T13.2 bounded aggregation/OpenAPI. Не BFF-service и не новая business-policy внутри screen endpoint.
 
-Ставить `BLOCKED` для зависимого этапа, если нужна смена владельца/слияние/перенумерация; parent/target неоднозначен; нужно угадывать потерянное намерение; adapter пишет в v1 без quota boundary; quota можно сбросить через recreate/delete; требуется перенос вызванного пациента/активного исполнения; нужен overnight interval; Alembic имеет несколько heads или разрушительный upgrade; обязательный PG/staging недоступен; scope вышел за безопасный срез. Независимые задачи могут продолжаться отдельными циклами, но зависимые не обходят блокировку.
+DTO: profile/settings; saved manual/publication intent; effective state/reasons; booking/overview mode; typed doctor/resource targets; public availability/address presence; allowed action kinds/entity refs без arbitrary URLs; unassigned tags/services/resources. Ordinary booking и automatic precreate feasibility раздельно; Service.doctor_id не обязателен multi-doctor направлению.
 
-Перед production rollout выполнить `docs/runbooks/STAGING_VALIDATION.md` и отдельно записать все 10 пунктов. CI/build не заменяют эту проверку. Не утверждать, что система работает или deployment завершён, без полного набора обязательных результатов.
+GET не создаёт queues/tokens/addresses/sessions/progress; DTO без PHI. Inactive resource с saved daily queue включается; active-only resolve_tag_resource недостаточен для истории.
 
-## 7. Завершение
+**Validation:** Admin auth unchanged/zero writes/empty/conflicts/overview/disabled-hidden/same numeric typed IDs/inactive owner-saved queue/action consistency/bounded queries/OpenAPI required-nullable-enums. `backend/tests/test_openapi_contract.py`, new focused Admin suite, rq16b DTO reference.
+**Stop:** data creation в GET/guess eligibility/auth redesign.
+**Evidence/logs:** DTO/action command mapping and query bound; safe ERROR only, types existing generator, не manual edits.
 
-План завершён, когда T00–T18 имеют статус `MERGED`; все admission paths применяют одну политику; неоднозначность явно видна и безопасно блокируется; настройка переживает переходы; UI отражает реальные данные и область действия; история/ownership/номера/`queue_time`/QR-защита сохранены; проверки имеют evidence для внедряемого commit.
+### T14. Setup UI на backend facts
 
-**Первая задача:** T00. **Первый runtime-патч:** T01 после документального checkpoint.
+**Зависимости:** T13. **Режим:** advisory_gate, clinic UI skill.
+**Anchors:** `frontend/src/components/admin/AdminSetupDirections.tsx`, `setupDirectionsReadiness.ts`, `PermanentDirectionQr.tsx`; existing `frontend/src/api/queueDirections.ts`.
+
+1. Заменить local buildChecklist/alias/collectServiceAssignmentGaps/owner-axis decisions facts T13; frontend formats known states/actions.
+2. Configuration/public entry/selected-day queues разделены; resource-only без «создать врача».
+3. Core rows не ждут per-profile QR: сейчас loadCore waits после четырёх catalog calls; QR on expand/bounded/deduplicated.
+4. QR error не скрывает table; stale core/QR не заменяют newest profile/day.
+5. Admin GET в existing API module если граница подходит; не duplicate client, useful QR stale/dedup tests сохранить.
+
+**Validation:** readiness/unknown/overview/conflict, rows before QR/error-retry/stale day-profile, no policy in React, type/lint/tests/synthetic cold-repeat waterfall. `setupDirectionsReadiness.test.ts`, `adminSetupDirections.textPin.test.tsx`, `permanentDirectionQr.test.tsx`, rq17.
+**Stop:** facts недостаточны→T13 repair, не restore React policy.
+**Evidence/logs:** request/content timing/DTO states; no raw payload, synthetic screenshots.
+
+### T15. Восстанавливаемый контекст настройки
+
+**Зависимости:** T14. **Режим:** advisory_gate; URL contract сначала plan/dossier.
+**Anchors:** AdminSetupDirections; existing ServiceCatalog/UserManagement/UserModal/QueueResourceManager/QueueProfilesManager TSX.
+
+1. Убрать unconditional Next/Finish; outstanding actions из T13, completion не local flags.
+2. Profile/section/day в URL; view/step/axis/tag сейчас component state, existing typed return context не найден.
+3. До edit DECISIONS: technical query keys/types/sections/entity kinds/internal destinations; arbitrary redirect URL не принимать, auth/RBAC не менять.
+4. Catalog/users переход с typed return context; save/return rereads facts; cancel/back не фиксирует fake completion.
+5. Reuse UserModal doctor onboarding; editor reuse постепенно, без второго wizard/refactor unrelated.
+
+**Validation:** save-return/cancel/reload/back-forward/deep link/unknown context/external changes/resource-only; UserModal onboarding/setup/rq17 plus focused URL tests.
+**Stop:** new ownership/security decision/second onboarding/progress table.
+**Evidence/logs:** URL/action mapping, safe error states; no noisy query/token logs; operator resume flow.
+
+### T16. Навигация и совместимые входы
+
+**Зависимости:** T09, T14, T15. **Режим:** plan/dossier перед advisory execute, routing SSOT.
+**Anchors:** `frontend/src/routing/routeRegistry.ts`, `routeSelectors.ts`, `routeDocsSnapshot.ts`; `frontend/src/components/admin/AdminServices.tsx`; page adapters/Sidebar i18n.
+
+1. Setup «Направления и очереди», settings «Общие правила очереди».
+2. Cabinet URL → today queues; servicesTab=queue-profiles → profiles unified context; catalog сохраняется, whole /admin/services redirect запрещён.
+3. Query/local state/back-forward согласовать: сейчас initial-only query/unknown nonempty accepted. Unknown→safe start.
+4. Admin rights/nav highlight/function access сохранить; unrelated role routes не менять.
+
+**Validation:** routeContract/routeOwnershipEnforcement/Sidebar.navI18n/rbacRouteParity tests; query changes/history; admin-navigation; four original URLs/catalog/unknown query.
+**Stop:** auth/route ownership change/mass alias cleanup.
+**Evidence/logs:** verified URL mapping/nav contract; no raw query logs; docs snapshot existing pattern/operator links.
+
+### T17. Массовые операции и CSV
+
+**Зависимости:** T10, T11, T12, T15. **Режим:** advisory existing-command UI; new write contract→separate mandatory slice.
+**Anchors:** QueueProfilesManager.tsx/queueProfilesCsv.ts; QueueProfilesManager.csv.test.tsx/queueProfilesCsv.test.ts/interactions; backend _queue_profiles reference-only.
+
+1. Bulk sequential loop сегодня aborts first error/no reload; exact row success/rejected/not-started + safe reason.
+2. Partial outcome→reread actual state даже при error. Retry failed/not-started only после revalidation.
+3. Impact preview/structured errors T10–T12; stale preview не обещает success.
+4. Parser/RFC4180/round-trip уже реализованы: не переписывать. Department/optional/export поддерживаемые поля сохраняются.
+5. New CSV POST always hidden; publication intent отдельный pending action после readiness, без auto-publish/молчаливой потери намерения.
+
+**Validation:** success-fail-not-started/partial import/network-loss/reload fail/retry remaining/used conflicts/publication/optional/round-trip; preserve T01 Dialog/keyboard.
+**Stop:** нужен bulk transaction/new backend command/missing structured errors→bounded contract slice.
+**Evidence/logs:** row outcomes/retry set; safe row codes/IDs, CSV content не логировать.
+
+### T18. Полная синтетическая приёмка
+
+**Зависимости:** T01–T17 и подэтапы. **Режим:** QA/evidence; выявленный code defect→bounded fix в соответствующем PR.
+**Anchors:** `frontend/e2e/rq17-setup-directions-live.spec.ts`, rq18 permanent-QR, Tier2 specs; `frontend/playwright.config.ts`; runbooks LOCAL_STAGING_ACCEPTANCE/AGENT_SESSION_WORKTREES/SCREEN_LATENCY_REGRESSION/STAGING_VALIDATION.
+
+До запуска deployed commit/frontend-API-DB synthetic isolation proof. Config hardcodes localhost5173, panel-qa-admin-live собственный baseURL; override проверять включая per-spec URLs. Не reuse сервер, направленный на production18000. REAL_API rq17/rq18 создают данные, production запрещён.
+
+Каждый сценарий отдельной строкой PASS/FAIL/NOT_RUN + SHA/artifact:
+
+1. Новое направление с несколькими врачами одной specialty/typed targets.
+2. Направление без врача/resource-only без лишнего onboarding.
+3. Исправление incomplete/conflicting config/truthful next actions.
+4. Hidden→explicit publish→hide/archive; address unchanged.
+5. Department off/on/manual archive/old token-direct join refusal.
+6. Defaults save-read-consume без restart/current snapshot unchanged.
+7. Cabinet preview/apply/stale/audit rollback/called-clinical block.
+8. Concurrent last slot/exactly one/consistent remaining.
+9. Lost response/replay/no double count/rollback-partial conservation.
+10. Four old URLs/catalog/typed return/reload/back-forward.
+
+Keyboard-only/focus/forms/errors/retry/empty/locales; viewport375/768/1280/1920. Cold actual rows/repeat same conditions: role/browser/network/data/commit/asset-API-backend-DB waterfall. Spinner/first paint не rows; runbook baseline не универсальный SLA.
+
+Artifacts established output/playwright/test-results по runbook; auth-state/tokens/full payload не коммитить. Safe paths/aggregates в evidence.
+**Приёмка:** доказательства конкретного deploy commit, без скрытых NOT_RUN; separate ten-point staging validation ниже.
+**Stop:** no required env/check/real patient origin/contract regression. QA не отключает PII masking.
+
+## 7. Контракты и обязательные проверки
+
+| Контракт | Изменение |
+|---|---|
+| Profiles read | Empty/error; effective state/reasons после T11 |
+| Profiles update | Used-binding guard/transactional publish-reactivate revalidation |
+| Cabinet read | Typed owner/day snapshot-default/same filter-count facts |
+| Cabinet commands | Explicit IDs/expected state/reason/atomic audit/replay |
+| Directions Admin GET | Typed read-only/actions/entity refs/Admin only/no PHI |
+| Availability/report | Length/issued/remaining/version; legacy unknown |
+
+OpenAPI required/nullable/enums/typed owner. Anonymous QR disclosure сохраняется; safe Admin code/details объясняют correction. DTO changes→generator/freshness/type parity; serializer matching scripts, не ручное форматирование.
+
+| Область | Обязательный proof |
+|---|---|
+| Forms/settings | Select/keyboard/focus/presets; GET fail no PUT; stale draft owner/base; dirty during save |
+| Defaults/snapshots | Same instance/no restart; concurrent command coherence; old/future snapshot |
+| Time | Four [start,end) boundaries/manual/no scheduler/timezone/future dates |
+| Quota/identity | PG race/replay/rollback/status-delete/clone-transfer/partial/inactive recreate/typed IDs |
+| Profiles | Disabled/parent off-on/manual/dangling-conflict-standalone/used tags-order-address |
+| Publish | Hidden constructors/publish-reactivate/mixed overview/token-address/same-direction doctors |
+| Cabinets | Filter-history/stale409/audit rollback/resource/called block |
+| Routing/CSV | Four URLs/catalog/query/history/rows-retry-round-trip-hidden import |
+| Schema | Single head/history/PG upgrade/CHECK/legacy/v1 flag false |
+
+После возобновления tests из worktree. Backend launcher scripts/run_backend_pytest.ps1 **этого worktree**; REPO_PYTHON существующий interpreter допустим, production venv не модифицировать. Frontend targeted Vitest→type-check→scoped ESLint/Stylelint/theme→build по влиянию. npm run lint содержит --fix: lint:check/non-fixing checks. Broader rerun только по новым changes/failures.
+
+Общие logs для всех карточек: INFO substantial admin safe IDs; WARN expected guard/conflict/stale; ERROR failure без query/tokens/PHI. Reads не log per-row. Mandatory audit actor/typed target/old-new/reason/requestID в change transaction. Operator docs в соответствующем PR; roadmap/исторический DevBrain evidence не переписывать.
+
+## 8. Внедрение, откат и остановка
+
+### Rollout gates
+
+1. Truthful UI/read/schema expand, existing legacy, creation flag false.
+2. Все writers classified/upgraded/window-quota-claim PG proof; unresolved mounted writer блокирует v1.
+3. Lifecycle/publish/read/UI/compatibility proof, ambiguous binding auto-reassign запрещён.
+4. T18 synthetic и full staging validation exact deploy commit.
+5. Operator-authorized v1 creation после рабочего дня; plan/CI не разрешение toggle.
+
+Old counter/version-blind writers рядом с v1 запрещены. Versions всех backend processes/workers/adapters и rollback target подтвердить. Precreated future legacy queues сохраняют policy; их список/compatible service scenario документировать до перехода.
+
+### Pre-deploy checklist
+
+Актуальный docs/runbooks/STAGING_VALIDATION.md целиком, включая prerequisites/check0 и дополнительные обязательные пункты. Минимальные десять checks отдельными строками с SHA/env/result/evidence:
+
+| № | Check | Доказательство этого плана сейчас |
+|---|---|---|
+| 1 | Sentry frontend/backend delivery | NOT_RUN |
+| 2 | DR backup restore | NOT_RUN |
+| 3 | AI kill-switch →503 | NOT_RUN |
+| 4 | AI requires_doctor_confirmation | NOT_RUN |
+| 5 | arq enqueue/process | NOT_RUN |
+| 6 | Telegram delivery если используется | NOT_RUN; applicability установить |
+| 7 | PII code/logs/Sentry | NOT_RUN |
+| 8 | Local pre-commit hooks | Historical PR results есть; deploy contour NOT_RUN |
+| 9 | Backend unit | T05 applicable CI PASS c04f4102; focused merged-tree tests 24 PASS на fd53206f; deploy staging NOT_RUN |
+| 10 | Frontend build/unit | T04 applicable CI PASS b59fff8a; T05 frontend jobs SKIPPED; deploy staging NOT_RUN |
+
+CI/build checklist не заменяют. Не заявлять «система проверена/работает/deployment complete» без required PASS. Docs update не выполняет runtime checks.
+
+### Rollback
+
+- До v1 rows runtime rollback при expanded schema сохранённой.
+- После v1 flag off запрещает new v1, existing enforcement продолжается. Counter-blind writer не rollback target.
+- Counter/version не удалять/data-losing downgrade не делать/profiles-addresses-targets не reassign.
+- UI rollback сохраняет compatible API/URLs; в PR конкретный minimal revert/ограничения.
+
+### Stop/BLOCKED
+
+Зависимый срез остановить при owner-transfer/merge/renumber, parent-public ambiguity requiring choice, unknown historical intent, admission bypass/reset, called-active transfer, overnight, multi-head/destructive upgrade, no mandatory PG/staging, выходе за first-touch.
+
+Read diagnostic conflict не означает auto production repair. Gate/PG proof не обходить mocks. Narrower subtask/sequence change сначала plan/checkpoint с основанием, сохраняя PR-цикл.
+
+## 9. Завершение
+
+T00–T18/подэтапы подтверждённо MERGED; все admissions единая v1 policy; legacy truthful; ambiguities shown/blocked; context survives navigation; UI facts/scope; history/ownership/numbers/queue_time/QR preserved; required evidence для deploy commit.
+
+План/журналы остаются постоянной памятью после завершения. Следующий агент начинает с [RESUME.md](admin-queue-simplification/RESUME.md), сверяет фактическое состояние и готовит безопасный срез T06. T00–T05 не повторять; deferral не переносить в DB gate или будущие PR.

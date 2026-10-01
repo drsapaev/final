@@ -2,7 +2,7 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
-Current plan: version 1.1. The user resumed implementation on 2026-10-01; the active task is closing T03 only. Start with [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md); historical entries keep their original state/SHA. Do not infer the required #3540 Tier 2 acknowledgment from approval of #3538.
+Current plan: version 1.2. T00–T05 are confirmed MERGED; T06–T18 remain PLANNED. The user delegated the #3543 staging decision, and a separate bounded T05 deferral was accepted before merge. Start with [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md); historical entries keep their original state/SHA. Accepted deferral is not PASS and never automatically authorizes another PR or the T06 DB gate.
 
 ## T00 — 2026-09-30
 
@@ -589,3 +589,67 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
 - Review/merge state: PR [#3543](https://github.com/drsapaev/final/pull/3543) remains OPEN and draft, `mergeable=true`, with no submitted code review and no review decision. Its Tier 2 synthetic-staging deferral acknowledgment remains unchecked; prior PR deferrals are not inherited.
 - Result: applicable remote CI PASS on the checked head; merge is still held for review and a separate explicit disposition of the staging deferral. No source, production configuration, or production data was changed by this checkpoint.
 - Next exact action: obtain review and explicit user/reviewer disposition for PR #3543; only then decide whether T05 may merge and T06 may start.
+
+## T05 merge checkpoint
+
+Recorded: 2026-10-01T16:41:51+05:00
+
+- Authorization: the user explicitly delegated the choice for #3543 between accepting a staging deferral with merge authorization and requiring staging before merge. The executing agent reviewed the bounded patch and selected the first option. This is not inherited from #3540/#3541 and is not represented as a GitHub author-approval review.
+- Review under test: PR head `c04f41021bef5f8c306b9668cbb1c4b9afef2cc1`, base `ecc14b05411c7e7b54efca2966416cd6a69df37c`; runtime source unchanged since `47276d178972226b0bcf561bdf8fa26a6940b913`.
+- Review result: no confirmed P0/P1/P2 in the T05 source/test delta. The command snapshot is task-local, keyed by service and DB session, reused by nested synchronous command methods, reset in finally, and passed into the start-number fallback. New top-level commands reread defaults; existing daily rows return with their saved snapshots. No schema/API/ownership/quota/cutoff/profile-lifecycle behavior was added.
+- Original staging requirement: synthetic admin-save → next-command refresh → unchanged existing-day snapshot, affected queue/admin backend-dependent E2E and cold/repeat actual-content timing. Local `test_rq24b_cross_panel_s21_pg.py` and `test_rq29_end_to_end_path_pg.py` also need PostgreSQL proof.
+- Deferral reason: isolated WSL staging remains stopped; synthetic QA credentials are not prepared. `wsl.exe -d Ubuntu-24.04 -- docker compose -f /mnt/c/final/_wt_aqs_t05_settings_cache/ops/compose.staging.yml ps --format json` exited 0 with no containers. Production backend/data were excluded.
+- Deferral evidence: real ClinicSettings regression, nested snapshot reuse, exception cleanup and immutable existing-day snapshots; applicable current-head backend/contract/security CI passed. This is evidence for the bounded code decision, not proof of the skipped staging scenarios.
+- Deferral owner/workstream: executing agent for admin-queue-simplification, tracked at T18/pre-deploy.
+- Resume condition: isolated synthetic staging and QA access available; run T05 save/refresh/snapshot smoke, `frontend/e2e/queue-system.spec.ts`, `panel-qa-admin-live.spec.ts` and applicable timing on the actual deployment candidate; rerun affected local PG files on disposable PG. Record each result independently.
+- Headline impact: T05 can be MERGED with zero validated staging scenarios contributed by the deferral. T18 and production rollout remain incomplete. T06 mandatory gate and disposable PostgreSQL migration upgrade are not waived. No future PR inherits this acknowledgment.
+- CI at reviewed head: Backend tests, Code Quality, Frontend-Backend Parity, Context Boundary Integrity, PR Required Gate, PR Review Quality Gate and applicable CodeQL/secret/security checks PASS. [Backend job](https://github.com/drsapaev/final/actions/runs/36851998918/job/110335676029) includes PostgreSQL setup, backend tests, reminder/QR concurrency probe and critical smoke steps. Exact execution of the two locally skipped PG files was not established from the inspected job output; do not claim those files PASS. Frontend/build/E2E, separate integration suite and staging-readiness jobs were path-aware SKIPPED, not PASS.
+- PR body gate: updated separate T05 deferral fields and reviewer acknowledgment, identifying delegated-agent assessment. `scripts/run_python.ps1 -PythonArgs @('-m','scripts.run_pr_review_gate_checks','--body-file','.t05-deferral-body.md','--author','drsapaev')` PASS, including 19 quality-gate tests and live-body checks. Ready event refreshed PR metadata quality checks; PR Quality Gate then PASS. No source commit changed after review.
+- Merge: `gh pr merge 3543 --squash --match-head-commit c04f41021bef5f8c306b9668cbb1c4b9afef2cc1` succeeded. [PR #3543](https://github.com/drsapaev/final/pull/3543) state MERGED, 2026-10-01T11:24:40Z, merge commit `fd53206f03b0361de6fc345f53b2bacf4195845c`. `git fetch origin` confirmed main at that commit; diff between reviewed HEAD and merged tree was empty.
+- Merged-tree validation: from detached T05 worktree, `REPO_PYTHON=C:\final\backend\.venv\Scripts\python.exe`, local SQLite import URL and `scripts/run_backend_pytest.ps1 tests/unit/test_queue_settings_command_scope.py tests/unit/test_queue_time_window.py tests/unit/test_graphql_queue_claim_coordinator.py tests/unit/test_queue_api_service.py tests/unit/test_queue_join_claim_coordinator.py tests/unit/test_queue_claim_service.py -q` — PASS, 24 passed, 1 warning in 11.75s. Python 3.11.9; fixtures are isolated SQLite, not runtime PostgreSQL.
+- Base synchronization: main was clean on main with no detected Git operation; guarded `git pull --ff-only origin main` advanced it to `fd53206f`. No production restart, deployment, data query or feature-flag toggle occurred.
+- Branch cleanup: T05 worktree detached at merge; local and remote `codex/aqs-T05-settings-cache` branches removed. Untracked PR bodies and temporary pre-commit environment retained. Earlier blocked deletion was not retried through another method.
+- Scope check: reviewed files are the nine T05 code/test/ledger paths recorded above; this decision introduced no runtime edit. Current documentation closure is a separate five-file PR from fresh main.
+- Remaining limitation: local PG integration, synthetic staging/browser/timing and full pre-deploy runbook remain NOT_RUN. Applicable CI does not establish production functionality.
+- Next exact action: preserve the detailed plan and missing RESUME on main via docs-only closure; next runtime task is T06, with its own mandatory gate and disposable PG requirements.
+
+```aif-gate-result
+{
+  "schema_version": 1,
+  "gate": "review",
+  "status": "warn",
+  "blocking": false,
+  "blockers": [],
+  "affected_files": [
+    "backend/app/crud/queue_resource_routing.py",
+    "backend/app/services/queue_svc/__init__.py",
+    "backend/app/services/queue_svc/_core.py",
+    "backend/app/services/queue_svc/_operations.py",
+    "backend/tests/integration/test_rq24b_cross_panel_s21_pg.py",
+    "backend/tests/integration/test_rq29_end_to_end_path_pg.py",
+    "backend/tests/unit/test_queue_settings_command_scope.py",
+    ".ai-factory/plans/admin-queue-simplification/EVIDENCE.md",
+    ".ai-factory/plans/admin-queue-simplification/PROGRESS.md"
+  ],
+  "suggested_next": {
+    "command": "T06 grounding and mandatory DB gate",
+    "reason": "T05 merged under a separately accepted deferral; deferred staging remains NOT_RUN and no T06 requirement is waived."
+  }
+}
+```
+
+## Documentation recovery checkpoint 1.2
+
+Recorded: 2026-10-01T16:41:51+05:00
+
+- Original inconsistency: main's primary plan still said runtime had not started; its detailed 1.1 replacement remained uncommitted in T03 worktree. EVIDENCE still named T03 as active, linked a missing RESUME, and PROGRESS still held T05 PR_OPEN pending this decision.
+- Environment/base: clean new `C:\final\_wt_aqs_t05_closure`, branch `codex/aqs-T05-closure`, fresh origin/main `fd53206f03b0361de6fc345f53b2bacf4195845c`.
+- Execution mode: direct_execute, documentation only. Canonical anchors: live #3543 merge, existing task ledger and saved detailed plan. No runtime gate required for this slice.
+- Allowed/actual paths: `.ai-factory/plans/codex-admin-queue-simplification.md` and `.ai-factory/plans/admin-queue-simplification/{PROGRESS,DECISIONS,EVIDENCE,RESUME}.md`.
+- Denied: runtime/UI/API/tests/schema/migrations, production/staging data/configuration, shared skills/settings, other plans, roadmap and historical DevBrain evidence.
+- Recovery: copied saved detailed plan/decisions from `C:\final\_wt_aqs_t03_cabinet_read` without editing or reverting that source worktree. Preserved all T00–T18 cards, dependencies, product decisions D1–D5, safety and rollout requirements. Corrected stale T03 Sync/default facts and T03–T05 statuses; restored RESUME and exact next T06 boundaries. Version is 1.2 to distinguish recovered detail from historical 1.1.
+- Validation: five-file consistency script PASS (19 ordered T00–T18 cards, unchanged D1–D5 table, 6 MERGED + 13 PLANNED registry, T06 checkpoint, all local Markdown links resolve); git diff --check PASS. Existing repository Python ran `pre_commit run --files <the five allowed Markdown files>` without SKIP overrides: applicable large-file/conflict/private-key/EOF/whitespace/branch/gitleaks checks PASS; language/file-type hooks SKIPPED because there are no matching files. No runtime/staging check is claimed for the docs diff. T05 merged-tree tests are reported separately above. Current-head PR results are recorded in the live PR after publication.
+- Stop condition: any required runtime/schema or product-policy change would leave this slice; none occurred. Do not start T06 while closing this docs PR.
+- PR body quality check: first local run FAIL for missing explicit `Targeted tests or smoke run`, `Result`, `Not checked` labels; added those documentation-only validation fields and reran the same `scripts/run_pr_review_gate_checks --body-file .t05-closure-pr-body.md --author drsapaev` command — PASS, 19 gate tests plus sample/live-body validation. No gate requirement was bypassed.
+- PR: pending at this checkpoint; verify actual branch/PR/checks before continuing.
+- Next exact action: validate five-file documentation consistency, commit, publish closure PR, inspect current-head applicable gates and close the docs cycle. Then the next runtime session begins T06 from fresh main.
