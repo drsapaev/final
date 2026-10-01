@@ -2,7 +2,7 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
-Current plan: version 2.1. T00–T06.2 are confirmed MERGED; T07 is locally VALIDATED and awaiting rebase/PR; T08–T18 remain PLANNED. The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver. Start with [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md); timestamped historical entries preserve their original state/SHA.
+Current plan: version 2.2. T00–T06.2 are confirmed MERGED; T07 is locally VALIDATED after rebase and awaiting PR; T08–T18 remain PLANNED. The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver. Start with [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md); timestamped historical entries preserve their original state/SHA.
 
 ## T00 — 2026-09-30
 
@@ -966,4 +966,16 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Changed-path Ruff — PASS. The first recheck invocation included a nonexistent path (`queue_auto_close_service.py`) and exited with Ruff E902; rerunning against actual changed backend runtime/test files passed. This was a validation-command path typo, not a source failure.
 - `git diff --check` — PASS after the QR change and documentation update.
 - No production or staging request/data/process was touched. PostgreSQL, synthetic staging/browser QA, visual QA and first-screen timing remain NOT_RUN; the flag remains off. T05/#3543 deferral remains separate and does not constitute T07 staging evidence.
-- Remaining: commit the validated checkpoint, rebase in this worktree onto fresh `origin/main`, rerun checks, then open T07 PR and verify its exact-head CI before merge.
+- Remaining: push the rebased branch, open T07 PR and verify its exact-head CI before merge.
+
+## T07 post-rebase validation — 2026-10-02T01:24:00+05:00
+
+- Code commit under test: `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`, rebased cleanly from `b804a71a6bad22400324e2236a3221317eac3158` onto fresh `origin/main` `3a776133bd8c22529422d3a555a589eedfce5063`. The worktree was clean after rebase before this evidence update.
+- Backend validation: combined focused command for online window, creation policy, settings command scope, queue time window, auto-close, GraphQL/token claim coordinators, OpenAPI contract and effective settings report — **94 passed, 7 skipped, 1 warning**. The seven skips are PostgreSQL-only integration cases because the local database is SQLite; they are not counted as passes.
+- Frontend: `npm run test:run -- src/components/admin/__tests__/QueueSettings.effective.test.tsx` — **27 passed** with existing React `act()`/mocked-error console warnings; `npm run type-check` — PASS; scoped `npm exec -- eslint --quiet -- ...` — PASS.
+- Static checks: changed-path Ruff — PASS; `git diff --check` — PASS. Pre-commit general/JSON/secret/Ruff hooks passed. `ruff-format` and `black` were skipped because the automatic whole-file formatting changed unrelated legacy sections in touched modules; those hook-only deltas were reversed against the staged patch. The local ESLint pre-commit entry also fails to strip `frontend/` before running from `frontend/`, so its file arguments do not resolve; the equivalent scoped ESLint command was run directly from `frontend/` and passed. These skip reasons are recorded for PR review.
+- First commit-hook attempt also found the pre-existing `isinstance(value, (int, float))` Ruff `UP038` in touched `clinic.py`; updated it to equivalent `isinstance(value, int | float)` and reran Ruff successfully. An initial Ruff invocation referenced a nonexistent `queue_auto_close_service.py` path and returned E902; the corrected actual changed-path command passed.
+- OpenAPI/API TypeScript generation passed before rebase; post-rebase OpenAPI contract tests confirm the generated schema contains the cutoff and policy fields. No runtime code changed during rebase.
+- PostgreSQL/staging/browser/visual/timing: **NOT_RUN**. Local PostgreSQL `127.0.0.1:55432` refused connection, staging ports `18001/18080` were not listening, and Docker CLI is unavailable. No production/staging traffic, data or process was touched; the v1 creation flag remains off. T05/#3543 deferral is not T07 evidence.
+- PR: none yet. Merge commit: none.
+- Next exact action: push the rebased branch, open the T07 PR, and verify exact-head CI/review before merge.

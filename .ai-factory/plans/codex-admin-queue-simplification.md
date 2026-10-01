@@ -1,13 +1,13 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 2.1 — T07 local checks complete, including mixed legacy/v1 clinic-wide QR regression; fresh-main rebase and PR CI are next.
+**Версия:** 2.2 — T07 rebased and local focused checks pass, including mixed legacy/v1 clinic-wide QR regression; PR CI is next.
 **Создан:** 30 сентября 2026. **Обновлён:** 2 октября 2026, Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Последний подтверждённый runtime merge:** `b804a71a6bad22400324e2236a3221317eac3158`, PR #3546 / T06.2.
-**Текущий worktree:** `C:\final\_wt_aqs_t07_window`, ветка `codex/aqs-T07-admission-window`, исходная база `b804a71a`; свежий `origin/main` — `3a776133` (rebase pending).
+**Текущий worktree:** `C:\final\_wt_aqs_t07_window`, ветка `codex/aqs-T07-admission-window`, rebase base `3a776133`; code commit `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`.
 
-> **T00–T06.2 — MERGED; T07 — VALIDATED локально, PR pending; T08–T18 — PLANNED.** PR #3546 смержен в `b804a71a`. T07 focused queue set: 57 passed, including the mixed legacy/v1 clinic-wide QR regression; OpenAPI tests: 37 passed / 7 skipped because PostgreSQL is unavailable; QueueSettings suite: 27 passed. Local PostgreSQL/staging/browser proof is NOT_RUN.
+> **T00–T06.2 — MERGED; T07 — VALIDATED локально, PR pending; T08–T18 — PLANNED.** PR #3546 смержен в `b804a71a`. T07 post-rebase combined backend/OpenAPI/effective-report run: 94 passed / 7 PostgreSQL-only skipped, 1 warning; QueueSettings suite: 27 passed. Local PostgreSQL/staging/browser proof is NOT_RUN.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -281,6 +281,8 @@ next exact action; checks to rerun after next change.
 **Evidence/logs:** совпадение availability/join для каждого boundary; safe WARN refusal/ERROR failure, anonymous diagnostics не расширять.
 
 **Подтверждённые активные точки интеграции для T07:** основной `QueueBusinessService.join_queue_with_token` и `_unbookable_doctor_ids`; прямой GraphQL `joinQueue`; QR session precheck в `qr_queue/_queue_ops.py`; публичный `/online-queue/status` через `crud/online_queue.check_queue_availability`; `QueueAutoCloseService` как отдельный переход к обслуживанию. `crud/online_queue.join_online_queue` находится в transitional CRUD и не имеет найденного смонтированного caller — не считать его активным admission writer без новых source evidence. Для существующего `legacy` сохраняются текущие правила допуска без нового end cutoff; `daily_online_issuances_v1` использует frozen start/end и clinic timezone. На несуществующую очередь availability применяет те же defaults/policy flag, которые использует её последующее создание. Будущие даты сохраняют существующее правило: временное окно текущего дня не применяется к ним. Это техническое толкование runtime и принятого плана, не новая продуктовая договорённость.
+
+Для clinic-wide QR overview при смешанных legacy/v1 очередях нельзя использовать политику случайной первой строки как общий cutoff: обзор доступен, когда хотя бы одна активная цель допускает запись по времени; конкретная выбранная очередь повторно проверяется каноническим join. Если все цели закрыты по времени, read result сообщает ближайшее соответствующее открытие/закрытие v1. Это техническая детализация адаптера; она не меняет отдельные цели записи и сохраняет старое поведение legacy.
 
 Для clinic-wide QR overview при смешанных legacy/v1 очередях нельзя использовать политику случайной первой строки как общий cutoff: обзор доступен, когда хотя бы одна активная цель допускает запись по времени; конкретная выбранная очередь повторно проверяется каноническим join. Если все цели закрыты по времени, read result сообщает ближайшее соответствующее открытие/закрытие v1. Это техническая детализация адаптера; она не меняет отдельные цели записи и сохраняет старое поведение legacy.
 

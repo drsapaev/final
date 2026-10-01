@@ -1,19 +1,19 @@
 # Progress
 
-Plan version: 2.1
+Plan version: 2.2
 Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 2026-10-01
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T07
-Current status: VALIDATED (local focused checks complete; rebase onto fresh main and PR are next)
+Current status: VALIDATED (rebased and local focused checks complete; PR is next)
 Last completed task: T06.2 — MERGED
 Worktree: `C:\final\_wt_aqs_t07_window`
 Branch: `codex/aqs-T07-admission-window`
-Base commit: `b804a71a6bad22400324e2236a3221317eac3158`
-Current commit: `b804a71a6bad22400324e2236a3221317eac3158` (T07 changes still uncommitted)
-Last updated: 2026-10-02T01:12:00+05:00
+Base commit: `3a776133bd8c22529422d3a555a589eedfce5063`
+Current commit: `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`
+Last updated: 2026-10-02T01:24:00+05:00
 
-> T00–T06.2 are confirmed MERGED. PR #3546 merged at `b804a71a6bad22400324e2236a3221317eac3158`. T07 local implementation checks pass: 57 focused queue tests, including mixed legacy/v1 clinic-wide QR behavior. Rebase from `b804a71a` onto fresh `origin/main` `3a776133bd8c22529422d3a555a589eedfce5063` remains before push/CI. Its v1 feature flag remains default-off; no production activation or deployment is authorized.
+> T00–T06.2 are confirmed MERGED. PR #3546 merged at `b804a71a6bad22400324e2236a3221317eac3158`. T07 is rebased onto `3a776133bd8c22529422d3a555a589eedfce5063` and locally validated on `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`; focused backend/OpenAPI tests report 94 passed and 7 PostgreSQL-only skips. PR is next. Its v1 feature flag remains default-off; no production activation or deployment is authorized.
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -52,8 +52,8 @@ Last updated: 2026-10-02T01:12:00+05:00
 - Blocker: none for opening the T07 PR. Disposable PostgreSQL/staging runtime was checked and is unavailable locally; seven PostgreSQL integration tests and all staging/browser checks remain NOT_RUN. Do not claim runtime proof or activate the policy flag.
 - Completed: v1 queues freeze clinic-local `[start,end)` and all active admission/read adapters now use the same policy; legacy queues gain no new end cutoff. Token join, QR precheck, public availability/status, GraphQL join, report metadata, all named queue constructors and the clinic-local auto-close selector are covered. Clinic-wide QR overview remains available when any active target is eligible; the chosen queue is rechecked by canonical admission. Settings reject malformed or overnight intervals. UI explains v1/legacy behavior in five locales. OpenAPI and TypeScript artifacts are generated and aligned.
 - Validation: 57 focused backend queue tests passed on SQLite; OpenAPI suite 37 passed, 7 integration cases skipped under SQLite; dedicated cutoff OpenAPI test 1 passed; QueueSettings suite 27 passed; TypeScript, focused ESLint (`--quiet`), changed-file Ruff, Python compilation, OpenAPI/type generation and `git diff --check` passed. Full commands and limitations are in `EVIDENCE.md#t07-local-validation` and the latest T07 follow-up checkpoint.
-- Next exact action: create a local checkpoint commit, rebase the T07 branch onto fresh `origin/main` `3a776133bd8c22529422d3a555a589eedfce5063` (the only new commit is CI-only PR #3555), rerun focused checks, then push/open the PR and wait for exact-head CI.
-- Checks to rerun after rebase or code change: the 57-test focused queue set, OpenAPI contract test, QueueSettings effective suite, TypeScript type-check, changed-file Ruff/ESLint, Python compile and `git diff --check`. Recheck PG/staging availability only if environment state changes.
+- Next exact action: push `codex/aqs-T07-admission-window`, open its PR with the documented scope/impact and NOT_RUN limits, then wait for exact-head CI/review.
+- Checks to rerun after a code change: the combined backend/OpenAPI/effective-report command (101 collected; seven PG cases skipped), QueueSettings effective suite, TypeScript type-check, changed-file Ruff/ESLint and `git diff --check`. Recheck PG/staging availability only if environment state changes.
 
 ## Historical T06.2 checkpoint (superseded; retained for evidence)
 
