@@ -5,12 +5,12 @@ Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 20
 Start here: this file; use `EVIDENCE.md` for task history
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T04
-Current status: VALIDATED
+Current status: PR_OPEN
 Worktree: `C:\final\_wt_aqs_t04_empty_profiles`
 Branch: `codex/aqs-T04-empty-profiles`
 Base commit: `1e781da72bd927926b538b139a6c251cd09848b5`
-Current commit: `77783b8a1d7c54843b3b47a257e5a45d10439a2f` (empty-catalog integration regression and updated evidence; runtime implementation is `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`)
-Last updated: 2026-10-01T12:58:11+05:00
+Current commit: `560860f724bf87874ed474bbe50cb5db1a245dd3` (PR head checked; latest code/test checkpoint is `77783b8a1d7c54843b3b47a257e5a45d10439a2f`)
+Last updated: 2026-10-01T13:19:52+05:00
 
 > **Возобновлено пользователем 2026-10-01:** «Продолжай реализации плана». T03 завершён: PR #3540 слит после исправления P1 и code-review verdict APPROVE. Tier 2 для #3540 остаётся принятым deferral, не пройденным тестовым набором.
 
@@ -20,7 +20,7 @@ Last updated: 2026-10-01T12:58:11+05:00
 | T01 | MERGED | `codex/aqs-T01-profile-modal` / [PR #3537](https://github.com/drsapaev/final/pull/3537) | `967bd398c14bce4b835bd5be1205532387e2a909` | `EVIDENCE.md#t01` |
 | T02 | MERGED | `codex/aqs-T02-queue-settings-state` / [PR #3538](https://github.com/drsapaev/final/pull/3538) | `b4ba6320797f056da19bbdc5cc672b3a97d2091e` | `EVIDENCE.md#t02` |
 | T03 | MERGED | `codex/aqs-T03-cabinet-read` / [PR #3540](https://github.com/drsapaev/final/pull/3540) | `1e781da72bd927926b538b139a6c251cd09848b5` | `EVIDENCE.md#t03-merge-checkpoint` |
-| T04 | VALIDATED | `codex/aqs-T04-empty-profiles` | | `EVIDENCE.md#t04-integration-follow-up` |
+| T04 | PR_OPEN | `codex/aqs-T04-empty-profiles` / [PR #3541](https://github.com/drsapaev/final/pull/3541) | | `EVIDENCE.md#t04-pr-open` |
 | T05 | PLANNED | | | |
 | T06 | PLANNED | | | |
 | T07 | PLANNED | | | |
@@ -46,9 +46,9 @@ Last updated: 2026-10-01T12:58:11+05:00
 - Completed for T04: fresh worktree from `origin/main` at `1e781da72`; canonical/legacy and seed paths inspected; red-first backend tests reproduced the fallback/error behavior; endpoint and UI fixes added; the old dependent fixture now supplies one explicit `ecg` backend profile. Focused backend/frontend tests, full Vitest (311 files / 2,880 tests), strict type check, full lint, theme and icon-control checks, production build, and all 86 Chromium tests across the six Tier 1 specs passed. Exact commands and environment notes are in `EVIDENCE.md#t04-final-validation`.
 - Validation notes: full lint exited 0 with 0 errors and 3,514 warnings. Direct scoped ESLint passed; the repository's local ESLint pre-commit hook has a path mismatch after changing directory to `frontend`, reproduced on the implementation and final test/evidence commits. Only that hook is skipped on retry; all other hooks remain enabled. Pinned Ruff-format and Black hooks passed after their formatting-only changes. The first Windows browser run lacked platform-specific Win32 snapshots; generated untracked images were removed. The complete browser suite passed against checked-in Linux baselines in an isolated WSL ext4 copy; no snapshots or package manifests were changed.
 - Resolved finding: the empty-catalog integration test now asserts `success`, `profiles == []`, and `source == "database"`; the separate database-backed test still verifies canonical `settings_key`. The stale comment in `test_rq16b_direction_entry_methods.py` now distinguishes the removed public-read fallback from that test's independent archived-key guard.
-- Remaining: commit the focused backend regression/evidence update, push, open the PR, run PR body checks and GitHub CI, and obtain reviewer acknowledgment for the Tier 2 deferral before merge.
-- Blocker: no blocker to opening the PR. Tier 2 backend-dependent E2E remains formally DEFERRED and unpassed because no isolated synthetic staging/QA environment was available; do not merge until the deferral is recorded and acknowledged in the PR. Stop if the fix requires changing a join/admission contract, auth/RBAC, or seeding behavior beyond migration 0055.
-- Next exact action: record this commit and the formatter-hook reconciliation in the ledger, push `codex/aqs-T04-empty-profiles`, and open the T04 PR. Keep the reviewer acknowledgment checkbox unchecked until the reviewer confirms the Tier 2 deferral.
+- Remaining: the current PR head's applicable GitHub checks passed. The PR has no review decision; obtain reviewer acknowledgment for the separate T04 Tier 2 deferral, then complete the merge cycle.
+- Blocker: PR #3541 is open with no review decision. Tier 2 remains NOT RUN and reviewer acknowledgment is pending; do not merge until the deferral is acknowledged. Skipped workflow jobs are recorded as skipped, not passes. Stop if the fix requires changing a join/admission contract, auth/RBAC, or seeding behavior beyond migration 0055.
+- Next exact action: commit/push the final evidence checkpoint, recheck checks on the resulting PR head, then obtain reviewer acknowledgment for T04's Tier 2 deferral. Keep the reviewer acknowledgment checkbox unchecked until the reviewer confirms it.
 - The previous T03 worktree remains locally preserved with its separate documentation and QA scratch; it is not part of T04. Do not delete or overwrite those files during this task.
 
 ## Checkpoint rules for the next agent

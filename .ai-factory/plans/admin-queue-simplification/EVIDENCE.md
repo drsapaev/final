@@ -463,3 +463,25 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
 - Scope check: no runtime changes after `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`; no schema, seed, profile write, auth/RBAC, queue admission, QR selection, route, or production changes.
 - Result: local status `VALIDATED`; Tier 1 frontend evidence from `T04 final validation` remains current because this follow-up changes only backend tests and documentation. Tier 2 remains `DEFERRED`, not run, and needs reviewer acknowledgment as recorded above. PR not yet opened.
 - Next exact action: commit the final commit-reference update in the ledger, push the branch, create the PR, run body checks/GitHub CI, and leave Tier 2 acknowledgment pending for a reviewer.
+
+## T04 PR open — 2026-10-01T13:04:04+05:00
+
+- PR: [#3541](https://github.com/drsapaev/final/pull/3541), title `fix(queue): preserve empty profile catalogs`, branch `codex/aqs-T04-empty-profiles`, base `main` at `1e781da72bd927926b538b139a6c251cd09848b5`, PR head at creation `560860f724bf87874ed474bbe50cb5db1a245dd3`.
+- State: OPEN, not a draft; GitHub reported merge state `BLOCKED`, no review decision, and required checks were still running at the first snapshot. No merge or deployment was performed.
+- PR body gate: `scripts/run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py','--body-file','.t04-pr-body.md','--author','drsapaev')` — PASS, 19 gate tests and both sample bodies passed; the T04 body passed. The temporary body file was removed after PR creation.
+- Completed checks in the first GitHub snapshot: Hardcoded Russian Text Detector, GitGuardian, Locale Key Parity, PR Review Quality Gate, Recommend PR lifecycle state, Regression Audit Gate, gitleaks, secret scan, and CI Scope — PASS.
+- Pending at first snapshot: Analyze (actions/javascript-typescript/python), Frontend build, code quality, Backend tests, documentation generation, Context Boundary Integrity, Frontend E2E, Frontend unit tests, Frontend lint report, Python formatting report, and security scan. These are not treated as passed.
+- Skipped at first snapshot: Notify on failure, Telegram Mini App Release Gate, Metadata checks, Supabase Preview, classify-and-route, and Nightly DAST. Skipped jobs are not passes.
+- Tier 2: NOT RUN / deferred, with reason, evidence, owner, resume condition, headline impact, and an unchecked reviewer-acknowledgment field in the PR body. The user has not yet acknowledged T04's deferral; their earlier acknowledgment applied only to PR #3540.
+- Artifact: PR #3541 is attached to this Codex task.
+- Next exact action: wait for current-head checks and review, fix any red check in this PR, and ask the reviewer to acknowledge the Tier 2 deferral before merge.
+
+## T04 PR checks complete — 2026-10-01T13:17:16+05:00
+
+- Commit under test: PR head `560860f724bf87874ed474bbe50cb5db1a245dd3` (same head as PR creation).
+- Environment: GitHub Actions; PR #3541, branch `codex/aqs-T04-empty-profiles`.
+- Result: all checks applicable to this PR head completed successfully, including Backend tests, Frontend E2E, Frontend build, Frontend lint, Frontend unit tests, Frontend-Backend Parity, Context Boundary Integrity, Code Quality, documentation generation, CodeQL, gitleaks, GitGuardian, security scan, PR Required Gate, and the formatting, locale, regression, and scope gates.
+- Skipped checks: metadata, Supabase Preview, Telegram Mini App Release Gate, nightly DAST, Docker build, integration tests, k6 load tests, and staging/production readiness reports. These were skipped by workflow scope/conditions and are not reported as passes.
+- PR state: OPEN, `mergeStateStatus=CLEAN`, no review decision or latest review recorded. No merge or deployment was performed.
+- Tier 2: NOT RUN / deferred. The PR body lists its reason, evidence, owner, resume condition, and headline impact; reviewer-acknowledgment checkbox remains unchecked. The approval of Tier 2 deferral for PR #3540 does not acknowledge the separate T04 deferral.
+- Next exact action: commit and push this documentation checkpoint, recheck the resulting PR head's applicable checks, then obtain explicit reviewer acknowledgment of T04's Tier 2 deferral before merge.
