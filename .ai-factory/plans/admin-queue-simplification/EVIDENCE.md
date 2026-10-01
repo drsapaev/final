@@ -782,3 +782,122 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR: [#3545](https://github.com/drsapaev/final/pull/3545), OPEN at the code HEAD observed above; any docs-only checkpoint pushed afterward must have its own live checks revalidated.
 - Merge commit: none.
 - Next exact action: retain the passing-code evidence, verify any docs-only PR HEAD checks, then request the user's explicit merge decision. Do not start T06.2 before merge and synchronization.
+
+## T06.1 merge checkpoint — 2026-10-01T20:23:08+05:00
+
+- PR: [#3545](https://github.com/drsapaev/final/pull/3545).
+- Reviewed PR HEAD: `b24de29924207696c601d8f224b745aa192685f0`; GitHub reported `MERGEABLE`/`CLEAN`; applicable blocking checks passed. Path-aware frontend, staging/readiness, DAST, integration and load jobs were skipped; synthetic staging/browser validation remains NOT_RUN.
+- Authorization: user explicitly wrote “мержай и продолжай”.
+- Result: squash merge confirmed by GitHub; merge commit `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`.
+- Fresh base: `origin/main` fetched and advanced to the exact merge commit. T06.2 worktree created clean from this SHA; production checkout was not switched or modified.
+- Scope: T06.1 schema only; no feature-flag activation, production DB/process/configuration changes, or staging changes.
+
+## T06.2 kickoff — 2026-10-01T20:23:08+05:00
+
+- Mode: mandatory `gate` (queue creation policy/identity), from the new worktree.
+- Worktree/branch/base: `C:\final\_wt_aqs_t062_creation_policy`; `codex/aqs-T06.2-creation-policy`; base `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`.
+- Canonical anchors: `DailyQueue` policy fields now on main; `queue_resource_routing.effective_day_start_number`; T06.2 plan; doctor/resource XOR ADR and project queue ownership rules.
+- Initial gate result misrouted constructor changes to frontend route ownership and listed unrelated route files plus `_operations.py`, the model and a time-window test.
+- One permitted retry used confirmed root `backend/app/services/queue_svc/_operations.py`. Gate returned `mode=narrow_override`, `gate_misroute=true`, `override_used=true`, and allowed only that file. No third gate attempt will be made.
+- Narrow-override basis: the user-approved plan explicitly requires one projected shared backend calculation and enumerates runtime constructors across queue service, CRUD, GraphQL, repositories, plus explicit classification of force-majeure/seed/migration paths. Manual boundary is restricted to that exact task and focused tests; no schema, admission enforcement, cutoff, API/UI, feature-flag activation, or production/staging.
+- Source inventory (literal `DailyQueue(` at runtime): queue service (resource + doctor), CRUD online queue (multiple online/open/resource/doctor paths), GraphQL untagged doctor path, queue API repository (doctor + resource), queue limits repository, visit confirmation repository (doctor + resource), force-majeure service, demo seed, migration service (legacy queue import + backup restore).
+- Compatibility classification: force-majeure is an active command creating target-day queues and remains in runtime scope; demo seed is synthetic and remains a legacy seed; migration-service `_get_or_create_daily_queue` imports historical records and remains legacy. Backup restore is a state-transfer path, not a defaults constructor. Source confirms `backup_queue_data` currently omits `policy_version`/`online_issued_count`, and `restore_queue_data` defaults them implicitly, so a v1 backup would restore as legacy/zero. This is a concrete data-preservation defect.
+- Scope refinement — 2026-10-01T20:31:19+05:00: include `backend/app/services/migration_service.py` only for those two fields in backup serialization and restore; test in `backend/tests/unit/test_migration_service.py`, including old payload missing the fields. This is directly required by the approved plan's migration-service classification and queue-state preservation invariant. No changes to historical import creation, backup endpoints, schema, or unrelated serialized fields.
+- Allowed first touch: new `backend/app/crud/daily_queue_creation_policy.py` (shared calculation); `backend/app/services/queue_svc/_operations.py`; `backend/app/crud/online_queue.py`; `backend/app/graphql/mutations.py`; `backend/app/repositories/queue_api_repository.py`; `backend/app/repositories/queue_limits_repository.py`; `backend/app/repositories/visit_confirmation_repository.py`; `backend/app/services/force_majeure_service.py`; `backend/app/services/migration_service.py` restricted to backup serialization/restore; new `backend/tests/unit/test_daily_queue_creation_policy.py`; `backend/tests/unit/test_migration_service.py`; only necessary direct regressions; plan-memory files. Denied: schema/migrations/model, `dev_seed.py`, `migration_service._get_or_create_daily_queue`, admission/quota enforcement, time-window policy, ordinary public/admin API contracts, frontend, feature-flag activation, production/staging.
+- Initial validation target: policy helper default-off/opt-in tests; constructor parity for doctor/resource owners; no change to existing objects; start-number inheritance; focused queue tests and `git diff --check`. PostgreSQL migration test is not needed unless schema or a database contract enters scope.
+- Result at kickoff: baseline inventory ongoing; no runtime edits; blocker none yet.
+- Next exact action: implement the shared policy calculator/runtime call sites and the narrow additive backup round-trip preservation, then run focused checks.
+
+## T06.2 implementation checkpoint — 2026-10-01T21:03:20+05:00
+
+- Commit under test: uncommitted T06.2 diff in worktree; base/HEAD `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`, equal to fetched `origin/main`.
+- Environment: Windows worktree; Python 3.11.9, pytest 8.4.2; disposable test-only SQLite selected with `DATABASE_URL=sqlite://` and `ALLOW_SQLITE_DATABASE_URL=1`. The queue creation flag was set only in the test process for runtime-adapter checks.
+- Execution mode: mandatory `gate` for queue creation policy, followed by one `--known-root-cause backend/app/services/queue_svc/_operations.py` retry. The gate misrouted constructors to frontend routing and the retry returned a one-file `narrow_override`; the user-approved plan is the documented basis for the bounded constructor allowlist. `gate_misroute=true`, `override_used=true`, no third attempt.
+- Allowed paths: new `backend/app/crud/daily_queue_creation_policy.py`; `backend/app/services/queue_svc/_operations.py`; `backend/app/crud/online_queue.py`; `backend/app/graphql/mutations.py`; `backend/app/repositories/queue_api_repository.py`; `backend/app/repositories/queue_limits_repository.py`; `backend/app/repositories/visit_confirmation_repository.py`; `backend/app/services/force_majeure_service.py`; `backend/app/services/migration_service.py` only for backup serialization/restore; focused tests in `backend/tests/unit/test_daily_queue_creation_policy.py` and `backend/tests/unit/test_migration_service.py`; these plan-memory files.
+- Actual changed paths: the allowed paths above. No model, Alembic revision, database/schema contract, seed, historic import constructor, admission/quota enforcement, cutoff, ordinary API/UI, production config, or deployment path changed.
+- Original behavior: T06.1 supplied legacy-safe policy/counter columns, but new runtime queues still relied on defaults and could not opt into the versioned snapshot. Backup/restore omitted both fields, so restoring a v1 queue could lose its policy and quota count.
+- Implementation: shared `daily_queue_creation_snapshot` defaults to `legacy`, returns count 0, and selects `daily_online_issuances_v1` only for newly constructed queues when `QUEUE_POLICY_V2_CREATION_ENABLED` is truthy. Doctor/resource ownership and effective start-number calculation remain delegated to the existing helper. Existing rows return before the calculator. The legacy CRUD constructor still honors an explicit `defaults["start_number"]`, now covered by regression. Backup/restore retains policy/count; old backups map to `legacy`/0. Synthetic seed and historical import remain legacy.
+- Validation commands/results:
+  - `scripts/run_backend_pytest.ps1 tests/unit/test_daily_queue_creation_policy.py tests/unit/test_migration_service.py tests/unit/test_queue_settings_command_scope.py` — PASS, 30 passed, 1 warning.
+  - `scripts/run_backend_pytest.ps1 tests/integration/test_queue_resource_runtime_switch.py -k '<8 resource/runtime adapter tests>'` with test-process creation flag enabled — PASS, 8 passed, 163 deselected, 1 warning.
+  - `scripts/run_backend_pytest.ps1 tests/unit/test_queue_api_service.py tests/unit/test_queue_limits_api_service.py tests/unit/test_visit_confirmation_service.py tests/unit/test_force_majeure_api_service.py tests/unit/test_graphql_queue_claim_coordinator.py` with the test-process flag enabled — PASS, 22 passed, 1 warning.
+  - Four focused integration tests for GraphQL's untagged path, cabinet creation parity and doctor/resource force-majeure snapshots with the test-process flag enabled — PASS, 4 passed, 1 warning.
+  - `scripts/run_python.ps1 -RequireModule compileall -m compileall -q <changed Python files>` — PASS.
+  - `git diff --check` — PASS.
+  - Ruff import sorting over changed Python paths — PASS. Ruff check on the new helper/test and Ruff format/Black checks on those two files — PASS. Full-file Ruff check reports four unchanged findings: `C416` at `_operations.py:99` and `:1099`, and `F401` imports at `test_migration_service.py:8` and `:13`. Ruff with those two existing codes ignored passes all changed paths. Full-file Ruff format check reports legacy formatting drift in eight touched files outside this patch; no mass-formatting was applied. Repository pre-commit was NOT_RUN.
+- Result: focused behavior, compilation, import sorting and diff hygiene PASS. PostgreSQL and staging checks are NOT_RUN for T06.2; the separate T06.1 disposable-PostgreSQL evidence remains recorded above and is not represented as a T06.2 runtime test.
+- Scope check: the creation flag was never changed outside isolated test processes. Production checkout/database, shared staging, API contracts and UI were not touched. Existing queues, counters and owner identities are not rewritten.
+- Remaining limitation: constructor integration ran on SQLite, not disposable PostgreSQL; no staging/browser check was run. The worktree diff is not committed and no PR exists yet. Full-file Ruff/format warnings are pre-existing outside the changed hunks and should be made explicit in the PR evidence.
+- PR: none yet.
+- Merge commit: none.
+- Next exact action: final diff/allowlist review, commit/push this worktree branch, open T06.2 PR, and wait for exact-head checks. Do not start T07 before this PR cycle closes; do not activate the flag or deploy.
+
+## T06.2 final validation checkpoint — 2026-10-01T21:16:20+05:00
+
+- Commit under test: staged, uncommitted T06.2 implementation; branch HEAD/base `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`, equal to fetched `origin/main`.
+- Environment: Windows; Python 3.11.9, pytest 8.4.2; disposable test-only SQLite with `DATABASE_URL=sqlite://` and `ALLOW_SQLITE_DATABASE_URL=1`.
+- Final rerun: `scripts/run_backend_pytest.ps1 tests/unit/test_daily_queue_creation_policy.py tests/unit/test_migration_service.py tests/unit/test_queue_settings_command_scope.py tests/integration/test_qr_least_loaded_routing.py` — PASS, 54 passed, 1 warning. An initial collection attempt without the SQLite test environment failed before collecting; the rerun with the documented test-only environment passed.
+- Earlier focused constructor/runtime checks remain applicable: 8 integration tests + 22 unit tests + 4 GraphQL/cabinet/force-majeure integration tests passed; v1 flag was set only inside those test processes. `compileall`, `git diff --check`, new helper/test Ruff+format/Black, and changed-file import sorting passed.
+- Pre-commit: first full invocation exposed two existing C416 findings in `_operations.py` and formatter rewrites across legacy portions of eight touched files. The worktree was clean before hook execution; after reviewing the generated worktree-only formatting diff, it was reversed to avoid unrelated mass-formatting. The two C416 comprehensions were changed to equivalent `dict(rows)` conversions. Final run with `SKIP=ruff-format,black` — PASS for added-large-files, merge-conflict, private-key, EOF, trailing-whitespace, branch-name, gitleaks, and Ruff hooks. `ruff-format` and Black hooks are explicitly NOT_RUN in that final run; targeted format/Black checks for the new helper and test pass. Do not describe the complete pre-commit suite as green.
+- Result: 54 focused tests and applicable selected checks PASS. PostgreSQL and staging remain NOT_RUN for T06.2; the separately recorded T06.1 PostgreSQL evidence does not cover this runtime slice.
+- Scope check: only the original T06.2 allowlist was changed. The two style-equivalent `dict(rows)` edits are in the already-authorized `_operations.py`; EOF cleanup removes one extra terminal blank line. No seed, schema, quota enforcement, API/UI, feature-flag activation, production, or staging changes.
+- Remaining limitation: formatter hooks were skipped to prevent unrelated whole-file formatting churn. No PostgreSQL/staging proof yet. The branch diff is staged, not committed; no PR exists.
+- PR: none.
+- Merge commit: none.
+- Next exact action: commit, push and open the T06.2 PR; validate exact-head CI and document path-aware skipped jobs accurately. Do not start T07 or enable the feature flag.
+
+## T06.2 PR-open checkpoint — 2026-10-01T21:20:54+05:00
+
+- Code commit under review: `f0fd22170a5b433009ec476c89bebabd2fe86abf`; base `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`.
+- PR: [#3546](https://github.com/drsapaev/final/pull/3546), opened as draft against `main`; GitHub confirmed head `f0fd22170a5b433009ec476c89bebabd2fe86abf` and base `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` at creation.
+- Initial check snapshot: `gh pr checks 3546` showed applicable workflow checks pending. GitGuardian Security Checks passed; Supabase Preview, DAST, and classify-and-route were skipped. No check was treated as passed based on pending/skipped state.
+- This checkpoint changes only plan-memory documents. It will advance the PR head; re-read live PR metadata and wait for the applicable checks on the new exact head.
+- Merge: not performed. No merge authorization for T06.2 is inferred from the separate T05/#3543 deferral or merge decision.
+- Scope: no production or shared staging change; v1 creation remains disabled unless configured.
+- Next exact action: push this PR_OPEN checkpoint and inspect checks for the resulting exact PR head.
+
+## T06.2 CI checkpoint — 2026-10-01T21:49:24+05:00
+
+- Commit under CI: `fdc8985724b0964984db6f55998cecc924730cbf`; base `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`.
+- PR: [#3546](https://github.com/drsapaev/final/pull/3546), OPEN/DRAFT at the time of check; GitHub mergeability was CLEAN after required jobs completed. No merge was performed.
+- Unified CI: [run 36891804601](https://github.com/drsapaev/final/actions/runs/36891804601) — PASS. Backend tests passed in PostgreSQL-backed CI, including RLS guard, QR/concurrency probe, and Critical E2E Smoke; Code Quality including formatting, Context Boundary Integrity, docs generation/OpenAPI freshness, Frontend–Backend Parity, CI Scope, PR Required Gate, and notifications passed.
+- Additional applicable checks: CodeQL (Python, JavaScript/TypeScript, Actions), gitleaks, security scanning, and GitGuardian passed. The initial PR Review Quality Gate failed only because the first PR body omitted required sections. After completing the body, the local checker passed and [PR Review Quality Gate run 36894736733](https://github.com/drsapaev/final/actions/runs/36894736733) passed on the same code head.
+- Path-aware skipped jobs: frontend build/unit/lint/E2E, DAST, Supabase Preview, Docker build, Unified Security scan, integration jobs, production/staging readiness, and load tests. Skipped jobs are not PASS. Synthetic staging/browser validation remains NOT_RUN.
+- Result: applicable GitHub CI gates PASS for `fdc89857`. This is not staging evidence and does not authorize production activation. Local disposable-PG runtime testing for T06.2 was not run; the GitHub backend suite used PostgreSQL CI infrastructure.
+- Scope: PR description and plan-memory evidence only changed after the CI observation; runtime code commit remains `f0fd2217`. This evidence-only checkpoint will advance the branch head, so verify current PR HEAD/checks before any merge decision.
+- Remaining: PR #3546 is still a draft awaiting the user's PR-specific merge/deferral decision. Do not start T07 until merge and fresh-main synchronization.
+- Next exact action: push this final plan-memory checkpoint, re-read the new exact PR head/checks, then present the concrete merge decision with staging limitation stated.
+
+## T06.2 rebase and local validation checkpoint — 2026-10-01T22:11:56+05:00
+
+- Commit under test: post-rebase worktree `e4776ca4f5020bfc3a1483406d31347849c2ed81`; runtime code commit after rebase `31ad36739`.
+- Environment: Windows worktree `C:\final\_wt_aqs_t062_creation_policy`, Python 3.11.9, isolated SQLite test configuration.
+- Execution mode: continuation of the approved T06.2 implementation PR cycle; no production checkout or service touched.
+- Allowed paths: the existing T06.2 constructor helper/adapters, backup compatibility tests, and plan-memory checkpoint files. No runtime scope expansion.
+- Actual changed paths: this checkpoint updates only plan/progress/resume/evidence context; rebase itself changed commit IDs but no file content relative to the pre-rebase branch.
+- Original failure: not applicable; this is a synchronization checkpoint after `origin/main` advanced.
+- Validation command: `scripts/run_backend_pytest.ps1 tests/unit/test_daily_queue_creation_policy.py tests/unit/test_migration_service.py tests/unit/test_queue_settings_command_scope.py tests/integration/test_qr_least_loaded_routing.py`, with isolated SQLite environment; `git diff --check`.
+- Result: PASS — 54 tests, 1 warning; `git diff --check` passed. This is local SQLite proof, not disposable PostgreSQL or staging proof.
+- Scope check: `origin/main` advanced to `575fde4d444bca4efd97cbe2cfcf401e121f196b` through CI-only PR #3547. Rebase completed without conflict. T06.2 source remains unchanged. Pre-rebase CI is historical only; GitHub checks for the pushed rebased exact head are NOT_RUN at this checkpoint.
+- Relevant output or artifact: local pytest output reported `54 passed, 1 warning`; branch HEAD before this documentation commit was `e4776ca4f5020bfc3a1483406d31347849c2ed81`.
+- Remaining limitation: local disposable-PG and synthetic staging/browser validation remain NOT_RUN. No feature flag activation, production mutation, or deployment.
+- PR: [#3546](https://github.com/drsapaev/final/pull/3546), draft until checks and readiness are refreshed.
+- Merge commit: none yet.
+- Next exact action: push rebased branch with lease, mark PR ready, verify applicable exact-head checks and mergeability, then merge under the user's current “мержай и продолжай” instruction. Only after merge, sync fresh `origin/main` and start T07 with its mandatory execution gate.
+
+## T06.2 second base refresh checkpoint — 2026-10-01T22:30:40+05:00
+
+- Commit under test: local second-rebase worktree `d233174ce40ccde7d7ab03aeae47483b872f8a6b`; runtime code commit `3452aad75`.
+- Environment: Windows worktree `C:\final\_wt_aqs_t062_creation_policy`, Python 3.11.9, isolated SQLite test configuration.
+- Execution mode: continuation of the approved T06.2 implementation PR cycle; no production checkout or service touched.
+- Allowed paths: the existing T06.2 constructor helper/adapters, backup compatibility tests, and plan-memory checkpoint files. No runtime scope expansion.
+- Actual changed paths: plan/progress/resume/evidence checkpoint files only; the rebase itself introduced no T06.2 source changes.
+- Original failure: not applicable; GitHub `main` advanced while exact-head checks were completing.
+- Validation command: `scripts/run_backend_pytest.ps1 tests/unit/test_daily_queue_creation_policy.py tests/unit/test_migration_service.py tests/unit/test_queue_settings_command_scope.py tests/integration/test_qr_least_loaded_routing.py`, with isolated SQLite environment; `git diff --check`.
+- Result: PASS — 54 tests, 1 warning; `git diff --check` passed. This is local SQLite proof, not disposable PostgreSQL or staging proof.
+- Scope check: `origin/main` advanced from `575fde4d` to `1358c70b` through CI-only PR #3550, which adds a mutation-test deselection in `backend/pyproject.toml`. Second rebase completed without conflict. Pre-second-rebase full CI passed on `f04ca94a`; GitHub checks for the next pushed head remain NOT_RUN.
+- Relevant output or artifact: local pytest reported `54 passed, 1 warning`; `git diff` confirms the new base's only change is mutation-test selection.
+- Remaining limitation: local disposable-PG and synthetic staging/browser validation remain NOT_RUN. No feature-flag activation, production mutation, or deployment.
+- PR: [#3546](https://github.com/drsapaev/final/pull/3546), ready for review.
+- Merge commit: none yet.
+- Next exact action: push this checkpoint with `--force-with-lease`, wait for exact-head checks, then merge promptly if checks pass and merge state is clean. Sync current `origin/main` after merge before T07.

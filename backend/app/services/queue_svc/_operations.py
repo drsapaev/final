@@ -12,8 +12,8 @@ from sqlalchemy.exc import IntegrityError
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import expand_queue_tags
 from app.crud import queue_resource_routing
+from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.crud.queue_resource_routing import (
-    effective_day_start_number,
     lock_queue_tag_claim_scope,  # Round-6 (P1-2): canonical batch pre-lock
 )
 from app.models.online_queue import QueueResource
@@ -96,7 +96,7 @@ def _unbookable_doctor_ids(
             .group_by(OnlineQueueEntry.queue_id)
             .all()
         )
-        active_counts = {queue_id: count for queue_id, count in count_rows}
+        active_counts = dict(count_rows)
 
     for queue in queues:
         if queue.specialist_id in unbookable:
@@ -529,8 +529,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     # RQ-13.b (D-06, E-039): снимок применённого стартового
                     # номера реестра — дальнейшие изменения живой строки
                     # реестра не сдвигают базовую линию действующего дня.
-                    start_number=effective_day_start_number(
-                        db, resource=resource, queue_tag=queue_tag
+                    **daily_queue_creation_snapshot(
+                        db,
+                        resource=resource,
+                        queue_tag=queue_tag,
+                        settings=queue_settings,
                     ),
                     # Codex round-7 P1: кабинет ОБЩЕЙ очереди тега — из
                     # реестра (default_cabinet; сиды 0059 держат NULL —
@@ -676,8 +679,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             max_online_entries=defaults.get("max_online_entries"),
             # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
             # дня (владелец → клиника) — живые настройки не сдвигают день.
-            start_number=effective_day_start_number(
-                db, doctor=doctor, queue_tag=queue_tag, settings=settings
+            **daily_queue_creation_snapshot(
+                db,
+                doctor=doctor,
+                queue_tag=queue_tag,
+                settings=settings,
             ),
             cabinet_number=defaults.get("cabinet_number"),
             cabinet_floor=defaults.get("cabinet_floor"),
@@ -1090,7 +1096,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             # look loaded.
             load_query = load_query.filter(DailyQueue.queue_tag == queue_tag)
         load_rows = load_query.group_by(DailyQueue.specialist_id).all()
-        active_loads = {specialist_id: count for specialist_id, count in load_rows}
+        active_loads = dict(load_rows)
 
         # Codex round-1 P1: rank BOOKABLE doctors first (see docstring).
         unbookable_ids = _unbookable_doctor_ids(db, doctors, day, queue_tag)
