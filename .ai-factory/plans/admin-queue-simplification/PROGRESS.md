@@ -5,15 +5,15 @@ Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 20
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T06.2
-Current status: VALIDATED (runtime constructors wired; 54 focused tests pass; selected pre-commit hooks pass; PR not opened)
+Current status: PR_OPEN (draft PR #3546; initial code head `f0fd2217`; checks pending at opening)
 Last completed task: T06.1 — MERGED
 Worktree: `C:\final\_wt_aqs_t062_creation_policy`
 Branch: `codex/aqs-T06.2-creation-policy`
 Base commit: `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`
-Current commit: `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`
-Last updated: 2026-10-01T21:16:20+05:00
+Current commit: code commit `f0fd22170a5b433009ec476c89bebabd2fe86abf`; verify actual branch HEAD after this docs checkpoint
+Last updated: 2026-10-01T21:20:54+05:00
 
-> T00–T06.1 are confirmed MERGED. T06.2 is VALIDATED locally and awaits PR. #3543 staging deferral is separate and staging remains NOT_RUN. No feature-flag activation or production deploy is authorized.
+> T00–T06.1 are confirmed MERGED. T06.2 PR #3546 is open as draft; checks were pending at opening. #3543 staging deferral is separate and staging remains NOT_RUN. No feature-flag activation or production deploy is authorized.
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -24,7 +24,7 @@ Last updated: 2026-10-01T21:16:20+05:00
 | T04 | MERGED | `codex/aqs-T04-empty-profiles` / [PR #3541](https://github.com/drsapaev/final/pull/3541) | `ecc14b05411c7e7b54efca2966416cd6a69df37c` | `EVIDENCE.md#t04-merge-checkpoint` |
 | T05 | MERGED | `codex/aqs-T05-settings-cache` / [PR #3543](https://github.com/drsapaev/final/pull/3543) | `fd53206f03b0361de6fc345f53b2bacf4195845c` | `EVIDENCE.md#t05-merge-checkpoint` |
 | T06.1 | MERGED | `codex/aqs-T06-policy-schema` / [PR #3545](https://github.com/drsapaev/final/pull/3545) | `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` | `EVIDENCE.md#t06.1-merge-checkpoint` |
-| T06.2 | VALIDATED | `codex/aqs-T06.2-creation-policy` | | `EVIDENCE.md#t06.2-final-validation-checkpoint` |
+| T06.2 | PR_OPEN | `codex/aqs-T06.2-creation-policy` / [PR #3546](https://github.com/drsapaev/final/pull/3546) | | `EVIDENCE.md#t06.2-pr-open-checkpoint` |
 | T07 | PLANNED | | | |
 | T08 | PLANNED | | | |
 | T09 | PLANNED | | | |
@@ -46,16 +46,16 @@ Last updated: 2026-10-01T21:16:20+05:00
 - Validation after merge: six focused queue unit files passed on `fd53206f` — 24 passed, 1 warning, Python 3.11.9 and isolated SQLite fixture. This is not PostgreSQL/staging proof. Earlier source lint/compile/hook results and baseline formatting limitations remain in timestamped T05 evidence.
 - Base/cleanup: production checkout was clean `main` and fast-forwarded to `fd53206f`. No production process restarted, data queried, feature flag toggled or deployment settings changed. T05 runtime branch removed locally/remotely; detached worktree retained with untracked scratch. Earlier T03 local documents/scratch remain untouched.
 - Documentation checkpoint #3544 is MERGED in `1af792e82935e10ae9b60a374ce5f149d2de0616`; clean main was fetched, then the T06 worktree was created from that fresh origin/main. The five plan-memory files and RESUME are now present in main.
-- Current T06.2 base: branch created from fetched `origin/main` at the T06.1 merge SHA. Production checkout was not switched. Current branch still has that base HEAD; validated implementation is staged in the isolated worktree.
+- Current T06.2 base: branch created from fetched `origin/main` at the T06.1 merge SHA. Code commit `f0fd2217` was pushed and opened as draft PR #3546. A docs-only progress checkpoint follows; verify actual local/GitHub HEAD before reviewing checks. Production checkout was not switched.
 - Gate: initial task route misclassified runtime constructors as frontend routing. One retry with confirmed root `backend/app/services/queue_svc/_operations.py` returned `narrow_override` with only that file. The approved user plan explicitly requires a projected shared calculation and enumerates the other runtime writer modules; manual boundaries are limited to those named constructors, one new helper module, focused tests, and this plan-memory checkpoint. `gate_misroute=true`, `override_used=true`, `known_root_cause_file=backend/app/services/queue_svc/_operations.py`. No third gate attempt.
 - Canonical source inventory: literal runtime constructors found in queue service, CRUD, GraphQL, queue API/limits/visit-confirmation repositories, and force-majeure service. `dev_seed.py` is a synthetic seed path. `migration_service._get_or_create_daily_queue` imports historical records and remains legacy. Its backup/restore path is an actual state-transfer writer: export currently omits the new version/count, so restoring a v1 queue would silently restore it as legacy/zero.
 - First-touch scope before implementation: new `backend/app/crud/daily_queue_creation_policy.py`; `backend/app/services/queue_svc/_operations.py`; `backend/app/crud/online_queue.py`; `backend/app/graphql/mutations.py`; `backend/app/repositories/queue_api_repository.py`; `backend/app/repositories/queue_limits_repository.py`; `backend/app/repositories/visit_confirmation_repository.py`; `backend/app/services/force_majeure_service.py`; `backend/app/services/migration_service.py` restricted to backup serialization/restore; new `backend/tests/unit/test_daily_queue_creation_policy.py`; `backend/tests/unit/test_migration_service.py`; only directly necessary focused regressions; plan progress/evidence files. Denied: schema/migrations/model, `dev_seed.py`, `migration_service._get_or_create_daily_queue`, admission enforcement, cutoff, API/UI contracts, flag activation, production/staging.
 - Validation target: unit tests for default-off/opt-in creation metadata and start-number inheritance; creator parity for doctor/resource identities; existing focused queue/service tests; `git diff --check`. Re-run PostgreSQL only if this patch changes schema or an actual DB-level contract.
 - Completed in the current worktree: shared `daily_queue_creation_snapshot` selects legacy by default and `daily_online_issuances_v1` only for new rows when `QUEUE_POLICY_V2_CREATION_ENABLED` is truthy; active doctor/resource constructors route through it; existing rows are reused unchanged; backup/restore preserves version/count and treats old backups as legacy/0. Synthetic seed and historical import remain legacy.
 - Validation: the final rerun passed 54 focused unit/integration tests (policy, backup/settings, and least-loaded routing). Earlier focused runtime-adapter runs passed 8 + 22 + 4 tests. Python compileall and `git diff --check` passed. Test DB was SQLite only. New helper/test Ruff and Black/format checks pass; import sorting passes. Ruff and non-format pre-commit hooks pass after two equivalent `dict(rows)` cleanup edits. `ruff-format` and Black pre-commit hooks were skipped on the final run because their whole-file edits would reformat unrelated legacy code; see `EVIDENCE.md#t06.2-final-validation-checkpoint`.
-- Remaining: commit, push and open the T06.2 PR; recheck exact-head CI and record skipped jobs accurately. PostgreSQL/staging evidence is NOT_RUN for this patch; T06.1's disposable-PG proof remains in its own evidence. T07–T18 remain planned.
+- Remaining: push the PR progress checkpoint, then recheck exact-head CI and record skipped jobs accurately. PostgreSQL/staging evidence is NOT_RUN for this patch; T06.1's disposable-PG proof remains in its own evidence. T07–T18 remain planned.
 - Blocker: none currently. Stop if a writer has unclear online vs staff/import semantics or preserving its snapshot needs a product decision.
-- Next exact action: commit/push this branch and open one T06.2 PR with SQLite-versus-PG/staging limitations and the skipped whole-file formatter hooks stated clearly.
+- Next exact action: push the documentation checkpoint and inspect the new exact PR head and applicable checks; do not merge until the PR-specific review/authorization gate is satisfied.
 - Checks to rerun after the next code change: helper and backup round-trip unit tests, changed-constructor integration tests, Ruff import check/new-file lint, compileall, and `git diff --check`. Do not run a repo-wide formatter over legacy files; it would rewrite unrelated existing sections.
 - Baseline: DailyQueue is the existing `daily_queues` table, owns exactly one doctor or queue resource, and stores frozen day snapshots. Fresh main had one Alembic head, `0076_derma_history_read_order`; the active worktree now has the new single head `0077_daily_queue_policy`.
 - Current patch: revision 0077 adds non-null `policy_version` (`legacy` default) and `online_issued_count` (0 default), with checks limiting policy values and rejecting negative counts. `DailyQueue` mirrors defaults and constraints. Existing queue ownership and snapshot columns are untouched. No admission writer, constructor, flag, endpoint or UI is changed.

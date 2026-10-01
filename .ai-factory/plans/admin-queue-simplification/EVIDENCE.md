@@ -845,3 +845,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR: none.
 - Merge commit: none.
 - Next exact action: commit, push and open the T06.2 PR; validate exact-head CI and document path-aware skipped jobs accurately. Do not start T07 or enable the feature flag.
+
+## T06.2 PR-open checkpoint — 2026-10-01T21:20:54+05:00
+
+- Code commit under review: `f0fd22170a5b433009ec476c89bebabd2fe86abf`; base `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`.
+- PR: [#3546](https://github.com/drsapaev/final/pull/3546), opened as draft against `main`; GitHub confirmed head `f0fd22170a5b433009ec476c89bebabd2fe86abf` and base `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` at creation.
+- Initial check snapshot: `gh pr checks 3546` showed applicable workflow checks pending. GitGuardian Security Checks passed; Supabase Preview, DAST, and classify-and-route were skipped. No check was treated as passed based on pending/skipped state.
+- This checkpoint changes only plan-memory documents. It will advance the PR head; re-read live PR metadata and wait for the applicable checks on the new exact head.
+- Merge: not performed. No merge authorization for T06.2 is inferred from the separate T05/#3543 deferral or merge decision.
+- Scope: no production or shared staging change; v1 creation remains disabled unless configured.
+- Next exact action: push this PR_OPEN checkpoint and inspect checks for the resulting exact PR head.
