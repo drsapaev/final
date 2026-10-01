@@ -20,7 +20,7 @@ The user resumed implementation with “Продолжай реализации 
 - Applicable T05 CI gates passed. Merged-tree focused tests: 24 passed, 1 warning. Local PostgreSQL integration, synthetic staging/browser E2E and cold/repeat timing are NOT_RUN. Skipped jobs are not PASS.
 - The executing agent accepted a bounded #3543/T05 deferral under the user's explicit delegation. Original requirement, reason, evidence, owner, resume condition and headline impact are in DECISIONS/EVIDENCE. No GitHub author-approval review was invented. Prior PR acknowledgments were not inherited.
 - T03 already fixed omitted-day cabinet Sync to `clinic_today(db)` after the user's P1 review. Do not reopen that closed defect from obsolete planning text.
-- Documentation closure branch: `codex/aqs-T05-closure`, worktree `C:\final\_wt_aqs_t05_closure`, base `fd53206f`. Verify the live closure PR merge before the next runtime cycle. Subsequent closure commits change the five plan-memory files only.
+- Documentation closure: [PR #3544](https://github.com/drsapaev/final/pull/3544), branch `codex/aqs-T05-closure`, worktree `C:\final\_wt_aqs_t05_closure`, base `fd53206f`. Verify its live merge/current-head checks before the next runtime cycle. Closure commits change the five plan-memory files only.
 
 Check actual git status/HEAD and GitHub PR state first. If they differ from this record, restore the factual checkpoint before editing. Timestamped EVIDENCE entries with PR_OPEN are historical, not current instructions.
 
