@@ -9540,10 +9540,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Дата в формате YYYY-MM-DD",
+              "description": "Дата в формате YYYY-MM-DD; по умолчанию текущий день клиники",
               "title": "Day"
             },
-            "description": "Дата в формате YYYY-MM-DD"
+            "description": "Дата в формате YYYY-MM-DD; по умолчанию текущий день клиники"
           },
           {
             "name": "specialist_id",
@@ -9640,9 +9640,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Queue Cabinet Info Api V1 Admin Queues  Queue Id  Cabinet Info Get"
+                  "$ref": "#/components/schemas/QueueCabinetResponse"
                 }
               }
             }
@@ -101859,6 +101857,44 @@
             "type": "string",
             "title": "Day"
           },
+          "owner_type": {
+            "type": "string",
+            "enum": [
+              "doctor",
+              "resource"
+            ],
+            "title": "Owner Type"
+          },
+          "owner_id": {
+            "type": "integer",
+            "title": "Owner Id"
+          },
+          "owner_name": {
+            "type": "string",
+            "title": "Owner Name"
+          },
+          "owner_default_cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Default Cabinet"
+          },
+          "queue_resource_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Resource Id"
+          },
           "specialist_id": {
             "anyOf": [
               {
@@ -101972,6 +102008,11 @@
         "required": [
           "id",
           "day",
+          "owner_type",
+          "owner_id",
+          "owner_name",
+          "owner_default_cabinet",
+          "queue_resource_id",
           "specialist_id",
           "specialist_name",
           "queue_tag",

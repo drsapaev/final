@@ -86,8 +86,11 @@ class QueueDomainService:
         )
         return QueueSnapshot(queue=queue, entries=entries)
 
-    def _resolve_specialist_name(self, specialist_id: int) -> str:
-        specialist = self.read_repository.get_doctor(specialist_id)
+    def _resolve_specialist_name(
+        self, specialist_id: int, specialist: Any | None = None
+    ) -> str:
+        if specialist is None:
+            specialist = self.read_repository.get_doctor(specialist_id)
         if specialist and specialist.user:
             user = specialist.user
             return user.full_name or user.username or f"Специалист #{specialist_id}"
@@ -113,6 +116,13 @@ class QueueDomainService:
                 "specialist_name": (
                     resource.display_name if resource else "Ресурс очереди"
                 ),
+                "owner_type": "resource",
+                "owner_id": queue.queue_resource_id,
+                "owner_name": resource.display_name if resource else "Ресурс очереди",
+                "owner_default_cabinet": (
+                    resource.default_cabinet if resource else None
+                ),
+                "queue_resource_id": queue.queue_resource_id,
                 "queue_tag": queue.queue_tag,
                 "cabinet_number": queue_cabinet,
                 "doctor_cabinet": None,
@@ -143,19 +153,30 @@ class QueueDomainService:
             sync_status = "doctor_cabinet_missing"
             integrity_warnings.append("doctor_cabinet_missing")
         elif queue_cabinet != doctor_cabinet:
-            sync_status = "stale"
-            integrity_warnings.append("queue_cabinet_stale")
+            # DailyQueue.cabinet_number is a saved day assignment. It remains
+            # valid when the owner's current default changes; report the
+            # difference as information instead of calling the snapshot stale.
+            sync_status = "default_differs"
         else:
             sync_status = "synced"
 
         if not effective_cabinet:
             integrity_warnings.append("effective_cabinet_missing")
 
+        owner_name = self._resolve_specialist_name(
+            queue.specialist_id, specialist=doctor
+        )
+
         return {
             "id": queue.id,
             "day": queue.day.isoformat(),
             "specialist_id": queue.specialist_id,
-            "specialist_name": self._resolve_specialist_name(queue.specialist_id),
+            "specialist_name": owner_name,
+            "owner_type": "doctor",
+            "owner_id": queue.specialist_id,
+            "owner_name": owner_name,
+            "owner_default_cabinet": doctor_cabinet,
+            "queue_resource_id": None,
             "queue_tag": queue.queue_tag,
             "cabinet_number": queue_cabinet,
             "doctor_cabinet": doctor_cabinet,
@@ -255,8 +276,9 @@ class QueueDomainService:
                     queue_id=daily_queue.id
                 )
                 queue_opened = daily_queue.opened_at is not None
-                max_entries = daily_queue.max_online_entries or max_per_day_settings.get(
-                    doctor.specialty, 15
+                max_entries = (
+                    daily_queue.max_online_entries
+                    or max_per_day_settings.get(doctor.specialty, 15)
                 )
             else:
                 daily_queue = self.read_repository.get_queue_by_specialist_day(
@@ -284,11 +306,14 @@ class QueueDomainService:
                     "max_entries": max_entries,
                     "limit_reached": current_entries >= max_entries,
                     "queue_opened": queue_opened,
-                    "online_available": (not queue_opened and current_entries < max_entries),
+                    "online_available": (
+                        not queue_opened and current_entries < max_entries
+                    ),
                 }
             )
 
         return result
+
     def get_queue_groups_payload(self) -> dict[str, Any]:
         from app.services.service_mapping import (
             QUEUE_GROUPS,
