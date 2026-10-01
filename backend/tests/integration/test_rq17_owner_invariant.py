@@ -174,6 +174,8 @@ def test_pin1_post_active_resource_on_requires_doctor_tag_rejected(
     _make_service(
         db_session, name="УЗИ с врачом", queue_tag="usound", requires_doctor=True
     )
+    _make_resource(db_session, code="rq17-existing", queue_tag="existing-rq17")
+    resource_count_before = db_session.query(QueueResource).count()
     from app.api.v1.endpoints.qr_queue import _resources
 
     with pytest.raises(HTTPException) as exc_info:
@@ -188,7 +190,11 @@ def test_pin1_post_active_resource_on_requires_doctor_tag_rejected(
             current_user=admin,
         )
     assert exc_info.value.status_code == 409
-    assert db_session.query(QueueResource).count() == 0
+    assert db_session.query(QueueResource).count() == resource_count_before
+    assert (
+        db_session.query(QueueResource).filter(QueueResource.code == "usound-r").count()
+        == 0
+    )
 
 
 def test_pin2_post_active_resource_on_mixed_tag_rejected(
@@ -417,9 +423,7 @@ def test_pin10_retag_moves_last_doctorless_out_of_resource_tag_rejected(
     service = _make_service(db_session, name="Анализ A", queue_tag="taga10")
     svc = ServicesApiService(db_session)
     with pytest.raises(OwnerInvariantViolation):
-        svc.update_service(
-            service_id=service.id, service_data={"queue_tag": "tagb10"}
-        )
+        svc.update_service(service_id=service.id, service_data={"queue_tag": "tagb10"})
     db_session.rollback()  # отбросить незакоммиченный flush (как get_db teardown)
     db_session.expire_all()
     assert db_session.get(Service, service.id).queue_tag == "taga10"
@@ -437,9 +441,7 @@ def test_pin11_retag_moves_requires_doctor_into_resource_tag_rejected(
     )
     svc = ServicesApiService(db_session)
     with pytest.raises(OwnerInvariantViolation):
-        svc.update_service(
-            service_id=service.id, service_data={"queue_tag": "tagb11"}
-        )
+        svc.update_service(service_id=service.id, service_data={"queue_tag": "tagb11"})
     db_session.rollback()  # отбросить незакоммиченный flush (как get_db teardown)
     db_session.expire_all()
     assert db_session.get(Service, service.id).queue_tag == "taga11"
@@ -617,9 +619,7 @@ def test_batch_update_missing_ids_reported_found_updated(
         service_ids=[service.id, 10_000_001], updates={"price": 42}
     )
     assert updated == [service.id]
-    assert failed == [
-        {"service_id": 10_000_001, "error": "Услуга не найдена"}
-    ]
+    assert failed == [{"service_id": 10_000_001, "error": "Услуга не найдена"}]
 
 
 def test_batch_update_endpoint_maps_invariant_to_409(
@@ -655,6 +655,7 @@ def test_batch_update_endpoint_maps_invariant_to_409(
 
 
 # ===================== пины 5/9/12: конкурентные writer-ы (PostgreSQL) =====================
+
 
 def _pg_engine_factory():
     """Схема-per-test PostgreSQL engine (прецедент
@@ -769,9 +770,7 @@ def test_pin5_concurrent_resource_activation_vs_requires_doctor_flip(
         SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
         setup = SessionLocal()
         admin = _make_user(setup, username="rq17_pg_admin5")
-        resource = _make_resource(
-            setup, code="lab5-r", queue_tag="lab5", active=False
-        )
+        resource = _make_resource(setup, code="lab5-r", queue_tag="lab5", active=False)
         service = _make_service(setup, name="Анализ L01", queue_tag="lab5")
         setup.commit()
         setup.close()
@@ -808,9 +807,7 @@ def test_pin5_concurrent_resource_activation_vs_requires_doctor_flip(
         )
         check = SessionLocal()
         try:
-            validate_tag_owner_invariant(
-                check, "lab5", clinic_today(check)
-            )
+            validate_tag_owner_invariant(check, "lab5", clinic_today(check))
         finally:
             check.close()
     finally:
@@ -963,9 +960,7 @@ def test_pin13_same_service_concurrent_retag_vs_requires_doctor_flip(
         setup = SessionLocal()
         _make_resource(setup, code="rq13-r", queue_tag="rq13b", active=True)
         _make_service(setup, name="Остаток B", queue_tag="rq13b")
-        service = _make_service(
-            setup, name="Переезд rq13a->rq13b", queue_tag="rq13a"
-        )
+        service = _make_service(setup, name="Переезд rq13a->rq13b", queue_tag="rq13a")
         setup.commit()
         setup.close()
 
@@ -984,21 +979,16 @@ def test_pin13_same_service_concurrent_retag_vs_requires_doctor_flip(
                 try:
                     for tag in ("rq13a", "rq13b"):
                         conn.execute(
-                            sa.text(
-                                "SELECT pg_advisory_xact_lock(hashtext(:k))"
-                            ),
+                            sa.text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
                             {"k": f"owner_config:tag:{tag}"},
                         )
                     conn.execute(
-                        sa.text(
-                            "SELECT id FROM services WHERE id = :i FOR UPDATE"
-                        ),
+                        sa.text("SELECT id FROM services WHERE id = :i FOR UPDATE"),
                         {"i": service.id},
                     )
                     conn.execute(
                         sa.text(
-                            "UPDATE services SET queue_tag = 'rq13b' "
-                            "WHERE id = :i"
+                            "UPDATE services SET queue_tag = 'rq13b' " "WHERE id = :i"
                         ),
                         {"i": service.id},
                     )
@@ -1021,9 +1011,7 @@ def test_pin13_same_service_concurrent_retag_vs_requires_doctor_flip(
 
         thread1 = threading.Thread(target=writer1_wrapped)
         thread1.start()
-        assert row_locked.wait(timeout=15), (
-            "pin13: writer1 never reached row lock"
-        )
+        assert row_locked.wait(timeout=15), "pin13: writer1 never reached row lock"
 
         def writer2_flip() -> object:
             try:
@@ -1047,9 +1035,9 @@ def test_pin13_same_service_concurrent_retag_vs_requires_doctor_flip(
             commit_go.set()
             outcome2 = future2.result()
         thread1.join(timeout=15)
-        assert writer1_outcome == [None], (
-            f"pin13: writer1 must commit the retag, got {writer1_outcome!r}"
-        )
+        assert writer1_outcome == [
+            None
+        ], f"pin13: writer1 must commit the retag, got {writer1_outcome!r}"
         assert isinstance(outcome2, OwnerInvariantViolation), (
             "pin13: writer2 must be rejected on the actual post-lock tag B, "
             f"got {outcome2!r}"
@@ -1092,9 +1080,7 @@ def test_pin14_same_service_concurrent_retag_vs_delete(
         SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
         setup = SessionLocal()
         _make_resource(setup, code="rq14-r", queue_tag="rq14b", active=True)
-        service = _make_service(
-            setup, name="Последняя doctorless", queue_tag="rq14a"
-        )
+        service = _make_service(setup, name="Последняя doctorless", queue_tag="rq14a")
         setup.commit()
         setup.close()
 
@@ -1109,21 +1095,16 @@ def test_pin14_same_service_concurrent_retag_vs_delete(
                 try:
                     for tag in ("rq14a", "rq14b"):
                         conn.execute(
-                            sa.text(
-                                "SELECT pg_advisory_xact_lock(hashtext(:k))"
-                            ),
+                            sa.text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
                             {"k": f"owner_config:tag:{tag}"},
                         )
                     conn.execute(
-                        sa.text(
-                            "SELECT id FROM services WHERE id = :i FOR UPDATE"
-                        ),
+                        sa.text("SELECT id FROM services WHERE id = :i FOR UPDATE"),
                         {"i": service.id},
                     )
                     conn.execute(
                         sa.text(
-                            "UPDATE services SET queue_tag = 'rq14b' "
-                            "WHERE id = :i"
+                            "UPDATE services SET queue_tag = 'rq14b' " "WHERE id = :i"
                         ),
                         {"i": service.id},
                     )
@@ -1146,9 +1127,7 @@ def test_pin14_same_service_concurrent_retag_vs_delete(
 
         thread1 = threading.Thread(target=writer1_wrapped)
         thread1.start()
-        assert row_locked.wait(timeout=15), (
-            "pin14: writer1 never reached row lock"
-        )
+        assert row_locked.wait(timeout=15), "pin14: writer1 never reached row lock"
 
         def writer2_delete() -> object:
             try:
@@ -1169,9 +1148,9 @@ def test_pin14_same_service_concurrent_retag_vs_delete(
             commit_go.set()
             outcome2 = future2.result()
         thread1.join(timeout=15)
-        assert writer1_outcome == [None], (
-            f"pin14: writer1 must commit the retag, got {writer1_outcome!r}"
-        )
+        assert writer1_outcome == [
+            None
+        ], f"pin14: writer1 must commit the retag, got {writer1_outcome!r}"
         assert isinstance(outcome2, OwnerInvariantViolation), (
             "pin14: delete must be rejected on the actual post-lock tag B, "
             f"got {outcome2!r}"
@@ -1262,7 +1241,12 @@ def test_pin16_patch_explicit_null_not_null_field_rejected_422() -> None:
     только `default_cabinet`; absent-поля остаются «нет изменения»."""
     from pydantic import ValidationError
 
-    for field in ("display_name", "start_number_online", "max_online_per_day", "active"):
+    for field in (
+        "display_name",
+        "start_number_online",
+        "max_online_per_day",
+        "active",
+    ):
         with pytest.raises(ValidationError) as exc_info:
             QueueResourceUpdate.model_validate({field: None})
         # причина — наш валидатор, а не неудавшееся приведение типа
@@ -1324,9 +1308,7 @@ def test_pin18_patch_rereads_row_under_serialization_scope(
     состоянию строки, а не по stale identity-map снапшоту."""
     admin = _make_user(db_session, username="rq17_admin_stale")
     _make_service(db_session, name="Анализ ST1", queue_tag="stale1")
-    row = _make_resource(
-        db_session, code="stale1-r", queue_tag="stale1", active=True
-    )
+    row = _make_resource(db_session, code="stale1-r", queue_tag="stale1", active=True)
 
     # внешний writer деактивирует строку ПОЗА identity-map db_session
     from sqlalchemy.orm import sessionmaker
@@ -1345,9 +1327,9 @@ def test_pin18_patch_rereads_row_under_serialization_scope(
     # возвращает ТОТ ЖЕ identity-map объект, который db.get в endpoint'е
     # отдаст без обращения к БД — именно этот stale снапшот re-read под
     # локом обязан перезатереть (populate_existing)
-    stale_view = db_session.query(QueueResource).filter(
-        QueueResource.id == row.id
-    ).first()
+    stale_view = (
+        db_session.query(QueueResource).filter(QueueResource.id == row.id).first()
+    )
     assert stale_view.active is True  # stale снапшот ещё жив
 
     from app.api.v1.endpoints.qr_queue import _resources
@@ -1369,9 +1351,9 @@ def test_pin18_patch_rereads_row_under_serialization_scope(
         db=db_session,
         current_user=admin,
     )
-    assert calls == ["stale1"], (
-        "gate must run against the re-read (post-lock) row state"
-    )
+    assert calls == [
+        "stale1"
+    ], "gate must run against the re-read (post-lock) row state"
     assert updated.active is True
 
 
