@@ -1,7 +1,7 @@
 # Resume — admin queue simplification
 
-Plan version: 2.2
-Last updated: 2026-10-02T01:24:00+05:00, Asia/Tashkent
+Plan version: 2.3
+Last updated: 2026-10-02T01:32:00+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user said “мержай и продолжай”. T06.2 is merged; T07 is active. This does not authorize production deployment or feature-flag activation.
 
 ## First read
@@ -19,7 +19,7 @@ Execution permission: IMPLEMENTATION_ACTIVE; user said “мержай и про
 
 ## Active step — T07, unified online booking window
 
-- Status: VALIDATED locally after fresh-main rebase; push, PR CI/review and merge remain. Shared snapshot, admission policy, active adapters, report, strict settings validation, localized UI and clinic-local scheduler selection are implemented.
+- Status: PR #3557 is open; exact-head Tier 1 CI/review and merge remain. Shared snapshot, admission policy, active adapters, report, strict settings validation, localized UI and clinic-local scheduler selection are implemented.
 - Mandatory gate was run once, then retried once with the known root `backend/app/services/queue_svc/_operations.py`. The retry returned `narrow_override` limited to that path. The user-approved T07 plan is the repository-approved basis for the bounded additional paths. Record exactly: `gate_misroute=false`, `override_used=true`, `known_root_cause_file=backend/app/services/queue_svc/_operations.py`. Do not run a third gate attempt.
 - Confirmed active admission/read paths: QueueBusinessService token join and least-loaded selection; GraphQL `joinQueue`; QR session precheck before canonical allocation; public `/online-queue/status` through `crud/online_queue.check_queue_availability`; `QueueAutoCloseService` is the separate service-opening transition. Transitional `crud/online_queue.join_online_queue` has no mounted caller found and remains out unless new source evidence proves it active.
 - T07 bounded allowlist: `backend/app/crud/daily_queue_creation_policy.py`; `backend/app/services/queue_svc/_operations.py`; `backend/app/services/qr_queue/_queue_ops.py`; `backend/app/crud/online_queue.py`; `backend/app/graphql/mutations.py`; the T06.2-connected constructors `backend/app/repositories/queue_api_repository.py`, `queue_limits_repository.py`, `visit_confirmation_repository.py`, and `backend/app/services/force_majeure_service.py`; `backend/app/services/queue_auto_close.py`; `backend/app/crud/clinic.py`; `backend/app/schemas/clinic.py`; `backend/app/api/v1/endpoints/online_queue_new.py`; `backend/app/schemas/online_queue.py`; generated contract artifacts `backend/openapi.json` and `frontend/src/types/generated/api.ts` because the settings DTO now documents strict `HH:MM`; `frontend/src/components/admin/QueueSettings.tsx` and locale files `ru.ts`, `en.ts`, `uz-Cyrl.ts`, `uz-Latn.ts`, `kk.ts`; focused tests under `backend/tests/unit` and relevant effective-settings, QR/session, online-status, GraphQL and scheduler suites; the canonical plan, PROGRESS, RESUME, DECISIONS and EVIDENCE. Constructor extension is required so every existing creation writer freezes the same v1 settings interval.
@@ -29,7 +29,7 @@ Execution permission: IMPLEMENTATION_ACTIVE; user said “мержай и про
 - Required focused coverage: before/exact start and before/exact end; old snapshot despite changed settings; no-row/current flag parity; clinic-vs-host date divergence; early manual close; cutoff with scheduler absent; future and legacy compatibility; invalid `HH:MM`/overnight rejection; QR/public status/actual join parity; GraphQL join.
 - Stop on ambiguous routing/claim flow, a writer bypassing the common admission boundary, overnight configuration, a need to change future-date behavior, ownership, queue numbering or clinical lifecycle. Also stop before using any staging/production environment with live data.
 - Environment check: local port 55432 did not accept a connection, staging ports 18001/18080 are not listening, Docker CLI is unavailable; WSL reports Ubuntu-24.04 but no isolated staging service is up. PostgreSQL integration and synthetic staging/browser checks are NOT_RUN. Production was not queried or changed; creation flag stays off.
-- Next exact action: push the clean rebased branch, open the T07 PR with explicit skipped/NOT_RUN evidence, and wait for exact-head CI/review.
+- Next exact action: check the exact current PR #3557 head and all Tier 1 gates. Tier 2 deferral is PR-specific and its reviewer checkbox is still empty; do not merge until Tier 1 is green and that checkbox is acknowledged.
 
 ## Merge, staging and rollout guardrails
 
@@ -42,4 +42,4 @@ Execution permission: IMPLEMENTATION_ACTIVE; user said “мержай и про
 
 - Earlier T03/T05/T06 worktrees and scratch were preserved per their checkpoints. Do not delete, clean, reset or rewrite them while doing T07. Use only this worktree for T07 code.
 - Older PR-open text in timestamped EVIDENCE is historical. Current state is the header/table in PROGRESS and this RESUME.
-- T07 runtime/doc changes are committed at code commit `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`; verify live branch status before resuming. Full commands/results and exact changed-path categories are in `EVIDENCE.md#t07-local-validation` and its post-rebase follow-up. The rebased branch is based on `3a776133`; work only in the T07 worktree, never rebase in `C:\final`.
+- T07 code commit is `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`; PR #3557 is open and the branch head may advance through plan-evidence commits or CI fixes. Verify live PR/HEAD/status before resuming. Full commands/results are in `EVIDENCE.md#t07-post-rebase-validation` and `EVIDENCE.md#t07-pr-open`. The branch is based on `3a776133`; work only in the T07 worktree, never rebase in `C:\final`.

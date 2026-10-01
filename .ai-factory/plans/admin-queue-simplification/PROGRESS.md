@@ -5,15 +5,15 @@ Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 20
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T07
-Current status: VALIDATED (rebased and local focused checks complete; PR is next)
+Current status: PR_OPEN (PR #3557; exact-head Tier 1 CI pending; Tier 2 deferral unacknowledged)
 Last completed task: T06.2 — MERGED
 Worktree: `C:\final\_wt_aqs_t07_window`
 Branch: `codex/aqs-T07-admission-window`
 Base commit: `3a776133bd8c22529422d3a555a589eedfce5063`
 Current commit: `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`
-Last updated: 2026-10-02T01:24:00+05:00
+Last updated: 2026-10-02T01:32:00+05:00
 
-> T00–T06.2 are confirmed MERGED. PR #3546 merged at `b804a71a6bad22400324e2236a3221317eac3158`. T07 is rebased onto `3a776133bd8c22529422d3a555a589eedfce5063` and locally validated on `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`; focused backend/OpenAPI tests report 94 passed and 7 PostgreSQL-only skips. PR is next. Its v1 feature flag remains default-off; no production activation or deployment is authorized.
+> T00–T06.2 are confirmed MERGED. PR #3546 merged at `b804a71a6bad22400324e2236a3221317eac3158`. T07 PR #3557 is open from the rebased `3a776133` base. Local focused backend/OpenAPI tests report 94 passed and 7 PostgreSQL-only skips. The required Tier 1 UI gate is awaiting exact-head CI; Tier 2 deferral is documented but not reviewer-acknowledged. Its v1 feature flag remains default-off; no production activation or deployment is authorized.
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -25,7 +25,7 @@ Last updated: 2026-10-02T01:24:00+05:00
 | T05 | MERGED | `codex/aqs-T05-settings-cache` / [PR #3543](https://github.com/drsapaev/final/pull/3543) | `fd53206f03b0361de6fc345f53b2bacf4195845c` | `EVIDENCE.md#t05-merge-checkpoint` |
 | T06.1 | MERGED | `codex/aqs-T06-policy-schema` / [PR #3545](https://github.com/drsapaev/final/pull/3545) | `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` | `EVIDENCE.md#t06.1-merge-checkpoint` |
 | T06.2 | MERGED | `codex/aqs-T06.2-creation-policy` / [PR #3546](https://github.com/drsapaev/final/pull/3546) | `b804a71a6bad22400324e2236a3221317eac3158` | `EVIDENCE.md#t06.2-merge-checkpoint` |
-| T07 | VALIDATED | `codex/aqs-T07-admission-window` | | `EVIDENCE.md#t07-local-validation` |
+| T07 | PR_OPEN | `codex/aqs-T07-admission-window` / [PR #3557](https://github.com/drsapaev/final/pull/3557) | | `EVIDENCE.md#t07-pr-open` |
 | T08 | PLANNED | | | |
 | T09 | PLANNED | | | |
 | T10 | PLANNED | | | |
@@ -49,10 +49,10 @@ Last updated: 2026-10-02T01:24:00+05:00
 - Technical interpretation (not a new product decision): legacy rows keep prior admission semantics, including no newly enforced end cutoff; v1 checks frozen start/end in clinic timezone. A rowless availability check uses the policy selected by the same creation flag and fresh settings used for subsequent creation. Future target dates retain the existing bypass of same-day time boundaries. Early `opened_at` remains a manual closure; existing entries are serviceable after cutoff.
 - Validation target: T07 boundaries before/exact start and before/exact cutoff; snapshot beats changed defaults; rowless settings/flag parity; clinic-vs-host date divergence; manual close and no-scheduler admission rejection; future and legacy behavior; invalid HH:MM/overnight rejection; public status and QR availability parity; GraphQL join rejection. Run focused policy/time-window, effective-settings, QR/token/session, GraphQL, online queue status and auto-close tests, then `git diff --check`, compile/lint and OpenAPI freshness if the schema metadata changes.
 - Stop condition: discover ambiguous owner/claim flow, a target adapter that bypasses the single admission gate, overnight settings, future-date behavior requiring product choice, or any need to change clinical lifecycle/ownership/quota. Do not silently expand scope.
-- Blocker: none for opening the T07 PR. Disposable PostgreSQL/staging runtime was checked and is unavailable locally; seven PostgreSQL integration tests and all staging/browser checks remain NOT_RUN. Do not claim runtime proof or activate the policy flag.
+- Blocker: merge is blocked until every Tier 1 UI gate is green on the exact PR head and a reviewer acknowledges the PR-specific Tier 2 deferral checkbox. PostgreSQL integration, synthetic staging/browser/visual/timing checks remain NOT_RUN. Do not claim runtime proof or activate the policy flag.
 - Completed: v1 queues freeze clinic-local `[start,end)` and all active admission/read adapters now use the same policy; legacy queues gain no new end cutoff. Token join, QR precheck, public availability/status, GraphQL join, report metadata, all named queue constructors and the clinic-local auto-close selector are covered. Clinic-wide QR overview remains available when any active target is eligible; the chosen queue is rechecked by canonical admission. Settings reject malformed or overnight intervals. UI explains v1/legacy behavior in five locales. OpenAPI and TypeScript artifacts are generated and aligned.
-- Validation: 57 focused backend queue tests passed on SQLite; OpenAPI suite 37 passed, 7 integration cases skipped under SQLite; dedicated cutoff OpenAPI test 1 passed; QueueSettings suite 27 passed; TypeScript, focused ESLint (`--quiet`), changed-file Ruff, Python compilation, OpenAPI/type generation and `git diff --check` passed. Full commands and limitations are in `EVIDENCE.md#t07-local-validation` and the latest T07 follow-up checkpoint.
-- Next exact action: push `codex/aqs-T07-admission-window`, open its PR with the documented scope/impact and NOT_RUN limits, then wait for exact-head CI/review.
+- Validation: post-rebase combined backend/OpenAPI/effective-report suite 94 passed, 7 PostgreSQL-only integration cases skipped; QueueSettings suite 27 passed; TypeScript, focused ESLint (`--quiet`), changed-path Ruff and `git diff --check` passed. Full commands and limitations are in `EVIDENCE.md#t07-post-rebase-validation`.
+- Next exact action: verify checks on the latest PR #3557 head; run any missing Tier 1 gates; do not merge until Tier 1 is green and the PR-specific Tier 2 deferral is acknowledged. Then merge under the user's standing instruction and begin T08 from freshly synced main.
 - Checks to rerun after a code change: the combined backend/OpenAPI/effective-report command (101 collected; seven PG cases skipped), QueueSettings effective suite, TypeScript type-check, changed-file Ruff/ESLint and `git diff --check`. Recheck PG/staging availability only if environment state changes.
 
 ## Historical T06.2 checkpoint (superseded; retained for evidence)

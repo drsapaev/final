@@ -2,7 +2,7 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
-Current plan: version 2.2. T00–T06.2 are confirmed MERGED; T07 is locally VALIDATED after rebase and awaiting PR; T08–T18 remain PLANNED. The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver. Start with [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md); timestamped historical entries preserve their original state/SHA.
+Current plan: version 2.3. T00–T06.2 are confirmed MERGED; T07 PR #3557 is open; T08–T18 remain PLANNED. The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver. Start with [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md); timestamped historical entries preserve their original state/SHA.
 
 ## T00 — 2026-09-30
 
@@ -979,3 +979,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PostgreSQL/staging/browser/visual/timing: **NOT_RUN**. Local PostgreSQL `127.0.0.1:55432` refused connection, staging ports `18001/18080` were not listening, and Docker CLI is unavailable. No production/staging traffic, data or process was touched; the v1 creation flag remains off. T05/#3543 deferral is not T07 evidence.
 - PR: none yet. Merge commit: none.
 - Next exact action: push the rebased branch, open the T07 PR, and verify exact-head CI/review before merge.
+
+## T07 PR opened — 2026-10-02T01:32:00+05:00
+
+- PR: [#3557](https://github.com/drsapaev/final/pull/3557), title `fix(queue): unify clinic-local online admission window`.
+- Initial PR head: `5823f09f7` (docs-only validation checkpoint after code commit `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`); base is fresh `main` `3a776133bd8c22529422d3a555a589eedfce5063`. Any later plan evidence or code fix updates PR head and requires exact-head CI recheck.
+- Branch pushed from clean worktree `C:\final\_wt_aqs_t07_window`; PR artifact attached to this task.
+- PR body quality gate: `scripts/run_pr_review_gate_checks.py --body-file .t07-pr-body.md` — PASS (19 gate unit tests plus both documented samples and the T07 body passed).
+- PR body records the Tier 1 checklist, passed local targeted checks, CI-pending full Tier 1 gates, and `TIER 2 NOT RUN` with concrete cause/specs/owner/resume condition/headline impact. The reviewer checkbox `deferral acknowledged by reviewer` is intentionally unchecked.
+- Exact-head GitHub CI/review: pending at PR creation. Do not merge until every Tier 1 UI gate is green on the final head and the reviewer acknowledges the PR-specific Tier 2 deferral. The #3543 decision is not inherited.
+- Next exact action: inspect the PR's exact-head checks, run any Tier 1 command not covered by CI, fix red checks in this PR, then wait for explicit PR-specific reviewer deferral acknowledgment before merge.

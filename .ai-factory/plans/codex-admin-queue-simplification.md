@@ -1,13 +1,13 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 2.2 — T07 rebased and local focused checks pass, including mixed legacy/v1 clinic-wide QR regression; PR CI is next.
+**Версия:** 2.3 — T07 PR #3557 is open; exact-head Tier 1 CI is pending and Tier 2 deferral requires reviewer acknowledgment.
 **Создан:** 30 сентября 2026. **Обновлён:** 2 октября 2026, Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Последний подтверждённый runtime merge:** `b804a71a6bad22400324e2236a3221317eac3158`, PR #3546 / T06.2.
 **Текущий worktree:** `C:\final\_wt_aqs_t07_window`, ветка `codex/aqs-T07-admission-window`, rebase base `3a776133`; code commit `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`.
 
-> **T00–T06.2 — MERGED; T07 — VALIDATED локально, PR pending; T08–T18 — PLANNED.** PR #3546 смержен в `b804a71a`. T07 post-rebase combined backend/OpenAPI/effective-report run: 94 passed / 7 PostgreSQL-only skipped, 1 warning; QueueSettings suite: 27 passed. Local PostgreSQL/staging/browser proof is NOT_RUN.
+> **T00–T06.2 — MERGED; T07 — PR_OPEN (#3557); T08–T18 — PLANNED.** PR #3546 смержен в `b804a71a`. T07 post-rebase combined backend/OpenAPI/effective-report run: 94 passed / 7 PostgreSQL-only skipped, 1 warning; QueueSettings suite: 27 passed. Required UI Tier 1 gates await exact-head CI; Tier 2 reviewer acknowledgment is pending. Local PostgreSQL/staging/browser proof is NOT_RUN.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -85,7 +85,7 @@ Milestone: `none`. Продолжение согласованного отде�
 | T05 | MERGED | [#3543](https://github.com/drsapaev/final/pull/3543), `fd53206f03b0361de6fc345f53b2bacf4195845c` |
 | T06.1 | MERGED | [#3545](https://github.com/drsapaev/final/pull/3545), `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` |
 | T06.2 | MERGED | [PR #3546](https://github.com/drsapaev/final/pull/3546), `b804a71a6bad22400324e2236a3221317eac3158` |
-| T07 | VALIDATED | `codex/aqs-T07-admission-window`, worktree `C:\final\_wt_aqs_t07_window`, based on `b804a71a`; rebase to `3a776133` pending |
+| T07 | PR_OPEN | `codex/aqs-T07-admission-window` / [PR #3557](https://github.com/drsapaev/final/pull/3557), worktree `C:\final\_wt_aqs_t07_window`, based on `3a776133` |
 | T08–T18 | PLANNED | Runtime-реализация не начата |
 
 Для #3543 проверен актуальный HEAD `c04f41021bef5f8c306b9668cbb1c4b9afef2cc1`: применимые Backend tests, Code Quality, parity, Context Boundary, PR Required Gate, security и PR Review Quality Gate — PASS. [Backend CI run 36851998918](https://github.com/drsapaev/final/actions/runs/36851998918). Path-aware skipped frontend/integration/staging jobs не считать PASS. На merged tree T05 целевые backend tests повторены: 24 passed, 1 warning. Локальные PG integration и synthetic staging/browser/cold-repeat timing — NOT_RUN.
