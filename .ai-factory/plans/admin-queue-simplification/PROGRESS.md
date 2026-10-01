@@ -1,6 +1,6 @@
 # Progress
 
-Plan version: 2.2
+Plan version: 2.3
 Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 2026-10-01
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
@@ -9,11 +9,11 @@ Current status: PR_OPEN (PR #3557; exact-head Tier 1 CI pending; Tier 2 deferral
 Last completed task: T06.2 — MERGED
 Worktree: `C:\final\_wt_aqs_t07_window`
 Branch: `codex/aqs-T07-admission-window`
-Base commit: `3a776133bd8c22529422d3a555a589eedfce5063`
-Current commit: `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`
-Last updated: 2026-10-02T01:32:00+05:00
+Base commit: `9a5404a5f9c339885662cc0b79a392cfd5b0e1f1`
+Current commit: `8ba092803` (test fix; PR push pending)
+Last updated: 2026-10-02T02:47:00+05:00
 
-> T00–T06.2 are confirmed MERGED. PR #3546 merged at `b804a71a6bad22400324e2236a3221317eac3158`. T07 PR #3557 is open from the rebased `3a776133` base. Local focused backend/OpenAPI tests report 94 passed and 7 PostgreSQL-only skips. The required Tier 1 UI gate is awaiting exact-head CI; Tier 2 deferral is documented but not reviewer-acknowledged. Its v1 feature flag remains default-off; no production activation or deployment is authorized.
+> T00–T06.2 are confirmed MERGED. PR #3546 merged at `b804a71a6bad22400324e2236a3221317eac3158`. T07 PR #3557 is open; its branch has been rebased onto `9a5404a5` and now has an unpushed deterministic-test fix at `8ba092803`. Local focused policy tests report 228 passed and 7 PostgreSQL-only skips; affected queue/QR tests report 130 passed and 40 environment skips. OpenAPI freshness passes. Exact-head CI is pending after push; Tier 2 deferral is documented but not reviewer-acknowledged. The v1 creation flag remains default-off; no production activation or deployment is authorized.
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -51,9 +51,9 @@ Last updated: 2026-10-02T01:32:00+05:00
 - Stop condition: discover ambiguous owner/claim flow, a target adapter that bypasses the single admission gate, overnight settings, future-date behavior requiring product choice, or any need to change clinical lifecycle/ownership/quota. Do not silently expand scope.
 - Blocker: merge is blocked until every Tier 1 UI gate is green on the exact PR head and a reviewer acknowledges the PR-specific Tier 2 deferral checkbox. PostgreSQL integration, synthetic staging/browser/visual/timing checks remain NOT_RUN. Do not claim runtime proof or activate the policy flag.
 - Completed: v1 queues freeze clinic-local `[start,end)` and all active admission/read adapters now use the same policy; legacy queues gain no new end cutoff. Token join, QR precheck, public availability/status, GraphQL join, report metadata, all named queue constructors and the clinic-local auto-close selector are covered. Clinic-wide QR overview remains available when any active target is eligible; the chosen queue is rechecked by canonical admission. Settings reject malformed or overnight intervals. UI explains v1/legacy behavior in five locales. OpenAPI and TypeScript artifacts are generated and aligned.
-- Validation: post-rebase combined backend/OpenAPI/effective-report suite 94 passed, 7 PostgreSQL-only integration cases skipped; QueueSettings suite 27 passed; TypeScript, focused ESLint (`--quiet`), changed-path Ruff and `git diff --check` passed. Full commands and limitations are in `EVIDENCE.md#t07-post-rebase-validation`.
-- Next exact action: verify checks on the latest PR #3557 head; run any missing Tier 1 gates; do not merge until Tier 1 is green and the PR-specific Tier 2 deferral is acknowledged. Then merge under the user's standing instruction and begin T08 from freshly synced main.
-- Checks to rerun after a code change: the combined backend/OpenAPI/effective-report command (101 collected; seven PG cases skipped), QueueSettings effective suite, TypeScript type-check, changed-file Ruff/ESLint and `git diff --check`. Recheck PG/staging availability only if environment state changes.
+- Validation: original PR CI found wall-clock-dependent failures at clinic time 01:50–01:54. QR/service clocks had been moved to 08:00 while test tokens still expired relative to real time; replaced that fixture with open test settings and retained real clocks/token TTLs. The same affected backend slice now reports 130 passed/40 environment skips; focused policy/window/adapters report 228 passed/7 PostgreSQL-only skips. OpenAPI regeneration is byte-identical, `git diff --check` passes, and non-format pre-commit hooks pass. Full details are in `EVIDENCE.md#t07-backend-ci-follow-up`.
+- Next exact action: update PR #3557 with commits `ca38cf26`, `d87872b1`, and `8ba092803` using force-with-lease against old remote head `956af95194aee00802f813f2b52c40ac06e5a528`; then wait for exact-head CI and inspect the PR-specific Tier 2 deferral acknowledgement. Do not merge until Tier 1 is green and that checkbox is acknowledged. After merge, begin T08 from freshly synced main.
+- Checks to rerun after a code change: affected backend queue/QR slice, focused policy/window/adapters, OpenAPI freshness, `git diff --check`, and changed-path Ruff. Frontend source did not change in the test follow-up; exact-head CI remains required. Recheck PG/staging availability only if environment state changes.
 
 ## Historical T06.2 checkpoint (superseded; retained for evidence)
 
