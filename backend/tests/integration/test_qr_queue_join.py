@@ -13,6 +13,8 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.queue_profile import QueueProfile
 from app.services.queue_service import QueueBusinessService
 
+pytestmark = pytest.mark.usefixtures("queue_admission_open")
+
 
 def _clinic_day() -> date:
     """Codex round-30: join/start classifies the token day in the CLINIC

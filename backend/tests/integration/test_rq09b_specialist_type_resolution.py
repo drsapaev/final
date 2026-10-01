@@ -57,6 +57,8 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
 
+pytestmark = pytest.mark.usefixtures("queue_admission_open")
+
 
 def _candidate_admin_urls() -> list[str]:
     urls: list[str] = []

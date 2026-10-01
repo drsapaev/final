@@ -6080,7 +6080,7 @@ def test_availability_compares_dates_on_clinic_clock(
         # future-day availability
         assert availability["available"] is False, availability
         assert availability["reason"] == "TOO_EARLY"
-        assert availability["available_from"] == "7:00"
+        assert availability["available_from"] == "07:00"
     finally:
         _durable_cleanup(db_session, "lab_res_qq2")
 
