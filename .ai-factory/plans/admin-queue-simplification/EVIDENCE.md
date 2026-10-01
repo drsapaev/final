@@ -867,3 +867,37 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope: PR description and plan-memory evidence only changed after the CI observation; runtime code commit remains `f0fd2217`. This evidence-only checkpoint will advance the branch head, so verify current PR HEAD/checks before any merge decision.
 - Remaining: PR #3546 is still a draft awaiting the user's PR-specific merge/deferral decision. Do not start T07 until merge and fresh-main synchronization.
 - Next exact action: push this final plan-memory checkpoint, re-read the new exact PR head/checks, then present the concrete merge decision with staging limitation stated.
+
+## T06.2 rebase and local validation checkpoint — 2026-10-01T22:11:56+05:00
+
+- Commit under test: post-rebase worktree `e4776ca4f5020bfc3a1483406d31347849c2ed81`; runtime code commit after rebase `31ad36739`.
+- Environment: Windows worktree `C:\final\_wt_aqs_t062_creation_policy`, Python 3.11.9, isolated SQLite test configuration.
+- Execution mode: continuation of the approved T06.2 implementation PR cycle; no production checkout or service touched.
+- Allowed paths: the existing T06.2 constructor helper/adapters, backup compatibility tests, and plan-memory checkpoint files. No runtime scope expansion.
+- Actual changed paths: this checkpoint updates only plan/progress/resume/evidence context; rebase itself changed commit IDs but no file content relative to the pre-rebase branch.
+- Original failure: not applicable; this is a synchronization checkpoint after `origin/main` advanced.
+- Validation command: `scripts/run_backend_pytest.ps1 tests/unit/test_daily_queue_creation_policy.py tests/unit/test_migration_service.py tests/unit/test_queue_settings_command_scope.py tests/integration/test_qr_least_loaded_routing.py`, with isolated SQLite environment; `git diff --check`.
+- Result: PASS — 54 tests, 1 warning; `git diff --check` passed. This is local SQLite proof, not disposable PostgreSQL or staging proof.
+- Scope check: `origin/main` advanced to `575fde4d444bca4efd97cbe2cfcf401e121f196b` through CI-only PR #3547. Rebase completed without conflict. T06.2 source remains unchanged. Pre-rebase CI is historical only; GitHub checks for the pushed rebased exact head are NOT_RUN at this checkpoint.
+- Relevant output or artifact: local pytest output reported `54 passed, 1 warning`; branch HEAD before this documentation commit was `e4776ca4f5020bfc3a1483406d31347849c2ed81`.
+- Remaining limitation: local disposable-PG and synthetic staging/browser validation remain NOT_RUN. No feature flag activation, production mutation, or deployment.
+- PR: [#3546](https://github.com/drsapaev/final/pull/3546), draft until checks and readiness are refreshed.
+- Merge commit: none yet.
+- Next exact action: push rebased branch with lease, mark PR ready, verify applicable exact-head checks and mergeability, then merge under the user's current “мержай и продолжай” instruction. Only after merge, sync fresh `origin/main` and start T07 with its mandatory execution gate.
+
+## T06.2 second base refresh checkpoint — 2026-10-01T22:30:40+05:00
+
+- Commit under test: local second-rebase worktree `d233174ce40ccde7d7ab03aeae47483b872f8a6b`; runtime code commit `3452aad75`.
+- Environment: Windows worktree `C:\final\_wt_aqs_t062_creation_policy`, Python 3.11.9, isolated SQLite test configuration.
+- Execution mode: continuation of the approved T06.2 implementation PR cycle; no production checkout or service touched.
+- Allowed paths: the existing T06.2 constructor helper/adapters, backup compatibility tests, and plan-memory checkpoint files. No runtime scope expansion.
+- Actual changed paths: plan/progress/resume/evidence checkpoint files only; the rebase itself introduced no T06.2 source changes.
+- Original failure: not applicable; GitHub `main` advanced while exact-head checks were completing.
+- Validation command: `scripts/run_backend_pytest.ps1 tests/unit/test_daily_queue_creation_policy.py tests/unit/test_migration_service.py tests/unit/test_queue_settings_command_scope.py tests/integration/test_qr_least_loaded_routing.py`, with isolated SQLite environment; `git diff --check`.
+- Result: PASS — 54 tests, 1 warning; `git diff --check` passed. This is local SQLite proof, not disposable PostgreSQL or staging proof.
+- Scope check: `origin/main` advanced from `575fde4d` to `1358c70b` through CI-only PR #3550, which adds a mutation-test deselection in `backend/pyproject.toml`. Second rebase completed without conflict. Pre-second-rebase full CI passed on `f04ca94a`; GitHub checks for the next pushed head remain NOT_RUN.
+- Relevant output or artifact: local pytest reported `54 passed, 1 warning`; `git diff` confirms the new base's only change is mutation-test selection.
+- Remaining limitation: local disposable-PG and synthetic staging/browser validation remain NOT_RUN. No feature-flag activation, production mutation, or deployment.
+- PR: [#3546](https://github.com/drsapaev/final/pull/3546), ready for review.
+- Merge commit: none yet.
+- Next exact action: push this checkpoint with `--force-with-lease`, wait for exact-head checks, then merge promptly if checks pass and merge state is clean. Sync current `origin/main` after merge before T07.

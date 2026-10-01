@@ -1,8 +1,8 @@
 # Resume — admin queue simplification
 
-Plan version: 1.4
-Last updated: 2026-10-01T21:03:20+05:00, Asia/Tashkent
-Execution permission: IMPLEMENTATION_ACTIVE; user explicitly authorized merge #3545 and continuation; T06.1 merged at e8f585ab; T06.2 is in progress
+Plan version: 1.7
+Last updated: 2026-10-01T22:30:40+05:00, Asia/Tashkent
+Execution permission: IMPLEMENTATION_ACTIVE; user instructed “мержай и продолжай” for the active PR cycle; T06.2 has been rebased a second time and needs exact-head CI
 
 ## First read
 
@@ -26,12 +26,12 @@ Check actual git status/HEAD and GitHub PR state first. If they differ from this
 
 ## Active runtime step — T06.2
 
-- Worktree: `C:\final\_wt_aqs_t062_creation_policy`; branch `codex/aqs-T06.2-creation-policy`; base `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`; code commit `f0fd22170a5b433009ec476c89bebabd2fe86abf` is pushed to draft PR #3546. Verify actual HEAD after the plan-memory checkpoint.
+- Worktree: `C:\final\_wt_aqs_t062_creation_policy`; branch `codex/aqs-T06.2-creation-policy`; latest base `origin/main` `1358c70bf4723d151861a9ef135bba147b118fee` after clean second rebase. The new base only adds a mutation-test deselection in `backend/pyproject.toml`. Post-rebase focused tests passed 54/54 and `git diff --check` passed. PR #3546 still needs force-with-lease push and fresh checks; verify the live head before merge.
 - Gate: initial routing misclassified queue-constructor work as frontend route ownership. The sole retry with known root `backend/app/services/queue_svc/_operations.py` returned a one-file override. The explicit user-approved T06.2 plan authorizes the projected shared helper plus the listed runtime constructors and focused tests; manual override is restricted to the exact allowlist in PROGRESS. Record the gate misroute/override in EVIDENCE; do not retry the gate.
 - Runtime scope: new shared calculation, `queue_svc/_operations.py`, `crud/online_queue.py`, `graphql/mutations.py`, queue API/limits/visit-confirmation repositories, and force-majeure queue creation. `dev_seed.py` remains synthetic legacy seed; `migration_service._get_or_create_daily_queue` remains historical import. The backup serializer/restore in `migration_service.py` is in scope only to preserve `policy_version`/`online_issued_count` and default old backups to legacy/0; source inspection proved omission would reset a restored v1 counter. No schema/migration changes, cutoff/quota enforcement, ordinary API/UI, flag activation, staging or production.
 - Implemented: shared `daily_queue_creation_snapshot`; queue-service, legacy CRUD, GraphQL, queue API/limits/visit-confirmation repositories and force-majeure constructors use it. V1 selection remains default-off. Backup/restore carries policy/count, while old backups restore to legacy/0. Synthetic seed and historical import stay legacy.
 - Local checks: final rerun — 54 policy/backup/settings and least-loaded routing unit/integration tests passed; earlier constructor-adapter runs passed 8 + 22 + 4 tests. The CRUD regression preserves explicit legacy `start_number`. `compileall`, `git diff --check`, helper/test Ruff+Black, import sorting and Ruff pre-commit passed. The final pre-commit run passed all non-format hooks; `ruff-format` and Black were skipped because whole-file formatting rewrote unrelated legacy code. Two equivalent `dict(rows)` cleanup edits removed pre-existing Ruff C416 failures. SQLite only; no T06.2 PostgreSQL or staging check. See `EVIDENCE.md#t06.2-final-validation-checkpoint`.
-- Current exact next action: inspect the live PR head after this evidence-only checkpoint and its applicable checks. PR #3546 remains draft/open; the last checked head passed applicable CI, but staging/browser remains NOT_RUN. Obtain a PR-specific merge/deferral decision before merging; do not start T07 until the PR cycle closes and main is fresh. No production feature flag or deployment action is authorized.
+- Current exact next action: push the second rebased T06.2 branch and wait for all applicable required checks on that exact head. PR #3546 is already ready. The user instructed “мержай и продолжай”; if exact-head checks pass and merge state is clean, merge promptly, then sync `origin/main` before T07. Synthetic staging/browser remains NOT_RUN; do not activate the feature flag or deploy.
 
 The T05 deferral does not waive T06.2 validation. Close the T06.2 PR cycle before T07; do not begin T07 while T06 is unresolved.
 
