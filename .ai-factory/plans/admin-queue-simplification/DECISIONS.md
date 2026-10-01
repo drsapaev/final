@@ -1,11 +1,11 @@
 # Decisions and contract
 
-Plan version: 1.2
-Last updated: 2026-10-01
+Plan version: 2.1
+Last updated: 2026-10-02T01:12:00+05:00
 
 ## Current execution instruction
 
-- **User instruction, 2026-10-01:** “Продолжай реализации плана”. Implementation is authorized. T00–T05 are now MERGED; the next runtime stage is T06. The current cycle only preserves the confirmed T05 decision and detailed plan; no T06 runtime/schema work starts here.
+- **User instruction, 2026-10-01:** “Продолжай реализации плана”, followed by “мержай и продолжай”. Implementation and sequential PR cycles are authorized. T00–T06.2 are MERGED; T07 is the active runtime stage. This does not authorize deployment or activating `QUEUE_POLICY_V2_CREATION_ENABLED`.
 - **Review scope:** #3540 was approved after the omitted-day Sync fix; #3541 had a separate explicit user Tier 2 acknowledgment and merge authorization. Those decisions did not automatically authorize #3543's deferral.
 - **Delegated decision, 2026-10-01:** the user instructed “реши по PR #3543 — принять deferral staging-проверки и разрешить merge либо потребовать staging-проверку до merge”. The agent accepted the bounded T05 deferral after source/CI review and merged the exact reviewed head. This is an agent decision under explicit user delegation, not a submitted GitHub author-approval review. See the separate decision below.
 
@@ -40,6 +40,8 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - A new admin directions endpoint is a read-only backend endpoint under the existing FastAPI queue router. It returns typed entity references/action kinds, never arbitrary frontend URLs or patient data.
 - Keep the partial-result contract of each existing multi-item path. Do not impose global all-or-nothing behavior.
 - Resolve inconsistent profile parent links as an explicit conflict; do not infer historical manual intent or auto-repair public bindings.
+- **T07 implementation interpretation (not a new product decision):** current `legacy` daily queues keep their pre-T07 admission behavior, with no newly enforced end cutoff. `daily_online_issuances_v1` enforces frozen `[start,end)` in clinic timezone. If the daily row does not exist, availability reads fresh defaults and selects the same policy that the creation flag would select for the later queue creation. Future target dates keep the existing behavior that bypasses same-day time boundaries. Evidence: current adapters, policy snapshots and exact T07 plan card; see `EVIDENCE.md#t07-prework-checkpoint`.
+- **T07 mixed clinic-wide QR interpretation (technical, not a product decision):** a clinic-wide QR check is an overview before a concrete booking target is selected. On a day containing legacy and v1 queues, one arbitrary row must not decide overview availability. The overview remains time-available if any active target's policy allows admission; the selected queue is then checked again by the canonical join. If none is available due to time, report the earliest v1 opening or latest applicable v1 cutoff. Existing legacy rows continue to have no new end cutoff. Evidence: regression `test_clinic_wide_qr_uses_any_available_queue_in_mixed_legacy_day` and T07 local follow-up in `EVIDENCE.md`.
 
 ## Planning clarifications — no additional product behavior approved
 

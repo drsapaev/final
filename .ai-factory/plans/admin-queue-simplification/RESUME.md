@@ -1,51 +1,45 @@
 # Resume — admin queue simplification
 
-Plan version: 1.7
-Last updated: 2026-10-01T22:30:40+05:00, Asia/Tashkent
-Execution permission: IMPLEMENTATION_ACTIVE; user instructed “мержай и продолжай” for the active PR cycle; T06.2 has been rebased a second time and needs exact-head CI
+Plan version: 2.1
+Last updated: 2026-10-02T01:12:00+05:00, Asia/Tashkent
+Execution permission: IMPLEMENTATION_ACTIVE; user said “мержай и продолжай”. T06.2 is merged; T07 is active. This does not authorize production deployment or feature-flag activation.
 
 ## First read
 
-1. Repo `AGENTS.md`, `docs/runbooks/AGENT_CYCLIC_WORKFLOW.md` and `docs/runbooks/AGENT_SESSION_WORKTREES.md`.
-2. [Canonical detailed plan](../codex-admin-queue-simplification.md).
-3. [PROGRESS.md](PROGRESS.md), [DECISIONS.md](DECISIONS.md), then current-task [EVIDENCE.md](EVIDENCE.md).
-4. Before ownership/schema work: `docs/devbrain/PROJECT_MEMORY.md`, `DEVBRAIN_STATUS.md`, `MEMORY_ROUTING.md`, `DEV_BRAIN_ROLE_MAP.md`, the direction contract and ADR-001.
+1. Repo `AGENTS.md`, `docs/runbooks/AGENT_CYCLIC_WORKFLOW.md`, and `docs/runbooks/AGENT_SESSION_WORKTREES.md`.
+2. [Canonical detailed plan](../codex-admin-queue-simplification.md), especially T07 and the preserved invariants.
+3. [PROGRESS.md](PROGRESS.md), [DECISIONS.md](DECISIONS.md), then the latest T07 [EVIDENCE.md](EVIDENCE.md#t07-prework-checkpoint).
+4. Before ownership-sensitive changes: `docs/devbrain/PROJECT_MEMORY.md`, `DEVBRAIN_STATUS.md`, `MEMORY_ROUTING.md`, `DEV_BRAIN_ROLE_MAP.md`, the direction contract, and ADR-001.
 
-The user resumed implementation with “Продолжай реализации плана”. The later request delegated the staging/merge decision for #3543. It did not waive future schema/admission gates or authorize production activation.
+## Verified current checkpoint
 
-## Verified checkpoint
+- T00–T06.2 are MERGED. PR #3546 / T06.2 is confirmed merged at `2026-10-01T17:48:53Z`: merge commit `b804a71a6bad22400324e2236a3221317eac3158`, exact PR head `2c6c04f996fdced70c8b8ecf1a8f24452336e83e`, base `1358c70bf4723d151861a9ef135bba147b118fee`. Applicable CI passed on that exact head. Focused local tests: 54 passed, 1 warning, SQLite only. Path-aware skips are not passes; PG runtime/staging/browser validation is NOT_RUN. The v1 creation flag remains default-off.
+- T05 / PR #3543's staging deferral was separately accepted under the user's delegated decision. It contributes no staging proof and is not inherited by another PR. See DECISIONS and EVIDENCE; T18/pre-deploy still owns the deferred scenarios.
+- T07 started from a clean `origin/main`/worktree base at `b804a71a6bad22400324e2236a3221317eac3158`. Worktree: `C:\final\_wt_aqs_t07_window`; branch: `codex/aqs-T07-admission-window`. The production checkout was not switched.
 
-- T00–T05 and T06.1 are MERGED. [PR #3545](https://github.com/drsapaev/final/pull/3545) merged at `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` after explicit user authorization. Its schema adds legacy-safe policy version/counter fields; it does not update constructors or enable v1 creation. T06.2 is now active; do not repeat T06.1.
-- T05 [PR #3543](https://github.com/drsapaev/final/pull/3543) merged at `fd53206f03b0361de6fc345f53b2bacf4195845c`, 2026-10-01T16:24:40+05:00, from reviewed head `c04f41021bef5f8c306b9668cbb1c4b9afef2cc1`. Runtime code dates from `47276d178972226b0bcf561bdf8fa26a6940b913`; merged/reviewed trees match.
-- Applicable T05 CI gates passed. Merged-tree focused tests: 24 passed, 1 warning. Local PostgreSQL integration, synthetic staging/browser E2E and cold/repeat timing are NOT_RUN. Skipped jobs are not PASS.
-- The executing agent accepted a bounded #3543/T05 deferral under the user's explicit delegation. Original requirement, reason, evidence, owner, resume condition and headline impact are in DECISIONS/EVIDENCE. No GitHub author-approval review was invented. Prior PR acknowledgments were not inherited.
-- T03 already fixed omitted-day cabinet Sync to `clinic_today(db)` after the user's P1 review. Do not reopen that closed defect from obsolete planning text.
-- Documentation closure [PR #3544](https://github.com/drsapaev/final/pull/3544) is merged at base `1af792e82935e10ae9b60a374ce5f149d2de0616`; its five plan-memory files are available in the active worktree.
+## Active step — T07, unified online booking window
 
-Check actual git status/HEAD and GitHub PR state first. If they differ from this record, restore the factual checkpoint before editing. Timestamped EVIDENCE entries with PR_OPEN are historical, not current instructions.
+- Status: VALIDATED locally; fresh-main rebase, PR CI/review and merge remain. Shared snapshot, admission policy, active adapters, report, strict settings validation, localized UI and clinic-local scheduler selection are implemented.
+- Mandatory gate was run once, then retried once with the known root `backend/app/services/queue_svc/_operations.py`. The retry returned `narrow_override` limited to that path. The user-approved T07 plan is the repository-approved basis for the bounded additional paths. Record exactly: `gate_misroute=false`, `override_used=true`, `known_root_cause_file=backend/app/services/queue_svc/_operations.py`. Do not run a third gate attempt.
+- Confirmed active admission/read paths: QueueBusinessService token join and least-loaded selection; GraphQL `joinQueue`; QR session precheck before canonical allocation; public `/online-queue/status` through `crud/online_queue.check_queue_availability`; `QueueAutoCloseService` is the separate service-opening transition. Transitional `crud/online_queue.join_online_queue` has no mounted caller found and remains out unless new source evidence proves it active.
+- T07 bounded allowlist: `backend/app/crud/daily_queue_creation_policy.py`; `backend/app/services/queue_svc/_operations.py`; `backend/app/services/qr_queue/_queue_ops.py`; `backend/app/crud/online_queue.py`; `backend/app/graphql/mutations.py`; the T06.2-connected constructors `backend/app/repositories/queue_api_repository.py`, `queue_limits_repository.py`, `visit_confirmation_repository.py`, and `backend/app/services/force_majeure_service.py`; `backend/app/services/queue_auto_close.py`; `backend/app/crud/clinic.py`; `backend/app/schemas/clinic.py`; `backend/app/api/v1/endpoints/online_queue_new.py`; `backend/app/schemas/online_queue.py`; generated contract artifacts `backend/openapi.json` and `frontend/src/types/generated/api.ts` because the settings DTO now documents strict `HH:MM`; `frontend/src/components/admin/QueueSettings.tsx` and locale files `ru.ts`, `en.ts`, `uz-Cyrl.ts`, `uz-Latn.ts`, `kk.ts`; focused tests under `backend/tests/unit` and relevant effective-settings, QR/session, online-status, GraphQL and scheduler suites; the canonical plan, PROGRESS, RESUME, DECISIONS and EVIDENCE. Constructor extension is required so every existing creation writer freezes the same v1 settings interval.
+- Denied: migrations/models, queue ownership/quota/counter writes, enabling the feature flag, new future-date behavior, queue numbering/status/clinical lifecycle changes, direct staging/production mutation, unrelated cleanup, and unmounted legacy CRUD join unless new evidence changes its classification.
+- Policy interpretation: existing `legacy` rows keep pre-T07 admission behavior without a new end cutoff. `daily_online_issuances_v1` enforces frozen `[start,end)` in clinic timezone. A rowless availability check uses fresh settings and the same policy selection as subsequent creation. Future dates keep the existing same-day-window bypass. Manual early closure via `opened_at` remains. Existing entries stay serviceable after cutoff. This is a technical interpretation of the user-approved plan and existing runtime, not a new product decision.
+- Completed loop: shared settings/window calculation and constructor parity; active token join, GraphQL join, QR precheck, public availability/status, effective settings report and scheduler now use the policy. Clinic-wide QR overview does not inherit the time policy from an arbitrary first row in a mixed legacy/v1 day; it stays available when any target is time-eligible and the selected queue is rechecked by canonical admission. Strict `HH:MM`, start-before-end, no-scheduler cutoff, replay and clinic/host-day divergence are covered. Final focused queue tests: 57 passed, 1 warning (SQLite). OpenAPI contract: 37 passed, 7 PostgreSQL integration cases skipped under SQLite; the dedicated changed-schema contract passed separately. QueueSettings suite: 27 passed. TypeScript check, focused ESLint, changed-path Ruff, Python compilation, OpenAPI/API-type generation and `git diff --check` passed.
+- Required focused coverage: before/exact start and before/exact end; old snapshot despite changed settings; no-row/current flag parity; clinic-vs-host date divergence; early manual close; cutoff with scheduler absent; future and legacy compatibility; invalid `HH:MM`/overnight rejection; QR/public status/actual join parity; GraphQL join.
+- Stop on ambiguous routing/claim flow, a writer bypassing the common admission boundary, overnight configuration, a need to change future-date behavior, ownership, queue numbering or clinical lifecycle. Also stop before using any staging/production environment with live data.
+- Environment check: local port 55432 did not accept a connection, staging ports 18001/18080 are not listening, Docker CLI is unavailable; WSL reports Ubuntu-24.04 but no isolated staging service is up. PostgreSQL integration and synthetic staging/browser checks are NOT_RUN. Production was not queried or changed; creation flag stays off.
+- Next exact action: commit this validated checkpoint, rebase onto fresh `origin/main` `3a776133bd8c22529422d3a555a589eedfce5063` (CI-only PR #3555), rerun focused checks, then push/open the T07 PR and wait for exact-head CI.
 
-## Active runtime step — T06.2
+## Merge, staging and rollout guardrails
 
-- Worktree: `C:\final\_wt_aqs_t062_creation_policy`; branch `codex/aqs-T06.2-creation-policy`; latest base `origin/main` `1358c70bf4723d151861a9ef135bba147b118fee` after clean second rebase. The new base only adds a mutation-test deselection in `backend/pyproject.toml`. Post-rebase focused tests passed 54/54 and `git diff --check` passed. PR #3546 still needs force-with-lease push and fresh checks; verify the live head before merge.
-- Gate: initial routing misclassified queue-constructor work as frontend route ownership. The sole retry with known root `backend/app/services/queue_svc/_operations.py` returned a one-file override. The explicit user-approved T06.2 plan authorizes the projected shared helper plus the listed runtime constructors and focused tests; manual override is restricted to the exact allowlist in PROGRESS. Record the gate misroute/override in EVIDENCE; do not retry the gate.
-- Runtime scope: new shared calculation, `queue_svc/_operations.py`, `crud/online_queue.py`, `graphql/mutations.py`, queue API/limits/visit-confirmation repositories, and force-majeure queue creation. `dev_seed.py` remains synthetic legacy seed; `migration_service._get_or_create_daily_queue` remains historical import. The backup serializer/restore in `migration_service.py` is in scope only to preserve `policy_version`/`online_issued_count` and default old backups to legacy/0; source inspection proved omission would reset a restored v1 counter. No schema/migration changes, cutoff/quota enforcement, ordinary API/UI, flag activation, staging or production.
-- Implemented: shared `daily_queue_creation_snapshot`; queue-service, legacy CRUD, GraphQL, queue API/limits/visit-confirmation repositories and force-majeure constructors use it. V1 selection remains default-off. Backup/restore carries policy/count, while old backups restore to legacy/0. Synthetic seed and historical import stay legacy.
-- Local checks: final rerun — 54 policy/backup/settings and least-loaded routing unit/integration tests passed; earlier constructor-adapter runs passed 8 + 22 + 4 tests. The CRUD regression preserves explicit legacy `start_number`. `compileall`, `git diff --check`, helper/test Ruff+Black, import sorting and Ruff pre-commit passed. The final pre-commit run passed all non-format hooks; `ruff-format` and Black were skipped because whole-file formatting rewrote unrelated legacy code. Two equivalent `dict(rows)` cleanup edits removed pre-existing Ruff C416 failures. SQLite only; no T06.2 PostgreSQL or staging check. See `EVIDENCE.md#t06.2-final-validation-checkpoint`.
-- Current exact next action: push the second rebased T06.2 branch and wait for all applicable required checks on that exact head. PR #3546 is already ready. The user instructed “мержай и продолжай”; if exact-head checks pass and merge state is clean, merge promptly, then sync `origin/main` before T07. Synthetic staging/browser remains NOT_RUN; do not activate the feature flag or deploy.
+- Continue one small PR cycle at a time from fresh `origin/main`; verify actual HEAD, diff, PR and checks before each merge. The user's “мержай и продолжай” authorizes continuing the planned cycles, but no deployment or flag activation.
+- Report exactly which local/GitHub/staging/PG checks passed, failed, skipped or were not run. Do not call skips “pass”. If an explicitly required PG/staging gate is unavailable, record the limitation and follow the plan's stop/deferral rules; never substitute production.
+- Do not enable `QUEUE_POLICY_V2_CREATION_ENABLED` in production or staging as part of T07. Do not restart production.
+- The accepted #3543 deferral resumes at T18/pre-deploy: synthetic admin settings save → fresh command defaults → unchanged existing daily snapshot, affected admin/queue E2E, cold/repeat first-content timing, and applicable local PG coverage. Run all 10 items of `docs/runbooks/STAGING_VALIDATION.md` before any production rollout and record each item separately.
 
-The T05 deferral does not waive T06.2 validation. Close the T06.2 PR cycle before T07; do not begin T07 while T06 is unresolved.
+## Historical worktree preservation
 
-## Deferred staging coverage
-
-- Owner: executing AQS agent, tracked through T18 and pre-deploy validation.
-- Resume when isolated synthetic staging and QA access are available: T05 admin-save/new-command/existing-snapshot smoke; affected queue/admin backend-dependent E2E; cold/repeat actual-content timing; relevant local PG integration on disposable PG.
-- Revalidate against the actual candidate deployment commit and record every PASS/FAIL/NOT_RUN. Deferral is accepted, not a passed scenario.
-- Before production rollout run the full `docs/runbooks/STAGING_VALIDATION.md`, with all ten checks individually evidenced. No production restart, feature-flag activation or data change was performed in this closure.
-
-## Local worktree preservation
-
-- The detailed 1.1 plan and decisions were recovered from `C:\final\_wt_aqs_t03_cabinet_read`; its original tracked/untracked changes remain untouched. Version 1.2 publishes the recovered detail plus current facts.
-- `C:\final\_wt_aqs_t05_settings_cache` is detached at the T05 merge; its local/remote runtime branch was removed. Untracked PR-body files and temporary pre-commit environment are retained.
-- An earlier automatic approval review rejected scratch deletion. Do not bypass it with another deletion technique or discard unrelated local edits. Scratch is not part of the PR.
-
-Before compaction, handoff or session end update the actual task/HEAD/diff/checks/next action in PROGRESS and append evidence. Do not rely on chat history alone.
+- Earlier T03/T05/T06 worktrees and scratch were preserved per their checkpoints. Do not delete, clean, reset or rewrite them while doing T07. Use only this worktree for T07 code.
+- Older PR-open text in timestamped EVIDENCE is historical. Current state is the header/table in PROGRESS and this RESUME.
+- T07 changes are implemented and locally validated but not yet committed; compare live git status/diff before resuming. Full commands/results and exact changed-path categories are in `EVIDENCE.md#t07-local-validation` and its latest T07 follow-up. The fetched `origin/main` advanced from the worktree base `b804a71a` to `3a776133` by CI-only PR #3555; rebase in this worktree, never in `C:\final`.

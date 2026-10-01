@@ -6,6 +6,10 @@ Split from qr_queue_service.py.
 from __future__ import annotations
 
 from app.crud.clinic import clinic_today
+from app.crud.daily_queue_creation_policy import (
+    evaluate_online_admission_window,
+    online_admission_window,
+)
 from app.crud.queue_resource_routing import (
     prefer_registry_surface,
     resolve_registry_tag_queue_for_specialist,
@@ -433,7 +437,8 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
 
         from app.crud.clinic import get_queue_settings
 
-        _tz_name = get_queue_settings(self.db).get("timezone", "Asia/Tashkent")
+        queue_settings = get_queue_settings(self.db)
+        _tz_name = queue_settings.get("timezone", "Asia/Tashkent")
         now = _now(ZoneInfo(_tz_name))
         today = now.date()
 
@@ -445,15 +450,16 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         # ✅ ИСПРАВЛЕНИЕ: Для общего QR ищем любую активную очередь на эту дату
         if qr_token.is_clinic_wide or qr_token.specialist_id is None:
             # Для общего QR проверяем, что есть хотя бы одна активная очередь
-            daily_queue = (
+            daily_queues = (
                 self.db.query(DailyQueue)
                 .filter(DailyQueue.day == target_date, DailyQueue.active == True)
-                .first()
+                .order_by(DailyQueue.id.asc())
+                .all()
             )
 
             # ✅ ИСПРАВЛЕНИЕ: Для общего QR разрешаем запись даже если очередей еще нет
             # (они могут быть созданы позже, или запись может быть на будущую дату)
-            if not daily_queue:
+            if not daily_queues:
                 # Проверяем, что дата не в прошлом (clinic-day SSOT)
                 if target_date < today:
                     logger.debug(
@@ -464,26 +470,44 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                         "message": f"Нельзя записаться на прошедшую дату ({target_date.strftime('%d.%m.%Y')})",
                     }
 
-                # ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем время для сегодняшнего дня
-                # Используем ту же логику, что и в check_queue_time_window
-                # (now — клиник-локальное время, см. clinic-day SSOT выше)
-                if target_date == today:
-                    from app.services.queue_service import QueueBusinessService
-
-                    current_time = now.time()
-                    start_time = QueueBusinessService.ONLINE_QUEUE_START_TIME  # 07:00
-
-                    if current_time < start_time:
-                        logger.debug(
-                            f"[_check_online_time_restrictions] ❌ Время еще не наступило: {current_time.strftime('%H:%M')} < {start_time.strftime('%H:%M')}"
-                        )
-                        return {
-                            "allowed": False,
-                            "message": f"⏰ Онлайн-запись откроется в {start_time.strftime('%H:%M')}. Текущее время: {current_time.strftime('%H:%M')}",
-                            "status": "before_start_time",
-                            "start_time": start_time.strftime('%H:%M'),
-                            "current_time": current_time.strftime('%H:%M'),
-                        }
+                window = online_admission_window(
+                    daily_queue=None,
+                    settings=queue_settings,
+                )
+                window_fields = {
+                    "policy_version": window.policy_version,
+                    "start_time": window.start_time.strftime("%H:%M"),
+                    "end_time": (
+                        window.end_time.strftime("%H:%M")
+                        if window.end_time is not None
+                        else None
+                    ),
+                    "target_date": target_date.isoformat(),
+                }
+                window_result = evaluate_online_admission_window(
+                    target_date, now, window
+                )
+                if window_result == "before_start":
+                    return {
+                        "allowed": False,
+                        "message": (
+                            "Онлайн-запись откроется в "
+                            f"{window_fields['start_time']}"
+                        ),
+                        "status": "before_start_time",
+                        "current_time": now.strftime("%H:%M"),
+                        **window_fields,
+                    }
+                if window_result == "after_end":
+                    return {
+                        "allowed": False,
+                        "message": (
+                            "Онлайн-запись закрыта в "
+                            f"{window_fields['end_time']}"
+                        ),
+                        "status": "after_end_time",
+                        **window_fields,
+                    }
 
                 # Если дата сегодня (и время прошло) или в будущем, разрешаем запись
                 # (очереди могут быть созданы позже или запись может быть на будущую дату)
@@ -494,8 +518,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "allowed": True,
                     "message": f"Запись на {target_date.strftime('%d.%m.%Y')} доступна",
                     "status": "available",
-                    "start_time": "07:00",  # Значения по умолчанию
-                    "end_time": "09:00",
+                    **window_fields,
                     "max_entries": 15,
                     "current_entries": 0,
                     "remaining_slots": 15,
@@ -519,6 +542,87 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "allowed": False,
                     "message": "Запись закрыта - прием уже открыт",
                     "status": "closed_reception_opened",
+                }
+
+            # A clinic-wide QR is an overview before the patient selects a
+            # concrete owner. Never let the first DailyQueue row impose its
+            # legacy/v1 window on every other destination in a mixed day.
+            # The selected queue is checked again by the canonical join.
+            available_queues = []
+            before_start_queues = []
+            after_end_queues = []
+            for queue in daily_queues:
+                queue_window = online_admission_window(
+                    daily_queue=queue,
+                    settings=queue_settings,
+                )
+                result = evaluate_online_admission_window(
+                    target_date, now, queue_window
+                )
+                if result == "available":
+                    available_queues.append((queue, queue_window))
+                elif result == "before_start":
+                    before_start_queues.append((queue, queue_window))
+                elif result == "after_end":
+                    after_end_queues.append((queue, queue_window))
+
+            if available_queues:
+                daily_queue, _ = available_queues[0]
+            elif before_start_queues:
+                _, window = min(
+                    before_start_queues,
+                    key=lambda item: item[1].start_time,
+                )
+                window_fields = {
+                    "policy_version": window.policy_version,
+                    "start_time": window.start_time.strftime("%H:%M"),
+                    "end_time": (
+                        window.end_time.strftime("%H:%M")
+                        if window.end_time is not None
+                        else None
+                    ),
+                    "target_date": target_date.isoformat(),
+                }
+                return {
+                    "allowed": False,
+                    "message": (
+                        "Онлайн-запись откроется в "
+                        f"{window_fields['start_time']}"
+                    ),
+                    "status": "before_start_time",
+                    "current_time": now.strftime("%H:%M"),
+                    **window_fields,
+                }
+            elif after_end_queues:
+                _, window = max(
+                    after_end_queues,
+                    key=lambda item: item[1].end_time,
+                )
+                window_fields = {
+                    "policy_version": window.policy_version,
+                    "start_time": window.start_time.strftime("%H:%M"),
+                    "end_time": (
+                        window.end_time.strftime("%H:%M")
+                        if window.end_time is not None
+                        else None
+                    ),
+                    "target_date": target_date.isoformat(),
+                }
+                return {
+                    "allowed": False,
+                    "message": (
+                        "Онлайн-запись закрыта в "
+                        f"{window_fields['end_time']}"
+                    ),
+                    "status": "after_end_time",
+                    **window_fields,
+                }
+            else:
+                return {
+                    "allowed": False,
+                    "message": f"Нельзя записаться на прошедшую дату ({target_date:%d.%m.%Y})",
+                    "status": "date_past",
+                    "target_date": target_date.isoformat(),
                 }
         else:
             # Для конкретного специалиста ищем его очередь
@@ -574,12 +678,26 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "status": "closed_reception_opened",
                 }
 
-        # Если QR для будущей даты - разрешаем запись
-        # (day/today — клиник-локальные, см. clinic-day SSOT выше)
+        window = online_admission_window(
+            daily_queue=daily_queue,
+            settings=queue_settings,
+        )
+        window_fields = {
+            "policy_version": window.policy_version,
+            "start_time": window.start_time.strftime("%H:%M"),
+            "end_time": (
+                window.end_time.strftime("%H:%M")
+                if window.end_time is not None
+                else None
+            ),
+            "target_date": target_date.isoformat(),
+        }
+
+        # Future dates retain the current contract: the same-day clock
+        # boundaries do not reject a future booking.
         if target_date > today:
-            # ✅ Защита от None для общего QR (хотя мы уже вернули результат выше)
             if daily_queue:
-                max_entries = getattr(daily_queue, 'max_online_entries', 15)
+                max_entries = getattr(daily_queue, "max_online_entries", 15)
                 current_entries = (
                     self.db.query(OnlineQueueEntry)
                     .filter(
@@ -590,7 +708,6 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     .count()
                 )
             else:
-                # Для общего QR без очередей используем значения по умолчанию
                 max_entries = 15
                 current_entries = 0
 
@@ -598,84 +715,35 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 "allowed": True,
                 "message": f"Запись на {target_date.strftime('%d.%m.%Y')} доступна",
                 "status": "available",
-                "start_time": (
-                    getattr(daily_queue, 'online_start_time', '07:00')
-                    if daily_queue
-                    else '07:00'
-                ),
-                "end_time": (
-                    getattr(daily_queue, 'online_end_time', '09:00')
-                    if daily_queue
-                    else '09:00'
-                ),
+                **window_fields,
                 "max_entries": max_entries,
                 "current_entries": current_entries,
                 "remaining_slots": max_entries - current_entries,
-                "target_date": target_date.isoformat(),
             }
 
-        # Если QR для сегодня - проверяем временные ограничения
-        # ✅ ИСПРАВЛЕНИЕ: Используем объекты time для сравнения, как в check_queue_time_window
-        from app.services.queue_service import QueueBusinessService
-
-        current_time_obj = now.time()
-        start_time_obj = QueueBusinessService.ONLINE_QUEUE_START_TIME  # 07:00
-
-        # Проверяем время начала (по умолчанию 07:00)
-        if current_time_obj < start_time_obj:
-            # Форматируем время для сообщений
-            start_time_str = start_time_obj.strftime('%H:%M')
-            current_time_str = current_time_obj.strftime('%H:%M')
-
-            # Вычисляем время до открытия
-            start_datetime = now.replace(
-                hour=start_time_obj.hour,
-                minute=start_time_obj.minute,
-                second=0,
-                microsecond=0,
-            )
-
-            # Если время уже прошло сегодня, значит открытие завтра
-            if start_datetime <= now:
-                start_datetime = start_datetime.replace(day=start_datetime.day + 1)
-
-            time_until_open = start_datetime - now
-            minutes_until_open = int(time_until_open.total_seconds() / 60)
-
+        window_result = evaluate_online_admission_window(target_date, now, window)
+        if window_result == "date_past":
             return {
                 "allowed": False,
-                "message": f"⏰ Онлайн-запись откроется в {start_time_str}. Текущее время: {current_time_str}",
-                "status": "before_start_time",
-                "start_time": start_time_str,
-                "current_time": current_time_str,
-                "minutes_until_open": minutes_until_open,
-                "opens_at_datetime": start_datetime.isoformat(),
-                "countdown_text": f"Откроется через {minutes_until_open} мин",
+                "message": f"Нельзя записаться на прошедшую дату ({target_date:%d.%m.%Y})",
+                "status": "date_past",
+                **window_fields,
             }
-
-        # Проверяем время окончания (по умолчанию 09:00)
-        # ✅ ИСПРАВЛЕНИЕ: Используем объекты time для сравнения
-        # Для времени окончания используем значение из настроек очереди или по умолчанию
-        end_time_str = (
-            getattr(daily_queue, 'online_end_time', '09:00') if daily_queue else '09:00'
-        )
-        if end_time_str:
-            # Парсим строку времени в объект time
-            end_hour, end_minute = map(int, end_time_str.split(':'))
-            _end_time_obj = (
-                datetime.now()
-                .replace(hour=end_hour, minute=end_minute, second=0, microsecond=0)
-                .time()
-            )
-
-            # TEMPORARY: Disable end time check for testing
-            if False:  # current_time_obj > end_time_obj:
-                return {
-                    "allowed": False,
-                    "message": f"Запись закрыта в {end_time_str}",
-                    "status": "after_end_time",
-                    "end_time": end_time_str,
-                }
+        if window_result == "before_start":
+            return {
+                "allowed": False,
+                "message": f"Онлайн-запись откроется в {window_fields['start_time']}",
+                "status": "before_start_time",
+                "current_time": now.strftime("%H:%M"),
+                **window_fields,
+            }
+        if window_result == "after_end":
+            return {
+                "allowed": False,
+                "message": f"Онлайн-запись закрыта в {window_fields['end_time']}",
+                "status": "after_end_time",
+                **window_fields,
+            }
 
         # Проверяем лимит записей
         # ✅ ИСПРАВЛЕНИЕ: Для общего QR не проверяем строгий лимит (будет проверяться при создании записей)
@@ -722,25 +790,14 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "status": "limit_reached",
                     "max_entries": max_entries,
                     "current_entries": current_entries,
+                    **window_fields,
                 }
-
-        # Все проверки пройдены
-        # ✅ ИСПРАВЛЕНИЕ: Определяем start_time и end_time для ответа
-        start_time_str = (
-            getattr(daily_queue, 'online_start_time', '07:00')
-            if daily_queue
-            else '07:00'
-        )
-        end_time_str = (
-            getattr(daily_queue, 'online_end_time', '09:00') if daily_queue else '09:00'
-        )
 
         return {
             "allowed": True,
             "message": "Запись доступна",
             "status": "available",
-            "start_time": start_time_str,
-            "end_time": end_time_str,
+            **window_fields,
             "max_entries": max_entries,
             "current_entries": current_entries,
             "remaining_slots": max_entries - current_entries,

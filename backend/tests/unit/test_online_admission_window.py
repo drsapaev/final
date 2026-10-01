@@ -1,0 +1,331 @@
+from datetime import date, datetime
+from types import SimpleNamespace
+from zoneinfo import ZoneInfo
+
+import pytest
+from pydantic import ValidationError
+
+from app.crud.daily_queue_creation_policy import (
+    LEGACY_POLICY_VERSION,
+    ONLINE_ISSUANCES_V1_POLICY_VERSION,
+    OnlineAdmissionWindow,
+    evaluate_online_admission_window,
+    online_admission_window,
+    online_window_for_settings,
+    parse_hhmm,
+)
+from app.schemas.clinic import QueueSettingsUpdate
+
+
+def _fixed_tashkent_time(monkeypatch, module, *, hour: int, minute: int = 0):
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            local = datetime(2030, 1, 2, hour, minute)
+            return local.replace(tzinfo=tz) if tz is not None else local
+
+    monkeypatch.setattr(module, "datetime", FixedDateTime)
+    return FixedDateTime
+
+
+def _make_v1_queue(db_session, *, day, doctor):
+    from app.models.online_queue import DailyQueue
+
+    queue = DailyQueue(
+        day=day,
+        specialist_id=doctor.id,
+        queue_tag=None,
+        active=True,
+        policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+        online_start_time="07:00",
+        online_end_time="09:00",
+        max_online_entries=15,
+    )
+    db_session.add(queue)
+    db_session.flush()
+    return queue
+
+
+@pytest.mark.parametrize("value", ["7:00", "24:00", "07:60", "07:0", " 07:00"])
+def test_parse_hhmm_rejects_noncanonical_or_out_of_range_values(value):
+    with pytest.raises(ValueError, match="HH:MM"):
+        parse_hhmm(value, field_name="auto_close_time")
+
+
+@pytest.mark.parametrize("value", ["7:00", "24:00", "07:60", "07:00:00"])
+def test_admin_queue_settings_rejects_noncanonical_cutoff(value):
+    with pytest.raises(ValidationError):
+        QueueSettingsUpdate(auto_close_time=value)
+
+
+@pytest.mark.parametrize("start,end", [(7, "07:00"), (7, "06:59"), (23, "00:30")])
+def test_admin_queue_settings_rejects_empty_or_overnight_window(start, end):
+    with pytest.raises(ValidationError):
+        QueueSettingsUpdate(queue_start_hour=start, auto_close_time=end)
+
+
+def test_admin_queue_settings_openapi_documents_hhmm_pattern():
+    schema = QueueSettingsUpdate.model_json_schema()
+
+    assert schema["properties"]["auto_close_time"]["pattern"] == (
+        r"^(?:[01]\d|2[0-3]):[0-5]\d$"
+    )
+
+
+def test_legacy_policy_keeps_start_gate_without_admission_cutoff():
+    start_time, end_time = online_window_for_settings(
+        {"queue_start_hour": 8, "auto_close_time": "10:00"},
+        policy_version=LEGACY_POLICY_VERSION,
+    )
+
+    assert start_time.strftime("%H:%M") == "08:00"
+    assert end_time is None
+
+
+def test_v1_row_uses_frozen_window_instead_of_changed_settings():
+    row = SimpleNamespace(
+        policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+        online_start_time="08:00",
+        online_end_time="10:00",
+    )
+
+    window = online_admission_window(
+        daily_queue=row,
+        settings={"queue_start_hour": 6, "auto_close_time": "07:00"},
+    )
+
+    assert window.start_time.strftime("%H:%M") == "08:00"
+    assert window.end_time.strftime("%H:%M") == "10:00"
+
+
+def test_rowless_v1_window_uses_fresh_settings_and_creation_policy(
+    monkeypatch,
+):
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
+
+    window = online_admission_window(
+        daily_queue=None,
+        settings={"queue_start_hour": 8, "auto_close_time": "10:30"},
+    )
+
+    assert window.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION
+    assert window.start_time.strftime("%H:%M") == "08:00"
+    assert window.end_time.strftime("%H:%M") == "10:30"
+
+
+@pytest.mark.parametrize(
+    ("clock", "expected"),
+    [
+        ("07:59", "before_start"),
+        ("08:00", "available"),
+        ("09:59", "available"),
+        ("10:00", "after_end"),
+        ("10:01", "after_end"),
+    ],
+)
+def test_v1_window_uses_half_open_boundaries(clock, expected):
+    start_time, end_time = online_window_for_settings(
+        {"queue_start_hour": 8, "auto_close_time": "10:00"},
+        policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+    )
+    now = datetime.combine(date(2026, 10, 1), datetime.strptime(clock, "%H:%M").time())
+    window = OnlineAdmissionWindow(
+        ONLINE_ISSUANCES_V1_POLICY_VERSION,
+        start_time,
+        end_time,
+    )
+
+    assert (
+        evaluate_online_admission_window(date(2026, 10, 1), now, window) == expected
+    )
+
+
+def test_window_applies_same_day_clock_in_the_supplied_clinic_timezone():
+    clinic_now = datetime(2026, 10, 1, 19, 30, tzinfo=ZoneInfo("UTC")).astimezone(
+        ZoneInfo("Asia/Tashkent")
+    )
+    start_time, end_time = online_window_for_settings(
+        {"queue_start_hour": 7, "auto_close_time": "09:00"},
+        policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+    )
+    window = OnlineAdmissionWindow(
+        ONLINE_ISSUANCES_V1_POLICY_VERSION,
+        start_time,
+        end_time,
+    )
+
+    assert clinic_now.date() == date(2026, 10, 2)
+    assert evaluate_online_admission_window(clinic_now.date(), clinic_now, window) == "before_start"
+
+
+def test_future_date_preserves_same_day_window_bypass():
+    start_time, end_time = online_window_for_settings(
+        {"queue_start_hour": 8, "auto_close_time": "10:00"},
+        policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+    )
+    window = OnlineAdmissionWindow(
+        ONLINE_ISSUANCES_V1_POLICY_VERSION,
+        start_time,
+        end_time,
+    )
+
+    assert (
+        evaluate_online_admission_window(
+            date(2026, 10, 2),
+            datetime(2026, 10, 1, 23, 0),
+            window,
+        )
+        == "available"
+    )
+
+
+@pytest.mark.unit
+def test_public_status_reports_same_v1_cutoff_as_availability(
+    db_session, monkeypatch
+):
+    import app.api.v1.endpoints.online_queue_new as online_queue_endpoint
+    import app.crud.clinic as clinic_crud
+    import app.crud.online_queue as online_queue_crud
+    from app.models.clinic import Doctor
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setattr(online_queue_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
+    _fixed_tashkent_time(monkeypatch, online_queue_crud, hour=9)
+    _fixed_tashkent_time(monkeypatch, online_queue_endpoint, hour=9)
+
+    doctor = Doctor(specialty="cardiology")
+    db_session.add(doctor)
+    db_session.flush()
+    queue = _make_v1_queue(db_session, day=date(2030, 1, 2), doctor=doctor)
+
+    availability = online_queue_crud.check_queue_availability(
+        db_session, queue.day, doctor.id
+    )
+    public_status = online_queue_endpoint.check_queue_status(
+        day=queue.day, specialist_id=doctor.id, db=db_session
+    )
+
+    assert availability["available"] is False
+    assert availability["reason"] == "AFTER_CUTOFF"
+    assert availability["end_time"] == "09:00"
+    assert public_status.within_hours is False
+    assert public_status.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION
+    assert public_status.queue_end_time == "09:00"
+
+    rowless_doctor = Doctor(specialty="dermatology")
+    db_session.add(rowless_doctor)
+    db_session.flush()
+    rowless = online_queue_crud.check_queue_availability(
+        db_session, queue.day, rowless_doctor.id
+    )
+    rowless_status = online_queue_endpoint.check_queue_status(
+        day=queue.day, specialist_id=rowless_doctor.id, db=db_session
+    )
+    assert rowless["available"] is False
+    assert rowless["reason"] == "AFTER_CUTOFF"
+    assert rowless["policy_version"] == ONLINE_ISSUANCES_V1_POLICY_VERSION
+    assert rowless["end_time"] == "09:00"
+    assert rowless_status.within_hours is False
+    assert rowless_status.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION
+
+
+@pytest.mark.unit
+def test_specific_qr_precheck_rejects_v1_at_exact_cutoff(db_session, monkeypatch):
+    import app.crud.clinic as clinic_crud
+    import app.services.qr_queue_service as qr_queue_service_module
+    import app.services.queue_service as queue_service_module
+    from app.models.clinic import Doctor
+    from app.models.online_queue import QueueToken
+    from app.services.qr_queue import QRQueueService
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.delenv("DISABLE_QUEUE_TIME_RESTRICTIONS", raising=False)
+    _fixed_tashkent_time(monkeypatch, queue_service_module, hour=9)
+    _fixed_tashkent_time(monkeypatch, qr_queue_service_module, hour=9)
+
+    doctor = Doctor(specialty="cardiology")
+    db_session.add(doctor)
+    db_session.flush()
+    queue = _make_v1_queue(db_session, day=date(2030, 1, 2), doctor=doctor)
+    token = QueueToken(
+        token="synthetic-v1-cutoff",
+        day=queue.day,
+        specialist_id=doctor.id,
+        expires_at=datetime(2030, 1, 3, 0, 0),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.flush()
+
+    result = QRQueueService(db_session)._check_online_time_restrictions(token.token)
+
+    assert result["allowed"] is False, result
+    assert result["status"] == "after_end_time"
+    assert result["policy_version"] == ONLINE_ISSUANCES_V1_POLICY_VERSION
+    assert result["end_time"] == "09:00"
+
+
+@pytest.mark.unit
+def test_clinic_wide_qr_uses_any_available_queue_in_mixed_legacy_day(
+    db_session, monkeypatch
+):
+    import app.crud.clinic as clinic_crud
+    import app.services.qr_queue_service as qr_queue_service_module
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue, QueueToken
+    from app.services.qr_queue import QRQueueService
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    _fixed_tashkent_time(monkeypatch, qr_queue_service_module, hour=9)
+
+    day = date(2030, 1, 2)
+    v1_doctor = Doctor(specialty="cardiology")
+    legacy_doctor = Doctor(specialty="dermatology")
+    db_session.add_all([v1_doctor, legacy_doctor])
+    db_session.flush()
+    _make_v1_queue(db_session, day=day, doctor=v1_doctor)
+    db_session.add(
+        DailyQueue(
+            day=day,
+            specialist_id=legacy_doctor.id,
+            queue_tag=None,
+            active=True,
+            policy_version=LEGACY_POLICY_VERSION,
+            online_start_time="07:00",
+            online_end_time="09:00",
+            max_online_entries=15,
+        )
+    )
+    token = QueueToken(
+        token="synthetic-clinicwide-mixed-policy",
+        day=day,
+        specialist_id=None,
+        is_clinic_wide=True,
+        expires_at=datetime(2030, 1, 3),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.flush()
+
+    result = QRQueueService(db_session)._check_online_time_restrictions(token.token)
+
+    assert result["allowed"] is True, result
+    assert result["status"] == "available"
+    assert result["policy_version"] == LEGACY_POLICY_VERSION
+    assert result["end_time"] is None

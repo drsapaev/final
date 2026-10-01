@@ -6,9 +6,7 @@
  * read-model over existing rows (D-06 APPROVED owner wording): every
  * managed setting carries a source level (clinic → department → owner →
  * day snapshot), a live flag ("does the runtime read this at all?"),
- * applied-when codes, and an honest note for dead fields (F-19: the
- * DepartmentQueueSettings block except queue_prefix; the clinic
- * auto_close_time display-only field).
+ * applied-when codes, and an honest note for fields that are not live.
  *
  * This module is presentation-agnostic: types + defensive parsing +
  * i18n key maps. The React panel in QueueSettings.tsx consumes it.
@@ -67,6 +65,7 @@ export interface ActiveDayRow {
   specialist_id: number | null;
   queue_resource_id: number | null;
   queue_tag: string | null;
+  policy_version: 'legacy' | 'daily_online_issuances_v1';
   active: boolean;
   opened_at: string | null;
   start_number: number;
@@ -207,6 +206,10 @@ const parseActiveDayRow = (raw: unknown): ActiveDayRow | null => {
     queue_resource_id:
       typeof rec.queue_resource_id === 'number' ? rec.queue_resource_id : null,
     queue_tag: asString(rec.queue_tag),
+    policy_version:
+      rec.policy_version === 'daily_online_issuances_v1'
+        ? 'daily_online_issuances_v1'
+        : 'legacy',
     active: rec.active !== false,
     opened_at: asString(rec.opened_at),
     start_number: asNumber(rec.start_number) || 1,

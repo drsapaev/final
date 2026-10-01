@@ -60,6 +60,125 @@ def test_queue_time_window_allows_after_start(monkeypatch):
     assert allowed is True
 
 
+def test_v1_queue_uses_its_frozen_start_and_end_boundaries(monkeypatch):
+    target = date(2026, 1, 1)
+    queue = DailyQueue(
+        day=target,
+        specialist_id=1,
+        policy_version="daily_online_issuances_v1",
+        online_start_time="08:00",
+        online_end_time="10:00",
+    )
+    settings = {"timezone": "Asia/Tashkent", "queue_start_hour": 6}
+
+    _freeze_datetime(monkeypatch, datetime(2026, 1, 1, 7, 59))
+    allowed, _ = QueueBusinessService.check_queue_time_window(
+        target, daily_queue=queue, settings=settings
+    )
+    assert allowed is False
+
+    _freeze_datetime(monkeypatch, datetime(2026, 1, 1, 8, 0))
+    allowed, _ = QueueBusinessService.check_queue_time_window(
+        target, daily_queue=queue, settings=settings
+    )
+    assert allowed is True
+
+    _freeze_datetime(monkeypatch, datetime(2026, 1, 1, 10, 0))
+    allowed, message = QueueBusinessService.check_queue_time_window(
+        target, daily_queue=queue, settings=settings
+    )
+    assert allowed is False
+    assert "10:00" in message
+
+
+def test_v1_queue_uses_clinic_local_date_when_host_date_diverges(monkeypatch):
+    target = date(2026, 1, 2)
+
+    class FixedUtcDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            instant = datetime(2026, 1, 1, 19, 30, tzinfo=ZoneInfo("UTC"))
+            if tz is not None:
+                return instant.astimezone(tz)
+            return instant.replace(tzinfo=None)
+
+    monkeypatch.setattr(queue_service, "datetime", FixedUtcDateTime)
+
+    allowed, message = QueueBusinessService.check_queue_time_window(
+        target,
+        daily_queue=DailyQueue(
+            day=target,
+            specialist_id=1,
+            policy_version="daily_online_issuances_v1",
+            online_start_time="07:00",
+            online_end_time="09:00",
+        ),
+        settings={"timezone": "Asia/Tashkent", "queue_start_hour": 7},
+    )
+
+    assert allowed is False
+    assert "07:00" in message
+
+
+def test_legacy_queue_does_not_gain_v1_end_cutoff(monkeypatch):
+    target = date(2026, 1, 1)
+    _freeze_datetime(monkeypatch, datetime(2026, 1, 1, 10, 30))
+
+    allowed, _ = QueueBusinessService.check_queue_time_window(
+        target,
+        daily_queue=DailyQueue(
+            day=target,
+            specialist_id=1,
+            policy_version="legacy",
+            online_start_time="07:00",
+            online_end_time="09:00",
+        ),
+        settings={"timezone": "Asia/Tashkent", "queue_start_hour": 7},
+    )
+
+    assert allowed is True
+
+
+def test_early_manual_close_still_blocks_a_v1_queue(monkeypatch):
+    target = date(2026, 1, 1)
+    _freeze_datetime(monkeypatch, datetime(2026, 1, 1, 8, 0))
+
+    allowed, message = QueueBusinessService.check_queue_time_window(
+        target,
+        queue_opened_at=datetime(2026, 1, 1, 7, 45),
+        daily_queue=DailyQueue(
+            day=target,
+            specialist_id=1,
+            policy_version="daily_online_issuances_v1",
+            online_start_time="07:00",
+            online_end_time="09:00",
+        ),
+        settings={"timezone": "Asia/Tashkent", "queue_start_hour": 7},
+    )
+
+    assert allowed is False
+    assert "Прием уже открыт" in message
+
+
+def test_v1_future_queue_preserves_existing_date_contract(monkeypatch):
+    target = date(2026, 1, 2)
+    _freeze_datetime(monkeypatch, datetime(2026, 1, 1, 11, 0))
+
+    allowed, _ = QueueBusinessService.check_queue_time_window(
+        target,
+        daily_queue=DailyQueue(
+            day=target,
+            specialist_id=1,
+            policy_version="daily_online_issuances_v1",
+            online_start_time="07:00",
+            online_end_time="09:00",
+        ),
+        settings={"timezone": "Asia/Tashkent", "queue_start_hour": 7},
+    )
+
+    assert allowed is True
+
+
 def _queue_service_with_static_settings(monkeypatch) -> QueueBusinessService:
     service = QueueBusinessService()
     monkeypatch.setattr(

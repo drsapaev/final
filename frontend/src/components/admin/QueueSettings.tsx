@@ -1047,6 +1047,11 @@ const QueueSettings = () => {
                           <div>
                             <div className="admin-text-xs-secondary">{dayRow.queue_tag ?? '—'}</div>
                             <div className="admin-flex-center-12">
+                              <span className="admin-text-xs-secondary">
+                                {t(dayRow.policy_version === 'daily_online_issuances_v1'
+                                  ? 'admin2.qs_eff_day_policy_v1'
+                                  : 'admin2.qs_eff_day_policy_legacy')}
+                              </span>
                               <span className="admin-text-xs-secondary">{t('admin2.qs_eff_day_start_number')}: </span>
                               <strong>{dayRow.start_number}</strong>
                               <span className="admin-text-xs-secondary">{t('admin2.qs_eff_day_window')}: </span>

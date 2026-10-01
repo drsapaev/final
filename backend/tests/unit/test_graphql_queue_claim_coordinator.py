@@ -178,3 +178,71 @@ def test_join_queue_recognizes_existing_resource_surface_claim(
         .count()
         == 1
     )
+
+
+@pytest.mark.unit
+@pytest.mark.queue
+def test_graphql_join_rejects_v1_at_exact_cutoff(
+    db_session,
+    test_doctor,
+    test_patient,
+    monkeypatch,
+) -> None:
+    from app.graphql import mutations as gql_mutations
+    from app.graphql.types import QueueEntryInput
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            frozen = datetime(2030, 1, 2, 9, 0)
+            return frozen.replace(tzinfo=tz) if tz is not None else frozen
+
+    day = datetime(2030, 1, 2, 9, 0).date()
+    queue = DailyQueue(
+        day=day,
+        specialist_id=test_doctor.id,
+        queue_tag=None,
+        active=True,
+        max_online_entries=15,
+        policy_version="daily_online_issuances_v1",
+        online_start_time="07:00",
+        online_end_time="09:00",
+    )
+    db_session.add(queue)
+    db_session.flush()
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_db_session",
+        lambda: contextlib.nullcontext(db_session),
+    )
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {
+            "timezone": "Asia/Tashkent",
+            "queue_start_hour": 7,
+            "auto_close_time": "09:00",
+        },
+    )
+    monkeypatch.setattr(
+        gql_mutations,
+        "ensure_doctor_eligible_for_appointment",
+        lambda db, doctor_id: None,
+    )
+    monkeypatch.setattr(gql_mutations, "datetime", FixedDateTime)
+
+    result = gql_mutations.Mutation._join_queue_impl(
+        SimpleNamespace(context=None),
+        QueueEntryInput(patient_id=test_patient.id, doctor_id=test_doctor.id),
+    )
+
+    assert result.success is False
+    assert result.errors == ["ONLINE_BOOKING_CLOSED"]
+    assert result.queue_entry is None
+    assert (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.queue_id == queue.id)
+        .count()
+        == 0
+    )

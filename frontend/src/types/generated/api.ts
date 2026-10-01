@@ -36250,7 +36250,7 @@ export type components = {
             queue_start_hour: number;
             /**
              * Auto Close Time
-             * @description Время автозакрытия
+             * @description Время окончания онлайн-записи для новых v1 очередей
              * @default 09:00
              */
             auto_close_time: string;
@@ -36278,6 +36278,54 @@ export type components = {
             max_per_day: {
                 [key: string]: number;
             };
+        };
+        /**
+         * QueueStatusCheck
+         * @description Проверка статуса очереди
+         */
+        QueueStatusCheck: {
+            /**
+             * Queue Open
+             * @description Очередь открыта
+             */
+            queue_open: boolean;
+            /**
+             * Within Hours
+             * @description В рабочих часах
+             */
+            within_hours: boolean;
+            /**
+             * Has Slots
+             * @description Есть свободные места
+             */
+            has_slots: boolean;
+            /**
+             * Current Time
+             * Format: date-time
+             * @description Текущее время
+             */
+            current_time: string;
+            /**
+             * Queue Start Time
+             * @description Время начала очереди
+             */
+            queue_start_time: string;
+            /**
+             * Queue End Time
+             * @description Фактический cutoff онлайн-записи; null для legacy policy
+             */
+            queue_end_time: string | null;
+            /**
+             * Policy Version
+             * @description Политика допуска действующей или будущей очереди
+             * @enum {string}
+             */
+            policy_version: "legacy" | "daily_online_issuances_v1";
+            /**
+             * Opened At
+             * @description Время открытия приема
+             */
+            opened_at?: string | null;
         };
         /**
          * QueueStatusNotificationRequest
@@ -41761,6 +41809,17 @@ export type components = {
              * @description Время начала онлайн-записи
              */
             start_time: string;
+            /**
+             * End Time
+             * @description Время cutoff онлайн-записи; null для legacy policy
+             */
+            end_time: string | null;
+            /**
+             * Policy Version
+             * @description Политика очереди на выбранный день
+             * @enum {string}
+             */
+            policy_version: "legacy" | "daily_online_issuances_v1";
             /**
              * Max Slots
              * @description Максимум мест в очереди
@@ -52116,9 +52175,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["QueueStatusCheck"];
                 };
             };
             /** @description Validation Error */

@@ -1,19 +1,19 @@
 # Progress
 
-Plan version: 1.7
+Plan version: 2.1
 Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 2026-10-01
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
-Current task: T06.2
-Current status: PR_OPEN (PR #3546 ready for review; branch rebased on latest `origin/main`; second post-rebase GitHub checks pending)
-Last completed task: T06.1 — MERGED
-Worktree: `C:\final\_wt_aqs_t062_creation_policy`
-Branch: `codex/aqs-T06.2-creation-policy`
-Base commit: `1358c70bf4723d151861a9ef135bba147b118fee`
-Current commit: `d233174ce40ccde7d7ab03aeae47483b872f8a6b` (second post-rebase local validation; this evidence checkpoint advances HEAD)
-Last updated: 2026-10-01T22:30:40+05:00
+Current task: T07
+Current status: VALIDATED (local focused checks complete; rebase onto fresh main and PR are next)
+Last completed task: T06.2 — MERGED
+Worktree: `C:\final\_wt_aqs_t07_window`
+Branch: `codex/aqs-T07-admission-window`
+Base commit: `b804a71a6bad22400324e2236a3221317eac3158`
+Current commit: `b804a71a6bad22400324e2236a3221317eac3158` (T07 changes still uncommitted)
+Last updated: 2026-10-02T01:12:00+05:00
 
-> T00–T06.1 are confirmed MERGED. PR #3546 is ready for review. The first rebased head `f04ca94a` passed applicable CI; `main` then advanced and the branch was rebased onto `1358c70b`. Push and verify checks on the new exact head before merge. Staging/browser validation remains NOT_RUN. The user instructed “мержай и продолжай” for this active PR cycle; merge after exact-head checks pass. No feature-flag activation or production deploy is authorized.
+> T00–T06.2 are confirmed MERGED. PR #3546 merged at `b804a71a6bad22400324e2236a3221317eac3158`. T07 local implementation checks pass: 57 focused queue tests, including mixed legacy/v1 clinic-wide QR behavior. Rebase from `b804a71a` onto fresh `origin/main` `3a776133bd8c22529422d3a555a589eedfce5063` remains before push/CI. Its v1 feature flag remains default-off; no production activation or deployment is authorized.
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -24,8 +24,8 @@ Last updated: 2026-10-01T22:30:40+05:00
 | T04 | MERGED | `codex/aqs-T04-empty-profiles` / [PR #3541](https://github.com/drsapaev/final/pull/3541) | `ecc14b05411c7e7b54efca2966416cd6a69df37c` | `EVIDENCE.md#t04-merge-checkpoint` |
 | T05 | MERGED | `codex/aqs-T05-settings-cache` / [PR #3543](https://github.com/drsapaev/final/pull/3543) | `fd53206f03b0361de6fc345f53b2bacf4195845c` | `EVIDENCE.md#t05-merge-checkpoint` |
 | T06.1 | MERGED | `codex/aqs-T06-policy-schema` / [PR #3545](https://github.com/drsapaev/final/pull/3545) | `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` | `EVIDENCE.md#t06.1-merge-checkpoint` |
-| T06.2 | PR_OPEN | `codex/aqs-T06.2-creation-policy` / [PR #3546](https://github.com/drsapaev/final/pull/3546) | | `EVIDENCE.md#t06.2-ci-checkpoint` |
-| T07 | PLANNED | | | |
+| T06.2 | MERGED | `codex/aqs-T06.2-creation-policy` / [PR #3546](https://github.com/drsapaev/final/pull/3546) | `b804a71a6bad22400324e2236a3221317eac3158` | `EVIDENCE.md#t06.2-merge-checkpoint` |
+| T07 | VALIDATED | `codex/aqs-T07-admission-window` | | `EVIDENCE.md#t07-local-validation` |
 | T08 | PLANNED | | | |
 | T09 | PLANNED | | | |
 | T10 | PLANNED | | | |
@@ -39,6 +39,23 @@ Last updated: 2026-10-01T22:30:40+05:00
 | T18 | PLANNED | | | |
 
 ## Current checkpoint
+
+- Completed: T00–T06.2 MERGED. PR #3546 is confirmed MERGED at `2026-10-01T17:48:53Z`; merge commit `b804a71a6bad22400324e2236a3221317eac3158`, exact head `2c6c04f996fdced70c8b8ecf1a8f24452336e83e`, base `1358c70bf4723d151861a9ef135bba147b118fee`. Applicable CI passed on that head. Path-aware frontend, staging/production readiness, Docker, DAST, Supabase preview, integration and load jobs were skipped; skipped is not PASS. Local focused tests were 54 passed/1 warning on SQLite. Staging/browser/PG runtime checks remain NOT_RUN. The flag remains default-off.
+- T07 execution boundary: mandatory `gate` selected because this is multi-adapter admission behavior. Initial gate stopped before resolving first-touch files; the one retry with confirmed root `backend/app/services/queue_svc/_operations.py` returned `narrow_override` limited to that file. The detailed user-approved T07 plan supplies the repository-approved basis for the additional named adapter/read/report/test paths below. Recorded fields: `gate_misroute=false`, `override_used=true`, `known_root_cause_file=backend/app/services/queue_svc/_operations.py`. No third gate attempt.
+- Canonical anchors: `daily_queue_creation_policy.py`; `queue_svc/_operations.py`; `qr_queue/_queue_ops.py` and `_sessions.py`; `graphql/mutations.py:_join_queue_impl`; `crud/online_queue.check_queue_availability`; `services/queue_auto_close.py`; `crud/clinic.py` settings/effective report; `schemas/clinic.py`; `online_queue_new.py` status schema/route.
+- Actual active paths confirmed: QueueBusinessService token join and least-loaded selection, GraphQL `joinQueue`, QR session precheck before the canonical allocator, and public `/online-queue/status`. `crud/online_queue.join_online_queue` has no found mounted caller and stays out unless new source evidence proves it active. Scheduler is a service-state transition; admission must close at the v1 boundary even if scheduler does not run.
+- First-touch allowlist (expanded before touching the additional T06.2 constructor files): `backend/app/crud/daily_queue_creation_policy.py`; `backend/app/services/queue_svc/_operations.py`; `backend/app/services/qr_queue/_queue_ops.py`; `backend/app/crud/online_queue.py`; `backend/app/graphql/mutations.py`; `backend/app/repositories/queue_api_repository.py`; `backend/app/repositories/queue_limits_repository.py`; `backend/app/repositories/visit_confirmation_repository.py`; `backend/app/services/force_majeure_service.py`; `backend/app/services/queue_auto_close.py`; `backend/app/crud/clinic.py`; `backend/app/schemas/clinic.py`; `backend/app/api/v1/endpoints/online_queue_new.py`; `backend/app/schemas/online_queue.py`; `backend/openapi.json` and `frontend/src/types/generated/api.ts` (generated artifacts required because `QueueSettingsUpdate` now exposes strict `HH:MM` metadata); `frontend/src/components/admin/QueueSettings.tsx` and locale files `ru.ts`, `en.ts`, `uz-Cyrl.ts`, `uz-Latn.ts`, `kk.ts`; focused tests under `backend/tests/unit` and the named settings/QR/GraphQL integration suites; these plan-memory docs. Additional constructor files are limited to the previously T06.2-connected creation writers; rationale: every new v1 queue must freeze the same settings interval regardless of which existing constructor creates it. Frontend copy is limited to correcting the T02 placeholder so it accurately says v1-only and existing rows are unaffected.
+- Denied: migrations/models/queue ownership or quota, counter mutation, flag activation, new future-date behavior, queue-number/status/clinical lifecycle changes, direct production/staging mutation, unrelated cleanup, unmounted legacy CRUD admission unless source evidence changes.
+- Technical interpretation (not a new product decision): legacy rows keep prior admission semantics, including no newly enforced end cutoff; v1 checks frozen start/end in clinic timezone. A rowless availability check uses the policy selected by the same creation flag and fresh settings used for subsequent creation. Future target dates retain the existing bypass of same-day time boundaries. Early `opened_at` remains a manual closure; existing entries are serviceable after cutoff.
+- Validation target: T07 boundaries before/exact start and before/exact cutoff; snapshot beats changed defaults; rowless settings/flag parity; clinic-vs-host date divergence; manual close and no-scheduler admission rejection; future and legacy behavior; invalid HH:MM/overnight rejection; public status and QR availability parity; GraphQL join rejection. Run focused policy/time-window, effective-settings, QR/token/session, GraphQL, online queue status and auto-close tests, then `git diff --check`, compile/lint and OpenAPI freshness if the schema metadata changes.
+- Stop condition: discover ambiguous owner/claim flow, a target adapter that bypasses the single admission gate, overnight settings, future-date behavior requiring product choice, or any need to change clinical lifecycle/ownership/quota. Do not silently expand scope.
+- Blocker: none for opening the T07 PR. Disposable PostgreSQL/staging runtime was checked and is unavailable locally; seven PostgreSQL integration tests and all staging/browser checks remain NOT_RUN. Do not claim runtime proof or activate the policy flag.
+- Completed: v1 queues freeze clinic-local `[start,end)` and all active admission/read adapters now use the same policy; legacy queues gain no new end cutoff. Token join, QR precheck, public availability/status, GraphQL join, report metadata, all named queue constructors and the clinic-local auto-close selector are covered. Clinic-wide QR overview remains available when any active target is eligible; the chosen queue is rechecked by canonical admission. Settings reject malformed or overnight intervals. UI explains v1/legacy behavior in five locales. OpenAPI and TypeScript artifacts are generated and aligned.
+- Validation: 57 focused backend queue tests passed on SQLite; OpenAPI suite 37 passed, 7 integration cases skipped under SQLite; dedicated cutoff OpenAPI test 1 passed; QueueSettings suite 27 passed; TypeScript, focused ESLint (`--quiet`), changed-file Ruff, Python compilation, OpenAPI/type generation and `git diff --check` passed. Full commands and limitations are in `EVIDENCE.md#t07-local-validation` and the latest T07 follow-up checkpoint.
+- Next exact action: create a local checkpoint commit, rebase the T07 branch onto fresh `origin/main` `3a776133bd8c22529422d3a555a589eedfce5063` (the only new commit is CI-only PR #3555), rerun focused checks, then push/open the PR and wait for exact-head CI.
+- Checks to rerun after rebase or code change: the 57-test focused queue set, OpenAPI contract test, QueueSettings effective suite, TypeScript type-check, changed-file Ruff/ESLint, Python compile and `git diff --check`. Recheck PG/staging availability only if environment state changes.
+
+## Historical T06.2 checkpoint (superseded; retained for evidence)
 
 - Completed: T00–T05 and T06.1 MERGED. T06.1 added legacy-safe `policy_version` and `online_issued_count` columns/constraints without changing constructors. PR #3545 merged at `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` after explicit user authorization; live GitHub state confirmed MERGED.
 - T05 review/merge: exact reviewed head `c04f41021bef5f8c306b9668cbb1c4b9afef2cc1`; runtime source unchanged since `47276d178972226b0bcf561bdf8fa26a6940b913`; merge `fd53206f03b0361de6fc345f53b2bacf4195845c` at 2026-10-01T16:24:40+05:00. Reviewed and merged trees match. Applicable backend/quality/contract/security gates passed; skipped path-aware jobs are not passed. No GitHub author-approval review was fabricated.

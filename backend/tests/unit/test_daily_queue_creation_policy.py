@@ -26,6 +26,8 @@ def test_creation_snapshot_defaults_to_legacy_and_inherits_clinic_start_number(
     assert snapshot == {
         "policy_version": LEGACY_POLICY_VERSION,
         "online_issued_count": 0,
+        "online_start_time": "07:00",
+        "online_end_time": "09:00",
         "start_number": 41,
     }
 
@@ -44,8 +46,51 @@ def test_creation_flag_selects_v1_for_new_snapshot_only(db_session, monkeypatch)
     assert snapshot == {
         "policy_version": ONLINE_ISSUANCES_V1_POLICY_VERSION,
         "online_issued_count": 0,
+        "online_start_time": "07:00",
+        "online_end_time": "09:00",
         "start_number": 7,
     }
+
+
+def test_v1_creation_snapshot_uses_configured_clinic_window(db_session, monkeypatch):
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
+
+    snapshot = daily_queue_creation_snapshot(
+        db_session,
+        doctor=Doctor(specialty="aqs-v1-window"),
+        queue_tag="aqs-v1-window",
+        settings={
+            "queue_start_hour": 8,
+            "auto_close_time": "10:30",
+            "start_numbers": {},
+        },
+    )
+
+    assert snapshot["policy_version"] == ONLINE_ISSUANCES_V1_POLICY_VERSION
+    assert snapshot["online_start_time"] == "08:00"
+    assert snapshot["online_end_time"] == "10:30"
+
+
+def test_v1_creation_snapshot_rejects_overnight_or_empty_window(
+    db_session, monkeypatch
+):
+    import pytest
+
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
+    doctor = Doctor(specialty="aqs-invalid-window")
+
+    for end_time in ("07:00", "06:59", "24:00", "9:00", "09:60"):
+        with pytest.raises(ValueError):
+            daily_queue_creation_snapshot(
+                db_session,
+                doctor=doctor,
+                queue_tag="aqs-invalid-window",
+                settings={
+                    "queue_start_hour": 7,
+                    "auto_close_time": end_time,
+                    "start_numbers": {},
+                },
+            )
 
 
 def test_existing_daily_queue_is_not_rewritten_when_creation_flag_changes(

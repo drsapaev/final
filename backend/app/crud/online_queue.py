@@ -38,7 +38,11 @@ from sqlalchemy.orm import Session
 from app.crud import clinic as crud_clinic
 from app.crud import queue_resource_routing
 from app.crud.clinic import get_queue_settings
-from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
+from app.crud.daily_queue_creation_policy import (
+    daily_queue_creation_snapshot,
+    evaluate_online_admission_window,
+    online_admission_window,
+)
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.services.queue_service import queue_service  # ✅ SSOT for business logic
@@ -721,34 +725,10 @@ def check_queue_availability(
 
     # Текущее время в часовом поясе клиники
     current_time = datetime.now(timezone)
-    queue_start_hour = queue_settings.get("queue_start_hour", 7)
 
-    # Codex round-33 P2: день сравнения — тоже КЛИНИК-локальный (из
-    # того же current_time): host date.today() в окне 19:00-24:00Z
-    # считал текущий клиник-день «будущим» и ПРОПУСКАЛ ограничение
-    # TOO_EARLY — /online-queue/status отвечал within_hours=true до
-    # открытия онлайн-записи.
-    today = current_time.date()
-
-    # Проверяем дату
-    if day < today:
-        return {
-            "available": False,
-            "reason": "DATE_PAST",
-            "message": "Нельзя записаться на прошедшую дату",
-        }
-
-    # Если сегодня, проверяем время
-    if day == today:
-        if current_time.hour < queue_start_hour:
-            return {
-                "available": False,
-                "reason": "TOO_EARLY",
-                "message": f"Онлайн-запись доступна с {queue_start_hour}:00",
-                "available_from": f"{queue_start_hour}:00",
-            }
-
-    # Проверяем что очередь не открыта
+    # Find the exact queue surface before evaluating its policy. A v1 row
+    # owns its frozen window; a missing row uses the defaults selected for
+    # the next creation.
     daily_queue = (
         db.query(DailyQueue)
         .filter(and_(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id))
@@ -761,12 +741,48 @@ def check_queue_availability(
         db, daily_queue, day, specialist_id
     )
 
+    window = online_admission_window(
+        daily_queue=daily_queue,
+        settings=queue_settings,
+    )
+    window_fields = {
+        "policy_version": window.policy_version,
+        "start_time": window.start_time.strftime("%H:%M"),
+        "end_time": (
+            window.end_time.strftime("%H:%M") if window.end_time is not None else None
+        ),
+    }
+    window_result = evaluate_online_admission_window(day, current_time, window)
+    if window_result == "date_past":
+        return {
+            "available": False,
+            "reason": "DATE_PAST",
+            "message": "Нельзя записаться на прошедшую дату",
+            **window_fields,
+        }
+    if window_result == "before_start":
+        return {
+            "available": False,
+            "reason": "TOO_EARLY",
+            "message": f"Онлайн-запись доступна с {window_fields['start_time']}",
+            "available_from": window_fields["start_time"],
+            **window_fields,
+        }
+    if window_result == "after_end":
+        return {
+            "available": False,
+            "reason": "AFTER_CUTOFF",
+            "message": f"Онлайн-запись закрыта в {window_fields['end_time']}",
+            **window_fields,
+        }
+
     if daily_queue and daily_queue.opened_at:
         return {
             "available": False,
             "reason": "QUEUE_OPENED",
             "message": "Онлайн-набор закрыт. Обратитесь в регистратуру.",
             "opened_at": daily_queue.opened_at,
+            **window_fields,
         }
 
     # Проверяем лимит мест
@@ -789,9 +805,14 @@ def check_queue_availability(
                 "available": False,
                 "reason": "QUEUE_FULL",
                 "message": f"Все места заняты ({current_count}/{max_slots})",
+                **window_fields,
             }
 
-    return {"available": True, "message": "Онлайн-запись доступна"}
+    return {
+        "available": True,
+        "message": "Онлайн-запись доступна",
+        **window_fields,
+    }
 
 
 # ===================== ПОИСК ДУБЛИКАТОВ =====================
@@ -928,8 +949,6 @@ def get_or_create_daily_queue(
                 queue_resource_id=int(resource.id),
                 queue_tag=queue_tag,
                 active=True,
-                online_start_time=f"{int(queue_settings.get('queue_start_hour', 7)):02d}:00",
-                online_end_time=f"{int(queue_settings.get('queue_end_hour', 9)):02d}:00",
                 max_online_entries=resource.max_online_per_day,
                 # RQ-13.b (D-06, E-039): снимок применённого стартового
                 # номера реестра — паритет с queue_svc-конструктором.
@@ -996,6 +1015,12 @@ def get_or_create_daily_queue(
         _creation_defaults["policy_version"] = _creation_snapshot["policy_version"]
         _creation_defaults["online_issued_count"] = _creation_snapshot[
             "online_issued_count"
+        ]
+        _creation_defaults["online_start_time"] = _creation_snapshot[
+            "online_start_time"
+        ]
+        _creation_defaults["online_end_time"] = _creation_snapshot[
+            "online_end_time"
         ]
         daily_queue = DailyQueue(
             day=day,

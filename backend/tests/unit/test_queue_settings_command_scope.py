@@ -83,10 +83,11 @@ def test_nested_queue_commands_share_one_settings_snapshot(db_session, monkeypat
     settings = {
         "timezone": "Asia/Tashkent",
         "queue_start_hour": 8,
-        "queue_end_hour": 10,
+        "auto_close_time": "10:00",
         "start_numbers": {},
         "max_per_day": {},
     }
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
     reads = 0
 
     def load_settings(_db):
@@ -112,6 +113,7 @@ def test_nested_queue_commands_share_one_settings_snapshot(db_session, monkeypat
 
     assert metadata["start_time"] == "08:00"
     assert metadata["end_time"] == "10:00"
+    assert metadata["policy_version"] == "daily_online_issuances_v1"
     assert reads == 1
 
 
