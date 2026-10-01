@@ -1,12 +1,13 @@
 from datetime import date, timedelta
 
 from app.api.v1.endpoints import admin_doctors
-from app.crud.clinic import clinic_today
 from app.core.security import get_password_hash
+from app.crud.clinic import clinic_today
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue
 from app.models.user import User
+from app.services import queue_cabinet_management_api_service as cabinet_sync_service
 
 
 def test_admin_doctors_stats_route_dispatches_before_doctor_id(
@@ -160,6 +161,7 @@ def test_queue_cabinet_info_defaults_to_clinic_day_and_separates_snapshot_from_d
     client,
     db_session,
     auth_headers,
+    monkeypatch,
 ):
     doctor_user = User(
         username="queue_doc",
@@ -227,14 +229,35 @@ def test_queue_cabinet_info_defaults_to_clinic_day_and_separates_snapshot_from_d
     assert response.status_code == 400
     assert "Канонический номер кабинета" in response.json()["detail"]
 
+    # Reproduce the UTC-host boundary: the local machine's date is still the
+    # prior day while the clinic calendar has already advanced. The request
+    # deliberately omits `day`, as the panel does for its default selection.
+    host_day = clinic_day - timedelta(days=1)
+
+    class HostLocalDate:
+        @staticmethod
+        def today() -> date:
+            return host_day
+
+    monkeypatch.setattr(cabinet_sync_service, "date", HostLocalDate)
+    monkeypatch.setattr(
+        cabinet_sync_service,
+        "clinic_today",
+        lambda _db: clinic_day,
+        raising=False,
+    )
+
     response = client.post(
-        f"/api/v1/admin/queues/sync-cabinet-info?day={clinic_day.isoformat()}",
+        "/api/v1/admin/queues/sync-cabinet-info",
         headers=auth_headers,
     )
     assert response.status_code == 200
+    assert response.json()["sync_date"] == clinic_day.isoformat()
 
     db_session.refresh(queue)
+    db_session.refresh(historical_queue)
     assert queue.cabinet_number == "305"
+    assert historical_queue.cabinet_number == "301"
 
 
 # ---------------------------------------------------------------------------

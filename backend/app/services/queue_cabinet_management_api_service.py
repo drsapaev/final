@@ -8,6 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import clinic_today
 from app.repositories.queue_cabinet_management_api_repository import (
     QueueCabinetManagementApiRepository,
 )
@@ -27,6 +28,7 @@ class QueueCabinetManagementApiService:
         db: Session,
         repository: QueueCabinetManagementApiRepository | None = None,
     ):
+        self.db = db
         self.repository = repository or QueueCabinetManagementApiRepository(db)
 
     @staticmethod
@@ -188,7 +190,9 @@ class QueueCabinetManagementApiService:
         for update in updates:
             queue = self.repository.get_daily_queue(update["queue_id"])
             if not queue:
-                errors.append({"queue_id": update["queue_id"], "error": "Очередь не найдена"})
+                errors.append(
+                    {"queue_id": update["queue_id"], "error": "Очередь не найдена"}
+                )
                 continue
 
             cabinet_info = update["cabinet_info"]
@@ -196,7 +200,9 @@ class QueueCabinetManagementApiService:
 
             if "cabinet_number" in cabinet_info:
                 try:
-                    self._assign_queue_cabinet_number(queue, cabinet_info["cabinet_number"])
+                    self._assign_queue_cabinet_number(
+                        queue, cabinet_info["cabinet_number"]
+                    )
                     updated = True
                 except QueueCabinetManagementDomainError as exc:
                     errors.append({"queue_id": update["queue_id"], "error": exc.detail})
@@ -241,7 +247,7 @@ class QueueCabinetManagementApiService:
                 error_detail="Неверный формат даты. Используйте YYYY-MM-DD",
             )
         else:
-            day_obj = date.today()
+            day_obj = clinic_today(self.db)
 
         queues = self.repository.list_queues_for_day(
             day_obj=day_obj,
@@ -333,9 +339,8 @@ class QueueCabinetManagementApiService:
 
             cabinet_stats[queue.cabinet_number]["queue_count"] += 1
             cabinet_stats[queue.cabinet_number]["specialists"].add(queue.specialist_id)
-            cabinet_stats[queue.cabinet_number]["total_entries"] += self.repository.count_entries(
-                queue_id=queue.id
-            )
+            entry_count = self.repository.count_entries(queue_id=queue.id)
+            cabinet_stats[queue.cabinet_number]["total_entries"] += entry_count
 
         cabinet_list = []
         for stats in cabinet_stats.values():
