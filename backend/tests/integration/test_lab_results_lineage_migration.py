@@ -138,17 +138,21 @@ def _seed_history_and_upgrade() -> str:
     engine = create_engine(sa_url, future=True)
     try:
         with engine.begin() as conn:
-            conn.execute(text(
-                "INSERT INTO lab_orders (status, created_at) "
-                "VALUES ('done', now())"
-            ))
-            conn.execute(text(
-                "INSERT INTO lab_results "
-                "    (order_id, test_code, test_name, value, abnormal, created_at) "
-                "VALUES "
-                "    ((SELECT MAX(id) FROM lab_orders), 'glucose', "
-                "     'Глюкоза', '5.4', false, now())"
-            ))
+            conn.execute(
+                text(
+                    "INSERT INTO lab_orders (status, created_at) "
+                    "VALUES ('done', now())"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO lab_results "
+                    "    (order_id, test_code, test_name, value, abnormal, created_at) "
+                    "VALUES "
+                    "    ((SELECT MAX(id) FROM lab_orders), 'glucose', "
+                    "     'Глюкоза', '5.4', false, now())"
+                )
+            )
         r = _run_alembic(sa_url, "upgrade", "head")
         assert r.returncode == 0, r.stderr[-1500:]
         return sa_url
@@ -170,9 +174,10 @@ def test_single_alembic_head(fresh_head_url):
     # 0072; main's corrective follow-up moved it to 0073 (routing
     # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
     # as 0074 on top of it; #3506 derma history read model moves it to
-    # 0075, its read-order index swap — to 0076. This file still proves
-    # 0070's own links via the graph pins below.
-    assert "0076_derma_history_read_order" in head_lines[0]
+    # 0075, its read-order index swap — to 0076; T06.1 adds daily queue
+    # policy persistence at 0077. This file still proves 0070's own links
+    # via the graph pins below.
+    assert "0077_daily_queue_policy" in head_lines[0]
 
 
 @pytest.mark.integration
@@ -182,12 +187,14 @@ def test_fresh_install_schema_shape(fresh_head_url):
         with engine.connect() as conn:
             columns = {
                 row.column_name: row.is_nullable
-                for row in conn.execute(text(
-                    "SELECT column_name, is_nullable FROM information_schema.columns "
-                    "WHERE table_name = 'lab_results' "
-                    "AND column_name IN "
-                    "('source_root_instance_id', 'source_instance_id')"
-                ))
+                for row in conn.execute(
+                    text(
+                        "SELECT column_name, is_nullable FROM information_schema.columns "
+                        "WHERE table_name = 'lab_results' "
+                        "AND column_name IN "
+                        "('source_root_instance_id', 'source_instance_id')"
+                    )
+                )
             }
             assert columns == {
                 "source_root_instance_id": "YES",
@@ -196,10 +203,12 @@ def test_fresh_install_schema_shape(fresh_head_url):
 
             indexes = {
                 row.indexname: row.indexdef
-                for row in conn.execute(text(
-                    "SELECT indexname, indexdef FROM pg_indexes "
-                    "WHERE tablename = 'lab_results'"
-                ))
+                for row in conn.execute(
+                    text(
+                        "SELECT indexname, indexdef FROM pg_indexes "
+                        "WHERE tablename = 'lab_results'"
+                    )
+                )
             }
             lineage_index = indexes.get("uq_lab_results_lineage_root_code", "")
             assert "UNIQUE" in lineage_index
@@ -208,19 +217,27 @@ def test_fresh_install_schema_shape(fresh_head_url):
                 and "test_code IS NOT NULL" in lineage_index
             ), f"unexpected partial predicate: {lineage_index!r}"
 
-            fks = conn.execute(text(
-                "SELECT conname FROM pg_constraint "
-                "WHERE conrelid = 'lab_results'::regclass "
-                "AND contype = 'f' AND conname LIKE 'fk_lab_results_source%'"
-            )).scalars().all()
+            fks = (
+                conn.execute(
+                    text(
+                        "SELECT conname FROM pg_constraint "
+                        "WHERE conrelid = 'lab_results'::regclass "
+                        "AND contype = 'f' AND conname LIKE 'fk_lab_results_source%'"
+                    )
+                )
+                .scalars()
+                .all()
+            )
             assert set(fks) == {
                 "fk_lab_results_source_root_instance",
                 "fk_lab_results_source_instance",
             }
 
-            rls = conn.execute(text(
-                "SELECT relrowsecurity FROM pg_class WHERE relname = 'lab_results'"
-            )).scalar()
+            rls = conn.execute(
+                text(
+                    "SELECT relrowsecurity FROM pg_class WHERE relname = 'lab_results'"
+                )
+            ).scalar()
             assert rls is True, "RLS must stay enabled on lab_results"
     finally:
         engine.dispose()
@@ -233,25 +250,29 @@ def test_upgrade_keeps_historical_rows_and_allows_lineage_less_duplicates():
     db_name = make_url(sa_url).database
     try:
         with engine.begin() as conn:
-            row = conn.execute(text(
-                "SELECT value, source_root_instance_id, source_instance_id "
-                "FROM lab_results WHERE test_code = 'glucose'"
-            )).fetchall()
+            row = conn.execute(
+                text(
+                    "SELECT value, source_root_instance_id, source_instance_id "
+                    "FROM lab_results WHERE test_code = 'glucose'"
+                )
+            ).fetchall()
             assert len(row) == 1
             assert row[0][0] == "5.4", "historical value must be untouched"
-            assert row[0][1] is None and row[0][2] is None, (
-                "historical row must keep NULL lineage"
-            )
+            assert (
+                row[0][1] is None and row[0][2] is None
+            ), "historical row must keep NULL lineage"
 
             # Исторические строки без lineage никогда не ограничены новым
             # ключом: второй ряд с тем же (order_id, test_code) легален.
-            conn.execute(text(
-                "INSERT INTO lab_results "
-                "    (order_id, test_code, test_name, value, abnormal, created_at) "
-                "VALUES "
-                "    ((SELECT MAX(id) FROM lab_orders), 'glucose', "
-                "     'Глюкоза (второй исторический)', '6.0', false, now())"
-            ))
+            conn.execute(
+                text(
+                    "INSERT INTO lab_results "
+                    "    (order_id, test_code, test_name, value, abnormal, created_at) "
+                    "VALUES "
+                    "    ((SELECT MAX(id) FROM lab_orders), 'glucose', "
+                    "     'Глюкоза (второй исторический)', '6.0', false, now())"
+                )
+            )
     finally:
         engine.dispose()
         _drop(db_name)
@@ -314,14 +335,17 @@ def test_managed_rows_uniqueness_and_fk(fresh_head_url):
             assert other_root_id != root_id
 
         def _insert_managed(conn, root, code, source=None):
-            conn.execute(text(
-                "INSERT INTO lab_results "
-                "    (order_id, test_code, test_name, value, abnormal, "
-                "     created_at, source_root_instance_id, source_instance_id) "
-                "VALUES "
-                "    ((SELECT MAX(id) FROM lab_orders), :code, 'Managed', "
-                "     '1', false, now(), :root, :source)"
-            ), {"code": code, "root": root, "source": source or root})
+            conn.execute(
+                text(
+                    "INSERT INTO lab_results "
+                    "    (order_id, test_code, test_name, value, abnormal, "
+                    "     created_at, source_root_instance_id, source_instance_id) "
+                    "VALUES "
+                    "    ((SELECT MAX(id) FROM lab_orders), :code, 'Managed', "
+                    "     '1', false, now(), :root, :source)"
+                ),
+                {"code": code, "root": root, "source": source or root},
+            )
 
         with engine.begin() as conn:
             _insert_managed(conn, root_id, "t1")

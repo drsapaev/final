@@ -2,7 +2,7 @@
 
 Plan version: 1.2
 Last updated: 2026-10-01, Asia/Tashkent
-Execution permission: IMPLEMENTATION_ACTIVE; current closure is documentation only
+Execution permission: IMPLEMENTATION_ACTIVE; T06.1 schema PR is in progress
 
 ## First read
 
@@ -15,26 +15,24 @@ The user resumed implementation with “Продолжай реализации 
 
 ## Verified checkpoint
 
-- T00–T05 are MERGED. T06–T18 are PLANNED. No T06 migration or runtime edit exists in this checkpoint.
+- T00–T05 are MERGED. T06.1 is implemented and locally validated in the active worktree; it is not yet committed or opened as a PR. T06.2 and T07–T18 remain PLANNED.
 - T05 [PR #3543](https://github.com/drsapaev/final/pull/3543) merged at `fd53206f03b0361de6fc345f53b2bacf4195845c`, 2026-10-01T16:24:40+05:00, from reviewed head `c04f41021bef5f8c306b9668cbb1c4b9afef2cc1`. Runtime code dates from `47276d178972226b0bcf561bdf8fa26a6940b913`; merged/reviewed trees match.
 - Applicable T05 CI gates passed. Merged-tree focused tests: 24 passed, 1 warning. Local PostgreSQL integration, synthetic staging/browser E2E and cold/repeat timing are NOT_RUN. Skipped jobs are not PASS.
 - The executing agent accepted a bounded #3543/T05 deferral under the user's explicit delegation. Original requirement, reason, evidence, owner, resume condition and headline impact are in DECISIONS/EVIDENCE. No GitHub author-approval review was invented. Prior PR acknowledgments were not inherited.
 - T03 already fixed omitted-day cabinet Sync to `clinic_today(db)` after the user's P1 review. Do not reopen that closed defect from obsolete planning text.
-- Documentation closure: [PR #3544](https://github.com/drsapaev/final/pull/3544), branch `codex/aqs-T05-closure`, worktree `C:\final\_wt_aqs_t05_closure`, base `fd53206f`. Verify its live merge/current-head checks before the next runtime cycle. Closure commits change the five plan-memory files only.
+- Documentation closure [PR #3544](https://github.com/drsapaev/final/pull/3544) is merged at base `1af792e82935e10ae9b60a374ce5f149d2de0616`; its five plan-memory files are available in the active worktree.
 
 Check actual git status/HEAD and GitHub PR state first. If they differ from this record, restore the factual checkpoint before editing. Timestamped EVIDENCE entries with PR_OPEN are historical, not current instructions.
 
-## Next exact runtime step — T06
+## Active runtime step — T06.1
 
-1. Fetch fresh `origin/main`; confirm T05 and documentation closure are merged. Keep `C:\final` on clean main; never switch/rebase it. Create an owned worktree and `codex/aqs-T06-<topic>` branch from fresh main.
-2. Use aif-implement with the explicit absolute plan path in that worktree: `$aif-implement @C:/final/<owned-T06-worktree>/.ai-factory/plans/codex-admin-queue-simplification.md`. Replace the placeholder with the actual path. Do not duplicate the plan under a branch-derived filename.
-3. Ground the T06 card on current source: `backend/app/models/online_queue.py:DailyQueue`, creation paths, resource/start-number policy, identity constraints, migration heads/history. Historical anchors are references, not an edit allowlist.
-4. Enumerate active constructors and compatibility/offline paths; record transaction owners and unresolved identity writers. Propose the smallest T06.1 model/new-revision legacy-safe slice before T06.2 shared creation calculation.
-5. Record execution mode, canonical/reference-only/first-touch/denied paths, baseline, checks and stop conditions in PROGRESS/EVIDENCE before the first edit. DB/Alembic requires `gate` or `gate_known_root_cause`; run the verified `ai/langgraph/scripts/run_agent_gate.ps1` from the T06 worktree and read its mandatory execution boundary.
-6. Establish an isolated disposable PostgreSQL environment and prove heads/history, non-destructive upgrade, legacy data/ownership/constraints and CHECK behavior. SQLite or T05 backend CI does not replace this migration proof. Stop dependent work and record BLOCKED if required gate/PG or constructor ownership cannot be established.
-7. Keep `QUEUE_POLICY_V2_CREATION_ENABLED` default false. Do not enable v1, convert legacy/future queues, change issued numbers/history/queue_time, or deploy as part of T06.
+- Worktree: `C:\final\_wt_aqs_t06_policy_schema`; branch `codex/aqs-T06-policy-schema`; base/current HEAD before commit `1af792e82935e10ae9b60a374ce5f149d2de0616`.
+- Changed: new revision `backend/alembic/versions/0077_daily_queue_policy.py`; `DailyQueue` fields/defaults/checks; focused schema/migration-parity tests; six exact current-head expectation updates; PROGRESS/EVIDENCE/RESUME.
+- Validation: `alembic heads` returns only `0077_daily_queue_policy`; `alembic history` exits 0. Disposable PostgreSQL 16 upgrade/data-preservation/default/check/downgrade-guard evidence is recorded in `EVIDENCE.md#t06.1-schema-checkpoint`. Targeted tests, compileall, pre-commit and diff checks are tracked there.
+- Do not commit `.t06-pg.compose.yml`; it is local disposable infrastructure scratch. Do not run or stop the separate PR #3524 staging Compose project. No production DB/process/configuration or flag was touched.
+- Next exact action: review the full diff for scope and formatting, complete final evidence and PR publication for T06.1. Do not begin T06.2 constructors or policy writers until this PR is merged and the worktree is synced to fresh main.
 
-The T05 deferral does not authorize bypassing any T06 requirement. Close each small PR cycle before the next one; do not begin T07 while T06 is unresolved.
+The T05 deferral does not authorize bypassing any T06 requirement. Close each small PR cycle before the next one; do not begin T07 while T06 is unresolved. T06.2 is a required separate continuation after T06.1, not a reason to widen this schema PR.
 
 ## Deferred staging coverage
 
