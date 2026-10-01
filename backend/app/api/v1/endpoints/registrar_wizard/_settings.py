@@ -212,9 +212,13 @@ def get_wizard_settings(
             )
             updated_at = use_new_wizard_setting.updated_at or updated_at
 
+        # Контракт объявлен как response_model=dict[str, Any]: возврат
+        # «голой» Pydantic-модели падает в serialize_response
+        # (dict_type validation) уже ПОСЛЕ try/except хендлера — это давало
+        # 500 на каждый GET (Sentry request.completed x57).
         return WizardSettingsResponse(
             use_new_wizard=use_new_wizard, updated_at=updated_at
-        )
+        ).model_dump(mode="json")
 
     except Exception as e:
         logger.error(f"Error getting wizard settings: {str(e)}")
