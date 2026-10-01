@@ -72,8 +72,8 @@ SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 # (same established pattern; the advance was missed in that cycle and
 # is carried by the RQ-26.b verification slice).
 # #3506 (P2 retro-review of #3494): derma history read model — 0075,
-# read-order index swap — 0076.
-EXPECTED_HEAD = "0076_derma_history_read_order"
+# read-order index swap — 0076; T06.1 queue policy persistence — 0077.
+EXPECTED_HEAD = "0077_daily_queue_policy"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -554,13 +554,17 @@ def test_seeded_catalog_untouched_and_no_endpoint(pg_session):
     the OpenAPI schema knows NO permanent-address endpoint (RQ-16.d)."""
     from app.models.queue_profile import QueueProfile
 
-    cardiology = pg_session.query(QueueProfile).filter(QueueProfile.key == "cardiology").one()
+    cardiology = (
+        pg_session.query(QueueProfile).filter(QueueProfile.key == "cardiology").one()
+    )
     assert cardiology.is_active is True
 
     from app.main import app
 
     spec = app.openapi()
-    paths = [p for p in spec["paths"] if "permanent" in p or p.rstrip("/").endswith("/q")]
+    paths = [
+        p for p in spec["paths"] if "permanent" in p or p.rstrip("/").endswith("/q")
+    ]
     assert paths == [], (
         f"no /q or permanent-address endpoint may exist in RQ-16.c "
         f"(that is RQ-16.d): {paths}"

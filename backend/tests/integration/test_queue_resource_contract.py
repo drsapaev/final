@@ -17,8 +17,8 @@ migration 0063_queue_resource_contract writes into the schema:
   four loud-abort categories (orphan rows, ACTIVE duplicates, corrupt
   tag<->resource links, non-synthetic bridge owners);
 - the offline PG DDL (QF-1 pattern): the CHECK and the partial unique
-  render exactly, the downgrade reverses them, the chain stays
-  single-headed with 0063 as the head and the revision id fits the
+  render exactly, the downgrade reverses them, the migration chain stays
+  single-headed through the current head and each revision id fits the
   alembic_version.version_num VARCHAR(32) limit (the 0059 CI lesson);
 - parity: the ORM model and the migration carry the byte-identical
   XOR expression and predicate so the two surfaces cannot drift.
@@ -47,6 +47,7 @@ BACKEND_ROOT = REPO_ROOT / "backend"
 MIGRATION_0063 = (
     BACKEND_ROOT / "alembic" / "versions" / "0063_queue_resource_contract.py"
 )
+MIGRATION_0077 = BACKEND_ROOT / "alembic" / "versions" / "0077_daily_queue_policy.py"
 ADR_001 = (
     REPO_ROOT / "docs" / "adr" / "ADR-001-queue-ownership-and-specialty-architecture.md"
 )
@@ -243,6 +244,16 @@ def test_partial_unique_allows_inactive_and_null_resource_duplicates(
 def _load_migration_0063():
     spec = importlib.util.spec_from_file_location(
         "migration_0063_queue_resource_contract", MIGRATION_0063
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_migration_0077():
+    spec = importlib.util.spec_from_file_location(
+        "migration_0077_daily_queue_policy", MIGRATION_0077
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -782,9 +793,7 @@ def test_alembic_chain_single_head_0063() -> None:
     # QD-2E (RQ-15.b): the cutover was renumbered 0065 -> 0066 after
     # main's RQ-14.a.1 claimed the 0065 slot from the same parent — the
     # chain stays single-headed.
-    assert graph["0066_general_retirement_cutover"] == (
-        "0065_queue_numbering_unique",
-    )
+    assert graph["0066_general_retirement_cutover"] == ("0065_queue_numbering_unique",)
     # RQ-13.b (D-06, E-039): the day's applied start-number snapshot
     # chains after the QD-2E cutover (additive column + owner backfill).
     assert graph["0067_daily_queue_start_number"] == (
@@ -794,16 +803,12 @@ def test_alembic_chain_single_head_0063() -> None:
     # (paired deletion of ecg_resource/lab_resource/general_resource)
     # chains after the direction public-address registry (0068,
     # RQ-16.c), which chains after the day start-number snapshot.
-    assert graph["0069_sentinel_pair_retirement"] == (
-        "0068_direction_public_address",
-    )
+    assert graph["0069_sentinel_pair_retirement"] == ("0068_direction_public_address",)
     assert len("0066_general_retirement_cutover") <= 32
     assert len("0067_daily_queue_start_number") <= 32
     # RQ-16.c: the head moved to 0068 with the direction public-address
     # registry (owner decision E-055, additive MODEL slice).
-    assert graph["0068_direction_public_address"] == (
-        "0067_daily_queue_start_number",
-    )
+    assert graph["0068_direction_public_address"] == ("0067_daily_queue_start_number",)
     assert len("0068_direction_public_address") <= 32
     assert len("0069_sentinel_pair_retirement") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
@@ -814,25 +819,20 @@ def test_alembic_chain_single_head_0063() -> None:
     # to 0072 (nurse workplace assignments 0071 + service executions 0072);
     # main's corrective follow-up moved it to 0073 (routing snapshot);
     # RQ-18 follow-up round-8 re-parents the payload binding as 0074.
-    assert graph["0073_execution_routing_snapshot"] == (
-        "0072_service_executions",
-    )
+    assert graph["0073_execution_routing_snapshot"] == ("0072_service_executions",)
     assert len("0073_execution_routing_snapshot") <= 32
-    assert graph["0074_join_payload_binding"] == (
-        "0073_execution_routing_snapshot",
-    )
+    assert graph["0074_join_payload_binding"] == ("0073_execution_routing_snapshot",)
     assert len("0074_join_payload_binding") <= 32
     # derma history read model (issue #3506, P2 retro-review of #3494)
-    assert graph["0075_derma_history_read_model"] == (
-        "0074_join_payload_binding",
-    )
+    assert graph["0075_derma_history_read_model"] == ("0074_join_payload_binding",)
     assert len("0075_derma_history_read_model") <= 32
     # read-order index swap moves the head to 0076 (#3506 step 2)
-    assert graph["0076_derma_history_read_order"] == (
-        "0075_derma_history_read_model",
-    )
+    assert graph["0076_derma_history_read_order"] == ("0075_derma_history_read_model",)
     assert len("0076_derma_history_read_order") <= 32
-    assert heads == ["0076_derma_history_read_order"]
+    # T06.1 adds persisted policy version and online issuance count.
+    assert graph["0077_daily_queue_policy"] == ("0076_derma_history_read_order",)
+    assert len("0077_daily_queue_policy") <= 32
+    assert heads == ["0077_daily_queue_policy"]
 
 
 # ===================== D. parity + ADR =====================
@@ -843,6 +843,87 @@ def test_model_and_migration_xor_expressions_are_identical() -> None:
     byte-identical expression — the surfaces cannot drift."""
     module = _load_migration_0063()
     assert MODEL_XOR_CHECK == module._OWNER_XOR_CHECK
+
+
+def test_daily_queue_policy_checks_match_migration() -> None:
+    migration = _load_migration_0077()
+    model_checks = {
+        constraint.name: str(constraint.sqltext)
+        for constraint in DailyQueue.__table__.constraints
+        if isinstance(constraint, sa.CheckConstraint)
+    }
+    assert model_checks[migration._POLICY_VERSION_CHECK] == (
+        migration._POLICY_VERSION_CHECK_EXPRESSION
+    )
+    assert model_checks[migration._ONLINE_ISSUED_COUNT_CHECK] == (
+        migration._ONLINE_ISSUED_COUNT_CHECK_EXPRESSION
+    )
+
+
+def test_daily_queue_policy_snapshot_defaults_and_checks(test_db) -> None:
+    """Old writers inherit legacy/zero; DB checks reject invalid policy state."""
+    with test_db.begin() as connection:
+        resource_id = connection.execute(
+            sa.text(
+                "INSERT INTO queue_resources "
+                "(code, queue_tag, display_name, active, start_number_online, "
+                "max_online_per_day) "
+                "VALUES ('aqs_t06_policy_schema_resource', "
+                "'aqs_t06_policy_schema_tag', 'Synthetic T06 resource', "
+                "false, 41, 73) RETURNING id"
+            )
+        ).scalar_one()
+    insert_legacy = sa.text(
+        "INSERT INTO daily_queues "
+        "(day, specialist_id, queue_resource_id, queue_tag, active, "
+        "online_start_time, online_end_time, max_online_entries, start_number) "
+        "VALUES (:day, NULL, :resource_id, :tag, false, '08:17', '10:43', 23, 41)"
+    )
+    legacy_day = date(2050, 1, 1)
+    insert_explicit_policy = sa.text(
+        "INSERT INTO daily_queues "
+        "(day, specialist_id, queue_resource_id, queue_tag, active, "
+        "online_start_time, online_end_time, max_online_entries, start_number, "
+        "policy_version, online_issued_count) "
+        "VALUES (:day, NULL, :resource_id, :tag, false, '08:00', '09:00', "
+        "10, 1, :policy_version, :online_issued_count)"
+    )
+    with test_db.begin() as connection:
+        connection.execute(
+            insert_legacy,
+            {
+                "day": legacy_day,
+                "resource_id": resource_id,
+                "tag": "aqs_t06_policy_schema_tag",
+            },
+        )
+        legacy = connection.execute(
+            sa.text(
+                "SELECT policy_version, online_issued_count, start_number, "
+                "online_start_time, online_end_time, max_online_entries "
+                "FROM daily_queues WHERE day = :day "
+                "AND queue_resource_id = :resource_id"
+            ),
+            {"day": legacy_day, "resource_id": resource_id},
+        ).one()
+        assert tuple(legacy) == ("legacy", 0, 41, "08:17", "10:43", 23)
+
+    for day, policy_version, online_issued_count in (
+        (date(2050, 1, 2), "unsupported_policy", 0),
+        (date(2050, 1, 3), "legacy", -1),
+    ):
+        with pytest.raises(IntegrityError):
+            with test_db.begin() as connection:
+                connection.execute(
+                    insert_explicit_policy,
+                    {
+                        "day": day,
+                        "resource_id": resource_id,
+                        "tag": "aqs_t06_policy_schema_tag",
+                        "policy_version": policy_version,
+                        "online_issued_count": online_issued_count,
+                    },
+                )
 
 
 def test_adr_001_documents_stage_d_contract() -> None:
