@@ -332,6 +332,18 @@ pytest_add_cli_args_test_selection = [
     # them (lab_reporting service/repository only). It keeps running green
     # in the normal backend-tests job and locally (63 passed).
     "--deselect", "tests/unit/test_lab_reporting_service.py",
+    # Repo-artifact readers, single-test deselects (nightly 2026-09-25..10-01):
+    # both read files OUTSIDE the mutmut sandbox and abort with
+    # FileNotFoundError before mutations run; zero mutation value (no
+    # app/crud/* imports; the mutated modules are not exercised by them).
+    # Both keep running green in the normal backend-tests CI job.
+    # - qr_join_round6 opens REPO/backend/openapi.json; sandbox geometry
+    #   resolves backend/backend/openapi.json (missing).
+    "--deselect", "tests/integration/test_qr_join_round6_refusal_contract.py::test_openapi_contract_declares_refusal_responses",
+    # - derma_history write-path audit reads an evidence allowlist file and
+    #   scans repo sources as text ("файл allowlist'а исчез" under the
+    #   sandbox); the file's other (DB-driven) tests stay in the run.
+    "--deselect", "tests/integration/test_derma_history_write_path_audit.py::TestDermaHistoryWritePathAudit::test_no_unaudited_core_or_raw_dml_on_sources",
 ]
 only_mutate = [
     "app/crud/appointment.py",
