@@ -566,3 +566,15 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
 - Commit hooks: applicable hooks passed; `ruff`, `ruff-format`, and `black` skipped with the documented baseline-drift reasons. The local hook invoked the repository's existing backend venv; no package was installed there.
 - State: commit is local and validated, not yet pushed; no PR has been created. `PROGRESS.md` records T05 `VALIDATED` and this implementation SHA.
 - Next exact action: push the branch, create a draft PR, then update the plan ledger with the PR URL and current head.
+
+## T05 PR opened — 2026-10-01T15:28:17+05:00
+
+- Commit under review: `d393c2c17db5e3b10d7b1c378396e5c4186da09c` (`docs(plan): record T05 implementation checkpoint`), including implementation commit `47276d178972226b0bcf561bdf8fa26a6940b913`.
+- Base: `main` at `ecc14b05411c7e7b54efca2966416cd6a69df37c`; PR reports `mergeable=true`, state OPEN, draft=true, with no review decision at this checkpoint.
+- PR: [#3543](https://github.com/drsapaev/final/pull/3543), `fix(queue): refresh settings per command`.
+- PR body review gate: `scripts/run_pr_review_gate_checks.py --body-file .t05-pr-body.md --author drsapaev` — PASS, 19 gate unit tests and sample/live PR body validation passed. The body explicitly marks Tier 2 `NOT RUN`; its reviewer acknowledgment checkbox is unchecked and the deferral is not inherited from earlier PRs.
+- Initial remote check snapshot at 2026-10-01T10:27:45Z: PR Review Quality Gate, CI Scope, PR Lifecycle Recommendation, gitleaks, GitGuardian, Frontend lint report, and Python formatting report — PASS. Backend tests, code quality, context boundary, CodeQL (actions/python/javascript-typescript), security scan, and secret scan — PENDING. Frontend build/E2E/lint/unit tests, Supabase Preview, metadata checks, docs generation, DAST, and Dependabot route — SKIPPED by path-aware conditions; these are not counted as passed.
+- PostgreSQL integration and synthetic staging checks remain `NOT_RUN` because staging Compose is stopped and no disposable PostgreSQL instance was available. No production backend/data was used.
+- Scope: no runtime source changed after `47276d17`; this checkpoint updates only the task ledger. The local PR body scratch file and temporary pre-commit environment are not included in the PR.
+- State: T05 is `PR_OPEN`; do not merge or start T06 until required checks and review are resolved and the explicit T05 Tier 2 deferral acknowledgment is obtained.
+- Next exact action: inspect current-head checks/review after the ledger checkpoint push and record any status changes.
