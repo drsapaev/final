@@ -8,8 +8,8 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.crud import clinic as crud_clinic
+from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.crud.queue_resource_routing import (
-    effective_day_start_number,
     lock_registry_tag_creation,
     resolve_tag_resource,
     resolve_tag_resource_locked,
@@ -115,8 +115,11 @@ class VisitConfirmationRepository:
                     max_online_entries=resource.max_online_per_day,
                     # RQ-13.b (D-06, E-039): снимок применённого стартового
                     # номера реестра — паритет с queue_svc-конструктором.
-                    start_number=effective_day_start_number(
-                        self.db, resource=resource, queue_tag=queue_tag
+                    **daily_queue_creation_snapshot(
+                        self.db,
+                        resource=resource,
+                        queue_tag=queue_tag,
+                        settings=settings,
                     ),
                     # Codex round-8 P2: канонический кабинет реестра —
                     # паритет с queue_svc-конструктором (round-7)
@@ -187,8 +190,11 @@ class VisitConfirmationRepository:
             online_end_time=f"{int(queue_end_hour):02d}:00",
             # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
             # дня (владелец → клиника) — паритет с queue_svc-конструктором.
-            start_number=effective_day_start_number(
-                self.db, doctor=doctor, queue_tag=queue_tag
+            **daily_queue_creation_snapshot(
+                self.db,
+                doctor=doctor,
+                queue_tag=queue_tag,
+                settings=settings,
             ),
         )
         self.db.add(daily_queue)
