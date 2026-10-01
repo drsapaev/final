@@ -855,3 +855,15 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Merge: not performed. No merge authorization for T06.2 is inferred from the separate T05/#3543 deferral or merge decision.
 - Scope: no production or shared staging change; v1 creation remains disabled unless configured.
 - Next exact action: push this PR_OPEN checkpoint and inspect checks for the resulting exact PR head.
+
+## T06.2 CI checkpoint — 2026-10-01T21:49:24+05:00
+
+- Commit under CI: `fdc8985724b0964984db6f55998cecc924730cbf`; base `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`.
+- PR: [#3546](https://github.com/drsapaev/final/pull/3546), OPEN/DRAFT at the time of check; GitHub mergeability was CLEAN after required jobs completed. No merge was performed.
+- Unified CI: [run 36891804601](https://github.com/drsapaev/final/actions/runs/36891804601) — PASS. Backend tests passed in PostgreSQL-backed CI, including RLS guard, QR/concurrency probe, and Critical E2E Smoke; Code Quality including formatting, Context Boundary Integrity, docs generation/OpenAPI freshness, Frontend–Backend Parity, CI Scope, PR Required Gate, and notifications passed.
+- Additional applicable checks: CodeQL (Python, JavaScript/TypeScript, Actions), gitleaks, security scanning, and GitGuardian passed. The initial PR Review Quality Gate failed only because the first PR body omitted required sections. After completing the body, the local checker passed and [PR Review Quality Gate run 36894736733](https://github.com/drsapaev/final/actions/runs/36894736733) passed on the same code head.
+- Path-aware skipped jobs: frontend build/unit/lint/E2E, DAST, Supabase Preview, Docker build, Unified Security scan, integration jobs, production/staging readiness, and load tests. Skipped jobs are not PASS. Synthetic staging/browser validation remains NOT_RUN.
+- Result: applicable GitHub CI gates PASS for `fdc89857`. This is not staging evidence and does not authorize production activation. Local disposable-PG runtime testing for T06.2 was not run; the GitHub backend suite used PostgreSQL CI infrastructure.
+- Scope: PR description and plan-memory evidence only changed after the CI observation; runtime code commit remains `f0fd2217`. This evidence-only checkpoint will advance the branch head, so verify current PR HEAD/checks before any merge decision.
+- Remaining: PR #3546 is still a draft awaiting the user's PR-specific merge/deferral decision. Do not start T07 until merge and fresh-main synchronization.
+- Next exact action: push this final plan-memory checkpoint, re-read the new exact PR head/checks, then present the concrete merge decision with staging limitation stated.

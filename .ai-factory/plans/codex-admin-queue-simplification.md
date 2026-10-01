@@ -1,13 +1,13 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 1.6 — checkpoint после открытия PR #3546.
+**Версия:** 1.7 — checkpoint после успешных CI gates PR #3546.
 **Создан:** 30 сентября 2026. **Обновлён:** 1 октября 2026, Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Последний подтверждённый runtime merge:** `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`, PR #3545 / T06.1.
 **Текущий worktree:** `C:\final\_wt_aqs_t062_creation_policy`, ветка `codex/aqs-T06.2-creation-policy`, база `origin/main` `e8f585ab`.
 
-> **T00–T05 и T06.1 — MERGED; T06.2 — PR_OPEN (#3546, draft); T07–T18 — PLANNED.** Пользователь явно поручил merge PR #3545 и продолжение реализации. T06.1 добавил только legacy-safe schema; T06.2 централизует создание snapshot и подключает runtime-конструкторы.
+> **T00–T05 и T06.1 — MERGED; T06.2 — PR_OPEN (#3546, draft; applicable CI PASS); T07–T18 — PLANNED.** Пользователь явно поручил merge PR #3545 и продолжение реализации. T06.1 добавил только legacy-safe schema; T06.2 централизует создание snapshot и подключает runtime-конструкторы.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -15,7 +15,7 @@
 **Решения:** [DECISIONS.md](admin-queue-simplification/DECISIONS.md).
 **Доказательства:** [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
 
-Подробная версия 1.1 ранее осталась незакоммиченной в worktree T03. Версия 1.2 восстановила её карточки и синхронизировала T03–T05; версия 1.3 фиксирует merge T06.1 и границы T06.2; версия 1.4 отмечает локальную реализацию; версия 1.5 фиксирует финальную локальную валидацию и границы formatter hooks; версия 1.6 фиксирует PR #3546. Исторические evidence сохраняются. Пропущенные staging/browser проверки остаются NOT_RUN и не считаются приёмкой.
+Подробная версия 1.1 ранее осталась незакоммиченной в worktree T03. Версия 1.2 восстановила её карточки и синхронизировала T03–T05; версия 1.3 фиксирует merge T06.1 и границы T06.2; версия 1.4 отмечает локальную реализацию; версия 1.5 фиксирует локальную валидацию и границы formatter hooks; версия 1.6 фиксирует PR #3546; версия 1.7 фиксирует его CI gates. Исторические evidence сохраняются. Пропущенные staging/browser проверки остаются NOT_RUN и не считаются приёмкой.
 
 ## 1. Цель и границы
 
@@ -91,7 +91,7 @@ Milestone: `none`. Продолжение согласованного отде�
 
 T03 завершён после исправления omitted-day Sync на `clinic_today(db)` и отдельного code APPROVE пользователя; T04 — после отдельного явного deferral/merge authorization пользователя. Для T05 пользователь делегировал выбор между deferral и staging до merge. Принят отдельный deferral #3543: command-local settings без schema/API/ownership/admission-policy изменений, целевые regressions и применимые CI PASS; isolated synthetic staging остановлен. Это техническое решение агента по явному поручению пользователя, а не выдуманный GitHub approval от автора. Полные поля deferral и оставшееся покрытие — DECISIONS/EVIDENCE.
 
-**Сейчас:** T06.1 подтверждённо слит; T06.2 реализован и локально валидирован; draft PR #3546 открыт. Код head `f0fd2217` прошёл 54 focused tests на SQLite; более ранние constructor-adapter checks: 8 + 22 + 4 passed. GitHub checks были pending при открытии PR; после docs checkpoint необходимо проверить новый точный head. PostgreSQL/staging runtime proof не заявляется. Ruff и non-format pre-commit hooks прошли; `ruff-format`/Black hooks не запускались в финальном проходе, поскольку formatter предложил массово менять несвязанные legacy sections; для новых файлов targeted format checks прошли. Подробности и ограничения записаны в EVIDENCE. Схема, admission/quota enforcement, cutoff, API/UI и включение флага в этом срезе запрещены. После merge T06.2 начать T07 только из свежей базы; T00–T06.1 повторно не выполнять.
+**Сейчас:** T06.1 подтверждённо слит; T06.2 реализован и локально валидирован; draft PR #3546 открыт. Кодовый commit `f0fd2217` прошёл 54 focused tests на SQLite; более ранние constructor-adapter checks: 8 + 22 + 4 passed. На точном PR head `fdc89857` Unified CI, backend PostgreSQL suite, quality/formatting, context boundary, docs/OpenAPI, parity, PR Required Gate, security и PR Review Quality Gate прошли. Path-aware frontend, DAST, Supabase Preview, staging/production readiness, load и integration jobs были skipped. Synthetic staging/browser validation остаётся NOT_RUN. Ruff и non-format pre-commit hooks прошли; локальные `ruff-format`/Black hooks были пропущены, чтобы не создавать несвязанный whole-file churn; новые файлы имеют отдельные targeted format checks. Подробности записаны в EVIDENCE. Схема, admission/quota enforcement, cutoff, API/UI и включение флага запрещены. После закрытия PR #3546 начать T07 только из свежей базы; T00–T06.1 повторно не выполнять.
 
 ## 4. Правила исполнения и постоянная память
 
