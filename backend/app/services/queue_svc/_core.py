@@ -4,15 +4,47 @@ Split from queue_service.py.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+from contextvars import ContextVar
+from functools import wraps
+from typing import Any, TypeVar, cast
+
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase, _now
+
+_QueueSettingsContext = tuple[object, object, dict[str, Any] | None]
+_queue_settings_context: ContextVar[_QueueSettingsContext | None] = ContextVar(
+    "queue_settings_context", default=None
+)
+_Command = TypeVar("_Command", bound=Callable[..., Any])
+
+
+def queue_settings_command(method: _Command) -> _Command:
+    """Keep one settings snapshot across a service command and its nested calls."""
+
+    @wraps(method)
+    def wrapped(self: Any, *args: Any, **kwargs: Any) -> Any:
+        db = kwargs.get("db")
+        if db is None and args:
+            db = args[0]
+        if db is None:
+            return method(self, *args, **kwargs)
+
+        current = _queue_settings_context.get()
+        if current is not None and current[0] is self and current[1] is db:
+            return method(self, *args, **kwargs)
+
+        token = _queue_settings_context.set((self, db, None))
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            _queue_settings_context.reset(token)
+
+    return cast(_Command, wrapped)
 
 
 class CoreMixin(QueueBusinessServiceMixinBase):
     """Core methods."""
-
-    def __init__(self) -> None:
-        self._cached_settings: dict[str, Any] | None = None
 
     @classmethod
 
@@ -99,11 +131,17 @@ class CoreMixin(QueueBusinessServiceMixinBase):
 
 
     def _load_queue_settings(self, db: Session) -> dict[str, Any]:
-        if self._cached_settings is None:
-            self._cached_settings = get_queue_settings(db) or {}
-        return self._cached_settings
+        current = _queue_settings_context.get()
+        if current is not None and current[0] is self and current[1] is db:
+            settings = current[2]
+            if settings is None:
+                settings = get_queue_settings(db) or {}
+                _queue_settings_context.set((self, db, settings))
+            return settings
+        return get_queue_settings(db) or {}
 
 
+    @queue_settings_command
     def get_local_timestamp(
         self, db: Session | None = None, timezone: str | None = None
     ) -> datetime:

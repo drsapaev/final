@@ -28,6 +28,7 @@ from app.services.queue_claim_service import (
 )
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase, _now
+from app.services.queue_svc._core import queue_settings_command
 from app.services.user_mgmt._base import (
     INCOMPLETE_DOCTOR_SPECIALTY,
     is_doctor_profile_incomplete,
@@ -439,6 +440,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
     # ----- Новые SSOT-функции (будут внедряться в следующих подэтапах) -----
 
 
+    @queue_settings_command
     def get_or_create_daily_queue(
         self,
         db: Session,
@@ -675,7 +677,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
             # дня (владелец → клиника) — живые настройки не сдвигают день.
             start_number=effective_day_start_number(
-                db, doctor=doctor, queue_tag=queue_tag
+                db, doctor=doctor, queue_tag=queue_tag, settings=settings
             ),
             cabinet_number=defaults.get("cabinet_number"),
             cabinet_floor=defaults.get("cabinet_floor"),
@@ -714,6 +716,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             raise
 
 
+    @queue_settings_command
     def get_next_queue_number(
         self,
         db: Session,
@@ -793,6 +796,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         return self.calculate_next_number(db, daily_queue)
 
 
+    @queue_settings_command
     def assign_queue_token(
         self,
         db: Session,
@@ -940,6 +944,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         return token_value, metadata
 
 
+    @queue_settings_command
     def validate_queue_token(
         self, db: Session, token: str
     ) -> tuple[QueueToken, dict[str, Any]]:
@@ -1220,6 +1225,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
     # inside the allocations below stays free.
     # ------------------------------------------------------------------
 
+    @queue_settings_command
     def resolve_join_batch_tag_targets(
         self,
         db: Session,
@@ -1324,6 +1330,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 continue
         return targets
 
+    @queue_settings_command
     def prelock_join_batch_tag_scopes(
         self,
         db: Session,
@@ -1354,6 +1361,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         for queue_tag in sorted(set(lock_targets.values())):
             lock_queue_tag_claim_scope(db, queue_tag, resolved_day)
 
+    @queue_settings_command
     def join_queue_with_token(
         self,
         db: Session,
@@ -1898,6 +1906,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         }
 
 
+    @queue_settings_command
     def create_queue_entry(
         self,
         db: Session,
@@ -1997,5 +2006,3 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             db.flush()
 
         return entry
-
-

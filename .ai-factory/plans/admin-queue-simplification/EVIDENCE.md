@@ -485,3 +485,75 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
 - PR state: OPEN, `mergeStateStatus=CLEAN`, no review decision or latest review recorded. No merge or deployment was performed.
 - Tier 2: NOT RUN / deferred. The PR body lists its reason, evidence, owner, resume condition, and headline impact; reviewer-acknowledgment checkbox remains unchecked. The approval of Tier 2 deferral for PR #3540 does not acknowledge the separate T04 deferral.
 - Next exact action: commit and push this documentation checkpoint, recheck the resulting PR head's applicable checks, then obtain explicit reviewer acknowledgment of T04's Tier 2 deferral before merge.
+
+## T04 merge checkpoint — 2026-10-01T14:42:46+05:00
+
+- PR: [#3541](https://github.com/drsapaev/final/pull/3541), title `fix(queue): preserve empty profile catalogs`, branch `codex/aqs-T04-empty-profiles`.
+- Review and authorization: the user reported `APPROVE`, P0/P1/P2 all zero, explicitly acknowledged Tier 2 deferral for this PR, and authorized merge at HEAD `b59fff8aed14fd9b4a285a8b6efcb23db6b43fb9`.
+- Merge: GitHub confirmed PR state `MERGED`; squash merge commit `ecc14b05411c7e7b54efca2966416cd6a69df37c`, merged at `2026-10-01T09:29:16Z`. `origin/main` points at that commit. It is the base of the T05 worktree.
+- Checks: the user reported all applicable blocking CI checks successful on the reviewed PR HEAD. Path-aware skipped checks were not treated as passes. Tier 2 remains accepted/deferred and unrun, not validated.
+- Result: T04 status is `MERGED`; T00–T04 are complete. No production deployment was performed.
+
+## T05 kickoff — 2026-10-01T14:42:46+05:00
+
+- Commit under test: base `ecc14b05411c7e7b54efca2966416cd6a69df37c`; worktree `C:\final\_wt_aqs_t05_settings_cache`, branch `codex/aqs-T05-settings-cache`; clean at kickoff.
+- Execution mode: `gate_known_root_cause`; selected because this task changes queue command behavior. The mandatory launcher was run from this worktree with `backend/app/services/queue_svc/_core.py` as the known root. Result: `mode=execute`, `handoff_required=false`, `gate_misroute=false`, `override_used=true`; `_core.py` appeared in its first-touch result. The gate's file list is narrower than the plan/source-derived implementation boundary, so this checkpoint records the necessary expansion before any runtime/test edits.
+- Canonical anchors: `_core.py::_load_queue_settings`; `QueueBusinessService` composition in `queue_svc/__init__.py`; settings-consuming commands and nested calls in `_operations.py`; CRUD `get_queue_settings`; existing `DailyQueue` day-snapshot fields.
+- First-touch files: `backend/app/services/queue_svc/_core.py`, `backend/app/services/queue_svc/_operations.py`, `backend/app/services/queue_svc/__init__.py`, one focused test file, the two PostgreSQL integration tests that clear `_cached_settings`, and this plan's `PROGRESS.md`/`EVIDENCE.md`.
+- Read-only references: CRUD settings loader, queue models, API/service call sites, `test_queue_time_window.py`, and snapshot-report tests.
+- Denied scope: schema/Alembic, queue ownership/fairness, admission/quota/cutoff semantics, profile lifecycle, APIs/UI, production/staging data, and unrelated cleanup.
+- Baseline finding: one process-lifetime `_cached_settings` value is created in `CoreMixin` and initialized again by `QueueBusinessService`. `_operations.py` reads settings in queue creation, next-number selection, token assignment/validation, and token join. Join and token methods call one another, so refreshing on every raw `_load_queue_settings` call would create inconsistent reads inside a single command. Two PostgreSQL tests manually reset the private cache before exercising settings changes.
+- Planned verification: first add a regression that fails when the same service instance is called after settings change; then verify per-command reuse across nested methods, refresh on the next command, exception cleanup, and preservation of a previously created queue snapshot. Run the focused backend test and `git diff --check`; run database-backed tests only if their PostgreSQL fixture/environment is available.
+- Original test result: `NOT_RUN` at kickoff; no source or test changes have been made. Staging and disposable PostgreSQL have not been checked for this task. No live or production data was queried.
+- Stop condition: stop if correctness needs endpoint-wide orchestration beyond the queue service boundary, mutation of existing day snapshots, or changes to ownership, numbering history, admission behavior, or schema.
+- Next exact action: validate this documentation diff, add the focused regression, and run it red before changing runtime code.
+
+## T05 scope refinement — 2026-10-01T15:07:56+05:00
+
+- Finding: the new-day queue constructor reads `queue_start_hour` from `_load_queue_settings()` but obtains fallback `start_number` by calling `effective_day_start_number()` in `backend/app/crud/queue_resource_routing.py`, which independently reloads clinic settings. A concurrent admin save could therefore freeze fields from two versions in one queue-creation command.
+- Scope refinement: add optional settings input to this existing CRUD calculation and pass the command snapshot from `_operations.py`. Existing callers that omit it retain the current direct-read behavior; owner/resource precedence, canonical start-number calculation, and persisted daily snapshot semantics remain unchanged.
+- Files added to first-touch: `backend/app/crud/queue_resource_routing.py` and the focused regression test. No schema, migration, ownership, fairness, or admission behavior is added.
+- Validation target: ensure new doctor-owned queue creation passes the same settings dictionary to time and start-number snapshot calculations; continue checking next-command refresh and immutable existing rows.
+- Stop condition: stop if implementing this requires changing owner/resource precedence or the start-number algorithm. No changes for this refinement have been made yet.
+
+## T05 initial validation — 2026-10-01T15:00:07+05:00
+
+- Commit under test: base `ecc14b05411c7e7b54efca2966416cd6a69df37c`; uncommitted worktree changes on `codex/aqs-T05-settings-cache`.
+- Environment: Windows, Python 3.11.9, `scripts/run_backend_pytest.ps1`. The suite's `db_session` fixture creates its own temporary SQLite database. A local SQLite `DATABASE_URL` was set only to satisfy the app's import-time engine setup; no staging or production connection was used.
+- Red result: before runtime changes, the focused regression failed because a new-day queue still had `online_start_time == "07:00"` after the settings provider changed to `08:00`. The test was then strengthened to persist and update a real `ClinicSettings` row in the isolated unit-test DB; the final green run uses the real CRUD loader.
+- Changes under test: `_core.py` now uses a `ContextVar` snapshot keyed by service instance and DB-session identity, with `finally` cleanup at command exit. Nested command decorators in `_operations.py` reuse the active snapshot; new commands load fresh defaults. Removed both `_cached_settings` initializers and the two PG-fixture monkeypatches that manually cleared that field. Existing queue rows are returned unchanged before defaults are read.
+- Actual changed paths: `backend/app/services/queue_svc/_core.py`, `_operations.py`, `__init__.py`; new `backend/tests/unit/test_queue_settings_command_scope.py`; `backend/tests/integration/test_rq24b_cross_panel_s21_pg.py`, `test_rq29_end_to_end_path_pg.py`; plan `PROGRESS.md` and `EVIDENCE.md`.
+- Validation commands and results:
+  - Pre-change red: `scripts/run_backend_pytest.ps1 tests/unit/test_queue_settings_command_scope.py -q` — FAIL as expected, old settings kept the next day's queue at 07:00.
+  - Focused final run: `tests/unit/test_queue_settings_command_scope.py`, `test_queue_time_window.py`, `test_graphql_queue_claim_coordinator.py`, `test_queue_api_service.py`, `test_queue_join_claim_coordinator.py`, and `test_queue_claim_service.py` through `scripts/run_backend_pytest.ps1` — PASS, 24 passed, 1 warning.
+  - `scripts/run_python.ps1 -PythonArgs @('-m','py_compile', ...)` for the three service files and new test — PASS.
+  - Scoped Ruff on all changed Python files with `--ignore C416` — PASS. Plain Ruff reports two existing C416 findings at `_operations.py` lines 99 and 1093, outside this change; import-order issue introduced during implementation was fixed.
+  - Black `--check` on the new unit regression — PASS. Black `--check` on all touched Python files reports five files would reformat; Black `--diff` shows broad legacy formatting drift in existing code, so no whole-file reformat was applied. The repository format-report workflow is report-only.
+  - `git diff --check` — PASS at this checkpoint.
+- PostgreSQL/staging: `docker compose ... ps` from the T05 worktree exited 0 and listed no containers. The PG-only integration tests were not run: `NOT_RUN` because staging is stopped and a separate disposable PostgreSQL service was not available. No production data was queried.
+- Result: local focused validation PASS; overall task remains `IN_PROGRESS` pending final diff/hook review, PR, current-head CI, and review. No commit, PR, merge, or deployment has occurred.
+- Remaining limitation: Tier 2/runtime staging validation has not been performed. Preserve existing queue ownership, issued numbers, history, and daily snapshots; no schema change was made.
+- Next exact action: inspect and finalize the diff, run final local checks after any edits, then commit/push and open the T05 PR.
+
+## T05 scope refinement validation — 2026-10-01T15:11:12+05:00
+
+- Commit under test: base `ecc14b05411c7e7b54efca2966416cd6a69df37c`; uncommitted T05 source and test changes.
+- Finding addressed: `get_or_create_daily_queue()` already had a command snapshot for queue start/end times, but the clinic fallback inside `effective_day_start_number()` independently fetched current settings. That could mix one command's queue-time settings with another read's starting-number default.
+- Change: added optional `settings` input to `effective_day_start_number()`; when supplied, the helper applies its existing canonical specialty/default resolution against that mapping. `_operations.py` passes the active command snapshot. Resource and owner overrides remain unchanged; all other callers that omit the argument retain the prior DB-read behavior.
+- Regression extension: the focused unit test stores `queue_start_hour=7` and a start number of 5, then substitutes a conflicting CRUD getter result of 99. Queue creation uses the loaded command snapshot and persists 5; after the saved clinic values change to 8 and 9, a new day's queue freezes 08:00/9 while the existing day's time/number remain 07:00/5.
+- Validation: the six-file queue unit set reran after this change — PASS, 24 passed, 1 warning. Ruff on changed Python files with the two unrelated existing C416 findings ignored — PASS. Black `--check` on the new unit test and changed CRUD helper — PASS. `py_compile` including the CRUD helper — PASS. `git diff --check` — PASS.
+- Scope check: only the already-declared settings loader, queue command methods, the directly used helper calculation, focused tests, and plan evidence changed. No numbering algorithm/precedence, queue identity/owner, schema, admissions, or production data changed.
+- Remaining limitation: PostgreSQL integration and staging checks remain `NOT_RUN` because staging is stopped and no separate disposable PG is available. The PR and remote CI are still pending.
+- Next exact action: complete final diff/hook review, then commit/push and open the focused T05 PR.
+
+## T05 precommit checkpoint — 2026-10-01T15:17:52+05:00
+
+- Pre-commit availability: `pre-commit` was absent from PATH and from the selected repository Python. Installed into a temporary Python 3.11 virtual environment under this worktree only; no production or shared venv was changed. Windows App Control blocked the generated `pre-commit.exe`; the same tool was invoked successfully via that environment's `python.exe -m pre_commit`.
+- Hook run: `SKIP=ruff,ruff-format,black python -m pre_commit run --files <the nine intended T05 files>`.
+- First run: all applicable checks passed except `end-of-file-fixer`, which normalized missing final newlines in `_operations.py` and `test_rq29_end_to_end_path_pg.py`. No content changes were made by other hooks.
+- Second run after normalization: PASS for large-file, merge-conflict, private-key, end-of-file, trailing-whitespace, branch guard, gitleaks, and applicable local guards. File-type-specific YAML/JSON/TOML and frontend hooks skipped due to no matching files.
+- Formatter/lint hooks: `ruff`, `ruff-format`, and `black` were explicitly skipped. Ruff's `--fix` hook would also rewrite two unrelated existing C416 expressions; direct Ruff on the changed Python files passed with only C416 ignored. Ruff-format/Black would produce over 1,000 lines of unrelated legacy formatting changes across the touched existing modules and PG tests; the new regression and changed CRUD helper passed direct Black checks, and the repository format-report workflow is nonblocking/report-only.
+- Scope: no hook configuration or repository settings were changed. The temporary pre-commit environment is local worktree scratch and is not staged.
+- Final recheck after end-of-file normalization: focused backend suite — PASS, 24 passed, 1 warning; Ruff with `--ignore C416` — PASS; Black on the new regression and changed CRUD helper — PASS; `py_compile` — PASS; `git diff --check` — PASS; second pre-commit run — PASS for all applicable non-formatter hooks.
+- Result: local T05 validation is `VALIDATED`; PostgreSQL integration and remote PR checks remain `NOT_RUN`/pending as recorded above.
+- Next exact action: stage only the nine declared T05 paths, commit with the documented formatter-hook skips, push `codex/aqs-T05-settings-cache`, and open the T05 draft PR.

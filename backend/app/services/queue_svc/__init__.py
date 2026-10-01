@@ -20,6 +20,3 @@ class QueueBusinessService(
     QueueBusinessServiceMixinBase,
 ):
     """Composed of focused mixin modules."""
-
-    def __init__(self) -> None:
-        self._cached_settings: dict[str, Any] | None = None

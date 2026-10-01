@@ -351,10 +351,6 @@ def _deterministic_clinic_day(monkeypatch):
     monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: dict(deterministic_settings))
     monkeypatch.setattr(queue_core, "get_queue_settings", lambda db: dict(deterministic_settings))
 
-    import app.services.queue_service as queue_service_module
-
-    monkeypatch.setattr(queue_service_module.queue_service, "_cached_settings", None)
-
     from app.services.display_websocket import get_display_manager
 
     monkeypatch.setattr(get_display_manager(), "_name_format_cache", {})
@@ -1426,4 +1422,3 @@ def test_rq29_combined_path(pg_client, pg_session, world):
     _step7_partial_payment_then_partial_service_cancel(
         pg_client, pg_session, world, step3
     )
-
