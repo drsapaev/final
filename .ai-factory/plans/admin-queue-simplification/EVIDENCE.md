@@ -578,3 +578,14 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
 - Scope: no runtime source changed after `47276d17`; this checkpoint updates only the task ledger. The local PR body scratch file and temporary pre-commit environment are not included in the PR.
 - State: T05 is `PR_OPEN`; do not merge or start T06 until required checks and review are resolved and the explicit T05 Tier 2 deferral acknowledgment is obtained.
 - Next exact action: inspect current-head checks/review after the ledger checkpoint push and record any status changes.
+
+## T05 remote CI checkpoint — 2026-10-01T15:53:04+05:00
+
+- Commit checked: PR head `f3cdc4f1385d558829f4f1b234e9b08c10eeae2c`; runtime source is unchanged from implementation commit `47276d178972226b0bcf561bdf8fa26a6940b913`.
+- Applicable GitHub checks on this head: Backend tests — PASS; Code Quality — PASS; Context Boundary Integrity — PASS; Frontend-Backend Parity — PASS; CI Scope — PASS; PR Required Gate — PASS; CodeQL (actions, Python, JavaScript/TypeScript) — PASS; Gitleaks, secret scan, and GitGuardian — PASS; PR Review Quality Gate and Lifecycle Recommendation — PASS.
+- Backend job details: full backend job passed; PostgreSQL-backed Reminder/QR-join concurrency probe — 4 passed; Critical E2E smoke — 35 passed. The local focused suite remains 24 passed, 1 warning.
+- Path-aware skips: frontend unit/lint/build/E2E, metadata/docs generation, Supabase Preview, DAST, Docker build, separate integration suite, staging readiness, and load tests were skipped by workflow conditions. Skips are not counted as passes. Synthetic staging/browser validation remains `NOT_RUN`.
+- Superseded run: on previous head `d393c2c17db5e3b10d7b1c378396e5c4186da09c`, Backend tests passed, but a push cancelled Code Quality and caused PR Required Gate to fail. The complete current-head run on `f3cdc4f1` passed PR Required Gate; the superseded cancelled result is not treated as current.
+- Review/merge state: PR [#3543](https://github.com/drsapaev/final/pull/3543) remains OPEN and draft, `mergeable=true`, with no submitted code review and no review decision. Its Tier 2 synthetic-staging deferral acknowledgment remains unchecked; prior PR deferrals are not inherited.
+- Result: applicable remote CI PASS on the checked head; merge is still held for review and a separate explicit disposition of the staging deferral. No source, production configuration, or production data was changed by this checkpoint.
+- Next exact action: obtain review and explicit user/reviewer disposition for PR #3543; only then decide whether T05 may merge and T06 may start.

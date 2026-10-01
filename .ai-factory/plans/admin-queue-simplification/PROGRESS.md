@@ -9,8 +9,8 @@ Current status: PR_OPEN
 Worktree: `C:\final\_wt_aqs_t05_settings_cache`
 Branch: `codex/aqs-T05-settings-cache`
 Base commit: `ecc14b05411c7e7b54efca2966416cd6a69df37c`
-Current commit: `d393c2c17db5e3b10d7b1c378396e5c4186da09c` (T05 PR head)
-Last updated: 2026-10-01T15:27:45+05:00
+Current commit: `f3cdc4f1385d558829f4f1b234e9b08c10eeae2c` (PR head checked; runtime source unchanged since `47276d178972226b0bcf561bdf8fa26a6940b913`)
+Last updated: 2026-10-01T15:53:04+05:00
 
 > **Возобновлено пользователем 2026-10-01:** «Продолжай реализации плана». T03 завершён: PR #3540 слит после исправления P1 и code-review verdict APPROVE. Tier 2 для #3540 остаётся принятым deferral, не пройденным тестовым набором.
 
@@ -48,11 +48,11 @@ Last updated: 2026-10-01T15:27:45+05:00
 - Completed for T05 so far: the regression failed before the runtime patch because a new-day queue still used `07:00` after the saved clinic setting changed to `08:00`. Implemented a task-local settings snapshot keyed by service instance and DB session; nested queue/token commands share it and each new command gets a fresh snapshot. Queue creation now passes that same snapshot into `effective_day_start_number()` for its `start_number`. Removed both duplicate `_cached_settings` initializers and the two integration-test cache-reset workarounds. The regression writes/updates real `ClinicSettings` rows, verifies existing queue time/number snapshots stay fixed, and verifies the next day's queue uses the updated time and start number.
 - Validation run: focused backend tests PASS (24 passed, 1 warning); `py_compile` PASS; Ruff scoped to touched files with pre-existing C416 ignored PASS; Black `--check` on the regression and changed CRUD helper PASS; applicable pre-commit hooks PASS; `git diff --check` PASS. Full commands and limitations are in `EVIDENCE.md#t05-initial-validation`, `#t05-scope-refinement-validation`, and `#t05-precommit-checkpoint`.
 - Environment/limitations: tests ran on Python 3.11.9 with their own isolated SQLite fixture. Staging Compose is stopped (no containers); disposable PostgreSQL was not available/used, so PostgreSQL integration files whose fixture requires that server are `NOT_RUN`. No production data was queried. Full-file Black check reports legacy formatting drift in five touched files; broad formatting-only churn (more than 1,000 diff lines reported) was not applied. Ordinary Ruff still reports two pre-existing C416 findings in unrelated `_operations.py` expressions; the new imports/code pass when those are excluded.
-- Changed but not fully verified: the committed implementation and focused local checks are verified. PostgreSQL integration/staging checks remain `NOT_RUN`; required remote checks and review are pending. The PR is draft and its T05 Tier 2 deferral is not acknowledged.
-- Remaining: complete current-head checks and review, resolve any findings, and obtain the required explicit Tier 2 deferral acknowledgment before merge. Do not start T06 until T05 is green, merged, and the worktree/branch are synchronized.
-- Blocker: no implementation blocker. PostgreSQL integration validation is unavailable because staging is stopped; record it as `NOT_RUN`, not PASS. Stop if review shows the command boundary must move into endpoint-wide orchestration.
-- Next exact action: monitor PR #3543 checks and review on head `d393c2c17db5e3b10d7b1c378396e5c4186da09c`; update this checkpoint after their result changes.
-- Checks to rerun after the next change: inspect all required checks at the new PR head after this ledger commit; rerun local checks only if source changes.
+- Changed but not fully verified: local focused checks and applicable remote CI pass on PR head `f3cdc4f1385d558829f4f1b234e9b08c10eeae2c`. Local staging/browser validation remains `NOT_RUN`; PR #3543 is still draft, has no review decision, and its Tier 2 staging-deferral acknowledgment is unchecked.
+- Remaining: obtain a separate review and explicit decision on the T05 Tier 2 staging deferral and merge authorization. Do not start T06 until T05 is merged and the worktree/branch are synchronized.
+- Blocker: no implementation or CI blocker. Only synthetic staging validation is unavailable because staging Compose is stopped; record it as `NOT_RUN`, not PASS. Stop if review identifies an ownership or command-boundary issue.
+- Next exact action: wait for user/reviewer disposition of PR #3543; do not merge or start T06 without the separate decision.
+- Checks to rerun after the next change: if source changes, rerun focused backend tests and relevant CI; if only ledger text changes, verify the new PR head's required checks without treating skipped path-aware jobs as passed.
 
 ## Checkpoint rules for the next agent
 
