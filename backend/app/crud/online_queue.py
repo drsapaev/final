@@ -38,6 +38,7 @@ from sqlalchemy.orm import Session
 from app.crud import clinic as crud_clinic
 from app.crud import queue_resource_routing
 from app.crud.clinic import get_queue_settings
+from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.services.queue_service import queue_service  # ✅ SSOT for business logic
@@ -360,9 +361,7 @@ def join_online_queue_multiple(
                     day=queue_token.day,
                     specialist_id=specialist_id,
                     active=True,
-                    start_number=queue_resource_routing.effective_day_start_number(
-                        db, doctor=_doc
-                    ),
+                    **daily_queue_creation_snapshot(db, doctor=_doc),
                 )
                 db.add(daily_queue)
                 db.commit()
@@ -623,9 +622,7 @@ def open_daily_queue(db: Session, day: date, specialist_id: int) -> dict[str, An
             day=day,
             specialist_id=specialist_id,
             active=True,
-            start_number=queue_resource_routing.effective_day_start_number(
-                db, doctor=_doc
-            ),
+            **daily_queue_creation_snapshot(db, doctor=_doc),
         )
         db.add(daily_queue)
 
@@ -936,8 +933,11 @@ def get_or_create_daily_queue(
                 max_online_entries=resource.max_online_per_day,
                 # RQ-13.b (D-06, E-039): снимок применённого стартового
                 # номера реестра — паритет с queue_svc-конструктором.
-                start_number=queue_resource_routing.effective_day_start_number(
-                    db, resource=resource, queue_tag=queue_tag
+                **daily_queue_creation_snapshot(
+                    db,
+                    resource=resource,
+                    queue_tag=queue_tag,
+                    settings=queue_settings,
                 ),
                 # Codex round-8 P2: канонический кабинет реестра — во
                 # ВСЕХ ветках создания (GQL joinQueue здесь; тикеты и
@@ -981,16 +981,22 @@ def get_or_create_daily_queue(
         # каноническом queue_svc flow) — GraphQL joinQueue передаёт
         # max_online_entries=doctor.max_online_per_day, иначе капа
         # врача недостижима за дефолтом модели 15.
-        # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
-        # дня (владелец → клиника); явный defaults["start_number"]
-        # сохраняет приоритет вызывающей стороны.
+        # The legacy defaults contract lets an explicit start_number win.
+        # Policy identity and issuance count are always supplied by the
+        # canonical new-queue calculation, never by caller defaults.
         _creation_defaults = dict(defaults or {})
-        _creation_defaults.setdefault(
-            "start_number",
-            queue_resource_routing.effective_day_start_number(
-                db, doctor=doctor_exists, queue_tag=queue_tag
-            ),
+        _creation_snapshot = daily_queue_creation_snapshot(
+            db,
+            doctor=doctor_exists,
+            queue_tag=queue_tag,
         )
+        _creation_defaults.setdefault(
+            "start_number", _creation_snapshot["start_number"]
+        )
+        _creation_defaults["policy_version"] = _creation_snapshot["policy_version"]
+        _creation_defaults["online_issued_count"] = _creation_snapshot[
+            "online_issued_count"
+        ]
         daily_queue = DailyQueue(
             day=day,
             specialist_id=actual_specialist_id,

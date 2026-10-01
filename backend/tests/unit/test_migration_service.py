@@ -302,6 +302,8 @@ class TestMigrationService:
             queue_tag="r19_roundtrip",
             active=True,
             start_number=41,
+            policy_version="daily_online_issuances_v1",
+            online_issued_count=4,
         )
         db_session.add(queue)
         db_session.commit()
@@ -320,6 +322,8 @@ class TestMigrationService:
         assert exported.get("start_number") == 41, (
             "backup must serialize the day's frozen start_number"
         )
+        assert exported.get("policy_version") == "daily_online_issuances_v1"
+        assert exported.get("online_issued_count") == 4
 
         # restore into a DB where the original row is absent
         db_session.delete(queue)
@@ -339,6 +343,8 @@ class TestMigrationService:
                 "restore must put the recorded snapshot back without "
                 "recalculation (got the column default?)"
             )
+            assert restored.policy_version == "daily_online_issuances_v1"
+            assert restored.online_issued_count == 4
             # the next ordinary ticket continues the SAVED baseline
             assert (
                 queue_service.get_next_queue_number(
@@ -392,6 +398,8 @@ class TestMigrationService:
             )
             assert restored is not None
             assert restored.start_number == 1
+            assert restored.policy_version == "legacy"
+            assert restored.online_issued_count == 0
         finally:
             leftover = (
                 db_session.query(DailyQueue).filter(DailyQueue.id == 998).first()
