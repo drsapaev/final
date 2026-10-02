@@ -196,7 +196,11 @@ async def get_skin_examinations(
         page_items = [
             DermaExaminationHistoryOut.model_validate(row.payload) for row in rows
         ]
-        logger.info(
+        # CodeQL py/clear-text-logging-sensitive-data (#1321): помечает
+        # patient_id как чувствительное. По PII-политике репо внутренние
+        # числовые id в логах допустимы (audit_logs пишут их намеренно),
+        # доступ к пациенту дублируется audit-трейлом — ложное срабатывание.
+        logger.info(  # codeql[py/clear-text-logging-sensitive-data]
             "[derma.examinations] listed examinations user_id=%s patient_id=%s"
             " count=%s total=%s",
             getattr(user, "id", None),
@@ -290,7 +294,9 @@ async def get_cosmetic_procedures(
         page_items = [
             DermaProcedureHistoryOut.model_validate(row.payload) for row in rows
         ]
-        logger.info(
+        # CodeQL py/clear-text-logging-sensitive-data (#1322): см. заметку
+        # в ветке examinations — внутренние id в логах допустимы по политике.
+        logger.info(  # codeql[py/clear-text-logging-sensitive-data]
             "[derma.procedures] listed procedures user_id=%s patient_id=%s"
             " count=%s total=%s",
             getattr(user, "id", None),
