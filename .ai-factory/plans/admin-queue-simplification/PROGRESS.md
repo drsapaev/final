@@ -5,15 +5,15 @@ Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 20
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T07
-Current status: PR_OPEN (PR #3557; follow-up `a8ce8a6d` pushed; exact-head checks pending; human review and Tier 2 gate still open)
+Current status: PR_OPEN (PR #3557; exact HEAD `e7be14cd` applicable blocking CI PASS; human review and Tier 2 gate still open)
 Last completed task: T06.2 — MERGED
 Worktree: `C:\final\_wt_aqs_t07_window`
 Branch: `codex/aqs-T07-admission-window`
 Base commit: `9a5404a5f9c339885662cc0b79a392cfd5b0e1f1`
-Current commit: `a8ce8a6d9dfd145f57a1bb4eec1ade35edbcbfa6` (latest runtime/test commit; docs checkpoint follows)
-Last updated: 2026-10-02T08:35:00+05:00
+Current commit: `e7be14cdcf71dced258f52dc8234f0cb644607ae` (latest verified PR HEAD; runtime fix is `a8ce8a6d`)
+Last updated: 2026-10-02T08:53:00+05:00
 
-> T00–T06.2 are confirmed MERGED. PR #3546 merged at `b804a71a6bad22400324e2236a3221317eac3158`. T07 PR #3557 is open at code HEAD `a8ce8a6d9dfd145f57a1bb4eec1ade35edbcbfa6`, based on `9a5404a5`. At 08:35+05, Backend tests and Frontend E2E remain pending; other completed applicable checks pass and path-aware skips are not passes. Local QR/API tests, TypeScript check, OpenAPI/types freshness, Ruff, PostgreSQL report tests (7/7), and isolated synthetic public QR/browser smoke passed. Authenticated Admin E2E and timing remain NOT_RUN because the synthetic Admin login requires normal 2FA setup; no bypass or account-security change was made. No human review or #3557-specific deferral acknowledgement exists. The v1 creation flag remains default-off; no production activation or deployment is authorized.
+> T00–T06.2 are confirmed MERGED. PR #3546 merged at `b804a71a6bad22400324e2236a3221317eac3158`. T07 PR #3557 is open at exact HEAD `e7be14cdcf71dced258f52dc8234f0cb644607ae`, based on `9a5404a5`; its code/test commit is `a8ce8a6d`. Applicable blocking checks on `e7be14cd` passed, including Backend tests, Frontend build/lint/unit/E2E, PR Required Gate, OpenAPI/docs, parity, code quality, security, and the final PR Review Quality Gate. Path-aware skips are not passes. Local queue/QR/API tests, TypeScript/OpenAPI freshness, PostgreSQL report tests (7/7), and isolated synthetic public QR/browser smoke passed. Authenticated Admin E2E and timing remain NOT_RUN because the synthetic Admin login requires normal 2FA setup; no bypass or account-security change was made. No human review or #3557-specific deferral acknowledgement exists. The v1 creation flag remains default-off; no production activation or deployment is authorized.
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -40,7 +40,7 @@ Last updated: 2026-10-02T08:35:00+05:00
 
 ## Current checkpoint
 
-- Latest T07 follow-up: commit `a8ce8a6d9dfd145f57a1bb4eec1ade35edbcbfa6` adds the `QRTokenInfoResponse` countdown fields that FastAPI had filtered from service results, with route and OpenAPI regressions. At 08:35+05, exact-head Backend tests and Frontend E2E are pending; other completed applicable checks pass, with path-aware skips excluded from pass counts.
+- Latest T07 follow-up: code commit `a8ce8a6d9dfd145f57a1bb4eec1ade35edbcbfa6` adds the `QRTokenInfoResponse` countdown fields that FastAPI had filtered from service results, with route and OpenAPI regressions. Exact PR HEAD `e7be14cdcf71dced258f52dc8234f0cb644607ae` has applicable blocking CI PASS, including Backend tests, Frontend E2E and both PR gates; see the 08:53+05 evidence entry. Path-aware skips remain excluded from pass counts.
 - Local validation on the follow-up: affected policy/window/GraphQL/QR/OpenAPI slice **73 passed, 1 warning**; focused route + OpenAPI regressions **2 passed, 1 warning**; frontend `npm run type-check`, API-types freshness, Ruff, py_compile, `git diff --check` passed. The first attempt with a missing `DATABASE_URL` and an incorrect test path was corrected; no product regression resulted.
 - Isolated staging `aqs-t07-staging-20261002` uses ports `18002/18082/55433` and separate volumes; backend source is mounted from this worktree and backend health returned `{"ok":true,"db":"ok"}`. Disposable PostgreSQL report suite: **7 passed, 1 warning**; scratch DB count after cleanup: 0. Public QR API returned `before_start_time` and all countdown fields; Node Playwright page returned HTTP 200 with countdown visible and 0 page errors. Synthetic doctor/queue/token rows were deleted (counts 0/0/0). Production and shared staging were untouched; `QUEUE_POLICY_V2_CREATION_ENABLED` remains unset/default-off.
 
