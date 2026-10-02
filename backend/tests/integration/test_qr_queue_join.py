@@ -282,3 +282,66 @@ def test_clinic_wide_qr_rejects_non_selectable_specialist_ids(
 
     entries = db_session.query(OnlineQueueEntry).all()
     assert entries == []
+
+
+@pytest.mark.queue
+def test_clinic_wide_qr_info_returns_before_start_countdown(
+    client, db_session, test_doctor, monkeypatch
+):
+    from app.crud import clinic as clinic_crud
+    from app.services.qr_queue import _queue_ops as qr_queue_ops
+
+    monkeypatch.setattr(
+        clinic_crud,
+        "get_queue_settings",
+        lambda _db: {
+            "timezone": "Asia/Tashkent",
+            "queue_start_hour": 7,
+            "auto_close_time": "09:00",
+        },
+    )
+    monkeypatch.setattr(
+        qr_queue_ops,
+        "_now",
+        lambda tz: datetime(2030, 1, 2, 6, 30, tzinfo=tz),
+    )
+
+    target_day = date(2030, 1, 2)
+    db_session.add(
+        DailyQueue(
+            day=target_day,
+            specialist_id=test_doctor.id,
+            queue_tag="countdown-contract",
+            active=True,
+            online_start_time="07:00",
+            online_end_time="09:00",
+            policy_version="daily_online_issuances_v1",
+            online_issued_count=0,
+        )
+    )
+    token_value = "test-clinic-wide-before-start-countdown"
+    db_session.add(
+        QueueToken(
+            token=token_value,
+            day=target_day,
+            specialist_id=None,
+            department="clinic",
+            is_clinic_wide=True,
+            expires_at=datetime(2030, 1, 3, 23, 59),
+            active=True,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/api/v1/queue/qr-tokens/{token_value}/info")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "before_start_time"
+    assert payload["policy_version"] == "daily_online_issuances_v1"
+    assert payload["start_time"] == "07:00"
+    assert payload["end_time"] == "09:00"
+    assert payload["current_time"] == "06:30"
+    assert payload["minutes_until_open"] == 30
+    assert payload["opens_at_datetime"] == "2030-01-02T07:00:00+05:00"
+    assert payload["countdown_text"] == "Откроется через 30 мин"

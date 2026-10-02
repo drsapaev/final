@@ -35729,6 +35729,20 @@ export type components = {
             status?: string | null;
             /** Message */
             message?: string | null;
+            /** Policy Version */
+            policy_version?: ("legacy" | "daily_online_issuances_v1") | null;
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** Current Time */
+            current_time?: string | null;
+            /** Minutes Until Open */
+            minutes_until_open?: number | null;
+            /** Opens At Datetime */
+            opens_at_datetime?: string | null;
+            /** Countdown Text */
+            countdown_text?: string | null;
         };
         /**
          * QrData

@@ -23,7 +23,7 @@ ACTIVE: Этот модуль содержит активные, рекомен�
 import logging  # noqa: F401
 import re  # noqa: F401
 from datetime import UTC, date, datetime, timedelta  # noqa: F401
-from typing import Any  # noqa: F401
+from typing import Any, Literal  # noqa: F401
 
 from fastapi import (  # noqa: F401
     APIRouter,
@@ -190,6 +190,13 @@ class QRTokenInfoResponse(BaseModel):
     allowed: bool | None = None
     status: str | None = None
     message: str | None = None
+    policy_version: Literal["legacy", "daily_online_issuances_v1"] | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    current_time: str | None = None
+    minutes_until_open: int | None = Field(default=None, ge=0)
+    opens_at_datetime: str | None = None
+    countdown_text: str | None = None
 
 
 class JoinSessionStartRequest(BaseModel):

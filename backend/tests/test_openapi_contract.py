@@ -294,8 +294,20 @@ def test_openapi_qr_token_info_exposes_join_read_contract(client: TestClient) ->
         "allowed",
         "status",
         "message",
+        "start_time",
+        "end_time",
+        "current_time",
+        "policy_version",
+        "minutes_until_open",
+        "opens_at_datetime",
+        "countdown_text",
     ):
         assert field_name in properties
+    assert properties["policy_version"]["anyOf"][0]["enum"] == [
+        "legacy",
+        "daily_online_issuances_v1",
+    ]
+    assert properties["minutes_until_open"]["anyOf"][0]["type"] == "integer"
 
 
 def test_openapi_telegram_onboarding_contract_has_stable_operation_ids(
