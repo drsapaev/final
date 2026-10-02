@@ -221,13 +221,13 @@ async def get_csrf_token(request: Request, response: Response) -> CSRFTokenRespo
         token = existing  # format-valid; reuse to avoid needless rotation
     else:
         token = secrets.token_urlsafe(32)  # mint fresh; overwrites any planted cookie
+    # codeql[py/cookie-injection] — значение выше прошло
+    # _valid_existing_csrf_token(): допускается только формат
+    # server-minted токена (base64url, 43 симв.), которые растение
+    # атакующим через поддомен не может подделать содержательно;
+    # поток для double-submit CSRF был проверен в #1200.
     response.set_cookie(
         key="csrf_token",
-        # codeql[py/cookie-injection] — значение выше прошло
-        # _valid_existing_csrf_token(): допускается только формат
-        # server-minted токена (base64url, 43 симв.), которые растение
-        # атакующим через поддомен не может подделать содержательно;
-        # поток для double-submit CSRF был проверен в #1200.
         value=token,
         httponly=False,
         secure=is_prod or samesite == "none",
