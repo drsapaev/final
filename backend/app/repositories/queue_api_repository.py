@@ -8,8 +8,8 @@ from datetime import date, datetime
 from sqlalchemy.orm import Session
 
 from app.crud import clinic as crud_clinic
+from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.crud.queue_resource_routing import (
-    effective_day_start_number,
     find_active_tag_queue,
     lock_registry_tag_creation,
     resolve_tag_resource,
@@ -49,9 +49,7 @@ class QueueApiRepository:
             day=day,
             specialist_id=specialist_id,
             active=True,
-            start_number=effective_day_start_number(
-                self.db, doctor=doctor, queue_tag=None
-            ),
+            **daily_queue_creation_snapshot(self.db, doctor=doctor, queue_tag=None),
         )
         self.db.add(daily_queue)
         self.db.commit()
@@ -105,8 +103,11 @@ class QueueApiRepository:
             max_online_entries=resource.max_online_per_day,
             # RQ-13.b (D-06, E-039): снимок применённого стартового номера
             # реестра — паритет с queue_svc-конструктором.
-            start_number=effective_day_start_number(
-                self.db, resource=resource, queue_tag=queue_tag
+            **daily_queue_creation_snapshot(
+                self.db,
+                resource=resource,
+                queue_tag=queue_tag,
+                settings=settings,
             ),
             # Codex round-8 P2: канонический кабинет реестра — паритет
             # с queue_svc-конструктором (round-7)

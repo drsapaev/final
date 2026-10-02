@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today
+from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.crud.queue_resource_routing import (
     resolve_registry_tag_queue_for_specialist,
 )
@@ -400,18 +401,12 @@ class ForceMajeureService:
             if doctor and doctor.specialty:
                 queue_tag = doctor.specialty.lower().replace(" ", "_")
 
-            # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
-            # нового (завтрашнего) дня — паритет с queue_svc-конструктором.
-            from app.crud.queue_resource_routing import (
-                effective_day_start_number,
-            )
-
             queue = DailyQueue(
                 day=target_date,
                 specialist_id=specialist_id,
                 queue_tag=queue_tag,
                 active=True,
-                start_number=effective_day_start_number(
+                **daily_queue_creation_snapshot(
                     self.db, doctor=doctor, queue_tag=queue_tag
                 ),
             )

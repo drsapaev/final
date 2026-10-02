@@ -48,38 +48,50 @@ For production, run the backend behind a TLS reverse proxy and keep filled env f
 
 ## Staging
 
-Для staging используйте отдельный compose-стек:
+На Windows clinic-host staging работает в WSL2 Ubuntu 24.04. Запускайте его
+из worktree проверяемого commit через общий launcher:
 
-```bash
-# из project-root/
-copy ops/staging.env.sample ops/staging.env
-docker compose --env-file ops/staging.env -f ops/compose.staging.yml up -d --build
+```powershell
+Copy-Item ops/staging.env.sample ops/staging.env
+# Заполните synthetic secrets, уникальный COMPOSE_PROJECT_NAME и свободные порты.
+.\ops\scripts\wsl_staging.ps1 -Action Preflight -EnvFile ops/staging.env
+.\ops\scripts\wsl_staging.ps1 -Action Start -EnvFile ops/staging.env
 ```
 
-Основные адреса по умолчанию:
+`Preflight` проверяет prerequisites до первого build, runtime readiness
+помечает `NOT_RUN`. После запуска `Check` требует healthy stack. Ошибки
+prerequisite фиксируйте и устраняйте до тестов.
+Для долгих тестов и browser QA оборачивайте весь собственный validation-script
+в `-Action Session -CommandArgs @(...)`: keeper работает до конца команды.
+Обычный `Start` удерживает WSL только на время запуска.
+
+Адреса текущего локального staging; для отдельного проекта выберите свободные:
 
 - Frontend: `http://<STAGING_PUBLIC_HOST>:18080`
-- Backend docs: `http://<STAGING_PUBLIC_HOST>:18000/docs`
+- Backend docs: `http://<STAGING_PUBLIC_HOST>:18001/docs`
 - Postgres: `127.0.0.1:55432`
 
-После старта стека прогоните EMR cutover уже на staging:
+В sample env PostgreSQL host port — `15432`; задавайте фактический порт явно.
+Launcher проверяет project, порты, mounts, health и доступ из Windows, вызывает
+Docker внутри WSL через local socket и всегда выбирает `ops/compose.staging.yml`.
+HEAD/mount и image IDs сами по себе не доказывают commit собранного frontend:
+helper явно сообщает `served_revision_verified=false` и `worktree_dirty`.
+Не выводите env или полный resolved Compose config: в них secrets.
 
-```bash
-docker compose --env-file ops/staging.env -f ops/compose.staging.yml exec backend python scripts/run_emr_cutover.py --pretty
+Остановка только собственного проекта:
+
+```powershell
+.\ops\scripts\wsl_staging.ps1 -Action Stop -EnvFile ops/staging.env
 ```
 
-Если Docker Desktop ведёт себя нестабильно, используйте host-based staging:
-
-```bash
-powershell -ExecutionPolicy Bypass -File ops/scripts/start_staging_host.ps1
-powershell -ExecutionPolicy Bypass -File ops/scripts/run_staging_cutover_host.ps1
-```
-
-Остановить host-based staging:
-
-```bash
-powershell -ExecutionPolicy Bypass -File ops/scripts/stop_staging_host.ps1
-```
+Не используйте host-based staging как fallback на этом Windows host: legacy
+helpers могут занять production `:18000`. Не останавливайте чужие проекты и
+общую WSL distribution. Рецепты Session, PostgreSQL-required тестов, normal
+Admin/2FA подготовки и повторяющихся ошибок:
+[WSL_STAGING_SESSION.md](../docs/runbooks/WSL_STAGING_SESSION.md).
+Полный gate перед production остаётся
+[STAGING_VALIDATION.md](../docs/runbooks/STAGING_VALIDATION.md); успешный
+launcher не заменяет его десять проверок.
 
 ## VPS / Production Rollout
 

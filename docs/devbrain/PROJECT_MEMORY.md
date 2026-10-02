@@ -54,6 +54,7 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 - Dev reset/seed commands must keep safety confirmations such as `--confirm-dev-reset`, `--confirm-dev-seed`, and `--confirm-db-name clinic_dev`.
 - Local 2FA bypass flags are manual smoke-test aids only and must not be used in production-like environments.
 - Isolated Linux staging runs in WSL2 Ubuntu 24.04 Docker on this Windows host, with its own Compose project, database, ports, and synthetic data; production remains the Windows main tree on backend `:18000`. See `docs/runbooks/AGENT_SESSION_WORKTREES.md`.
+- Use the worktree's `ops/scripts/wsl_staging.ps1 -Action Preflight` before WSL staging builds and `Session` for the entire validation. Reported recurring failures and strict PG mode's audited-suite boundary are documented in `docs/runbooks/WSL_STAGING_SESSION.md`; unavailable prerequisites/skipped mandatory PG cases are not success, mount/image identity is not served-revision proof, and uptime resets alone do not prove OOM.
 
 ## Migration / Alembic Ownership Rules
 
