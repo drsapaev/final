@@ -20,7 +20,24 @@ on this same Windows computer; it is not a VPS. Its executable configuration
 is `ops/compose.staging.yml`. Run it from the worktree containing the commit
 under test, not from an old staging worktree snapshot. The Compose project,
 Postgres/Redis volumes, database credentials, and host ports must be separate
-from production. Staging can be stopped between tests; check its state first.
+from production. Staging can be stopped between tests; check its state first
+using the worktree's Windows-to-WSL launcher:
+
+```powershell
+.\ops\scripts\wsl_staging.ps1 -Action Preflight -EnvFile ops/staging.env
+.\ops\scripts\wsl_staging.ps1 -Action Start -EnvFile ops/staging.env
+```
+
+Set an explicit unique `COMPOSE_PROJECT_NAME` in that ignored env file.
+`Preflight` checks prerequisites before the first build and reports runtime
+readiness `NOT_RUN`; use `Check` for an already-started healthy stack.
+Use `-Action Session -CommandArgs @(...)` around the complete long-running
+test/browser script, so the WSL keeper lasts until validation ends rather
+than expiring after a fixed sleep. `Start` holds the keeper only during
+startup. Stop only your project with `-Action Stop`. Full recipes, strict
+PostgreSQL result checks, and recurring failure handling are in
+[WSL_STAGING_SESSION.md](WSL_STAGING_SESSION.md). Do not shut down the shared
+distribution or fall back to legacy host staging on production's port.
 
 Current local staging uses backend `127.0.0.1:18001`, frontend
 `127.0.0.1:18080`, and Postgres `127.0.0.1:55432`. Windows production uses
@@ -29,8 +46,7 @@ and `STAGING_POSTGRES_HOST_PORT=55432` explicitly in the untracked staging
 env file before starting Compose. The sample and Compose backend fallback
 now both use `18001`; the sample Postgres port is `15432`, while the current
 local staging contour uses `55432`. Check the effective project name and
-port bindings
-with `docker compose ps`, then check staging backend health at
+port bindings with the helper's compact result, then check staging backend health at
 `http://127.0.0.1:18001/api/v1/health`. Do not print the env file or
 interpolated Compose configuration into logs because it contains secrets.
 Postgres is loopback-bound; the current Compose file publishes backend and
@@ -59,8 +75,9 @@ The worktree has no `.venv`. Point the launchers at the main tree's
 interpreter (same app, same dependency set):
 
 ```powershell
+cd C:\final\_wt_<topic>
 $env:REPO_PYTHON = 'C:\final\backend\.venv\Scripts\python.exe'
-C:\final\scripts\run_backend_pytest.ps1 tests\test_something.py
+.\scripts\run_backend_pytest.ps1 tests\test_something.py
 ```
 
 Alternatively, junction the venv into the worktree (read-write — installs
@@ -70,9 +87,16 @@ affect production, so prefer `REPO_PYTHON`):
 cmd /c mklink /J C:\final\_wt_<topic>\backend\.venv C:\final\backend\.venv
 ```
 
-Frontend checks: junction `frontend\node_modules` the same way, or run
-them in the main tree only when it is parked on `main` (CI covers PRs
-anyway).
+The launcher derives the repository root from its own path: always use the
+worktree's script, even when reusing the main tree's interpreter. Do not
+install packages into the production venv. PostgreSQL-required tests need an
+explicit isolated DSN and fresh results with no skipped cases. The helper's
+strict `Session -PgAdminEnv RQ23A_PG_ADMIN_URL -Junit <absolute-path>` mode runs
+only its audited effective-settings suite. Other fixtures need separate
+connection-routing audit; see `WSL_STAGING_SESSION.md`.
+
+Frontend checks: junction `frontend\node_modules` the same way if dependencies
+match, or install dependencies in the worktree. Run checks from the worktree.
 
 ## PR flow from a worktree
 
