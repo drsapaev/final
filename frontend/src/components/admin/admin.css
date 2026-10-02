@@ -11840,28 +11840,10 @@
   gap: 8px;
 }
 
-.admin-qp-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: color-mix(in srgb, black, transparent 50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
 .admin-qp-modal {
-  background: var(--admin-bgc0, white);
-  border-radius: 16px;
   padding: 24px;
-  width: 500px;
-  max-width: 90vw;
-  max-height: 90vh;
-  overflow: auto;
-  box-shadow: 0 25px 50px -12px color-mix(in srgb, black, transparent 75%);
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .admin-qp-modal-header {
@@ -12120,29 +12102,6 @@
   padding: 2px 6px;
   border-radius: var(--mac-radius-sm);
   word-break: break-all;
-}
-
-/* ─── Dev Mode (dynamic bg/border via custom props) ─── */
-.admin-dev-mode-card {
-  background: var(--admin-card-bg, var(--mac-bg-secondary));
-  border: 1px solid var(--admin-card-border, var(--mac-border));
-  border-radius: var(--mac-radius-lg);
-  padding: var(--mac-spacing-4);
-}
-
-.admin-dev-mode-btn {
-  background: var(--admin-btn-bg, var(--mac-bg-tertiary));
-  color: var(--admin-btn-color, var(--mac-text-primary));
-  border: 1px solid var(--mac-border);
-  border-radius: var(--mac-radius-md);
-  padding: var(--mac-spacing-2) var(--mac-spacing-3);
-  font-size: var(--mac-font-size-sm);
-  font-weight: var(--mac-font-weight-medium);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--mac-spacing-2);
-  cursor: pointer;
-  transition: background var(--mac-duration-normal) var(--mac-ease);
 }
 
 /* ─── Text blocks (sm/xs + color + flex col + gap) ─── */

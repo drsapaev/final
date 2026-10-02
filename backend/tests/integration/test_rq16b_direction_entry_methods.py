@@ -163,7 +163,9 @@ def pg_engine():
 
         engine = create_engine(sa_url, future=True)
         with engine.connect() as conn:
-            version = conn.execute(text("select version_num from alembic_version")).scalar()
+            version = conn.execute(
+                text("select version_num from alembic_version")
+            ).scalar()
             dialect = conn.execute(text("select version()")).scalar()
         assert version, "alembic_version must be present after upgrade"
         assert "PostgreSQL" in (dialect or ""), "RQ-16.b proof requires real PostgreSQL"
@@ -226,11 +228,7 @@ def seeded_directions(pg_session):
     # idempotent (the lifecycle module's delete-if-exists precedent).
     stale = (
         pg_session.query(QueueProfile)
-        .filter(
-            QueueProfile.key.in_(
-                ["stomatology", "rq16b-archived", "rq16b-hidden"]
-            )
-        )
+        .filter(QueueProfile.key.in_(["stomatology", "rq16b-archived", "rq16b-hidden"]))
         .all()
     )
     if stale:
@@ -303,9 +301,9 @@ def test_openapi_schema_contains_entry_methods_contract(pg_client):
     assert set(item_model["properties"]) == {"method", "supported"}
     enum_ref = item_model["properties"]["method"]["$ref"]
     enum_schema = spec["components"]["schemas"][enum_ref.split("/")[-1]]
-    assert sorted(enum_schema["enum"]) == sorted(ALL_METHODS), (
-        "the methods space must be explicitly enumerated in the schema"
-    )
+    assert sorted(enum_schema["enum"]) == sorted(
+        ALL_METHODS
+    ), "the methods space must be explicitly enumerated in the schema"
 
 
 def test_qr_visible_direction_lists_all_three_methods(pg_client, seeded_directions):
@@ -371,17 +369,15 @@ def test_alias_key_resolves_via_service_normalization(pg_client, seeded_directio
 def test_archived_catalog_key_is_not_resurrected_from_fallback(pg_client, pg_session):
     """Fail-closed: alembic seeds the profile catalog into the scratch DB,
     so a built-in key like "cardiology" exists as a REAL row here. The
-    fallback failure mode this pins: /queues/profiles/public fabricates
-    catalog directions when the DB is empty — the same fallback in THIS
-    surface would RESURRECT a DB-archived direction from the built-in
-    catalog. Archiving the row must flip the answer to the anonymous 404
-    (S-15: archived blocks new joins), never a catalog-backed 200."""
+    public profile-read fallback that fabricated catalog directions for an
+    empty DB is removed by T04. This separate entry-methods surface must
+    also never RESURRECT an archived row from built-in metadata. Archiving
+    the row must flip the answer to the anonymous 404 (S-15: archived blocks
+    new joins), never a catalog-backed 200."""
     from app.models.queue_profile import QueueProfile
 
     row = (
-        pg_session.query(QueueProfile)
-        .filter(QueueProfile.key == "cardiology")
-        .first()
+        pg_session.query(QueueProfile).filter(QueueProfile.key == "cardiology").first()
     )
     assert row is not None, "catalog seed must be present after alembic head"
     assert pg_client.get(_methods_url("cardiology")).status_code == 200

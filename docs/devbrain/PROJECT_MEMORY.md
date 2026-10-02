@@ -31,6 +31,8 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 - Broad audit findings should be converted into small PR slices before implementation.
 - A closed `/ws/queue` connection once retried receive errors in a tight loop, flooding logs and consuming CPU while unrelated panels waited. Preserve exit, heartbeat cancellation, room cleanup, and the focused disconnect regression test.
 - First-screen latency means time until content appears, not FastAPI startup. Separate browser bundle/API waterfalls, backend queries, and WebSocket load before changing infrastructure; keep inactive panel tabs off the initial path.
+- An all-ASC index does NOT serve a mixed-direction ORDER BY (e.g. DESC, DESC, ASC, DESC, ASC): the planner falls back to a temp-btree sort of the whole set, silently turning O(page) reads into O(N log N). Index columns must mirror the ORDER BY directions (#3506, derma history read model).
+- Session-scoped SQLAlchemy event listeners (after_flush) must be registered from a module every entry point imports (app/db/base.py), never from an endpoint's import of the listener module — removing that import silently disables the projection (#3506).
 
 ## Strict Operating Rules
 
@@ -52,6 +54,7 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 - Dev reset/seed commands must keep safety confirmations such as `--confirm-dev-reset`, `--confirm-dev-seed`, and `--confirm-db-name clinic_dev`.
 - Local 2FA bypass flags are manual smoke-test aids only and must not be used in production-like environments.
 - Isolated Linux staging runs in WSL2 Ubuntu 24.04 Docker on this Windows host, with its own Compose project, database, ports, and synthetic data; production remains the Windows main tree on backend `:18000`. See `docs/runbooks/AGENT_SESSION_WORKTREES.md`.
+- Use the worktree's `ops/scripts/wsl_staging.ps1 -Action Preflight` before WSL staging builds and `Session` for the entire validation. Reported recurring failures and strict PG mode's audited-suite boundary are documented in `docs/runbooks/WSL_STAGING_SESSION.md`; unavailable prerequisites/skipped mandatory PG cases are not success, mount/image identity is not served-revision proof, and uptime resets alone do not prove OOM.
 
 ## Migration / Alembic Ownership Rules
 

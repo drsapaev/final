@@ -229,6 +229,7 @@ import {
   findMissingDoctorItems,
   wizardServiceFromCatalogEntry,
   type WizardCatalogServiceData as ServiceData,
+  type DoctorsRequestStatus,
   categories
 } from './wizardUtils';
 
@@ -345,6 +346,12 @@ const AppointmentWizardV2 = ({
   const [phoneError, setPhoneError] = useState<{ message?: string; patient?: unknown } | null>(null); // ✅ Ошибка уникальности телефона
   const [servicesData, setServicesData] = useState<ServiceData[]>([]);
   const [doctorsData, setDoctorsData] = useState<DoctorData[]>([]);
+  // Round-3 PR #3511 (P2): статус запроса списка врачей. Отличает успешно
+  // загруженный ПУСТОЙ roster ('loaded' — тогда закреплённые услуги дают
+  // doctor_missing с инструкцией) от незавершённого/упавшего запроса
+  // ('loading'/'error' — блок instructions не показываем, нет ложной
+  // конфиг-ошибки при сбое загрузки).
+  const [doctorsRequestStatus, setDoctorsRequestStatus] = useState<DoctorsRequestStatus>('idle');
   const [filteredServices, setFilteredServices] = useState<ServiceData[]>([]);
   const [showAllServices, setShowAllServices] = useState(false);
   const [formattedBirthDate, setFormattedBirthDate] = useState('');
@@ -1032,11 +1039,14 @@ const AppointmentWizardV2 = ({
   }, [servicesData, wizardData.cart.items]); // ✅ ИСПРАВЛЕНО: Триггерим при изменении servicesData или корзины
 
   const loadDoctors = useCallback(async () => {
+    setDoctorsRequestStatus('loading');
     try {
       const { doctors } = await fetchRegistrarDoctors();
       setDoctorsData(doctors.map((doctor): DoctorData => ({ ...doctor })));
+      setDoctorsRequestStatus('loaded');
     } catch (error: unknown) {
       logger.error('Ошибка загрузки врачей:', error);
+      setDoctorsRequestStatus('error');
     }
   }, []);
 
@@ -3267,6 +3277,7 @@ const AppointmentWizardV2 = ({
               cart={wizardData.cart}
               services={filteredServices}
               doctorsData={doctorsData}
+              doctorsRequestStatus={doctorsRequestStatus}
               showAllServices={showAllServices}
               onToggleAllServices={() => setShowAllServices(!showAllServices)}
               onAddToCart={addToCart}

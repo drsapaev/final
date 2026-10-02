@@ -92,7 +92,7 @@ dependencies = [
 
   # PDF & documents
   "reportlab>=4.0,<4.6",
-  "weasyprint>=68.1,<70.0",
+  "weasyprint>=68.1,<71.0",
   "qrcode[pil]>=7.4,<8.3",
   "pillow>=12.2.0,<13.0.0",
   "defusedxml>=0.7.1,<0.8",
@@ -332,6 +332,50 @@ pytest_add_cli_args_test_selection = [
     # them (lab_reporting service/repository only). It keeps running green
     # in the normal backend-tests job and locally (63 passed).
     "--deselect", "tests/unit/test_lab_reporting_service.py",
+    # Repo-artifact readers, single-test deselects (nightly 2026-09-25..10-01):
+    # both read files OUTSIDE the mutmut sandbox and abort with
+    # FileNotFoundError before mutations run; zero mutation value (no
+    # app/crud/* imports; the mutated modules are not exercised by them).
+    # Both keep running green in the normal backend-tests CI job.
+    # - qr_join_round6 opens REPO/backend/openapi.json; sandbox geometry
+    #   resolves backend/backend/openapi.json (missing).
+    "--deselect", "tests/integration/test_qr_join_round6_refusal_contract.py::test_openapi_contract_declares_refusal_responses",
+    # - derma_history write-path audit reads an evidence allowlist file and
+    #   scans repo sources as text ("файл allowlist'а исчез" under the
+    #   sandbox); the file's other (DB-driven) tests stay in the run.
+    "--deselect", "tests/integration/test_derma_history_write_path_audit.py::TestDermaHistoryWritePathAudit::test_no_unaudited_core_or_raw_dml_on_sources",
+    # tests/unit/test_patient_portal_jwt_api.py — whole-file deselect
+    # (nightly 2026-10-01 run 36905520755, after the class-level attempt in
+    # #3551): a THIRD class failed with the identical sandbox signature -
+    # TestReplayPatientPolicy::test_replay_after_soft_delete_returns_403_
+    # not_cached_201 (assert 0 == 1), after TestBooking::test_create_ok
+    # ("assert row is not None") and TestBookingIdempotency (assert 0 == 1).
+    # The file's ~20 classes share one pattern (TestClient POST + row/audit
+    # asserts via the test's own session), which is structurally
+    # incompatible with the mutmut sandbox's module-identity / session-graph
+    # visibility - same documented class as the idempotency file below.
+    # Recent booking-path transaction changes (#3545/#3546) shifted commit
+    # boundaries and exposed it file-wide. Green in normal CI (real PG) and
+    # locally; zero mutation value lost outside this file's own assertions
+    # (the crud modules stay covered by the remaining ~2900 tests).
+    "--deselect", "tests/unit/test_patient_portal_jwt_api.py",
+    # tests/unit/test_portal_department_booking_lock.py — whole-file deselect
+    # (nightly 2026-10-01 run 36909115097, after the patient-portal file in
+    # #3552): sibling file from the same mini-app booking workstream, same
+    # structural class - TestClient booking POST + "assert row is not None"
+    # via the test's own session (module-identity / session-graph visibility
+    # under the mutmut sandbox). Green in normal CI (real PG) and locally.
+    "--deselect", "tests/unit/test_portal_department_booking_lock.py",
+    # tests/unit/test_schedule_department_contract.py — whole-file deselect
+    # (nightly 2026-10-01 run 36912332538, after #3554):
+    # TestScheduleDepartmentKeyContract::test_daily_schedule_appointment_
+    # department_is_key_string failed with the same sandbox signature
+    # ("assert None is not None" - row written via the app write path not
+    # visible to the test's own session). 22 tests / 5 classes, all
+    # schedule-create persistence contracts sharing the pattern; structurally
+    # incompatible with the mutmut sandbox (module-identity / session-graph
+    # visibility). Green in normal CI (real PG) and locally.
+    "--deselect", "tests/unit/test_schedule_department_contract.py",
 ]
 only_mutate = [
     "app/crud/appointment.py",

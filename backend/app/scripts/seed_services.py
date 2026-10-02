@@ -95,8 +95,8 @@ CATEGORIES: tuple[CategorySpec, ...] = (
 SERVICES: tuple[ServiceSpec, ...] = (
     # Консультации
     ServiceSpec("K01", "Консультация кардиолога", "50000", category_code="K", service_code="K01", category_link="consultation.cardiology", queue_tag="cardio", requires_doctor=True, is_consultation=True, department_key="cardiology"),
-    ServiceSpec("D01", "Консультация дерматолога-косметолога", "50000", category_code="D", service_code="D01", queue_tag="dermatology", requires_doctor=True, is_consultation=True),
-    ServiceSpec("S01", "Консультация стоматолога", "40000", category_code="S", service_code="S01", queue_tag="stomatology", requires_doctor=True, is_consultation=True),
+    ServiceSpec("D01", "Консультация дерматолога-косметолога", "50000", category_code="D", service_code="D01", queue_tag="dermatology", requires_doctor=True, is_consultation=True, department_key="dermatology"),
+    ServiceSpec("S01", "Консультация стоматолога", "40000", category_code="S", service_code="S01", queue_tag="stomatology", requires_doctor=True, is_consultation=True, department_key="stomatology"),
     ServiceSpec("O20", "Невропатолог", "100000", category_code="O", service_code="O20", category_link="other", queue_tag="neurology", duration_minutes=20, is_consultation=True, department_key="neurology"),
     # Кардиодиагностика
     ServiceSpec("K10", "ЭКГ", "25000", category_code="K", service_code="K10", queue_tag="ecg", duration_minutes=20, requires_doctor=True, department_key="echokg"),
@@ -149,7 +149,7 @@ SERVICES: tuple[ServiceSpec, ...] = (
     ServiceSpec("L31", "Кал на я/г", "10000", category_code="L", service_code="L64", queue_tag="general", duration_minutes=20),
     ServiceSpec("LAB_IGE", "Иммуноглобулин Е", "18000", category_code="L", service_code="L65", queue_tag="general"),
     # Стоматология
-    ServiceSpec("S10", "Рентгенография зуба", "15000", category_code="S", service_code="S10", queue_tag="stomatology", duration_minutes=15, requires_doctor=True),
+    ServiceSpec("S10", "Рентгенография зуба", "15000", category_code="S", service_code="S10", queue_tag="stomatology", duration_minutes=15, requires_doctor=True, department_key="stomatology"),
     # Физиотерапия
     ServiceSpec("P08", "Дарсонваль", "15000", category_code="P", service_code="P01", queue_tag="procedures", duration_minutes=20, requires_doctor=True),
     ServiceSpec("P03", "УФО терапия", "12000", category_code="P", service_code="P02", queue_tag="procedures", duration_minutes=15, requires_doctor=True),

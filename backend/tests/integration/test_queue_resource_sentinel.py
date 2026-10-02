@@ -567,9 +567,7 @@ def test_alembic_chain_single_head_0062() -> None:
     # round-24 persisted bot identity lives in clinic_settings (a KV
     # row, covering env-backed credentials too) — no schema entry.
     assert "0062_telegram_webhook_dedup" in graph
-    assert graph["0062_telegram_webhook_dedup"] == (
-        "0061_telegram_config_singleton",
-    )
+    assert graph["0062_telegram_webhook_dedup"] == ("0061_telegram_config_singleton",)
     # QD-2D: the chain head moved to 0063 (daily_queues owner contract —
     # XOR CHECK + partial active uniqueness; the bridge conversion is
     # data-only, the id fits the VARCHAR(32) version stamp).
@@ -585,9 +583,7 @@ def test_alembic_chain_single_head_0062() -> None:
     # main's RQ-14.a.1 claimed the 0065 slot from the same parent — the
     # chain stays single-headed (data-only; the id fits the VARCHAR(32)
     # stamp).
-    assert graph["0066_general_retirement_cutover"] == (
-        "0065_queue_numbering_unique",
-    )
+    assert graph["0066_general_retirement_cutover"] == ("0065_queue_numbering_unique",)
     # RQ-13.b (D-06, E-039): the day's applied start-number snapshot
     # chains after the QD-2E cutover (additive column + owner backfill).
     assert graph["0067_daily_queue_start_number"] == (
@@ -597,9 +593,7 @@ def test_alembic_chain_single_head_0062() -> None:
     # (paired deletion of ecg_resource/lab_resource/general_resource)
     # chains after the direction public-address registry (0068,
     # RQ-16.c), which chains after the day start-number snapshot.
-    assert graph["0069_sentinel_pair_retirement"] == (
-        "0068_direction_public_address",
-    )
+    assert graph["0069_sentinel_pair_retirement"] == ("0068_direction_public_address",)
     # alembic_version.version_num is VARCHAR(32): both ends of the new
     # link must fit (CI on 40cec49 exploded on real PostgreSQL with a
     # 38-char id — scratch-SQLite ignores VARCHAR widths).
@@ -613,9 +607,7 @@ def test_alembic_chain_single_head_0062() -> None:
     assert len("0061_telegram_config_singleton") <= 32
     # RQ-16.c: the head moved to 0068 with the direction public-address
     # registry (owner decision E-055, additive MODEL slice).
-    assert graph["0068_direction_public_address"] == (
-        "0067_daily_queue_start_number",
-    )
+    assert graph["0068_direction_public_address"] == ("0067_daily_queue_start_number",)
     assert len("0068_direction_public_address") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
@@ -624,32 +616,29 @@ def test_alembic_chain_single_head_0062() -> None:
     # the lab-results lineage (A+ stage 1) claims 0070, and NURSE-V2 N2-2
     # (owner design-GO 2026-09-19) extends the chain with the workplace
     # assignments (0071) and service executions (0072).
-    assert graph["0071_nurse_workplace_assignments"] == (
-        "0070_lab_results_lineage",
-    )
-    assert graph["0072_service_executions"] == (
-        "0071_nurse_workplace_assignments",
-    )
+    assert graph["0071_nurse_workplace_assignments"] == ("0070_lab_results_lineage",)
+    assert graph["0072_service_executions"] == ("0071_nurse_workplace_assignments",)
     # RQ-18 follow-up round-8 (PR #3362 review): the join-session payload
     # binding + response snapshot is re-parented as 0074 on top of main's
     # 0073 (execution routing snapshot).
-    assert graph["0074_join_payload_binding"] == (
-        "0073_execution_routing_snapshot",
-    )
+    assert graph["0074_join_payload_binding"] == ("0073_execution_routing_snapshot",)
     assert len("0071_nurse_workplace_assignments") <= 32
     assert len("0072_service_executions") <= 32
     # Main's corrective follow-up moved the head to 0073 (routing
     # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
     # as 0074 on top of it.
-    assert graph["0073_execution_routing_snapshot"] == (
-        "0072_service_executions",
-    )
+    assert graph["0073_execution_routing_snapshot"] == ("0072_service_executions",)
     assert len("0073_execution_routing_snapshot") <= 32
-    assert graph["0074_join_payload_binding"] == (
-        "0073_execution_routing_snapshot",
-    )
+    assert graph["0074_join_payload_binding"] == ("0073_execution_routing_snapshot",)
     assert len("0074_join_payload_binding") <= 32
-    assert heads == ["0074_join_payload_binding"]
+    # derma history read model (issue #3506, P2 retro-review of #3494)
+    assert graph["0075_derma_history_read_model"] == ("0074_join_payload_binding",)
+    assert len("0075_derma_history_read_model") <= 32
+    # read-order index swap moves the head to 0076 (#3506 step 2)
+    assert graph["0076_derma_history_read_order"] == ("0075_derma_history_read_model",)
+    assert len("0076_derma_history_read_order") <= 32
+    assert graph["0077_daily_queue_policy"] == ("0076_derma_history_read_order",)
+    assert heads == ["0077_daily_queue_policy"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

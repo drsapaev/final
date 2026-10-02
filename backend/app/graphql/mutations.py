@@ -34,12 +34,8 @@ from app.crud.appointment import (
     create_appointment as crud_create_appointment,
 )
 from app.crud.clinic import get_queue_settings
+from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.crud.patient import soft_delete_patient
-from app.crud.queue_resource_routing import (
-    effective_day_start_number,
-    resource_start_number,
-    tag_routes_to_resource,
-)
 
 # Backward-compatible monkeypatch seam for the registry deactivation regression.
 from app.crud.queue_resource_routing import (
@@ -47,6 +43,10 @@ from app.crud.queue_resource_routing import (
 )
 from app.crud.queue_resource_routing import (
     resolve_tag_resource_locked as _resolve_tag_resource_locked,
+)
+from app.crud.queue_resource_routing import (
+    resource_start_number,
+    tag_routes_to_resource,
 )
 from app.crud.visit import create_visit
 from app.schemas.patient import PatientCreate, PatientUpdate
@@ -1277,8 +1277,11 @@ class Mutation:
                         # стартового номера нового дня (владелец →
                         # клиника-уровень); тег отсутствует → клиника
                         # «default».
-                        start_number=effective_day_start_number(
-                            db, doctor=doctor, queue_tag=None
+                        **daily_queue_creation_snapshot(
+                            db,
+                            doctor=doctor,
+                            queue_tag=None,
+                            settings=queue_settings,
                         ),
                     )
                     db.add(daily_queue)

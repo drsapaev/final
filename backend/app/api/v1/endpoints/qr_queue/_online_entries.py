@@ -1287,10 +1287,25 @@ def _full_update_resolve_target_queue_id(
     from app.services.registrar_doctor_eligibility import (
         assert_doctor_eligible_for_service,
         service_requires_doctor_selection,
+        service_routes_to_resource_queue,
     )
 
     default_queue_id = entry.queue_id
-    if service_requires_doctor_selection(service):
+    # PR #3511 review P1 (round 5): an explicitly pinned service (catalog
+    # flags unset) whose tag does NOT route to the resource axis takes
+    # the DOCTOR branch — ``Service.doctor_id`` is the doctor identity
+    # and the guard below enforces the exact-doctor contract (the pin
+    # used to be silently bypassed here: an unflagged service rode the
+    # resource branch and could land on ANY doctor's queue for its tag).
+    # A pinned service on a resource-routed tag stays on the resource
+    # branch: queue ownership wins, the pin is decorative and the admin
+    # readiness reports the configuration error.
+    pinned_takes_doctor_branch = getattr(
+        service, "doctor_id", None
+    ) is not None and not service_routes_to_resource_queue(
+        db, service, entry.queue.day if entry.queue else None
+    )
+    if service_requires_doctor_selection(service) or pinned_takes_doctor_branch:
         # The request has no doctor selector. Preserve the source queue's
         # doctor; a resource QR entry may still add a non-consultation service
         # assigned to the catalog's default doctor (existing cross-tag flow).
@@ -1996,6 +2011,7 @@ def _full_update_assert_doctor_services(
     from app.services.registrar_doctor_eligibility import (
         assert_doctor_eligible_for_service,
         service_requires_doctor_selection,
+        service_routes_to_resource_queue,
     )
 
     requested_ids = {
@@ -2010,7 +2026,14 @@ def _full_update_assert_doctor_services(
     for item in request.services:
         service_id = int(item["service_id"])
         service = services.get(service_id)
-        if service is None or not service_requires_doctor_selection(service):
+        # PR #3511 review P1 (round 5): the loop's entry condition mirrors
+        # the canonical guard — an explicitly pinned service (catalog
+        # flags unset) is validated too; the pin used to be skipped
+        # entirely here, so a pinned service could ride any entry.
+        if service is None or (
+            not service_requires_doctor_selection(service)
+            and getattr(service, "doctor_id", None) is None
+        ):
             continue
         source_queue = entry.queue
         source_doctor_id = source_queue.specialist_id if source_queue else None
@@ -2035,7 +2058,21 @@ def _full_update_assert_doctor_services(
                     status_code=409,
                     detail=f"Консультацию «{service.name}» нельзя добавить в ресурсную очередь",
                 )
-        doctor_id = source_doctor_id or service.doctor_id
+        # PR #3511 review P1 (round 5): a resource-routed pin must not
+        # fabricate a doctor for the guard — the catalog offers that
+        # service on the resource surface (doctorless), so forcing the
+        # pin here would 409 exactly what the read side offered (a
+        # read/write drift). The SOURCE doctor keeps the fail-closed 409
+        # semantics of resource-routed tags; a doctor-queue pin stays the
+        # fallback identity and the guard enforces the exact-doctor rule.
+        resource_routed = not service.is_consultation and (
+            service_routes_to_resource_queue(
+                db, service, source_queue.day if source_queue else None
+            )
+        )
+        doctor_id = source_doctor_id or (
+            None if resource_routed else getattr(service, "doctor_id", None)
+        )
         selected_doctor = item.get("specialist_id", item.get("doctor_id"))
         if selected_doctor is not None:
             try:

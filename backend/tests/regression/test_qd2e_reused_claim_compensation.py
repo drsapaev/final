@@ -24,6 +24,7 @@ Fix contract (provenance-aware compensation):
 Run:
     pytest backend/tests/regression/test_qd2e_reused_claim_compensation.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -69,7 +70,11 @@ from app.models import (  # noqa: F401  # noqa: F401
     visit,
 )
 from app.models.clinic import Doctor  # noqa: E402
-from app.models.online_queue import DailyQueue, OnlineQueueEntry  # noqa: E402
+from app.models.online_queue import (
+    DailyQueue,
+    OnlineQueueEntry,
+    QueueResource,
+)  # noqa: E402
 from app.models.patient import Patient  # noqa: E402
 from app.models.service import Service  # noqa: E402
 from app.models.user import User  # noqa: E402
@@ -121,8 +126,14 @@ def session_factory(db_engine):
 def clean_db(db_engine):
     with db_engine.connect() as conn:
         for table in [
-            "queue_entries", "visit_services", "visits",
-            "daily_queues", "services", "doctors", "patients", "users",
+            "queue_entries",
+            "visit_services",
+            "visits",
+            "daily_queues",
+            "services",
+            "doctors",
+            "patients",
+            "users",
         ]:
             conn.execute(__import__("sqlalchemy").text(f"DELETE FROM {table}"))
         conn.commit()
@@ -134,9 +145,15 @@ def _prepare_world(setup: object) -> dict:
     both tags — and NO visit yet (the cart creates it)."""
     unique = uuid.uuid4().hex[:8]
     doctor_user = User(
-        username=f"doctor_{unique}", full_name="Dr", email=f"d_{unique}@t.local",
-        hashed_password="x", role="Doctor", is_active=True, is_superuser=False,
-        must_change_password=False, created_at=datetime.now(UTC),
+        username=f"doctor_{unique}",
+        full_name="Dr",
+        email=f"d_{unique}@t.local",
+        hashed_password="x",
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+        must_change_password=False,
+        created_at=datetime.now(UTC),
     )
     setup.add(doctor_user)
     setup.flush()
@@ -144,9 +161,14 @@ def _prepare_world(setup: object) -> dict:
     setup.add(doctor)
     setup.flush()
     patient = Patient(
-        last_name="Тестов", first_name="Пациент", birth_date=date(1990, 1, 1),
-        sex="M", phone="+998900000000", email=f"p_{unique}@t.local",
-        created_at=datetime.now(UTC), is_deleted=False,
+        last_name="Тестов",
+        first_name="Пациент",
+        birth_date=date(1990, 1, 1),
+        sex="M",
+        phone="+998900000000",
+        email=f"p_{unique}@t.local",
+        created_at=datetime.now(UTC),
+        is_deleted=False,
     )
     setup.add(patient)
     setup.flush()
@@ -155,15 +177,56 @@ def _prepare_world(setup: object) -> dict:
     for label in ("a", "b"):
         tag = f"tag_{label}_{unique}"
         tags[label] = tag
-        setup.add(Service(
-            code=f"SVC_{label}_{unique}", name=f"Service {label}", price=10000,
-            duration_minutes=30, active=True, requires_doctor=True,
-            queue_tag=tag, is_consultation=True,
-            allow_doctor_price_override=False,
-        ))
-        setup.add(DailyQueue(
-            day=_DAY, specialist_id=doctor.id, queue_tag=tag, active=True,
-        ))
+        if label == "a":
+            # Workstream A (per-doctor single queue): doctor axis — the
+            # visit's consultation tag; the doctor's ONE queue of the day.
+            setup.add(
+                Service(
+                    code=f"SVC_{label}_{unique}",
+                    name=f"Service {label}",
+                    price=10000,
+                    duration_minutes=30,
+                    active=True,
+                    requires_doctor=True,
+                    queue_tag=tag,
+                    is_consultation=True,
+                    allow_doctor_price_override=False,
+                )
+            )
+            setup.add(
+                DailyQueue(
+                    day=_DAY,
+                    specialist_id=doctor.id,
+                    queue_tag=tag,
+                    active=True,
+                )
+            )
+        else:
+            # Resource axis: the SECOND direction of the cart is a registry
+            # tag — per-tag entry. The regression scenario «first direction
+            # binds the ticket, LATER direction fails» stays live under the
+            # single-doctor-entry contract via the mixed axis.
+            setup.add(
+                Service(
+                    code=f"SVC_{label}_{unique}",
+                    name=f"Service {label}",
+                    price=10000,
+                    duration_minutes=30,
+                    active=True,
+                    requires_doctor=False,
+                    queue_tag=tag,
+                    is_consultation=False,
+                    allow_doctor_price_override=False,
+                )
+            )
+            setup.add(
+                QueueResource(
+                    code=f"RES_{label}_{unique}",
+                    queue_tag=tag,
+                    display_name=f"Resource {label}",
+                    active=True,
+                )
+            )
     setup.flush()
     setup.commit()
     return {
@@ -213,11 +276,16 @@ def _create_cart_visit(session, world: dict) -> Visit:
     committed — mirroring ``/registrar/cart`` (create_visit(commit=False)
     → assign_same_day_queue_numbers → db.commit())."""
     visit = Visit(
-        patient_id=world["patient_id"], doctor_id=world["doctor_id"],
-        status="confirmed", visit_date=_DAY, visit_time="10:00",
-        discount_mode="none", department="general",
+        patient_id=world["patient_id"],
+        doctor_id=world["doctor_id"],
+        status="confirmed",
+        visit_date=_DAY,
+        visit_time="10:00",
+        discount_mode="none",
+        department="general",
         confirmation_token=f"tok-{uuid.uuid4().hex[:8]}",
-        confirmation_channel="desk", confirmed_at=datetime.now(UTC),
+        confirmation_channel="desk",
+        confirmed_at=datetime.now(UTC),
         confirmation_expires_at=datetime.now(UTC),
         created_at=datetime.now(UTC),
     )
@@ -225,17 +293,22 @@ def _create_cart_visit(session, world: dict) -> Visit:
     session.flush()
     for code in world["service_codes"]:
         service = session.query(Service).filter(Service.code == code).one()
-        session.add(VisitService(
-            visit_id=visit.id, service_id=service.id, code=service.code,
-            name=service.name, qty=1, price=service.price, currency="UZS",
-        ))
+        session.add(
+            VisitService(
+                visit_id=visit.id,
+                service_id=service.id,
+                code=service.code,
+                name=service.name,
+                qty=1,
+                price=service.price,
+                currency="UZS",
+            )
+        )
     session.flush()
     return visit
 
 
-def _make_failing_basket(
-    session, world: dict, *, fail_tag: str
-):
+def _make_failing_basket(session, world: dict, *, fail_tag: str):
     """The basket with the review's injected failure: processing of the
     SECOND direction performs a flush (persisting the first direction's
     binding of the pre-existing ticket) and then raises a non-SQL error
@@ -331,9 +404,9 @@ class TestQD2EReusedClaimCompensation:
         cart.close()
 
         proof = session_factory()
-        row = proof.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.id == entry_id
-        ).one()
+        row = (
+            proof.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).one()
+        )
         assert row.id == entry_id
         assert row.number == number
         assert row.queue_time == _PRESERVED_QUEUE_TIME
@@ -378,9 +451,9 @@ class TestQD2EReusedClaimCompensation:
         cart.close()
 
         proof = session_factory()
-        row = proof.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.id == entry_id
-        ).one()
+        row = (
+            proof.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).one()
+        )
         assert row.number == number
         assert row.queue_time == _PRESERVED_QUEUE_TIME
         assert row.patient_id == world["patient_id"]
@@ -458,9 +531,7 @@ class TestQD2EReusedClaimCompensation:
         cart = session_factory()
         visit = _create_cart_visit(cart, world)
         visit_id = visit.id
-        basket = _make_failing_basket_before_flush(
-            cart, world, fail_tag=world["tag_b"]
-        )
+        basket = _make_failing_basket_before_flush(cart, world, fail_tag=world["tag_b"])
 
         queue_numbers = basket.assign_same_day_queue_numbers(
             [visit], target_day=_DAY, source="desk"
@@ -472,9 +543,9 @@ class TestQD2EReusedClaimCompensation:
         cart.close()
 
         proof = session_factory()
-        row = proof.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.id == entry_id
-        ).one()
+        row = (
+            proof.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).one()
+        )
         assert row.id == entry_id
         assert row.number == number
         assert row.queue_time == _PRESERVED_QUEUE_TIME

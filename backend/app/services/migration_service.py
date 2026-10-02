@@ -357,6 +357,8 @@ class MigrationService:
                         if queue.start_number is not None
                         else 1
                     ),
+                    "policy_version": queue.policy_version,
+                    "online_issued_count": int(queue.online_issued_count or 0),
                     "queue_tag": queue.queue_tag,
                     "active": queue.active,
                     "opened_at": (
@@ -472,6 +474,10 @@ class MigrationService:
                         if queue_data.get("start_number") is not None
                         else 1
                     ),
+                    # T06.2: retain the saved queue policy and quota state;
+                    # older backups remain compatible as legacy/zero.
+                    policy_version=queue_data.get("policy_version", "legacy"),
+                    online_issued_count=int(queue_data.get("online_issued_count", 0)),
                     queue_tag=queue_data["queue_tag"],
                     active=queue_data["active"],
                     opened_at=(

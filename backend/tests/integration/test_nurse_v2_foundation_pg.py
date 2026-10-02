@@ -214,8 +214,10 @@ def test_single_alembic_head(head_url):
     assert len(head_lines) == 1, f"multi-head detected: {r.stdout!r}"
     # Main's corrective follow-up moved the head to 0073 (routing
     # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
-    # as 0074 on top of it.
-    assert "0074_join_payload_binding" in head_lines[0]
+    # as 0074 on top of it; #3506 derma history read model moves it to
+    # 0075, its read-order index swap — to 0076; T06.1 adds daily queue
+    # policy persistence at 0077.
+    assert "0077_daily_queue_policy" in head_lines[0]
 
 
 @pytest.mark.integration

@@ -111,6 +111,38 @@ def test_openapi_queue_join_contract_has_request_and_responses(
     assert any(code in operation["responses"] for code in ("200", "201", "400", "422"))
 
 
+def test_openapi_queue_cabinet_response_exposes_typed_owner_fields(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/admin/queues/cabinet-info"]["get"]
+    response_schema = operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["items"]
+    response_name = response_schema["$ref"].rsplit("/", 1)[-1]
+    cabinet_response = schema["components"]["schemas"][response_name]
+
+    assert {
+        "owner_type",
+        "owner_id",
+        "owner_name",
+        "owner_default_cabinet",
+        "queue_resource_id",
+    }.issubset(cabinet_response["required"])
+    assert cabinet_response["properties"]["owner_type"]["enum"] == [
+        "doctor",
+        "resource",
+    ]
+
+    single_operation = schema["paths"]["/api/v1/admin/queues/{queue_id}/cabinet-info"][
+        "get"
+    ]
+    single_response = single_operation["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"]
+    assert single_response["$ref"] == f"#/components/schemas/{response_name}"
+
+
 def test_openapi_doctor_queue_workflow_exposes_canonical_ids(
     client: TestClient,
 ) -> None:

@@ -1,6 +1,6 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Building2,
   CalendarDays,
@@ -15,12 +15,12 @@ import { toast } from 'react-toastify';
 
 import { apiRequest } from '../../api/client';
 import logger from '../../utils/logger';
-import React from "react";
 import {
   Badge,
   Button,
   Card,
   AppEmpty,
+  AppError,
   Input,
   StatCard,
 } from '../ui/macos';
@@ -34,12 +34,12 @@ const INITIAL_FILTERS = {
 
 interface QueueRow {
   day?: string;
-  specialist_name?: string;
-  specialist_id?: string | number;
+  owner_type: 'doctor' | 'resource';
+  owner_id: number;
+  owner_name: string;
+  owner_default_cabinet: string | null;
   queue_tag?: string;
-  effective_cabinet?: string;
   cabinet_number?: string | number;
-  doctor_cabinet?: string | number;
   cabinet_floor?: string | number;
   cabinet_building?: string | number;
   entries_count?: number;
@@ -50,20 +50,11 @@ interface QueueRow {
   integrity_warnings?: string[];
 }
 
-// Local queue-statistics shape for the cabinet-management admin panel. Named
-// `QueueStatsDto` because `QueueStats` is a canonical domain type in
-// @/types/domain/queue.
-interface QueueStatsDto {
-  total_queues?: number;
-  queues_with_cabinet?: number;
-  cabinets?: unknown[];
-}
-
+// Summary values are derived from the same queue rows shown in the table.
 interface StatsSummary {
   totalQueues: number;
   queuesWithCabinet: number;
   uniqueCabinets: number;
-  activeQueues: number;
   totalEntries: number;
 }
 
@@ -93,81 +84,56 @@ const toOptionalString = (value: unknown): string | null => {
   return normalized.length ? normalized : null;
 };
 
-const buildStatsSummary = (
-  stats: QueueStatsDto | null,
-  queues: QueueRow[],
-): StatsSummary => {
+const buildStatsSummary = (queues: QueueRow[]): StatsSummary => {
   const safeQueues = Array.isArray(queues) ? queues : [];
   const cabinets = new Set<string | number>();
   let totalEntries = 0;
-  let activeQueues = 0;
 
   safeQueues.forEach((queue) => {
     if (queue?.cabinet_number) cabinets.add(queue.cabinet_number);
     totalEntries += Number(queue?.entries_count || 0);
-    if (queue?.active) activeQueues += 1;
   });
 
   return {
-    totalQueues: stats?.total_queues ?? safeQueues.length,
-    queuesWithCabinet: stats?.queues_with_cabinet ?? safeQueues.filter((queue) => queue?.cabinet_number).length,
-    uniqueCabinets: stats?.cabinets?.length ?? cabinets.size,
-    activeQueues,
+    totalQueues: safeQueues.length,
+    queuesWithCabinet: safeQueues.filter((queue) => queue?.cabinet_number).length,
+    uniqueCabinets: cabinets.size,
     totalEntries,
   };
 };
 
 const QueueCabinetManagement = () => {
-  const { t: rawT } = useTranslation(); const t = rawT;
+  const { t } = useTranslation();
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(INITIAL_FILTERS);
   const [queues, setQueues] = useState<QueueRow[]>([]);
-  const [statistics, setStatistics] = useState<QueueStatsDto | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const loadRequestSequence = useRef(0);
 
   const loadData = useCallback(async (filterSnapshot = INITIAL_FILTERS) => {
+    const requestSequence = ++loadRequestSequence.current;
     setLoading(true);
+    setLoadError(false);
     try {
       const queueParams = {
         day: filterSnapshot.day || undefined,
         specialist_id: toOptionalNumber(filterSnapshot.specialistId) ?? undefined,
         cabinet_number: toOptionalString(filterSnapshot.cabinetNumber) ?? undefined,
       };
-      const statsParams = {
-        date_from: filterSnapshot.day || undefined,
-        date_to: filterSnapshot.day || undefined,
-      };
-
-      const [queuesResult, statisticsResult] = await Promise.allSettled([
-        apiRequest('GET', '/admin/queues/cabinet-info', { params: queueParams }),
-        apiRequest('GET', '/admin/queues/cabinet-statistics', { params: statsParams }),
-      ]);
-
-      if (queuesResult.status === 'fulfilled') {
-        setQueues(Array.isArray(queuesResult.value) ? (queuesResult.value as QueueRow[]) : []);
-      } else {
-        logger.warn('API /api/v1/admin/queues/cabinet-info недоступен', queuesResult.reason);
-        setQueues([]);
-      }
-
-      if (statisticsResult.status === 'fulfilled') {
-        const payload = (statisticsResult.value || {}) as Record<string, unknown>;
-        setStatistics((payload.statistics || payload) as QueueStatsDto | null);
-      } else {
-        logger.warn(
-          'API /api/v1/admin/queues/cabinet-statistics недоступен',
-          statisticsResult.reason
-        );
-        setStatistics(null);
-      }
-    } catch (error: unknown) {
-      logger.error('Ошибка загрузки информации о кабинетах:', error);
-      toast.error(t('admin2.qcm_load_error'));
+      const result = await apiRequest('GET', '/admin/queues/cabinet-info', {
+        params: queueParams,
+      });
+      if (requestSequence !== loadRequestSequence.current) return;
+      setQueues(Array.isArray(result) ? (result as QueueRow[]) : []);
+    } catch {
+      if (requestSequence !== loadRequestSequence.current) return;
+      logger.warn('API /api/v1/admin/queues/cabinet-info недоступен');
       setQueues([]);
-      setStatistics(null);
+      setLoadError(true);
     } finally {
-      setLoading(false);
+      if (requestSequence === loadRequestSequence.current) setLoading(false);
     }
   }, []);
 
@@ -176,8 +142,8 @@ const QueueCabinetManagement = () => {
   }, [loadData]);
 
   const summary = useMemo(
-    () => buildStatsSummary(statistics, queues),
-    [queues, statistics]
+    () => buildStatsSummary(queues),
+    [queues],
   );
 
   const applyFilters = async () => {
@@ -230,11 +196,7 @@ const QueueCabinetManagement = () => {
   const tableRows = useMemo(
     () =>
       queues.map((queue) => {
-        // QD-2C (Codex round-31 P2): a 0059 bridge keeps its retained
-        // specialist_id while the backend classifies it resource-owned
-        // (sync_status="resource_owned") — classify by that flag, not
-        // by the nullable id, for both presentation decisions.
-        const resourceOwned = queue.sync_status === 'resource_owned';
+        const resourceOwned = queue.owner_type === 'resource';
         return {
           day: (
             <span className="admin-primary-fs-sm">
@@ -249,12 +211,23 @@ const QueueCabinetManagement = () => {
               </div>
               <div>
                 <div className="admin-fw-600-primary">
-                  {queue.specialist_name || t('admin2.qcm_specialist_fallback', { id: queue.specialist_id })}
+                  {queue.owner_name}
                 </div>
                 <div className="admin-fs-xs-tertiary-3">
-                  {resourceOwned
-                    ? t('admin2.qcm_resource_tag_line', { tag: queue.queue_tag || '—' })
-                    : `ID ${queue.specialist_id}`}
+                  {t(
+                    resourceOwned
+                      ? 'admin2.qcm_owner_type_resource'
+                      : 'admin2.qcm_owner_type_doctor',
+                  )}{' '}
+                  #{queue.owner_id}
+                  {resourceOwned ? (
+                    <span>
+                      {' · '}
+                      {t('admin2.qcm_resource_tag_line', {
+                        tag: queue.queue_tag || '—',
+                      })}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -267,13 +240,11 @@ const QueueCabinetManagement = () => {
           cabinet_number: (
             <div>
               <div className="admin-primary-fw-600-1">
-                {queue.effective_cabinet || t('admin2.qcm_not_specified')}
+                {queue.cabinet_number || t('admin2.qcm_not_specified')}
               </div>
-              {resourceOwned ? null : (
-                <div className="admin-fs-xs-tertiary-2">
-                  {t('admin2.qcm_queue_doctor_line', { queue: queue.cabinet_number || '—', doctor: queue.doctor_cabinet || '—' })}
-                </div>
-              )}
+              <div className="admin-fs-xs-tertiary-2">
+                {t('admin2.qcm_owner_default_cabinet')}: {queue.owner_default_cabinet || '—'}
+              </div>
             </div>
           ),
           cabinet_floor: (
@@ -300,7 +271,7 @@ const QueueCabinetManagement = () => {
           ),
           sync_state: (
             <div className="admin-d-flex-fd-column-gap-6">
-              {queue.sync_status === 'resource_owned' ? (
+              {resourceOwned ? (
                 <>
                   <Badge variant="success">
                     {t('admin2.qcm_sync_state_resource')}
@@ -311,7 +282,7 @@ const QueueCabinetManagement = () => {
                     </Badge>
                   </div>
                   <div className="admin-fs-xs-tertiary-1">
-                    {t('admin2.qcm_resource_hint')}
+                    {t('admin2.qcm_snapshot_hint')}
                   </div>
                 </>
               ) : (
@@ -320,15 +291,15 @@ const QueueCabinetManagement = () => {
                     variant={
                       queue.sync_status === 'synced'
                         ? 'success'
-                        : queue.sync_status === 'stale'
-                          ? 'warning'
-                          : 'secondary'
+                        : queue.sync_status === 'default_differs'
+                          ? 'secondary'
+                          : 'warning'
                     }
                   >
                     {queue.sync_status === 'synced'
                       ? t('admin2.qcm_sync_state_synced')
-                      : queue.sync_status === 'stale'
-                        ? t('admin2.qcm_sync_state_stale')
+                      : queue.sync_status === 'default_differs'
+                        ? t('admin2.qcm_sync_state_default_differs')
                         : queue.sync_status === 'missing_doctor'
                           ? t('admin2.qcm_sync_state_missing_doctor')
                           : t('admin2.qcm_sync_state_missing_cabinet')}
@@ -348,7 +319,7 @@ const QueueCabinetManagement = () => {
                     </Badge>
                   </div>
                   <div className="admin-fs-xs-tertiary-1">
-                    {t('admin2.qcm_canonical_hint')}
+                    {t('admin2.qcm_snapshot_hint')}
                   </div>
                 </>
               )}
@@ -361,7 +332,7 @@ const QueueCabinetManagement = () => {
           ),
         };
       }),
-    [queues]
+    [queues, t],
   );
 
   return (
@@ -400,37 +371,38 @@ const QueueCabinetManagement = () => {
             </div>
           </div>
 
-          <div
-            className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-mb-24">
-            <StatCard
-              title={t('admin2.qcm_stat_queues')}
-              value={summary.totalQueues}
-              icon={CalendarDays}
-              color="blue"
-              loading={loading}
-            />
-            <StatCard
-              title={t('admin2.qcm_stat_with_cabinet')}
-              value={summary.queuesWithCabinet}
-              icon={MapPin}
-              color="green"
-              loading={loading}
-            />
-            <StatCard
-              title={t('admin2.qcm_stat_cabinets')}
-              value={summary.uniqueCabinets}
-              icon={Building2}
-              color="purple"
-              loading={loading}
-            />
-            <StatCard
-              title={t('admin2.qcm_stat_entries')}
-              value={summary.totalEntries}
-              icon={Users}
-              color="orange"
-              loading={loading}
-            />
-          </div>
+          {!loadError ? (
+            <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-mb-24">
+              <StatCard
+                title={t('admin2.qcm_stat_queues')}
+                value={summary.totalQueues}
+                icon={CalendarDays}
+                color="blue"
+                loading={loading}
+              />
+              <StatCard
+                title={t('admin2.qcm_stat_with_cabinet')}
+                value={summary.queuesWithCabinet}
+                icon={MapPin}
+                color="green"
+                loading={loading}
+              />
+              <StatCard
+                title={t('admin2.qcm_stat_cabinets')}
+                value={summary.uniqueCabinets}
+                icon={Building2}
+                color="purple"
+                loading={loading}
+              />
+              <StatCard
+                title={t('admin2.qcm_stat_entries')}
+                value={summary.totalEntries}
+                icon={Users}
+                color="orange"
+                loading={loading}
+              />
+            </div>
+          ) : null}
 
           <Card
             className="admin-p-20-mb-24-bgc-bg-secondary">
@@ -450,6 +422,9 @@ const QueueCabinetManagement = () => {
                     setFilters((current) => ({ ...current, day: event.target.value }))
                   }
                 />
+                <p className="admin-fs-xs-tertiary-1">
+                  {t('admin2.qcm_clinic_day_hint')}
+                </p>
               </div>
 
               <div>
@@ -503,7 +478,20 @@ const QueueCabinetManagement = () => {
             </div>
           </Card>
 
-          {!loading && queues.length === 0 ? (
+          {!loading && loadError ? (
+            <AppError
+              title={t('admin2.qcm_load_error')}
+              description={t('admin2.qcm_load_error_description')}
+              action={
+                <Button
+                  onClick={() => loadData(appliedFilters)}
+                  className="admin-d-inline-flex-ai-center-gap-8">
+                  <RefreshCw className="w-4 h-4" />
+                  {t('admin2.qcm_retry_load')}
+                </Button>
+              }
+            />
+          ) : !loading && queues.length === 0 ? (
             <AppEmpty
               icon={Building2}
               title={t('admin2.qcm_empty_title')}
@@ -521,7 +509,7 @@ const QueueCabinetManagement = () => {
             <DataTable
               columns={[
                 { key: 'day', title: t('admin2.col_day'), sortable: false },
-                { key: 'specialist_name', title: t('admin2.col_specialist'), sortable: false },
+                { key: 'specialist_name', title: t('admin2.qcm_owner'), sortable: false },
                 { key: 'queue_tag', title: t('admin2.col_tag'), sortable: false },
                 { key: 'cabinet_number', title: t('admin2.col_cabinet'), sortable: false },
                 { key: 'cabinet_floor', title: t('admin2.col_floor'), sortable: false },

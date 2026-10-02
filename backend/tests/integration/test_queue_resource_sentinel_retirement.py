@@ -1065,19 +1065,18 @@ def test_alembic_chain_single_head_0069() -> None:
     heads = sorted(revision for revision in graph if revision not in referenced)
     # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved to
     # 0072 (workplace assignments 0071 + service executions 0072).
-    assert graph["0071_nurse_workplace_assignments"] == (
-        "0070_lab_results_lineage",
-    )
-    assert graph["0072_service_executions"] == (
-        "0071_nurse_workplace_assignments",
-    )
+    assert graph["0071_nurse_workplace_assignments"] == ("0070_lab_results_lineage",)
+    assert graph["0072_service_executions"] == ("0071_nurse_workplace_assignments",)
     # Main's corrective follow-up moved the head to 0073 (routing
     # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
     # as 0074 on top of it.
-    assert graph["0073_execution_routing_snapshot"] == (
-        "0072_service_executions",
-    )
-    assert heads == ["0074_join_payload_binding"]
+    assert graph["0073_execution_routing_snapshot"] == ("0072_service_executions",)
+    # derma history read model (issue #3506, P2 retro-review of #3494)
+    # moves the head to 0075; its read-order index swap moves it to 0076.
+    assert graph["0075_derma_history_read_model"] == ("0074_join_payload_binding",)
+    assert graph["0076_derma_history_read_order"] == ("0075_derma_history_read_model",)
+    assert graph["0077_daily_queue_policy"] == ("0076_derma_history_read_order",)
+    assert heads == ["0077_daily_queue_policy"]
 
 
 # ===================== C. PostgreSQL FK introspection =====================
@@ -1553,10 +1552,13 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
             [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
             capture_output=True,
             text=True,
-            cwd=str(next(
-                p for p in Path(__file__).resolve().parents
-                if (p / "alembic.ini").is_file()
-            )),
+            cwd=str(
+                next(
+                    p
+                    for p in Path(__file__).resolve().parents
+                    if (p / "alembic.ini").is_file()
+                )
+            ),
             env=env,
             timeout=600,
         )
@@ -1571,11 +1573,13 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar()
                 # The chain grew past the retirement (0070 lineage; now
-                # NURSE-V2 0071/0072, main's 0073 routing snapshot and the
-                # round-8 0074 payload binding); the retirement end-state
-                # (no synthetic usernames/doctors) is a head-agnostic
-                # invariant.
-                assert version == "0074_join_payload_binding"
+                # NURSE-V2 0071/0072, main's 0073 routing snapshot, the
+                # round-8 0074 payload binding, the #3506 0075 derma
+                # history read model and its 0076 read-order index swap,
+                # followed by 0077 daily queue policy persistence);
+                # the retirement end-state (no synthetic usernames/doctors)
+                # is a head-agnostic invariant.
+                assert version == "0077_daily_queue_policy"
 
                 usernames = {
                     row[0]
@@ -1860,9 +1864,9 @@ def test_pg_introspection_aborts_on_a_foreign_source_cascade(
             rows = conn.execute(module._SELECT_FK_SURFACES).fetchall()
             conn.rollback()
             foreign_rows = [row for row in rows if row.src_schema == foreign]
-            assert {
-                (row.table_name, row.column_name) for row in foreign_rows
-            } == {("audit_rows", "user_id")}
+            assert {(row.table_name, row.column_name) for row in foreign_rows} == {
+                ("audit_rows", "user_id")
+            }
             assert foreign_rows[0].ref_table == "users"
             assert foreign_rows[0].delete_rule == "CASCADE"
 
@@ -1960,8 +1964,7 @@ def test_pg_allowlist_does_not_inherit_across_schemas(
         with engine.begin() as conn:
             conn.execute(
                 sa.text(
-                    f'INSERT INTO "{foreign}".login_attempts (user_id)'
-                    " VALUES (:u)"
+                    f'INSERT INTO "{foreign}".login_attempts (user_id)' " VALUES (:u)"
                 ),
                 {"u": pairs["general_resource"][0]},
             )
@@ -2058,8 +2061,7 @@ def test_pg_foreign_surface_on_non_pair_rows_does_not_false_abort(
             assert int(child_rows) == 1
             (linked,) = conn.execute(
                 sa.text(
-                    f'SELECT COUNT(*) FROM "{foreign}".audit_rows'
-                    " WHERE user_id = :u"
+                    f'SELECT COUNT(*) FROM "{foreign}".audit_rows' " WHERE user_id = :u"
                 ),
                 {"u": int(real_user_id)},
             ).fetchone()
@@ -2126,9 +2128,9 @@ def test_pg_introspection_aborts_on_fk_to_doctors_alternate_key(
             rows = conn.execute(module._SELECT_FK_SURFACES).fetchall()
             conn.rollback()
             foreign_rows = [row for row in rows if row.src_schema == foreign]
-            assert {
-                (row.table_name, row.column_name) for row in foreign_rows
-            } == {("audit", "doctor_user_id")}
+            assert {(row.table_name, row.column_name) for row in foreign_rows} == {
+                ("audit", "doctor_user_id")
+            }
             assert foreign_rows[0].ref_table == "doctors"
             assert foreign_rows[0].ref_column == "user_id"
             assert foreign_rows[0].delete_rule == "CASCADE"
@@ -2164,8 +2166,7 @@ def test_pg_introspection_aborts_on_fk_to_doctors_alternate_key(
             # (the alternate-key value) — invisible to an id-valued count.
             conn.execute(
                 sa.text(
-                    f'INSERT INTO "{foreign}".audit (doctor_user_id)'
-                    " VALUES (:u)"
+                    f'INSERT INTO "{foreign}".audit (doctor_user_id)' " VALUES (:u)"
                 ),
                 {"u": pairs["ecg_resource"][0]},
             )

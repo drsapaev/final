@@ -16,9 +16,8 @@ the legacy refusal; a blanket backfill would have silently legalized
 exactly those rows).
 
 Proven on real PostgreSQL: the scratch database is upgraded to 0072,
-pre-0073 rows are seeded RAW (the ORM model at HEAD carries the snapshot
-columns the 0072 schema does not have), then 0073 runs and the backfill
-outcome is pinned:
+pre-0073 queue/execution rows are seeded RAW (the ORM model at HEAD carries
+columns added after 0072), then 0073 runs and the backfill outcome is pinned:
 
 - R1  in_progress, owner-axis chain, catalog corroborates -> BACKFILLED;
 - R2  in_progress, tag-axis chain (queue without an owner resource),
@@ -48,7 +47,7 @@ import os
 import subprocess
 import sys
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import psycopg
@@ -58,7 +57,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
+from app.models.online_queue import OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -206,7 +205,9 @@ def _seed_pre_0073_world(engine) -> dict:
     # ownerless queue since 0063) that still carries the station's tag —
     # the exact shape whose chain resolves through the runtime's tag
     # axis fallback (``_execution_station_resource``).
-    doctor = Doctor(specialty="tag_n23_bf", start_number_online=1, max_online_per_day=15)
+    doctor = Doctor(
+        specialty="tag_n23_bf", start_number_online=1, max_online_per_day=15
+    )
     resource = QueueResource(
         code="n23_bf_procedures",
         queue_tag="tag_n23_bf",
@@ -221,28 +222,37 @@ def _seed_pre_0073_world(engine) -> dict:
     for row in (nurse, patient, resource, doctor):
         session.refresh(row)
 
-    owner_queue = DailyQueue(
-        day=date.today(),
-        specialist_id=None,
-        queue_resource_id=resource.id,
-        queue_tag=resource.queue_tag,
-        active=True,
-        cabinet_number="c1",
-        start_number=1,
+    # This fixture intentionally remains at migration 0072. The current
+    # DailyQueue ORM includes fields added by 0073 and 0077, so seed the
+    # pre-0073 queues through their historical column shape.
+    queue_columns = (
+        "INSERT INTO daily_queues "
+        "(day, specialist_id, queue_resource_id, queue_tag, active, "
+        "cabinet_number, online_start_time, online_end_time, "
+        "max_online_entries, start_number) "
+        "VALUES (:day, :specialist_id, :resource_id, :queue_tag, true, "
+        "'c1', '07:00', '09:00', 15, 1) RETURNING id"
     )
-    tag_axis_queue = DailyQueue(
-        day=date.today(),
-        specialist_id=doctor.id,  # bridged: doctor axis + the station tag
-        queue_resource_id=None,
-        queue_tag=resource.queue_tag,
-        active=True,
-        cabinet_number="c1",
-        start_number=1,
-    )
-    session.add_all([owner_queue, tag_axis_queue])
+    today = date.today()
+    owner_queue_id = session.execute(
+        text(queue_columns),
+        {
+            "day": today,
+            "specialist_id": None,
+            "resource_id": resource.id,
+            "queue_tag": resource.queue_tag,
+        },
+    ).scalar_one()
+    tag_axis_queue_id = session.execute(
+        text(queue_columns),
+        {
+            "day": today,
+            "specialist_id": doctor.id,
+            "resource_id": None,
+            "queue_tag": resource.queue_tag,
+        },
+    ).scalar_one()
     session.commit()
-    for row in (owner_queue, tag_axis_queue):
-        session.refresh(row)
 
     visit = Visit(
         patient_id=patient.id,
@@ -306,7 +316,7 @@ def _seed_pre_0073_world(engine) -> dict:
         session.refresh(row)
 
     entry_owner = OnlineQueueEntry(
-        queue_id=owner_queue.id,
+        queue_id=owner_queue_id,
         number=1,
         patient_id=patient.id,
         patient_name="Backfill",
@@ -316,7 +326,7 @@ def _seed_pre_0073_world(engine) -> dict:
         visit_id=visit.id,
     )
     entry_tag_axis = OnlineQueueEntry(
-        queue_id=tag_axis_queue.id,
+        queue_id=tag_axis_queue_id,
         number=2,
         patient_id=patient.id,
         patient_name="Backfill",
@@ -326,7 +336,7 @@ def _seed_pre_0073_world(engine) -> dict:
         visit_id=visit.id,
     )
     entry_retagged = OnlineQueueEntry(
-        queue_id=owner_queue.id,
+        queue_id=owner_queue_id,
         number=3,
         patient_id=patient.id,
         patient_name="Backfill",
@@ -355,7 +365,7 @@ def _seed_pre_0073_world(engine) -> dict:
     }
     session.close()
 
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     raw_rows = [
         # (visit_service_id, queue_entry_id, attempt_no, status)
         (ids["vs_routed_id"], ids["entry_owner_id"], 1, "in_progress"),

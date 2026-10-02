@@ -12,8 +12,8 @@ from sqlalchemy.exc import IntegrityError
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import expand_queue_tags
 from app.crud import queue_resource_routing
+from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.crud.queue_resource_routing import (
-    effective_day_start_number,
     lock_queue_tag_claim_scope,  # Round-6 (P1-2): canonical batch pre-lock
 )
 from app.models.online_queue import QueueResource
@@ -28,6 +28,7 @@ from app.services.queue_claim_service import (
 )
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase, _now
+from app.services.queue_svc._core import queue_settings_command
 from app.services.user_mgmt._base import (
     INCOMPLETE_DOCTOR_SPECIALTY,
     is_doctor_profile_incomplete,
@@ -95,7 +96,7 @@ def _unbookable_doctor_ids(
             .group_by(OnlineQueueEntry.queue_id)
             .all()
         )
-        active_counts = {queue_id: count for queue_id, count in count_rows}
+        active_counts = dict(count_rows)
 
     for queue in queues:
         if queue.specialist_id in unbookable:
@@ -439,6 +440,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
     # ----- Новые SSOT-функции (будут внедряться в следующих подэтапах) -----
 
 
+    @queue_settings_command
     def get_or_create_daily_queue(
         self,
         db: Session,
@@ -527,8 +529,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     # RQ-13.b (D-06, E-039): снимок применённого стартового
                     # номера реестра — дальнейшие изменения живой строки
                     # реестра не сдвигают базовую линию действующего дня.
-                    start_number=effective_day_start_number(
-                        db, resource=resource, queue_tag=queue_tag
+                    **daily_queue_creation_snapshot(
+                        db,
+                        resource=resource,
+                        queue_tag=queue_tag,
+                        settings=queue_settings,
                     ),
                     # Codex round-7 P1: кабинет ОБЩЕЙ очереди тега — из
                     # реестра (default_cabinet; сиды 0059 держат NULL —
@@ -625,6 +630,35 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if daily_queue:
             return daily_queue
 
+        # Per-doctor single-queue contract (PR-26 text made effective): a
+        # doctor owns ONE active queue per day. The exact-tag lookup above
+        # misses when another writer (wizard cart, online join, batch)
+        # already opened this doctor's queue under a different tag
+        # spelling ("cardio" vs "cardiology", "dermatology" vs
+        # "procedures"). Reusing the doctor's existing active queue of
+        # the day keeps the owner axis singular instead of forking
+        # parallel tag queues for one doctor — two queues meant two
+        # numbering sequences and the same patient holding two numbers
+        # in one doctor's worklist. The existing row's queue_tag stays
+        # the routing/display metadata of the first writer and does NOT
+        # override per-doctor ownership. Pre-existing parallel queues
+        # keep their committed entries; only NEW resolutions converge.
+        # The advisory lock above serializes (day, specialist) creators,
+        # so this read cannot race a concurrent doctor-queue insert.
+        if queue_tag:
+            doctor_day_queue = (
+                db.query(DailyQueue)
+                .filter(
+                    DailyQueue.day == day,
+                    DailyQueue.specialist_id == actual_specialist_id,
+                    DailyQueue.active == True,
+                )
+                .order_by(DailyQueue.id.asc())
+                .first()
+            )
+            if doctor_day_queue is not None:
+                return doctor_day_queue
+
         # Fallback: if no queue exists for this specific doctor on this day,
         # check if there's an active queue for the same queue_tag+day that
         # belongs to a DIFFERENT doctor (legacy shared-queue scenario).
@@ -645,8 +679,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             max_online_entries=defaults.get("max_online_entries"),
             # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
             # дня (владелец → клиника) — живые настройки не сдвигают день.
-            start_number=effective_day_start_number(
-                db, doctor=doctor, queue_tag=queue_tag
+            **daily_queue_creation_snapshot(
+                db,
+                doctor=doctor,
+                queue_tag=queue_tag,
+                settings=settings,
             ),
             cabinet_number=defaults.get("cabinet_number"),
             cabinet_floor=defaults.get("cabinet_floor"),
@@ -685,6 +722,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             raise
 
 
+    @queue_settings_command
     def get_next_queue_number(
         self,
         db: Session,
@@ -764,6 +802,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         return self.calculate_next_number(db, daily_queue)
 
 
+    @queue_settings_command
     def assign_queue_token(
         self,
         db: Session,
@@ -911,6 +950,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         return token_value, metadata
 
 
+    @queue_settings_command
     def validate_queue_token(
         self, db: Session, token: str
     ) -> tuple[QueueToken, dict[str, Any]]:
@@ -1056,7 +1096,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             # look loaded.
             load_query = load_query.filter(DailyQueue.queue_tag == queue_tag)
         load_rows = load_query.group_by(DailyQueue.specialist_id).all()
-        active_loads = {specialist_id: count for specialist_id, count in load_rows}
+        active_loads = dict(load_rows)
 
         # Codex round-1 P1: rank BOOKABLE doctors first (see docstring).
         unbookable_ids = _unbookable_doctor_ids(db, doctors, day, queue_tag)
@@ -1191,6 +1231,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
     # inside the allocations below stays free.
     # ------------------------------------------------------------------
 
+    @queue_settings_command
     def resolve_join_batch_tag_targets(
         self,
         db: Session,
@@ -1295,6 +1336,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 continue
         return targets
 
+    @queue_settings_command
     def prelock_join_batch_tag_scopes(
         self,
         db: Session,
@@ -1325,6 +1367,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         for queue_tag in sorted(set(lock_targets.values())):
             lock_queue_tag_claim_scope(db, queue_tag, resolved_day)
 
+    @queue_settings_command
     def join_queue_with_token(
         self,
         db: Session,
@@ -1869,6 +1912,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         }
 
 
+    @queue_settings_command
     def create_queue_entry(
         self,
         db: Session,
@@ -1968,5 +2012,3 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             db.flush()
 
         return entry
-
-

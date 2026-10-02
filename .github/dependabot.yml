@@ -1,4 +1,5 @@
 version: 2
+# 2026-09-28: config touch = immediate update run (documented trigger).
 updates:
   # Python зависимости (backend)
   # P-009 cleanup: groups minor/patch into one PR, limits to 5 open PRs,

@@ -44,6 +44,31 @@
   margin-bottom: var(--mac-spacing-3, 12px);
 }
 
+/* Workstream A (Task 3): instruction block for pinned services whose
+   assigned doctor is missing/inactive or fails specialty eligibility. */
+.cart-step-v2__assignment-gaps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-1, 4px);
+  border: 1px solid var(--mac-border, currentColor);
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-bg-secondary, transparent);
+  padding: var(--mac-spacing-3, 12px);
+  margin-bottom: var(--mac-spacing-3, 12px);
+}
+
+.cart-step-v2__assignment-gaps ul {
+  margin: 0;
+  padding-left: var(--mac-spacing-4, 16px);
+  color: var(--mac-text-primary, currentColor);
+  font-size: var(--mac-font-size-sm, 12px);
+}
+
+.cart-step-v2__assignment-gaps strong {
+  color: var(--mac-text-primary, currentColor);
+  font-size: var(--mac-font-size-sm, 12px);
+}
+
 .cart-step-v2__doctor-card {
   min-width: 0;
   border: 1px solid var(--mac-border, currentColor);

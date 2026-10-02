@@ -18,9 +18,30 @@ from app.services.user_mgmt._base import is_doctor_profile_incomplete
 # Existing queue specialty vocabulary, shared with doctor integration. Keep
 # these aliases together so registrar catalog and command gates cannot drift.
 DOCTOR_QUEUE_SPECIALTY_VARIANTS: dict[str, list[str]] = {
-    "cardiology": ["cardiology", "cardio", "Cardiologist", "Cardio", "cardiology_common", "Кардиология"],
-    "cardio": ["cardiology", "cardio", "Cardiologist", "Cardio", "cardiology_common", "Кардиология"],
-    "cardiology_common": ["cardiology", "cardio", "Cardiologist", "Cardio", "cardiology_common", "Кардиология"],
+    "cardiology": [
+        "cardiology",
+        "cardio",
+        "Cardiologist",
+        "Cardio",
+        "cardiology_common",
+        "Кардиология",
+    ],
+    "cardio": [
+        "cardiology",
+        "cardio",
+        "Cardiologist",
+        "Cardio",
+        "cardiology_common",
+        "Кардиология",
+    ],
+    "cardiology_common": [
+        "cardiology",
+        "cardio",
+        "Cardiologist",
+        "Cardio",
+        "cardiology_common",
+        "Кардиология",
+    ],
     "derma": ["derma", "dermatology", "Dermatologist"],
     "dermatology": ["derma", "dermatology", "Dermatologist"],
     "dentist": ["dentist", "dental", "dentistry", "Dentist", "stomatology"],
@@ -60,6 +81,25 @@ def service_requires_doctor_selection(service: Service) -> bool:
     and :func:`doctor_selection_required_for_surface`.
     """
     return bool(service.requires_doctor or service.is_consultation)
+
+
+def service_has_explicit_doctor_assignment(service: Service) -> bool:
+    """PR #3511 review P1 (round 5): is the service PINNED to one doctor?
+
+    An administrator can pin a service to a concrete clinician via
+    ``Service.doctor_id`` WITHOUT the ``requires_doctor``/
+    ``is_consultation`` flags (the admin catalog saves them
+    independently). The pin is a RESTRICTION of its own: the service is
+    bookable only with that exact doctor on every registrar surface.
+    Callers must therefore treat ``flagged OR pinned`` as "the doctor
+    contract applies" — the historical early-exit on the raw flags
+    bypassed the pin entirely (booking to any other doctor passed).
+
+    Duck-typed on purpose (``getattr``): surface tests pass lightweight
+    namespace objects without ORM attributes; a missing attribute means
+    "no explicit assignment" — the previous semantics.
+    """
+    return getattr(service, "doctor_id", None) is not None
 
 
 def service_routes_to_resource_queue(
@@ -169,8 +209,17 @@ def doctor_selection_required_for_surface(
       selection stays required and doctor booking is unavailable: the
       misconfiguration fails closed instead of silently booking a
       clinician consult into a staff-served resource queue.
+    - **pinned without flags** (PR #3511 review P1, round 5):
+      ``Service.doctor_id`` set while ``requires_doctor``/
+      ``is_consultation`` are unset. A doctor-queue tag keeps the DOCTOR
+      surface: selection is required and the wizard pins the service to
+      the assigned doctor's card only. A resource-routed tag stays on the
+      RESOURCE surface (queue ownership wins, the pin is decorative and
+      the admin readiness flags it as a configuration error).
     """
-    if not service_requires_doctor_selection(service):
+    if not service_requires_doctor_selection(service) and not (
+        service_has_explicit_doctor_assignment(service)
+    ):
         return False
     if service.is_consultation:
         return True
@@ -190,8 +239,18 @@ def doctor_booking_unavailable_reason(
     the resource axis is not doctor-bookable either (the runtime owner is
     the resource, a doctor_id would be decorative). The tag set is the
     date-aware routing truth (``resource_routed_tags_for_day``).
+
+    PR #3511 review P1 (round 5): an explicitly pinned service
+    (``Service.doctor_id``) participates in the same rule even without
+    the catalog flags — pinned to a resource-routed tag it is exactly the
+    "requires_doctor + resource axis" shape (the runtime owner is the
+    resource), so the reason is ``resource_queue``; pinned to a
+    doctor-queue tag the service IS doctor-bookable (with its own doctor
+    only) and the reason stays ``None``.
     """
-    if not service_requires_doctor_selection(service):
+    if not service_requires_doctor_selection(service) and not (
+        service_has_explicit_doctor_assignment(service)
+    ):
         return None
     if not service.queue_tag:
         return "missing_queue_tag" if service.is_consultation else None
@@ -224,8 +283,32 @@ def assert_doctor_eligible_for_service(
     doctor_map: dict[int, Doctor] | None = None,
     target_date: date | None = None,
 ) -> None:
-    """Validate a doctor-required service before any registrar write."""
-    if not service_requires_doctor_selection(service):
+    """Validate a doctor-required service before any registrar write.
+
+    Explicit assignment rule (registrar doctor-services plan): when an
+    administrator pins a service to a concrete doctor
+    (``Service.doctor_id``), the booking MUST use exactly that doctor.
+    The rule is enforced on every write surface that calls this guard
+    (registrar cart save, edit-delta quote/apply, QR full-update) so
+    the read-side card filter and the write-side decision cannot drift.
+    Specialty eligibility stays in force for the pinned doctor too —
+    a pin is an additional restriction, never a cross-specialty
+    exception (fail-closed instead of silently booking a cardiologist
+    service to a dentist).
+
+    PR #3511 review P1 (round 5): the explicit-assignment rule applies
+    EVEN WHEN the catalog flags are unset. ``doctor_id задан,
+    requires_doctor=false`` must not fall through the early exit below
+    the way it used to — the pin was silently bypassed and the service
+    booked to any doctor (or none) without the exact-doctor check.
+    Queue ownership keeps its priority: a pinned service whose tag
+    routes to the resource axis stays on the resource surface (the pin
+    is decorative, the admin readiness reports the configuration
+    error), and supplying a doctor for it still fails closed with 409.
+    """
+    if not service_requires_doctor_selection(service) and not (
+        service_has_explicit_doctor_assignment(service)
+    ):
         return
     # PR #3438 review P1-1: queue ownership decides the doctor surface.
     # A non-consultation doctor-selection service whose queue_tag routes
@@ -253,6 +336,23 @@ def assert_doctor_eligible_for_service(
             detail=(
                 f"Услуга «{service.name}» требует выбора врача: "
                 "сохранение визита без врача недоступно"
+            ),
+        )
+    # Explicit assignment: a pinned service is bookable only with its own
+    # doctor. The mismatch is detectable without a DB round-trip and is
+    # more specific than a missing/inactive-doctor error, so it comes
+    # first. The exact-doctor contract is shared with the read side
+    # (registrar catalog emits doctor_id; the wizard card filter pins the
+    # service to that doctor's card only). getattr — duck-typed сервисы
+    # в тестах поверхностей без ORM-атрибутов: отсутствие поля значит
+    # «явного назначения нет», прежняя семантика.
+    service_doctor_id = getattr(service, "doctor_id", None)
+    if service_doctor_id is not None and int(service_doctor_id) != int(doctor_id):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Услуга «{service.name}» назначена другому врачу "
+                f"(ID {service_doctor_id}): запись возможна только к нему"
             ),
         )
     doctor = (

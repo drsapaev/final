@@ -12,6 +12,7 @@ Covers:
 - migration 0049: real upgrade() rewrites doctors, profile tags and
   specialty-keyed clinic_settings values; downgrade is a no-op.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -137,9 +138,7 @@ def test_get_doctors_by_specialty_matches_all_family_spellings(db_session) -> No
 
 
 def test_get_doctors_by_specialty_eligible_only_still_hides_general(db_session) -> None:
-    crud_clinic.create_doctor(
-        db_session, DoctorCreate(specialty="dental", active=True)
-    )
+    crud_clinic.create_doctor(db_session, DoctorCreate(specialty="dental", active=True))
     db_session.add(Doctor(specialty="general", active=True))
     db_session.commit()
 
@@ -213,9 +212,7 @@ def test_clinic_wide_join_finds_canonical_dentistry_doctor(
 
 def _load_migration():
     path = (
-        Path(__file__)
-        .resolve()
-        .parents[2]
+        Path(__file__).resolve().parents[2]
         / "alembic"
         / "versions"
         / "0049_dental_specialty_canonical.py"
@@ -347,10 +344,13 @@ def test_migration_0049_rewrites_doctors_profiles_and_settings(tmp_path) -> None
             ).scalar()
 
         def _exists(key: str) -> bool:
-            return con.execute(
-                sa.text("SELECT COUNT(*) FROM clinic_settings WHERE key=:k"),
-                {"k": key},
-            ).scalar_one() > 0
+            return (
+                con.execute(
+                    sa.text("SELECT COUNT(*) FROM clinic_settings WHERE key=:k"),
+                    {"k": key},
+                ).scalar_one()
+                > 0
+            )
 
         # merge semantics: max(12 stomatology, 20 canonical) -> 20
         assert int(_scalar_one("max_per_day_dentistry")) == 20
@@ -362,7 +362,9 @@ def test_migration_0049_rewrites_doctors_profiles_and_settings(tmp_path) -> None
         assert not _exists("start_number_Dental")
         assert not _exists("start_number_dental")
         row_cat = con.execute(
-            sa.text("SELECT category FROM clinic_settings WHERE key='start_number_dentistry'")
+            sa.text(
+                "SELECT category FROM clinic_settings WHERE key='start_number_dentistry'"
+            )
         ).scalar()
         assert row_cat == "queue"
         # non-dental untouched
@@ -397,10 +399,14 @@ def test_migration_0049_dental_only_limits_are_not_lost(tmp_path) -> None:
         module.upgrade()
 
         mx = con.execute(
-            sa.text("SELECT value FROM clinic_settings WHERE key='max_per_day_dentistry'")
+            sa.text(
+                "SELECT value FROM clinic_settings WHERE key='max_per_day_dentistry'"
+            )
         ).scalar()
         sn = con.execute(
-            sa.text("SELECT value FROM clinic_settings WHERE key='start_number_dentistry'")
+            sa.text(
+                "SELECT value FROM clinic_settings WHERE key='start_number_dentistry'"
+            )
         ).scalar()
         assert int(mx) == 12
         assert int(sn) == 7
@@ -410,7 +416,9 @@ def test_migration_0049_dental_only_limits_are_not_lost(tmp_path) -> None:
         }
         assert not any(k.endswith("_stomatology") for k in keys)
         cat = con.execute(
-            sa.text("SELECT category FROM clinic_settings WHERE key='max_per_day_dentistry'")
+            sa.text(
+                "SELECT category FROM clinic_settings WHERE key='max_per_day_dentistry'"
+            )
         ).scalar()
         assert cat == "queue"
     finally:
@@ -444,9 +452,7 @@ def test_migration_0049_rewrites_case_variants_of_canonical(tmp_path) -> None:
         assert stored == {"dentistry", "cardiology"}
         # every family row is stored EXACTLY canonical
         exact = con.execute(
-            sa.text(
-                "SELECT COUNT(*) FROM doctors WHERE specialty = 'dentistry'"
-            )
+            sa.text("SELECT COUNT(*) FROM doctors WHERE specialty = 'dentistry'")
         ).scalar_one()
         assert exact == 4
 
@@ -472,14 +478,11 @@ def test_migration_0049_postcondition_rejects_legacy_spellings(tmp_path) -> None
         for bad in ("stomatology", "dental", "dentist", "Dentistry", " dentistry "):
             _seed(
                 con,
-                "INSERT INTO doctors (user_id, specialty) VALUES "
-                f"(NULL, '{bad}')",
+                "INSERT INTO doctors (user_id, specialty) VALUES " f"(NULL, '{bad}')",
             )
             with pytest.raises(RuntimeError, match="postcondition failed"):
                 module._assert_exact_canonical_family_rows(con)
-            con.execute(
-                sa.text("DELETE FROM doctors WHERE specialty = :s"), {"s": bad}
-            )
+            con.execute(sa.text("DELETE FROM doctors WHERE specialty = :s"), {"s": bad})
             con.commit()
     finally:
         con.close()
@@ -583,9 +586,7 @@ def test_get_queue_settings_exposes_canonical_keys(db_session) -> None:
 
     db_session.add_all(
         [
-            ClinicSettings(
-                key="max_per_day_stomatology", value=12, category="queue"
-            ),
+            ClinicSettings(key="max_per_day_stomatology", value=12, category="queue"),
             ClinicSettings(key="start_number_Dental", value=4, category="queue"),
         ]
     )
@@ -666,7 +667,9 @@ def test_queue_repositories_match_family_spellings(db_session, query) -> None:
     for repo_cls in (QueueReadRepository, QueueLimitsRepository):
         found = repo_cls(db_session).list_active_doctors(specialty=query)
         ids = {d.id for d in found}
-        assert canonical.id in ids, f"{repo_cls.__name__} missed canonical for {query!r}"
+        assert (
+            canonical.id in ids
+        ), f"{repo_cls.__name__} missed canonical for {query!r}"
         assert legacy.id in ids, f"{repo_cls.__name__} missed legacy for {query!r}"
         assert cardiologist.id not in ids
 
@@ -685,25 +688,16 @@ def test_queue_repositories_unfiltered_still_returns_all(db_session) -> None:
 # ===================== H. /queues/profiles settings_key (round-3 P1-3) ==
 
 
-def test_queue_profiles_response_carries_canonical_settings_key(db_session) -> None:
-    """The profiles payload must carry the backend-computed canonical
-    settings segment so the admin screen reads/edits clinic_settings by
-    the SAME key the runtime writes (dentistry, not stomatology)."""
+def test_queue_profiles_empty_catalog_stays_empty(db_session) -> None:
+    """An empty profile catalog is a valid database result, not a seed trigger."""
     from app.api.v1.endpoints.registrar_integration._queue_profiles import (
         get_queue_profiles,
     )
 
     payload = get_queue_profiles(active_only=True, db=db_session, current_user=None)
-    profiles = payload["profiles"]
-    assert profiles, "expected fallback profiles when the table is empty"
-
-    by_key = {p["key"]: p for p in profiles}
-    assert "settings_key" in by_key["stomatology"]
-    # the machinery key normalizes to the canonical settings segment
-    assert by_key["stomatology"]["settings_key"] == "dentistry"
-    # non-dental keys pass through unchanged
-    assert by_key["cardiology"]["settings_key"] == "cardiology"
-    assert by_key["dermatology"]["settings_key"] == "dermatology"
+    assert payload["success"] is True
+    assert payload["profiles"] == []
+    assert payload["source"] == "database"
 
 
 def test_queue_profiles_db_path_settings_key_canonical(db_session) -> None:
@@ -742,9 +736,7 @@ def test_reconcile_queue_setting_aliases_renames_when_no_canonical(db_session) -
         _reconcile_queue_setting_aliases,
     )
 
-    alias = ClinicSettings(
-        key="start_number_dental", value=7, category="queue"
-    )
+    alias = ClinicSettings(key="start_number_dental", value=7, category="queue")
     db_session.add(alias)
     db_session.commit()
 
@@ -763,7 +755,9 @@ def test_reconcile_queue_setting_aliases_renames_when_no_canonical(db_session) -
     assert row.category == "queue"
 
 
-def test_reconcile_queue_setting_aliases_deletes_when_canonical_exists(db_session) -> None:
+def test_reconcile_queue_setting_aliases_deletes_when_canonical_exists(
+    db_session,
+) -> None:
     """Canonical row already present: alias rows are removed so the
     unordered read cannot collapse a stale alias over the enforced value."""
     from app.api.v1.endpoints.admin_departments._helpers import (
@@ -817,18 +811,12 @@ def test_department_integration_writes_canonical_settings_keys(db_session) -> No
     )
     from app.models.department import Department
 
-    legacy_alias = ClinicSettings(
-        key="start_number_dental", value=7, category="queue"
-    )
+    legacy_alias = ClinicSettings(key="start_number_dental", value=7, category="queue")
     db_session.add(legacy_alias)
-    db_session.add(
-        Department(key="dental", name_ru="Стоматология", active=True)
-    )
+    db_session.add(Department(key="dental", name_ru="Стоматология", active=True))
     db_session.commit()
 
-    department = (
-        db_session.query(Department).filter(Department.key == "dental").first()
-    )
+    department = db_session.query(Department).filter(Department.key == "dental").first()
     result = _ensure_department_integrations(db_session, department, None)
     db_session.commit()
 
@@ -974,13 +962,9 @@ def test_department_integration_profile_tags_cover_family(db_session) -> None:
     )
     from app.models.department import Department
 
-    db_session.add(
-        Department(key="dental", name_ru="Стоматология", active=True)
-    )
+    db_session.add(Department(key="dental", name_ru="Стоматология", active=True))
     db_session.commit()
-    department = (
-        db_session.query(Department).filter(Department.key == "dental").first()
-    )
+    department = db_session.query(Department).filter(Department.key == "dental").first()
 
     _ensure_department_integrations(db_session, department, None)
     db_session.commit()

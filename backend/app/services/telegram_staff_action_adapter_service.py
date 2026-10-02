@@ -518,6 +518,24 @@ class TelegramStaffActionAdapterService:
                     )
                 # Sync the identity-map instance with the atomic UPDATE.
                 self.db.refresh(visit)
+                # P1 (owner review of 9e6c0f6c1): the bulk query(Visit)
+                # .update(..., synchronize_session=False) above writes
+                # visit_date — a PROJECTION column of the derma read model —
+                # straight to Core SQL: the after_flush listener never sees
+                # bulk Query.update() (the same blind-spot class as the
+                # reschedule paths, owner fact-check 5625c8f1b), and
+                # derma_history_entries silently stayed on the old date
+                # while visits.visit_date moved (owner repro: 2026-10-20
+                # vs 2026-11-05). Re-project the visit's read-model rows in
+                # THE SAME transaction — after refresh(visit), before
+                # _commit_or_flush: a rollback of the move rolls the
+                # projection back too. No-op for visits without EMR
+                # (cheap, safe to always call).
+                from app.services.derma_history_projection import (
+                    resync_derma_history_for_visits,
+                )
+
+                resync_derma_history_for_visits(self.db, [visit_id])
             else:
                 visit.visit_date = new_visit_date
             # The lease is never written by mutations — Codex round 8, P1

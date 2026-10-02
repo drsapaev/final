@@ -9540,10 +9540,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Дата в формате YYYY-MM-DD",
+              "description": "Дата в формате YYYY-MM-DD; по умолчанию текущий день клиники",
               "title": "Day"
             },
-            "description": "Дата в формате YYYY-MM-DD"
+            "description": "Дата в формате YYYY-MM-DD; по умолчанию текущий день клиники"
           },
           {
             "name": "specialist_id",
@@ -9640,9 +9640,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Queue Cabinet Info Api V1 Admin Queues  Queue Id  Cabinet Info Get"
+                  "$ref": "#/components/schemas/QueueCabinetResponse"
                 }
               }
             }
@@ -48246,7 +48244,7 @@
           "derma"
         ],
         "summary": "Осмотры кожи (история: ЭМК + legacy)",
-        "description": "История осмотров кожи (review follow-up P2-4b).\n\nОбъединяет два read-only источника: осмотры из specialty_data ЭМК\n(emr/v2, specialty=dermatology, source=\"emr\") и строки закрытой\nlegacy-таблицы derma_examinations (source=\"legacy\"). Скоупинг\nпациентов идентичен прежнему контракту. Пагинация — канонический\nконверт page/size/total/pages (контракт GET /files): total точен по\nобоим источникам, без скрытых усечений.",
+        "description": "История осмотров кожи (issue #3506: read model).\n\nСлужит из производной таблицы derma_history_entries: та же проекция\n(осмотры из specialty_data ЭМК, source=\"emr\", и строки закрытой\nlegacy-таблицы derma_examinations, source=\"legacy\"), материализуемая\nпри записи, а не пересчитываемая в памяти на каждый запрос.\nСкоупинг пациентов идентичен прежнему контракту. Пагинация —\nканонический конверт page/size/total/pages (контракт GET /files):\ntotal точен по обоим источникам, без скрытых усечений.",
         "operationId": "get_skin_examinations_api_v1_derma_examinations_get",
         "security": [
           {
@@ -48371,7 +48369,7 @@
           "derma"
         ],
         "summary": "Косметические процедуры (история: ЭМК + legacy)",
-        "description": "История косметических процедур (review follow-up P2-4b).\n\nОбъединяет два read-only источника: процедуры из\nspecialty_data.cosmetic_procedures ЭМК (emr/v2, specialty=dermatology,\nsource=\"emr\", total_cost=None — цена не хранится в ЭМК) и строки закрытой\nlegacy-таблицы derma_procedures (source=\"legacy\"). Скоупинг пациентов\nидентичен прежнему контракту. Пагинация — канонический конверт\npage/size/total/pages (контракт GET /files): total точен по обоим\nисточникам, без скрытых усечений.",
+        "description": "История косметических процедур (issue #3506: read model).\n\nСлужит из производной таблицы derma_history_entries: та же проекция\n(процедуры из specialty_data.cosmetic_procedures ЭМК, source=\"emr\",\ntotal_cost=None — цена не хранится в ЭМК, и строки закрытой\nlegacy-таблицы derma_procedures, source=\"legacy\"), материализуемая\nпри записи, а не пересчитываемая в памяти на каждый запрос.\nКанонический ключ записи — specialty_data.cosmetic_procedures\n(решение P3 по реконсиляции #3490/#3491); legacy-ключ\nspecialty_data.procedures читается проекцией временно как alias\n(Phase A): полный union без скрытия строк, записи без стабильного ID\nне дедуплицируются по содержимому — возможные дубликаты устраняются\nв Phase B (миграция данных с журналированием), удаление алиаса —\nPhase C (после аудита хранимых данных).\nСкоупинг пациентов идентичен прежнему контракту. Пагинация —\nканонический конверт page/size/total/pages (контракт GET /files):\ntotal точен по обоим источникам, без скрытых усечений.",
         "operationId": "get_cosmetic_procedures_api_v1_derma_procedures_get",
         "security": [
           {
@@ -101859,6 +101857,44 @@
             "type": "string",
             "title": "Day"
           },
+          "owner_type": {
+            "type": "string",
+            "enum": [
+              "doctor",
+              "resource"
+            ],
+            "title": "Owner Type"
+          },
+          "owner_id": {
+            "type": "integer",
+            "title": "Owner Id"
+          },
+          "owner_name": {
+            "type": "string",
+            "title": "Owner Name"
+          },
+          "owner_default_cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Default Cabinet"
+          },
+          "queue_resource_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Resource Id"
+          },
           "specialist_id": {
             "anyOf": [
               {
@@ -101972,6 +102008,11 @@
         "required": [
           "id",
           "day",
+          "owner_type",
+          "owner_id",
+          "owner_name",
+          "owner_default_cabinet",
+          "queue_resource_id",
           "specialist_id",
           "specialist_name",
           "queue_tag",

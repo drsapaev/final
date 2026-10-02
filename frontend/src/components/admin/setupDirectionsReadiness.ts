@@ -332,3 +332,160 @@ export function candidateTags(
 ): string[] {
   return collectKnownTags(services, profiles, []);
 }
+
+// =====================================================================
+// Workstream A (registrar doctor-services plan, Tasks 2/5): service-to-
+// doctor assignment gaps — admin-visible readiness errors.
+// =====================================================================
+
+export type ServiceAssignmentGapReason =
+  | 'doctor_missing'
+  | 'specialty_mismatch'
+  | 'missing_specialty_mapping'
+  | 'resource_queue_conflict';
+
+export interface ServiceAssignmentGap {
+  serviceId: number;
+  serviceName: string;
+  serviceCode: string | null;
+  queueTag: string | null;
+  pinnedDoctorId: number | null;
+  reason: ServiceAssignmentGapReason;
+}
+
+/**
+ * Явные нарушения контракта «услуга → врач», которые не видны в
+ * тег-строках чек-листа:
+ *
+ * - ``doctor_missing`` — услуга закреплена за врачом
+ *   (``Service.doctor_id``), которого нет в активном списке
+ *   (деактивирован/удалён/без связанного аккаунта): мастер не
+ *   предлагает её НИ одной карточке, сохранение отверг 409-м;
+ * - ``specialty_mismatch`` — закреплённый врач не проходит
+ *   specialty-eligibility услуги (department_key): пин к чужой
+ *   специальности — конфиг-ошибка, не «показать коллегам»;
+ * - ``missing_specialty_mapping`` — врач-исполняемая услуга без
+ *   department_key: серверная семантика «нет ограничения» — услуга
+ *   предлагается КАЖДОЙ карточке; по контракту плана это ошибка
+ *   настройки, а не «все врачи»;
+ * - ``resource_queue_conflict`` (PR #3511 review P1, round 5) —
+ *   закреплённая услуга с тегом АКТИВНОЙ ресурсной очереди: владелец
+ *   очереди — ресурс, закрепление не действует (услуга записывается в
+ *   общую очередь без врача), сервер честно отказывает запись к врачу
+ *   409-м. Убрать назначение врача или сменить тег услуги.
+ *
+ * Специальность сверяется теми же alias-семействами, что и
+ * eligibleDoctorsForTag (зеркало backend DOCTOR_QUEUE_SPECIALTY_VARIANTS
+ * для dental-семейства; остальные — нормализованное равенство).
+ */
+export function collectServiceAssignmentGaps(
+  services: ChecklistServiceDto[],
+  doctors: ChecklistDoctorDto[],
+  resources: ChecklistResourceDto[] = [],
+): ServiceAssignmentGap[] {
+  if (!Array.isArray(services) || !Array.isArray(doctors)) return [];
+  const gaps: ServiceAssignmentGap[] = [];
+  const activeRoster = doctors.filter((doctor) => doctor.active !== false);
+  const activeResourceTags = new Set(
+    resources
+      .filter((resource) => resource.active === true && resource.queue_tag)
+      .map((resource) => specialtyTagKey(resource.queue_tag)),
+  );
+
+  for (const service of services) {
+    if (service.active === false) continue;
+    // PR #3511 review P1 (round 5): явное назначение участвует в контракте
+    // и без флага requires_doctor — раньше закреплённая услуга с
+    // requires_doctor=false полностью выпадала из проверки готовности,
+    // хотя сервер с этого же PR гоняет её через точный гвард врача.
+    if (service.requires_doctor !== true && service.doctor_id == null) {
+      continue;
+    }
+
+    const serviceCode =
+      typeof service.service_code === 'string'
+        ? service.service_code
+        : typeof service.code === 'string'
+          ? service.code
+          : null;
+    const serviceName = String(service.name || serviceCode || service.id);
+    const queueTag =
+      typeof service.queue_tag === 'string' ? service.queue_tag : null;
+
+    const pinnedDoctorId =
+      service.doctor_id != null ? Number(service.doctor_id) : null;
+
+    // PR #3511 review P1 (round 5): закрепление + тег АКТИВНОЙ ресурсной
+    // очереди — конфликт владельца: очередь принадлежит ресурсу, пин
+    // декоративен, запись идёт без врача (сервер 409 при явном враче).
+    // Проверка первая: конфликт владельца первичнее судьбы самого врача.
+    if (
+      pinnedDoctorId != null &&
+      Number.isFinite(pinnedDoctorId) &&
+      queueTag &&
+      activeResourceTags.has(specialtyTagKey(queueTag))
+    ) {
+      gaps.push({
+        serviceId: service.id,
+        serviceName,
+        serviceCode,
+        queueTag,
+        pinnedDoctorId,
+        reason: 'resource_queue_conflict',
+      });
+      continue;
+    }
+
+    if (pinnedDoctorId == null || !Number.isFinite(pinnedDoctorId)) {
+      const departmentKey = specialtyTagKey(
+        (service as { department_key?: unknown }).department_key,
+      );
+      if (!departmentKey) {
+        gaps.push({
+          serviceId: service.id,
+          serviceName,
+          serviceCode,
+          queueTag,
+          pinnedDoctorId: null,
+          reason: 'missing_specialty_mapping',
+        });
+      }
+      continue;
+    }
+
+    const pinned = activeRoster.filter(
+      (doctor) => Number(doctor.id) === pinnedDoctorId,
+    );
+    if (pinned.length === 0) {
+      gaps.push({
+        serviceId: service.id,
+        serviceName,
+        serviceCode,
+        queueTag,
+        pinnedDoctorId,
+        reason: 'doctor_missing',
+      });
+      continue;
+    }
+
+    const departmentKey = specialtyTagKey(
+      (service as { department_key?: unknown }).department_key,
+    );
+    if (!departmentKey) continue;
+    const eligibleForService = eligibleDoctorsForTag(
+      pinned,
+      departmentKey,
+    );
+    if (eligibleForService.length === 0) {
+      gaps.push({
+        serviceId: service.id,
+        serviceName,
+        serviceCode,
+        queueTag,
+        pinnedDoctorId,
+        reason: 'specialty_mismatch',
+      });
+    }
+  }
+  return gaps;
+}

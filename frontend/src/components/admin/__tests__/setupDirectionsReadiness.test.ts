@@ -19,6 +19,7 @@ import {
     buildChecklist,
     candidateTags,
     collectKnownTags,
+    collectServiceAssignmentGaps,
     eligibleDoctorsForTag,
     readPermanentAddressSupported,
     specialtyTagKey,
@@ -308,5 +309,127 @@ describe('candidateTags — «ноль технических ключей» (§
             [profile({ queue_tags: ['lab', 'ultrasound'] })],
         );
         expect(tags).toEqual(['lab', 'ultrasound']);
+    });
+});
+
+describe('collectServiceAssignmentGaps — Workstream A (Tasks 2/5)', () => {
+    it('doctor_missing: pinned service whose doctor is not in the active roster', () => {
+        const gaps = collectServiceAssignmentGaps(
+            [svc({ id: 10, name: 'ЭхоКГ', requires_doctor: true, doctor_id: 999, queue_tag: 'cardio', department_key: 'cardiology' })],
+            [doctor({ id: 42, specialty: 'cardiology' })],
+        );
+        expect(gaps).toHaveLength(1);
+        expect(gaps[0].reason).toBe('doctor_missing');
+        expect(gaps[0].pinnedDoctorId).toBe(999);
+        expect(gaps[0].serviceCode ?? null).toBeNull();
+    });
+
+    it('specialty_mismatch: pinned doctor present but of the wrong specialty family', () => {
+        const gaps = collectServiceAssignmentGaps(
+            [svc({ id: 11, name: 'Кардио-услуга', requires_doctor: true, doctor_id: 42, queue_tag: 'cardio', department_key: 'cardiology' })],
+            [doctor({ id: 42, specialty: 'dentistry' })],
+        );
+        expect(gaps).toHaveLength(1);
+        expect(gaps[0].reason).toBe('specialty_mismatch');
+    });
+
+    it('missing_specialty_mapping: doctor-performed service without department_key', () => {
+        const gaps = collectServiceAssignmentGaps(
+            [svc({ id: 12, name: 'Рентгенография зуба', requires_doctor: true, doctor_id: null, queue_tag: 'stomatology', department_key: null })],
+            [doctor({ id: 42, specialty: 'dentistry' })],
+        );
+        expect(gaps).toHaveLength(1);
+        expect(gaps[0].reason).toBe('missing_specialty_mapping');
+        expect(gaps[0].pinnedDoctorId).toBeNull();
+    });
+
+    it('healthy rows: pinned eligible doctor and doctorless services produce no gaps', () => {
+        const gaps = collectServiceAssignmentGaps(
+            [
+                svc({ id: 13, name: 'ЭхоКГ врача 42', requires_doctor: true, doctor_id: 42, queue_tag: 'cardio', department_key: 'cardiology' }),
+                svc({ id: 14, name: 'Лаборатория', requires_doctor: false, doctor_id: null, queue_tag: 'lab', department_key: null }),
+                svc({ id: 15, name: 'Неактивная', active: false, requires_doctor: true, doctor_id: 999, queue_tag: 'cardio', department_key: 'cardiology' }),
+            ],
+            [doctor({ id: 42, specialty: 'cardiology' })],
+        );
+        expect(gaps).toEqual([]);
+    });
+
+    it('dental alias family keeps a dentistry doctor eligible for a stomatology department_key', () => {
+        const gaps = collectServiceAssignmentGaps(
+            [svc({ id: 16, name: 'Рентген зуба закреплённая', requires_doctor: true, doctor_id: 42, queue_tag: 'stomatology', department_key: 'stomatology' })],
+            [doctor({ id: 42, specialty: 'dentistry' })],
+        );
+        expect(gaps).toEqual([]);
+    });
+});
+
+describe('collectServiceAssignmentGaps — PR #3511 review P1 (round 5): pin without flags', () => {
+    it('unflagged pinned service participates in the contract: missing doctor is a gap (was silently skipped)', () => {
+        const gaps = collectServiceAssignmentGaps(
+            [svc({ id: 20, name: 'ЭхоКГ закреплённая', requires_doctor: false, doctor_id: 999, queue_tag: 'cardio', department_key: 'cardiology' })],
+            [doctor({ id: 42, specialty: 'cardiology' })],
+        );
+        expect(gaps).toHaveLength(1);
+        expect(gaps[0].reason).toBe('doctor_missing');
+        expect(gaps[0].pinnedDoctorId).toBe(999);
+    });
+
+    it('unflagged pinned service with wrong-specialty doctor is a specialty_mismatch gap', () => {
+        const gaps = collectServiceAssignmentGaps(
+            [svc({ id: 21, name: 'Кардио-услуга без флага', requires_doctor: false, doctor_id: 42, queue_tag: 'cardio', department_key: 'cardiology' })],
+            [doctor({ id: 42, specialty: 'dentistry' })],
+        );
+        expect(gaps).toHaveLength(1);
+        expect(gaps[0].reason).toBe('specialty_mismatch');
+    });
+
+    it('healthy unflagged pin produces no gap (control)', () => {
+        const gaps = collectServiceAssignmentGaps(
+            [svc({ id: 22, name: 'ЭхоКГ врача 42', requires_doctor: false, doctor_id: 42, queue_tag: 'cardio', department_key: 'cardiology' })],
+            [doctor({ id: 42, specialty: 'cardiology' })],
+        );
+        expect(gaps).toEqual([]);
+    });
+
+    it('resource_queue_conflict: pinned service (flagged or not) on an ACTIVE resource tag is an owner conflict', () => {
+        const res = (over: Record<string, unknown>) => resource({ id: 77, queue_tag: 'ecg', active: true, ...over });
+        const services = [
+            svc({ id: 23, name: 'Пин без флага на ecg', requires_doctor: false, doctor_id: 42, queue_tag: 'ecg', department_key: 'cardiology' }),
+            svc({ id: 24, name: 'Пин с флагом на ecg', requires_doctor: true, doctor_id: 42, queue_tag: 'ecg', department_key: 'cardiology' }),
+        ];
+        const gaps = collectServiceAssignmentGaps(
+            services,
+            [doctor({ id: 42, specialty: 'cardiology' })],
+            [res({})],
+        );
+        expect(gaps.map((g) => [g.serviceId, g.reason])).toEqual([
+            [23, 'resource_queue_conflict'],
+            [24, 'resource_queue_conflict'],
+        ]);
+        expect(gaps[0].queueTag).toBe('ecg');
+        expect(gaps[0].pinnedDoctorId).toBe(42);
+    });
+
+    it('a DRAFT (inactive) registry row is NOT a conflict; unpinned flagged K10 stays healthy', () => {
+        const gaps = collectServiceAssignmentGaps(
+            [
+                svc({ id: 25, name: 'Пин на черновом ecg', requires_doctor: false, doctor_id: 42, queue_tag: 'ecg', department_key: 'cardiology' }),
+                svc({ id: 26, name: 'K10 без пина', requires_doctor: true, doctor_id: null, queue_tag: 'ecg', department_key: 'cardiology' }),
+            ],
+            [doctor({ id: 42, specialty: 'cardiology' })],
+            [resource({ id: 77, queue_tag: 'ecg', active: false })],
+        );
+        expect(gaps).toEqual([]);
+    });
+
+    it('tag normalization applies to the conflict match (trimmed/case-insensitive)', () => {
+        const gaps = collectServiceAssignmentGaps(
+            [svc({ id: 27, name: 'Пин на тег с пробелом', requires_doctor: false, doctor_id: 42, queue_tag: ' ECG ', department_key: 'cardiology' })],
+            [doctor({ id: 42, specialty: 'cardiology' })],
+            [resource({ id: 77, queue_tag: 'ecg', active: true })],
+        );
+        expect(gaps).toHaveLength(1);
+        expect(gaps[0].reason).toBe('resource_queue_conflict');
     });
 });

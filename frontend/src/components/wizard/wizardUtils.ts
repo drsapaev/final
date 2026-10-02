@@ -148,6 +148,14 @@ export interface WizardDoctorRecord {
  * RQ-08.a: источник eligibility для фильтра врачей — либо строковый ключ
  * отделения (легаси-вызовы), либо запись каталога с серверным набором
  * допустимых специальностей (приоритетный путь).
+ *
+ * Workstream A (registrar doctor-services plan, Task 3): запись каталога
+ * может нести явное назначение врача (Service.doctor_id из DTO каталога) —
+ * такая услуга предлагается ТОЛЬКО карточке назначенного врача. Пин —
+ * ДОПОЛНИТЕЛЬНОЕ ограничение поверх specialty-eligibility (не замена):
+ * назначенный врач чужой специальности не показывается нигде, а
+ * неактивный/отсутствующий врач даёт admin-instruction состояние, а не
+ * услугу под карточкой коллеги (см. collectDoctorAssignmentGaps).
  */
 export type DoctorEligibilityInput =
   | string
@@ -156,6 +164,7 @@ export type DoctorEligibilityInput =
   | {
       department_key?: string | null;
       accepted_specialties?: string[] | null;
+      doctor_id?: string | number | null;
       [key: string]: unknown;
     };
 
@@ -178,6 +187,33 @@ export const filterDoctorsForService = (
   const all: WizardDoctorRecord[] = Array.isArray(doctors)
     ? doctors.filter((d): d is WizardDoctorRecord => Boolean(d))
     : [];
+  const entry = typeof service === 'string' ? null : service;
+  // Workstream A (Task 3): явное назначение Service.doctor_id — услуга
+  // доступна ТОЛЬКО этому врачу. Приоритет выше specialty-фильтра: пин
+  // сужает список до одного врача, а specialty-eligibility ниже решает,
+  // годен ли он (пин к врачу чужой специальности = конфиг-ошибка,
+  // услуга не показывается ни одной карточке — это ловит readiness-чек).
+  const pinnedDoctorId = entry?.doctor_id;
+  if (pinnedDoctorId != null && String(pinnedDoctorId) !== '') {
+    const pinned = all.filter(
+      (doctor) => String(doctor.id) === String(pinnedDoctorId),
+    );
+    if (pinned.length === 0) {
+      // Назначенный врач не в списке (неактивен/удалён/без аккаунта):
+      // услуга не переезжает к коллегам — ConfigurableInstruction
+      // (collectDoctorAssignmentGaps) объясняет, где починить.
+      return [];
+    }
+    return filterDoctorsBySpecialty(pinned, service);
+  }
+  return filterDoctorsBySpecialty(all, service);
+};
+
+const filterDoctorsBySpecialty = (
+  doctors: WizardDoctorRecord[],
+  service: DoctorEligibilityInput,
+): WizardDoctorRecord[] => {
+  const all: WizardDoctorRecord[] = doctors;
   const entry = typeof service === 'string' ? null : service;
   const key = String((entry ? entry.department_key : service) || '')
     .toLowerCase()
@@ -217,6 +253,128 @@ export const filterDoctorsForService = (
     // Пара вне таблицы алиасов: точное совпадение, без подстрок.
     return docSpecialty === canonicalKey;
   });
+};
+
+// =====================================================================
+// DOCTOR ASSIGNMENT GAPS (Workstream A, Task 3)
+// =====================================================================
+
+/** Услуга каталога с явным назначением врача (DTO /registrar/services). */
+export interface AssignmentGapServiceLike {
+  id?: string | number | null;
+  name?: string | null;
+  service_code?: string | null;
+  code?: string | null;
+  doctor_id?: string | number | null;
+  doctor_selection_required?: boolean;
+  is_consultation?: boolean;
+  requires_doctor?: boolean;
+  accepted_specialties?: string[] | null;
+  department_key?: string | null;
+  [key: string]: unknown;
+}
+
+export type DoctorAssignmentGapReason =
+  | 'doctor_missing'
+  | 'specialty_mismatch';
+
+/** Статус запроса списка врачей (проводится из AppointmentWizardV2 в CartStepV2). */
+export type DoctorsRequestStatus = 'idle' | 'loading' | 'loaded' | 'error';
+
+export interface DoctorAssignmentGap {
+  serviceId: string | number;
+  serviceName: string;
+  serviceCode: string | null;
+  pinnedDoctorId: string | number;
+  reason: DoctorAssignmentGapReason;
+}
+
+export interface DoctorAssignmentGapOptions {
+  /**
+   * Раунд-3 ревью PR #3511 (P2): пустой roster имеет ДВЕ разные причины,
+   * которые нельзя смешивать.
+   *
+   * - `true` / флаг опущен — переданный массив это ДОСТОВЕРНЫЙ список
+   *   активных врачей (запрос успешно завершён). Даже пустой: каждая
+   *   закреплённая услуга не может быть предложена ни одной карточке →
+   *   `doctor_missing` с инструкцией администратору.
+   * - `false` — список ещё НЕ получен (запрос в полёте или упал).
+   *   Отсутствие врача в неполученном списке — НЕ конфиг-ошибка:
+   *   блок instructions не показываем, иначе ложная ошибка конфигурации
+   *   при временном сбое загрузки.
+   */
+  rosterLoaded?: boolean;
+}
+
+/**
+ * Явные назначения, которые НЕ могут быть предложены ни одной карточке
+ * врача: назначенный врач отсутствует в списке активных (неактивен,
+ * удалён, без связанного аккаунта) или не проходит specialty-eligibility
+ * услуги. Такие услуги не переезжают к коллегам — мастер показывает
+ * инструкцию администратору (Admin → Врачи / Услуги → Каталог), а
+ * серверный гейт корзины отверг бы бронирование 409-м.
+ *
+ * Чистая функция: те же входные данные (каталог + врачи), тот же
+ * predicate eligibility (filterDoctorsForService), без догадок.
+ *
+ * Пустой roster (раунд-3 ревью PR #3511, P2): ПУСТОЙ, но достоверно
+ * загруженный список активных врачей — валидное состояние, при котором
+ * закреплённые услуги дают `doctor_missing` (ранний выход `[]` убран —
+ * он прятал причину недоступности услуги). Незавершённый/упавший запрос
+ * различается опцией `rosterLoaded: false` — с ней конфиг-ошибок не
+ * показываем; `doctors` null/undefined (список не передан) — нечем
+ * сверять, тоже без gaps.
+ */
+export const collectDoctorAssignmentGaps = (
+  services: AssignmentGapServiceLike[],
+  doctors: Array<WizardDoctorRecord | null | undefined> | null | undefined,
+  options: DoctorAssignmentGapOptions = {},
+): DoctorAssignmentGap[] => {
+  if (!Array.isArray(services) || services.length === 0) return [];
+  // Список врачей ещё не получен (loading/error): «отсутствие» назначенного
+  // врача в неподтверждённом списке — не конфиг-ошибка.
+  if (options.rosterLoaded === false) return [];
+  // Список не передан вовсе (null/undefined/не-массив) — нечем сверять.
+  if (!Array.isArray(doctors)) return [];
+  const roster: WizardDoctorRecord[] = doctors
+    .filter((d): d is WizardDoctorRecord => Boolean(d));
+  // РАННИЙ ВЫХОД ПРИ ПУСТОМ ROSTER УБРАН (P2 #3511): успешно загруженный
+  // пустой список активных врачей судится тем же predicate — закреплённая
+  // услуга не появляется ни на одной карточке и обязана объяснить причину.
+
+  const gaps: DoctorAssignmentGap[] = [];
+  for (const service of services) {
+    const pinnedDoctorId = service.doctor_id;
+    if (pinnedDoctorId == null || String(pinnedDoctorId) === '') continue;
+    const pinned = roster.filter(
+      (doctor) => String(doctor.id) === String(pinnedDoctorId),
+    );
+    const serviceName = String(service.name || service.service_code || service.id);
+    if (pinned.length === 0) {
+      gaps.push({
+        serviceId: service.id as string | number,
+        serviceName,
+        serviceCode: (service.service_code || service.code) ?? null,
+        pinnedDoctorId,
+        reason: 'doctor_missing',
+      });
+      continue;
+    }
+    // Врач есть, но не проходит specialty-eligibility услуги — пин к
+    // чужой специальности это конфиг-ошибка назначения, а не «показать
+    // коллегам».
+    const eligible = filterDoctorsForService(pinned, service);
+    if (eligible.length === 0) {
+      gaps.push({
+        serviceId: service.id as string | number,
+        serviceName,
+        serviceCode: (service.service_code || service.code) ?? null,
+        pinnedDoctorId,
+        reason: 'specialty_mismatch',
+      });
+    }
+  }
+  return gaps;
 };
 
 // =====================================================================
@@ -958,14 +1116,21 @@ export const groupCartItemsByVisit = (
     // Безврачебная ресурсная очередь — единая точка обслуживания, даже если
     // услуги каталога относятся к разным отделениям. Для неё queue_tag
     // определяет владельца группировки, а department остаётся метаданными
-    // созданного визита. Врачебные и неклассифицированные услуги сохраняют
-    // прежний контракт department + doctor_id.
+    // созданного визита.
+    //
+    // Workstream A (registrar doctor-services plan, Task 4): врачебная
+    // группировка — ТОЛЬКО по врачу и времени записи. Department/тег/
+    // категория услуги НЕ владеют визитом врача: услуги одного врача из
+    // разных отделений (D01 «dermatology» + D_PROC «procedures») идут
+    // ОДНИМ визитом в ЕДИНУЮ очередь врача (один номер), а не раскалывают
+    // бронирование на отдельные визиты/записи. Department остаётся
+    // метаданными визита (первая услуга), как и для ресурсной оси.
     const resourceQueueTag = item.doctor_id == null
       ? getResourceQueueTagByService(item.service_id as string | number)
       : null;
     const ownerIdentity = resourceQueueTag
       ? ['resource', resourceQueueTag]
-      : ['doctor', finalDepartment, item.doctor_id || null];
+      : ['doctor', item.doctor_id || null];
     const key = JSON.stringify([
       ...ownerIdentity,
       item.visit_date || null,
