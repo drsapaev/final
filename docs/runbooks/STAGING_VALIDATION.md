@@ -36,14 +36,38 @@ executed the checks in this runbook AND they all passed. Hallucinating
 
 Before running any check below:
 
-1. **Staging is up** — `docker compose -f ops/compose.staging.yml up -d`
-2. **Migrations applied** — `cd backend && alembic upgrade head`
-3. **Env vars set** — at minimum `DATABASE_URL`, `SENTRY_DSN`, `SECRET_KEY`
-4. **Test users seeded** — `python -m app.scripts.dev_seed --confirm-dev-seed`
-   (creates admin/doctor/registrar with known passwords)
+1. **Own isolated staging is up** — on the Windows clinic host, use the
+   launcher from the worktree containing the commit under test:
+
+   ```powershell
+   .\ops\scripts\wsl_staging.ps1 -Action Preflight -EnvFile ops/staging.env
+   .\ops\scripts\wsl_staging.ps1 -Action Start -EnvFile ops/staging.env
+   ```
+
+   Its ignored env file must use an explicit unique `COMPOSE_PROJECT_NAME`,
+   synthetic credentials, and free non-production ports. For long validation,
+   run the whole validation script through `-Action Session -CommandArgs
+   @(...)`; `Start` keeps WSL alive only during startup. See
+   [WSL_STAGING_SESSION.md](WSL_STAGING_SESSION.md) for the complete recipe.
+2. **Migrations applied to that staging database** — the canonical staging
+   backend entrypoint runs Alembic when `RUN_ALEMBIC_ON_START=1`. Confirm its
+   successful readiness; do not run a host migration command with an implicit
+   or production `DATABASE_URL`.
+3. **Env vars set for that staging only** — at minimum `DATABASE_URL`,
+   `SENTRY_DSN`, `SECRET_KEY`. Do not print secrets or resolved Compose config.
+4. **Synthetic test users prepared** — seed only this project's synthetic DB
+   using the documented fixture guards. Prepare normal Admin login and 2FA
+   enrollment before Admin browser checks; do not bypass authentication.
 
 If any prerequisite fails, stop and fix it. The checks below assume a
-running staging environment.
+running staging environment. Record dependent checks as `NOT_RUN` if a
+prerequisite is unavailable. PostgreSQL-required suites need an explicit
+isolated local DSN and a fresh absolute-path JUnit report with no skips; a
+timeout followed by skipped tests is not a passing PostgreSQL check. The
+helper's strict PG mode runs only the audited effective-settings suite via
+`RQ23A_PG_ADMIN_URL`; other fixture routing needs a separate audit. Environment
+health and mount/image IDs do not establish the served frontend revision or
+mark any of the ten checks below as completed.
 
 ---
 
@@ -319,7 +343,8 @@ export QA_ADMIN_USERNAME=admin@clinic.com
 export QA_ADMIN_PASSWORD=<admin password>
 export QA_REGISTRAR_USERNAME=registrar@clinic.com
 export QA_REGISTRAR_PASSWORD=<registrar password>
-export BACKEND_URL=http://localhost:18000
+# Use your project's chosen staging backend port, not production :18000.
+export BACKEND_URL=http://localhost:18001
 
 # Run the spec
 npx playwright test e2e/ai-safety-guardrails.spec.ts --project=chromium
@@ -458,7 +483,10 @@ finally:
 ### If it fails
 
 - **"arq: command not found"**: `pip install arq>=0.26.0`
-- **"Connection refused on redis:6379"**: Redis not running — `docker compose up redis`
+- **"Connection refused on redis:6379"**: verify your configured staging project;
+  from its Windows worktree run
+  `.\ops\scripts\wsl_staging.ps1 -Action Start -EnvFile ops/staging.env -NoBuild`.
+  Do not use bare Compose commands or start another project's Redis.
 - **"send failed: TELEGRAM_BOT_TOKEN not set"**: expected in dev; set token for prod
 - **Job not picked up**: worker not running, or queue name mismatch
 

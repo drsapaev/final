@@ -1,12 +1,8 @@
-$ErrorActionPreference = "Stop"
-$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\\..")).Path
-$composeFile = Join-Path $projectRoot "ops\\compose.staging.yml"
-$envFile = Join-Path $projectRoot "ops\\staging.env"
+param(
+    [string]$EnvFile = 'ops/staging.env',
+    [string]$Distribution = 'Ubuntu-24.04'
+)
 
-Push-Location $projectRoot
-try {
-    docker compose --env-file $envFile -f $composeFile down
-}
-finally {
-    Pop-Location
-}
+& (Join-Path $PSScriptRoot 'wsl_staging.ps1') -Action Stop -EnvFile $EnvFile `
+    -Distribution $Distribution
+exit $LASTEXITCODE
