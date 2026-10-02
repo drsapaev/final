@@ -91,11 +91,10 @@ def _normalize_required_roles(*roles: Any) -> tuple[str, ...]:
             nested_roles = tuple(role)
             nested_normalized = _normalize_required_roles(*nested_roles)
             if nested_normalized:
-                logger.debug(
-                    "[FIX:require_roles] Flattened nested role collection %s -> %s",
-                    nested_roles,
-                    nested_normalized,
-                )
+                # Debug-лог упразднён (CodeQL py/clear-text-logging-sensitive-data
+                # #1302/#1303): CodeQL считает аргументы security-функции
+                # чувствительными данными; роли — не секрет, но лог и не нужен —
+                # результат детерминирован и покрыт тестами.
                 normalized.extend(nested_normalized)
             continue
 

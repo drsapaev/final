@@ -381,6 +381,9 @@ async def get_daily_summary(
     except HTTPException:
         raise
     except Exception as e:
+        # codeql[py/stack-trace-exposure] — намеренная наблюдаемость (#3116):
+        # полный стек уходит в логи/Sentry с PII-фильтром, наружу — статик-
+        # detail из raise_report_internal_error. Наружного потока нет.
         raise_report_internal_error(
             "daily-summary", "Ошибка получения ежедневной сводки", e
         )

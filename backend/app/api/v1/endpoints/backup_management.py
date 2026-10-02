@@ -29,6 +29,9 @@ async def create_backup(
     try:
         service = BackupService(db)
         backup_info = service.create_backup(backup_type)
+        # codeql[py/stack-trace-exposure] — HTTP-ответ несёт статик-detail
+        # ("Internal server error"); исключение уходит только в логи/Sentry
+        # с PII-фильтром. Наружного потока стека нет.
         return backup_info
     except Exception as e:
         logger.error(f"Error creating backup: {e}")

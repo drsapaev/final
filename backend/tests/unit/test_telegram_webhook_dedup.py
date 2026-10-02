@@ -115,7 +115,7 @@ def test_claim_none_update_id_is_claimed_without_row(db_session):
 def test_ledger_bot_identity_is_stable_and_non_secret():
     """The fallback identity binds a claim to its credential without
     leaking it."""
-    token = "123456789:test-only-not-a-real-credential-value"
+    token = "telegram-test-credential-a"
     identity = telegram_webhook_dedup.ledger_bot_identity(token)
 
     assert identity is not None
@@ -135,7 +135,7 @@ async def test_resolve_persists_getme_id_and_caches():
     """Codex round 24: the getMe-resolved id is PERSISTED (so every
     uvicorn worker / the polling worker shares ONE namespace) and cached
     in-process (one getMe per credential)."""
-    token = "123456789:resolve-stable-token"
+    token = "telegram-test-credential-b"
     telegram_webhook_dedup._IDENTITY_BY_TOKEN.pop(token, None)
     calls = []
     persisted = []
@@ -167,7 +167,7 @@ async def test_resolve_uses_persisted_identity_without_getme():
     still claims under the SAME namespace as the workers that resolved
     the id — the persisted telegram_configs.bot_identity is read first
     and getMe is never needed."""
-    token = "123456789:resolve-persisted-token"
+    token = "telegram-test-credential-c"
     telegram_webhook_dedup._IDENTITY_BY_TOKEN.pop(token, None)
 
     with pytest.MonkeyPatch.context() as mp:
@@ -192,7 +192,7 @@ async def test_resolve_returns_none_without_caching_when_getme_fails():
     identity (the caller defers the delivery instead) and nothing is
     cached — the next resolution retries getMe / re-reads the persisted
     value so every worker converges on one namespace."""
-    token = "123456789:resolve-fallback-token"
+    token = "telegram-test-credential-d"
     telegram_webhook_dedup._IDENTITY_BY_TOKEN.pop(token, None)
     fetch_calls = []
 
