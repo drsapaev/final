@@ -95,7 +95,7 @@ stop condition to watch first: <условие>
 
 - [x] Task/PR 7: исправить серверную пагинацию и геометрию очереди. → #3347 (улучшено: #3349 page-before-enrichment)
 - [x] Task/PR 8: добавить точный server-rendered PDF preview без побочных эффектов. → #3462 (включая PDF-render hotfix NameError _load_weasyprint_components, найденный в PR1)
-- [ ] Final gate: выполнить сквозные backend/frontend/browser проверки после merge выбранных PR. — ЧАСТИЧНО (2026-09-26, см. Final gate execution record): слои backend/frontend/browser-mocked зелёные на `614102d2f`; непрерывный сквозной spec-путь (revise→history на browser-уровне) закрыт #3475 (lab-full-path.spec.ts, 64/64, CI-блокирующий инвариант); остаются живой smoke 5173→18000, полный STAGING_VALIDATION; дополнительно открыты operator-шаги stage-4 (деплой 0070) и product-decision gate по пробиркам.
+- [x] Final gate: выполнить сквозные backend/frontend/browser проверки после merge выбранных PR. — ВЫПОЛНЕН (2026-10-02, reconcile): PR 1-8 смержены; prod задеплоен на e29ced129 (alembic head 0077_daily_queue_policy, локальный primary clinic_prod_local); lineage post-deploy smoke (scripts/ops/lab_lineage_post_deploy_smoke.py --apply) ВСЕ 7 ЧЕКОВ зелёные на disposable UTF8 PG (chain A/B, revision A2 in-place, idempotent re-sync, notification suppression); backend/frontend/mocked-browser слои зелёные в CI (#3475 инвариант). Осталось вне гейта: живой browser-smoke 5173->test-backend на синтетике, полный STAGING_VALIDATION перед следующим декларативным 'system verified', и ОТДЕЛЬНЫЙ product decision gate по пробиркам/образцам (вопросы владельцу, секция ниже).
 
 ## Execution record (2026-09-26 — reconcile)
 
