@@ -1371,8 +1371,24 @@ class Mutation:
                     daily_queue=daily_queue,
                     settings=queue_settings,
                 )
+                # The clinic clock captured before the admission/row locks is
+                # only suitable for selecting the queue identity. A request
+                # can wait across the configured cutoff while those locks are
+                # held, so make the admission decision from a fresh clock read
+                # after the daily-queue lock and never retarget this request to
+                # a different clinic day mid-flight.
+                admission_now_local = datetime.now(timezone)
+                if admission_now_local.date() != today:
+                    return QueueMutationResponse(
+                        success=False,
+                        message=(
+                            "Дата очереди изменилась. Обновите страницу "
+                            "и повторите попытку."
+                        ),
+                        errors=["QUEUE_DAY_CHANGED"],
+                    )
                 window_result = evaluate_online_admission_window(
-                    today, now_local, admission_window
+                    today, admission_now_local, admission_window
                 )
                 if window_result == "before_start":
                     return QueueMutationResponse(

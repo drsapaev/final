@@ -182,19 +182,31 @@ def test_join_queue_recognizes_existing_resource_surface_claim(
 
 @pytest.mark.unit
 @pytest.mark.queue
-def test_graphql_join_rejects_v1_at_exact_cutoff(
+@pytest.mark.parametrize(
+    ("locked_time", "cutoff", "expected_error"),
+    [
+        (datetime(2030, 1, 2, 9, 0), "09:00", "ONLINE_BOOKING_CLOSED"),
+        (datetime(2030, 1, 3, 0, 0), "23:59", "QUEUE_DAY_CHANGED"),
+    ],
+)
+def test_graphql_join_rechecks_v1_window_after_queue_lock(
     db_session,
     test_doctor,
     test_patient,
     monkeypatch,
+    locked_time,
+    cutoff,
+    expected_error,
 ) -> None:
-    from app.graphql import mutations as gql_mutations
-    from app.graphql.types import QueueEntryInput
+    clock_values = [datetime(2030, 1, 2, 8, 59), locked_time]
+    clock_calls = 0
 
-    class FixedDateTime(datetime):
+    class LockBoundaryDateTime(datetime):
         @classmethod
         def now(cls, tz=None):  # type: ignore[override]
-            frozen = datetime(2030, 1, 2, 9, 0)
+            nonlocal clock_calls
+            frozen = clock_values[min(clock_calls, len(clock_values) - 1)]
+            clock_calls += 1
             return frozen.replace(tzinfo=tz) if tz is not None else frozen
 
     day = datetime(2030, 1, 2, 9, 0).date()
@@ -206,7 +218,7 @@ def test_graphql_join_rejects_v1_at_exact_cutoff(
         max_online_entries=15,
         policy_version="daily_online_issuances_v1",
         online_start_time="07:00",
-        online_end_time="09:00",
+        online_end_time=cutoff,
     )
     db_session.add(queue)
     db_session.flush()
@@ -222,7 +234,7 @@ def test_graphql_join_rejects_v1_at_exact_cutoff(
         lambda db: {
             "timezone": "Asia/Tashkent",
             "queue_start_hour": 7,
-            "auto_close_time": "09:00",
+            "auto_close_time": cutoff,
         },
     )
     monkeypatch.setattr(
@@ -230,15 +242,16 @@ def test_graphql_join_rejects_v1_at_exact_cutoff(
         "ensure_doctor_eligible_for_appointment",
         lambda db, doctor_id: None,
     )
-    monkeypatch.setattr(gql_mutations, "datetime", FixedDateTime)
+    monkeypatch.setattr(gql_mutations, "datetime", LockBoundaryDateTime)
 
     result = gql_mutations.Mutation._join_queue_impl(
         SimpleNamespace(context=None),
         QueueEntryInput(patient_id=test_patient.id, doctor_id=test_doctor.id),
     )
 
+    assert clock_calls == 2
     assert result.success is False
-    assert result.errors == ["ONLINE_BOOKING_CLOSED"]
+    assert result.errors == [expected_error]
     assert result.queue_entry is None
     assert (
         db_session.query(OnlineQueueEntry)

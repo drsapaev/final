@@ -5,8 +5,11 @@ Split from qr_queue_service.py.
 
 from __future__ import annotations
 
+from datetime import date, datetime
+
 from app.crud.clinic import clinic_today
 from app.crud.daily_queue_creation_policy import (
+    OnlineAdmissionWindow,
     evaluate_online_admission_window,
     online_admission_window,
 )
@@ -16,6 +19,22 @@ from app.crud.queue_resource_routing import (
 )
 from app.services.qr_queue._base import *  # noqa: F401, F403
 from app.services.qr_queue._base import QRQueueServiceMixinBase, _now
+
+
+def _before_start_wait_fields(
+    target_date: date,
+    now: datetime,
+    window: OnlineAdmissionWindow,
+) -> dict[str, str | int]:
+    """Preserve the QR client's countdown contract for a closed start window."""
+    opens_at = datetime.combine(target_date, window.start_time, tzinfo=now.tzinfo)
+    seconds_until_open = max(0, int((opens_at - now).total_seconds()))
+    minutes_until_open = max(1, (seconds_until_open + 59) // 60)
+    return {
+        "minutes_until_open": minutes_until_open,
+        "opens_at_datetime": opens_at.isoformat(),
+        "countdown_text": f"Откроется через {minutes_until_open} мин",
+    }
 
 
 class QueueOpsMixin(QRQueueServiceMixinBase):
@@ -497,6 +516,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                         "status": "before_start_time",
                         "current_time": now.strftime("%H:%M"),
                         **window_fields,
+                        **_before_start_wait_fields(target_date, now, window),
                     }
                 if window_result == "after_end":
                     return {
@@ -592,6 +612,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "status": "before_start_time",
                     "current_time": now.strftime("%H:%M"),
                     **window_fields,
+                    **_before_start_wait_fields(target_date, now, window),
                 }
             elif after_end_queues:
                 _, window = max(
@@ -736,6 +757,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 "status": "before_start_time",
                 "current_time": now.strftime("%H:%M"),
                 **window_fields,
+                **_before_start_wait_fields(target_date, now, window),
             }
         if window_result == "after_end":
             return {

@@ -277,6 +277,68 @@ def test_specific_qr_precheck_rejects_v1_at_exact_cutoff(db_session, monkeypatch
 
 
 @pytest.mark.unit
+def test_clinic_wide_legacy_qr_before_start_returns_countdown_metadata(
+    db_session, monkeypatch
+):
+    import app.crud.clinic as clinic_crud
+    import app.services.qr_queue._queue_ops as qr_queue_ops_module
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue, QueueToken
+    from app.services.qr_queue import QRQueueService
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setattr(
+        qr_queue_ops_module,
+        "_now",
+        lambda tz: datetime(2030, 1, 2, 6, 30, tzinfo=tz),
+    )
+    monkeypatch.delenv("DISABLE_QUEUE_TIME_RESTRICTIONS", raising=False)
+
+    day = date(2030, 1, 2)
+    doctor = Doctor(specialty="cardiology")
+    db_session.add(doctor)
+    db_session.flush()
+    queue = DailyQueue(
+        day=day,
+        specialist_id=doctor.id,
+        queue_tag=None,
+        active=True,
+        policy_version=LEGACY_POLICY_VERSION,
+        online_start_time="07:00",
+        online_end_time="09:00",
+        max_online_entries=15,
+    )
+    db_session.add(queue)
+    db_session.add(
+        QueueToken(
+            token="synthetic-clinicwide-legacy-before-start",
+            day=day,
+            specialist_id=None,
+            is_clinic_wide=True,
+            expires_at=datetime(2030, 1, 3),
+            active=True,
+        )
+    )
+    db_session.flush()
+
+    result = QRQueueService(db_session)._check_online_time_restrictions(
+        "synthetic-clinicwide-legacy-before-start"
+    )
+
+    assert result["allowed"] is False, result
+    assert result["status"] == "before_start_time"
+    assert result["policy_version"] == LEGACY_POLICY_VERSION
+    assert result["minutes_until_open"] == 30
+    assert result["opens_at_datetime"] == "2030-01-02T07:00:00+05:00"
+    assert result["countdown_text"] == "Откроется через 30 мин"
+
+
+@pytest.mark.unit
 def test_clinic_wide_qr_uses_any_available_queue_in_mixed_legacy_day(
     db_session, monkeypatch
 ):
