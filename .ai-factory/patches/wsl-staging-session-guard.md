@@ -2,7 +2,8 @@
 
 Base: `9a5404a5f9c339885662cc0b79a392cfd5b0e1f1`
 Branch: `codex/wsl-staging-session-guard`
-Status: VALIDATED locally; preparing a separate PR. Separate from Admin Queue Simplification T07 / #3557.
+Status: PR_OPEN — [#3559](https://github.com/drsapaev/final/pull/3559). Separate from Admin Queue Simplification T07 / #3557.
+Code commit: `4705d6873f1de342bff02b8bd430cb0b3d1a521a`; subsequent checkpoint commit is documentation only.
 
 ## Pre-work boundary
 
@@ -29,7 +30,7 @@ Status: VALIDATED locally; preparing a separate PR. Separate from Admin Queue Si
 - Native WSL entry point complete: Preflight / Check / Start / Stop / Session. Session owns an EOF-based keeper for the full child lifetime and releases it in finally.
 - Explicit Compose project, ignored env, canonical YAML and `ops/` relative path base; fixed local daemon socket; no ambient Compose overrides. Protect source mounts, foreign projects, production ports and native Windows listener ownership.
 - Strict PostgreSQL mode is intentionally limited to the audited effective-settings suite / `RQ23A_PG_ADMIN_URL`. It constructs the command, pins candidates against dotenv fallback, normalizes only app DATABASE_URL to psycopg, and requires a new zero-skip report. Other fixtures require a separate routing audit (RQ15D has a hardcoded fallback).
-- Next exact action: open PR for `codex/wsl-staging-session-guard`, inspect exact-head CI/review. Resolve PR with `gh pr list --head codex/wsl-staging-session-guard`; do not resume T08 or alter #3557 as part of this tooling PR.
+- Next exact action: inspect #3559 exact-head CI/review and fix blocking failures in this branch. Initial checks are pending; skipped jobs are not passes. Do not resume T08 or alter #3557 as part of this tooling PR.
 - Shared projects and global WSL settings preserved. No application/deployment verification claim.
 
 ## Validation — 2026-10-02, Asia/Tashkent
