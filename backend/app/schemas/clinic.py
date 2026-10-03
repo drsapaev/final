@@ -2,11 +2,12 @@
 Pydantic схемы для управления клиникой в админ панели
 """
 
+import re
 from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
@@ -254,7 +255,11 @@ class QueueSettingsUpdate(BaseModel):
     queue_start_hour: int = Field(
         7, ge=0, le=23, description="Час начала онлайн очереди"
     )
-    auto_close_time: str = Field("09:00", description="Время автозакрытия")
+    auto_close_time: str = Field(
+        "09:00",
+        description="Время окончания онлайн-записи для новых v1 очередей",
+        pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$",
+    )
 
     # Настройки по специальностям
     start_numbers: dict[str, int] = Field(
@@ -266,6 +271,23 @@ class QueueSettingsUpdate(BaseModel):
         default={"cardiology": 15, "dermatology": 20, "stomatology": 12},
         description="Максимум онлайн записей в день",
     )
+
+    @field_validator("auto_close_time")
+    @classmethod
+    def _validate_auto_close_time_format(cls, value: str) -> str:
+        if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value):
+            raise ValueError("auto_close_time must use HH:MM format")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_online_window(self) -> "QueueSettingsUpdate":
+        end_time = time.fromisoformat(self.auto_close_time)
+        start_time = time(self.queue_start_hour, 0)
+        if end_time <= start_time:
+            raise ValueError(
+                "auto_close_time must be later than queue_start_hour"
+            )
+        return self
 
 
 class QueueTestRequest(BaseModel):

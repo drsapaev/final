@@ -437,7 +437,7 @@ def test_department_fields_live_flags(pg_client, pg_admin_user, pg_session):
         assert qs[dead]["note"], f"dead field must explain itself: {dead}"
 
 
-def test_clinic_auto_close_time_is_display_only(pg_client, pg_admin_user, pg_session):
+def test_clinic_auto_close_time_is_v1_creation_cutoff(pg_client, pg_admin_user, pg_session):
     headers = _auth_headers(pg_admin_user)
     _set_queue_setting(pg_session, "auto_close_time", "11:30")
 
@@ -446,11 +446,11 @@ def test_clinic_auto_close_time_is_display_only(pg_client, pg_admin_user, pg_ses
 
     auto_close = fields["auto_close_time"]
     assert auto_close["value"] == "11:30"
-    # The close ENGINE never reads this setting: it reads the
-    # DailyQueue.online_end_time snapshot (from the never-persisted
-    # queue_end_hour key → hardcoded 9). Display payloads do read it.
-    assert auto_close["live"] is False
-    assert "online_end_time" in auto_close["note"]
+    assert auto_close["live"] is True
+    assert auto_close["applied_when"] == ["day_creation_snapshot"]
+    assert auto_close["snapshot_field"] == "DailyQueue.online_end_time"
+    assert "legacy" in auto_close["note"]
+    assert "планировщика" in auto_close["note"]
 
 
 # ---------------------------------------------------------------

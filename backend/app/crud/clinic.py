@@ -120,7 +120,7 @@ def _coerce_ticket_print_bool(value: Any, default: bool) -> bool:
         return default
     if isinstance(value, bool):
         return value
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return bool(value)
     if isinstance(value, str):
         normalized = value.strip().lower()
@@ -508,7 +508,7 @@ def clinic_today(db: Session) -> date:
     окне подтверждение ошибочно пропускает выдачу номеров очереди и
     активацию confirmed → open (main CI red 2026-09-04 19:05Z-19:47Z).
     """
-    from datetime import date, datetime
+    from datetime import datetime
     from zoneinfo import ZoneInfo
 
     tz_name = get_queue_settings(db).get("timezone", "Asia/Tashkent")
@@ -718,27 +718,25 @@ def get_effective_queue_settings_report(
             runtime_consumers=["online_entry_gate", "day_creation_snapshot"],
             snapshot_field="DailyQueue.online_start_time",
             note=(
-                "Гейт онлайн-записи до стартового часа — живое чтение; "
-                "одновременно снимается в строку дня при создании. "
-                "Активный день продолжает работать на снимке (D-06: "
-                "новые настройки применяются со следующего дня/строки)."
+                "Legacy admission gate продолжает читать настройку; для v1 "
+                "старт снимается в DailyQueue.online_start_time при создании. "
+                "Уже созданные v1 строки не меняются при обновлении настройки."
             ),
         ),
         _report_field(
             "auto_close_time",
             "clinic",
             clinic.get("auto_close_time", "09:00"),
-            live=False,
-            applied_when=[],
-            runtime_consumers=["display_only"],
+            live=True,
+            applied_when=["day_creation_snapshot"],
+            runtime_consumers=["v1_online_admission_gate", "queue_auto_close"],
+            snapshot_field="DailyQueue.online_end_time",
             note=(
-                "Движок автозакрытия читает СНИМОК дня "
-                "DailyQueue.online_end_time, а не это поле; "
-                "online_end_time фиксируется при создании дня из ключа "
-                "queue_end_hour, который не персистится и не читается "
-                "(жёсткий дефолт 9). Значение отображается, но на "
-                "закрытие не влияет — F-19 зафиксирован отчётом, "
-                "переподключение требует отдельного решения."
+                "Только новые daily_online_issuances_v1 очереди фиксируют "
+                "это значение как admission cutoff; текущие legacy очереди "
+                "не переводятся и сохраняют старую admission policy. "
+                "Планировщик перехода к обслуживанию читает end-time snapshot "
+                "строки; сам admission cutoff не зависит от планировщика."
             ),
         ),
         _report_field(
@@ -876,6 +874,7 @@ def get_effective_queue_settings_report(
                 "specialist_id": row.specialist_id,
                 "queue_resource_id": row.queue_resource_id,
                 "queue_tag": row.queue_tag,
+                "policy_version": row.policy_version,
                 "active": bool(row.active),
                 "opened_at": row.opened_at.isoformat() if row.opened_at else None,
                 "start_number": int(row.start_number or 1),
@@ -885,8 +884,8 @@ def get_effective_queue_settings_report(
                 "source": "day_snapshot",
                 "note": (
                     "Снимок действующего дня заморожен при создании "
-                    "(время/лимиты/стартовый номер); живые настройки не "
-                    "переписывают его задним числом (D-06, E-039)."
+                    "(policy, время/лимиты/стартовый номер); живые настройки "
+                    "не переписывают его задним числом (D-06, E-039)."
                 ),
             }
         )

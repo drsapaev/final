@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 import strawberry
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy import func, text
+from sqlalchemy import func
 from strawberry import UNSET
 
 from app.core.audit import extract_model_changes, log_critical_change
@@ -34,8 +34,17 @@ from app.crud.appointment import (
     create_appointment as crud_create_appointment,
 )
 from app.crud.clinic import get_queue_settings
-from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
+from app.crud.daily_queue_creation_policy import (
+    daily_queue_creation_snapshot,
+    evaluate_online_admission_window,
+    online_admission_window,
+)
 from app.crud.patient import soft_delete_patient
+from app.crud.queue_resource_routing import (
+    lock_daily_queue_creation,
+    resource_start_number,
+    tag_routes_to_resource,
+)
 
 # Backward-compatible monkeypatch seam for the registry deactivation regression.
 from app.crud.queue_resource_routing import (
@@ -43,10 +52,6 @@ from app.crud.queue_resource_routing import (
 )
 from app.crud.queue_resource_routing import (
     resolve_tag_resource_locked as _resolve_tag_resource_locked,
-)
-from app.crud.queue_resource_routing import (
-    resource_start_number,
-    tag_routes_to_resource,
 )
 from app.crud.visit import create_visit
 from app.schemas.patient import PatientCreate, PatientUpdate
@@ -1040,7 +1045,6 @@ class Mutation:
                 timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
                 now_local = datetime.now(timezone)
                 today = now_local.date()
-                queue_start_hour = queue_settings.get("queue_start_hour", 7)
 
                 # QD-2E: один claim-lock на точный (day, queue_tag) берётся
                 # ДО row-lock врача/ресурса/очереди. Поэтому два writer-а,
@@ -1072,19 +1076,30 @@ class Mutation:
                             ),
                             errors=["QUEUE_CONFLICT"],
                         )
-                elif db.bind is not None and db.bind.dialect.name == "postgresql":
-                    # Untagged doctor queues have no shared tag scope. Preserve
-                    # their original creation lock without collapsing every
-                    # NULL tag into one false cross-doctor claim scope.
-                    db.execute(
-                        text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
-                        {
-                            "k": (
-                                f"daily_queue:{input.doctor_id}:"
-                                f"{today.isoformat()}:"
-                            )
-                        },
-                    )
+                else:
+                    # Lock-parity follow-up to the #3511 review: untagged
+                    # doctor creation must serialize on the SAME advisory
+                    # key as the canonical
+                    # queue_service.get_or_create_daily_queue. The legacy
+                    # inline lock used a different key spelling
+                    # (doctor-before-day plus a trailing ':'), so a GQL
+                    # untagged join only serialized against ITSELF — a
+                    # concurrent canonical writer (registrar cart,
+                    # morning assignment) racing it for the same
+                    # (day, doctor) forked two active NULL-tag rows and
+                    # the partial unique then failed one writer with an
+                    # unhandled IntegrityError. The shared key turns that
+                    # race into clean block → re-read → reuse.
+                    # Untagged doctor queues still have no shared tag
+                    # scope — the helper does not collapse every NULL
+                    # tag into one false cross-doctor claim scope (the
+                    # scope stays per-doctor). Advisory-first ordering is
+                    # preserved (the lock sits BEFORE the Doctor FOR SHARE
+                    # row lock below), keeping the QD-2E no-inversion
+                    # invariant against the cart's lock order. Helper is
+                    # PostgreSQL-only — a no-op on SQLite, matching the
+                    # previous dialect guard.
+                    lock_daily_queue_creation(db, today, input.doctor_id)
 
                 # Row-lock follows the common tag/day lock. It keeps doctor
                 # eligibility stable through the final queue-entry commit.
@@ -1362,14 +1377,48 @@ class Mutation:
                         errors=["QUEUE_CLOSED"],
                     )
 
-                # рабочие часы: now_local/queue_start_hour вычислены выше
-                # по конфигурированной таймзоне (round-8) — тот же момент
-                # времени, что и день очереди.
-                if now_local.hour < queue_start_hour:
+                # The daily queue's version selects whether this is the
+                # legacy start-only rule or its frozen v1 half-open window.
+                admission_window = online_admission_window(
+                    daily_queue=daily_queue,
+                    settings=queue_settings,
+                )
+                # The clinic clock captured before the admission/row locks is
+                # only suitable for selecting the queue identity. A request
+                # can wait across the configured cutoff while those locks are
+                # held, so make the admission decision from a fresh clock read
+                # after the daily-queue lock and never retarget this request to
+                # a different clinic day mid-flight.
+                admission_now_local = datetime.now(timezone)
+                if admission_now_local.date() != today:
                     return QueueMutationResponse(
                         success=False,
-                        message=f"Онлайн-запись доступна с {queue_start_hour}:00",
+                        message=(
+                            "Дата очереди изменилась. Обновите страницу "
+                            "и повторите попытку."
+                        ),
+                        errors=["QUEUE_DAY_CHANGED"],
+                    )
+                window_result = evaluate_online_admission_window(
+                    today, admission_now_local, admission_window
+                )
+                if window_result == "before_start":
+                    return QueueMutationResponse(
+                        success=False,
+                        message=(
+                            "Онлайн-запись доступна с "
+                            f"{admission_window.start_time.strftime('%H:%M')}"
+                        ),
                         errors=["OUTSIDE_HOURS"],
+                    )
+                if window_result == "after_end":
+                    return QueueMutationResponse(
+                        success=False,
+                        message=(
+                            "Онлайн-запись закрыта в "
+                            f"{admission_window.end_time.strftime('%H:%M')}"
+                        ),
+                        errors=["ONLINE_BOOKING_CLOSED"],
                     )
 
                 # Лимит: индивидуальный на очередь -> капа врача

@@ -3472,3 +3472,27 @@ credentials or messaging real patients.
   entry. The user explicitly authorized continuing deployment preparation.
 - Follow-up: improve gate routing for staging-only runtime configuration and
   validation-runbook work so it includes Compose/env owners and documentation.
+
+## Task 99 - T07 mixed clinic-wide QR review follow-up
+
+### User task
+Review and correct PR #3557 after finding that an opened legacy direction could
+block clinic-wide QR access to a different direction whose v1 admission window
+was still open.
+
+### Gate result
+- `gate_misroute`: yes (the combined source-and-test prompt did not return both
+  first-touch files)
+- `override_used`: yes (the known-root retry was used to identify the service
+  owner; the combined request required a retry)
+- `known_root_cause_file`: `backend/app/services/qr_queue/_queue_ops.py`
+- Resolution: separate explicit one-file prompts returned `gate_ok` for the QR
+  service and its regression test; the patch stayed in those files.
+
+### Manual reconstruction and follow-up
+- Source confirmed an unconditional `opened_at` check ran before policy
+  evaluation for every active queue on the clinic-wide token path.
+- The path-specific regression and service change were kept within T07.
+- Follow-up: improve gate handling for bounded runtime-plus-regression tasks so
+  an explicitly named service and its single target test can both be resolved
+  without a broad known-root override.

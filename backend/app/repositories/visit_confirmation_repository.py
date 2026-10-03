@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.crud import clinic as crud_clinic
 from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.crud.queue_resource_routing import (
+    lock_daily_queue_creation,
     lock_registry_tag_creation,
     resolve_tag_resource,
     resolve_tag_resource_locked,
@@ -110,8 +111,6 @@ class VisitConfirmationRepository:
                     queue_resource_id=int(resource.id),
                     queue_tag=queue_tag,
                     active=True,
-                    online_start_time=f"{int(settings.get('queue_start_hour', 7)):02d}:00",
-                    online_end_time=f"{int(settings.get('queue_end_hour', 9)):02d}:00",
                     max_online_entries=resource.max_online_per_day,
                     # RQ-13.b (D-06, E-039): снимок применённого стартового
                     # номера реестра — паритет с queue_svc-конструктором.
@@ -153,6 +152,19 @@ class VisitConfirmationRepository:
 
         actual_specialist_id = doctor.id
 
+        # Lock-parity follow-up to the #3511 review: serialize the
+        # check-then-insert window below on the canonical (day, doctor)
+        # advisory key — the same scope
+        # queue_service.get_or_create_daily_queue holds. A concurrent
+        # canonical writer (registrar cart, morning assignment) racing
+        # this path for the same (day, doctor, tag) could both observe
+        # no queue and insert — the partial unique then fails the loser
+        # with an unhandled IntegrityError instead of the clean
+        # block → re-read → reuse this lock provides. flush-only
+        # creation: the lock lives until the caller's single commit.
+        # Advisory-first: nothing row-locked earlier in this flow.
+        lock_daily_queue_creation(self.db, day, actual_specialist_id)
+
         # QD-2E (Codex round-4 P1): поверхность для записи с решённым
         # врачом — очередь ЭТОГО врача (PR-26 per-doctor), не tag-only
         # очередь другого врача того же тега (doctor 10 не должен
@@ -178,16 +190,11 @@ class VisitConfirmationRepository:
             return daily_queue
 
         settings = crud_clinic.get_queue_settings(self.db)
-        queue_start_hour = settings.get("queue_start_hour", 7)
-        queue_end_hour = settings.get("queue_end_hour", 9)
-
         daily_queue = DailyQueue(
             day=day,
             specialist_id=actual_specialist_id,
             queue_tag=queue_tag,
             active=True,
-            online_start_time=f"{int(queue_start_hour):02d}:00",
-            online_end_time=f"{int(queue_end_hour):02d}:00",
             # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
             # дня (владелец → клиника) — паритет с queue_svc-конструктором.
             **daily_queue_creation_snapshot(

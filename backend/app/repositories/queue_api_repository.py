@@ -98,8 +98,6 @@ class QueueApiRepository:
             queue_resource_id=int(resource.id),
             queue_tag=queue_tag,
             active=True,
-            online_start_time=f"{int(settings.get('queue_start_hour', 7)):02d}:00",
-            online_end_time=f"{int(settings.get('queue_end_hour', 9)):02d}:00",
             max_online_entries=resource.max_online_per_day,
             # RQ-13.b (D-06, E-039): снимок применённого стартового номера
             # реестра — паритет с queue_svc-конструктором.

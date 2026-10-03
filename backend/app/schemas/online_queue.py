@@ -27,6 +27,12 @@ class QRTokenResponse(BaseModel):
     cabinet: str | None = Field(None, description="Номер кабинета")
     day: date = Field(..., description="Дата приема")
     start_time: str = Field(..., description="Время начала онлайн-записи")
+    end_time: str | None = Field(
+        ..., description="Время cutoff онлайн-записи; null для legacy policy"
+    )
+    policy_version: Literal["legacy", "daily_online_issuances_v1"] = Field(
+        ..., description="Политика очереди на выбранный день"
+    )
     max_slots: int = Field(..., description="Максимум мест в очереди")
     current_count: int = Field(0, description="Текущее количество записавшихся")
 
@@ -217,4 +223,11 @@ class QueueStatusCheck(BaseModel):
     has_slots: bool = Field(..., description="Есть свободные места")
     current_time: datetime = Field(..., description="Текущее время")
     queue_start_time: str = Field(..., description="Время начала очереди")
+    queue_end_time: str | None = Field(
+        ...,
+        description="Фактический cutoff онлайн-записи; null для legacy policy",
+    )
+    policy_version: Literal["legacy", "daily_online_issuances_v1"] = Field(
+        ..., description="Политика допуска действующей или будущей очереди"
+    )
     opened_at: datetime | None = Field(None, description="Время открытия приема")

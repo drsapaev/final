@@ -16882,9 +16882,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Check Queue Status Api V1 Online Queue Status Get"
+                  "$ref": "#/components/schemas/QueueStatusCheck"
                 }
               }
             }
@@ -101765,6 +101763,88 @@
               }
             ],
             "title": "Message"
+          },
+          "policy_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "legacy",
+                  "daily_online_issuances_v1"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Version"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time"
+          },
+          "current_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Time"
+          },
+          "minutes_until_open": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes Until Open"
+          },
+          "opens_at_datetime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opens At Datetime"
+          },
+          "countdown_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Countdown Text"
           }
         },
         "type": "object",
@@ -103023,8 +103103,9 @@
           },
           "auto_close_time": {
             "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$",
             "title": "Auto Close Time",
-            "description": "Время автозакрытия",
+            "description": "Время окончания онлайн-записи для новых v1 очередей",
             "default": "09:00"
           },
           "start_numbers": {
@@ -103057,6 +103138,82 @@
         "type": "object",
         "title": "QueueSettingsUpdate",
         "description": "Настройки системы очередей"
+      },
+      "QueueStatusCheck": {
+        "properties": {
+          "queue_open": {
+            "type": "boolean",
+            "title": "Queue Open",
+            "description": "Очередь открыта"
+          },
+          "within_hours": {
+            "type": "boolean",
+            "title": "Within Hours",
+            "description": "В рабочих часах"
+          },
+          "has_slots": {
+            "type": "boolean",
+            "title": "Has Slots",
+            "description": "Есть свободные места"
+          },
+          "current_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Current Time",
+            "description": "Текущее время"
+          },
+          "queue_start_time": {
+            "type": "string",
+            "title": "Queue Start Time",
+            "description": "Время начала очереди"
+          },
+          "queue_end_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue End Time",
+            "description": "Фактический cutoff онлайн-записи; null для legacy policy"
+          },
+          "policy_version": {
+            "type": "string",
+            "enum": [
+              "legacy",
+              "daily_online_issuances_v1"
+            ],
+            "title": "Policy Version",
+            "description": "Политика допуска действующей или будущей очереди"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At",
+            "description": "Время открытия приема"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queue_open",
+          "within_hours",
+          "has_slots",
+          "current_time",
+          "queue_start_time",
+          "queue_end_time",
+          "policy_version"
+        ],
+        "title": "QueueStatusCheck",
+        "description": "Проверка статуса очереди"
       },
       "QueueStatusNotificationRequest": {
         "properties": {
@@ -118224,6 +118381,27 @@
             "title": "Start Time",
             "description": "Время начала онлайн-записи"
           },
+          "end_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time",
+            "description": "Время cutoff онлайн-записи; null для legacy policy"
+          },
+          "policy_version": {
+            "type": "string",
+            "enum": [
+              "legacy",
+              "daily_online_issuances_v1"
+            ],
+            "title": "Policy Version",
+            "description": "Политика очереди на выбранный день"
+          },
           "max_slots": {
             "type": "integer",
             "title": "Max Slots",
@@ -118244,6 +118422,8 @@
           "specialty",
           "day",
           "start_time",
+          "end_time",
+          "policy_version",
           "max_slots"
         ],
         "title": "QRTokenResponse",

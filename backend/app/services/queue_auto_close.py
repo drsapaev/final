@@ -3,12 +3,14 @@
 """
 
 import logging
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import get_queue_settings
 from app.db.session import get_db
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
@@ -28,8 +30,11 @@ class QueueAutoCloseService:
         Returns:
             Статистика закрытых очередей
         """
-        today = date.today()
-        current_time = datetime.now().strftime("%H:%M")
+        settings = get_queue_settings(self.db) or {}
+        timezone = ZoneInfo(settings.get("timezone", "Asia/Tashkent"))
+        now = datetime.now(timezone)
+        today = now.date()
+        current_time = now.strftime("%H:%M")
 
         # Находим очереди, которые нужно закрыть
         queues_to_close = (
@@ -51,7 +56,7 @@ class QueueAutoCloseService:
         for queue in queues_to_close:
             try:
                 # Помечаем очередь как открытую (автозакрытие)
-                queue.opened_at = datetime.now()
+                queue.opened_at = now
 
                 # Логируем закрытие
                 logger.info(
@@ -90,8 +95,11 @@ class QueueAutoCloseService:
         Returns:
             Список очередей с информацией о времени закрытия
         """
-        today = date.today()
-        current_time = datetime.now().strftime("%H:%M")
+        settings = get_queue_settings(self.db) or {}
+        timezone = ZoneInfo(settings.get("timezone", "Asia/Tashkent"))
+        now = datetime.now(timezone)
+        today = now.date()
+        current_time = now.strftime("%H:%M")
 
         pending_queues = (
             self.db.query(DailyQueue)

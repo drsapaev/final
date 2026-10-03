@@ -111,6 +111,44 @@ def test_openapi_queue_join_contract_has_request_and_responses(
     assert any(code in operation["responses"] for code in ("200", "201", "400", "422"))
 
 
+def test_openapi_documents_online_booking_policy_and_cutoff_contract(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    components = schema["components"]["schemas"]
+
+    status_schema = schema["paths"]["/api/v1/online-queue/status"]["get"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    assert status_schema["$ref"].endswith("/QueueStatusCheck")
+    status_contract = components["QueueStatusCheck"]
+    assert {"queue_end_time", "policy_version"}.issubset(
+        status_contract["required"]
+    )
+    assert status_contract["properties"]["policy_version"]["enum"] == [
+        "legacy",
+        "daily_online_issuances_v1",
+    ]
+    assert any(
+        branch.get("type") == "null"
+        for branch in status_contract["properties"]["queue_end_time"]["anyOf"]
+    )
+
+    qr_schema = schema["paths"]["/api/v1/online-queue/qrcode"]["post"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    qr_contract = components[qr_schema["$ref"].rsplit("/", 1)[-1]]
+    assert {"end_time", "policy_version"}.issubset(qr_contract["required"])
+
+    settings_body = schema["paths"]["/api/v1/admin/queue/settings"]["put"][
+        "requestBody"
+    ]["content"]["application/json"]["schema"]
+    settings_contract = components[settings_body["$ref"].rsplit("/", 1)[-1]]
+    assert settings_contract["properties"]["auto_close_time"]["pattern"] == (
+        r"^(?:[01]\d|2[0-3]):[0-5]\d$"
+    )
+
+
 def test_openapi_queue_cabinet_response_exposes_typed_owner_fields(
     client: TestClient,
 ) -> None:
@@ -256,8 +294,20 @@ def test_openapi_qr_token_info_exposes_join_read_contract(client: TestClient) ->
         "allowed",
         "status",
         "message",
+        "start_time",
+        "end_time",
+        "current_time",
+        "policy_version",
+        "minutes_until_open",
+        "opens_at_datetime",
+        "countdown_text",
     ):
         assert field_name in properties
+    assert properties["policy_version"]["anyOf"][0]["enum"] == [
+        "legacy",
+        "daily_online_issuances_v1",
+    ]
+    assert properties["minutes_until_open"]["anyOf"][0]["type"] == "integer"
 
 
 def test_openapi_telegram_onboarding_contract_has_stable_operation_ids(
@@ -358,7 +408,7 @@ def _is_shadowed_static_route(previous_route: str, current_route: str) -> bool:
         return False
 
     saw_previous_param = False
-    for previous_part, current_part in zip(previous_parts, current_parts):
+    for previous_part, current_part in zip(previous_parts, current_parts, strict=False):
         if previous_part == current_part:
             continue
         if (

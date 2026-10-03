@@ -6080,7 +6080,7 @@ def test_availability_compares_dates_on_clinic_clock(
         # future-day availability
         assert availability["available"] is False, availability
         assert availability["reason"] == "TOO_EARLY"
-        assert availability["available_from"] == "7:00"
+        assert availability["available_from"] == "07:00"
     finally:
         _durable_cleanup(db_session, "lab_res_qq2")
 
@@ -8540,7 +8540,7 @@ def test_resource_branch_created_visit_start_not_durable_when_boundary_commit_fa
             pass
 
 
-def test_start_visit_success_persists_whole_unit_existing_visit() -> None:
+def test_start_visit_success_persists_whole_unit_existing_visit(monkeypatch) -> None:
     """Start-atomicity, SUCCESS path (existing visit): the endpoint's
     single boundary commit persists the WHOLE unit — the entry flip,
     the lifecycle transition AND the visit
@@ -8548,7 +8548,12 @@ def test_start_visit_success_persists_whole_unit_existing_visit() -> None:
     "simplified" into dropping the boundary commit entirely."""
     import os
 
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
     from sqlalchemy.orm import Session, sessionmaker
+
+    from app.api.v1.endpoints.doctor_integration import _queue_ops
 
     from app.api.v1.endpoints.doctor_integration._queue_ops import (
         start_patient_visit,
@@ -8558,6 +8563,8 @@ def test_start_visit_success_persists_whole_unit_existing_visit() -> None:
 
     engine, db_path = _atomicity_scratch_world()
     try:
+        clinic_start = datetime(2026, 10, 2, 12, 34, tzinfo=ZoneInfo("Asia/Tashkent"))
+        monkeypatch.setattr(_queue_ops, "_clinic_now", lambda _db: clinic_start)
         maker = sessionmaker(bind=engine, autocommit=False, autoflush=False)
         db = maker()
 
