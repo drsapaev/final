@@ -3528,3 +3528,31 @@ Continue T08 daily successful online issuance quota from the approved admin queu
 
 ### Source correction
 - Telegram remains only a source-classification reference for this quota slice. Existing evidence says its reachable callback calls a missing queue method and fails before a database write; this is not authorization to repair that flow under T08.2a.
+
+## Task 102 - DevBrain legacy wrapper scope misroute — 2026-10-03
+
+### User task
+Implement PR 2 of the approved automatic-memory plan: make file-backed memory
+the default for DevBrain wrappers and keep LlamaIndex/LightRAG opt-in.
+
+### Gate result
+- Initial gate returned `gate_ok` but listed only `ai/langgraph/scripts/agent_gate.py`
+  and `run_agent_gate.ps1` as first-touch files for a wrapper and documentation task.
+- One retry used `scripts/devbrain_refresh_memory.ps1` as the confirmed root
+  cause. It returned `narrow_override`, with `gate_misroute: yes` and
+  `override_used: yes`, but still listed only that one wrapper.
+- Manual scope basis: the user-approved PR 2 plan names the four wrappers,
+  focused tests, and DevBrain status/routing documents. No gate/router file was
+  included in the patch scope.
+
+### Source review and follow-up
+- ADR-0007 marks both legacy retrieval layers dormant, while the status document
+  and wrappers still described them as active and ran queries by default.
+- The local artifacts were absent in the inspected worktree; no legacy index
+  was created or queried during this review.
+- Gate/prompt helped identify the refresh wrapper as one root-cause file, but
+  missed the remaining wrappers, tests, and status-document owners.
+- LightRAG retrieval relevance was not evaluated; this was a gate scope-routing
+  miss, not a graph-query quality check.
+- Follow-up: review multi-wrapper DevBrain maintenance routing in a separate
+  approved task if the same misroute recurs. This PR does not change the gate.
