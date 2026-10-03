@@ -1,0 +1,43 @@
+name: Uptime monitor guard tests
+
+# Locks the incident-management logic of .github/workflows/uptime-monitor.yml
+# (#3562 follow-up): scripts/check_uptime_monitor_workflow.py runs structural
+# assertions and behavioral tests against the REAL github-script step
+# extracted from the workflow (node + stubbed github API), so a future edit
+# cannot silently reintroduce the no-data "backup stale" false incident that
+# fabricated "newest backup is h old" / "status: " during a pure tunnel
+# outage (HTTP 530 / Cloudflare 1033).
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/uptime-monitor.yml"
+      - ".github/workflows/uptime-guard-tests.yml"
+      - "scripts/check_uptime_monitor_workflow.py"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/uptime-monitor.yml"
+      - ".github/workflows/uptime-guard-tests.yml"
+      - "scripts/check_uptime_monitor_workflow.py"
+
+permissions:
+  contents: read
+
+jobs:
+  guard-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Install PyYAML
+        run: python -m pip install --quiet pyyaml
+      - name: Run workflow guard tests
+        run: python scripts/check_uptime_monitor_workflow.py

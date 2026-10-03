@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.specialties import specialty_variants
 from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
+from app.crud.queue_resource_routing import lock_daily_queue_creation
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
@@ -81,6 +82,18 @@ class QueueLimitsRepository:
         specialist_id: int,
         max_online_entries: int,
     ) -> DailyQueue:
+        # Lock-parity follow-up to the #3511 review: serialize the
+        # check-then-insert window below on the canonical (day, doctor)
+        # advisory key — the same scope
+        # queue_service.get_or_create_daily_queue holds. An admin limit
+        # write racing a canonical writer (registrar cart, morning
+        # assignment) for the same (day, doctor) could both observe no
+        # queue and insert — the partial unique then fails the loser
+        # with an unhandled IntegrityError instead of the clean
+        # block → re-read → reuse this lock provides. Advisory-first:
+        # nothing row-locked earlier in this flow; save()'s commit
+        # releases the transaction-scoped lock.
+        lock_daily_queue_creation(self.db, day, specialist_id)
         queue = self.get_daily_queue(day=day, specialist_id=specialist_id)
         if not queue:
             doctor = self.db.get(Doctor, specialist_id)

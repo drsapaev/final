@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 import strawberry
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy import func, text
+from sqlalchemy import func
 from strawberry import UNSET
 
 from app.core.audit import extract_model_changes, log_critical_change
@@ -40,6 +40,11 @@ from app.crud.daily_queue_creation_policy import (
     online_admission_window,
 )
 from app.crud.patient import soft_delete_patient
+from app.crud.queue_resource_routing import (
+    lock_daily_queue_creation,
+    resource_start_number,
+    tag_routes_to_resource,
+)
 
 # Backward-compatible monkeypatch seam for the registry deactivation regression.
 from app.crud.queue_resource_routing import (
@@ -47,10 +52,6 @@ from app.crud.queue_resource_routing import (
 )
 from app.crud.queue_resource_routing import (
     resolve_tag_resource_locked as _resolve_tag_resource_locked,
-)
-from app.crud.queue_resource_routing import (
-    resource_start_number,
-    tag_routes_to_resource,
 )
 from app.crud.visit import create_visit
 from app.schemas.patient import PatientCreate, PatientUpdate
@@ -1075,19 +1076,30 @@ class Mutation:
                             ),
                             errors=["QUEUE_CONFLICT"],
                         )
-                elif db.bind is not None and db.bind.dialect.name == "postgresql":
-                    # Untagged doctor queues have no shared tag scope. Preserve
-                    # their original creation lock without collapsing every
-                    # NULL tag into one false cross-doctor claim scope.
-                    db.execute(
-                        text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
-                        {
-                            "k": (
-                                f"daily_queue:{input.doctor_id}:"
-                                f"{today.isoformat()}:"
-                            )
-                        },
-                    )
+                else:
+                    # Lock-parity follow-up to the #3511 review: untagged
+                    # doctor creation must serialize on the SAME advisory
+                    # key as the canonical
+                    # queue_service.get_or_create_daily_queue. The legacy
+                    # inline lock used a different key spelling
+                    # (doctor-before-day plus a trailing ':'), so a GQL
+                    # untagged join only serialized against ITSELF — a
+                    # concurrent canonical writer (registrar cart,
+                    # morning assignment) racing it for the same
+                    # (day, doctor) forked two active NULL-tag rows and
+                    # the partial unique then failed one writer with an
+                    # unhandled IntegrityError. The shared key turns that
+                    # race into clean block → re-read → reuse.
+                    # Untagged doctor queues still have no shared tag
+                    # scope — the helper does not collapse every NULL
+                    # tag into one false cross-doctor claim scope (the
+                    # scope stays per-doctor). Advisory-first ordering is
+                    # preserved (the lock sits BEFORE the Doctor FOR SHARE
+                    # row lock below), keeping the QD-2E no-inversion
+                    # invariant against the cart's lock order. Helper is
+                    # PostgreSQL-only — a no-op on SQLite, matching the
+                    # previous dialect guard.
+                    lock_daily_queue_creation(db, today, input.doctor_id)
 
                 # Row-lock follows the common tag/day lock. It keeps doctor
                 # eligibility stable through the final queue-entry commit.
