@@ -1284,3 +1284,21 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Cleanup: Stop was issued only for the owned project; a follow-up `Check` returned `STAGING_NOT_READY`, confirming its services are stopped. The helper's Stop preserves volumes. No WSL shutdown, prune, or foreign project action was used.
 - PR: https://github.com/drsapaev/final/pull/3557. Update the PR body with this result before the documentation checkpoint is pushed.
 - Merge commit: none.
+
+## T07 PR-specific review and deferral disposition — 2026-10-03T18:21:56+05:00
+
+- Commit assessed: fcace1f3bf77a000932382780a572be1273c8699; base f1be5697dbc487d792e8d5ae60db53c079bbe638.
+- Environment: clean T07 Windows worktree; read-only GitHub state check. No new staging run.
+- Execution mode: direct_execute — known documentation/review state update, no risky runtime domain.
+- Canonical anchors: AGENTS_UI.md section 13, current PR diff/CI, prior exact-head EVIDENCE and DECISIONS.
+- Allowed paths: PROGRESS.md, RESUME.md, DECISIONS.md, EVIDENCE.md; ignored PR-body scratch; PR description and authorized review.
+- Denied: application/tests/schema, auth configuration, production/shared staging, feature flags, merge/deployment.
+- Original gap: three named specs NOT_RUN with no #3557-specific disposition; authenticated account is also PR author.
+- Validation: actual GitHub HEAD/account checked; fcace1f3 CI 27 SUCCESS / 12 SKIPPED / 0 failures. See the separately recorded staging results; no new runtime PASS is claimed.
+- Result: bounded Tier-2 deferral ACCEPTED under explicit user delegation; technical review APPROVE (0 P0/P1/P2). Three deferred specs remain NOT_RUN, Tier 2 PARTIAL, full pre-deploy runbook NOT_RUN and mandatory.
+- Six required deferral fields: recorded in DECISIONS section above and PR body. Owner T07/T18; resume before rollout/v1 activation after isolated normal-TOTP/Registrar/origin setup. Deferred specs contribute zero completed coverage.
+- Review identity: CLI/connector drsapaev is PR author; agent technical COMMENT cannot be called independent human APPROVED.
+- Scope/stop: documentation and authorized PR metadata only. Stop before merge/deployment or any runtime change.
+- PR: https://github.com/drsapaev/final/pull/3557. No merge commit.
+
+- Local validation: git diff --check PASS; run_pr_review_gate_checks.py PASS (19 unit tests, both documented samples and actual updated PR body). Only the four declared plan-memory documents changed.

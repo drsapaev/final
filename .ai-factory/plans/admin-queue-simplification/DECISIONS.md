@@ -69,3 +69,17 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - Recover the detailed 1.1 plan and decisions from the untouched local T03 worktree, correct stale T03–T05 status, and publish the missing RESUME entry point in a separate docs-only PR.
 - Keep original user decisions D1–D5 unchanged. Preserve historical evidence; current statuses live in PROGRESS, not in old timestamped journal entries.
 - Retain old untracked scratch and temporary environments. Earlier automatic approval rejection of scratch deletion is not bypassed by another deletion method.
+
+## T07 / PR #3557 — accepted bounded Tier-2 deferral
+
+- Decision source: user explicitly requested a review and a separate Tier-2 decision on 2026-10-03. This is an agent technical assessment under human delegation, not an independently submitted human GitHub approval.
+- Reviewed head: fcace1f3bf77a000932382780a572be1273c8699; runtime unchanged from reviewed 037c6493. Technical verdict: APPROVE, P0=0 / P1=0 / P2=0.
+- Decision: ACCEPT the PR-specific deferral of admin-navigation.spec.ts, queue-system.spec.ts, and panel-qa-admin-live.spec.ts for merge disposition. Documentation-only successors inherit this disposition if runtime is unchanged; later PRs and runtime changes do not.
+- Original requirement: run those three named backend-dependent Playwright specs on isolated synthetic staging.
+- Reason: admin-navigation does not handle mandatory Admin TOTP; queue-system lacks verified synthetic Registrar credentials in the owned project and writes queue/patient data; panel-qa-admin-live pins localhost:5173 and origin-bound storage state and writes patient/service data. These require safe harness/credential preparation, not a production fallback.
+- Evidence: all three remain NOT_RUN. Core T07 mixed-policy QR and real PostgreSQL cutoff-after-lock scenarios passed; normal Admin password/TOTP, four routes, settings round-trip/restore and cold/repeated timings passed; exact clean-head served frontend hashes matched 255/255 files. CI on fcace1f3: 27 SUCCESS / 12 SKIPPED / 0 failures. Skips remain NOT_RUN.
+- Owner/workstream: T07/T18 Admin Queue Simplification synthetic staging executor.
+- Resume condition: prepare normal-TOTP-compatible login, verified synthetic Registrar credentials and an explicitly isolated configurable origin; run all three at T18 before production rollout or v1 activation, record each result and clean synthetic writes. Reopen disposition if a product defect or changed runtime invalidates evidence.
+- Headline impact: Tier 2 remains PARTIAL; 0 of 3 deferred named specs is completed. No overall completion percentage is inferred. Deferral adds no coverage.
+- Remaining gates: full ten-item STAGING_VALIDATION.md is mandatory pre-deploy and NOT waived. New-head required CI still applies. No deployment, flag activation, merge or independent human GitHub approval is performed by this decision. T07 remains PR_OPEN until a merge is confirmed.
+- Identity constraint: CLI and connector both authenticate as author drsapaev. Technical APPROVE is recorded via COMMENT; GitHub self-APPROVE is unavailable.
