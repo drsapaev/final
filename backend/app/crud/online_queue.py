@@ -508,12 +508,11 @@ def join_online_queue_multiple(
             db.add(queue_entry)
             db.flush()  # Получаем ID записи
             logger.info(
-                "[join_online_queue_multiple] ✅ Создана OnlineQueueEntry id=%d для specialist_id=%d, queue_id=%d, number=%d, patient_id=%s",
+                "[join_online_queue_multiple] ✅ Создана OnlineQueueEntry id=%d для specialist_id=%d, queue_id=%d, number=%d",
                 queue_entry.id,
                 specialist_id,
                 daily_queue.id,
                 next_number,
-                patient_id,
             )
 
             # Получаем информацию о специальности для иконки
