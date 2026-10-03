@@ -1,7 +1,7 @@
 # Resume — admin queue simplification
 
 Plan version: 2.3
-Last updated: 2026-10-03T07:22:00+05:00, Asia/Tashkent
+Last updated: 2026-10-03T07:24:00+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user said “мержай и продолжай”. T06.2 is merged; T07 is active. This does not authorize production deployment or feature-flag activation.
 
 ## First read
@@ -15,7 +15,7 @@ Execution permission: IMPLEMENTATION_ACTIVE; user said “мержай и про
 
 - T00–T06.2 are MERGED. PR #3546 / T06.2 is confirmed merged at `2026-10-01T17:48:53Z`: merge commit `b804a71a6bad22400324e2236a3221317eac3158`, exact PR head `2c6c04f996fdced70c8b8ecf1a8f24452336e83e`, base `1358c70bf4723d151861a9ef135bba147b118fee`. Applicable CI passed on that exact head. Focused local tests: 54 passed, 1 warning, SQLite only. Path-aware skips are not passes; PG runtime/staging/browser validation is NOT_RUN. The v1 creation flag remains default-off.
 - T05 / PR #3543's staging deferral was separately accepted under the user's delegated decision. It contributes no staging proof and is not inherited by another PR. See DECISIONS and EVIDENCE; T18/pre-deploy still owns the deferred scenarios.
-- Latest T07 state: local code/test commit `e216935dbceca481595754635057f341c6ee767f` fixes the reviewed token cutoff race; remote PR still points at `7edd9e249f46988e531170e5361d9a60a0f3b274` until push. Exact-head CI for the fix is pending. Worktree/branch/base remain `C:\final\_wt_aqs_t07_window`, `codex/aqs-T07-admission-window`, and `e29ced129ce03b80efb867670f6a5a1ce8ce185a`.
+- Latest T07 state: local code/test commit `4595d67a6e484bab8a9a59277bdaf2775e143d56` fixes the reviewed token cutoff race; remote PR still points at `7edd9e249f46988e531170e5361d9a60a0f3b274` until push. Exact-head CI for the fix is pending. Worktree/branch/base remain `C:\final\_wt_aqs_t07_window`, `codex/aqs-T07-admission-window`, and `e29ced129ce03b80efb867670f6a5a1ce8ce185a`.
 
 ## Active step — T07, unified online booking window
 
@@ -30,7 +30,7 @@ Execution permission: IMPLEMENTATION_ACTIVE; user said “мержай и про
 - Stop on ambiguous routing/claim flow, a writer bypassing the common admission boundary, overnight configuration, a need to change future-date behavior, ownership, queue numbering or clinical lifecycle. Also stop before using any staging/production environment with live data.
 - Environment check: owned synthetic Compose staging was stopped with volumes retained after the full run confirmed zero fixture rows. The feature flag is unset/default-off. Normal supported Admin 2FA was used; no MFA bypass occurred. Production, shared staging, and the unrelated PR #3524 project were not accessed or changed. After the WSL update, the full run kept one boot ID from Start through Session/Stop; available memory dropped below 1 GiB during the session without a reboot or timeout. Earlier parallel diagnostics had coincided with `Wsl/Service/WSAETIMEDOUT`; that remains no evidence of OOM.
 - WSL continuation rules to avoid repeating the prior failure mode: (1) keep one persistent WSL keeper for the entire Start → Session → Stop sequence; (2) do not issue parallel `wsl.exe`/Docker diagnostics while Compose is building or serving; (3) inspect the owned Compose project name before every Docker action and never stop foreign projects; (4) reuse the image already built from the exact PR source and use a no-build validation retry for a failed scenario; (5) if `WSAETIMEDOUT` recurs, allow the active helper to finish, capture only its result marker, and retry only the failed check after the environment is stable—do not repeat the entire build or infer OOM without memory/kernel evidence; (6) avoid `wsl --shutdown` and broad Docker prune. A generic runbook improvement, if still needed after T07 closes, must be a separate focused docs PR, not mixed into this one-purpose PR.
-- Next exact action: push commit `e216935d` and this checkpoint to PR #3557, then verify checks on the exact new HEAD. PostgreSQL blocking-lock proof and staging against the fixed revision are NOT_RUN. Keep the PR open pending exact-head CI, independent human review, and a PR-specific Tier 2 disposition or completion of the missing staging scope. Do not begin T08.
+- Next exact action: push force-push the rebased branch after confirming remote HEAD remains `7edd9e249f46988e531170e5361d9a60a0f3b274` to PR #3557, then verify checks on the exact new HEAD. PostgreSQL blocking-lock proof and staging against the fixed revision are NOT_RUN. Keep the PR open pending exact-head CI, independent human review, and a PR-specific Tier 2 disposition or completion of the missing staging scope. Do not begin T08.
 
 ## Merge, staging and rollout guardrails
 
