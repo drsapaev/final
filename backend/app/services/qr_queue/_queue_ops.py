@@ -522,8 +522,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     return {
                         "allowed": False,
                         "message": (
-                            "Онлайн-запись закрыта в "
-                            f"{window_fields['end_time']}"
+                            "Онлайн-запись закрыта в " f"{window_fields['end_time']}"
                         ),
                         "status": "after_end_time",
                         **window_fields,
@@ -546,24 +545,6 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "warning": "Очереди еще не созданы, но запись разрешена",
                 }
 
-            # Проверяем, что хотя бы одна очередь не открыта
-            any_opened = (
-                self.db.query(DailyQueue)
-                .filter(
-                    DailyQueue.day == target_date,
-                    DailyQueue.active == True,
-                    DailyQueue.opened_at.isnot(None),
-                )
-                .first()
-            )
-
-            if any_opened:
-                return {
-                    "allowed": False,
-                    "message": "Запись закрыта - прием уже открыт",
-                    "status": "closed_reception_opened",
-                }
-
             # A clinic-wide QR is an overview before the patient selects a
             # concrete owner. Never let the first DailyQueue row impose its
             # legacy/v1 window on every other destination in a mixed day.
@@ -571,7 +552,14 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             available_queues = []
             before_start_queues = []
             after_end_queues = []
+            opened_queues = []
             for queue in daily_queues:
+                # Opening one direction closes admission only for that
+                # queue. Other directions may have a later frozen v1 window
+                # and remain selectable through the clinic-wide overview.
+                if queue.opened_at is not None:
+                    opened_queues.append(queue)
+                    continue
                 queue_window = online_admission_window(
                     daily_queue=queue,
                     settings=queue_settings,
@@ -606,8 +594,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 return {
                     "allowed": False,
                     "message": (
-                        "Онлайн-запись откроется в "
-                        f"{window_fields['start_time']}"
+                        "Онлайн-запись откроется в " f"{window_fields['start_time']}"
                     ),
                     "status": "before_start_time",
                     "current_time": now.strftime("%H:%M"),
@@ -632,11 +619,16 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 return {
                     "allowed": False,
                     "message": (
-                        "Онлайн-запись закрыта в "
-                        f"{window_fields['end_time']}"
+                        "Онлайн-запись закрыта в " f"{window_fields['end_time']}"
                     ),
                     "status": "after_end_time",
                     **window_fields,
+                }
+            elif opened_queues:
+                return {
+                    "allowed": False,
+                    "message": "Запись закрыта - прием уже открыт",
+                    "status": "closed_reception_opened",
                 }
             else:
                 return {
@@ -772,7 +764,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         if qr_token.is_clinic_wide or qr_token.specialist_id is None:
             # Для общего QR используем значения из первой очереди для информации (если есть)
             max_entries = (
-                getattr(daily_queue, 'max_online_entries', 15) if daily_queue else 15
+                getattr(daily_queue, "max_online_entries", 15) if daily_queue else 15
             )
             # Подсчитываем общее количество онлайн записей на эту дату
             all_queues_ids = [
@@ -794,7 +786,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             )
         else:
             # Для конкретного специалиста проверяем лимит его очереди
-            max_entries = getattr(daily_queue, 'max_online_entries', 15)
+            max_entries = getattr(daily_queue, "max_online_entries", 15)
             current_entries = (
                 self.db.query(OnlineQueueEntry)
                 .filter(
