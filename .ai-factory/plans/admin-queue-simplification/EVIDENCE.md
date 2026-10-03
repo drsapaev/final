@@ -1397,3 +1397,11 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: PostgreSQL last-slot, replay and partial-result scenarios remain T08.3 and NOT_RUN; staging/browser validation is NOT_RUN. The v1 creation flag remains default-off.
 - PR: not opened yet.
 - Merge commit: none.
+
+## T08.1b PR opened — 2026-10-03T20:58:00+05:00
+
+- Code commit: `8e215d4ab82c8f7f6c4010c1578819ea56ae79b1`, based on `d397656c7f597d72d6a6c92676cd204aff72d4d8`.
+- PR: https://github.com/drsapaev/final/pull/3572.
+- Push and PR creation succeeded; local PR body quality gate passed. The PR body marks browser Tier 1/2 checks not applicable for this backend-only slice and explicitly leaves PostgreSQL concurrency/replay/partial-result proof NOT_RUN for T08.3 before rollout.
+- Exact-head GitHub checks and mergeability: pending; no merge claimed.
+- The runtime implementation and focused tests are committed. This evidence-only checkpoint is being pushed separately so the current PR state remains recoverable.

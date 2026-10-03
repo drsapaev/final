@@ -1,8 +1,8 @@
 # Resume — admin queue simplification
 
 Plan version: 2.4
-Last updated: 2026-10-03T20:43:00+05:00, Asia/Tashkent
-Execution permission: IMPLEMENTATION_ACTIVE; user confirmed #3557 merged and said continue. T07/#3557 and T08.1a/#3571 are MERGED; #3571 merge commit/base is d397656c7f597d72d6a6c92676cd204aff72d4d8. Current task is T08.1b in `C:\final\_wt_aqs_t081b_identity`, branch `codex/aqs-T081b-identity-guard`, based on that merge. Local source changes are under test; no PR is open yet. No production deployment or v1 activation is authorized.
+Last updated: 2026-10-03T20:58:00+05:00, Asia/Tashkent
+Execution permission: IMPLEMENTATION_ACTIVE; user confirmed #3557 merged and said continue. T07/#3557 and T08.1a/#3571 are MERGED; #3571 merge commit/base is d397656c7f597d72d6a6c92676cd204aff72d4d8. Current task is T08.1b in `C:\final\_wt_aqs_t081b_identity`, branch `codex/aqs-T081b-identity-guard`, based on that merge. Runtime commit `8e215d4ab82c8f7f6c4010c1578819ea56ae79b1` is open as PR #3572; exact-head CI is pending. No production deployment or v1 activation is authorized.
 
 ## First read
 
@@ -30,12 +30,12 @@ Execution permission: IMPLEMENTATION_ACTIVE; user confirmed #3557 merged and sai
 
 ## Active step — T08.1b, v1 identity/recreation guard
 
-- Base/worktree: `C:\final\_wt_aqs_t081b_identity`, branch `codex/aqs-T081b-identity-guard`, base `d397656c7f597d72d6a6c92676cd204aff72d4d8`; runtime/test edits are currently uncommitted.
+- Base/worktree: `C:\final\_wt_aqs_t081b_identity`, branch `codex/aqs-T081b-identity-guard`, base `d397656c7f597d72d6a6c92676cd204aff72d4d8`; runtime/test commit `8e215d4ab82c8f7f6c4010c1578819ea56ae79b1` is open as PR #3572.
 - Gate: mandatory `gate_known_root_cause` was run before editing. Initial gate misrouted; the single permitted known-root retry identified `_operations.py` but still omitted sibling constructors. The manually approved T08 plan explicitly includes the shared creation policy and all runtime DailyQueue constructors, so the narrow implementation expands only to those call sites and focused tests. Record `gate_misroute=true`, `override_used=true`, and `known_root_cause_file=backend/app/services/queue_svc/_operations.py` in EVIDENCE. Do not run a third gate.
 - Canonical implementation: `backend/app/crud/daily_queue_creation_policy.py` calls the typed identity guard in `backend/app/crud/queue_resource_routing.py` only when selecting v1 for a new snapshot. Doctor identity is `(doctor, day, exact tag)`; resource identity is `(resource, day)`. Any prior active or inactive row blocks a zero-counter replacement. Legacy creation retains its previous behavior.
 - Covered runtime constructors: canonical queue service, CRUD online queue paths, GraphQL direct constructor, queue API open path, queue limits, visit confirmation and force-majeure creation. The Admin retention endpoint deletes only queues before a cutoff with `days_to_keep >= 1`, so it cannot delete today's/future queue; past-day online admission is already rejected. Backup restore preserves policy/count and is a recovery path, not an admission writer; dev seed is non-runtime. Source scan found no ordinary runtime counter/version assignment.
-- Validation already run on current code: policy suite 11 passed / 1 warning; six related API/limits/visit/force-majeure/GraphQL/token modules 36 passed / 1 warning; scoped Ruff, Ruff format check for three focused files, compileall, `git diff --check`, and the PR-body quality gate pass. SQLite test fixture only; PostgreSQL race proof is NOT_RUN and remains T08.3.
-- Next exact action: inspect the whole diff, then commit/push and open one T08.1b PR. Confirm exact-head CI before moving to T08.2.
+- Validation already run on the PR code: policy suite 11 passed / 1 warning; six related API/limits/visit/force-majeure/GraphQL/token modules 36 passed / 1 warning; Ruff, Ruff format, Black, compileall, `git diff --check`, and the PR-body quality gate pass. SQLite test fixture only; PostgreSQL race proof is NOT_RUN and remains T08.3.
+- Next exact action: push this PR-state checkpoint and confirm exact-head CI/review/mergeability for #3572; do not start T08.2 until this PR cycle is green and merged.
 - Stop if any runtime constructor bypasses the common policy, identity axes become ambiguous, or preventing recreation would require queue merge/renumbering. Do not enable the v1 flag; PG concurrency/replay/partial-result proof remains mandatory before rollout.
 ## Merge, staging and rollout guardrails
 
