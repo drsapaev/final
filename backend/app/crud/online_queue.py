@@ -958,6 +958,21 @@ def get_or_create_daily_queue(
 
     actual_specialist_id = doctor_exists.id
 
+    # Lock-parity follow-up to the #3511 review: serialize the
+    # check-then-insert window below on the canonical (day, doctor)
+    # advisory key — the same scope
+    # queue_service.get_or_create_daily_queue holds. The queue_batch
+    # path reaches this branch with tag=None: two concurrent batch (or
+    # batch-vs-canonical) writers could both observe no NULL-tag queue
+    # and insert — the partial unique then fails the loser with an
+    # unhandled IntegrityError instead of the clean block → re-read →
+    # reuse this lock provides. Taken BEFORE the lookup, flush/commit
+    # releases it at this function's own commit. PostgreSQL-only; the
+    # sequential SQLite tests skip harmlessly.
+    queue_resource_routing.lock_daily_queue_creation(
+        db, day, actual_specialist_id
+    )
+
     # Ищем очередь с учетом queue_tag
     query_filters = [
         DailyQueue.day == day,
