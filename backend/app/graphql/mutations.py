@@ -772,7 +772,7 @@ class Mutation:
                         )
                     except Exception as notify_error:  # noqa: BLE001
                         logger.warning(
-                            "GraphQL createVisit: all_free notification " "failed: %s",
+                            "GraphQL createVisit: all_free notification failed: %s",
                             notify_error,
                         )
 
@@ -1182,21 +1182,20 @@ class Mutation:
                         requested_resource_id = (
                             getattr(registry_surface, "queue_resource_id", None)
                             if registry_surface is not None
-                            and getattr(
-                                registry_surface, "queue_resource_id", None
-                            )
+                            and getattr(registry_surface, "queue_resource_id", None)
                             is not None
-                            else int(registry_resource.id)
-                            if registry_resource is not None
-                            else None
+                            else (
+                                int(registry_resource.id)
+                                if registry_resource is not None
+                                else None
+                            )
                         )
                         same_owner = (
                             registry_surface_id is not None
                             and claim_queue.id == registry_surface_id
                         ) or (
                             requested_resource_id is not None
-                            and claim_queue.queue_resource_id
-                            == requested_resource_id
+                            and claim_queue.queue_resource_id == requested_resource_id
                         )
                     else:
                         same_owner = (
@@ -1294,6 +1293,7 @@ class Mutation:
                         # «default».
                         **daily_queue_creation_snapshot(
                             db,
+                            day=today,
                             doctor=doctor,
                             queue_tag=None,
                             settings=queue_settings,
@@ -1738,8 +1738,8 @@ class Mutation:
                         # очереди — легаси-комната байт-идентично.
                         from app.ws.queue_ws import queue_update_departments
 
-                        payload["broadcast_departments"] = (
-                            queue_update_departments(db, entry.queue)
+                        payload["broadcast_departments"] = queue_update_departments(
+                            db, entry.queue
                         )
 
                     # --- post-commit side effects с sync-DB (в этом же worker) ---
@@ -1778,11 +1778,12 @@ class Mutation:
                                 and entry.queue.specialist.user
                                 else "Врач"
                             )
-                        payload[
-                            "display_message"
-                        ] = get_display_manager().build_patient_call_message(
-                            entry, specialist_name, payload["cabinet"]
+                        display_message = (
+                            get_display_manager().build_patient_call_message(
+                                entry, specialist_name, payload["cabinet"]
+                            )
                         )
+                        payload["display_message"] = display_message
                     except Exception as e:  # noqa: BLE001 — non-blocking
                         logger.warning(
                             "GraphQL callNext: display payload build failed: %s", e

@@ -1,13 +1,13 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 2.3 — T07 PR #3557 is open; exact-head Tier 1 CI is pending and Tier 2 deferral requires reviewer acknowledgment.
-**Создан:** 30 сентября 2026. **Обновлён:** 2 октября 2026, Asia/Tashkent.
+**Версия:** 2.4 — T07 / #3557 and T08.1a / #3571 are merged; T08.1b is in progress.
+**Создан:** 30 сентября 2026. **Обновлён:** 3 октября 2026, 20:26 Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
-**Последний подтверждённый runtime merge:** `b804a71a6bad22400324e2236a3221317eac3158`, PR #3546 / T06.2.
-**Текущий worktree:** `C:\final\_wt_aqs_t07_window`, ветка `codex/aqs-T07-admission-window`, rebase base `3a776133`; code commit `9b7c5663ab3ce0ef6bad7222ca6104a6059cb520`.
+**Последний подтверждённый runtime merge:** `d397656c7f597d72d6a6c92676cd204aff72d4d8`, PR #3571 / T08.1a.
+**Текущий worktree:** `C:\final\_wt_aqs_t081b_identity`, ветка `codex/aqs-T081b-identity-guard`, base `d397656c7f597d72d6a6c92676cd204aff72d4d8`; T08.1b implementation in progress.
 
-> **T00–T06.2 — MERGED; T07 — PR_OPEN (#3557); T08–T18 — PLANNED.** PR #3546 смержен в `b804a71a`. T07 post-rebase combined backend/OpenAPI/effective-report run: 94 passed / 7 PostgreSQL-only skipped, 1 warning; QueueSettings suite: 27 passed. Required UI Tier 1 gates await exact-head CI; Tier 2 reviewer acknowledgment is pending. Local PostgreSQL/staging/browser proof is NOT_RUN.
+> **T00–T07 и T08.1a — MERGED; T08.1b — IN_PROGRESS; T08.2–T18 — PLANNED.** PR #3557 merged as `425df11c7a84f0d1e7954df0d00415927212669a`; PR #3571 merged as `d397656c7f597d72d6a6c92676cd204aff72d4d8`. T08.1b protects v1 identity reuse across shared creation paths. PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -15,7 +15,7 @@
 **Решения:** [DECISIONS.md](admin-queue-simplification/DECISIONS.md).
 **Доказательства:** [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
 
-Подробная версия 1.1 ранее осталась незакоммиченной в worktree T03. Версии 1.2–1.7 сохранили последовательные checkpoints T03–T06.2. Версия 1.8 подтверждает merge T06.2 и фиксирует точную T07 границу до первого runtime edit. Исторические evidence сохраняются. Пропущенные staging/browser проверки остаются NOT_RUN и не считаются приёмкой.
+Подробная версия 1.1 ранее осталась незакоммиченной в worktree T03. Версии 1.2–1.7 сохранили последовательные checkpoints T03–T06.2. Версия 1.8 подтвердила merge T06.2; версии 2.0–2.3 сохранили T07/T08 history. Версия 2.4 подтверждает слияние T07 и T08.1a и фиксирует границы T08.1b. Исторические evidence сохраняются. Пропущенные staging/browser/PG проверки остаются NOT_RUN и не считаются приёмкой.
 
 ## 1. Цель и границы
 
@@ -291,7 +291,7 @@ next exact action; checks to rerun after next change.
 **Зависимости:** T06, T07. **Режим:** mandatory gate, locking/admission.
 **Anchors:** `services/queue_domain_service.py:allocate_ticket`; `queue_svc/_operations.py:join_queue_with_token`, `check_queue_limits`, `get_next_queue_number`, batch prelocks; `services/queue_claim_service.py`; `crud/queue_resource_routing.py` claim/registry locks.
 
-Срезы: **T08.1** v1 quota/identity; **T08.2** adapters/reports; **T08.3** PG concurrency/replay/partial proof. V1 не включать при неполном покрытии; facade-only change GraphQL не покрывает.
+Срезы: **T08.1a** canonical token quota; **T08.1b** v1 identity/recreation guard; **T08.2** remaining admission adapters/reports; **T08.3** PG concurrency/replay/partial proof. V1 не включать при неполном покрытии; facade-only change GraphQL не покрывает.
 
 V1 transaction contract:
 
@@ -314,6 +314,8 @@ V1 transaction contract:
 | Staff/derivatives | registrar wizard/_today_queues, batch patient/queue, visit confirmation, transfer/clone; source не является proof online issuance |
 
 Identity guard: искать active/inactive same doctor/day/tag или resource/day. Partial active uniqueness недостаточна. Не создавать zero-count replacement; ordinary commands не reset counter/identity/delete used v1; conflicting queues не merge автоматически.
+
+T08.1b implementation boundary: v1 identity check belongs on the shared `daily_queue_creation_snapshot` path so every active runtime constructor using that policy supplies the queue date and typed owner. The known call sites include `queue_svc/_operations.py`, `crud/online_queue.py`, GraphQL, queue API, queue limits, visit confirmation and force-majeure creation. Legacy queue creation must keep its prior behavior. Migration import/restore must preserve stored policy/count; dev seeding is not an online runtime writer. Existing Admin retention cleanup is bounded to rows older than a cutoff of at least one day; past-date admission is rejected by T07, so it cannot delete today's/future identity or reopen an eligible quota. Before closing T08.1b, source-scan ordinary mutation/delete paths for `policy_version`, `online_issued_count`, owner identity and `DailyQueue` deletion. SQLite tests do not replace T08.3 PostgreSQL concurrency proof.
 
 **Validation:** independent PG sessions last-slot → ровно одна issuance; response-loss replay/rollback; statuses/deletion; desk/source-online clone/transfer; partial result; inactive recreate; tags; identical doctor/resource numeric IDs. Existing allocator characterization/concurrency, claim/QR/GraphQL boundary/integration suites; meaningful new PG race proof, не mocks вместо locks.
 **Reporting:** queue length/issued/remaining/version раздельно; v1 remaining=max(0,max-count); legacy count unknown.

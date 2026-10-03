@@ -365,7 +365,9 @@ def join_online_queue_multiple(
                     day=queue_token.day,
                     specialist_id=specialist_id,
                     active=True,
-                    **daily_queue_creation_snapshot(db, doctor=_doc),
+                    **daily_queue_creation_snapshot(
+                        db, day=queue_token.day, doctor=_doc
+                    ),
                 )
                 db.add(daily_queue)
                 db.commit()
@@ -516,17 +518,17 @@ def join_online_queue_multiple(
 
             # Получаем информацию о специальности для иконки
             specialty_icon_map = {
-                'cardiology': '❤️',
-                'cardio': '❤️',
-                'dermatology': '✨',
-                'derma': '✨',
-                'dentistry': '🦷',
-                'dentist': '🦷',
-                'laboratory': '🔬',
-                'lab': '🔬',
+                "cardiology": "❤️",
+                "cardio": "❤️",
+                "dermatology": "✨",
+                "derma": "✨",
+                "dentistry": "🦷",
+                "dentist": "🦷",
+                "laboratory": "🔬",
+                "lab": "🔬",
             }
             doctor_specialty = (
-                doctor.specialty.lower() if doctor and doctor.specialty else ''
+                doctor.specialty.lower() if doctor and doctor.specialty else ""
             )
             icon = next(
                 (
@@ -534,7 +536,7 @@ def join_online_queue_multiple(
                     for key, icon in specialty_icon_map.items()
                     if key in doctor_specialty
                 ),
-                '👨‍⚕️',
+                "👨‍⚕️",
             )
 
             results.append(
@@ -626,7 +628,7 @@ def open_daily_queue(db: Session, day: date, specialist_id: int) -> dict[str, An
             day=day,
             specialist_id=specialist_id,
             active=True,
-            **daily_queue_creation_snapshot(db, doctor=_doc),
+            **daily_queue_creation_snapshot(db, day=day, doctor=_doc),
         )
         db.add(daily_queue)
 
@@ -927,9 +929,7 @@ def get_or_create_daily_queue(
         resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
         if resource is not None:
             queue_resource_routing.lock_registry_tag_creation(db, queue_tag, day)
-            resource = queue_resource_routing.resolve_tag_resource_locked(
-                db, queue_tag
-            )
+            resource = queue_resource_routing.resolve_tag_resource_locked(db, queue_tag)
         if resource is not None:
             existing_by_tag = (
                 db.query(DailyQueue)
@@ -954,6 +954,7 @@ def get_or_create_daily_queue(
                 # номера реестра — паритет с queue_svc-конструктором.
                 **daily_queue_creation_snapshot(
                     db,
+                    day=day,
                     resource=resource,
                     queue_tag=queue_tag,
                     settings=queue_settings,
@@ -988,9 +989,7 @@ def get_or_create_daily_queue(
     # reuse this lock provides. Taken BEFORE the lookup, flush/commit
     # releases it at this function's own commit. PostgreSQL-only; the
     # sequential SQLite tests skip harmlessly.
-    queue_resource_routing.lock_daily_queue_creation(
-        db, day, actual_specialist_id
-    )
+    queue_resource_routing.lock_daily_queue_creation(db, day, actual_specialist_id)
 
     # Ищем очередь с учетом queue_tag
     query_filters = [
@@ -1021,6 +1020,7 @@ def get_or_create_daily_queue(
         _creation_defaults = dict(defaults or {})
         _creation_snapshot = daily_queue_creation_snapshot(
             db,
+            day=day,
             doctor=doctor_exists,
             queue_tag=queue_tag,
         )
@@ -1034,9 +1034,7 @@ def get_or_create_daily_queue(
         _creation_defaults["online_start_time"] = _creation_snapshot[
             "online_start_time"
         ]
-        _creation_defaults["online_end_time"] = _creation_snapshot[
-            "online_end_time"
-        ]
+        _creation_defaults["online_end_time"] = _creation_snapshot["online_end_time"]
         daily_queue = DailyQueue(
             day=day,
             specialist_id=actual_specialist_id,
