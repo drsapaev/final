@@ -73,6 +73,7 @@ const kk = {
     density_spacious: 'Кең',
   },
   common: {
+    clear: 'Очистить',
     save: 'Сохранить',
     save_draft: 'Сохранить черновик',
     cancel: 'Отмена',
