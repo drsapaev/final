@@ -188,3 +188,103 @@ class TestBackupServiceRejectsMaliciousFilename:
         result = svc.verify_backup("subdir/backup.db")
         assert result["valid"] is False
         assert "Invalid backup filename" in result["error"] or "forbidden" in result["error"]
+
+
+# ============================================================
+# Offsite R2 error exposure — closes py/stack-trace-exposure #1283
+# ============================================================
+
+class TestOffsiteErrorExposure:
+    """create_backup must put a STATIC sentinel into backup_info["offsite"]
+    when the R2 upload fails — never str(exception).
+
+    The response dict flows straight into the POST /backup/create HTTP
+    response (Admin-only, but still an external user); the R2 failure text
+    can embed the storage endpoint URL, bucket paths and client error
+    strings. Observability is preserved: the full detail goes to
+    logger.warning (Sentry sink), per the #3116 error-observability split.
+    """
+
+    def _make_service(self, tmp_path: Path) -> "bs.BackupService":
+        svc = bs.BackupService.__new__(bs.BackupService)
+        svc.backup_dir = tmp_path
+        svc.retention_days = 7
+        svc.max_backups = 10
+        return svc
+
+    def test_offsite_failure_returns_static_sentinel(
+        self, tmp_path: Path, monkeypatch, caplog
+    ) -> None:
+        import logging
+        import sqlite3
+
+        # Real tiny sqlite source DB so the local dump leg succeeds.
+        source = tmp_path / "clinic_local.db"
+        conn = sqlite3.connect(source)
+        conn.execute("CREATE TABLE t (x INTEGER)")
+        conn.commit()
+        conn.close()
+
+        monkeypatch.setattr(
+            bs, "_get_database_url", lambda: f"sqlite:///{source}"
+        )
+        monkeypatch.setattr(bs.r2_uploader, "r2_configured", lambda: True)
+
+        secret_detail = (
+            "PutObject 403 https://acct123.r2.cloudflarestorage.com/"
+            "finalclinic-db-backups/daily/backup_manual_x.db "
+            "SignatureDoesNotMatch /internal/path"
+        )
+
+        def _boom(*, key: str, filepath: str):
+            raise RuntimeError(secret_detail)
+
+        monkeypatch.setattr(bs.r2_uploader, "upload_file", _boom)
+
+        svc = self._make_service(tmp_path)
+        with caplog.at_level(logging.WARNING, logger="app.services.backup_service"):
+            info = svc.create_backup("manual")
+
+        offsite = info["offsite"]
+        assert offsite["status"] == "error"
+        assert offsite["error"] == "offsite_upload_failed"
+        # No slice of the exception text may reach the response dict.
+        assert "r2.cloudflarestorage.com" not in repr(info)
+        assert "SignatureDoesNotMatch" not in repr(info)
+
+        # Observability preserved: full detail goes to the log sink.
+        assert any(secret_detail in r.message for r in caplog.records)
+
+    def test_offsite_success_still_inlines_upload_metadata(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """Success path unchanged: key/size/sha256/etag metadata stays in
+        the response (it is operational info the Admin UI relies on)."""
+        import sqlite3
+
+        source = tmp_path / "clinic_local.db"
+        conn = sqlite3.connect(source)
+        conn.execute("CREATE TABLE t (x INTEGER)")
+        conn.commit()
+        conn.close()
+
+        monkeypatch.setattr(
+            bs, "_get_database_url", lambda: f"sqlite:///{source}"
+        )
+        monkeypatch.setattr(bs.r2_uploader, "r2_configured", lambda: True)
+        monkeypatch.setattr(
+            bs.r2_uploader,
+            "upload_file",
+            lambda *, key, filepath: {
+                "key": key,
+                "size": 123,
+                "sha256": "0" * 64,
+                "etag": "abc",
+            },
+        )
+
+        svc = self._make_service(tmp_path)
+        info = svc.create_backup("manual")
+
+        assert info["offsite"]["status"] == "ok"
+        assert info["offsite"]["key"].startswith("daily/backup_manual_")

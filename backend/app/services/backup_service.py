@@ -309,13 +309,17 @@ class BackupService:
                     )
                     backup_info["offsite"] = {"status": "ok", **uploaded}
                 except Exception as off_err:  # noqa: BLE001 — сигнал, не сбой
+                    # CodeQL #1283 (py/stack-trace-exposure): в API-ответ
+                    # (backup_info → POST /backup/create) уходит только
+                    # статический индикатор; детали ошибки R2 (URL/пути
+                    # эндпоинта, сетевые тексты) — в лог/Sentry, не наружу.
                     backup_info["offsite"] = {
                         "status": "error",
-                        "error": str(off_err)[:200],
+                        "error": "offsite_upload_failed",
                     }
                     logger.warning(
                         "Offsite R2 upload failed: %s",
-                        backup_info["offsite"]["error"],
+                        str(off_err)[:200],
                     )
 
             # Cleanup old backups
