@@ -1,7 +1,7 @@
 # Resume — admin queue simplification
 
 Plan version: 2.6
-Last updated: 2026-10-03T23:29:58+05:00, Asia/Tashkent
+Last updated: 2026-10-03T23:33:16+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
 ## Current continuation checkpoint — T08.2b
@@ -14,8 +14,8 @@ Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576
 - First-touch docs only: canonical plan, PROGRESS, RESUME, DECISIONS, EVIDENCE, and one factual append to `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md`. Runtime sources and tests are read-only. Target validation: source/route coverage table plus `git diff --check`; stop if any uncovered successful writer, ambiguous partial-result behavior, or need for wider runtime/API scope appears.
 - PostgreSQL concurrency/replay/partial-result proof remains T08.3. Availability/report parity remains T08.2c. `QUEUE_POLICY_V2_CREATION_ENABLED` stays default-off; staging and production were not used.
 - The local PR review body gate passed (19 unit checks, both documented samples, and the current body); `git diff --check` passed. No runtime tests were applicable.
-- PR #3581 is OPEN: https://github.com/drsapaev/final/pull/3581. Its initial evidence commit `f12b30abb193c27259ef865fe44c71841a74e240` has been rebased after main advanced by PRs #3567 and #3580; the source inventory commit is now `66e0c6e48`. A same-file evidence-log conflict was resolved by preserving upstream Task 102 and renumbering this gate record to Task 103. The rebased branch has not yet been pushed; remote head is `f40cf66ad3713c7a9a8141e35c3427beeaf4a094`.
-- Next exact action: commit and lease-push the resolved rebase against that remote head, confirm PR #3581 targets `c0ea82be6698828a3b040d9a516a48e132b8261d`, then wait for checks and merge. After merge, sync a fresh worktree before T08.2c.
+- PR #3581 is OPEN: https://github.com/drsapaev/final/pull/3581. Its initial evidence commit `f12b30abb193c27259ef865fe44c71841a74e240` was rebased after main advanced by PRs #3567 and #3580; source inventory commit is now `66e0c6e48`. A same-file evidence-log conflict was resolved by preserving upstream Task 102 and renumbering this gate record to Task 103. The rebased branch was lease-pushed to `c0ea82be6698828a3b040d9a516a48e132b8261d`; latest known PR head is `bfa1c81603dc077451f9447be4c08a1ecfefeb88`. Resolve the live current head because this journal update may advance it.
+- Next exact action: push this journal update, verify PR #3581 base/head, and wait for applicable checks and merge. After merge, sync a fresh worktree before T08.2c.
 
 ## Historical continuation checkpoint — T08.2a (merged)
 
