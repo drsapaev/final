@@ -1,12 +1,12 @@
 # Resume — admin queue simplification
 
 Plan version: 2.6
-Last updated: 2026-10-03T23:14:40+05:00, Asia/Tashkent
+Last updated: 2026-10-03T23:19:42+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
 ## Current continuation checkpoint — T08.2b
 
-- Fresh base: `origin/main` = `4e6f125f17c637fc27296e2d0ec9d23f5d376775`; worktree `C:\final\_wt_aqs_t082b_admission`; branch `codex/aqs-T08.2b-admission`.
+- Current fresh base: `origin/main` = `a1542489e4c73eadafbab57ad51a588b3a4b0773` (unrelated Derma PR #3567); worktree `C:\final\_wt_aqs_t082b_admission`; branch `codex/aqs-T08.2b-admission`. The source inventory itself was reviewed against `4e6f125f17c637fc27296e2d0ec9d23f5d376775`; the intervening main commit does not touch queue paths.
 - T08.2a / PR #3576 exact code HEAD `35b6943cce8c0295b8e9a68077cb881c73fcda20`; user-confirmed merge commit `1ed6d05874c2ea205a625bb70879adb10b077be4`. Its prior local validation was 7 unit and 17 GraphQL integration tests; applicable CI on that exact HEAD passed as recorded in the PR. Skipped path-aware jobs are not passes.
 - T08.2b is an evidence-only source inventory because no uncovered active independent writer was found. The legacy token endpoint, compatibility online endpoint, QR session completion (single/multiple), and permanent-direction session all use the canonical token allocator. GraphQL was the only direct independent writer and is now covered by #3576.
 - Non-writers classified: old CRUD `join_online_queue` has no app caller and the old router is unmounted; the mounted Telegram callback fails before a database write; `/queue/open` manages queue state but issues no entry and already takes the canonical creation lock; registrar/service additions and transfers are derivatives excluded by D1.
@@ -14,8 +14,8 @@ Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576
 - First-touch docs only: canonical plan, PROGRESS, RESUME, DECISIONS, EVIDENCE, and one factual append to `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md`. Runtime sources and tests are read-only. Target validation: source/route coverage table plus `git diff --check`; stop if any uncovered successful writer, ambiguous partial-result behavior, or need for wider runtime/API scope appears.
 - PostgreSQL concurrency/replay/partial-result proof remains T08.3. Availability/report parity remains T08.2c. `QUEUE_POLICY_V2_CREATION_ENABLED` stays default-off; staging and production were not used.
 - The local PR review body gate passed (19 unit checks, both documented samples, and the current body); `git diff --check` passed. No runtime tests were applicable.
-- PR #3581 is OPEN: https://github.com/drsapaev/final/pull/3581. It was created from branch `codex/aqs-T08.2b-admission`, base `4e6f125f17c637fc27296e2d0ec9d23f5d376775`, initial evidence commit `f12b30abb193c27259ef865fe44c71841a74e240`; later commits are journal-only. Resolve the current head with GitHub/`git rev-parse` before relying on checks.
-- Next exact action: verify applicable checks on PR #3581's latest HEAD and wait for merge, then sync a fresh worktree from `origin/main` before T08.2c.
+- PR #3581 is OPEN: https://github.com/drsapaev/final/pull/3581. Its initial evidence commit `f12b30abb193c27259ef865fe44c71841a74e240` has been rebased to source inventory commit `2d5f9dab1` after main advanced by PR #3567; the whole branch now includes journal-only checkpoints. Push with a lease against remote head `b57105f329c2aa00992fc9302844c01abfb3b59c`, then resolve exact GitHub head/checks.
+- Next exact action: lease-guard push the rebase, verify exact PR base/head and checks, wait for merge, then sync a fresh worktree from `origin/main` before T08.2c.
 
 ## Historical continuation checkpoint — T08.2a (merged)
 

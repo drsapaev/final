@@ -5,13 +5,13 @@ Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 20
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T08.2b — source inventory of remaining active admission adapters
-Current status: T08.2a / PR #3576 is user-confirmed MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`. T08.2b source audit on fresh `origin/main` `4e6f125f17c637fc27296e2d0ec9d23f5d376775` found the mounted legacy token, compatibility online, QR-session, and permanent-address paths delegate to `QueueBusinessService.join_queue_with_token`; GraphQL was the only confirmed independent successful writer and is now quota-aware. No T08.2b runtime patch is indicated. Evidence-only PR [#3581](https://github.com/drsapaev/final/pull/3581) is OPEN. The source inventory commit is `f12b30abb193c27259ef865fe44c71841a74e240`; later journal-only checkpoints may advance the branch, so read the exact live HEAD and its checks before acting. Do not mark T08.2b MERGED until its PR is merged.
+Current status: T08.2a / PR #3576 is user-confirmed MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`. T08.2b source audit on `origin/main` `4e6f125f17c637fc27296e2d0ec9d23f5d376775` found the mounted legacy token, compatibility online, QR-session, and permanent-address paths delegate to `QueueBusinessService.join_queue_with_token`; GraphQL was the only confirmed independent successful writer and is now quota-aware. No T08.2b runtime patch is indicated. After main advanced with unrelated PR #3567, the branch was rebased onto `a1542489e4c73eadafbab57ad51a588b3a4b0773`; PR #3581 is OPEN and needs a lease-guarded push and exact-head check rerun. Do not mark T08.2b MERGED until its PR is merged.
 Last completed task: T08.2a — MERGED (#3576, merge commit `1ed6d05874c2ea205a625bb70879adb10b077be4`)
 Worktree: C:\final\_wt_aqs_t082b_admission
 Branch: codex/aqs-T08.2b-admission
-Base commit: 4e6f125f17c637fc27296e2d0ec9d23f5d376775
-Current code commit: source inventory commit `f12b30abb193c27259ef865fe44c71841a74e240`; resolve the current PR branch head live because journal-only commits may follow it.
-Last updated: 2026-10-03T23:14:40+05:00
+Base commit: a1542489e4c73eadafbab57ad51a588b3a4b0773
+Current code commit: rebased source inventory commit `2d5f9dab1`; resolve the PR branch tip live because journal-only commits may follow it.
+Last updated: 2026-10-03T23:19:42+05:00
 
 > Historical checkpoint superseded: current T07 status and exact-head evidence are recorded in dated sections below and in RESUME.md; do not use the earlier snapshot as a continuation instruction.
 
@@ -47,7 +47,7 @@ Last updated: 2026-10-03T23:14:40+05:00
 - Gate: first run routed the queue task to generic model/window and unrelated Telegram files. The only known-root retry used `backend/app/services/queue_svc/_operations.py`, returned `narrow_override`, and still included unrelated paths. The user-approved T08 plan and required coverage table are the manual basis for the narrow docs-only checkpoint; no additional gate run is permitted.
 - PostgreSQL concurrency/replay/partial-result proof remains T08.3. T08.2c reporting parity is still planned. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off; no staging or production work was performed.
 - The repository PR-body quality gate passed: 19 unit checks, both documented samples, and this PR body.
-- Next exact action: verify applicable checks on the latest PR #3581 HEAD and wait for merge. After merge, refresh `origin/main` and start T08.2c.
+- Next exact action: lease-guard push the rebased branch, verify the PR has the new main base and exact HEAD, then wait for applicable checks and merge. After merge, start T08.2c from fresh `origin/main`.
 
 ### Historical completed context (T08.2a and earlier)
 
