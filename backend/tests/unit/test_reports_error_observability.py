@@ -77,3 +77,44 @@ def test_log_report_service_error_stays_warning(caplog):
     records = [r for r in caplog.records if "daily_summary" in r.getMessage()]
     assert records and records[0].levelname == "WARNING"
     assert records[0].exc_info is None
+
+
+class TestDailySummaryErrorExposure:
+    """CodeQL py/stack-trace-exposure #1324: generate_daily_summary must
+    return a STATIC sentinel on failure — never str(exception). The dict
+    flows to GET /api/v1/reports/daily-summary; the endpoint maps any
+    "error" key to a 500 with a static detail, but the taint source has
+    to go too (CodeQL tracks the whole dict through the return). The
+    exception detail belongs to the log/Sentry sink only."""
+
+    def test_error_returns_static_sentinel_and_logs_detail(self, caplog, tmp_path, monkeypatch):
+        import app.services.reporting_svc as svc_pkg
+        from app.services.reporting_svc import ReportingService
+
+        # Keep the constructor's reports_dir out of the repo working dir.
+        monkeypatch.chdir(tmp_path)
+
+        secret_detail = (
+            "sqlalchemy internal failure: SELECT visits.visit_date, "
+            "patients.phone FROM ... (psycopg2.InternalError)"
+        )
+
+        class BoomDB:
+            def query(self, *args, **kwargs):
+                raise RuntimeError(secret_detail)
+
+        svc = ReportingService(BoomDB())
+        with caplog.at_level(logging.ERROR):
+            result = svc.generate_daily_summary(None)
+
+        assert result == {"error": "internal_error"}
+        assert "sqlalchemy" not in repr(result), "no exception text may leak"
+        assert "psycopg2" not in repr(result)
+
+        error_records = [
+            r
+            for r in caplog.records
+            if r.levelno >= logging.ERROR and "ежедневной сводки" in r.getMessage()
+        ]
+        assert error_records, "detail must reach the log sink"
+        assert any(secret_detail in r.getMessage() for r in error_records)
