@@ -35,6 +35,7 @@ from app.crud.appointment import (
 )
 from app.crud.clinic import get_queue_settings
 from app.crud.daily_queue_creation_policy import (
+    ONLINE_ISSUANCES_V1_POLICY_VERSION,
     daily_queue_creation_snapshot,
     evaluate_online_admission_window,
     online_admission_window,
@@ -1445,26 +1446,29 @@ class Mutation:
                         errors=["ALREADY_IN_QUEUE"],
                     )
 
-                # Лимит: считаем записи ВЫБРАННОЙ очереди (не всех очередей
-                # врача за день) и сравниваем с её же капой. Codex P1
-                # (round-7): только НЕ-терминальные статусы (waiting/called) —
-                # как в каноническом QueueBusinessService.check_queue_limits;
-                # served/cancelled не должны съедать слоты онлайн-набора.
-                online_entries_count = (
-                    db.query(OnlineQueueEntry)
-                    .filter(
-                        OnlineQueueEntry.queue_id == daily_queue.id,
-                        OnlineQueueEntry.status.in_(["waiting", "called"]),
+                # Legacy queues retain the waiting/called count contract.
+                # V1 uses successful online issuances, so cancelled/removed
+                # rows do not reopen capacity and staff entries stay outside
+                # this online-only limit.
+                if daily_queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+                    quota_used = daily_queue.online_issued_count
+                    max_slots = daily_queue.max_online_entries
+                else:
+                    quota_used = (
+                        db.query(OnlineQueueEntry)
+                        .filter(
+                            OnlineQueueEntry.queue_id == daily_queue.id,
+                            OnlineQueueEntry.status.in_(["waiting", "called"]),
+                        )
+                        .count()
                     )
-                    .count()
-                )
+                    max_slots = (
+                        daily_queue.max_online_entries
+                        if daily_queue.max_online_entries is not None
+                        else doctor.max_online_per_day
+                    )
 
-                max_slots = (
-                    daily_queue.max_online_entries
-                    if daily_queue.max_online_entries is not None
-                    else doctor.max_online_per_day
-                )
-                if online_entries_count >= max_slots:
+                if quota_used >= max_slots:
                     return QueueMutationResponse(
                         success=False,
                         message="Превышен лимит онлайн записей на сегодня",
@@ -1507,6 +1511,8 @@ class Mutation:
                 )
 
                 db.add(queue_entry)
+                if daily_queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+                    daily_queue.online_issued_count += 1
                 db.commit()
                 db.refresh(queue_entry)
 

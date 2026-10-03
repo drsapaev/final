@@ -1,13 +1,13 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 2.4 — T07 / #3557 and T08.1a / #3571 are merged; T08.1b is in progress.
-**Создан:** 30 сентября 2026. **Обновлён:** 3 октября 2026, 20:26 Asia/Tashkent.
+**Версия:** 2.5 — T07 / #3557, T08.1a / #3571 and T08.1b / #3572 are merged; T08.2a is in progress.
+**Создан:** 30 сентября 2026. **Обновлён:** 3 октября 2026, 22:23 Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
-**Последний подтверждённый runtime merge:** `d397656c7f597d72d6a6c92676cd204aff72d4d8`, PR #3571 / T08.1a.
-**Текущий worktree:** `C:\final\_wt_aqs_t081b_identity`, ветка `codex/aqs-T081b-identity-guard`, base `d397656c7f597d72d6a6c92676cd204aff72d4d8`; T08.1b implementation in progress.
+**Последний подтверждённый runtime merge:** `95ff3b4752a091f22f9702977d611a3b6d9f1595`, PR #3572 / T08.1b.
+**Текущий worktree:** `C:\final\_wt_aqs_t082_adapters`, ветка `codex/aqs-T08.2-adapters`, rebased base `bbb5bda93a165e309dc0ee85f5180eb351a6369a`; T08.2a implementation commit `a9a4f3988e617190d83a4d9c8f1252721edc757f`; PR #3576 OPEN with the rebased branch, exact HEAD/checks must be reread after this evidence update.
 
-> **T00–T07 и T08.1a — MERGED; T08.1b — IN_PROGRESS; T08.2–T18 — PLANNED.** PR #3557 merged as `425df11c7a84f0d1e7954df0d00415927212669a`; PR #3571 merged as `d397656c7f597d72d6a6c92676cd204aff72d4d8`. T08.1b protects v1 identity reuse across shared creation paths. PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
+> **T00–T07, T08.1a и T08.1b — MERGED; T08.2a — IN_PROGRESS; T08.2b–T18 — PLANNED.** PR #3557 merged as `425df11c7a84f0d1e7954df0d00415927212669a`; PR #3571 as `d397656c7f597d72d6a6c92676cd204aff72d4d8`; PR #3572 as `95ff3b4752a091f22f9702977d611a3b6d9f1595`. T08.1b protects v1 identity reuse across shared creation paths. PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -291,7 +291,7 @@ next exact action; checks to rerun after next change.
 **Зависимости:** T06, T07. **Режим:** mandatory gate, locking/admission.
 **Anchors:** `services/queue_domain_service.py:allocate_ticket`; `queue_svc/_operations.py:join_queue_with_token`, `check_queue_limits`, `get_next_queue_number`, batch prelocks; `services/queue_claim_service.py`; `crud/queue_resource_routing.py` claim/registry locks.
 
-Срезы: **T08.1a** canonical token quota; **T08.1b** v1 identity/recreation guard; **T08.2** remaining admission adapters/reports; **T08.3** PG concurrency/replay/partial proof. V1 не включать при неполном покрытии; facade-only change GraphQL не покрывает.
+Срезы: **T08.1a** canonical token quota; **T08.1b** v1 identity/recreation guard; **T08.2a** GraphQL direct writer; **T08.2b** remaining active admission adapters after source proof; **T08.2c** availability/report parity; **T08.3** PG concurrency/replay/partial proof. V1 не включать при неполном покрытии; facade-only change GraphQL не покрывает. Current T08.2a must keep its first PR limited to GraphQL and its focused tests. Telegram remains inventory-only unless a live issuance path is proven; the current source audit says its callback fails before a queue write.
 
 V1 transaction contract:
 

@@ -3517,7 +3517,19 @@ Continue T08 daily successful online issuance quota from the approved admin queu
 - GraphQL is a distinct direct writer and is reserved for T08.2. Telegram callback can be reached but invokes missing QueueBusinessService.join_queue and fails before a database write. Registrar/staff derivation uses entry-creation paths outside independent online admission.
 - Follow-up: gate misses on T07 and T08 indicate a queue-service ownership routing rule should be reviewed separately; this evidence entry does not broaden the T08 patch.
 
-## Task 101 - DevBrain legacy wrapper scope misroute
+
+## Task 101 - T08.2a GraphQL quota gate routing — 2026-10-03
+
+### Gate observation
+- The first T08.2 gate identified the approved queue-quota plan but selected unrelated Admin Telegram management/webhook/manager files as first-touch and proposed Python compilation plus frontend build. The runtime root was confirmed separately in `backend/app/graphql/mutations.py:Mutation._join_queue_impl` and the explicit T08 GraphQL coverage row.
+- The one permitted `--known-root-cause backend/app/graphql/mutations.py` retry returned `narrow_override` with only that runtime module. It excluded the focused test and evidence checkpoint.
+- Gate fields: `gate_misroute=true` from the observed first-touch mismatch (the first tool result itself emitted `gate_misroute=false`); `override_used=true`; `known_root_cause_file=backend/app/graphql/mutations.py`.
+- Manual scope basis: the user-approved T08 plan explicitly requires GraphQL integration coverage and a transaction/counter contract. Scope is limited to this direct writer, its focused unit regression, and the plan evidence files. No third gate attempt and no gate source changes.
+
+### Source correction
+- Telegram remains only a source-classification reference for this quota slice. Existing evidence says its reachable callback calls a missing queue method and fails before a database write; this is not authorization to repair that flow under T08.2a.
+
+## Task 102 - DevBrain legacy wrapper scope misroute — 2026-10-03
 
 ### User task
 Implement PR 2 of the approved automatic-memory plan: make file-backed memory
