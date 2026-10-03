@@ -420,8 +420,8 @@ def cmd_audit(args: argparse.Namespace) -> int:
     # числовые суррогатные id (record/visit/patient) и счётчики, без
     # PHI-полей — политика derma.py #1321 / patient_service.py #1295
     for r in sorted(active_with_legacy, key=lambda x: x["record_id"]):
-        print(  # codeql[py/clear-text-logging-sensitive-data]
-            "  EMR #%d visit=%s patient=%s status=%s class=%s "
+        print(
+            "  EMR #%d visit=%s patient=%s status=%s class=%s "  # codeql[py/clear-text-logging-sensitive-data]
             "canon(valid/invalid)=%d/%d legacy(valid/invalid)=%d/%d "
             "exact=%d date=%d"
             % (
@@ -473,8 +473,8 @@ def cmd_audit(args: argparse.Namespace) -> int:
     # и процедуры) — это предмет ревью владельца Phase B; пишется в
     # локальную ФС оператора на хосте БД (тот же домен доверия, что сама
     # БД и её pg_dump-бэкапы), наружу не передаётся
-    out_path.write_text(  # codeql[py/clear-text-storage-of-sensitive-information]
-        json.dumps(artifact, ensure_ascii=False, indent=1, default=str),
+    out_path.write_text(
+        json.dumps(artifact, ensure_ascii=False, indent=1, default=str),  # codeql[py/clear-text-storage-sensitive-data]
         encoding="utf-8",
     )
     print()
