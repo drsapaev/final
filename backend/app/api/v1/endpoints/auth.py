@@ -10,11 +10,10 @@ dispatched either by awaiting (async) or via run_in_threadpool (sync).
 from __future__ import annotations
 
 import logging
-import re
 import secrets
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
@@ -138,41 +137,35 @@ class CSRFTokenResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Security: CSRF token format validation
+# Security: CSRF bootstrap never echoes user-supplied cookie values
 #
-# Closes CodeQL py/cookie-injection alert #1200.
+# Closes CodeQL py/cookie-injection alerts #1200 -> #1316.
 #
-# The /csrf-token endpoint previously did:
+# History: the endpoint originally did
 #     token = request.cookies.get("csrf_token") or secrets.token_urlsafe(32)
-# This re-used whatever value was in the cookie, including attacker-planted
-# values (e.g. via subdomain cookie injection on a shared parent domain).
-# An attacker who knows the planted value can then perform CSRF because the
-# double-submit check (cookie == X-CSRF-Token header) succeeds.
+# (#1200) — echoing any planted cookie value straight into Set-Cookie.
+# The intermediate fix validated the cookie format before reuse, but that
+# does NOT hold: base64url is trivially constructible, so an attacker who
+# can plant a cookie (subdomain cookie injection on a shared parent domain)
+# can also construct a format-valid value they know — and the double-submit
+# check (cookie == X-CSRF-Token header) then succeeds for them. The
+# user-supplied value also kept flowing into Set-Cookie (#1316).
 #
-# Fix: validate the existing cookie matches the server-minted format
-# (base64url of 32+ bytes). If it does, reuse it (avoid needlessly rotating
-# the token on every page load). If it doesn't, mint a fresh server-side
-# token, overwriting any attacker-planted cookie.
+# Fix (#1316): ALWAYS mint a fresh server-side token. No user input ever
+# reaches Set-Cookie; a planted cookie is simply overwritten by the fresh
+# value. Rotation safety:
+#  * same-origin deployments: the SPA reads document.cookie first and calls
+#    this endpoint only when the cookie is missing (frontend/src/api/client.ts
+#    ensureCSRFToken), so bootstrap is rare;
+#  * split-origin deployments (VITE_API_BASE_URL): every mutating request
+#    bootstraps, but the client already handles cookie drift — single-flight
+#    fetch + the CSRF 403 recovery with exactly one retry (client.ts,
+#    csrfRecovery.test.ts) covers 8h expiry, multi-tab and rotation alike.
 # ---------------------------------------------------------------------------
-
-# secrets.token_urlsafe(32) produces 43 base64url chars; allow 32-128 for
-# forward compat with longer tokens.
-_CSRF_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
-
-
-def _valid_existing_csrf_token(value: str | None) -> bool:
-    """Return True iff `value` matches the server-minted CSRF token format.
-
-    This is NOT a security check on the token's authenticity (the double-submit
-    pattern doesn't require server-side state). It only ensures the value was
-    minted by us (or matches our format), so we don't propagate arbitrary
-    attacker-controlled strings into the response cookie.
-    """
-    return bool(value) and bool(_CSRF_TOKEN_PATTERN.match(value))
 
 
 @router.get("/csrf-token", response_model=CSRFTokenResponse)
-async def get_csrf_token(request: Request, response: Response) -> CSRFTokenResponse:
+async def get_csrf_token(response: Response) -> CSRFTokenResponse:
     """
     Возвращает CSRF-токен и дублирует его в cookie для frontend bootstrap.
 
@@ -210,22 +203,12 @@ async def get_csrf_token(request: Request, response: Response) -> CSRFTokenRespo
             detail="CSRF_COOKIE_SAMESITE must be one of: lax, strict, none",
         )
 
-    # SECURITY (CodeQL #1200): validate the existing cookie matches the
-    # server-minted format before reusing it. An attacker could plant a
-    # cookie via subdomain cookie injection (e.g. on a shared parent domain)
-    # and then perform CSRF because they know the planted value. By requiring
-    # the cookie value to match our base64url format, we reject attacker-planted
-    # values and replace them with a fresh server-minted token.
-    existing = request.cookies.get("csrf_token")
-    if _valid_existing_csrf_token(existing):
-        token = existing  # format-valid; reuse to avoid needless rotation
-    else:
-        token = secrets.token_urlsafe(32)  # mint fresh; overwrites any planted cookie
-    # codeql[py/cookie-injection] — значение выше прошло
-    # _valid_existing_csrf_token(): допускается только формат
-    # server-minted токена (base64url, 43 симв.), которые растение
-    # атакующим через поддомен не может подделать содержательно;
-    # поток для double-submit CSRF был проверен в #1200.
+    # SECURITY (CodeQL #1316 / py/cookie-injection): never echo the
+    # request cookie into Set-Cookie — always mint a fresh server-side
+    # token (rationale in the module comment above). Any planted cookie
+    # is overwritten by the fresh value, so an attacker-known value can
+    # never survive a bootstrap.
+    token = secrets.token_urlsafe(32)
     response.set_cookie(
         key="csrf_token",
         value=token,
