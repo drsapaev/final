@@ -5,13 +5,13 @@ Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 20
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T08.2a — GraphQL direct online-admission quota
-Current status: T08.1b / PR #3572 is user-confirmed MERGED at `95ff3b4752a091f22f9702977d611a3b6d9f1595`. T08.2a PR #3576 is OPEN. The last read of PR state preceded a docs-only status push, so re-read `gh pr view` and `gh pr checks` and compare the head with local `git rev-parse HEAD` before acting. PostgreSQL concurrency and staging remain NOT_RUN. V1 flag stays default-off.
+Current status: T08.1b / PR #3572 is user-confirmed MERGED at `95ff3b4752a091f22f9702977d611a3b6d9f1595`. T08.2a PR #3576 is OPEN. Its branch has been rebased locally onto fresh `origin/main` `bbb5bda93a165e309dc0ee85f5180eb351a6369a` and correctly revalidated; remote PR head `7d93b56e263c8b75df36af913a77fd74dd3427ee` is still the old, behind revision. Push the rebased branch with the exact lease recorded in EVIDENCE, then re-read checks for the new head. PostgreSQL concurrency and staging remain NOT_RUN. V1 flag stays default-off.
 Last completed task: T08.1b — MERGED (#3572, merge commit `95ff3b4752a091f22f9702977d611a3b6d9f1595`)
 Worktree: C:\final\_wt_aqs_t082_adapters
 Branch: codex/aqs-T08.2-adapters
-Base commit: 95ff3b4752a091f22f9702977d611a3b6d9f1595
-Current code commit: `a19aba1ae` (T08.2a GraphQL implementation and focused tests); a docs-only PR-state checkpoint is at the current branch tip.
-Last updated: 2026-10-03T22:05:00+05:00
+Base commit: bbb5bda93a165e309dc0ee85f5180eb351a6369a
+Current code commit: `a9a4f3988e617190d83a4d9c8f1252721edc757f` (T08.2a GraphQL implementation and focused tests); rebase/worktree validation checkpoint is in this branch.
+Last updated: 2026-10-03T22:13:00+05:00
 
 > Historical checkpoint superseded: current T07 status and exact-head evidence are recorded in dated sections below and in RESUME.md; do not use the earlier snapshot as a continuation instruction.
 
@@ -26,7 +26,7 @@ Last updated: 2026-10-03T22:05:00+05:00
 | T06.1 | MERGED | `codex/aqs-T06-policy-schema` / [PR #3545](https://github.com/drsapaev/final/pull/3545) | `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` | `EVIDENCE.md#t06.1-merge-checkpoint` |
 | T06.2 | MERGED | `codex/aqs-T06.2-creation-policy` / [PR #3546](https://github.com/drsapaev/final/pull/3546) | `b804a71a6bad22400324e2236a3221317eac3158` | `EVIDENCE.md#t06.2-merge-checkpoint` |
 | T07 | MERGED | codex/aqs-T07-admission-window / PR #3557 | 425df11c7a84f0d1e7954df0d00415927212669a | EVIDENCE.md#t07-merge-and-t08-gate-source-audit |
-| T08 | IN_PROGRESS | T08.1a [PR #3571](https://github.com/drsapaev/final/pull/3571) MERGED; T08.1b [PR #3572](https://github.com/drsapaev/final/pull/3572) MERGED; T08.2a active | `95ff3b4752a091f22f9702977d611a3b6d9f1595` | EVIDENCE.md#t08.2a-local-implementation-checkpoint |
+| T08 | IN_PROGRESS | T08.1a [PR #3571](https://github.com/drsapaev/final/pull/3571) MERGED; T08.1b [PR #3572](https://github.com/drsapaev/final/pull/3572) MERGED; T08.2a [PR #3576](https://github.com/drsapaev/final/pull/3576) OPEN | `bbb5bda93a165e309dc0ee85f5180eb351a6369a` | EVIDENCE.md#t08.2a-rebase-and-worktree-validation |
 | T09 | PLANNED | | | |
 | T10 | PLANNED | | | |
 | T11 | PLANNED | | | |
@@ -53,7 +53,7 @@ Last updated: 2026-10-03T22:05:00+05:00
 - Validation on current code: `test_daily_queue_creation_policy.py` — 11 passed / 1 warning; queue API, queue limits, visit confirmation, force majeure, GraphQL claim and canonical quota modules — 36 passed / 1 warning. Ruff, Ruff format, Black, compileall and `git diff --check` pass. PR-body quality gate passed (19 unit checks plus documented samples and this body). SQLite fixture only; no PostgreSQL race proof.
 - PR #3572 is MERGED at `95ff3b4752a091f22f9702977d611a3b6d9f1595`; the preceding “OPEN/checks pending” text is historical and superseded by the checkpoint above and the merge evidence entry.
 - Blocker: none identified for T08.1b. Remaining T08.2 adapter/report parity and T08.3 PostgreSQL concurrency/replay/partial-result proof are still required before considering v1 rollout.
-- Next exact action: re-read PR #3576's current HEAD and checks; the previously observed `fe7d38c4efe02d1fa944315ca84b5f74930213ab` was superseded by the evidence-only push. Compare live PR HEAD with local `git rev-parse HEAD`, then wait for/fix checks on that exact current head.
+- Next exact action: push the rebased local branch using `--force-with-lease=refs/heads/codex/aqs-T08.2-adapters:7d93b56e263c8b75df36af913a77fd74dd3427ee`; then compare live PR HEAD with local `git rev-parse HEAD` and wait for/fix checks on that exact head.
 - Checks to rerun after any further runtime edit: policy suite, the six queue API/limits/visit/force-majeure/GraphQL/token suites, scoped Ruff, compileall and `git diff --check`. PostgreSQL concurrency proof remains T08.3.
 ## Checkpoint rules for the next agent
 
