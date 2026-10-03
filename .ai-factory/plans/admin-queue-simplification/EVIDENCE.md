@@ -1443,3 +1443,11 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Worktree results after rebase: `tests/unit/test_graphql_queue_claim_coordinator.py` — **7 passed / 1 warning**; `tests/integration/test_graphql_resolvers_real_db.py` — **17 passed / 1 warning**; scoped Ruff, Ruff-format, Black, compileall, Gitleaks/pre-commit and `git diff --check origin/main...HEAD` — **PASS**.
 - Rebase preserved the declared eight changed paths only. Local HEAD is based on `origin/main` `bbb5bda93a165e309dc0ee85f5180eb351a6369a`; GitHub PR #3576 still points to old head `7d93b56e263c8b75df36af913a77fd74dd3427ee` and reports `BEHIND`. Old-head checks are not current evidence.
 - Next action: push the rebase with `--force-with-lease=refs/heads/codex/aqs-T08.2-adapters:7d93b56e263c8b75df36af913a77fd74dd3427ee`, then confirm exact-head checks. PostgreSQL concurrency/replay/rollback/partial-result proof remains T08.3; v1 creation flag remains default-off.
+
+## T08.2a rebased PR update — 2026-10-03T22:23:00+05:00
+
+- The lease-guarded update succeeded: PR #3576 moved from old head `7d93b56e263c8b75df36af913a77fd74dd3427ee` to the rebased branch based on `origin/main` `bbb5bda93a165e309dc0ee85f5180eb351a6369a`. Runtime commit is `a9a4f3988e617190d83a4d9c8f1252721edc757f`.
+- Before this evidence-only checkpoint push, GitHub had started CI, CodeQL, formatter report, PR Review Quality Gate, PR lifecycle recommendation, gitleaks and security scan; GitGuardian had passed; Supabase Preview and Dependabot routing were skipped. Those results belong to the pre-checkpoint head and are not current evidence.
+- This checkpoint is included in PR #3576 and will produce a new head. Re-read live PR HEAD/checks after the push; no previous-head status authorizes merge. The local worktree revalidation on the rebased code is recorded immediately above.
+- No formal independent review has been submitted (`reviews=[]`); the PR lifecycle recommendation says `needs-review`. No merge claimed. PostgreSQL race/replay/partial-result proof remains T08.3; staging is not claimed; v1 creation flag remains default-off.
+- Next exact action: compare live PR HEAD with local `git rev-parse HEAD`, wait for applicable checks and human review, then fix any in-scope failure in PR #3576.
