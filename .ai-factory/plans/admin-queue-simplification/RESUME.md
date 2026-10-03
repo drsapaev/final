@@ -1,8 +1,24 @@
 # Resume — admin queue simplification
 
-Plan version: 2.4
-Last updated: 2026-10-03T20:58:00+05:00, Asia/Tashkent
-Execution permission: IMPLEMENTATION_ACTIVE; user confirmed #3557 merged and said continue. T07/#3557 and T08.1a/#3571 are MERGED; #3571 merge commit/base is d397656c7f597d72d6a6c92676cd204aff72d4d8. Current task is T08.1b in `C:\final\_wt_aqs_t081b_identity`, branch `codex/aqs-T081b-identity-guard`, based on that merge. Runtime commit `8e215d4ab82c8f7f6c4010c1578819ea56ae79b1` is open as PR #3572; exact-head CI is pending. No production deployment or v1 activation is authorized.
+Plan version: 2.5
+Last updated: 2026-10-03T22:23:00+05:00, Asia/Tashkent
+Execution permission: IMPLEMENTATION_ACTIVE; user confirmed #3572 was merged by them and said continue. GitHub and fresh `origin/main` confirm T08.1b / #3572 MERGED at `95ff3b4752a091f22f9702977d611a3b6d9f1595`.
+
+## Current continuation checkpoint — T08.2a
+
+- Fresh base: `origin/main` = `bbb5bda93a165e309dc0ee85f5180eb351a6369a` (merged PR #3575); worktree `C:\final\_wt_aqs_t082_adapters`; branch `codex/aqs-T08.2-adapters`; rebased locally with no conflicts.
+- Current task: T08.2a, the GraphQL direct-writer quota slice. Runtime/tests commit `a9a4f3988e617190d83a4d9c8f1252721edc757f`; PR #3576 is OPEN and was updated with a lease-guarded push after rebase. This documentation checkpoint also updates that PR; re-read its live HEAD/checks after pushing this checkpoint.
+- Exact-head checks for merged PR #3572: PR Required Gate, CodeQL, gitleaks, security scan, Backend tests, Frontend-Backend Parity and Code Quality passed. Frontend build/lint/unit/e2e jobs were path-skipped; they are not passes. No staging or PostgreSQL race result is claimed.
+- Read T08, project memory/DevBrain status/routing/role map, ADR-001, the direction contract, and cyclic/worktree runbooks before editing.
+- Gate result: first prompt chose unrelated Telegram files. The one retry anchored on confirmed `backend/app/graphql/mutations.py` returned `narrow_override`; the user-approved T08.2 contract is the basis for including the focused unit regression and durable plan evidence. Do not retry the gate.
+- Exact source: `_join_queue_impl` directly inserts and commits a new `OnlineQueueEntry` after queue lock, clinic-local v1/legacy window validation and duplicate claim check. It now uses `online_issued_count` for v1 and increments the counter in the same transaction; legacy uses the previous active waiting/called count.
+- Allowed first slice: `backend/app/graphql/mutations.py`; `backend/tests/unit/test_graphql_queue_claim_coordinator.py`; `backend/tests/integration/test_graphql_resolvers_real_db.py` for the T08-required full-schema/database assertion; T08 plan/progress/resume/evidence; one factual append to `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md` recording the gate miss.
+- Validation already completed: fail-first reproduced two v1 mismatches; unit GraphQL claim/window file 7/7; full GraphQL integration resolver module 17/17; scoped Ruff, pinned repository pre-commit, compileall, `git diff --check`, and PR-body gate passed. Full integration-file Ruff format check flags unrelated pre-existing formatting drift; no broad rewrite. SQLite only, not T08.3 PostgreSQL concurrency.
+- Do not change GraphQL legacy active-entry semantics. This behavior is implemented and covered; do not broaden it to other writers or reports in this PR.
+- Stop on any need to change schema, owner identity, lock ordering, replay contract, Telegram, other adapters, API/report contracts, feature-flag defaults, staging or production.
+- Next exact action: verify the new exact PR #3576 HEAD after this docs checkpoint, then wait for all applicable checks and a human code review. Fix in-scope failures in this PR. Preserve unrelated integration-file formatting drift.
+
+Older timestamped “Active step — T08.1b” records below are historical and superseded by this checkpoint and the T08.1b merge entry in EVIDENCE.md.
 
 ## First read
 
@@ -28,14 +44,14 @@ Execution permission: IMPLEMENTATION_ACTIVE; user confirmed #3557 merged and sai
 - Completion evidence: PR #3571 is MERGED at d397656c7f597d72d6a6c92676cd204aff72d4d8. Its local validation, body gate and exact-head CI are recorded in EVIDENCE; do not act on the old pending run checkpoint.
 - Stop if another admission writer enters this sub-scope, a replay is charged, the counter cannot share the existing transaction, or lock ordering must change. PostgreSQL proof is mandatory before considering v1 rollout.
 
-## Active step — T08.1b, v1 identity/recreation guard
+## Historical completed step — T08.1b, v1 identity/recreation guard
 
-- Base/worktree: `C:\final\_wt_aqs_t081b_identity`, branch `codex/aqs-T081b-identity-guard`, base `d397656c7f597d72d6a6c92676cd204aff72d4d8`; runtime/test commit `8e215d4ab82c8f7f6c4010c1578819ea56ae79b1` is open as PR #3572.
+- Historical base/worktree: `C:\final\_wt_aqs_t081b_identity`, branch `codex/aqs-T081b-identity-guard`, base `d397656c7f597d72d6a6c92676cd204aff72d4d8`; PR #3572 was later merged at `95ff3b4752a091f22f9702977d611a3b6d9f1595`.
 - Gate: mandatory `gate_known_root_cause` was run before editing. Initial gate misrouted; the single permitted known-root retry identified `_operations.py` but still omitted sibling constructors. The manually approved T08 plan explicitly includes the shared creation policy and all runtime DailyQueue constructors, so the narrow implementation expands only to those call sites and focused tests. Record `gate_misroute=true`, `override_used=true`, and `known_root_cause_file=backend/app/services/queue_svc/_operations.py` in EVIDENCE. Do not run a third gate.
 - Canonical implementation: `backend/app/crud/daily_queue_creation_policy.py` calls the typed identity guard in `backend/app/crud/queue_resource_routing.py` only when selecting v1 for a new snapshot. Doctor identity is `(doctor, day, exact tag)`; resource identity is `(resource, day)`. Any prior active or inactive row blocks a zero-counter replacement. Legacy creation retains its previous behavior.
 - Covered runtime constructors: canonical queue service, CRUD online queue paths, GraphQL direct constructor, queue API open path, queue limits, visit confirmation and force-majeure creation. The Admin retention endpoint deletes only queues before a cutoff with `days_to_keep >= 1`, so it cannot delete today's/future queue; past-day online admission is already rejected. Backup restore preserves policy/count and is a recovery path, not an admission writer; dev seed is non-runtime. Source scan found no ordinary runtime counter/version assignment.
 - Validation already run on the PR code: policy suite 11 passed / 1 warning; six related API/limits/visit/force-majeure/GraphQL/token modules 36 passed / 1 warning; Ruff, Ruff format, Black, compileall, `git diff --check`, and the PR-body quality gate pass. SQLite test fixture only; PostgreSQL race proof is NOT_RUN and remains T08.3.
-- Next exact action: push this PR-state checkpoint and confirm exact-head CI/review/mergeability for #3572; do not start T08.2 until this PR cycle is green and merged.
+- Historical next action, fulfilled: verify exact-head checks and merge #3572 before starting T08.2.
 - Stop if any runtime constructor bypasses the common policy, identity axes become ambiguous, or preventing recreation would require queue merge/renumbering. Do not enable the v1 flag; PG concurrency/replay/partial-result proof remains mandatory before rollout.
 ## Merge, staging and rollout guardrails
 
