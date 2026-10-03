@@ -1898,6 +1898,20 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 "token": token_obj,
             }
 
+        # Admission must be serialized with writes to this queue. In
+        # particular, a request can wait here past the v1 cutoff; refresh
+        # the loaded row after acquiring the lock and evaluate the window
+        # only after the wait has finished. The tag/day claim lock above
+        # remains first in the established lock order.
+        locked_queue_id = db.execute(
+            select(DailyQueue.id)
+            .where(DailyQueue.id == daily_queue.id)
+            .with_for_update()
+        ).scalar_one_or_none()
+        if locked_queue_id is None:
+            raise QueueNotFoundError("Очередь больше не активна")
+        db.refresh(daily_queue)
+
         time_allowed, time_message = self.check_queue_time_window(
             day,
             daily_queue.opened_at,
