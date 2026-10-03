@@ -1,9 +1,22 @@
+# Lifecycle contract (see AGENT_SESSION_WORKTREES.md): every project started
+# from this file is an EPHEMERAL test environment. End a validation run with
+#   scripts/staging_down.ps1 -ProjectName <name> [-EnvFile <env>]
+# (docker compose down -v --remove-orphans --rmi local); set KEEP_STAGING=1
+# only to keep a failed stack for investigation. No service uses
+# restart: unless-stopped — a forgotten stack must not resurrect at every
+# daemon start. Sweep forgotten leftovers with scripts/staging_gc.ps1.
 name: ${COMPOSE_PROJECT_NAME:-clinic-staging}
+
+x-clinic-labels: &clinic-labels
+  clinic.lifecycle: ${CLINIC_LIFECYCLE:-ephemeral}
+  clinic.purpose: ${CLINIC_PURPOSE:-staging}
+  clinic.owner: ${CLINIC_OWNER:-unknown}
+  clinic.expires_at: ${CLINIC_EXPIRES_AT:-}
 
 services:
   postgres:
+    labels: *clinic-labels
     image: postgres:17-alpine
-    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -20,10 +33,10 @@ services:
       start_period: 10s
 
   backend:
+    labels: *clinic-labels
     build:
       context: ../backend
       dockerfile: Dockerfile.staging
-    restart: unless-stopped
     environment:
       ENV: staging
       APP_NAME: ${APP_NAME:-Clinic Manager Staging}
@@ -97,6 +110,7 @@ services:
       start_period: 25s
 
   frontend:
+    labels: *clinic-labels
     build:
       context: ../frontend
       dockerfile: Dockerfile.staging
@@ -108,7 +122,6 @@ services:
         VITE_WS_HOST: ${STAGING_PUBLIC_WS_HOST}
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
         VITE_SENTRY_ENV: staging
-    restart: unless-stopped
     ports:
       - "${STAGING_FRONTEND_PORT:-18080}:80"
     depends_on:
@@ -123,8 +136,8 @@ services:
 
   # Redis (for WebSocket pubsub + arq broker) — staging
   redis:
+    labels: *clinic-labels
     image: redis:7-alpine
-    restart: unless-stopped
     # Codex R7 #3092 (P1): idempotency claims and completed-response
     # snapshots live here — allkeys-lru may EVICT either under memory
     # pressure, a same-key retry on the other worker then re-executes the
@@ -143,11 +156,11 @@ services:
 
   # arq worker — staging
   worker:
+    labels: *clinic-labels
     build:
       context: ..
       dockerfile: ops/backend.Dockerfile
       target: runtime
-    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       ARQ_REDIS_URL: redis://redis:6379/0
@@ -181,5 +194,12 @@ services:
 
 volumes:
   staging_backend_data:
+    labels: *clinic-labels
   staging_postgres_data:
+    labels: *clinic-labels
   staging_redis_data:
+    labels: *clinic-labels
+
+networks:
+  default:
+    labels: *clinic-labels

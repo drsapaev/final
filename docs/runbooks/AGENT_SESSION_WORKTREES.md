@@ -39,6 +39,50 @@ PostgreSQL result checks, and recurring failure handling are in
 [WSL_STAGING_SESSION.md](WSL_STAGING_SESSION.md). Do not shut down the shared
 distribution or fall back to legacy host staging on production's port.
 
+### Staging lifecycle contract (mandatory)
+
+Every Compose project started from `ops/compose.staging.yml` is an
+**ephemeral test environment**, not a deployment. The historical failure
+mode this prevents: creation is automated and per-PR isolated, but
+teardown was optional, so forgotten stacks accumulated (containers +
+volumes + ~2.4 GB of project images per run), re-occupied the standard
+18001/18080/55432 contour through `restart: unless-stopped`, and blocked
+the next validation session. The contract:
+
+1. **Create** with a unique `COMPOSE_PROJECT_NAME` and the lifecycle
+   labels (`CLINIC_OWNER`, `CLINIC_EXPIRES_AT`) from the compose file.
+   `CLINIC_EXPIRES_AT` is an ISO timestamp (e.g. now + 2 days) used by GC.
+2. **Validate.** If a failure needs the live stack preserved, set
+   `KEEP_STAGING=1` and record it in the task checkpoint; this is the
+   ONLY accepted reason to leave a stack running.
+3. **Teardown is mandatory** at the end of every run — a normal
+   successful validation always ends with:
+
+   ```powershell
+   powershell -File scripts/staging_down.ps1 -ProjectName <name> [-EnvFile ops/staging.env]
+   ```
+
+   This runs `docker compose down -v --remove-orphans --rmi local`
+   (containers, networks, named volumes, locally built images) and refuses
+   to run while `KEEP_STAGING=1` is set unless `-Force` is passed.
+4. **Disposable test containers** (scratch PostgreSQL for PG-backed tests)
+   always run with `--rm`, or are removed in the test's own teardown.
+5. **Session-start/end GC** sweeps forgotten leftovers — it removes ONLY
+   resources labeled `clinic.lifecycle=ephemeral` whose
+   `clinic.expires_at` has passed; unlabeled resources are never touched,
+   and there is deliberately no global `docker system prune`:
+
+   ```powershell
+   powershell -File scripts/staging_gc.ps1 -DryRun   # list
+   powershell -File scripts/staging_gc.ps1           # remove expired
+   ```
+
+   A stack with no `CLINIC_EXPIRES_AT` is report-only (KEEP) — set the
+   label when starting a stack so GC can eventually reclaim it.
+
+Both scripts detect whether `docker.exe` exists on Windows PATH and
+otherwise wrap `wsl -d Ubuntu-24.04 -- docker`, converting paths.
+
 Current local staging uses backend `127.0.0.1:18001`, frontend
 `127.0.0.1:18080`, and Postgres `127.0.0.1:55432`. Windows production uses
 backend `:18000`. Set `STAGING_BACKEND_PORT=18001` (or another free port)

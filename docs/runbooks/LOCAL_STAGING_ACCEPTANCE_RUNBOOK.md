@@ -65,6 +65,29 @@ Current local staging contour (verify the active Compose project and port overri
 - Complete-visit/status flows use canonical visit resolution and do not depend on legacy EMR persistence
 - Files and attachments remain reachable through canonical refs
 
+## Mandatory Teardown (lifecycle contract)
+
+A validation session is complete only after its staging stack is removed.
+Leaving a stack running blocks the next session's standard ports
+(18001/18080/55432) and accumulates dead containers, volumes, and images.
+
+- Normal end of a run (pass or documented fail):
+
+  ```powershell
+  powershell -File scripts/staging_down.ps1 -ProjectName <project> [-EnvFile ops/staging.env]
+  ```
+
+- Failure investigation exception: `KEEP_STAGING=1` before the run (or keep
+  the stack and record `KEEP_STAGING` in the task checkpoint). The down
+  script refuses to run while it is set; re-run with `-Force` afterwards.
+- Forgotten stacks from earlier sessions: sweep with
+  `scripts/staging_gc.ps1 -DryRun` then `scripts/staging_gc.ps1` (removes
+  only `clinic.lifecycle=ephemeral` resources whose `clinic.expires_at`
+  passed; unlabeled resources are never touched).
+- Disposable scratch PostgreSQL for backend tests: always `--rm` (or
+  explicit teardown inside the test fixture). Never point a test at a
+  production-reachable PostgreSQL, even on localhost.
+
 ## Data Closure
 
 - Queue-domain legacy gap: archive legacy queue data explicitly as non-canonical. Do not keep a hidden dual source of truth.
