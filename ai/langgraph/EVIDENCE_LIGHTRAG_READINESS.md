@@ -3496,3 +3496,35 @@ was still open.
 - Follow-up: improve gate handling for bounded runtime-plus-regression tasks so
   an explicitly named service and its single target test can both be resolved
   without a broad known-root override.
+
+
+## Task 100 - T08 daily queue quota gate misroute
+
+### User task
+Continue T08 daily successful online issuance quota from the approved admin queue simplification plan.
+
+### Gate result
+- First gate mapped the queue quota/admission task to runtime packaging and staging Docker/Compose files.
+- One retry supplied backend/app/services/queue_domain_service.py from the plan anchor as --known-root-cause; gate returned narrow_override, still with unrelated packaging files and without the canonical operation mixin.
+- gate_misroute: yes
+- override_used: yes
+- Gate input known_root_cause_file: backend/app/services/queue_domain_service.py; source review shows this is a compatibility facade. Actual token admission owner is backend/app/services/queue_svc/_operations.py.
+- Manual scope basis: the user-approved detailed T08 plan explicitly names the queue allocator, token operation, claim/resource locks, adapters and PG validation. The first PR is narrowed to the canonical token operation and direct tests. No third gate attempt; no gate source change in this quota PR.
+
+### Manual reconstruction
+- join_queue_with_token already performs duplicate/claim resolution, tag claim lock, daily queue row lock/refresh, time and current active-entry limit checks, entry insertion with commit=False, token-use mutation, and either its own commit or caller-owned QR transaction.
+- online_issued_count is schema-backed but currently has only a zero initialization; no runtime increment/decrement path was found.
+- GraphQL is a distinct direct writer and is reserved for T08.2. Telegram callback can be reached but invokes missing QueueBusinessService.join_queue and fails before a database write. Registrar/staff derivation uses entry-creation paths outside independent online admission.
+- Follow-up: gate misses on T07 and T08 indicate a queue-service ownership routing rule should be reviewed separately; this evidence entry does not broaden the T08 patch.
+
+
+## Task 101 - T08.2a GraphQL quota gate routing — 2026-10-03
+
+### Gate observation
+- The first T08.2 gate identified the approved queue-quota plan but selected unrelated Admin Telegram management/webhook/manager files as first-touch and proposed Python compilation plus frontend build. The runtime root was confirmed separately in `backend/app/graphql/mutations.py:Mutation._join_queue_impl` and the explicit T08 GraphQL coverage row.
+- The one permitted `--known-root-cause backend/app/graphql/mutations.py` retry returned `narrow_override` with only that runtime module. It excluded the focused test and evidence checkpoint.
+- Gate fields: `gate_misroute=true` from the observed first-touch mismatch (the first tool result itself emitted `gate_misroute=false`); `override_used=true`; `known_root_cause_file=backend/app/graphql/mutations.py`.
+- Manual scope basis: the user-approved T08 plan explicitly requires GraphQL integration coverage and a transaction/counter contract. Scope is limited to this direct writer, its focused unit regression, and the plan evidence files. No third gate attempt and no gate source changes.
+
+### Source correction
+- Telegram remains only a source-classification reference for this quota slice. Existing evidence says its reachable callback calls a missing queue method and fails before a database write; this is not authorization to repair that flow under T08.2a.

@@ -35,6 +35,7 @@ from app.crud.appointment import (
 )
 from app.crud.clinic import get_queue_settings
 from app.crud.daily_queue_creation_policy import (
+    ONLINE_ISSUANCES_V1_POLICY_VERSION,
     daily_queue_creation_snapshot,
     evaluate_online_admission_window,
     online_admission_window,
@@ -772,7 +773,7 @@ class Mutation:
                         )
                     except Exception as notify_error:  # noqa: BLE001
                         logger.warning(
-                            "GraphQL createVisit: all_free notification " "failed: %s",
+                            "GraphQL createVisit: all_free notification failed: %s",
                             notify_error,
                         )
 
@@ -1182,21 +1183,20 @@ class Mutation:
                         requested_resource_id = (
                             getattr(registry_surface, "queue_resource_id", None)
                             if registry_surface is not None
-                            and getattr(
-                                registry_surface, "queue_resource_id", None
-                            )
+                            and getattr(registry_surface, "queue_resource_id", None)
                             is not None
-                            else int(registry_resource.id)
-                            if registry_resource is not None
-                            else None
+                            else (
+                                int(registry_resource.id)
+                                if registry_resource is not None
+                                else None
+                            )
                         )
                         same_owner = (
                             registry_surface_id is not None
                             and claim_queue.id == registry_surface_id
                         ) or (
                             requested_resource_id is not None
-                            and claim_queue.queue_resource_id
-                            == requested_resource_id
+                            and claim_queue.queue_resource_id == requested_resource_id
                         )
                     else:
                         same_owner = (
@@ -1294,6 +1294,7 @@ class Mutation:
                         # «default».
                         **daily_queue_creation_snapshot(
                             db,
+                            day=today,
                             doctor=doctor,
                             queue_tag=None,
                             settings=queue_settings,
@@ -1445,26 +1446,29 @@ class Mutation:
                         errors=["ALREADY_IN_QUEUE"],
                     )
 
-                # Лимит: считаем записи ВЫБРАННОЙ очереди (не всех очередей
-                # врача за день) и сравниваем с её же капой. Codex P1
-                # (round-7): только НЕ-терминальные статусы (waiting/called) —
-                # как в каноническом QueueBusinessService.check_queue_limits;
-                # served/cancelled не должны съедать слоты онлайн-набора.
-                online_entries_count = (
-                    db.query(OnlineQueueEntry)
-                    .filter(
-                        OnlineQueueEntry.queue_id == daily_queue.id,
-                        OnlineQueueEntry.status.in_(["waiting", "called"]),
+                # Legacy queues retain the waiting/called count contract.
+                # V1 uses successful online issuances, so cancelled/removed
+                # rows do not reopen capacity and staff entries stay outside
+                # this online-only limit.
+                if daily_queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+                    quota_used = daily_queue.online_issued_count
+                    max_slots = daily_queue.max_online_entries
+                else:
+                    quota_used = (
+                        db.query(OnlineQueueEntry)
+                        .filter(
+                            OnlineQueueEntry.queue_id == daily_queue.id,
+                            OnlineQueueEntry.status.in_(["waiting", "called"]),
+                        )
+                        .count()
                     )
-                    .count()
-                )
+                    max_slots = (
+                        daily_queue.max_online_entries
+                        if daily_queue.max_online_entries is not None
+                        else doctor.max_online_per_day
+                    )
 
-                max_slots = (
-                    daily_queue.max_online_entries
-                    if daily_queue.max_online_entries is not None
-                    else doctor.max_online_per_day
-                )
-                if online_entries_count >= max_slots:
+                if quota_used >= max_slots:
                     return QueueMutationResponse(
                         success=False,
                         message="Превышен лимит онлайн записей на сегодня",
@@ -1507,6 +1511,8 @@ class Mutation:
                 )
 
                 db.add(queue_entry)
+                if daily_queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+                    daily_queue.online_issued_count += 1
                 db.commit()
                 db.refresh(queue_entry)
 
@@ -1738,8 +1744,8 @@ class Mutation:
                         # очереди — легаси-комната байт-идентично.
                         from app.ws.queue_ws import queue_update_departments
 
-                        payload["broadcast_departments"] = (
-                            queue_update_departments(db, entry.queue)
+                        payload["broadcast_departments"] = queue_update_departments(
+                            db, entry.queue
                         )
 
                     # --- post-commit side effects с sync-DB (в этом же worker) ---
@@ -1778,11 +1784,12 @@ class Mutation:
                                 and entry.queue.specialist.user
                                 else "Врач"
                             )
-                        payload[
-                            "display_message"
-                        ] = get_display_manager().build_patient_call_message(
-                            entry, specialist_name, payload["cabinet"]
+                        display_message = (
+                            get_display_manager().build_patient_call_message(
+                                entry, specialist_name, payload["cabinet"]
+                            )
                         )
+                        payload["display_message"] = display_message
                     except Exception as e:  # noqa: BLE001 — non-blocking
                         logger.warning(
                             "GraphQL callNext: display payload build failed: %s", e

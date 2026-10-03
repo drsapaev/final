@@ -5,12 +5,15 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
-from datetime import time
+from datetime import date, time
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.crud.queue_resource_routing import effective_day_start_number
+from app.crud.queue_resource_routing import (
+    effective_day_start_number,
+    ensure_daily_queue_identity_is_new,
+)
 from app.models.clinic import Doctor
 from app.models.online_queue import QueueResource
 
@@ -101,11 +104,11 @@ def online_admission_window(
         start_time = parse_hhmm(
             daily_queue.online_start_time, field_name="online_start_time"
         )
-        end_time = parse_hhmm(
-            daily_queue.online_end_time, field_name="online_end_time"
-        )
+        end_time = parse_hhmm(daily_queue.online_end_time, field_name="online_end_time")
         if end_time <= start_time:
-            raise ValueError("daily queue online end time must be later than start time")
+            raise ValueError(
+                "daily queue online end time must be later than start time"
+            )
     else:
         start_time, end_time = online_window_for_settings(
             settings, policy_version=policy_version
@@ -130,6 +133,7 @@ def evaluate_online_admission_window(day, now, window: OnlineAdmissionWindow) ->
 def daily_queue_creation_snapshot(
     db: Session,
     *,
+    day: date | None = None,
     doctor: Doctor | None = None,
     resource: QueueResource | None = None,
     queue_tag: str | None = None,
@@ -147,6 +151,24 @@ def daily_queue_creation_snapshot(
 
         settings = get_queue_settings(db) or {}
     policy_version = policy_version_for_new_queue()
+    if policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+        if day is None:
+            raise ValueError("day is required when creating a v1 daily queue")
+        if (doctor is None) == (resource is None):
+            raise ValueError("v1 daily queue creation requires exactly one owner")
+        if doctor is not None and doctor.id is None:
+            raise ValueError("persisted doctor is required for v1 daily queue creation")
+        if resource is not None and resource.id is None:
+            raise ValueError(
+                "persisted resource is required for v1 daily queue creation"
+            )
+        ensure_daily_queue_identity_is_new(
+            db,
+            day=day,
+            specialist_id=doctor.id if doctor is not None else None,
+            queue_resource_id=resource.id if resource is not None else None,
+            queue_tag=queue_tag,
+        )
     start_time, end_time = online_window_for_settings(
         settings, policy_version=policy_version
     )

@@ -55,7 +55,9 @@ class QueueLimitsRepository:
             .count()
         )
 
-    def list_active_daily_queues(self, *, day: date, specialist_id: int) -> list[DailyQueue]:
+    def list_active_daily_queues(
+        self, *, day: date, specialist_id: int
+    ) -> list[DailyQueue]:
         """ALL active same-day queues of the doctor (Codex round-5 P2: a
         doctor may hold several active queues under different tags — the
         aggregate capacity must enumerate every enforced cap)."""
@@ -102,7 +104,9 @@ class QueueLimitsRepository:
                 specialist_id=specialist_id,
                 active=True,
                 max_online_entries=max_online_entries,
-                **daily_queue_creation_snapshot(self.db, doctor=doctor, queue_tag=None),
+                **daily_queue_creation_snapshot(
+                    self.db, day=day, doctor=doctor, queue_tag=None
+                ),
             )
             self.db.add(queue)
         return queue

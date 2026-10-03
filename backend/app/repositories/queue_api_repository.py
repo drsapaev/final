@@ -49,7 +49,9 @@ class QueueApiRepository:
             day=day,
             specialist_id=specialist_id,
             active=True,
-            **daily_queue_creation_snapshot(self.db, doctor=doctor, queue_tag=None),
+            **daily_queue_creation_snapshot(
+                self.db, day=day, doctor=doctor, queue_tag=None
+            ),
         )
         self.db.add(daily_queue)
         self.db.commit()
@@ -103,6 +105,7 @@ class QueueApiRepository:
             # реестра — паритет с queue_svc-конструктором.
             **daily_queue_creation_snapshot(
                 self.db,
+                day=day,
                 resource=resource,
                 queue_tag=queue_tag,
                 settings=settings,

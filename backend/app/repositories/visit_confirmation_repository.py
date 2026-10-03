@@ -35,7 +35,10 @@ class VisitConfirmationRepository:
     def get_pending_visit_by_token(self, token: str) -> Visit | None:
         return (
             self.db.query(Visit)
-            .filter(Visit.confirmation_token == token, Visit.status == "pending_confirmation")
+            .filter(
+                Visit.confirmation_token == token,
+                Visit.status == "pending_confirmation",
+            )
             .first()
         )
 
@@ -46,7 +49,9 @@ class VisitConfirmationRepository:
         return self.db.query(Patient).filter(Patient.id == patient_id).first()
 
     def get_visit_services(self, visit_id: int) -> list[VisitService]:
-        return self.db.query(VisitService).filter(VisitService.visit_id == visit_id).all()
+        return (
+            self.db.query(VisitService).filter(VisitService.visit_id == visit_id).all()
+        )
 
     def get_service(self, service_id: int) -> Service | None:
         return self.db.query(Service).filter(Service.id == service_id).first()
@@ -116,6 +121,7 @@ class VisitConfirmationRepository:
                     # номера реестра — паритет с queue_svc-конструктором.
                     **daily_queue_creation_snapshot(
                         self.db,
+                        day=day,
                         resource=resource,
                         queue_tag=queue_tag,
                         settings=settings,
@@ -199,6 +205,7 @@ class VisitConfirmationRepository:
             # дня (владелец → клиника) — паритет с queue_svc-конструктором.
             **daily_queue_creation_snapshot(
                 self.db,
+                day=day,
                 doctor=doctor,
                 queue_tag=queue_tag,
                 settings=settings,
