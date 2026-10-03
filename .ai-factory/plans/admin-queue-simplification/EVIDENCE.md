@@ -1350,3 +1350,18 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Tier 2: no staging deferral requested or claimed for this backend-only slice. The full ten-item pre-deploy runbook remains mandatory. PostgreSQL concurrency is NOT_RUN and remains a T08.3 gate before v1 rollout.
 - Review/checks: no review verdict is recorded at PR creation. Exact-head required checks must be read after the current progress checkpoint is pushed.
 - Merge commit: none.
+
+## T08.1a corrected PR body and exact-head CI checkpoint — 2026-10-03T19:33:00+05:00
+
+- Commit under test: current PR HEAD `d13505357ac7701345b14896f6b1f7b4c0b22cbe`; runtime/test commit remains `e0ebcfb756cf1ff31093c5905aed9b937a2fa769`; base `473138216ae040c1c7fa60e92334d33ef8a0b856`.
+- Environment: GitHub PR #3571 plus Windows worktree `C:\final\_wt_aqs_t081_quota`; no staging or production environment used.
+- Execution mode: PR metadata/quality-gate correction and read-only status verification; no runtime code changed.
+- Allowed paths: PR description and T08.1a progress/resume/evidence checkpoint. Actual runtime/test paths are unchanged.
+- Original failure: initial GitHub PR Review Quality Gate found required headings and Validation fields missing from the first PR body. After correction, rerunning the original workflow event still used its immutable initial body snapshot and failed again. A fresh `pull_request.edited` event then validated the corrected current body successfully.
+- Validation command: `scripts/run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py', '--body-file', '.pr-body-T08.1a.md')` — PASS (19 gate tests, documented samples and actual PR body). GitHub PR Review Quality Gate run `37129646426` — SUCCESS on HEAD `d13505357ac7701345b14896f6b1f7b4c0b22cbe`.
+- Exact-head CI: Unified pipeline run `37129318025` is in progress on `d13505357ac7701345b14896f6b1f7b4c0b22cbe`. At checkpoint, Backend tests, Code Quality and Context Boundary Integrity were running; front-end-only and path-specific jobs were skipped. Other current checks: CodeQL (actions, Python and JavaScript), gitleaks, GitGuardian, security scan and lifecycle recommendation passed. The stale-body quality-gate failure is superseded by the fresh-event success; the canceled intermediate edit-event run is not a pass.
+- Result: PR body gate fixed and passed; overall PR cycle remains OPEN/PENDING until exact-head Unified CI completes. PR review list is empty; no separate human review verdict is claimed. Tier 2 staging deferral is not applicable or claimed for this backend-only PR.
+- Scope check: no source, test, schema, feature flag, staging, production or patient data changed in this checkpoint.
+- Remaining limitation: PostgreSQL last-slot concurrency/replay/partial-result proof remains NOT_RUN for T08.3 and is required before v1 rollout. GraphQL/direct-writer parity and identity/recreation protection remain separate planned subtasks. QUEUE_POLICY_V2_CREATION_ENABLED remains default-off.
+- PR: https://github.com/drsapaev/final/pull/3571.
+- Merge commit: none.

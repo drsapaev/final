@@ -1,8 +1,8 @@
 # Resume — admin queue simplification
 
 Plan version: 2.3
-Last updated: 2026-10-03T19:21:09+05:00, Asia/Tashkent
-Execution permission: IMPLEMENTATION_ACTIVE; user confirmed #3557 merged and said continue. T07 is MERGED; T08.1a runtime/tests are committed as e0ebcfb756cf1ff31093c5905aed9b937a2fa769 and locally validated against base origin/main 473138216. PR #3571 is OPEN; it was created at head e8bedbc3 and this progress checkpoint must be pushed before exact-head checks. The branch was fast-forwarded over a docs-only upstream commit before runtime edits. No production deployment or v1 activation is authorized.
+Last updated: 2026-10-03T19:33:00+05:00, Asia/Tashkent
+Execution permission: IMPLEMENTATION_ACTIVE; user confirmed #3557 merged and said continue. T07 is MERGED; T08.1a runtime/tests are committed as e0ebcfb756cf1ff31093c5905aed9b937a2fa769 and locally validated against base 473138216. PR #3571 is OPEN at current HEAD d13505357ac7701345b14896f6b1f7b4c0b22cbe; corrected PR body passed the local template validator and current GitHub PR Review Quality Gate. Exact-head Unified CI run 37129318025 is in progress. No production deployment or v1 activation is authorized.
 
 ## First read
 
@@ -19,13 +19,13 @@ Execution permission: IMPLEMENTATION_ACTIVE; user confirmed #3557 merged and sai
 
 ## Active step — T08.1a, canonical token admission quota
 
-- Current worktree: C:\final\_wt_aqs_t081_quota; branch codex/aqs-T081-online-quota; base 473138216ae040c1c7fa60e92334d33ef8a0b856; runtime/test commit e0ebcfb756cf1ff31093c5905aed9b937a2fa769; PR #3571 is OPEN. The PR creation head was e8bedbc3; read actual branch/PR HEAD before continuing. PR #3557 merge commit is 425df11c7a84f0d1e7954df0d00415927212669a. The branch was fast-forwarded across a docs-only upstream commit before code edits.
+- Current worktree: C:\final\_wt_aqs_t081_quota; branch codex/aqs-T081-online-quota; base 473138216ae040c1c7fa60e92334d33ef8a0b856; runtime/test commit e0ebcfb756cf1ff31093c5905aed9b937a2fa769; PR #3571 is OPEN at HEAD d13505357ac7701345b14896f6b1f7b4c0b22cbe. PR #3557 merge commit is 425df11c7a84f0d1e7954df0d00415927212669a. The branch was fast-forwarded across a docs-only upstream commit before code edits.
 - Canonical owner: backend/app/services/queue_svc/_operations.py. queue_domain_service.py:allocate_ticket is only a compatibility facade. The gate misroute and its single permitted known-root retry are recorded in EVIDENCE and ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md. Do not repeat the gate or edit gate code in this quota PR.
 - Local implementation: v1 check_queue_limits compares persisted online_issued_count with max_online_entries exactly, including zero. Doctor selection uses the same quota semantics for v1, while legacy selection/enforcement continue using active waiting/called entries. join_queue_with_token increments only after creating a new entry, under the existing DailyQueue lock and before the current commit/flush. Existing duplicate return and staff create_queue_entry paths do not increment; there is no decrement path.
 - Focused coverage: zero/exhausted/available cap; legacy fallback; v1 doctor-selection parity against active desk rows; duplicate replay no-increment; new token entry count increment; a second request at the last-slot boundary is rejected; caller-owned commit=False rollback removes entry/counter/token usage together.
-- Validation on current working tree: test_queue_join_claim_coordinator.py + test_online_admission_window.py + test_qr_least_loaded_routing.py: 64 passed, 1 warning using test-fixture SQLite. Ruff check, compile, git diff --check PASS. Ruff format check passes for the test file. The legacy _operations.py format check still reports broad formatter diffs in untouched regions; no unrelated whole-file reformat was applied.
+- Validation on current working tree: test_queue_join_claim_coordinator.py + test_online_admission_window.py + test_qr_least_loaded_routing.py: 64 passed, 1 warning using test-fixture SQLite. Ruff check, compile, git diff --check PASS. Ruff format check passes for the test file. The legacy _operations.py format check still reports broad formatter diffs in untouched regions; no unrelated whole-file reformat was applied. PR body gate: local validator passed; GitHub PR Review Quality Gate passed on current HEAD (run 37129646426).
 - NOT_RUN: PostgreSQL last-slot concurrency, adapter/report parity (including GraphQL), identity/recreation protection, staging/browser and deployment checklist. These remain T08.1b/T08.2/T08.3/T18 obligations. QUEUE_POLICY_V2_CREATION_ENABLED remains default-off.
-- Next exact action: push the current plan/evidence checkpoint, read the actual PR #3571 head, and verify exact-head CI and review status. Do not start another T08 subtask until this PR cycle completes. Wait for exact-head CI/review; do not begin T08.1b/T08.2 or enable the flag until this PR cycle completes.
+- Next exact action: wait for exact-head Unified CI run 37129318025 to complete, inspect all applicable jobs, then confirm PR HEAD/status before completing this PR cycle. The PR has no recorded separate human review verdict; no Tier-2 deferral applies. Do not begin T08.1b/T08.2 or enable the flag until this PR cycle completes.
 - Stop if another admission writer enters this sub-scope, a replay is charged, the counter cannot share the existing transaction, or lock ordering must change. PostgreSQL proof is mandatory before considering v1 rollout.
 ## Merge, staging and rollout guardrails
 

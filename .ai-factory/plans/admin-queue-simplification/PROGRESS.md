@@ -5,13 +5,13 @@ Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 20
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T08.1a — canonical token admission quota
-Current status: T07 MERGED. PR #3557 merged as 425df11c7a84f0d1e7954df0d00415927212669a; final CI 27 SUCCESS / 12 SKIPPED / 0 failures. T08.1a code/test commit e0ebcfb756cf1ff31093c5905aed9b937a2fa769 is locally validated on base 473138216ae040c1c7fa60e92334d33ef8a0b856. PR #3571 is OPEN, created at head e8bedbc3; this evidence checkpoint must be pushed and exact-head CI checked. Later T08 writers and PostgreSQL proof remain open; v1 flag stays default-off.
+Current status: T07 MERGED. PR #3557 merged as 425df11c7a84f0d1e7954df0d00415927212669a; final CI 27 SUCCESS / 12 SKIPPED / 0 failures. T08.1a is PR_OPEN on PR #3571, current PR HEAD d13505357ac7701345b14896f6b1f7b4c0b22cbe, base 473138216ae040c1c7fa60e92334d33ef8a0b856. The corrected PR body passes local validation and the latest GitHub PR Review Quality Gate; exact-head Unified CI is in progress. No Tier-2 staging deferral is claimed for this backend-only slice. Later T08 writers and PostgreSQL proof remain open; v1 flag stays default-off.
 Last completed task: T07 — MERGED (#3557, merge commit 425df11c7a84f0d1e7954df0d00415927212669a)
 Worktree: C:\final\_wt_aqs_t081_quota
 Branch: codex/aqs-T081-online-quota
 Base commit: 473138216ae040c1c7fa60e92334d33ef8a0b856
 Last runtime/test commit: e0ebcfb756cf1ff31093c5905aed9b937a2fa769 (T08.1a, local branch); base 473138216ae040c1c7fa60e92334d33ef8a0b856.
-Last updated: 2026-10-03T19:21:09+05:00
+Last updated: 2026-10-03T19:33:00+05:00
 
 > Historical checkpoint superseded: current T07 status and exact-head evidence are recorded in dated sections below and in RESUME.md; do not use the earlier snapshot as a continuation instruction.
 
@@ -41,10 +41,12 @@ Last updated: 2026-10-03T19:21:09+05:00
 ## Current checkpoint
 
 - T07/PR #3557 is MERGED as 425df11c7a84f0d1e7954df0d00415927212669a; exact-head applicable CI finished 27 SUCCESS / 12 SKIPPED / 0 failures. Its three named Tier-2 deferrals remain NOT_RUN; full STAGING_VALIDATION remains mandatory before deployment.
-- T08.1a implementation is committed as e0ebcfb756cf1ff31093c5905aed9b937a2fa769 on current base 473138216ae040c1c7fa60e92334d33ef8a0b856. It uses online_issued_count for v1 admission and doctor selection; increments only after new entry creation under the locked queue row, before the existing commit/flush. Legacy active-entry behavior is unchanged. No other admission writer, constructor, report, flag, or schema was changed.
+- T08.1a implementation is committed as e0ebcfb756cf1ff31093c5905aed9b937a2fa769 on base 473138216ae040c1c7fa60e92334d33ef8a0b856; current docs/PR checkpoint is d13505357ac7701345b14896f6b1f7b4c0b22cbe. It uses online_issued_count for v1 admission and doctor selection; increments only after new entry creation under the locked queue row, before the existing commit/flush. Legacy active-entry behavior is unchanged. No other admission writer, constructor, report, flag, or schema was changed.
 - Validation: focused queue-claim, admission-window, and QR least-loaded routing suites 64 passed / 1 warning on test-fixture SQLite; scoped Ruff check, compile, and git diff --check PASS. The test file passes Ruff format check. Ruff format check for the legacy _operations.py reports broad existing changes outside this patch; no whole-file reformat was applied. PostgreSQL concurrency, GraphQL/direct writers, queue identity recreation and staging are NOT_RUN/reserved for later T08 slices.
-- Blocker: none for the narrow local T08.1a slice. Keep QUEUE_POLICY_V2_CREATION_ENABLED unset/default-off.
-- Next exact action: push the current evidence checkpoint to PR #3571, verify the actual GitHub head and all applicable checks, then wait for review/merge before starting the next subtask.
+- PR #3571: body template gate initially failed because the first description lacked required sections. The body is now corrected; local validator passed (19 tests, sample bodies and actual PR body), and GitHub PR Review Quality Gate run 37129646426 passed on HEAD d13505357ac7701345b14896f6b1f7b4c0b22cbe. A rerun of the original event still failed on its stale body snapshot; it is historical and superseded by the fresh edited-event pass.
+- Exact-head Unified CI run 37129318025 is in progress on d13505357. Backend tests, Code Quality and Context Boundary jobs are running; frontend-only jobs and path-specific checks are skipped. No separate human review verdict is recorded. Keep QUEUE_POLICY_V2_CREATION_ENABLED unset/default-off.
+- Blocker: final exact-head CI is still in progress. PostgreSQL concurrency proof remains NOT_RUN and is required in T08.3 before rollout, but does not change this backend-only PR's scope.
+- Next exact action: wait for run 37129318025 to complete; record its passed/failed/skipped jobs and confirm the PR still points at the tested head before completing this PR cycle. Do not start the next subtask before the PR cycle is complete.
 - Checks to rerun after the next runtime change: the two focused modules, scoped Ruff check, compile, and git diff --check. PostgreSQL concurrency proof remains a T08.3 gate and must be completed before v1 rollout/flag activation.
 ## Checkpoint rules for the next agent
 
