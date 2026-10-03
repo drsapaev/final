@@ -18,6 +18,11 @@ class TestQueueApiService:
             def get_doctor(self, specialist_id):
                 return None
 
+            # Lock-parity (merge-gate P1): the doctor path takes the
+            # canonical advisory scope via repository.db — a bind-less
+            # double keeps the helper a documented no-op.
+            db = None
+
             def get_daily_queue(self, *, day, specialist_id):
                 return None
 

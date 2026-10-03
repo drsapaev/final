@@ -1,9 +1,10 @@
 """Lock-parity pins for the doctor day-queue creation advisory scope.
 
-Follow-up to the #3511 review (owner verdict round): the canonical
+Follow-up to the #3511 review (owner verdict round + merge-gate
+round): the canonical
 ``queue_service.get_or_create_daily_queue`` serializes its
 check-then-insert on ``pg_advisory_xact_lock('daily_queue:{day}:{doctor}')``,
-while four legacy creation paths ran the same query-then-insert outside
+while FIVE legacy creation paths ran the same query-then-insert outside
 that scope:
 
 - GraphQL ``joinQueue`` (untagged) took a DIFFERENT key spelling
@@ -11,9 +12,11 @@ that scope:
   so it serialized only against itself, never against the canonical
   writer (registrar cart, morning assignment);
 - ``crud/online_queue.get_or_create_daily_queue`` (the queue_batch
-  path), ``visit_confirmation_repository.get_or_create_daily_queue`` and
-  ``queue_limits_repository.get_or_create_daily_queue`` took no lock at
-  all.
+  path), ``visit_confirmation_repository.get_or_create_daily_queue``,
+  ``queue_limits_repository.get_or_create_daily_queue`` and
+  ``QueueApiService.get_or_create_daily_queue`` (the deprecated but
+  mounted ``POST /queue/open`` for Admin/Registrar queue management)
+  took no lock at all.
 
 Two concurrent writers could both observe "no queue" and insert — the
 ``uq_daily_queues_active_doctor_day_tag`` partial unique then failed the
@@ -28,7 +31,7 @@ path through ``lock_daily_queue_creation``. These pins hold:
   silently lost again);
 - the helper's PostgreSQL-only parity (execute on PG, no-op on SQLite
   and on bind-less test doubles);
-- the call-site wiring: all four legacy paths call the helper, and the
+- the call-site wiring: all five legacy paths call the helper, and the
   legacy inline spelling is gone (scanner pins — the same family the
   repo uses for source-level contracts).
 
@@ -167,10 +170,12 @@ def test_gql_untagged_join_uses_the_shared_helper() -> None:
 
 
 def test_legacy_creation_paths_call_the_helper_before_their_lookup() -> None:
-    """crud/online_queue (queue_batch), the visit-confirmation repository
-    and the queue-limits repository acquire the canonical scope BEFORE
-    their existing-queue lookup — an advisory taken after the lookup
-    would not close the check-then-insert window."""
+    """crud/online_queue (queue_batch), the visit-confirmation
+    repository, the queue-limits repository and the queue-api legacy
+    service (the deprecated but mounted POST /queue/open) acquire the
+    canonical scope BEFORE their existing-queue lookup — an advisory
+    taken after the lookup would not close the check-then-insert
+    window."""
 
     sites = {
         "app/crud/online_queue.py": (
@@ -184,6 +189,10 @@ def test_legacy_creation_paths_call_the_helper_before_their_lookup() -> None:
         "app/repositories/queue_limits_repository.py": (
             "lock_daily_queue_creation(self.db, day, specialist_id)",
             "queue = self.get_daily_queue(day=day, specialist_id=specialist_id)",
+        ),
+        "app/services/queue_api_service.py": (
+            "queue_resource_routing.lock_daily_queue_creation(",
+            "daily_queue = self.repository.get_daily_queue(",
         ),
     }
     for relpath, (lock_call, lookup_marker) in sites.items():

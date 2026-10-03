@@ -58,6 +58,27 @@ class QueueApiService:
             )
             if registry_queue is not None:
                 return registry_queue
+        # Lock-parity follow-up to the #3511 review (merge-gate P1): the
+        # legacy ``POST /queue/open`` doctor path is the FIFTH creator
+        # of a doctor's day queue — serialize its check-then-insert on
+        # the canonical (day, doctor) advisory key, the same scope
+        # queue_service.get_or_create_daily_queue holds. A canonical
+        # writer (registrar cart, morning assignment) racing this
+        # deprecated-but-mounted endpoint for the same (day, doctor)
+        # could both observe no queue and insert: two NULL-tag rows fail
+        # the loser on ``uq_daily_queues_active_doctor_day_tag`` with an
+        # unhandled IntegrityError, and a tagged-vs-NULL-tag pair — the
+        # partial unique's COALESCE(queue_tag, '') keys differ — forks
+        # TWO active queues for one doctor-day. Taken BEFORE the lookup;
+        # create_daily_queue's commit releases the transaction-scoped
+        # lock. Advisory-first: nothing row-locked earlier in this flow
+        # (the registry branch exits on plain lookups or returns a
+        # queue; its deactivation-race tag lock precedes this in the
+        # same tag-then-doctor order the canonical batch flow uses).
+        # PostgreSQL-only; the sequential SQLite tests skip harmlessly.
+        queue_resource_routing.lock_daily_queue_creation(
+            self.repository.db, day, specialist_id
+        )
         daily_queue = self.repository.get_daily_queue(
             day=day, specialist_id=specialist_id
         )

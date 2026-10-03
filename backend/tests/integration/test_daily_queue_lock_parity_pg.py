@@ -1,12 +1,14 @@
 """PostgreSQL proof for the doctor day-queue creation lock parity.
 
-Follow-up to the #3511 review (owner verdict round): four legacy
-creation paths ran the check-then-insert for a doctor's day queue
-outside the canonical ``pg_advisory_xact_lock`` scope that
-``queue_service.get_or_create_daily_queue`` holds — the GraphQL untagged
-join even used a different key spelling and serialized only against
-itself. Two concurrent writers could both observe "no queue for this
-doctor today" and insert; the ``uq_daily_queues_active_doctor_day_tag``
+Follow-up to the #3511 review (owner verdict round + merge-gate
+round): FIVE legacy creation paths ran the check-then-insert for a
+doctor's day queue outside the canonical ``pg_advisory_xact_lock``
+scope that ``queue_service.get_or_create_daily_queue`` holds — the
+GraphQL untagged join even used a different key spelling and
+serialized only against itself, and the queue-api legacy service (the
+deprecated but mounted ``POST /queue/open``) took no lock at all. Two
+concurrent writers could both observe "no queue for this doctor
+today" and insert; the ``uq_daily_queues_active_doctor_day_tag``
 partial unique then failed the loser with an UNHANDLED IntegrityError
 (a 500 to the operator) instead of a clean block → re-read → reuse.
 
@@ -18,10 +20,11 @@ lookup.
 Proofs (real workers against one PostgreSQL, mixed legacy + canonical
 paths for the same fresh (day, doctor)):
 
-1. ``..._serialize_on_one_canonical_scope``: four concurrent creators —
+1. ``..._serialize_on_one_canonical_scope``: five concurrent creators —
    the canonical queue service, the crud get_or_create (the queue_batch
-   path), the visit-confirmation repository and the queue-limits
-   repository — race for the same (day, doctor) with no seeded queue.
+   path), the visit-confirmation repository, the queue-limits
+   repository and the queue-api legacy service (POST /queue/open) —
+   race for the same (day, doctor) with no seeded queue.
    Every worker returns a queue, NO worker raises, exactly ONE active
    queue row exists afterwards, and every worker saw the SAME queue id
    (block → re-read → reuse). Without the parity lock the interleaving
@@ -86,6 +89,7 @@ from app.repositories.queue_limits_repository import QueueLimitsRepository
 from app.repositories.visit_confirmation_repository import (
     VisitConfirmationRepository,
 )
+from app.services.queue_api_service import QueueApiService
 from app.services.queue_service import queue_service
 
 # bounded waits keep a REGRESSION loud and fast instead of hanging the
@@ -218,9 +222,27 @@ def _limits_creator(engine, day, doctor_id, barrier, errors, queue_ids):
         errors.append(("queue_limits", exc))
 
 
+def _queue_api_legacy_creator(engine, day, doctor_id, barrier, errors, queue_ids):
+    try:
+        with Session(engine) as session:
+            barrier.wait(timeout=30)
+            # the deprecated but mounted POST /queue/open path: the
+            # service's create_daily_queue commits internally, exactly
+            # as in prod; the context manager bounds a failure with a
+            # rollback so a raised creator never leaks the advisory.
+            # An empty registry (no queue_resources rows) keeps this on
+            # the doctor-keyed path — the fifth creator the merge-gate
+            # round closed.
+            service = QueueApiService(session)
+            queue = service.get_or_create_daily_queue(day=day, specialist_id=doctor_id)
+            queue_ids.append(int(queue.id))
+    except Exception as exc:  # noqa: BLE001
+        errors.append(("queue_api_legacy", exc))
+
+
 @pytest.mark.integration
 def test_mixed_creators_serialize_on_one_canonical_scope(lock_parity_engine):
-    """Four real creation paths, one fresh (day, doctor): one queue row,
+    """Five real creation paths, one fresh (day, doctor): one queue row,
     one shared id, zero exceptions."""
 
     from datetime import date
@@ -230,7 +252,7 @@ def test_mixed_creators_serialize_on_one_canonical_scope(lock_parity_engine):
 
     errors: list[tuple[str, Exception]] = []
     queue_ids: list[int] = []
-    barrier = threading.Barrier(4)
+    barrier = threading.Barrier(5)
 
     workers = [
         lambda: _canonical_creator(
@@ -245,8 +267,11 @@ def test_mixed_creators_serialize_on_one_canonical_scope(lock_parity_engine):
         lambda: _limits_creator(
             lock_parity_engine, day, doctor_id, barrier, errors, queue_ids
         ),
+        lambda: _queue_api_legacy_creator(
+            lock_parity_engine, day, doctor_id, barrier, errors, queue_ids
+        ),
     ]
-    pool = ThreadPoolExecutor(max_workers=4)
+    pool = ThreadPoolExecutor(max_workers=5)
     try:
         futures = [pool.submit(worker) for worker in workers]
         for future in futures:
@@ -258,7 +283,7 @@ def test_mixed_creators_serialize_on_one_canonical_scope(lock_parity_engine):
         pool.shutdown(wait=False, cancel_futures=True)
 
     assert errors == [], f"concurrent creators failed: {errors!r}"
-    assert len(queue_ids) == 4
+    assert len(queue_ids) == 5
 
     with Session(lock_parity_engine) as verify:
         rows = (
