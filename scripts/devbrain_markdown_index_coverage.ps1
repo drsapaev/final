@@ -1,8 +1,18 @@
+param(
+    [switch] $IncludeRetrieval
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Resolve-Path (Join-Path $scriptDir "..")
+
+if (-not $IncludeRetrieval) {
+    Write-Output "DevBrain Markdown Index Coverage"
+    Write-Output "SKIP: intentional; legacy retrieval is dormant. Pass -IncludeRetrieval for read-only manifest coverage."
+    exit 0
+}
 
 $durableMarkdownRoots = @(
     "docs/devbrain",
