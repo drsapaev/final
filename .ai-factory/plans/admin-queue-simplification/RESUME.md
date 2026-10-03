@@ -1,7 +1,7 @@
 # Resume — admin queue simplification
 
 Plan version: 2.6
-Last updated: 2026-10-03T23:19:42+05:00, Asia/Tashkent
+Last updated: 2026-10-03T23:23:05+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
 ## Current continuation checkpoint — T08.2b
@@ -14,8 +14,8 @@ Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576
 - First-touch docs only: canonical plan, PROGRESS, RESUME, DECISIONS, EVIDENCE, and one factual append to `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md`. Runtime sources and tests are read-only. Target validation: source/route coverage table plus `git diff --check`; stop if any uncovered successful writer, ambiguous partial-result behavior, or need for wider runtime/API scope appears.
 - PostgreSQL concurrency/replay/partial-result proof remains T08.3. Availability/report parity remains T08.2c. `QUEUE_POLICY_V2_CREATION_ENABLED` stays default-off; staging and production were not used.
 - The local PR review body gate passed (19 unit checks, both documented samples, and the current body); `git diff --check` passed. No runtime tests were applicable.
-- PR #3581 is OPEN: https://github.com/drsapaev/final/pull/3581. Its initial evidence commit `f12b30abb193c27259ef865fe44c71841a74e240` has been rebased to source inventory commit `2d5f9dab1` after main advanced by PR #3567; the whole branch now includes journal-only checkpoints. Push with a lease against remote head `b57105f329c2aa00992fc9302844c01abfb3b59c`, then resolve exact GitHub head/checks.
-- Next exact action: lease-guard push the rebase, verify exact PR base/head and checks, wait for merge, then sync a fresh worktree from `origin/main` before T08.2c.
+- PR #3581 is OPEN: https://github.com/drsapaev/final/pull/3581. Its initial evidence commit `f12b30abb193c27259ef865fe44c71841a74e240` has been rebased to source inventory commit `2d5f9dab1` after main advanced by PR #3567. The rebase was pushed with an explicit lease; this journal checkpoint may advance the head once more. Resolve live GitHub head/checks rather than relying on prior-head results.
+- Next exact action: push this journal update, read exact PR base/head, wait for applicable checks and merge, then sync a fresh worktree from `origin/main` before T08.2c.
 
 ## Historical continuation checkpoint — T08.2a (merged)
 

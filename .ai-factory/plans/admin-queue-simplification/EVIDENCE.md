@@ -1452,7 +1452,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - No formal independent review has been submitted (`reviews=[]`); the PR lifecycle recommendation says `needs-review`. No merge claimed. PostgreSQL race/replay/partial-result proof remains T08.3; staging is not claimed; v1 creation flag remains default-off.
 - Next exact action: compare live PR HEAD with local `git rev-parse HEAD`, wait for applicable checks and human review, then fix any in-scope failure in PR #3576.
 
-## T08.2a merge and T08.2b source inventory — 2026-10-03T23:19:42+05:00
+## T08.2a merge and T08.2b source inventory — 2026-10-03T23:23:05+05:00
 
 - User confirmation: the user merged PR #3576 themselves. GitHub reports PR #3576 MERGED; exact code HEAD `35b6943cce8c0295b8e9a68077cb881c73fcda20`; merge commit `1ed6d05874c2ea205a625bb70879adb10b077be4`. The merge commit is an ancestor of current `origin/main` `4e6f125f17c637fc27296e2d0ec9d23f5d376775`.
 - T08.2b worktree: `C:\final\_wt_aqs_t082b_admission`; branch `codex/aqs-T08.2b-admission`; base `4e6f125f17c637fc27296e2d0ec9d23f5d376775`. This is a source inventory; no runtime or test source changed.
@@ -1474,4 +1474,5 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Validation: route/source inventory only; no runtime tests run because runtime and test files were not edited. `git diff --check` — **PASS**. `run_pr_review_gate_checks.py --body-file pr-body-t082b.md` — **PASS** (19 unit checks, documented samples, current PR body). Synthetic staging, production and T08.3 PostgreSQL concurrency/replay/partial-result checks were not run.
 - Result: T08.2b source coverage supports an evidence-only completion PR; do not claim adapter runtime tests or staging proof. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off.
 - PR checkpoint: PR #3581 is open at `https://github.com/drsapaev/final/pull/3581`. It was opened from base `4e6f125f17c637fc27296e2d0ec9d23f5d376775` at source inventory commit `f12b30abb193c27259ef865fe44c71841a74e240`. Main then advanced by unrelated PR #3567 to `a1542489e4c73eadafbab57ad51a588b3a4b0773`; the branch has been rebased, and the source inventory commit is now `2d5f9dab1`. The prior PR head `b57105f329c2aa00992fc9302844c01abfb3b59c` had applicable checks pass, with path-aware jobs skipped; these checks are stale after rebase.
-- Next exact action: lease-guard push the rebased branch against remote head `b57105f329c2aa00992fc9302844c01abfb3b59c`, then verify exact PR base/head and rerun status before merge. After merge, start T08.2c from a fresh worktree.
+- The rebased branch was lease-pushed. PR #3581 now targets `a1542489e4c73eadafbab57ad51a588b3a4b0773`; latest pushed head before this journal update was `00e23e093b2f3cd1b1ffa3b5190f852b2d6d92f3`, with checks rerunning. This checkpoint will advance the head; resolve its exact current SHA and status after push.
+- Next exact action: push this journal update, verify the live PR base/head, and wait for applicable checks before merge. After merge, start T08.2c from a fresh worktree.

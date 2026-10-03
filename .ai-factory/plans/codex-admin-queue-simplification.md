@@ -1,11 +1,11 @@
 # План исправления и упрощения административной настройки очередей
 
 **Версия:** 2.6 — T07, T08.1a, T08.1b and T08.2a are merged; T08.2b evidence PR #3581 is open.
-**Создан:** 30 сентября 2026. **Обновлён:** 3 октября 2026, 23:19 Asia/Tashkent.
+**Создан:** 30 сентября 2026. **Обновлён:** 3 октября 2026, 23:23 Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Последний подтверждённый runtime merge:** `1ed6d05874c2ea205a625bb70879adb10b077be4`, PR #3576 / T08.2a; пользователь подтвердил, что выполнил merge самостоятельно.
-**Текущий worktree:** `C:\final\_wt_aqs_t082b_admission`, ветка `codex/aqs-T08.2b-admission`, база `origin/main` `a1542489e4c73eadafbab57ad51a588b3a4b0773`; T08.2b проверяет оставшиеся admission paths по source, без runtime изменений. PR #3581 нужно обновить после этого rebase.
+**Текущий worktree:** `C:\final\_wt_aqs_t082b_admission`, ветка `codex/aqs-T08.2b-admission`, база `origin/main` `a1542489e4c73eadafbab57ad51a588b3a4b0773`; T08.2b проверяет оставшиеся admission paths по source, без runtime изменений. PR #3581 rebased and lease-pushed; exact-head checks должны быть подтверждены повторно.
 
 > **T00–T07, T08.1a, T08.1b и T08.2a — MERGED; T08.2b — IN_PROGRESS; T08.2c–T18 — PLANNED.** PR #3557 merged as `425df11c7a84f0d1e7954df0d00415927212669a`; PR #3571 as `d397656c7f597d72d6a6c92676cd204aff72d4d8`; PR #3572 as `95ff3b4752a091f22f9702977d611a3b6d9f1595`; PR #3576 as `1ed6d05874c2ea205a625bb70879adb10b077be4`. T08.2a added the persisted quota check to the sole confirmed direct writer, GraphQL. T08.2b is verifying that mounted adapters share the canonical writer and classifying non-admission paths. PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
