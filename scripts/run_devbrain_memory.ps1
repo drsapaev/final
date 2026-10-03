@@ -9,7 +9,7 @@ $ErrorActionPreference='Stop'
 $scriptDir=Split-Path -Parent $MyInvocation.MyCommand.Path
 $helper=Join-Path $scriptDir 'devbrain_memory.py'
 $argsList=[System.Collections.Generic.List[string]]::new()
-$argsList.Add($helper); $argsList.Add($Action)
+$argsList.Add($helper); $argsList.Add($Action.ToLowerInvariant())
 if ($InputFile) {
     $resolved=(Resolve-Path -LiteralPath $InputFile).Path
     $inputInfo=Get-Item -LiteralPath $resolved

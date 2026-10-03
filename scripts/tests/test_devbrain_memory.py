@@ -1,5 +1,5 @@
 """Isolated synthetic-git acceptance tests for local memory."""
-import json, os, subprocess, sys, tempfile, unittest
+import hashlib, json, os, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 SCRIPT=Path(__file__).resolve().parents[1]/"devbrain_memory.py"
@@ -21,6 +21,13 @@ class MemoryTests(unittest.TestCase):
   self.assertEqual(p.returncode,expected,p.stderr.decode()); return json.loads(p.stdout or p.stderr)
  def capture(self,task="alpha",rev=0,idem=None,knowledge=None,checkpoint=None):
   return self.runmem("capture",{"task_id":task,"expected_revision":rev,"checkpoint":checkpoint or CP,"knowledge":knowledge or [KN],"idempotency_key":idem})
+ def curated(self, item=None):
+  item=item or dict(KN,id="curated-api",key="api-origin",topic="api",summary="API requests use the anchored runtime origin",tags=["API","origin"],anchors=[{"path":"source.py","sha256":hashlib.sha256((self.root/"source.py").read_bytes()).hexdigest()}])
+  path=self.root/"docs"/"devbrain"/"memory"/"curated.json"; path.parent.mkdir(parents=True,exist_ok=True)
+  path.write_text(json.dumps({"schema_version":1,"knowledge":[item]}),encoding="utf-8")
+  subprocess.run(["git","-C",str(self.root),"add",str(path.relative_to(self.root))],check=True)
+  subprocess.run(["git","-C",str(self.root),"commit","-qm","add curated fixture"],check=True)
+  return item
  def test_begin_creates_id_and_checkpoint_then_new_process_recalls(self):
   b=self.runmem("begin",{"goal":"Check a contract"}); self.assertTrue(b["task_id"]); self.assertEqual(b["revision"],1)
   r=self.runmem("recall",cwd=self.root,extra=("--task-id",b["task_id"])); self.assertEqual(r["checkpoint"]["goal"],"Check a contract")
@@ -64,7 +71,7 @@ class MemoryTests(unittest.TestCase):
   self.assertEqual((store/".lock").read_bytes(),b"0")
  def test_anchor_safety_and_provenance(self):
   self.capture("anchored")
-  (self.root/"source.py").write_text("changed\n")
+  (self.root/"source.py").write_text("changed\n"); subprocess.run(["git","-C",str(self.root),"add","source.py"],check=True); subprocess.run(["git","-C",str(self.root),"commit","-qm","change anchor"],check=True)
   r=self.runmem("recall",extra=("--query","queue")); self.assertEqual(r["knowledge"][0]["provenance_state"],"source_changed"); self.assertNotIn("summary",r["knowledge"][0]); self.assertFalse(r["knowledge"][0]["current_assertion"])
   self.assertNotIn("k1",[k["id"] for k in self.runmem("export")["knowledge"]])
   for bad in ("../outside","/tmp/private"):
@@ -77,6 +84,12 @@ class MemoryTests(unittest.TestCase):
    k=dict(KN,anchors=["escape.txt"]); p=subprocess.run([sys.executable,str(SCRIPT),"capture"],cwd=self.root,input=json.dumps({"task_id":"symlink","expected_revision":0,"checkpoint":CP,"knowledge":[k]}).encode(),capture_output=True); self.assertEqual(p.returncode,2); self.assertNotIn(b"must not read",p.stderr)
   (self.root/".env").write_text("secret")
   self.assertEqual(self.runmem("capture",{"task_id":"bad","expected_revision":0,"checkpoint":CP,"knowledge":[dict(KN,anchors=[".env"] )]},expected=2)["error"],"anchor path rejected")
+  token_source=self.root/"telegram_staff_link_tokens.py"; token_source.write_text("table = 'telegram_staff_link_tokens'\n",encoding="utf-8")
+  token_fact=dict(KN,id="token-schema-source",key="token-schema",summary="Token schema is source-backed",anchors=[token_source.name])
+  self.assertEqual(self.capture("token-schema",knowledge=[token_fact])["result"],"OK")
+  token_dir=self.root/"tokens"; token_dir.mkdir(); (token_dir/"schema.py").write_text("table = 'tokens'\n",encoding="utf-8")
+  blocked=self.runmem("capture",{"task_id":"blocked-token-dir","expected_revision":0,"checkpoint":CP,"knowledge":[dict(KN,id="blocked-token-dir",anchors=["tokens/schema.py"])]},expected=2)
+  self.assertEqual(blocked["error"],"anchor path rejected")
   nested=self.root/".env.local"; nested.mkdir(); (nested/"config.py").write_text("placeholder")
   self.assertEqual(self.runmem("capture",{"task_id":"bad-dir","expected_revision":0,"checkpoint":CP,"knowledge":[dict(KN,anchors=[".env.local/config.py"])]},expected=2)["error"],"anchor path rejected")
  def test_sensitive_payload_not_echoed_and_corrupt_degraded(self):
@@ -161,6 +174,39 @@ class MemoryTests(unittest.TestCase):
   self.capture("russian",knowledge=[russian])
   result=self.runmem("recall",extra=("--query","\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0442\u0443\u0440\u0430"))
   self.assertEqual(result["knowledge"][0]["id"],"ru")
+ def test_curated_memory_is_portable_ranked_and_source_checked(self):
+  item=self.curated()
+  result=self.runmem("recall",extra=("--query","API origin"))
+  self.assertEqual(result["knowledge"][0]["id"],item["id"]); self.assertEqual(result["knowledge"][0]["origin"],"curated")
+  self.assertTrue(result["knowledge"][0]["current_assertion"])
+  self.assertEqual(self.runmem("status")["curated_count"],1)
+  self.assertIn(item["id"],[record["id"] for record in self.runmem("export")["knowledge"]])
+  linked=self.base/"curated-linked"; subprocess.run(["git","-C",str(self.root),"worktree","add","-qb","curated-branch",str(linked)],check=True)
+  self.assertEqual(self.runmem("recall",cwd=linked,extra=("--query","API origin"))["knowledge"][0]["id"],item["id"])
+  replacement=dict(KN,id="curated-api-replacement",key="api-origin",topic="api",summary="Replacement API origin note",tags=["API","origin"],anchors=["source.py"],supersedes=[item["id"]])
+  self.capture("curated-fix",knowledge=[replacement])
+  self.assertNotIn(item["id"],[record["id"] for record in self.runmem("recall",extra=("--query","API origin"))["knowledge"]])
+ def test_curated_dirty_or_stale_anchor_is_not_current_and_invalid_file_degrades(self):
+  item=self.curated()
+  (self.root/"source.py").write_text("local uncommitted source\n")
+  local=self.runmem("recall",extra=("--query","API origin"))["knowledge"][0]
+  self.assertEqual(local["provenance_state"],"worktree_only"); self.assertFalse(local["current_assertion"]); self.assertEqual(local["scope"],"worktree")
+  linked=self.base/"curated-clean-reader"; subprocess.run(["git","-C",str(self.root),"worktree","add","-qb","curated-clean-branch",str(linked)],check=True)
+  (linked/"source.py").write_text("committed source changed\n"); subprocess.run(["git","-C",str(linked),"add","source.py"],check=True); subprocess.run(["git","-C",str(linked),"commit","-qm","stale curated anchor"],check=True)
+  changed=self.runmem("recall",cwd=linked,extra=("--query","API origin"))["knowledge"][0]
+  self.assertEqual(changed["provenance_state"],"source_changed"); self.assertNotIn("summary",changed)
+  (linked/"source.py").unlink()
+  missing=self.runmem("recall",cwd=linked,extra=("--query","API origin"))["knowledge"][0]
+  self.assertEqual(missing["provenance_state"],"source_missing"); self.assertNotIn("summary",missing)
+  (self.root/"docs"/"devbrain"/"memory"/"curated.json").write_text("{",encoding="utf-8")
+  status=self.runmem("status"); self.assertEqual(status["status"],"DEGRADED"); self.assertIn("curated.json:invalid",status["errors"])
+ def test_uncommitted_curated_file_is_only_a_worktree_hint(self):
+  self.curated()
+  path=self.root/"docs"/"devbrain"/"memory"/"curated.json"
+  data=json.loads(path.read_text(encoding="utf-8")); data["knowledge"][0]["summary"]="Uncommitted curated note"
+  path.write_text(json.dumps(data),encoding="utf-8")
+  item=self.runmem("recall",extra=("--query","API origin"))["knowledge"][0]
+  self.assertEqual(item["provenance_state"],"worktree_only"); self.assertEqual(item["scope"],"worktree"); self.assertFalse(item["current_assertion"])
  def test_concurrent_writes_and_many_records_bounded(self):
   ps=[]
   for i in range(3):
@@ -190,6 +236,8 @@ class MemoryTests(unittest.TestCase):
  def test_launcher_interface(self):
   if os.name!="nt": self.skipTest("PowerShell wrapper is Windows-only")
   self.capture("seed")
+  uppercase_status=subprocess.run(["pwsh","-NoProfile","-File",str(LAUNCHER),"-Action","Status"],cwd=self.root,text=True,capture_output=True,timeout=10)
+  self.assertEqual(uppercase_status.returncode,0,uppercase_status.stderr); self.assertEqual(json.loads(uppercase_status.stdout)["status"],"OK")
   p=subprocess.run(["pwsh","-NoProfile","-File",str(LAUNCHER),"-Action","begin","-Query","not-a-match","-Topics","queue"],cwd=self.root,input="{}",text=True,capture_output=True)
   self.assertEqual(p.returncode,0,p.stderr); result=json.loads(p.stdout); self.assertEqual(result["checkpoint"]["goal"],"not-a-match"); self.assertEqual(result["recall"]["knowledge"][0]["key"],"queue-owner")
   no_stdin=subprocess.run(["pwsh","-NoProfile","-File",str(LAUNCHER),"-Action","begin","-Query","no stdin needed"],cwd=self.root,text=True,capture_output=True,timeout=10)

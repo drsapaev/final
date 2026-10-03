@@ -9,7 +9,11 @@ against the current checkout before relying on optional retrieval artifacts.
 | --- | --- | --- |
 | `AGENTS.md`, runbooks, skills | active | Portable operating rules and domain guidance read directly by agents. |
 | `docs/devbrain/PROJECT_MEMORY.md` | active | Compact, repository-tracked project memory. |
-| `scripts/devbrain_memory.py` | local memory tool available | Checkpoints and knowledge are stored under this clone's Git common directory and shared by its linked worktrees. Agent startup automation is not enabled by this status change. |
+| `scripts/devbrain_memory.py` | local memory tool available | Checkpoints and local knowledge are stored under this clone's Git common directory and shared by its linked worktrees. `AGENTS.md` defines the agent-called start/recall/capture lifecycle; there are no client event hooks. |
+| `docs/devbrain/memory/curated.json` | tracked portable memory | Reviewed repo facts are recalled with pinned source hashes; stale or dirty sources are not current assertions. |
+| Codex adapter | configured; runtime unverified | Repo instructions are present; a new-session call/recall check remains pending. |
+| Claude adapter | configured; runtime unverified | Claude CLI was not found on PATH; no installation was attempted. |
+| Cursor adapter | configured; runtime unverified | Cursor application CLI is present, but a fresh Agent chat call/recall check remains pending. |
 | `ai/langgraph/scripts/agent_gate.py` | active | Deterministic execution guard for tasks routed through gate modes. |
 | LlamaIndex | dormant | Legacy local lexical retrieval. Do not run by default. |
 | LightRAG | dormant | Legacy relationship retrieval. Do not run by default. |
@@ -31,7 +35,8 @@ Use the shared local memory helper through its PowerShell launcher:
 
 The store is local to one clone and shared by that clone's Git worktrees. It is
 not synchronized to other clones or machines. Status reports store health and
-counts without dumping saved content.
+counts without dumping saved content. Agent calls are instruction-driven, not
+client hooks or background conversation analysis.
 
 ## Guardrail acceptance
 

@@ -3556,3 +3556,29 @@ the default for DevBrain wrappers and keep LlamaIndex/LightRAG opt-in.
   miss, not a graph-query quality check.
 - Follow-up: review multi-wrapper DevBrain maintenance routing in a separate
   approved task if the same misroute recurs. This PR does not change the gate.
+
+
+## Task 103 - DevBrain automatic-memory bootstrap scope misroute — 2026-10-03
+
+### Gate result
+- PR 3 of the user-approved automatic-memory plan covers the helper's portable
+  curated memory, repo bootstrap, Claude/Cursor adapters, and compact project
+  memory.
+- Initial gate returned `gate_ok` but limited first-touch files to the gate
+  implementation and launcher.
+- One `--known-root-cause scripts/devbrain_memory.py` retry returned
+  `narrow_override`, still omitted the agent/client bootstrap and their
+  documentation owners, and reported `gate_misroute=true` and
+  `override_used=true`.
+- Manual scope basis: the user's approved PR 3 plan explicitly names those
+  helper, bootstrap, adapter, and memory-doc paths. Gate/router files remain
+  outside this patch.
+
+### Manual reconstruction and follow-up
+- The portable-memory runtime owner is `scripts/devbrain_memory.py`; agent
+  lifecycle policy is `AGENTS.md`; Claude and Cursor consume repo-local
+  adapters; curated source facts are anchored to canonical code, tests, and
+  runbooks.
+- Follow-up: improve gate routing for bounded multi-client bootstrap and
+  portable-memory integration work so it includes the named helper and docs
+  owners. No LightRAG query-quality evaluation was performed.
