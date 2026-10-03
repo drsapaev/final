@@ -5,13 +5,13 @@ Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 20
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T08.2b — source inventory of remaining active admission adapters
-Current status: T08.2a / PR #3576 is user-confirmed MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`. T08.2b source audit on fresh `origin/main` `4e6f125f17c637fc27296e2d0ec9d23f5d376775` found the mounted legacy token, compatibility online, QR-session, and permanent-address paths delegate to `QueueBusinessService.join_queue_with_token`; GraphQL was the only confirmed independent successful writer and is now quota-aware. No T08.2b runtime patch is indicated. Evidence-only PR [#3581](https://github.com/drsapaev/final/pull/3581) is OPEN; initial evidence commit `f12b30abb193c27259ef865fe44c71841a74e240` was based on fresh main. A journal checkpoint update is being added; inspect the live PR HEAD and checks after it. Do not mark T08.2b MERGED until its PR is merged.
+Current status: T08.2a / PR #3576 is user-confirmed MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`. T08.2b source audit on fresh `origin/main` `4e6f125f17c637fc27296e2d0ec9d23f5d376775` found the mounted legacy token, compatibility online, QR-session, and permanent-address paths delegate to `QueueBusinessService.join_queue_with_token`; GraphQL was the only confirmed independent successful writer and is now quota-aware. No T08.2b runtime patch is indicated. Evidence-only PR [#3581](https://github.com/drsapaev/final/pull/3581) is OPEN. The source inventory commit is `f12b30abb193c27259ef865fe44c71841a74e240`; later journal-only checkpoints may advance the branch, so read the exact live HEAD and its checks before acting. Do not mark T08.2b MERGED until its PR is merged.
 Last completed task: T08.2a — MERGED (#3576, merge commit `1ed6d05874c2ea205a625bb70879adb10b077be4`)
 Worktree: C:\final\_wt_aqs_t082b_admission
 Branch: codex/aqs-T08.2b-admission
 Base commit: 4e6f125f17c637fc27296e2d0ec9d23f5d376775
-Current code commit: source inventory commit `f12b30abb193c27259ef865fe44c71841a74e240`; this docs-only journal update will advance the PR head, which must be re-read after push.
-Last updated: 2026-10-03T23:13:05+05:00
+Current code commit: source inventory commit `f12b30abb193c27259ef865fe44c71841a74e240`; resolve the current PR branch head live because journal-only commits may follow it.
+Last updated: 2026-10-03T23:14:40+05:00
 
 > Historical checkpoint superseded: current T07 status and exact-head evidence are recorded in dated sections below and in RESUME.md; do not use the earlier snapshot as a continuation instruction.
 
