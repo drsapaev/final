@@ -291,13 +291,9 @@ async def get_cosmetic_procedures(
         page_items = [
             DermaProcedureHistoryOut.model_validate(row.payload) for row in rows
         ]
-        # CodeQL py/clear-text-logging-sensitive-data (#1322): см. заметку
-        # в ветке examinations — внутренние id в логах допустимы по политике.
-        logger.info(  # codeql[py/clear-text-logging-sensitive-data]
-            "[derma.procedures] listed procedures user_id=%s patient_id=%s"
-            " count=%s total=%s",
+        logger.info(
+            "[derma.procedures] listed procedures user_id=%s count=%s total=%s",
             getattr(user, "id", None),
-            patient_id,
             len(page_items),
             total,
         )
@@ -306,9 +302,8 @@ async def get_cosmetic_procedures(
         )
     except SQLAlchemyError:
         logger.exception(
-            "[derma.procedures] failed to list procedures user_id=%s patient_id=%s",
+            "[derma.procedures] failed to list procedures user_id=%s",
             getattr(user, "id", None),
-            patient_id,
         )
         raise HTTPException(
             status_code=500, detail="Internal server error"
