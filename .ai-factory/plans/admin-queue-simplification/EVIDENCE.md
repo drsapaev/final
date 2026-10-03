@@ -1421,9 +1421,9 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Stop conditions: any need to alter the transaction/claim-lock order, introduce a new replay contract, change another runtime writer, or decide ambiguous legacy/v1 behavior. PostgreSQL race proof stays T08.3; no staging proof substituted.
 - Fail-first result after the initial source-audit checkpoint: the focused GraphQL quota regression reproduced two failures (v1 staff entry incorrectly consumed the online slot; v1 persisted counter exhaustion incorrectly allowed a new entry); legacy case passed. The regression now passes after the runtime patch. The T08-required full-schema/database assertion is in the existing GraphQL integration module; this remains a single direct-writer slice.
 
-## T08.2a local implementation checkpoint — 2026-10-03T22:01:00+05:00
+## T08.2a PR checkpoint — 2026-10-03T22:04:00+05:00
 
-- Commit under test: T08.2a runtime/test commit `a19aba1ae`, based on `95ff3b4752a091f22f9702977d611a3b6d9f1595`; a follow-up plan-state commit records this checkpoint.
+- Commit under test: PR #3576 exact HEAD `fe7d38c4efe02d1fa944315ca84b5f74930213ab`; runtime/test commit `a19aba1ae`, based on `95ff3b4752a091f22f9702977d611a3b6d9f1595`.
 - Environment: Windows worktree `C:\final\_wt_aqs_t082_adapters`; Python 3.11.9, pytest 8.4.2; unit/integration tests use isolated SQLite fixtures. No PostgreSQL, staging, production or patient data was accessed.
 - Execution mode and gate: mandatory queue `gate`, then the sole `gate_known_root_cause` retry for `backend/app/graphql/mutations.py`; see Task 101 in `EVIDENCE_LIGHTRAG_READINESS.md`. No third gate call.
 - Actual runtime change: GraphQL v1 compares persisted `online_issued_count` against the queue snapshot cap and increments once after adding the new entry, before the existing direct commit. Legacy keeps its original waiting/called-entry count and cap fallback. No claim-lock, queue-row-lock, window, duplicate, transaction ownership, replay, schema or feature-flag behavior changed.
@@ -1433,5 +1433,5 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Hook command: `C:\final\backend\.venv\Scripts\python.exe -m pre_commit run --files <eight changed paths>` — all applicable hooks passed, including Gitleaks. No hook was skipped.
 - Actual changed paths: GraphQL mutation; focused unit test; existing GraphQL integration test; plan/PROGRESS/RESUME/EVIDENCE; one gate-misroute evidence append. No other adapters, reports, Telegram runtime, schema, feature flag, staging or production paths changed.
 - Remaining: independent PostgreSQL concurrency/replay/rollback/partial-result proof remains T08.3. Adapter/report coverage beyond GraphQL remains T08.2b/.2c. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off.
-- Result: local T08.2a implementation validated and committed as `a19aba1ae`; PR not yet opened, exact-head CI and merge remain pending.
-- Next exact action: push/open the PR, attach it to this task, and check all applicable results on the resulting exact HEAD.
+- Result: PR #3576 was opened and attached to this task. Initial exact-head snapshot: PR Review Quality Gate, PR lifecycle recommendation and GitGuardian PASS; CodeQL, formatting reports, CI Scope, security scan and gitleaks were still IN_PROGRESS; DAST and Supabase Preview SKIPPED. Mergeability reported BLOCKED while required jobs ran. No merge claimed.
+- Next exact action: wait for applicable checks on exact HEAD `fe7d38c4efe02d1fa944315ca84b5f74930213ab`; fix any in-scope failure in PR #3576 and reassess only the resulting HEAD.

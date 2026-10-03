@@ -1,13 +1,13 @@
 # Resume — admin queue simplification
 
 Plan version: 2.5
-Last updated: 2026-10-03T22:01:00+05:00, Asia/Tashkent
+Last updated: 2026-10-03T22:04:00+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed #3572 was merged by them and said continue. GitHub and fresh `origin/main` confirm T08.1b / #3572 MERGED at `95ff3b4752a091f22f9702977d611a3b6d9f1595`.
 
 ## Current continuation checkpoint — T08.2a
 
 - Fresh base: `origin/main` = `95ff3b4752a091f22f9702977d611a3b6d9f1595`; worktree `C:\final\_wt_aqs_t082_adapters`; branch `codex/aqs-T08.2-adapters`; clean at task start, with current scoped edits and validation recorded below and in EVIDENCE.md.
-- Current task: T08.2a, the GraphQL direct-writer quota slice. Runtime/tests are committed locally at `a19aba1ae` and validated; PR is not open yet.
+- Current task: T08.2a, the GraphQL direct-writer quota slice. Runtime/tests are committed at `a19aba1ae`; PR #3576 is OPEN at exact HEAD `fe7d38c4efe02d1fa944315ca84b5f74930213ab`; GitHub checks are in progress.
 - Exact-head checks for merged PR #3572: PR Required Gate, CodeQL, gitleaks, security scan, Backend tests, Frontend-Backend Parity and Code Quality passed. Frontend build/lint/unit/e2e jobs were path-skipped; they are not passes. No staging or PostgreSQL race result is claimed.
 - Read T08, project memory/DevBrain status/routing/role map, ADR-001, the direction contract, and cyclic/worktree runbooks before editing.
 - Gate result: first prompt chose unrelated Telegram files. The one retry anchored on confirmed `backend/app/graphql/mutations.py` returned `narrow_override`; the user-approved T08.2 contract is the basis for including the focused unit regression and durable plan evidence. Do not retry the gate.
@@ -16,7 +16,7 @@ Execution permission: IMPLEMENTATION_ACTIVE; user confirmed #3572 was merged by 
 - Validation already completed: fail-first reproduced two v1 mismatches; unit GraphQL claim/window file 7/7; full GraphQL integration resolver module 17/17; scoped Ruff, pinned repository pre-commit, compileall, `git diff --check`, and PR-body gate passed. Full integration-file Ruff format check flags unrelated pre-existing formatting drift; no broad rewrite. SQLite only, not T08.3 PostgreSQL concurrency.
 - Do not change GraphQL legacy active-entry semantics. This behavior is implemented and covered; do not broaden it to other writers or reports in this PR.
 - Stop on any need to change schema, owner identity, lock ordering, replay contract, Telegram, other adapters, API/report contracts, feature-flag defaults, staging or production.
-- Next exact action: push `codex/aqs-T08.2-adapters`, open the single-purpose T08.2a PR, attach it to this task and verify exact-head CI. Preserve unrelated integration-file formatting drift.
+- Next exact action: poll PR #3576 checks for exact HEAD `fe7d38c4efe02d1fa944315ca84b5f74930213ab`; fix any in-scope failure in the same PR, then continue only after all applicable gates are resolved. Preserve unrelated integration-file formatting drift.
 
 Older timestamped “Active step — T08.1b” records below are historical and superseded by this checkpoint and the T08.1b merge entry in EVIDENCE.md.
 

@@ -5,13 +5,13 @@ Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 20
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T08.2a — GraphQL direct online-admission quota
-Current status: T08.1b / PR #3572 is user-confirmed MERGED at `95ff3b4752a091f22f9702977d611a3b6d9f1595`. T08.2a runtime and tests are committed locally as `a19aba1ae`; focused GraphQL tests, scoped hooks and PR-body gate pass. PR not opened yet. PostgreSQL concurrency and staging remain NOT_RUN. V1 flag stays default-off.
+Current status: T08.1b / PR #3572 is user-confirmed MERGED at `95ff3b4752a091f22f9702977d611a3b6d9f1595`. T08.2a is PR #3576, OPEN at exact HEAD `fe7d38c4efe02d1fa944315ca84b5f74930213ab`; required GitHub checks are still running. PostgreSQL concurrency and staging remain NOT_RUN. V1 flag stays default-off.
 Last completed task: T08.1b — MERGED (#3572, merge commit `95ff3b4752a091f22f9702977d611a3b6d9f1595`)
 Worktree: C:\final\_wt_aqs_t082_adapters
 Branch: codex/aqs-T08.2-adapters
 Base commit: 95ff3b4752a091f22f9702977d611a3b6d9f1595
-Current code commit: `a19aba1ae` (T08.2a GraphQL implementation and focused tests); PR-state docs checkpoint is being recorded.
-Last updated: 2026-10-03T22:01:00+05:00
+Current code commit: `a19aba1ae` (T08.2a GraphQL implementation and focused tests); PR/evidence checkpoint HEAD `fe7d38c4efe02d1fa944315ca84b5f74930213ab`.
+Last updated: 2026-10-03T22:04:00+05:00
 
 > Historical checkpoint superseded: current T07 status and exact-head evidence are recorded in dated sections below and in RESUME.md; do not use the earlier snapshot as a continuation instruction.
 
@@ -53,7 +53,7 @@ Last updated: 2026-10-03T22:01:00+05:00
 - Validation on current code: `test_daily_queue_creation_policy.py` — 11 passed / 1 warning; queue API, queue limits, visit confirmation, force majeure, GraphQL claim and canonical quota modules — 36 passed / 1 warning. Ruff, Ruff format, Black, compileall and `git diff --check` pass. PR-body quality gate passed (19 unit checks plus documented samples and this body). SQLite fixture only; no PostgreSQL race proof.
 - PR #3572 is MERGED at `95ff3b4752a091f22f9702977d611a3b6d9f1595`; the preceding “OPEN/checks pending” text is historical and superseded by the checkpoint above and the merge evidence entry.
 - Blocker: none identified for T08.1b. Remaining T08.2 adapter/report parity and T08.3 PostgreSQL concurrency/replay/partial-result proof are still required before considering v1 rollout.
-- Next exact action: push `codex/aqs-T08.2-adapters`, open the single-purpose T08.2a PR, attach it to this task and verify exact-head CI before continuing the authorized merge cycle.
+- Next exact action: wait for applicable checks on exact HEAD `fe7d38c4efe02d1fa944315ca84b5f74930213ab`; fix any in-scope failure in PR #3576 and reassess only the resulting HEAD.
 - Checks to rerun after any further runtime edit: policy suite, the six queue API/limits/visit/force-majeure/GraphQL/token suites, scoped Ruff, compileall and `git diff --check`. PostgreSQL concurrency proof remains T08.3.
 ## Checkpoint rules for the next agent
 
