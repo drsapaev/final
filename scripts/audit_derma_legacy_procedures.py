@@ -417,11 +417,10 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
     print()
     print("== Записи с legacy-ключом (активные) ==")
+    # числовые суррогатные id (record/visit/patient) и счётчики, без
+    # PHI-полей — политика derma.py #1321 / patient_service.py #1295
     for r in sorted(active_with_legacy, key=lambda x: x["record_id"]):
-        # codeql[py/clear-text-logging-sensitive-data] — только числовые
-        # суррогатные id (record/visit/patient) и счётчики, без PHI-полей:
-        # та же политика, что derma.py #1321 и patient_service.py #1295.
-        print(
+        print(  # codeql[py/clear-text-logging-sensitive-data]
             "  EMR #%d visit=%s patient=%s status=%s class=%s "
             "canon(valid/invalid)=%d/%d legacy(valid/invalid)=%d/%d "
             "exact=%d date=%d"
@@ -470,12 +469,11 @@ def cmd_audit(args: argparse.Namespace) -> int:
         "derma_legacy_procedures_audit_%s.json"
         % datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     )
-    # codeql[py/clear-text-storage-of-sensitive-information] — артефакт
-    # аудита НАМЕРЕННО содержит клинические данные (id записей и
-    # процедуры): это предмет ревью владельца Phase B. Файл пишется в
-    # локальную ФС оператора на хосте БД — тот же домен доверия, что
-    # сама БД и её pg_dump-бэкапы; наружу не передаётся.
-    out_path.write_text(
+    # артефакт аудита НАМЕРЕННО содержит клинические данные (id записей
+    # и процедуры) — это предмет ревью владельца Phase B; пишется в
+    # локальную ФС оператора на хосте БД (тот же домен доверия, что сама
+    # БД и её pg_dump-бэкапы), наружу не передаётся
+    out_path.write_text(  # codeql[py/clear-text-storage-of-sensitive-information]
         json.dumps(artifact, ensure_ascii=False, indent=1, default=str),
         encoding="utf-8",
     )
