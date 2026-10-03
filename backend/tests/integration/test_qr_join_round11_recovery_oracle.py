@@ -41,6 +41,8 @@ from app.models.online_queue import (
 from app.models.patient import Patient
 from app.services.queue_service import QueueBusinessService
 
+pytestmark = pytest.mark.usefixtures("queue_admission_open")
+
 COMPLETE_URL = "/api/v1/queue/join/complete"
 PROBE_URL = "/api/v1/queue/join/probe"
 START_URL = "/api/v1/queue/join/start"

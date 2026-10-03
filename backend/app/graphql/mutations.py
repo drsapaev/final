@@ -34,7 +34,11 @@ from app.crud.appointment import (
     create_appointment as crud_create_appointment,
 )
 from app.crud.clinic import get_queue_settings
-from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
+from app.crud.daily_queue_creation_policy import (
+    daily_queue_creation_snapshot,
+    evaluate_online_admission_window,
+    online_admission_window,
+)
 from app.crud.patient import soft_delete_patient
 from app.crud.queue_resource_routing import (
     lock_daily_queue_creation,
@@ -1041,7 +1045,6 @@ class Mutation:
                 timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
                 now_local = datetime.now(timezone)
                 today = now_local.date()
-                queue_start_hour = queue_settings.get("queue_start_hour", 7)
 
                 # QD-2E: один claim-lock на точный (day, queue_tag) берётся
                 # ДО row-lock врача/ресурса/очереди. Поэтому два writer-а,
@@ -1374,14 +1377,48 @@ class Mutation:
                         errors=["QUEUE_CLOSED"],
                     )
 
-                # рабочие часы: now_local/queue_start_hour вычислены выше
-                # по конфигурированной таймзоне (round-8) — тот же момент
-                # времени, что и день очереди.
-                if now_local.hour < queue_start_hour:
+                # The daily queue's version selects whether this is the
+                # legacy start-only rule or its frozen v1 half-open window.
+                admission_window = online_admission_window(
+                    daily_queue=daily_queue,
+                    settings=queue_settings,
+                )
+                # The clinic clock captured before the admission/row locks is
+                # only suitable for selecting the queue identity. A request
+                # can wait across the configured cutoff while those locks are
+                # held, so make the admission decision from a fresh clock read
+                # after the daily-queue lock and never retarget this request to
+                # a different clinic day mid-flight.
+                admission_now_local = datetime.now(timezone)
+                if admission_now_local.date() != today:
                     return QueueMutationResponse(
                         success=False,
-                        message=f"Онлайн-запись доступна с {queue_start_hour}:00",
+                        message=(
+                            "Дата очереди изменилась. Обновите страницу "
+                            "и повторите попытку."
+                        ),
+                        errors=["QUEUE_DAY_CHANGED"],
+                    )
+                window_result = evaluate_online_admission_window(
+                    today, admission_now_local, admission_window
+                )
+                if window_result == "before_start":
+                    return QueueMutationResponse(
+                        success=False,
+                        message=(
+                            "Онлайн-запись доступна с "
+                            f"{admission_window.start_time.strftime('%H:%M')}"
+                        ),
                         errors=["OUTSIDE_HOURS"],
+                    )
+                if window_result == "after_end":
+                    return QueueMutationResponse(
+                        success=False,
+                        message=(
+                            "Онлайн-запись закрыта в "
+                            f"{admission_window.end_time.strftime('%H:%M')}"
+                        ),
+                        errors=["ONLINE_BOOKING_CLOSED"],
                     )
 
                 # Лимит: индивидуальный на очередь -> капа врача

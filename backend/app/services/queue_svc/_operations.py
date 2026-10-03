@@ -4,7 +4,7 @@ Split from queue_service.py.
 """
 from __future__ import annotations
 
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from sqlalchemy import select  # RQ-14.a: row-lock
 from sqlalchemy.exc import IntegrityError
@@ -12,7 +12,11 @@ from sqlalchemy.exc import IntegrityError
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import expand_queue_tags
 from app.crud import queue_resource_routing
-from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
+from app.crud.daily_queue_creation_policy import (
+    daily_queue_creation_snapshot,
+    evaluate_online_admission_window,
+    online_admission_window,
+)
 from app.crud.queue_resource_routing import (
     lock_daily_queue_creation,  # Lock-parity follow-up to the #3511 review
     lock_queue_tag_claim_scope,  # Round-6 (P1-2): canonical batch pre-lock
@@ -41,12 +45,13 @@ def _unbookable_doctor_ids(
     doctors: list[Doctor],
     day,
     queue_tag: str | None = None,
+    settings: dict[str, Any] | None = None,
 ) -> set[int]:
     """Doctors of ``doctors`` whose online queue for ``day`` can NOT accept
     a new entry (mirror of check_queue_time_window + check_queue_limits):
 
     - past days: never bookable;
-    - same-day joins before the 07:00 online window: never bookable;
+    - same-day joins outside the queue's effective online window: not bookable;
     - the per-(day, doctor, tag) queue already OPENED reception
       (``opened_at`` set, same-day only): not bookable;
     - the per-(day, doctor, tag) queue reached its online cap
@@ -60,13 +65,11 @@ def _unbookable_doctor_ids(
         return set()
 
     doctor_ids = [d.id for d in doctors]
-
-    # Day-level window (identical semantics to check_queue_time_window).
-    now = _now()
+    queue_settings = settings or get_queue_settings(db) or {}
+    timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+    now = _now(timezone)
     today = now.date()
     if day < today:
-        return set(doctor_ids)
-    if day == today and now.time() < QueueBusinessServiceMixinBase.ONLINE_QUEUE_START_TIME:
         return set(doctor_ids)
     same_day = day == today
 
@@ -99,11 +102,22 @@ def _unbookable_doctor_ids(
         )
         active_counts = dict(count_rows)
 
+    queues_by_doctor: dict[int, DailyQueue] = {}
     for queue in queues:
-        if queue.specialist_id in unbookable:
+        queues_by_doctor.setdefault(queue.specialist_id, queue)
+
+    for doctor_id in doctor_ids:
+        queue = queues_by_doctor.get(doctor_id)
+        window = online_admission_window(
+            daily_queue=queue, settings=queue_settings
+        )
+        if evaluate_online_admission_window(day, now, window) != "available":
+            unbookable.add(doctor_id)
             continue
-        if same_day and queue.opened_at is not None:
-            unbookable.add(queue.specialist_id)
+        if same_day and queue is not None and queue.opened_at is not None:
+            unbookable.add(doctor_id)
+            continue
+        if queue is None:
             continue
         # Codex round-2 P2: DailyQueue persists the online cap as
         # ``max_online_entries`` (dev_seed sets 20, legacy crud honors it);
@@ -116,7 +130,7 @@ def _unbookable_doctor_ids(
             or QueueBusinessServiceMixinBase.DEFAULT_MAX_SLOTS
         )
         if active_counts.get(queue.id, 0) >= max_slots:
-            unbookable.add(queue.specialist_id)
+            unbookable.add(doctor_id)
     return unbookable
 
 
@@ -175,7 +189,12 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
     @classmethod
     def check_queue_time_window(
-        cls, target_date: date, queue_opened_at: datetime | None = None
+        cls,
+        target_date: date,
+        queue_opened_at: datetime | None = None,
+        *,
+        daily_queue: DailyQueue | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> tuple[bool, str]:
         """
         Проверить, доступна ли онлайн-запись по времени
@@ -183,27 +202,37 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         Returns:
             (is_allowed, message)
         """
-        now = _now()
-        today = now.date()
-        current_time = now.time()
-
-        if target_date < today:
+        queue_settings = settings or {
+            "timezone": "Asia/Tashkent",
+            "queue_start_hour": cls.ONLINE_QUEUE_START_TIME.hour,
+        }
+        timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+        now = _now(timezone)
+        window = online_admission_window(
+            daily_queue=daily_queue, settings=queue_settings
+        )
+        outcome = evaluate_online_admission_window(target_date, now, window)
+        if outcome == "date_past":
             return False, "❌ QR код устарел. Обратитесь в регистратуру за новым кодом."
 
-        if target_date == today:
-            # Проверяем время для сегодняшнего дня
-            if current_time < cls.ONLINE_QUEUE_START_TIME:
-                return (
-                    False,
-                    f"⏰ Онлайн-запись откроется в {cls.ONLINE_QUEUE_START_TIME.strftime('%H:%M')}. Текущее время: {current_time.strftime('%H:%M')}",
-                )
+        if outcome == "before_start":
+            return (
+                False,
+                f"⏰ Онлайн-запись откроется в {window.start_time.strftime('%H:%M')}. Текущее время: {now.strftime('%H:%M')}",
+            )
 
-            if queue_opened_at:
-                opened_time = queue_opened_at.strftime('%H:%M')
-                return (
-                    False,
-                    f"🚪 Прием уже открыт в {opened_time}. Онлайн-запись закрыта. Обратитесь в регистратуру.",
-                )
+        if outcome == "after_end":
+            return (
+                False,
+                f"Онлайн-запись закрыта в {window.end_time.strftime('%H:%M')}",
+            )
+
+        if target_date == now.date() and queue_opened_at:
+            opened_time = queue_opened_at.strftime('%H:%M')
+            return (
+                False,
+                f"🚪 Прием уже открыт в {opened_time}. Онлайн-запись закрыта. Обратитесь в регистратуру.",
+            )
 
         # Для будущих дней разрешаем запись
         return True, ""
@@ -520,8 +549,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     queue_resource_id=int(resource.id),
                     queue_tag=queue_tag,
                     active=True,
-                    online_start_time=f"{int(queue_settings.get('queue_start_hour', 7)):02d}:00",
-                    online_end_time=f"{int(queue_settings.get('queue_end_hour', 9)):02d}:00",
                     max_online_entries=(
                         queue_resource_routing.resource_queue_defaults(resource)[
                             "max_online_entries"
@@ -668,16 +695,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         # This is the correct behavior: each doctor has their own queue.
 
         settings = self._load_queue_settings(db)
-        queue_start_hour = settings.get("queue_start_hour", 7)
-        queue_end_hour = settings.get("queue_end_hour", 9)
-
         daily_queue = DailyQueue(
             day=day,
             specialist_id=actual_specialist_id,  # ✅ Используем doctor.id для ForeignKey
             queue_tag=queue_tag,
             active=True,
-            online_start_time=f"{int(queue_start_hour):02d}:00",
-            online_end_time=f"{int(queue_end_hour):02d}:00",
             max_online_entries=defaults.get("max_online_entries"),
             # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
             # дня (владелец → клиника) — живые настройки не сдвигают день.
@@ -925,6 +947,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 resource.default_cabinet if resource is not None else None
             )
 
+        admission_window = online_admission_window(
+            daily_queue=daily_queue,
+            settings=queue_settings,
+        )
+
         metadata = {
             "day": day,
             "queue_id": daily_queue.id if daily_queue else None,
@@ -932,16 +959,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             or ("Все специалисты" if is_clinic_wide else None),
             "specialty": doctor.specialty if doctor else "clinic",
             "cabinet": cabinet,
-            "start_time": (
-                daily_queue.online_start_time
-                if daily_queue
-                else f"{queue_settings.get('queue_start_hour', 7):02d}:00"
-            ),
+            "start_time": admission_window.start_time.strftime("%H:%M"),
             "end_time": (
-                daily_queue.online_end_time
-                if daily_queue
-                else f"{queue_settings.get('queue_end_hour', 9):02d}:00"
+                admission_window.end_time.strftime("%H:%M")
+                if admission_window.end_time is not None
+                else None
             ),
+            "policy_version": admission_window.policy_version,
             "max_slots": max_slots,
             "current_count": current_count,
             "expires_at": queue_token.expires_at,
@@ -1042,6 +1066,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         doctors: list[Doctor],
         day,
         queue_tag: str | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> Doctor | None:
         """D-2 least-loaded routing: pick the doctor with the shortest
         ACTIVE queue (waiting+called entries) for ``day``; ties break to
@@ -1101,7 +1126,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         active_loads = dict(load_rows)
 
         # Codex round-1 P1: rank BOOKABLE doctors first (see docstring).
-        unbookable_ids = _unbookable_doctor_ids(db, doctors, day, queue_tag)
+        unbookable_ids = _unbookable_doctor_ids(
+            db, doctors, day, queue_tag, settings=settings
+        )
         candidates = [d for d in doctors if d.id not in unbookable_ids]
         if not candidates:
             # Nobody bookable: keep the legacy least-loaded pick so the
@@ -1645,7 +1672,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                         cabinet = doctor.cabinet if doctor else None
                     else:
                         doctor = self._pick_least_loaded_doctor(
-                            db, eligible_doctors, day, queue_tag=profile_key
+                            db,
+                            eligible_doctors,
+                            day,
+                            queue_tag=profile_key,
+                            settings=queue_settings,
                         )
 
                         # Если не нашли - это ошибка сопоставления профиля, а не повод
@@ -1869,8 +1900,25 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 "token": token_obj,
             }
 
+        # Admission must be serialized with writes to this queue. In
+        # particular, a request can wait here past the v1 cutoff; refresh
+        # the loaded row after acquiring the lock and evaluate the window
+        # only after the wait has finished. The tag/day claim lock above
+        # remains first in the established lock order.
+        locked_queue_id = db.execute(
+            select(DailyQueue.id)
+            .where(DailyQueue.id == daily_queue.id)
+            .with_for_update()
+        ).scalar_one_or_none()
+        if locked_queue_id is None:
+            raise QueueNotFoundError("Очередь больше не активна")
+        db.refresh(daily_queue)
+
         time_allowed, time_message = self.check_queue_time_window(
-            day, daily_queue.opened_at
+            day,
+            daily_queue.opened_at,
+            daily_queue=daily_queue,
+            settings=queue_settings,
         )
         if not time_allowed:
             raise QueueValidationError(time_message)

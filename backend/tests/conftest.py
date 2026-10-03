@@ -551,3 +551,23 @@ def _clear_replay_cache():
         cache_manager.clear()
     except Exception:
         pass
+
+
+@pytest.fixture
+def queue_admission_open(monkeypatch):
+    """Keep admission unrelated tests independent of the clinic's wall clock."""
+    from app.crud import clinic as clinic_crud
+    from app.services.queue_svc import _base as queue_base
+    from app.services.queue_svc import _core as queue_core
+    from app.services.queue_svc import _operations as queue_operations
+
+    get_queue_settings = clinic_crud.get_queue_settings
+
+    def _open_settings(db):
+        settings = get_queue_settings(db) or {}
+        return {**settings, "queue_start_hour": 0, "auto_close_time": "23:59"}
+
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", _open_settings)
+    monkeypatch.setattr(queue_base, "get_queue_settings", _open_settings)
+    monkeypatch.setattr(queue_core, "get_queue_settings", _open_settings)
+    monkeypatch.setattr(queue_operations, "get_queue_settings", _open_settings)
