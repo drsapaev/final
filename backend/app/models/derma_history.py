@@ -42,8 +42,9 @@ class DermaHistoryEntry(Base):
     # id EMR-записи или id строки legacy-таблицы (уникален внутри (kind, source))
     record_id: Mapped[int] = mapped_column(Integer, nullable=False)
     # позиция внутри записи: для процедур — индекс в ИСХОДНОМ массиве
-    # источника (canonical: index; alias: len(canonical)+index), не плотный
-    # display-индекс — разрывы при пропуске invalid-записей допустимы;
+    # источника (индекс в specialty_data.cosmetic_procedures; Phase C:
+    # legacy-alias больше не проецируется), не плотный display-индекс —
+    # разрывы при пропуске invalid-записей допустимы;
     # 0 для остальных kind
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     patient_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
