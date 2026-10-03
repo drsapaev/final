@@ -1340,3 +1340,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: local sub-slice validated; status remains T08 IN_PROGRESS. Exact-head CI/review/PR and the PR-cycle completion are pending.
 - PR: not created at this checkpoint.
 - Merge commit: none.
+
+## T08.1a PR opened — 2026-10-03T19:21:09+05:00
+
+- Runtime/test commit: e0ebcfb756cf1ff31093c5905aed9b937a2fa769.
+- Documentation checkpoint present at PR creation: e8bedbc3ccd1cd07e91cc000ddc9d9a2d4790b8a.
+- PR: https://github.com/drsapaev/final/pull/3571; state OPEN; base main; PR creation head e8bedbc3ccd1cd07e91cc000ddc9d9a2d4790b8a. The subsequent evidence checkpoint commit will move the branch head; verify the live GitHub head before reporting CI.
+- PR scope: T08.1a canonical token admission only. No schema/migration, direct GraphQL writer, identity/recreation guard, report, staging, production or feature flag change.
+- Tier 2: no staging deferral requested or claimed for this backend-only slice. The full ten-item pre-deploy runbook remains mandatory. PostgreSQL concurrency is NOT_RUN and remains a T08.3 gate before v1 rollout.
+- Review/checks: no review verdict is recorded at PR creation. Exact-head required checks must be read after the current progress checkpoint is pushed.
+- Merge commit: none.
