@@ -1,11 +1,11 @@
 # План исправления и упрощения административной настройки очередей
 
 **Версия:** 2.5 — T07 / #3557, T08.1a / #3571 and T08.1b / #3572 are merged; T08.2a is in progress.
-**Создан:** 30 сентября 2026. **Обновлён:** 3 октября 2026, 22:04 Asia/Tashkent.
+**Создан:** 30 сентября 2026. **Обновлён:** 3 октября 2026, 22:05 Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Последний подтверждённый runtime merge:** `95ff3b4752a091f22f9702977d611a3b6d9f1595`, PR #3572 / T08.1b.
-**Текущий worktree:** `C:\final\_wt_aqs_t082_adapters`, ветка `codex/aqs-T08.2-adapters`, base `95ff3b4752a091f22f9702977d611a3b6d9f1595`; T08.2a implementation commit `a19aba1ae`; PR #3576 OPEN at `fe7d38c4efe02d1fa944315ca84b5f74930213ab`, checks in progress.
+**Текущий worktree:** `C:\final\_wt_aqs_t082_adapters`, ветка `codex/aqs-T08.2-adapters`, base `95ff3b4752a091f22f9702977d611a3b6d9f1595`; T08.2a implementation commit `a19aba1ae`; PR #3576 OPEN. Re-read its live HEAD and checks after the most recent docs-only state push.
 
 > **T00–T07, T08.1a и T08.1b — MERGED; T08.2a — IN_PROGRESS; T08.2b–T18 — PLANNED.** PR #3557 merged as `425df11c7a84f0d1e7954df0d00415927212669a`; PR #3571 as `d397656c7f597d72d6a6c92676cd204aff72d4d8`; PR #3572 as `95ff3b4752a091f22f9702977d611a3b6d9f1595`. T08.1b protects v1 identity reuse across shared creation paths. PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
