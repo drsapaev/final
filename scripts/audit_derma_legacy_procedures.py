@@ -421,7 +421,8 @@ def cmd_audit(args: argparse.Namespace) -> int:
     # PHI-полей — политика derma.py #1321 / patient_service.py #1295
     for r in sorted(active_with_legacy, key=lambda x: x["record_id"]):
         print(
-            "  EMR #%d visit=%s patient=%s status=%s class=%s "  # codeql[py/clear-text-logging-sensitive-data]
+            # codeql[py/clear-text-logging-sensitive-data] — только числовые суррогатные id, без PHI-полей
+            "  EMR #%d visit=%s patient=%s status=%s class=%s "
             "canon(valid/invalid)=%d/%d legacy(valid/invalid)=%d/%d "
             "exact=%d date=%d"
             % (
@@ -474,7 +475,8 @@ def cmd_audit(args: argparse.Namespace) -> int:
     # локальную ФС оператора на хосте БД (тот же домен доверия, что сама
     # БД и её pg_dump-бэкапы), наружу не передаётся
     out_path.write_text(
-        json.dumps(artifact, ensure_ascii=False, indent=1, default=str),  # codeql[py/clear-text-storage-sensitive-data]
+        # codeql[py/clear-text-storage-sensitive-data] — операторский артефакт аудита на хосте БД (тот же домен доверия, что pg_dump)
+        json.dumps(artifact, ensure_ascii=False, indent=1, default=str),
         encoding="utf-8",
     )
     print()
