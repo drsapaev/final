@@ -1,8 +1,9 @@
 import React from 'react';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLocation } from 'react-router-dom';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import i18n from '@/i18n';
 import HeaderNew, { isThemeMenuInteraction } from '../HeaderNew';
 import auth from '../../../stores/auth';
 
@@ -338,5 +339,25 @@ describe('HeaderNew brand navigation (HDR-POLISH-2, audit P3-3)', () => {
     renderHeader({ role: 'Doctor', path: '/clinical/patients' });
     fireEvent.click(screen.getByTitle('На главную'));
     expect(screen.getByTestId('location-probe')).toHaveTextContent('/doctor');
+  });
+
+  it('brand accessible name contains the visible brand text (WCAG 2.5.3 Label in Name)', async () => {
+    // Deterministic language pin: the composite accessible name is asserted
+    // as an exact string (repo convention, see Sidebar.navI18n.test.tsx).
+    await act(async () => {
+      await i18n.changeLanguage('ru');
+    });
+    renderHeader({ role: 'Admin', path: '/admin' });
+
+    // The visible label "Управление клиникой" is the brand span inside the
+    // button; it collapses to icon-only only at <=480px (hdr-hide-xs).
+    const visibleText = screen.getByText('Управление клиникой');
+    expect(visibleText).toBeInTheDocument();
+
+    // The accessible name must CONTAIN that visible text (composite with the
+    // tooltip title) — replacing it would break Label-in-Name speech-input
+    // matching on every width where the brand text is visible.
+    const brand = screen.getByRole('button', { name: 'Управление клиникой — На главную' });
+    expect(brand).toContainElement(visibleText);
   });
 });
