@@ -49,7 +49,9 @@ class QueueApiRepository:
             day=day,
             specialist_id=specialist_id,
             active=True,
-            **daily_queue_creation_snapshot(self.db, doctor=doctor, queue_tag=None),
+            **daily_queue_creation_snapshot(
+                self.db, day=day, doctor=doctor, queue_tag=None
+            ),
         )
         self.db.add(daily_queue)
         self.db.commit()
@@ -98,13 +100,12 @@ class QueueApiRepository:
             queue_resource_id=int(resource.id),
             queue_tag=queue_tag,
             active=True,
-            online_start_time=f"{int(settings.get('queue_start_hour', 7)):02d}:00",
-            online_end_time=f"{int(settings.get('queue_end_hour', 9)):02d}:00",
             max_online_entries=resource.max_online_per_day,
             # RQ-13.b (D-06, E-039): снимок применённого стартового номера
             # реестра — паритет с queue_svc-конструктором.
             **daily_queue_creation_snapshot(
                 self.db,
+                day=day,
                 resource=resource,
                 queue_tag=queue_tag,
                 settings=settings,

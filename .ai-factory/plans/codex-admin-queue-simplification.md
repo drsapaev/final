@@ -1,13 +1,13 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 1.7 — checkpoint после успешных CI gates PR #3546; текущий T06.2 rebase и новый exact-head CI фиксируются в `PROGRESS.md`/`EVIDENCE.md`.
-**Создан:** 30 сентября 2026. **Обновлён:** 1 октября 2026, Asia/Tashkent.
+**Версия:** 2.5 — T07 / #3557, T08.1a / #3571 and T08.1b / #3572 are merged; T08.2a is in progress.
+**Создан:** 30 сентября 2026. **Обновлён:** 3 октября 2026, 22:23 Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
-**Последний подтверждённый runtime merge:** `e8f585ab0a51e256fa638fe56c0582eff0bbafc6`, PR #3545 / T06.1.
-**Текущий worktree:** `C:\final\_wt_aqs_t062_creation_policy`, ветка `codex/aqs-T06.2-creation-policy`, база `origin/main` `e8f585ab`.
+**Последний подтверждённый runtime merge:** `95ff3b4752a091f22f9702977d611a3b6d9f1595`, PR #3572 / T08.1b.
+**Текущий worktree:** `C:\final\_wt_aqs_t082_adapters`, ветка `codex/aqs-T08.2-adapters`, rebased base `bbb5bda93a165e309dc0ee85f5180eb351a6369a`; T08.2a implementation commit `a9a4f3988e617190d83a4d9c8f1252721edc757f`; PR #3576 OPEN with the rebased branch, exact HEAD/checks must be reread after this evidence update.
 
-> **T00–T05 и T06.1 — MERGED; T06.2 — PR_OPEN (#3546, draft; applicable CI PASS); T07–T18 — PLANNED.** Пользователь явно поручил merge PR #3545 и продолжение реализации. T06.1 добавил только legacy-safe schema; T06.2 централизует создание snapshot и подключает runtime-конструкторы.
+> **T00–T07, T08.1a и T08.1b — MERGED; T08.2a — IN_PROGRESS; T08.2b–T18 — PLANNED.** PR #3557 merged as `425df11c7a84f0d1e7954df0d00415927212669a`; PR #3571 as `d397656c7f597d72d6a6c92676cd204aff72d4d8`; PR #3572 as `95ff3b4752a091f22f9702977d611a3b6d9f1595`. T08.1b protects v1 identity reuse across shared creation paths. PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -15,7 +15,7 @@
 **Решения:** [DECISIONS.md](admin-queue-simplification/DECISIONS.md).
 **Доказательства:** [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
 
-Подробная версия 1.1 ранее осталась незакоммиченной в worktree T03. Версия 1.2 восстановила её карточки и синхронизировала T03–T05; версия 1.3 фиксирует merge T06.1 и границы T06.2; версия 1.4 отмечает локальную реализацию; версия 1.5 фиксирует локальную валидацию и границы formatter hooks; версия 1.6 фиксирует PR #3546; версия 1.7 фиксирует его CI gates. Исторические evidence сохраняются. Пропущенные staging/browser проверки остаются NOT_RUN и не считаются приёмкой.
+Подробная версия 1.1 ранее осталась незакоммиченной в worktree T03. Версии 1.2–1.7 сохранили последовательные checkpoints T03–T06.2. Версия 1.8 подтвердила merge T06.2; версии 2.0–2.3 сохранили T07/T08 history. Версия 2.4 подтверждает слияние T07 и T08.1a и фиксирует границы T08.1b. Исторические evidence сохраняются. Пропущенные staging/browser/PG проверки остаются NOT_RUN и не считаются приёмкой.
 
 ## 1. Цель и границы
 
@@ -84,14 +84,15 @@ Milestone: `none`. Продолжение согласованного отде�
 | T04 | MERGED | [#3541](https://github.com/drsapaev/final/pull/3541), `ecc14b05411c7e7b54efca2966416cd6a69df37c` |
 | T05 | MERGED | [#3543](https://github.com/drsapaev/final/pull/3543), `fd53206f03b0361de6fc345f53b2bacf4195845c` |
 | T06.1 | MERGED | [#3545](https://github.com/drsapaev/final/pull/3545), `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` |
-| T06.2 | PR_OPEN | `codex/aqs-T06.2-creation-policy`, [PR #3546](https://github.com/drsapaev/final/pull/3546), worktree `C:\final\_wt_aqs_t062_creation_policy`, base `e8f585ab` |
-| T07–T18 | PLANNED | Runtime-реализация не начата |
+| T06.2 | MERGED | [PR #3546](https://github.com/drsapaev/final/pull/3546), `b804a71a6bad22400324e2236a3221317eac3158` |
+| T07 | PR_OPEN | `codex/aqs-T07-admission-window` / [PR #3557](https://github.com/drsapaev/final/pull/3557), worktree `C:\final\_wt_aqs_t07_window`, based on `3a776133` |
+| T08–T18 | PLANNED | Runtime-реализация не начата |
 
 Для #3543 проверен актуальный HEAD `c04f41021bef5f8c306b9668cbb1c4b9afef2cc1`: применимые Backend tests, Code Quality, parity, Context Boundary, PR Required Gate, security и PR Review Quality Gate — PASS. [Backend CI run 36851998918](https://github.com/drsapaev/final/actions/runs/36851998918). Path-aware skipped frontend/integration/staging jobs не считать PASS. На merged tree T05 целевые backend tests повторены: 24 passed, 1 warning. Локальные PG integration и synthetic staging/browser/cold-repeat timing — NOT_RUN.
 
 T03 завершён после исправления omitted-day Sync на `clinic_today(db)` и отдельного code APPROVE пользователя; T04 — после отдельного явного deferral/merge authorization пользователя. Для T05 пользователь делегировал выбор между deferral и staging до merge. Принят отдельный deferral #3543: command-local settings без schema/API/ownership/admission-policy изменений, целевые regressions и применимые CI PASS; isolated synthetic staging остановлен. Это техническое решение агента по явному поручению пользователя, а не выдуманный GitHub approval от автора. Полные поля deferral и оставшееся покрытие — DECISIONS/EVIDENCE.
 
-**Сейчас:** T06.1 подтверждённо слит; T06.2 реализован и локально валидирован; draft PR #3546 открыт. Кодовый commit `f0fd2217` прошёл 54 focused tests на SQLite; более ранние constructor-adapter checks: 8 + 22 + 4 passed. На точном PR head `fdc89857` Unified CI, backend PostgreSQL suite, quality/formatting, context boundary, docs/OpenAPI, parity, PR Required Gate, security и PR Review Quality Gate прошли. Path-aware frontend, DAST, Supabase Preview, staging/production readiness, load и integration jobs были skipped. Synthetic staging/browser validation остаётся NOT_RUN. Ruff и non-format pre-commit hooks прошли; локальные `ruff-format`/Black hooks были пропущены, чтобы не создавать несвязанный whole-file churn; новые файлы имеют отдельные targeted format checks. Подробности записаны в EVIDENCE. Схема, admission/quota enforcement, cutoff, API/UI и включение флага запрещены. После закрытия PR #3546 начать T07 только из свежей базы; T00–T06.1 повторно не выполнять.
+**Сейчас:** T06.2 подтверждённо слит в `b804a71a`; точные merge и CI сведения находятся в `EVIDENCE.md#t06.2-merge-checkpoint`. T07 runtime edits и локальная проверка завершены в отдельном worktree, но ещё не закоммичены. Свежий `origin/main` — `3a776133` после CI-only PR #3555; перед PR требуется rebase в этом worktree и повтор целевых проверок. Mandatory gate после одного разрешённого retry выдал `narrow_override` только для `_operations.py`; source inventory и точный ручной allowlist основаны на карточке T07 утверждённого пользователем плана. `gate_misroute=false`, `override_used=true`, `known_root_cause_file=backend/app/services/queue_svc/_operations.py`. T07 сохраняет v1 flag default-off; staging/PG runtime proof не выполнено.
 
 ## 4. Правила исполнения и постоянная память
 
@@ -279,12 +280,18 @@ next exact action; checks to rerun after next change.
 **Stop:** overnight/clinical lifecycle/silent legacy conversion.
 **Evidence/logs:** совпадение availability/join для каждого boundary; safe WARN refusal/ERROR failure, anonymous diagnostics не расширять.
 
+**Подтверждённые активные точки интеграции для T07:** основной `QueueBusinessService.join_queue_with_token` и `_unbookable_doctor_ids`; прямой GraphQL `joinQueue`; QR session precheck в `qr_queue/_queue_ops.py`; публичный `/online-queue/status` через `crud/online_queue.check_queue_availability`; `QueueAutoCloseService` как отдельный переход к обслуживанию. `crud/online_queue.join_online_queue` находится в transitional CRUD и не имеет найденного смонтированного caller — не считать его активным admission writer без новых source evidence. Для существующего `legacy` сохраняются текущие правила допуска без нового end cutoff; `daily_online_issuances_v1` использует frozen start/end и clinic timezone. На несуществующую очередь availability применяет те же defaults/policy flag, которые использует её последующее создание. Будущие даты сохраняют существующее правило: временное окно текущего дня не применяется к ним. Это техническое толкование runtime и принятого плана, не новая продуктовая договорённость.
+
+Для clinic-wide QR overview при смешанных legacy/v1 очередях нельзя использовать политику случайной первой строки как общий cutoff: обзор доступен, когда хотя бы одна активная и ещё не открытая очередь допускает запись по времени; `opened_at` закрывает admission только этой очереди. Конкретная выбранная очередь повторно проверяется каноническим join. Если все неоткрытые цели закрыты по времени, read result сообщает ближайшее соответствующее открытие/закрытие v1; если открыты все цели, сохраняется ответ `closed_reception_opened`. Это техническая детализация адаптера; она не меняет отдельные цели записи и сохраняет старое поведение legacy.
+
+Для clinic-wide QR overview при смешанных legacy/v1 очередях нельзя использовать политику случайной первой строки как общий cutoff: обзор доступен, когда хотя бы одна активная и ещё не открытая очередь допускает запись по времени; `opened_at` закрывает admission только этой очереди. Конкретная выбранная очередь повторно проверяется каноническим join. Если все неоткрытые цели закрыты по времени, read result сообщает ближайшее соответствующее открытие/закрытие v1; если открыты все цели, сохраняется ответ `closed_reception_opened`. Это техническая детализация адаптера; она не меняет отдельные цели записи и сохраняет старое поведение legacy.
+
 ### T08. Дневная квота успешных онлайн-выдач
 
 **Зависимости:** T06, T07. **Режим:** mandatory gate, locking/admission.
 **Anchors:** `services/queue_domain_service.py:allocate_ticket`; `queue_svc/_operations.py:join_queue_with_token`, `check_queue_limits`, `get_next_queue_number`, batch prelocks; `services/queue_claim_service.py`; `crud/queue_resource_routing.py` claim/registry locks.
 
-Срезы: **T08.1** v1 quota/identity; **T08.2** adapters/reports; **T08.3** PG concurrency/replay/partial proof. V1 не включать при неполном покрытии; facade-only change GraphQL не покрывает.
+Срезы: **T08.1a** canonical token quota; **T08.1b** v1 identity/recreation guard; **T08.2a** GraphQL direct writer; **T08.2b** remaining active admission adapters after source proof; **T08.2c** availability/report parity; **T08.3** PG concurrency/replay/partial proof. V1 не включать при неполном покрытии; facade-only change GraphQL не покрывает. Current T08.2a must keep its first PR limited to GraphQL and its focused tests. Telegram remains inventory-only unless a live issuance path is proven; the current source audit says its callback fails before a queue write.
 
 V1 transaction contract:
 
@@ -307,6 +314,8 @@ V1 transaction contract:
 | Staff/derivatives | registrar wizard/_today_queues, batch patient/queue, visit confirmation, transfer/clone; source не является proof online issuance |
 
 Identity guard: искать active/inactive same doctor/day/tag или resource/day. Partial active uniqueness недостаточна. Не создавать zero-count replacement; ordinary commands не reset counter/identity/delete used v1; conflicting queues не merge автоматически.
+
+T08.1b implementation boundary: v1 identity check belongs on the shared `daily_queue_creation_snapshot` path so every active runtime constructor using that policy supplies the queue date and typed owner. The known call sites include `queue_svc/_operations.py`, `crud/online_queue.py`, GraphQL, queue API, queue limits, visit confirmation and force-majeure creation. Legacy queue creation must keep its prior behavior. Migration import/restore must preserve stored policy/count; dev seeding is not an online runtime writer. Existing Admin retention cleanup is bounded to rows older than a cutoff of at least one day; past-date admission is rejected by T07, so it cannot delete today's/future identity or reopen an eligible quota. Before closing T08.1b, source-scan ordinary mutation/delete paths for `policy_version`, `online_issued_count`, owner identity and `DailyQueue` deletion. SQLite tests do not replace T08.3 PostgreSQL concurrency proof.
 
 **Validation:** independent PG sessions last-slot → ровно одна issuance; response-loss replay/rollback; statuses/deletion; desk/source-online clone/transfer; partial result; inactive recreate; tags; identical doctor/resource numeric IDs. Existing allocator characterization/concurrency, claim/QR/GraphQL boundary/integration suites; meaningful new PG race proof, не mocks вместо locks.
 **Reporting:** queue length/issued/remaining/version раздельно; v1 remaining=max(0,max-count); legacy count unknown.

@@ -38,7 +38,11 @@ from sqlalchemy.orm import Session
 from app.crud import clinic as crud_clinic
 from app.crud import queue_resource_routing
 from app.crud.clinic import get_queue_settings
-from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
+from app.crud.daily_queue_creation_policy import (
+    daily_queue_creation_snapshot,
+    evaluate_online_admission_window,
+    online_admission_window,
+)
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.services.queue_service import queue_service  # ✅ SSOT for business logic
@@ -361,7 +365,9 @@ def join_online_queue_multiple(
                     day=queue_token.day,
                     specialist_id=specialist_id,
                     active=True,
-                    **daily_queue_creation_snapshot(db, doctor=_doc),
+                    **daily_queue_creation_snapshot(
+                        db, day=queue_token.day, doctor=_doc
+                    ),
                 )
                 db.add(daily_queue)
                 db.commit()
@@ -502,27 +508,26 @@ def join_online_queue_multiple(
             db.add(queue_entry)
             db.flush()  # Получаем ID записи
             logger.info(
-                "[join_online_queue_multiple] ✅ Создана OnlineQueueEntry id=%d для specialist_id=%d, queue_id=%d, number=%d, patient_id=%s",
+                "[join_online_queue_multiple] ✅ Создана OnlineQueueEntry id=%d для specialist_id=%d, queue_id=%d, number=%d",
                 queue_entry.id,
                 specialist_id,
                 daily_queue.id,
                 next_number,
-                patient_id,
             )
 
             # Получаем информацию о специальности для иконки
             specialty_icon_map = {
-                'cardiology': '❤️',
-                'cardio': '❤️',
-                'dermatology': '✨',
-                'derma': '✨',
-                'dentistry': '🦷',
-                'dentist': '🦷',
-                'laboratory': '🔬',
-                'lab': '🔬',
+                "cardiology": "❤️",
+                "cardio": "❤️",
+                "dermatology": "✨",
+                "derma": "✨",
+                "dentistry": "🦷",
+                "dentist": "🦷",
+                "laboratory": "🔬",
+                "lab": "🔬",
             }
             doctor_specialty = (
-                doctor.specialty.lower() if doctor and doctor.specialty else ''
+                doctor.specialty.lower() if doctor and doctor.specialty else ""
             )
             icon = next(
                 (
@@ -530,7 +535,7 @@ def join_online_queue_multiple(
                     for key, icon in specialty_icon_map.items()
                     if key in doctor_specialty
                 ),
-                '👨‍⚕️',
+                "👨‍⚕️",
             )
 
             results.append(
@@ -622,7 +627,7 @@ def open_daily_queue(db: Session, day: date, specialist_id: int) -> dict[str, An
             day=day,
             specialist_id=specialist_id,
             active=True,
-            **daily_queue_creation_snapshot(db, doctor=_doc),
+            **daily_queue_creation_snapshot(db, day=day, doctor=_doc),
         )
         db.add(daily_queue)
 
@@ -721,34 +726,10 @@ def check_queue_availability(
 
     # Текущее время в часовом поясе клиники
     current_time = datetime.now(timezone)
-    queue_start_hour = queue_settings.get("queue_start_hour", 7)
 
-    # Codex round-33 P2: день сравнения — тоже КЛИНИК-локальный (из
-    # того же current_time): host date.today() в окне 19:00-24:00Z
-    # считал текущий клиник-день «будущим» и ПРОПУСКАЛ ограничение
-    # TOO_EARLY — /online-queue/status отвечал within_hours=true до
-    # открытия онлайн-записи.
-    today = current_time.date()
-
-    # Проверяем дату
-    if day < today:
-        return {
-            "available": False,
-            "reason": "DATE_PAST",
-            "message": "Нельзя записаться на прошедшую дату",
-        }
-
-    # Если сегодня, проверяем время
-    if day == today:
-        if current_time.hour < queue_start_hour:
-            return {
-                "available": False,
-                "reason": "TOO_EARLY",
-                "message": f"Онлайн-запись доступна с {queue_start_hour}:00",
-                "available_from": f"{queue_start_hour}:00",
-            }
-
-    # Проверяем что очередь не открыта
+    # Find the exact queue surface before evaluating its policy. A v1 row
+    # owns its frozen window; a missing row uses the defaults selected for
+    # the next creation.
     daily_queue = (
         db.query(DailyQueue)
         .filter(and_(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id))
@@ -761,12 +742,48 @@ def check_queue_availability(
         db, daily_queue, day, specialist_id
     )
 
+    window = online_admission_window(
+        daily_queue=daily_queue,
+        settings=queue_settings,
+    )
+    window_fields = {
+        "policy_version": window.policy_version,
+        "start_time": window.start_time.strftime("%H:%M"),
+        "end_time": (
+            window.end_time.strftime("%H:%M") if window.end_time is not None else None
+        ),
+    }
+    window_result = evaluate_online_admission_window(day, current_time, window)
+    if window_result == "date_past":
+        return {
+            "available": False,
+            "reason": "DATE_PAST",
+            "message": "Нельзя записаться на прошедшую дату",
+            **window_fields,
+        }
+    if window_result == "before_start":
+        return {
+            "available": False,
+            "reason": "TOO_EARLY",
+            "message": f"Онлайн-запись доступна с {window_fields['start_time']}",
+            "available_from": window_fields["start_time"],
+            **window_fields,
+        }
+    if window_result == "after_end":
+        return {
+            "available": False,
+            "reason": "AFTER_CUTOFF",
+            "message": f"Онлайн-запись закрыта в {window_fields['end_time']}",
+            **window_fields,
+        }
+
     if daily_queue and daily_queue.opened_at:
         return {
             "available": False,
             "reason": "QUEUE_OPENED",
             "message": "Онлайн-набор закрыт. Обратитесь в регистратуру.",
             "opened_at": daily_queue.opened_at,
+            **window_fields,
         }
 
     # Проверяем лимит мест
@@ -789,9 +806,14 @@ def check_queue_availability(
                 "available": False,
                 "reason": "QUEUE_FULL",
                 "message": f"Все места заняты ({current_count}/{max_slots})",
+                **window_fields,
             }
 
-    return {"available": True, "message": "Онлайн-запись доступна"}
+    return {
+        "available": True,
+        "message": "Онлайн-запись доступна",
+        **window_fields,
+    }
 
 
 # ===================== ПОИСК ДУБЛИКАТОВ =====================
@@ -906,9 +928,7 @@ def get_or_create_daily_queue(
         resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
         if resource is not None:
             queue_resource_routing.lock_registry_tag_creation(db, queue_tag, day)
-            resource = queue_resource_routing.resolve_tag_resource_locked(
-                db, queue_tag
-            )
+            resource = queue_resource_routing.resolve_tag_resource_locked(db, queue_tag)
         if resource is not None:
             existing_by_tag = (
                 db.query(DailyQueue)
@@ -928,13 +948,12 @@ def get_or_create_daily_queue(
                 queue_resource_id=int(resource.id),
                 queue_tag=queue_tag,
                 active=True,
-                online_start_time=f"{int(queue_settings.get('queue_start_hour', 7)):02d}:00",
-                online_end_time=f"{int(queue_settings.get('queue_end_hour', 9)):02d}:00",
                 max_online_entries=resource.max_online_per_day,
                 # RQ-13.b (D-06, E-039): снимок применённого стартового
                 # номера реестра — паритет с queue_svc-конструктором.
                 **daily_queue_creation_snapshot(
                     db,
+                    day=day,
                     resource=resource,
                     queue_tag=queue_tag,
                     settings=queue_settings,
@@ -969,9 +988,7 @@ def get_or_create_daily_queue(
     # reuse this lock provides. Taken BEFORE the lookup, flush/commit
     # releases it at this function's own commit. PostgreSQL-only; the
     # sequential SQLite tests skip harmlessly.
-    queue_resource_routing.lock_daily_queue_creation(
-        db, day, actual_specialist_id
-    )
+    queue_resource_routing.lock_daily_queue_creation(db, day, actual_specialist_id)
 
     # Ищем очередь с учетом queue_tag
     query_filters = [
@@ -1002,6 +1019,7 @@ def get_or_create_daily_queue(
         _creation_defaults = dict(defaults or {})
         _creation_snapshot = daily_queue_creation_snapshot(
             db,
+            day=day,
             doctor=doctor_exists,
             queue_tag=queue_tag,
         )
@@ -1012,6 +1030,10 @@ def get_or_create_daily_queue(
         _creation_defaults["online_issued_count"] = _creation_snapshot[
             "online_issued_count"
         ]
+        _creation_defaults["online_start_time"] = _creation_snapshot[
+            "online_start_time"
+        ]
+        _creation_defaults["online_end_time"] = _creation_snapshot["online_end_time"]
         daily_queue = DailyQueue(
             day=day,
             specialist_id=actual_specialist_id,

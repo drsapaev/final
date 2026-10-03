@@ -1,191 +1,112 @@
 # DevBrain Status
 
-Operational status file for the repository's DevBrain layers. Agents must verify this file against the filesystem before assuming a retrieval layer is active.
+Operational status for repository memory and guardrail layers. Verify this file
+against the current checkout before relying on optional retrieval artifacts.
 
-## Active Portable Layers
+## Current status
 
-| Layer | Status | Notes |
+| Layer | Status | Operational meaning |
 | --- | --- | --- |
-| `AGENTS.md` | active | Primary repo-level operating rules. |
-| `docs/devbrain/PROJECT_MEMORY.md` | active | Canonical compact project memory anchor. |
-| `docs/runbooks/AGENT_CYCLIC_WORKFLOW.md` | active | Small PR execution protocol. |
-| `docs/runbooks/CODEX_SUPERPOWERS_GUARD.md` | active | Local Superpowers workflow guard SSOT. |
-| `.agents/skills/*` | active | Repo/user skills available when installed in the current agent session. |
-| `.ai-factory/*` | active file memory | Logs, dossiers, contracts, patches, plans, and skill-context. |
-| PR/CI gates | active | PR template, review gate scripts, and GitHub Actions enforce evidence discipline. |
+| `AGENTS.md`, runbooks, skills | active | Portable operating rules and domain guidance read directly by agents. |
+| `docs/devbrain/PROJECT_MEMORY.md` | active | Compact, repository-tracked project memory. |
+| `scripts/devbrain_memory.py` | local memory tool available | Checkpoints and knowledge are stored under this clone's Git common directory and shared by its linked worktrees. Agent startup automation is not enabled by this status change. |
+| `ai/langgraph/scripts/agent_gate.py` | active | Deterministic execution guard for tasks routed through gate modes. |
+| LlamaIndex | dormant | Legacy local lexical retrieval. Do not run by default. |
+| LightRAG | dormant | Legacy relationship retrieval. Do not run by default. |
 
-## Local Retrieval Layers
+ADR-0007 is the policy source for dormant LlamaIndex and LightRAG status. Their
+source directories and launchers may exist while generated indexes are absent
+or stale. Filesystem presence and old status text do not activate them.
 
-| Layer | Current checkout status | Required verification before use |
-| --- | --- | --- |
-| LangGraph gate | active | `Test-Path ai/langgraph/scripts/run_agent_gate.ps1` and run through the launcher. |
-| AI Factory dossiers/logs | active file-backed | Check `.ai-factory/dossiers`, `.ai-factory/logs`, `.ai-factory/patches`. |
-| LlamaIndex | active local fallback | `ai/llamaindex` exists; smoke passed without external API; generated storage remains gitignored. |
-| LightRAG | active relationship fallback | `ai/lightrag` exists; relationship graph acceptance passed; generated graph storage remains gitignored. |
+## Local memory commands
 
-## Current Checkout Acceptance
+Use the shared local memory helper through its PowerShell launcher:
 
-- Base main commit before this status refresh: `81bac240d3b7246dd2a501e9de443c1bb0e24dda`
-- Retrieval layer commit: `10dc91c19c6a6536157c6b4ce9f102dbf86fe9b3`
-- **Z.ai cleanup sprint base**: `b2c22ae7` (pre-PR #1781) → `1aeef136` (post-PR #1805)
-- **Z.ai sprint stats**: 87 commits, 590 files changed, +16381/-9061 lines, 20+ PRs merged
-- Merge handling: use a normal merge commit so the retrieval layer commit remains in main ancestry.
-- Inventory: `passed`
-- Guardrail acceptance: `pass: 5`, `warn: 0`, `fail: 0`
-- LlamaIndex: `active local fallback` (dormant — see ADR-0007)
-- LightRAG: `active relationship fallback` (dormant — see ADR-0007)
-- Unified DevBrain status: `portable accepted in this checkout`
-- Limitation: `not a production autonomous brain`
+```powershell
+.\scripts\run_devbrain_memory.ps1 -Action Status
+.\scripts\run_devbrain_memory.ps1 -Action Begin -Query "short task summary"
+.\scripts\run_devbrain_memory.ps1 -Action Recall -TaskId "<uuid>"
+.\scripts\run_devbrain_memory.ps1 -Action Capture -InputFile ".scratch\devbrain-capture.json"
+```
 
-## Z.ai Cleanup Sprint Impact (2026-07-03 → 2026-07-04)
+The store is local to one clone and shared by that clone's Git worktrees. It is
+not synchronized to other clones or machines. Status reports store health and
+counts without dumping saved content.
 
-- **Security**: bandit 0 HIGH/0 MEDIUM (was 17 HIGH/53 MEDIUM), pip-audit 0 CVEs, gitleaks active
-- **Monitoring**: Sentry wired (frontend + backend), DSNs committed, PII scrubbing 3 layers
-- **AI safety**: 18 endpoints feature-flagged, `requires_doctor_confirmation` enforced via Playwright spec
-- **Background jobs**: arq + Redis (replaced dead Celery stub), 3 jobs, cron daily retention
-- **Repo hygiene**: 0 stray .py at root or backend/ root (was 134), 6 canonical root .md (was 70)
-- **Validation**: `docs/runbooks/STAGING_VALIDATION.md` + `scripts/smoke_test_staging.sh` (10 checks, MANDATORY)
-- **CI**: 9 active workflows (was 11 — deleted 2 dead: monitoring.yml, load-testing.yml)
-- **Tests**: 60+ new unit tests (pii_masker, wait_time_predictor, synthetic_seed)
-- **Docs**: 4 ADRs added (0002-0006), Sentry runbook, Staging validation runbook
+## Guardrail acceptance
 
-See `docs/devbrain/PROJECT_MEMORY.md` "Z.ai Cleanup Sprint" section for full fact inventory.
-
-## Active / Documented / Dormant / Missing Status
-
-| Component | Status | Operational meaning |
-| --- | --- | --- |
-| `agent_gate.py` | active | Use only for gate and gate-known-root-cause modes. |
-| `run_agent_gate.ps1` | active | Preferred launcher; do not call bare `python` for the gate. |
-| Historical `dev_brain.py` workflows | dormant | Do not run unless restored and verified. |
-| LlamaIndex portable retrieval | active local fallback | Uses `ai/llamaindex` scripts; no-key smoke passed; generated storage is gitignored. |
-| LightRAG evidence log | active evidence | Historical readiness/evaluation record, not proof of active graph storage. |
-| LightRAG relationship graph | active relationship fallback | Uses `ai/lightrag` scripts; acceptance passed; generated graph storage is gitignored. |
-
-## LlamaIndex Status
-
-- Current status: `active local fallback`.
-- Required checks:
-  - `Test-Path ai/llamaindex`
-  - `Test-Path ai/llamaindex/scripts/query.py`
-  - `Test-Path ai/llamaindex/scripts/ingest.py`
-  - `Test-Path ai/llamaindex/storage/devbrain_index.json`
-  - `./ai/llamaindex/scripts/run_smoke.ps1`
-- Last indexed commit: `8356203b8323970870931901e17a6bcfd67d3874`
-- Last verification date: `2026-05-26T18:28:52+00:00`
-- Indexed document count: `1627`
-- Acceptance result: `simple locate smoke passed in no-key fallback mode`
-- Smoke query: `Where is runtime API/WS origin resolution implemented on the frontend?`
-- Smoke result: `frontend/src/api/runtime.js`
-
-## LightRAG Status
-
-- Current status: `active relationship fallback`.
-- Evidence file: `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md`.
-- Relationship graph storage: `ai/lightrag/indexes/lightrag_graph/graph.json` (gitignored).
-- Relationship artifacts: `ai/lightrag/indexes/lightrag_graph/artifacts/` (gitignored; generated by `./ai/lightrag/scripts/run_artifacts.ps1`).
-- Relationship artifact check: `./ai/lightrag/scripts/run_artifact_check.ps1` verifies artifacts and freshness against `HEAD`.
-- Required checks:
-  - `Test-Path ai/lightrag`
-  - `Test-Path ai/lightrag/scripts/query.py`
-  - `Test-Path ai/lightrag/scripts/ingest.py`
-  - `Test-Path ai/lightrag/indexes/lightrag_graph/graph.json`
-  - `./ai/lightrag/scripts/run_artifacts.ps1`
-  - `./ai/lightrag/scripts/run_artifact_check.ps1`
-  - `./ai/lightrag/scripts/run_acceptance.ps1`
-- Last indexed commit: `8356203b8323970870931901e17a6bcfd67d3874`
-- Last verification date: `2026-05-26T18:28:55+00:00`
-- Indexed document count: `1513`
-- Relationship concept count: `12`
-- Relationship edge count: `6837`
-- Acceptance result: `simple locate, Telegram mixed-contract, registrar payment/status persistence, Alembic migration, notification anti-noise, and queue identity scenarios passed`
-- Provider mode: `no-key fallback; DeepSeek bridge optional when DEEPSEEK_API_KEY is set`
-
-## Acceptance Gates
-
-LightRAG or LlamaIndex may be treated as active project retrieval only after all relevant gates pass with evidence.
-
-1. `simple locate`
-   - Expected: reliably finds canonical files for a narrow known task.
-   - Status: `passed via LightRAG acceptance`.
-2. `Telegram mixed-contract`
-   - Expected: separates Bot API/UX/webhook work from token storage, security, and migration ownership.
-   - Status: `passed via LightRAG acceptance`.
-3. `registrar payment/status persistence ownership`
-   - Expected: maps frontend table/status symptoms to backend service, persistence, API DTO/read model, frontend adapter, and validation targets.
-   - Status: `passed via LightRAG acceptance`.
-4. `Alembic migration ownership`
-   - Expected: maps SQLAlchemy/table gaps to new Alembic revision ownership and migration validation.
-   - Status: `passed via LightRAG acceptance`.
-5. `notification catalog anti-noise ownership`
-   - Expected: maps notification preferences, mute, snooze, and DND work to catalog/settings/runtime policy ownership.
-   - Status: `passed via LightRAG acceptance`.
-6. `queue identity/fairness ownership`
-   - Expected: maps queue specialist/doctor identity work to backend queue/service ownership and validation.
-   - Status: `passed via LightRAG acceptance`.
-
-## How To Verify Guardrail Behavior
-
-Use the local guardrail acceptance checker before changing DevBrain routing rules:
+Run the read-only acceptance checker to exercise deterministic gate scenarios:
 
 ```powershell
 .\scripts\devbrain_acceptance.ps1
 ```
 
-The checker is read-only. It runs `ai/langgraph/scripts/run_agent_gate.ps1` against critical routing scenarios and prints `PASS`, `WARN`, or `FAIL` per scenario. It does not require LlamaIndex or LightRAG, does not run product tests, and exits non-zero only when a core guardrail expectation is clearly violated.
+This checks routing behavior. It does not prove product behavior or activate
+legacy retrieval.
 
-## How To Run Full DevBrain Regression Matrix
+## Regression matrix
 
-Use the local regression matrix before trusting DevBrain for graph-heavy, risky, or ownership-sensitive work:
+The default matrix checks portable memory, the local memory helper, and
+guardrail behavior. Legacy retrieval probes and freshness checks are an
+intentional skip unless explicitly requested:
 
 ```powershell
 .\scripts\devbrain_regression_matrix.ps1
+.\scripts\devbrain_regression_matrix.ps1 -IncludeRetrieval
 ```
 
-The matrix is read-only. It runs inventory, guardrail acceptance, LlamaIndex simple locate, LightRAG artifact integrity, LightRAG registrar/payment, Alembic migration, notification anti-noise, and queue identity probes when the corresponding retrieval layers are active. It does not run ingest, does not require API keys, and does not update generated storage or status files.
+`-IncludeRetrieval` reads existing index metadata and may query only when the
+corresponding generated index is already present. Missing indexes are reported
+without being created. Freshness comes from the artifacts' own commit metadata,
+not from this historical status document.
 
-For generated LightRAG graph artifacts, run:
+Markdown coverage is likewise opt-in:
 
 ```powershell
-.\ai\lightrag\scripts\run_artifact_check.ps1
+.\scripts\devbrain_markdown_index_coverage.ps1 -IncludeRetrieval
 ```
 
-This read-only checker validates `entities.jsonl`, `relationships.jsonl`, `vector_store.jsonl`, `doc_store.jsonl`, `graph_store.json`, and `metadata.json`. It fails when artifacts are missing, malformed, not gitignored, misaligned with `graph.json`, or stale against the current `HEAD`. Use `--warn-stale` only when stale artifacts are acceptable for exploratory local work.
+## Refresh behavior
 
-## How To Refresh DevBrain Memory
-
-Use the local refresh wrapper after durable memory, runbook, manifest, routing, or ownership-anchor changes:
+The default refresh checks local filesystem memory and the portable regression
+matrix. It does not ingest, query, export, or update retrieval artifacts:
 
 ```powershell
 .\scripts\devbrain_refresh_memory.ps1
 ```
 
-The wrapper runs LlamaIndex smoke, LightRAG acceptance, LightRAG artifact export/check, and the regression matrix when the corresponding scripts exist. Missing optional retrieval scripts are reported as `WARN`/`skip`; the regression matrix is the core command and must pass.
+Only an explicit request refreshes legacy retrieval:
 
-Excellent DevBrain status requires:
+```powershell
+.\scripts\devbrain_refresh_memory.ps1 -RefreshRetrieval
+```
 
-- inventory green
-- acceptance green
-- retrieval freshness checked
-- LightRAG artifacts exist, are gitignored, and are fresh at `HEAD`
-- graph-heavy probes return relevant anchors
-- no `STALE / NEEDS REINDEX` warning for trusted retrieval use
+That option calls Python entry points through `scripts/run_python.ps1` without
+the legacy `--update-status` flag. Generated retrieval output stays in ignored
+local storage. A smoke or acceptance result is historical evidence for that
+run; it does not change ADR-0007 or this durable dormant policy.
 
-If the indexed commit is behind `HEAD` only because `docs/devbrain/DEVBRAIN_STATUS.md` or retrieval status/freshness tooling changed, the regression matrix treats that as bookkeeping-only and does not require a full reindex. Any source, runbook, backend, frontend, migration, memory, or manifest change still requires reindex before trusted retrieval use.
+## Historical retrieval evidence
 
-## Last Indexed Commit Placeholders
+The following values are dated observations from 2026-05-26, not current
+readiness claims:
 
-| Retrieval layer | Last indexed commit | Last verified by | Notes |
+| Layer | Recorded commit | Last recorded verification | Historical result |
 | --- | --- | --- | --- |
-| AI Factory file memory | `file-backed; no index` | `TBD` | Update relevant logs/dossiers manually. |
-| LlamaIndex | `8356203b8323970870931901e17a6bcfd67d3874` | `2026-05-26T18:28:52+00:00` | Active local fallback; smoke passed without external API. |
-| LightRAG | `8356203b8323970870931901e17a6bcfd67d3874` | `2026-05-26T18:28:55+00:00` | Active relationship fallback; acceptance passed without external API. |
+| LlamaIndex | `8356203b8323970870931901e17a6bcfd67d3874` | `2026-05-26T18:28:52+00:00` | 1,627 documents; simple locate smoke passed in no-key fallback mode. |
+| LightRAG | `8356203b8323970870931901e17a6bcfd67d3874` | `2026-05-26T18:28:55+00:00` | 1,513 documents, 12 concepts, 6,837 edges; historical acceptance reported pass. |
 
-## Known Limitations
+These historical counts and acceptance notes do not establish present artifact
+availability, freshness, or usefulness. Re-evaluation requires an explicit
+request and current artifact metadata.
 
-- DevBrain memory is still partly distributed across AGENTS, runbooks, AI Factory logs, dossiers, patches, evidence files, skills, and chat history.
-- Gate routing can still misclassify keyword-heavy tasks without a confirmed root-cause anchor.
-- Graph retrieval should not be claimed active from documentation alone.
-- LightRAG readiness evidence shows where graph retrieval would help, but does not prove current graph availability.
-- For simple local fixes, direct execution is often better than invoking the full gate path.
-- For risky domains, gate/handoff remains valuable, but it must allow narrow override after confirmed misroute.
+## Known limitations
+
+- Local automatic memory is per clone; it does not synchronize independent
+  clones or computers.
+- Memory records are advisory. Source, tests, migrations, and repository rules
+  remain authoritative.
+- The model still performs reasoning and execution; DevBrain is not an
+  autonomous production developer.
+- Legacy retrieval artifacts can be missing or stale while the project status
+  remains correctly dormant.

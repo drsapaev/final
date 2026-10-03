@@ -1,11 +1,11 @@
 # Decisions and contract
 
-Plan version: 1.2
-Last updated: 2026-10-01
+Plan version: 2.3
+Last updated: 2026-10-02T01:32:00+05:00
 
 ## Current execution instruction
 
-- **User instruction, 2026-10-01:** “Продолжай реализации плана”. Implementation is authorized. T00–T05 are now MERGED; the next runtime stage is T06. The current cycle only preserves the confirmed T05 decision and detailed plan; no T06 runtime/schema work starts here.
+- **User instruction, 2026-10-01:** “Продолжай реализации плана”, followed by “мержай и продолжай”. Implementation and sequential PR cycles are authorized. T00–T06.2 are MERGED; T07 is the active runtime stage. This does not authorize deployment or activating `QUEUE_POLICY_V2_CREATION_ENABLED`.
 - **Review scope:** #3540 was approved after the omitted-day Sync fix; #3541 had a separate explicit user Tier 2 acknowledgment and merge authorization. Those decisions did not automatically authorize #3543's deferral.
 - **Delegated decision, 2026-10-01:** the user instructed “реши по PR #3543 — принять deferral staging-проверки и разрешить merge либо потребовать staging-проверку до merge”. The agent accepted the bounded T05 deferral after source/CI review and merged the exact reviewed head. This is an agent decision under explicit user delegation, not a submitted GitHub author-approval review. See the separate decision below.
 
@@ -40,6 +40,8 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - A new admin directions endpoint is a read-only backend endpoint under the existing FastAPI queue router. It returns typed entity references/action kinds, never arbitrary frontend URLs or patient data.
 - Keep the partial-result contract of each existing multi-item path. Do not impose global all-or-nothing behavior.
 - Resolve inconsistent profile parent links as an explicit conflict; do not infer historical manual intent or auto-repair public bindings.
+- **T07 implementation interpretation (not a new product decision):** current `legacy` daily queues keep their pre-T07 admission behavior, with no newly enforced end cutoff. `daily_online_issuances_v1` enforces frozen `[start,end)` in clinic timezone. If the daily row does not exist, availability reads fresh defaults and selects the same policy that the creation flag would select for the later queue creation. Future target dates keep the existing behavior that bypasses same-day time boundaries. Evidence: current adapters, policy snapshots and exact T07 plan card; see `EVIDENCE.md#t07-prework-checkpoint`.
+- **T07 mixed clinic-wide QR interpretation (technical, not a product decision):** a clinic-wide QR check is an overview before a concrete booking target is selected. On a day containing legacy and v1 queues, one arbitrary row must not decide overview availability. The overview remains available if any active, not-yet-opened target is within its own admission policy; `opened_at` closes only that concrete queue, and the selected queue is then checked again by the canonical join. If none is available due to time, report the earliest v1 opening or latest applicable v1 cutoff; if every target is already opened, retain the existing closed-reception response. Existing legacy rows continue to have no new end cutoff. Evidence: regressions `test_clinic_wide_qr_uses_any_available_queue_in_mixed_legacy_day` and `test_clinic_wide_qr_keeps_later_direction_available_after_another_opens`, plus T07 review evidence.
 
 ## Planning clarifications — no additional product behavior approved
 
@@ -67,3 +69,39 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - Recover the detailed 1.1 plan and decisions from the untouched local T03 worktree, correct stale T03–T05 status, and publish the missing RESUME entry point in a separate docs-only PR.
 - Keep original user decisions D1–D5 unchanged. Preserve historical evidence; current statuses live in PROGRESS, not in old timestamped journal entries.
 - Retain old untracked scratch and temporary environments. Earlier automatic approval rejection of scratch deletion is not bypassed by another deletion method.
+
+## T07 / PR #3557 — accepted bounded Tier-2 deferral
+
+- Decision source: user explicitly requested a review and a separate Tier-2 decision on 2026-10-03. This is an agent technical assessment under human delegation, not an independently submitted human GitHub approval.
+- Reviewed head: fcace1f3bf77a000932382780a572be1273c8699; runtime unchanged from reviewed 037c6493. Technical verdict: APPROVE, P0=0 / P1=0 / P2=0.
+- Decision: ACCEPT the PR-specific deferral of admin-navigation.spec.ts, queue-system.spec.ts, and panel-qa-admin-live.spec.ts for merge disposition. Documentation-only successors inherit this disposition if runtime is unchanged; later PRs and runtime changes do not.
+- Original requirement: run those three named backend-dependent Playwright specs on isolated synthetic staging.
+- Reason: admin-navigation does not handle mandatory Admin TOTP; queue-system lacks verified synthetic Registrar credentials in the owned project and writes queue/patient data; panel-qa-admin-live pins localhost:5173 and origin-bound storage state and writes patient/service data. These require safe harness/credential preparation, not a production fallback.
+- Evidence: all three remain NOT_RUN. Core T07 mixed-policy QR and real PostgreSQL cutoff-after-lock scenarios passed; normal Admin password/TOTP, four routes, settings round-trip/restore and cold/repeated timings passed; exact clean-head served frontend hashes matched 255/255 files. CI on fcace1f3: 27 SUCCESS / 12 SKIPPED / 0 failures. Skips remain NOT_RUN.
+- Owner/workstream: T07/T18 Admin Queue Simplification synthetic staging executor.
+- Resume condition: prepare normal-TOTP-compatible login, verified synthetic Registrar credentials and an explicitly isolated configurable origin; run all three at T18 before production rollout or v1 activation, record each result and clean synthetic writes. Reopen disposition if a product defect or changed runtime invalidates evidence.
+- Headline impact: Tier 2 remains PARTIAL; 0 of 3 deferred named specs is completed. No overall completion percentage is inferred. Deferral adds no coverage.
+- Remaining gates: full ten-item STAGING_VALIDATION.md is mandatory pre-deploy and NOT waived. New-head required CI still applies. No deployment, flag activation, merge or independent human GitHub approval is performed by this decision. T07 remains PR_OPEN until a merge is confirmed.
+- Identity constraint: CLI and connector both authenticate as author drsapaev. Technical APPROVE is recorded via COMMENT; GitHub self-APPROVE is unavailable.
+
+## T07 merge and T08 sub-slice — 2026-10-03T18:49:47+05:00
+
+- User confirmed they merged PR #3557. GitHub reports PR state MERGED at 2026-10-03T13:30:30Z, HEAD f5ad17e51db8def21162f2876b26853b09902ca8, merge commit 425df11c7a84f0d1e7954df0d00415927212669a, base f1be5697dbc487d792e8d5ae60db53c079bbe638.
+- Exact PR-head CI finished with 27 SUCCESS, 12 SKIPPED, 0 failures. Skips remain NOT_RUN.
+- Earlier explicit user-delegated decision accepting #3557's named-spec deferral remains PR-specific. The three named E2E specs remain NOT_RUN for T18; full docs/runbooks/STAGING_VALIDATION.md remains mandatory before deployment. Feature flag remains default-off.
+- Technical execution choice: split T08.1 into T08.1a (atomic quota at canonical token admission) and T08.1b (identity/recreation protection across constructors). T08.2 remains direct adapters/reports; T08.3 remains PostgreSQL concurrency/replay/partial-result evidence. This decomposition preserves the accepted T08 contract and does not change product semantics.
+- T08.1a first patch is restricted to backend/app/services/queue_svc/_operations.py, its focused queue-claim/quota unit tests, and the plan's progress/evidence documents. GraphQL direct writer and non-token adapters are explicitly reserved for T08.2. No migration/model/feature-flag change is in this slice.
+
+## T08.1a implementation interpretation — 2026-10-03T19:11:22+05:00
+
+- Technical choice derived from user decision D1 and the canonical plan: for policy_version=daily_online_issuances_v1, capacity is based only on the persisted successful independent online issuance count, including zero as a real limit. The same predicate governs doctor bookability and final token admission; legacy queues keep their existing active-entry-count behavior.
+- The count changes only after a new token admission has created its entry, while the selected DailyQueue row is already locked and before the current transaction is committed/flushed. Existing replay returns before this path; rollback includes entry, count and token-use. No cancellation/status/delete path decrements the count.
+- This implementation choice applies only to the canonical token path in T08.1a. Direct GraphQL writers, reports, creation/recreation identity protection and PostgreSQL concurrency remain separate planned gates. It does not authorize enabling the v1 creation flag.
+
+## T08.1b identity/recreation guard — 2026-10-03T20:16:00+05:00
+
+- Type: technical implementation choice under the existing user-approved T08 plan; no product decision changed.
+- For a new `daily_online_issuances_v1` snapshot, require the queue date and exactly one persisted owner. Reject creation if any row already exists for the same doctor/day/exact `queue_tag`, or same resource/day identity. Do not auto-reactivate or merge the old row. This prevents replacing an inactive queue with a fresh zero counter.
+- The guard is centralized in the shared queue creation policy and reused by active runtime constructors. Legacy-policy queue creation stays compatible. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off.
+- Source audit found no ordinary runtime write of `policy_version`/`online_issued_count`. The existing Admin retention command deletes only past-date queues beyond a cutoff of at least one day; T07 rejects past-date admission, so it cannot reopen today's/future v1 quota identity. Backup restore is a recovery path that preserves source policy/count, not an admission command. Any future reset/delete command that can target an eligible used v1 queue must be guarded.
+- PostgreSQL race behavior is not claimed by the SQLite tests; T08.3 remains the required PG concurrency/replay/partial-result proof before v1 rollout.

@@ -28,6 +28,8 @@ import pytest
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.services.queue_service import QueueBusinessService
 
+pytestmark = pytest.mark.usefixtures("queue_admission_open")
+
 COMPLETE_URL = "/api/v1/queue/join/complete"
 START_URL = "/api/v1/queue/join/start"
 

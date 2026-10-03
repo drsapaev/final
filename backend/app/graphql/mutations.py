@@ -34,7 +34,12 @@ from app.crud.appointment import (
     create_appointment as crud_create_appointment,
 )
 from app.crud.clinic import get_queue_settings
-from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
+from app.crud.daily_queue_creation_policy import (
+    ONLINE_ISSUANCES_V1_POLICY_VERSION,
+    daily_queue_creation_snapshot,
+    evaluate_online_admission_window,
+    online_admission_window,
+)
 from app.crud.patient import soft_delete_patient
 from app.crud.queue_resource_routing import (
     lock_daily_queue_creation,
@@ -768,7 +773,7 @@ class Mutation:
                         )
                     except Exception as notify_error:  # noqa: BLE001
                         logger.warning(
-                            "GraphQL createVisit: all_free notification " "failed: %s",
+                            "GraphQL createVisit: all_free notification failed: %s",
                             notify_error,
                         )
 
@@ -1041,7 +1046,6 @@ class Mutation:
                 timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
                 now_local = datetime.now(timezone)
                 today = now_local.date()
-                queue_start_hour = queue_settings.get("queue_start_hour", 7)
 
                 # QD-2E: один claim-lock на точный (day, queue_tag) берётся
                 # ДО row-lock врача/ресурса/очереди. Поэтому два writer-а,
@@ -1179,21 +1183,20 @@ class Mutation:
                         requested_resource_id = (
                             getattr(registry_surface, "queue_resource_id", None)
                             if registry_surface is not None
-                            and getattr(
-                                registry_surface, "queue_resource_id", None
-                            )
+                            and getattr(registry_surface, "queue_resource_id", None)
                             is not None
-                            else int(registry_resource.id)
-                            if registry_resource is not None
-                            else None
+                            else (
+                                int(registry_resource.id)
+                                if registry_resource is not None
+                                else None
+                            )
                         )
                         same_owner = (
                             registry_surface_id is not None
                             and claim_queue.id == registry_surface_id
                         ) or (
                             requested_resource_id is not None
-                            and claim_queue.queue_resource_id
-                            == requested_resource_id
+                            and claim_queue.queue_resource_id == requested_resource_id
                         )
                     else:
                         same_owner = (
@@ -1291,6 +1294,7 @@ class Mutation:
                         # «default».
                         **daily_queue_creation_snapshot(
                             db,
+                            day=today,
                             doctor=doctor,
                             queue_tag=None,
                             settings=queue_settings,
@@ -1374,14 +1378,48 @@ class Mutation:
                         errors=["QUEUE_CLOSED"],
                     )
 
-                # рабочие часы: now_local/queue_start_hour вычислены выше
-                # по конфигурированной таймзоне (round-8) — тот же момент
-                # времени, что и день очереди.
-                if now_local.hour < queue_start_hour:
+                # The daily queue's version selects whether this is the
+                # legacy start-only rule or its frozen v1 half-open window.
+                admission_window = online_admission_window(
+                    daily_queue=daily_queue,
+                    settings=queue_settings,
+                )
+                # The clinic clock captured before the admission/row locks is
+                # only suitable for selecting the queue identity. A request
+                # can wait across the configured cutoff while those locks are
+                # held, so make the admission decision from a fresh clock read
+                # after the daily-queue lock and never retarget this request to
+                # a different clinic day mid-flight.
+                admission_now_local = datetime.now(timezone)
+                if admission_now_local.date() != today:
                     return QueueMutationResponse(
                         success=False,
-                        message=f"Онлайн-запись доступна с {queue_start_hour}:00",
+                        message=(
+                            "Дата очереди изменилась. Обновите страницу "
+                            "и повторите попытку."
+                        ),
+                        errors=["QUEUE_DAY_CHANGED"],
+                    )
+                window_result = evaluate_online_admission_window(
+                    today, admission_now_local, admission_window
+                )
+                if window_result == "before_start":
+                    return QueueMutationResponse(
+                        success=False,
+                        message=(
+                            "Онлайн-запись доступна с "
+                            f"{admission_window.start_time.strftime('%H:%M')}"
+                        ),
                         errors=["OUTSIDE_HOURS"],
+                    )
+                if window_result == "after_end":
+                    return QueueMutationResponse(
+                        success=False,
+                        message=(
+                            "Онлайн-запись закрыта в "
+                            f"{admission_window.end_time.strftime('%H:%M')}"
+                        ),
+                        errors=["ONLINE_BOOKING_CLOSED"],
                     )
 
                 # Лимит: индивидуальный на очередь -> капа врача
@@ -1408,26 +1446,29 @@ class Mutation:
                         errors=["ALREADY_IN_QUEUE"],
                     )
 
-                # Лимит: считаем записи ВЫБРАННОЙ очереди (не всех очередей
-                # врача за день) и сравниваем с её же капой. Codex P1
-                # (round-7): только НЕ-терминальные статусы (waiting/called) —
-                # как в каноническом QueueBusinessService.check_queue_limits;
-                # served/cancelled не должны съедать слоты онлайн-набора.
-                online_entries_count = (
-                    db.query(OnlineQueueEntry)
-                    .filter(
-                        OnlineQueueEntry.queue_id == daily_queue.id,
-                        OnlineQueueEntry.status.in_(["waiting", "called"]),
+                # Legacy queues retain the waiting/called count contract.
+                # V1 uses successful online issuances, so cancelled/removed
+                # rows do not reopen capacity and staff entries stay outside
+                # this online-only limit.
+                if daily_queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+                    quota_used = daily_queue.online_issued_count
+                    max_slots = daily_queue.max_online_entries
+                else:
+                    quota_used = (
+                        db.query(OnlineQueueEntry)
+                        .filter(
+                            OnlineQueueEntry.queue_id == daily_queue.id,
+                            OnlineQueueEntry.status.in_(["waiting", "called"]),
+                        )
+                        .count()
                     )
-                    .count()
-                )
+                    max_slots = (
+                        daily_queue.max_online_entries
+                        if daily_queue.max_online_entries is not None
+                        else doctor.max_online_per_day
+                    )
 
-                max_slots = (
-                    daily_queue.max_online_entries
-                    if daily_queue.max_online_entries is not None
-                    else doctor.max_online_per_day
-                )
-                if online_entries_count >= max_slots:
+                if quota_used >= max_slots:
                     return QueueMutationResponse(
                         success=False,
                         message="Превышен лимит онлайн записей на сегодня",
@@ -1470,6 +1511,8 @@ class Mutation:
                 )
 
                 db.add(queue_entry)
+                if daily_queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+                    daily_queue.online_issued_count += 1
                 db.commit()
                 db.refresh(queue_entry)
 
@@ -1701,8 +1744,8 @@ class Mutation:
                         # очереди — легаси-комната байт-идентично.
                         from app.ws.queue_ws import queue_update_departments
 
-                        payload["broadcast_departments"] = (
-                            queue_update_departments(db, entry.queue)
+                        payload["broadcast_departments"] = queue_update_departments(
+                            db, entry.queue
                         )
 
                     # --- post-commit side effects с sync-DB (в этом же worker) ---
@@ -1741,11 +1784,12 @@ class Mutation:
                                 and entry.queue.specialist.user
                                 else "Врач"
                             )
-                        payload[
-                            "display_message"
-                        ] = get_display_manager().build_patient_call_message(
-                            entry, specialist_name, payload["cabinet"]
+                        display_message = (
+                            get_display_manager().build_patient_call_message(
+                                entry, specialist_name, payload["cabinet"]
+                            )
                         )
+                        payload["display_message"] = display_message
                     except Exception as e:  # noqa: BLE001 — non-blocking
                         logger.warning(
                             "GraphQL callNext: display payload build failed: %s", e

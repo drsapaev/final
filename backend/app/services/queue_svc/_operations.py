@@ -2,9 +2,10 @@
 
 Split from queue_service.py.
 """
+
 from __future__ import annotations
 
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from sqlalchemy import select  # RQ-14.a: row-lock
 from sqlalchemy.exc import IntegrityError
@@ -12,7 +13,12 @@ from sqlalchemy.exc import IntegrityError
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import expand_queue_tags
 from app.crud import queue_resource_routing
-from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
+from app.crud.daily_queue_creation_policy import (
+    ONLINE_ISSUANCES_V1_POLICY_VERSION,
+    daily_queue_creation_snapshot,
+    evaluate_online_admission_window,
+    online_admission_window,
+)
 from app.crud.queue_resource_routing import (
     lock_daily_queue_creation,  # Lock-parity follow-up to the #3511 review
     lock_queue_tag_claim_scope,  # Round-6 (P1-2): canonical batch pre-lock
@@ -41,16 +47,17 @@ def _unbookable_doctor_ids(
     doctors: list[Doctor],
     day,
     queue_tag: str | None = None,
+    settings: dict[str, Any] | None = None,
 ) -> set[int]:
     """Doctors of ``doctors`` whose online queue for ``day`` can NOT accept
     a new entry (mirror of check_queue_time_window + check_queue_limits):
 
     - past days: never bookable;
-    - same-day joins before the 07:00 online window: never bookable;
+    - same-day joins outside the queue's effective online window: not bookable;
     - the per-(day, doctor, tag) queue already OPENED reception
       (``opened_at`` set, same-day only): not bookable;
-    - the per-(day, doctor, tag) queue reached its online cap
-      (active waiting+called entries >= max slots): not bookable.
+    - a v1 queue reached its persisted successful-online-issuance cap, or a
+      legacy queue reached its active waiting+called-entry cap: not bookable.
 
     Doctors WITHOUT a matching queue row are bookable — the join creates
     their queue with ``opened_at = NULL`` and zero entries (exactly what
@@ -60,13 +67,11 @@ def _unbookable_doctor_ids(
         return set()
 
     doctor_ids = [d.id for d in doctors]
-
-    # Day-level window (identical semantics to check_queue_time_window).
-    now = _now()
+    queue_settings = settings or get_queue_settings(db) or {}
+    timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+    now = _now(timezone)
     today = now.date()
     if day < today:
-        return set(doctor_ids)
-    if day == today and now.time() < QueueBusinessServiceMixinBase.ONLINE_QUEUE_START_TIME:
         return set(doctor_ids)
     same_day = day == today
 
@@ -99,11 +104,24 @@ def _unbookable_doctor_ids(
         )
         active_counts = dict(count_rows)
 
+    queues_by_doctor: dict[int, DailyQueue] = {}
     for queue in queues:
-        if queue.specialist_id in unbookable:
+        queues_by_doctor.setdefault(queue.specialist_id, queue)
+
+    for doctor_id in doctor_ids:
+        queue = queues_by_doctor.get(doctor_id)
+        window = online_admission_window(daily_queue=queue, settings=queue_settings)
+        if evaluate_online_admission_window(day, now, window) != "available":
+            unbookable.add(doctor_id)
             continue
-        if same_day and queue.opened_at is not None:
-            unbookable.add(queue.specialist_id)
+        if same_day and queue is not None and queue.opened_at is not None:
+            unbookable.add(doctor_id)
+            continue
+        if queue is None:
+            continue
+        if queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+            if queue.online_issued_count >= queue.max_online_entries:
+                unbookable.add(doctor_id)
             continue
         # Codex round-2 P2: DailyQueue persists the online cap as
         # ``max_online_entries`` (dev_seed sets 20, legacy crud honors it);
@@ -112,11 +130,10 @@ def _unbookable_doctor_ids(
         # and the picker disagreed with the configured bookability. Same
         # fallback shape as the legacy crud path (falsy -> default).
         max_slots = (
-            queue.max_online_entries
-            or QueueBusinessServiceMixinBase.DEFAULT_MAX_SLOTS
+            queue.max_online_entries or QueueBusinessServiceMixinBase.DEFAULT_MAX_SLOTS
         )
         if active_counts.get(queue.id, 0) >= max_slots:
-            unbookable.add(queue.specialist_id)
+            unbookable.add(doctor_id)
     return unbookable
 
 
@@ -175,7 +192,12 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
     @classmethod
     def check_queue_time_window(
-        cls, target_date: date, queue_opened_at: datetime | None = None
+        cls,
+        target_date: date,
+        queue_opened_at: datetime | None = None,
+        *,
+        daily_queue: DailyQueue | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> tuple[bool, str]:
         """
         Проверить, доступна ли онлайн-запись по времени
@@ -183,34 +205,42 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         Returns:
             (is_allowed, message)
         """
-        now = _now()
-        today = now.date()
-        current_time = now.time()
-
-        if target_date < today:
+        queue_settings = settings or {
+            "timezone": "Asia/Tashkent",
+            "queue_start_hour": cls.ONLINE_QUEUE_START_TIME.hour,
+        }
+        timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+        now = _now(timezone)
+        window = online_admission_window(
+            daily_queue=daily_queue, settings=queue_settings
+        )
+        outcome = evaluate_online_admission_window(target_date, now, window)
+        if outcome == "date_past":
             return False, "❌ QR код устарел. Обратитесь в регистратуру за новым кодом."
 
-        if target_date == today:
-            # Проверяем время для сегодняшнего дня
-            if current_time < cls.ONLINE_QUEUE_START_TIME:
-                return (
-                    False,
-                    f"⏰ Онлайн-запись откроется в {cls.ONLINE_QUEUE_START_TIME.strftime('%H:%M')}. Текущее время: {current_time.strftime('%H:%M')}",
-                )
+        if outcome == "before_start":
+            return (
+                False,
+                f"⏰ Онлайн-запись откроется в {window.start_time.strftime('%H:%M')}. Текущее время: {now.strftime('%H:%M')}",
+            )
 
-            if queue_opened_at:
-                opened_time = queue_opened_at.strftime('%H:%M')
-                return (
-                    False,
-                    f"🚪 Прием уже открыт в {opened_time}. Онлайн-запись закрыта. Обратитесь в регистратуру.",
-                )
+        if outcome == "after_end":
+            return (
+                False,
+                f"Онлайн-запись закрыта в {window.end_time.strftime('%H:%M')}",
+            )
+
+        if target_date == now.date() and queue_opened_at:
+            opened_time = queue_opened_at.strftime("%H:%M")
+            return (
+                False,
+                f"🚪 Прием уже открыт в {opened_time}. Онлайн-запись закрыта. Обратитесь в регистратуру.",
+            )
 
         # Для будущих дней разрешаем запись
         return True, ""
 
     @classmethod
-
-
     def check_queue_limits(
         cls, db: Session, daily_queue: DailyQueue
     ) -> tuple[bool, str]:
@@ -220,6 +250,15 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         Returns:
             (is_allowed, message)
         """
+        if daily_queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+            max_slots = daily_queue.max_online_entries
+            if daily_queue.online_issued_count >= max_slots:
+                return (
+                    False,
+                    f"🚫 Достигнут лимит мест ({max_slots}). Обратитесь в регистратуру.",
+                )
+            return True, ""
+
         current_entries = (
             db.query(OnlineQueueEntry)
             .filter(
@@ -246,8 +285,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         return True, ""
 
     @classmethod
-
-
     def check_uniqueness(
         cls,
         db: Session,
@@ -297,13 +334,10 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 return patient_entry, "повторная запись этого пациента"
 
         if phone:
-            phone_query = (
-                db.query(OnlineQueueEntry)
-                .filter(
-                    OnlineQueueEntry.queue_id == daily_queue.id,
-                    OnlineQueueEntry.phone == phone,
-                    OnlineQueueEntry.status.in_(["waiting", "called"]),
-                )
+            phone_query = db.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.queue_id == daily_queue.id,
+                OnlineQueueEntry.phone == phone,
+                OnlineQueueEntry.status.in_(["waiting", "called"]),
             )
             if patient_id:
                 # RQ-25.a.1: the caller carries a resolved patient
@@ -313,9 +347,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 # member, not a duplicate; only legacy rows without a
                 # patient link may still dedup (narrowed by the typed
                 # entry name so family members stay separate).
-                legacy_query = phone_query.filter(
-                    OnlineQueueEntry.patient_id.is_(None)
-                )
+                legacy_query = phone_query.filter(OnlineQueueEntry.patient_id.is_(None))
                 if patient_name:
                     legacy_query = legacy_query.filter(
                         func.lower(func.trim(OnlineQueueEntry.patient_name))
@@ -349,8 +381,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         return None, ""
 
     @classmethod
-
-
     def calculate_next_number(cls, db: Session, daily_queue: DailyQueue) -> int:
         """Вычислить следующий номер в очереди.
 
@@ -377,8 +407,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         return max(max_number + 1, start_number)
 
     @classmethod
-
-
     def get_queue_statistics(cls, db: Session, daily_queue: DailyQueue) -> dict:
         """Получить статистику очереди"""
         entries = (
@@ -393,11 +421,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             "called": len([e for e in entries if e.status == "called"]),
             "completed": len([e for e in entries if e.status == "completed"]),
             "cancelled": len([e for e in entries if e.status == "cancelled"]),
-            "max_slots": getattr(daily_queue, 'max_slots', None)
+            "max_slots": getattr(daily_queue, "max_slots", None)
             or cls.DEFAULT_MAX_SLOTS,
             "available_slots": max(
                 0,
-                (getattr(daily_queue, 'max_slots', None) or cls.DEFAULT_MAX_SLOTS)
+                (getattr(daily_queue, "max_slots", None) or cls.DEFAULT_MAX_SLOTS)
                 - len([e for e in entries if e.status in ["waiting", "called"]]),
             ),
             "is_open": daily_queue.opened_at is not None,
@@ -409,8 +437,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         return stats
 
     @classmethod
-
-
     def validate_queue_entry_data(
         cls,
         patient_name: str,
@@ -439,7 +465,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         return True, ""
 
     # ----- Новые SSOT-функции (будут внедряться в следующих подэтапах) -----
-
 
     @queue_settings_command
     def get_or_create_daily_queue(
@@ -496,9 +521,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 return surface
             resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
             if resource is not None:
-                queue_resource_routing.lock_registry_tag_creation(
-                    db, queue_tag, day
-                )
+                queue_resource_routing.lock_registry_tag_creation(db, queue_tag, day)
                 # Codex round-4 P2: перепроверка ПОСЛЕ лока — деактивация
                 # строки между resolve и lock не должна создавать очередь;
                 # round-6 P2: перепроверка под row-lock (FOR UPDATE) и с
@@ -520,8 +543,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     queue_resource_id=int(resource.id),
                     queue_tag=queue_tag,
                     active=True,
-                    online_start_time=f"{int(queue_settings.get('queue_start_hour', 7)):02d}:00",
-                    online_end_time=f"{int(queue_settings.get('queue_end_hour', 9)):02d}:00",
                     max_online_entries=(
                         queue_resource_routing.resource_queue_defaults(resource)[
                             "max_online_entries"
@@ -532,6 +553,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     # реестра не сдвигают базовую линию действующего дня.
                     **daily_queue_creation_snapshot(
                         db,
+                        day=day,
                         resource=resource,
                         queue_tag=queue_tag,
                         settings=queue_settings,
@@ -668,21 +690,17 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         # This is the correct behavior: each doctor has their own queue.
 
         settings = self._load_queue_settings(db)
-        queue_start_hour = settings.get("queue_start_hour", 7)
-        queue_end_hour = settings.get("queue_end_hour", 9)
-
         daily_queue = DailyQueue(
             day=day,
             specialist_id=actual_specialist_id,  # ✅ Используем doctor.id для ForeignKey
             queue_tag=queue_tag,
             active=True,
-            online_start_time=f"{int(queue_start_hour):02d}:00",
-            online_end_time=f"{int(queue_end_hour):02d}:00",
             max_online_entries=defaults.get("max_online_entries"),
             # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
             # дня (владелец → клиника) — живые настройки не сдвигают день.
             **daily_queue_creation_snapshot(
                 db,
+                day=day,
                 doctor=doctor,
                 queue_tag=queue_tag,
                 settings=settings,
@@ -722,7 +740,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 f"queue_tag={queue_tag}, error={e}"
             )
             raise
-
 
     @queue_settings_command
     def get_next_queue_number(
@@ -781,7 +798,12 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if daily_queue is None:
             if queue_id is None:
                 raise QueueValidationError("daily_queue or queue_id must be provided")
-            daily_queue = db.query(DailyQueue).filter(DailyQueue.id == queue_id).with_for_update().first()
+            daily_queue = (
+                db.query(DailyQueue)
+                .filter(DailyQueue.id == queue_id)
+                .with_for_update()
+                .first()
+            )
             if not daily_queue:
                 raise QueueNotFoundError(f"DailyQueue {queue_id} not found")
         else:
@@ -802,7 +824,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             )
 
         return self.calculate_next_number(db, daily_queue)
-
 
     @queue_settings_command
     def assign_queue_token(
@@ -925,6 +946,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 resource.default_cabinet if resource is not None else None
             )
 
+        admission_window = online_admission_window(
+            daily_queue=daily_queue,
+            settings=queue_settings,
+        )
+
         metadata = {
             "day": day,
             "queue_id": daily_queue.id if daily_queue else None,
@@ -932,16 +958,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             or ("Все специалисты" if is_clinic_wide else None),
             "specialty": doctor.specialty if doctor else "clinic",
             "cabinet": cabinet,
-            "start_time": (
-                daily_queue.online_start_time
-                if daily_queue
-                else f"{queue_settings.get('queue_start_hour', 7):02d}:00"
-            ),
+            "start_time": admission_window.start_time.strftime("%H:%M"),
             "end_time": (
-                daily_queue.online_end_time
-                if daily_queue
-                else f"{queue_settings.get('queue_end_hour', 9):02d}:00"
+                admission_window.end_time.strftime("%H:%M")
+                if admission_window.end_time is not None
+                else None
             ),
+            "policy_version": admission_window.policy_version,
             "max_slots": max_slots,
             "current_count": current_count,
             "expires_at": queue_token.expires_at,
@@ -950,7 +973,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         }
 
         return token_value, metadata
-
 
     @queue_settings_command
     def validate_queue_token(
@@ -1042,6 +1064,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         doctors: list[Doctor],
         day,
         queue_tag: str | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> Doctor | None:
         """D-2 least-loaded routing: pick the doctor with the shortest
         ACTIVE queue (waiting+called entries) for ``day``; ties break to
@@ -1101,7 +1124,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         active_loads = dict(load_rows)
 
         # Codex round-1 P1: rank BOOKABLE doctors first (see docstring).
-        unbookable_ids = _unbookable_doctor_ids(db, doctors, day, queue_tag)
+        unbookable_ids = _unbookable_doctor_ids(
+            db, doctors, day, queue_tag, settings=settings
+        )
         candidates = [d for d in doctors if d.id not in unbookable_ids]
         if not candidates:
             # Nobody bookable: keep the legacy least-loaded pick so the
@@ -1273,8 +1298,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     for tag in queue_tags
                     if queue_resource_routing.tag_routes_to_resource(db, tag, day)
                     is not None
-                    or queue_resource_routing.resolve_tag_resource(db, tag)
-                    is not None
+                    or queue_resource_routing.resolve_tag_resource(db, tag) is not None
                 ),
                 None,
             )
@@ -1291,9 +1315,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 if not token_obj.is_clinic_wide:
                     daily_queue = token_meta.get("daily_queue")
                     queue_tag = (
-                        daily_queue.queue_tag
-                        if daily_queue is not None
-                        else None
+                        daily_queue.queue_tag if daily_queue is not None else None
                     )
                     if queue_tag:
                         targets[index] = queue_tag
@@ -1453,9 +1475,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             _public_department = token_obj.department or ""
             _direction_scoped = bool(
                 token_obj.is_clinic_wide
-                and _public_department.startswith(
-                    self.PUBLIC_ADDRESS_DEPARTMENT_PREFIX
-                )
+                and _public_department.startswith(self.PUBLIC_ADDRESS_DEPARTMENT_PREFIX)
             )
             if _direction_scoped and (
                 queue_profile is None
@@ -1520,8 +1540,10 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     )
                     queue_tag = resource_tag
                     if tag_claim is not None:
-                        expected_surface = queue_resource_routing.tag_routes_to_resource(
-                            db, resource_tag, day
+                        expected_surface = (
+                            queue_resource_routing.tag_routes_to_resource(
+                                db, resource_tag, day
+                            )
                         )
                         expected_resource = queue_resource_routing.resolve_tag_resource(
                             db, resource_tag
@@ -1645,7 +1667,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                         cabinet = doctor.cabinet if doctor else None
                     else:
                         doctor = self._pick_least_loaded_doctor(
-                            db, eligible_doctors, day, queue_tag=profile_key
+                            db,
+                            eligible_doctors,
+                            day,
+                            queue_tag=profile_key,
+                            settings=queue_settings,
                         )
 
                         # Если не нашли - это ошибка сопоставления профиля, а не повод
@@ -1781,9 +1807,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     patient_name=patient_name,
                 )
                 if tag_claim is not None:
-                    if not _queue_owner_matches(
-                        tag_claim.daily_queue, daily_queue
-                    ):
+                    if not _queue_owner_matches(tag_claim.daily_queue, daily_queue):
                         _raise_cross_owner_claim_conflict()
                     daily_queue = tag_claim.daily_queue
                     resolved_claim_entry = tag_claim.entry
@@ -1869,8 +1893,25 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 "token": token_obj,
             }
 
+        # Admission must be serialized with writes to this queue. In
+        # particular, a request can wait here past the v1 cutoff; refresh
+        # the loaded row after acquiring the lock and evaluate the window
+        # only after the wait has finished. The tag/day claim lock above
+        # remains first in the established lock order.
+        locked_queue_id = db.execute(
+            select(DailyQueue.id)
+            .where(DailyQueue.id == daily_queue.id)
+            .with_for_update()
+        ).scalar_one_or_none()
+        if locked_queue_id is None:
+            raise QueueNotFoundError("Очередь больше не активна")
+        db.refresh(daily_queue)
+
         time_allowed, time_message = self.check_queue_time_window(
-            day, daily_queue.opened_at
+            day,
+            daily_queue.opened_at,
+            daily_queue=daily_queue,
+            settings=queue_settings,
         )
         if not time_allowed:
             raise QueueValidationError(time_message)
@@ -1890,6 +1931,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             auto_number=True,
             commit=False,
         )
+
+        if daily_queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+            daily_queue.online_issued_count += 1
 
         self._increment_token_usage(token_obj)
         if commit:
@@ -1912,7 +1956,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             "daily_queue": daily_queue,
             "token": token_obj,
         }
-
 
     @queue_settings_command
     def create_queue_entry(

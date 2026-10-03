@@ -35,7 +35,10 @@ class VisitConfirmationRepository:
     def get_pending_visit_by_token(self, token: str) -> Visit | None:
         return (
             self.db.query(Visit)
-            .filter(Visit.confirmation_token == token, Visit.status == "pending_confirmation")
+            .filter(
+                Visit.confirmation_token == token,
+                Visit.status == "pending_confirmation",
+            )
             .first()
         )
 
@@ -46,7 +49,9 @@ class VisitConfirmationRepository:
         return self.db.query(Patient).filter(Patient.id == patient_id).first()
 
     def get_visit_services(self, visit_id: int) -> list[VisitService]:
-        return self.db.query(VisitService).filter(VisitService.visit_id == visit_id).all()
+        return (
+            self.db.query(VisitService).filter(VisitService.visit_id == visit_id).all()
+        )
 
     def get_service(self, service_id: int) -> Service | None:
         return self.db.query(Service).filter(Service.id == service_id).first()
@@ -111,13 +116,12 @@ class VisitConfirmationRepository:
                     queue_resource_id=int(resource.id),
                     queue_tag=queue_tag,
                     active=True,
-                    online_start_time=f"{int(settings.get('queue_start_hour', 7)):02d}:00",
-                    online_end_time=f"{int(settings.get('queue_end_hour', 9)):02d}:00",
                     max_online_entries=resource.max_online_per_day,
                     # RQ-13.b (D-06, E-039): снимок применённого стартового
                     # номера реестра — паритет с queue_svc-конструктором.
                     **daily_queue_creation_snapshot(
                         self.db,
+                        day=day,
                         resource=resource,
                         queue_tag=queue_tag,
                         settings=settings,
@@ -192,20 +196,16 @@ class VisitConfirmationRepository:
             return daily_queue
 
         settings = crud_clinic.get_queue_settings(self.db)
-        queue_start_hour = settings.get("queue_start_hour", 7)
-        queue_end_hour = settings.get("queue_end_hour", 9)
-
         daily_queue = DailyQueue(
             day=day,
             specialist_id=actual_specialist_id,
             queue_tag=queue_tag,
             active=True,
-            online_start_time=f"{int(queue_start_hour):02d}:00",
-            online_end_time=f"{int(queue_end_hour):02d}:00",
             # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
             # дня (владелец → клиника) — паритет с queue_svc-конструктором.
             **daily_queue_creation_snapshot(
                 self.db,
+                day=day,
                 doctor=doctor,
                 queue_tag=queue_tag,
                 settings=settings,

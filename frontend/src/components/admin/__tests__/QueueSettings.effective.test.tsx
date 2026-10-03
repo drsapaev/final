@@ -2,9 +2,8 @@
  * RQ-23.ui (S-20, D-06): the queue settings panel must show, for every
  * managed setting, WHERE its effective value comes from (clinic →
  * department → owner → day snapshot) and WHEN it applies — or say
- * honestly that the field is not applied at all (F-19 dead fields:
- * the DepartmentQueueSettings block except queue_prefix and the clinic
- * auto_close_time display-only field).
+ * honestly that the field is not applied at all (F-19 dead department
+ * fields except queue_prefix).
  *
  * The report is strictly read-only: the active day is a frozen snapshot
  * (D-06 — живые настройки не переписывают действующий день), so the
@@ -78,10 +77,11 @@ const baseReport = {
       field: 'auto_close_time',
       level: 'clinic',
       value: '09:00',
-      live: false,
-      applied_when: [],
-      runtime_consumers: ['display_only'],
-      note: 'Движок автозакрытия читает СНИМОК дня DailyQueue.online_end_time, а не это поле.',
+      live: true,
+      applied_when: ['day_creation_snapshot'],
+      runtime_consumers: ['v1_online_admission_gate', 'queue_auto_close'],
+      snapshot_field: 'DailyQueue.online_end_time',
+      note: 'Только новые v1 очереди фиксируют cutoff; существующие legacy очереди сохраняют старые правила.',
     },
     {
       field: 'start_numbers',
@@ -112,6 +112,7 @@ const baseReport = {
       specialist_id: 77,
       queue_resource_id: null,
       queue_tag: 'cardiology',
+      policy_version: 'daily_online_issuances_v1',
       active: true,
       opened_at: '2026-09-17T07:00:00',
       start_number: 12,
@@ -127,6 +128,7 @@ const baseReport = {
       specialist_id: 78,
       queue_resource_id: null,
       queue_tag: 'derm_old',
+      policy_version: 'legacy',
       active: false,
       opened_at: null,
       start_number: 1,
@@ -261,9 +263,11 @@ describe('queueSettingsEffective SSOT normalizer (RQ-23.ui)', () => {
     expect(parsed.clinic_today).toBe('2026-09-17');
     expect(parsed.chain_order).toEqual(['clinic', 'department', 'owner', 'day_snapshot']);
     expect(parsed.fields).toHaveLength(5);
-    const dead = parsed.fields.find((f) => f.field === 'auto_close_time');
-    expect(dead?.live).toBe(false);
-    expect(dead?.applied_when).toEqual([]);
+    const cutoff = parsed.fields.find((f) => f.field === 'auto_close_time');
+    expect(cutoff?.live).toBe(true);
+    expect(cutoff?.applied_when).toEqual(['day_creation_snapshot']);
+    expect(parsed.active_day[0].policy_version).toBe('daily_online_issuances_v1');
+    expect(parsed.active_day[1].policy_version).toBe('legacy');
     const live = parsed.fields.find((f) => f.field === 'queue_start_hour');
     expect(live?.live).toBe(true);
     expect(live?.snapshot_field).toBe('DailyQueue.online_start_time');
@@ -335,7 +339,7 @@ describe('QueueSettings effective-settings report panel (RQ-23.ui, S-20)', () =>
     });
   });
 
-  it('shows source + applied-when for clinic fields and flags the dead auto_close_time honestly (F-19)', async () => {
+  it('shows auto_close_time as a v1-only snapshot setting and keeps the current day read-only', async () => {
     const user = userEvent.setup();
     renderPanel();
     const region = await getEffectiveRegion();
@@ -348,11 +352,15 @@ describe('QueueSettings effective-settings report panel (RQ-23.ui, S-20)', () =>
     expect(within(region).getAllByText('сразу').length).toBeGreaterThan(0);
     expect(within(region).getAllByText('снимок при создании дня').length).toBeGreaterThan(0);
 
-    // Dead clinic field: honest "не применяется" + the backend reason.
-    const deadRow = within(region).getByText('Время автозакрытия (клиника)').closest('[data-field-row]');
-    expect(deadRow).not.toBeNull();
-    expect(within(deadRow as HTMLElement).getByText('не применяется')).toBeInTheDocument();
-    expect(within(deadRow as HTMLElement).getByText(/DailyQueue\.online_end_time/)).toBeInTheDocument();
+    // The end time applies only to new v1 queues; existing day snapshots remain unchanged.
+    const cutoffRow = within(region).getByText('Время автозакрытия (клиника)').closest('[data-field-row]');
+    expect(cutoffRow).not.toBeNull();
+    expect(within(cutoffRow as HTMLElement).getByText('применяется')).toBeInTheDocument();
+    expect(within(cutoffRow as HTMLElement).getByText('снимок при создании дня')).toBeInTheDocument();
+    expect(within(cutoffRow as HTMLElement).getByText(/DailyQueue\.online_end_time/)).toBeInTheDocument();
+    const activeDay = region.querySelector('[data-day-row]');
+    expect(activeDay).not.toBeNull();
+    expect(within(activeDay as HTMLElement).getByText('V1: онлайн-запись закрывается в указанное время')).toBeInTheDocument();
     expect(user).toBeTruthy();
   });
 
@@ -679,12 +687,12 @@ describe('QueueSettings panel fixes for PR 3291 review findings (owner audit, cu
     renderPanel();
     const region = await getEffectiveRegion();
     // ru: the raw backend note is shown as-is.
-    expect(within(region).getAllByText(/DailyQueue\.online_end_time/).length).toBeGreaterThan(0);
+    expect(within(region).getByText(/Только новые v1 очереди фиксируют cutoff/)).toBeInTheDocument();
 
     try {
       await i18n.changeLanguage('en');
-      expect(within(region).queryByText(/DailyQueue\.online_end_time/)).toBeNull();
-      expect(within(region).getAllByText('not applied').length).toBeGreaterThan(0);
+      expect(within(region).queryByText(/Только новые v1 очереди фиксируют cutoff/)).toBeNull();
+      expect(within(region).getAllByText('applied').length).toBeGreaterThan(0);
     } finally {
       await i18n.changeLanguage('ru');
     }

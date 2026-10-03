@@ -693,13 +693,18 @@ def test_join_queue_broadcasts_to_display_and_ws(gql_data, monkeypatch):
     на TV-табло и entry_added в админский /ws/queue — как канонический
     REST /queue/join."""
     import app.ws.queue_ws as queue_ws_module
+    from app.db import session as db_session_module
     from app.graphql import mutations as gql_mutations
 
     # Time-of-day gotcha (#2992): фиксируем окно онлайн-набора.
     monkeypatch.setattr(
         gql_mutations,
         "get_queue_settings",
-        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+        lambda db: {
+            "queue_start_hour": 0,
+            "timezone": "Asia/Tashkent",
+            "auto_close_time": "23:59",
+        },
     )
 
     display_calls: list[dict] = []
@@ -720,6 +725,22 @@ def test_join_queue_broadcasts_to_display_and_ws(gql_data, monkeypatch):
 
     d = gql_data
     suffix = d["suffix"]
+    queue_tag = f"gql-v1-quota-{suffix}"
+    with db_session_module.SessionLocal() as queue_session:
+        v1_queue = DailyQueue(
+            day=_queue_day(),
+            specialist_id=d["doctor"].id,
+            queue_tag=queue_tag,
+            active=True,
+            max_online_entries=15,
+            policy_version="daily_online_issuances_v1",
+            online_issued_count=0,
+            online_start_time="00:00",
+            online_end_time="23:59",
+        )
+        queue_session.add(v1_queue)
+        queue_session.commit()
+        v1_queue_id = v1_queue.id
 
     # свежий пациент (seed уже waiting — словили бы ALREADY_IN_QUEUE)
     data = _execute(
@@ -743,11 +764,21 @@ def test_join_queue_broadcasts_to_display_and_ws(gql_data, monkeypatch):
           joinQueue(input: $input) { success queueEntry { id number } }
         }
         """,
-        {"input": {"patientId": patient_id, "doctorId": d["doctor"].id}},
+        {
+            "input": {
+                "patientId": patient_id,
+                "doctorId": d["doctor"].id,
+                "queueTag": queue_tag,
+            }
+        },
     )
     join = data["joinQueue"]
     assert join["success"] is True, join
     entry_id = join["queueEntry"]["id"]
+    with db_session_module.SessionLocal() as queue_session:
+        persisted_v1_queue = queue_session.get(DailyQueue, v1_queue_id)
+        assert persisted_v1_queue is not None
+        assert persisted_v1_queue.online_issued_count == 1
 
     # 1) TV-табло получила queue.created для новой записи
     assert display_calls == [{"entry_id": entry_id, "event_type": "queue.created"}]

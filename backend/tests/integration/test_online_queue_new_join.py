@@ -8,10 +8,15 @@ import pytest
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.services.queue_service import QueueBusinessService
 
+pytestmark = pytest.mark.usefixtures("queue_admission_open")
+
 
 def _make_daily_queue_and_token(db_session, test_doctor, token_value: str):
+    from app.crud.clinic import clinic_today
+
+    clinic_day = clinic_today(db_session)
     daily_queue = DailyQueue(
-        day=date.today(),
+        day=clinic_day,
         specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,
@@ -23,7 +28,7 @@ def _make_daily_queue_and_token(db_session, test_doctor, token_value: str):
     local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
     token = QueueToken(
         token=token_value,
-        day=date.today(),
+        day=clinic_day,
         specialist_id=test_doctor.id,
         department="cardiology",
         expires_at=local_now + timedelta(hours=2),

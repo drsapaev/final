@@ -154,7 +154,7 @@ def test_get_doctors_by_specialty_eligible_only_still_hides_general(db_session) 
 
 @pytest.mark.queue
 def test_clinic_wide_join_finds_canonical_dentistry_doctor(
-    db_session, test_doctor_user, monkeypatch
+    db_session, test_doctor_user, monkeypatch, queue_admission_open
 ) -> None:
     """A profile with OLD queue_tags (no 'dentistry') must still see a
     canonical 'dentistry' doctor (the 0049 code-level half of D-1)."""
@@ -182,7 +182,7 @@ def test_clinic_wide_join_finds_canonical_dentistry_doctor(
     local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
     token = QueueToken(
         token="d1-canonical-join-token",
-        day=date.today(),
+        day=crud_clinic.clinic_today(db_session),
         specialist_id=None,
         department=None,
         is_clinic_wide=True,

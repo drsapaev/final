@@ -72,6 +72,8 @@ def generate_qr_token(
             cabinet=token_data["cabinet"],
             day=day,
             start_time=token_data["start_time"],
+            end_time=token_data["end_time"],
+            policy_version=token_data["policy_version"],
             max_slots=token_data["max_slots"],
             current_count=token_data["current_count"],
         )
@@ -185,7 +187,7 @@ def open_queue(
 # ===================== ПРОВЕРКА СТАТУСА =====================
 
 
-@router.get("/online-queue/status", response_model=dict[str, Any])
+@router.get("/online-queue/status", response_model=QueueStatusCheck)
 def check_queue_status(
     day: date = Query(..., description="Дата"),
     specialist_id: int = Query(..., description="ID специалиста"),
@@ -214,7 +216,11 @@ def check_queue_status(
             within_hours=availability.get("available", False),
             has_slots=not availability.get("reason") == "QUEUE_FULL",
             current_time=current_time.replace(tzinfo=None),
-            queue_start_time=f"{queue_settings.get('queue_start_hour', 7)}:00",
+            queue_start_time=availability.get(
+                "start_time", f"{queue_settings.get('queue_start_hour', 7):02d}:00"
+            ),
+            queue_end_time=availability.get("end_time"),
+            policy_version=availability.get("policy_version", "legacy"),
             opened_at=queue_status.get("opened_at"),
         )
 

@@ -9,6 +9,8 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.services.force_majeure_service import ForceMajeureService
 from app.services.queue_service import QueueBusinessService, queue_service
 
+pytestmark = pytest.mark.usefixtures("queue_admission_open")
+
 
 def _create_daily_queue_and_token(db_session, test_doctor, token_value: str) -> tuple[DailyQueue, QueueToken]:
     # Codex round-30: join/start classifies the token day in the CLINIC

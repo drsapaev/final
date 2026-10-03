@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 class ForceMajeureError(Exception):
     """Ошибка при обработке форс-мажора"""
+
     pass
 
 
@@ -65,7 +66,7 @@ class ForceMajeureService:
         self,
         queue_id: int | None = None,
         specialist_id: int | None = None,
-        target_date: date | None = None
+        target_date: date | None = None,
     ) -> list[OnlineQueueEntry]:
         """
         Получить записи в ожидании для переноса/отмены
@@ -106,10 +107,12 @@ class ForceMajeureService:
 
         query = query.filter(
             DailyQueue.day == target_date,
-            OnlineQueueEntry.status.in_(["waiting", "called"])
+            OnlineQueueEntry.status.in_(["waiting", "called"]),
         )
 
-        return query.order_by(OnlineQueueEntry.priority.desc(), OnlineQueueEntry.queue_time).all()
+        return query.order_by(
+            OnlineQueueEntry.priority.desc(), OnlineQueueEntry.queue_time
+        ).all()
 
     def transfer_entries_to_tomorrow(
         self,
@@ -117,7 +120,7 @@ class ForceMajeureService:
         specialist_id: int,
         reason: str,
         performed_by_id: int,
-        send_notifications: bool = True
+        send_notifications: bool = True,
     ) -> dict[str, Any]:
         """
         Массовый перенос записей на завтра
@@ -139,7 +142,7 @@ class ForceMajeureService:
             return {
                 "success": True,
                 "transferred": 0,
-                "message": "Нет записей для переноса"
+                "message": "Нет записей для переноса",
             }
 
         # Codex round-26 P2: «завтра» — от дня КЛИНИКИ (тот же SSOT,
@@ -192,7 +195,7 @@ class ForceMajeureService:
                     source="force_majeure_transfer",
                     status="waiting",
                     priority=self.TRANSFER_PRIORITY,  # Высокий приоритет
-                    queue_time=datetime.now(UTC)  # Новое время в очереди
+                    queue_time=datetime.now(UTC),  # Новое время в очереди
                 )
 
                 self.db.add(new_entry)
@@ -201,34 +204,35 @@ class ForceMajeureService:
                 entry.status = "cancelled"
                 entry.incomplete_reason = f"Форс-мажор: {reason}"
 
-                transferred.append({
-                    "old_entry_id": entry.id,
-                    "new_entry_id": None,  # Будет заполнено после flush
-                    "patient_name": entry.patient_name,
-                    "phone": entry.phone,
-                    "telegram_id": entry.telegram_id,
-                    "new_number": next_number,
-                    "new_date": str(tomorrow)
-                })
+                transferred.append(
+                    {
+                        "old_entry_id": entry.id,
+                        "new_entry_id": None,  # Будет заполнено после flush
+                        "patient_name": entry.patient_name,
+                        "phone": entry.phone,
+                        "telegram_id": entry.telegram_id,
+                        "new_number": next_number,
+                        "new_date": str(tomorrow),
+                    }
+                )
 
                 # Добавляем в список для уведомлений
                 if entry.phone or entry.telegram_id:
-                    notification_targets.append({
-                        "phone": entry.phone,
-                        "telegram_id": entry.telegram_id,
-                        "patient_name": entry.patient_name,
-                        "new_number": next_number,
-                        "new_date": tomorrow
-                    })
+                    notification_targets.append(
+                        {
+                            "phone": entry.phone,
+                            "telegram_id": entry.telegram_id,
+                            "patient_name": entry.patient_name,
+                            "new_number": next_number,
+                            "new_date": tomorrow,
+                        }
+                    )
 
                 next_number += 1
 
             except Exception as e:
                 logger.error(f"Ошибка при переносе записи {entry.id}: {e}")
-                failed.append({
-                    "entry_id": entry.id,
-                    "error": str(e)
-                })
+                failed.append({"entry_id": entry.id, "error": str(e)})
 
         self.db.flush()
 
@@ -256,7 +260,7 @@ class ForceMajeureService:
             "new_queue_id": tomorrow_queue.id,
             "details": transferred,
             "errors": failed,
-            "reason": reason
+            "reason": reason,
         }
 
     def cancel_entries_with_refund(
@@ -265,7 +269,7 @@ class ForceMajeureService:
         reason: str,
         refund_type: RefundType,
         performed_by_id: int,
-        send_notifications: bool = True
+        send_notifications: bool = True,
     ) -> dict[str, Any]:
         """
         Массовая отмена записей с возвратом средств
@@ -284,7 +288,7 @@ class ForceMajeureService:
             return {
                 "success": True,
                 "cancelled": 0,
-                "message": "Нет записей для отмены"
+                "message": "Нет записей для отмены",
             }
 
         cancelled = []
@@ -312,7 +316,7 @@ class ForceMajeureService:
                             reason=reason,
                             payment_id=payment.id,
                             visit_id=entry.visit_id,
-                            performed_by_id=performed_by_id
+                            performed_by_id=performed_by_id,
                         )
                     else:
                         refund_info = self._create_refund_request(
@@ -322,35 +326,36 @@ class ForceMajeureService:
                             amount=payment.amount,
                             reason=reason,
                             refund_type=refund_type,
-                            is_automatic=True
+                            is_automatic=True,
                         )
                         refund_requests.append(refund_info)
 
-                cancelled.append({
-                    "entry_id": entry.id,
-                    "patient_name": entry.patient_name,
-                    "phone": entry.phone,
-                    "refund_type": refund_type.value if refund_type else None,
-                    "refund_amount": float(payment.amount) if payment else 0,
-                    "refund_info": refund_info
-                })
+                cancelled.append(
+                    {
+                        "entry_id": entry.id,
+                        "patient_name": entry.patient_name,
+                        "phone": entry.phone,
+                        "refund_type": refund_type.value if refund_type else None,
+                        "refund_amount": float(payment.amount) if payment else 0,
+                        "refund_info": refund_info,
+                    }
+                )
 
                 # Добавляем в список для уведомлений
                 if entry.phone or entry.telegram_id:
-                    notification_targets.append({
-                        "phone": entry.phone,
-                        "telegram_id": entry.telegram_id,
-                        "patient_name": entry.patient_name,
-                        "refund_type": refund_type.value if refund_type else None,
-                        "refund_amount": float(payment.amount) if payment else 0
-                    })
+                    notification_targets.append(
+                        {
+                            "phone": entry.phone,
+                            "telegram_id": entry.telegram_id,
+                            "patient_name": entry.patient_name,
+                            "refund_type": refund_type.value if refund_type else None,
+                            "refund_amount": float(payment.amount) if payment else 0,
+                        }
+                    )
 
             except Exception as e:
                 logger.error(f"Ошибка при отмене записи {entry.id}: {e}")
-                failed.append({
-                    "entry_id": entry.id,
-                    "error": str(e)
-                })
+                failed.append({"entry_id": entry.id, "error": str(e)})
 
         self.db.commit()
 
@@ -370,7 +375,7 @@ class ForceMajeureService:
             "refund_requests_created": len(refund_requests),
             "details": cancelled,
             "errors": failed,
-            "reason": reason
+            "reason": reason,
         }
 
     def _get_or_create_queue(self, specialist_id: int, target_date: date) -> DailyQueue:
@@ -382,18 +387,19 @@ class ForceMajeureService:
         прежний путь врача байт-идентично."""
         doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
         if doctor is not None and doctor.specialty:
-            registry_queue = QueueApiRepository(
-                self.db
-            ).get_or_create_registry_queue(
+            registry_queue = QueueApiRepository(self.db).get_or_create_registry_queue(
                 day=target_date, queue_tag=doctor.specialty
             )
             if registry_queue is not None:
                 return registry_queue
 
-        queue = self.db.query(DailyQueue).filter(
-            DailyQueue.specialist_id == specialist_id,
-            DailyQueue.day == target_date
-        ).first()
+        queue = (
+            self.db.query(DailyQueue)
+            .filter(
+                DailyQueue.specialist_id == specialist_id, DailyQueue.day == target_date
+            )
+            .first()
+        )
 
         if not queue:
             # Получаем информацию о специалисте
@@ -407,7 +413,10 @@ class ForceMajeureService:
                 queue_tag=queue_tag,
                 active=True,
                 **daily_queue_creation_snapshot(
-                    self.db, doctor=doctor, queue_tag=queue_tag
+                    self.db,
+                    day=target_date,
+                    doctor=doctor,
+                    queue_tag=queue_tag,
                 ),
             )
             self.db.add(queue)
@@ -428,10 +437,11 @@ class ForceMajeureService:
                 "Queue entry visit does not belong to the queue patient"
             )
 
-        return self.db.query(Payment).filter(
-            Payment.visit_id == entry.visit_id,
-            Payment.status == "paid"
-        ).first()
+        return (
+            self.db.query(Payment)
+            .filter(Payment.visit_id == entry.visit_id, Payment.status == "paid")
+            .first()
+        )
 
     def _add_to_deposit(
         self,
@@ -440,22 +450,22 @@ class ForceMajeureService:
         reason: str,
         payment_id: int,
         visit_id: int | None,
-        performed_by_id: int
+        performed_by_id: int,
     ) -> dict[str, Any]:
         """Добавить средства на депозит пациента"""
         from decimal import Decimal
+
         amount_decimal = Decimal(str(amount))
 
         # Получаем или создаём депозит пациента
-        deposit = self.db.query(PatientDeposit).filter(
-            PatientDeposit.patient_id == patient_id
-        ).first()
+        deposit = (
+            self.db.query(PatientDeposit)
+            .filter(PatientDeposit.patient_id == patient_id)
+            .first()
+        )
 
         if not deposit:
-            deposit = PatientDeposit(
-                patient_id=patient_id,
-                balance=amount_decimal
-            )
+            deposit = PatientDeposit(patient_id=patient_id, balance=amount_decimal)
             self.db.add(deposit)
         else:
             deposit.balance += amount_decimal
@@ -471,7 +481,7 @@ class ForceMajeureService:
             description=f"Возврат (форс-мажор): {reason}",
             payment_id=payment_id,
             visit_id=visit_id,
-            performed_by=performed_by_id
+            performed_by=performed_by_id,
         )
         self.db.add(transaction)
 
@@ -479,7 +489,7 @@ class ForceMajeureService:
             "type": "deposit",
             "deposit_id": deposit.id,
             "amount": float(amount_decimal),
-            "new_balance": float(deposit.balance)
+            "new_balance": float(deposit.balance),
         }
 
     def _create_refund_request(
@@ -490,10 +500,11 @@ class ForceMajeureService:
         amount: float,
         reason: str,
         refund_type: RefundType,
-        is_automatic: bool = False
+        is_automatic: bool = False,
     ) -> dict[str, Any]:
         """Создать заявку на возврат"""
         from decimal import Decimal
+
         amount_decimal = Decimal(str(amount))
 
         refund_request = RefundRequest(
@@ -506,7 +517,7 @@ class ForceMajeureService:
             refund_type=refund_type.value,
             status=RefundRequestStatus.PENDING.value,
             reason=reason,
-            is_automatic=is_automatic
+            is_automatic=is_automatic,
         )
         self.db.add(refund_request)
         self.db.flush()
@@ -515,13 +526,11 @@ class ForceMajeureService:
             "type": "refund_request",
             "request_id": refund_request.id,
             "amount": float(amount_decimal),
-            "status": refund_request.status
+            "status": refund_request.status,
         }
 
     def _send_transfer_notifications(
-        self,
-        targets: list[dict[str, Any]],
-        reason: str
+        self, targets: list[dict[str, Any]], reason: str
     ) -> None:
         """Отправить уведомления о переносе"""
         for target in targets:
@@ -536,7 +545,7 @@ class ForceMajeureService:
                 )
 
                 # Отправка через Telegram
-                if target.get('telegram_id'):
+                if target.get("telegram_id"):
                     try:
                         # TODO: Интеграция с Telegram service
                         pass
@@ -550,16 +559,14 @@ class ForceMajeureService:
                 logger.error(f"Ошибка отправки уведомления: {e}")
 
     def _send_cancellation_notifications(
-        self,
-        targets: list[dict[str, Any]],
-        reason: str
+        self, targets: list[dict[str, Any]], reason: str
     ) -> None:
         """Отправить уведомления об отмене"""
         for target in targets:
             try:
                 refund_info = ""
-                if target.get('refund_amount') and target['refund_amount'] > 0:
-                    if target.get('refund_type') == 'deposit':
+                if target.get("refund_amount") and target["refund_amount"] > 0:
+                    if target.get("refund_type") == "deposit":
                         refund_info = (
                             f"\n💰 Средства ({target['refund_amount']:,.0f} UZS) "
                             f"зачислены на ваш депозит в клинике."
@@ -579,7 +586,7 @@ class ForceMajeureService:
                 )
 
                 # Отправка через Telegram
-                if target.get('telegram_id'):
+                if target.get("telegram_id"):
                     try:
                         # TODO: Интеграция с Telegram service
                         pass
