@@ -1,5 +1,7 @@
 import React, { type CSSProperties, type FocusEvent, type MouseEvent, type ComponentType } from 'react';
 import { XCircle } from 'lucide-react';
+import { useTranslation } from '@/i18n/useTranslation';
+import Tooltip from './Tooltip';
 type InputSize = 'sm' | 'md' | 'lg';
 type InputVariant = 'default' | 'filled' | 'error';
 type IconPosition = 'left' | 'right';
@@ -44,6 +46,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   onClear,   // Extract to prevent passing to input
   ...props
 }, ref) => {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = React.useState<boolean>(false);
   const sizeStyles: Record<InputSize, CSSProperties> = {
     sm: {
@@ -183,34 +186,35 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
         {...props}
       />
       {showClearButton && (
-        <button
-          type="button"
-          aria-label="Clear input"
-          title="Clear input"
-          style={clearButtonStyle}
-          onClick={(e: MouseEvent<HTMLButtonElement>) => {
-            e.stopPropagation();
-            onClear?.();
-          }}
-          onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.color = 'var(--mac-text-secondary)';
-            e.currentTarget.style.opacity = '1';
-          }}
-          onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.color = 'var(--mac-text-tertiary)';
-            e.currentTarget.style.opacity = '0.7';
-          }}
-          onFocus={(e: FocusEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.boxShadow = '0 0 0 2px var(--mac-accent-blue)';
-            e.currentTarget.style.opacity = '1';
-          }}
-          onBlur={(e: FocusEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.boxShadow = 'none';
-            e.currentTarget.style.opacity = '0.7';
-          }}
-        >
-          <XCircle size={16} />
-        </button>
+        <Tooltip content={t('clear_input', { defaultValue: 'Clear input' })}>
+          <button
+            type="button"
+            aria-label={t('clear_input', { defaultValue: 'Clear input' })}
+            style={clearButtonStyle}
+            onClick={(e: MouseEvent<HTMLButtonElement>) => {
+              e.stopPropagation();
+              onClear?.();
+            }}
+            onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
+              e.currentTarget.style.color = 'var(--mac-text-secondary)';
+              e.currentTarget.style.opacity = '1';
+            }}
+            onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
+              e.currentTarget.style.color = 'var(--mac-text-tertiary)';
+              e.currentTarget.style.opacity = '0.7';
+            }}
+            onFocus={(e: FocusEvent<HTMLButtonElement>) => {
+              e.currentTarget.style.boxShadow = '0 0 0 2px var(--mac-accent-blue)';
+              e.currentTarget.style.opacity = '1';
+            }}
+            onBlur={(e: FocusEvent<HTMLButtonElement>) => {
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.opacity = '0.7';
+            }}
+          >
+            <XCircle size={16} />
+          </button>
+        </Tooltip>
       )}
     </div>
   );
