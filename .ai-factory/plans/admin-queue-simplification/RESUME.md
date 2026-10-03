@@ -1,7 +1,7 @@
 # Resume — admin queue simplification
 
 Plan version: 2.6
-Last updated: 2026-10-03T23:10:52+05:00, Asia/Tashkent
+Last updated: 2026-10-03T23:13:05+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
 ## Current continuation checkpoint — T08.2b
@@ -14,7 +14,8 @@ Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576
 - First-touch docs only: canonical plan, PROGRESS, RESUME, DECISIONS, EVIDENCE, and one factual append to `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md`. Runtime sources and tests are read-only. Target validation: source/route coverage table plus `git diff --check`; stop if any uncovered successful writer, ambiguous partial-result behavior, or need for wider runtime/API scope appears.
 - PostgreSQL concurrency/replay/partial-result proof remains T08.3. Availability/report parity remains T08.2c. `QUEUE_POLICY_V2_CREATION_ENABLED` stays default-off; staging and production were not used.
 - The local PR review body gate passed (19 unit checks, both documented samples, and the current body); `git diff --check` passed. No runtime tests were applicable.
-- Next exact action: commit and open this inventory PR; wait for merge, then sync a fresh worktree from `origin/main` before T08.2c.
+- PR #3581 is OPEN: https://github.com/drsapaev/final/pull/3581. It was created from branch `codex/aqs-T08.2b-admission`, base `4e6f125f17c637fc27296e2d0ec9d23f5d376775`, initial evidence commit `f12b30abb193c27259ef865fe44c71841a74e240`. This journal checkpoint will advance its HEAD; inspect live HEAD/checks after the push.
+- Next exact action: verify applicable checks on PR #3581's latest HEAD and wait for merge, then sync a fresh worktree from `origin/main` before T08.2c.
 
 ## Historical continuation checkpoint — T08.2a (merged)
 
