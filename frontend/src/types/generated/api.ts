@@ -16858,13 +16858,14 @@ export type paths = {
          *     total_cost=None — цена не хранится в ЭМК, и строки закрытой
          *     legacy-таблицы derma_procedures, source="legacy"), материализуемая
          *     при записи, а не пересчитываемая в памяти на каждый запрос.
-         *     Канонический ключ записи — specialty_data.cosmetic_procedures
-         *     (решение P3 по реконсиляции #3490/#3491); legacy-ключ
-         *     specialty_data.procedures читается проекцией временно как alias
-         *     (Phase A): полный union без скрытия строк, записи без стабильного ID
-         *     не дедуплицируются по содержимому — возможные дубликаты устраняются
-         *     в Phase B (миграция данных с журналированием), удаление алиаса —
-         *     Phase C (после аудита хранимых данных).
+         *     Канонический ключ записи — единственный —
+         *     specialty_data.cosmetic_procedures (решение P3 по реконсиляции
+         *     #3490/#3491; Phase A временно читала legacy-ключ
+         *     specialty_data.procedures как READ-alias, Phase C алиас удалила:
+         *     projection и граница записи emr_contract.normalize_emr_data
+         *     работают только с каноническим ключом, наличие данных под
+         *     legacy-ключом в активных записях исключено Phase B verify-gate —
+         *     scripts/audit_derma_legacy_procedures.py).
          *     Скоупинг пациентов идентичен прежнему контракту. Пагинация —
          *     канонический конверт page/size/total/pages (контракт GET /files):
          *     total точен по обоим источникам, без скрытых усечений.
