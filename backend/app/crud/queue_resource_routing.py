@@ -35,6 +35,7 @@ pairs (QD-2E) — the legacy fallback paths here keep working until E.
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import Any
 
@@ -42,6 +43,8 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.models.online_queue import DailyQueue, QueueResource
+
+logger = logging.getLogger(__name__)
 
 
 def resolve_tag_resource(db: Session, queue_tag: str | None) -> QueueResource | None:
@@ -123,6 +126,65 @@ def find_active_tag_queue(db: Session, day: date, queue_tag: str) -> DailyQueue 
         )
         .order_by(DailyQueue.id.asc())
         .first()
+    )
+
+
+def ensure_daily_queue_identity_is_new(
+    db: Session,
+    *,
+    day: date,
+    specialist_id: int | None,
+    queue_resource_id: int | None,
+    queue_tag: str | None,
+) -> None:
+    """Reject a v1 replacement queue for any existing owner/day identity.
+
+    Active-row lookups are the normal reuse path. This second guard also
+    considers inactive rows: a newly inserted row would otherwise restart
+    the persisted online-issuance counter for the same canonical identity.
+    Doctor and resource identifiers are queried on separate owner axes.
+    """
+    if (specialist_id is None) == (queue_resource_id is None):
+        raise ValueError("daily queue identity requires exactly one owner")
+
+    owner_type = "doctor" if specialist_id is not None else "resource"
+    owner_id = specialist_id if specialist_id is not None else queue_resource_id
+    logger.debug(
+        "Checking DailyQueue v1 identity day=%s owner_type=%s owner_id=%s",
+        day,
+        owner_type,
+        owner_id,
+    )
+
+    query = db.query(DailyQueue).filter(DailyQueue.day == day)
+    if specialist_id is not None:
+        query = query.filter(DailyQueue.specialist_id == specialist_id)
+        if queue_tag is None:
+            query = query.filter(DailyQueue.queue_tag.is_(None))
+        else:
+            query = query.filter(DailyQueue.queue_tag == queue_tag)
+    else:
+        query = query.filter(DailyQueue.queue_resource_id == queue_resource_id)
+
+    existing = query.order_by(DailyQueue.id.asc()).first()
+    if existing is not None:
+        logger.warning(
+            "DailyQueue v1 replacement blocked day=%s owner_type=%s "
+            "owner_id=%s existing_queue_id=%s",
+            day,
+            owner_type,
+            owner_id,
+            existing.id,
+        )
+        raise ValueError(
+            "an existing daily queue identity must be reviewed before "
+            "a replacement can be created"
+        )
+    logger.debug(
+        "DailyQueue v1 identity available day=%s owner_type=%s owner_id=%s",
+        day,
+        owner_type,
+        owner_id,
     )
 
 
