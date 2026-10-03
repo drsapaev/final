@@ -83,3 +83,17 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - Headline impact: Tier 2 remains PARTIAL; 0 of 3 deferred named specs is completed. No overall completion percentage is inferred. Deferral adds no coverage.
 - Remaining gates: full ten-item STAGING_VALIDATION.md is mandatory pre-deploy and NOT waived. New-head required CI still applies. No deployment, flag activation, merge or independent human GitHub approval is performed by this decision. T07 remains PR_OPEN until a merge is confirmed.
 - Identity constraint: CLI and connector both authenticate as author drsapaev. Technical APPROVE is recorded via COMMENT; GitHub self-APPROVE is unavailable.
+
+## T07 merge and T08 sub-slice — 2026-10-03T18:49:47+05:00
+
+- User confirmed they merged PR #3557. GitHub reports PR state MERGED at 2026-10-03T13:30:30Z, HEAD f5ad17e51db8def21162f2876b26853b09902ca8, merge commit 425df11c7a84f0d1e7954df0d00415927212669a, base f1be5697dbc487d792e8d5ae60db53c079bbe638.
+- Exact PR-head CI finished with 27 SUCCESS, 12 SKIPPED, 0 failures. Skips remain NOT_RUN.
+- Earlier explicit user-delegated decision accepting #3557's named-spec deferral remains PR-specific. The three named E2E specs remain NOT_RUN for T18; full docs/runbooks/STAGING_VALIDATION.md remains mandatory before deployment. Feature flag remains default-off.
+- Technical execution choice: split T08.1 into T08.1a (atomic quota at canonical token admission) and T08.1b (identity/recreation protection across constructors). T08.2 remains direct adapters/reports; T08.3 remains PostgreSQL concurrency/replay/partial-result evidence. This decomposition preserves the accepted T08 contract and does not change product semantics.
+- T08.1a first patch is restricted to backend/app/services/queue_svc/_operations.py, its focused queue-claim/quota unit tests, and the plan's progress/evidence documents. GraphQL direct writer and non-token adapters are explicitly reserved for T08.2. No migration/model/feature-flag change is in this slice.
+
+## T08.1a implementation interpretation — 2026-10-03T19:11:22+05:00
+
+- Technical choice derived from user decision D1 and the canonical plan: for policy_version=daily_online_issuances_v1, capacity is based only on the persisted successful independent online issuance count, including zero as a real limit. The same predicate governs doctor bookability and final token admission; legacy queues keep their existing active-entry-count behavior.
+- The count changes only after a new token admission has created its entry, while the selected DailyQueue row is already locked and before the current transaction is committed/flushed. Existing replay returns before this path; rollback includes entry, count and token-use. No cancellation/status/delete path decrements the count.
+- This implementation choice applies only to the canonical token path in T08.1a. Direct GraphQL writers, reports, creation/recreation identity protection and PostgreSQL concurrency remain separate planned gates. It does not authorize enabling the v1 creation flag.

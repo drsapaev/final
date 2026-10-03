@@ -13,6 +13,7 @@ from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import expand_queue_tags
 from app.crud import queue_resource_routing
 from app.crud.daily_queue_creation_policy import (
+    ONLINE_ISSUANCES_V1_POLICY_VERSION,
     daily_queue_creation_snapshot,
     evaluate_online_admission_window,
     online_admission_window,
@@ -54,8 +55,8 @@ def _unbookable_doctor_ids(
     - same-day joins outside the queue's effective online window: not bookable;
     - the per-(day, doctor, tag) queue already OPENED reception
       (``opened_at`` set, same-day only): not bookable;
-    - the per-(day, doctor, tag) queue reached its online cap
-      (active waiting+called entries >= max slots): not bookable.
+    - a v1 queue reached its persisted successful-online-issuance cap, or a
+      legacy queue reached its active waiting+called-entry cap: not bookable.
 
     Doctors WITHOUT a matching queue row are bookable — the join creates
     their queue with ``opened_at = NULL`` and zero entries (exactly what
@@ -118,6 +119,10 @@ def _unbookable_doctor_ids(
             unbookable.add(doctor_id)
             continue
         if queue is None:
+            continue
+        if queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+            if queue.online_issued_count >= queue.max_online_entries:
+                unbookable.add(doctor_id)
             continue
         # Codex round-2 P2: DailyQueue persists the online cap as
         # ``max_online_entries`` (dev_seed sets 20, legacy crud honors it);
@@ -249,6 +254,15 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         Returns:
             (is_allowed, message)
         """
+        if daily_queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+            max_slots = daily_queue.max_online_entries
+            if daily_queue.online_issued_count >= max_slots:
+                return (
+                    False,
+                    f"🚫 Достигнут лимит мест ({max_slots}). Обратитесь в регистратуру.",
+                )
+            return True, ""
+
         current_entries = (
             db.query(OnlineQueueEntry)
             .filter(
@@ -1938,6 +1952,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             auto_number=True,
             commit=False,
         )
+
+        if daily_queue.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+            daily_queue.online_issued_count += 1
 
         self._increment_token_usage(token_obj)
         if commit:

@@ -1302,3 +1302,66 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR: https://github.com/drsapaev/final/pull/3557. No merge commit.
 
 - Local validation: git diff --check PASS; run_pr_review_gate_checks.py PASS (19 unit tests, both documented samples and actual updated PR body). Only the four declared plan-memory documents changed.
+
+## T07 merge and T08 gate/source audit — 2026-10-03T18:49:47+05:00
+
+- T07 commit under review: f5ad17e51db8def21162f2876b26853b09902ca8; PR #3557 merged by user; merge commit 425df11c7a84f0d1e7954df0d00415927212669a; base f1be5697dbc487d792e8d5ae60db53c079bbe638.
+- Merge verification: GitHub reports MERGED; final applicable CI completed 27 SUCCESS / 12 SKIPPED / 0 failures.
+- T07 Tier 2: bounded deferral accepted under user delegation for admin-navigation.spec.ts, queue-system.spec.ts, and panel-qa-admin-live.spec.ts; each remains NOT_RUN. Full ten-item pre-deploy checklist remains NOT_RUN and mandatory before deployment. No v1 flag activation.
+- T08 execution mode: mandatory gate because quota/admission locking and persistent PostgreSQL state are sensitive.
+- Gate result: first prompt mapped to ops/backend.entrypoint.sh, staging Dockerfiles and Compose. One retry used --known-root-cause backend/app/services/queue_domain_service.py; result narrow_override, gate_misroute=true, override_used=true, with the same unrelated packaging paths. Source confirms queue_domain_service.py:allocate_ticket is a compatibility delegate, not the runtime owner. QueueBusinessService.join_queue_with_token is implemented in backend/app/services/queue_svc/_operations.py.
+- Override basis: the user-approved canonical T08 plan explicitly names the queue allocator, token operation, claim/resource locks, adapters and PG validation. This source-grounded plan is the repo-approved basis for a manual narrow scope; no third gate attempt is permitted or needed for this slice. Gate fields: gate_misroute=true, override_used=true, known_root_cause_file=backend/app/services/queue_domain_service.py (gate input; actual implementation owner corrected above).
+- Current source facts:
+  - /api/v1/queue/join, /api/v1/online-queue/join, QR completion, and permanent-direction sessions use QueueBusinessService.join_queue_with_token.
+  - Token method resolves claim/replay before new admission, acquires existing tag/day claim locks, locks and refreshes the DailyQueue row, then checks time/capacity, creates the entry with commit=False, updates token usage, and commits or lets the QR session own the one outer transaction.
+  - check_queue_limits currently counts only waiting/called rows and uses a legacy falsy-cap fallback; it has one token-flow call site. It does not use online_issued_count.
+  - online_issued_count is currently initialized to zero by queue creation; no runtime increment or decrement path was found. The mapped nonnegative column is already present from T06.
+  - GraphQL _join_queue_impl is a separate direct writer: it row-locks, counts active entries, inserts OnlineQueueEntry(source="online"), and commits. Reserved for T08.2.
+  - Registrar/staff/derivative writers call create_queue_entry or related services directly. Source labels alone are not proof of independent online issuance; keep them out of T08.1a.
+  - Telegram webhook feeds a reachable queue_* callback, but the handler invokes QueueBusinessService.join_queue, a method absent from that class. It catches the resulting exception before any queue DB write. Classify as reachable broken UI flow, not a successful issuance writer; do not rehabilitate it as part of quota work.
+- T08.1a allowed paths: backend/app/services/queue_svc/_operations.py; focused test changes under backend/tests/unit/ for canonical token admission/quota; .ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,DECISIONS,EVIDENCE}.md.
+- T08.1a denied paths: GraphQL and other non-token adapters/reports (T08.2), queue creation constructors/identity guard (T08.1b), models/Alembic, feature flag, Telegram, staff/transfer/clone code, staging/production, unrelated cleanup.
+- Narrow validation target: v1 check uses the persisted count and exact cap including zero; only a new successful token admission increments; duplicate path does not; commit=False rollback removes entry/count/token-usage together; legacy capacity behavior remains unchanged. Run the focused test file and adjacent claim/window regressions, then git diff --check.
+- First stop condition: quota increment cannot share the entry/token/QR outcome transaction, an existing replay is charged, a source-based staff derivative is charged, or any path in this slice bypasses the locked daily queue.
+- Initial T08 worktree at 425df11c7a84f0d1e7954df0d00415927212669a was clean. No application code was edited before this scope and source audit.
+
+## T08.1a local implementation checkpoint — 2026-10-03T19:18:04+05:00
+
+- Runtime/test commit under test: e0ebcfb756cf1ff31093c5905aed9b937a2fa769 on base 473138216ae040c1c7fa60e92334d33ef8a0b856. The plan/evidence checkpoint is still an uncommitted working-tree change; PR not yet created.
+- Environment: Windows worktree C:\final\_wt_aqs_t081_quota; Python 3.11.9; pytest 8.4.2. The conftest uses its own temporary SQLite test database. DATABASE_URL=sqlite:// and TESTING=1 were set only to satisfy import-time application engine initialization; no production/staging database was contacted.
+- Execution mode: mandatory gate; first invocation and the sole known-root retry misrouted. Manual narrow scope is based on the user-approved T08 plan; exact gate fields and source correction are in the previous T07 merge/T08 source-audit section and Task 100 of EVIDENCE_LIGHTRAG_READINESS.md.
+- Allowed paths: backend/app/services/queue_svc/_operations.py; backend/tests/unit/test_queue_join_claim_coordinator.py; plan DECISIONS/EVIDENCE/PROGRESS/RESUME; the single gate-misroute evidence append. Actual changed paths match this list.
+- Original failure: before the runtime change, all three v1 limit cases reached the legacy active-entry query and failed comparing an unconfigured Mock count; the end-to-end successful v1 admission left online_issued_count at 0 instead of 1.
+- Change: v1 final admission and doctor-selection bookability now use online_issued_count >= max_online_entries without a falsy-cap fallback. A new independent token entry increments the locked queue's counter after entry creation and before the existing commit/flush. Legacy behavior and all other writers are unchanged.
+- Validation command: scripts/run_backend_pytest.ps1 tests/unit/test_queue_join_claim_coordinator.py tests/unit/test_online_admission_window.py tests/integration/test_qr_least_loaded_routing.py -q — PASS, 64 passed, 1 warning. SQLite test fixture only; no concurrency claim.
+- Validation: changed-path Ruff check PASS; compileall of both changed Python files PASS; test file Ruff format check PASS; git diff --check PASS. Ruff format --check for _operations.py is NOT_PASS because it reports many full-file formatting changes in untouched legacy sections. The first commit-hook run stopped after ruff-format rewrote that file; a retry skipping only ruff-format then stopped after Black rewrote the same file. Those exact formatter diffs were reversed against the staged patch. Final commit used SKIP=ruff-format,black; all remaining hooks passed (large-file, conflict, private-key, YAML/JSON/TOML, EOF, whitespace, branch guard, gitleaks and Ruff). No unrelated formatting changes were accepted.
+- Scope check: only canonical token admission, its doctor-bookability predictor, and focused unit tests changed. GraphQL/direct writers, reporting, identity/recreation guards, schema, flags, Telegram, production and staging were not changed.
+- Remaining limitation: PostgreSQL last-slot concurrency/replay/partial-result evidence is NOT_RUN and remains T08.3. Adapter/report parity and identity recreation remain T08.2/T08.1b. Staging/browser and full pre-deploy validation are NOT_RUN. V1 flag remains default-off.
+- Result: local sub-slice validated; status remains T08 IN_PROGRESS. Exact-head CI/review/PR and the PR-cycle completion are pending.
+- PR: not created at this checkpoint.
+- Merge commit: none.
+
+## T08.1a PR opened — 2026-10-03T19:21:09+05:00
+
+- Runtime/test commit: e0ebcfb756cf1ff31093c5905aed9b937a2fa769.
+- Documentation checkpoint present at PR creation: e8bedbc3ccd1cd07e91cc000ddc9d9a2d4790b8a.
+- PR: https://github.com/drsapaev/final/pull/3571; state OPEN; base main; PR creation head e8bedbc3ccd1cd07e91cc000ddc9d9a2d4790b8a. The subsequent evidence checkpoint commit will move the branch head; verify the live GitHub head before reporting CI.
+- PR scope: T08.1a canonical token admission only. No schema/migration, direct GraphQL writer, identity/recreation guard, report, staging, production or feature flag change.
+- Tier 2: no staging deferral requested or claimed for this backend-only slice. The full ten-item pre-deploy runbook remains mandatory. PostgreSQL concurrency is NOT_RUN and remains a T08.3 gate before v1 rollout.
+- Review/checks: no review verdict is recorded at PR creation. Exact-head required checks must be read after the current progress checkpoint is pushed.
+- Merge commit: none.
+
+## T08.1a corrected PR body and exact-head CI checkpoint — 2026-10-03T19:33:00+05:00
+
+- Commit under test: current PR HEAD `d13505357ac7701345b14896f6b1f7b4c0b22cbe`; runtime/test commit remains `e0ebcfb756cf1ff31093c5905aed9b937a2fa769`; base `473138216ae040c1c7fa60e92334d33ef8a0b856`.
+- Environment: GitHub PR #3571 plus Windows worktree `C:\final\_wt_aqs_t081_quota`; no staging or production environment used.
+- Execution mode: PR metadata/quality-gate correction and read-only status verification; no runtime code changed.
+- Allowed paths: PR description and T08.1a progress/resume/evidence checkpoint. Actual runtime/test paths are unchanged.
+- Original failure: initial GitHub PR Review Quality Gate found required headings and Validation fields missing from the first PR body. After correction, rerunning the original workflow event still used its immutable initial body snapshot and failed again. A fresh `pull_request.edited` event then validated the corrected current body successfully.
+- Validation command: `scripts/run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py', '--body-file', '.pr-body-T08.1a.md')` — PASS (19 gate tests, documented samples and actual PR body). GitHub PR Review Quality Gate run `37129646426` — SUCCESS on HEAD `d13505357ac7701345b14896f6b1f7b4c0b22cbe`.
+- Exact-head CI: Unified pipeline run `37129318025` is in progress on `d13505357ac7701345b14896f6b1f7b4c0b22cbe`. At checkpoint, Backend tests, Code Quality and Context Boundary Integrity were running; front-end-only and path-specific jobs were skipped. Other current checks: CodeQL (actions, Python and JavaScript), gitleaks, GitGuardian, security scan and lifecycle recommendation passed. The stale-body quality-gate failure is superseded by the fresh-event success; the canceled intermediate edit-event run is not a pass.
+- Result: PR body gate fixed and passed; overall PR cycle remains OPEN/PENDING until exact-head Unified CI completes. PR review list is empty; no separate human review verdict is claimed. Tier 2 staging deferral is not applicable or claimed for this backend-only PR.
+- Scope check: no source, test, schema, feature flag, staging, production or patient data changed in this checkpoint.
+- Remaining limitation: PostgreSQL last-slot concurrency/replay/partial-result proof remains NOT_RUN for T08.3 and is required before v1 rollout. GraphQL/direct-writer parity and identity/recreation protection remain separate planned subtasks. QUEUE_POLICY_V2_CREATION_ENABLED remains default-off.
+- PR: https://github.com/drsapaev/final/pull/3571.
+- Merge commit: none.
