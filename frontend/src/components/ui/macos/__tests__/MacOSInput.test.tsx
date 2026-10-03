@@ -79,6 +79,44 @@ describe('Input', () => {
     expect(screen.getByRole('button', { name: 'Tozalash' })).toBeInTheDocument();
   });
 
+  it('localizes kk natively instead of the carried-over Russian string (kk → Тазалау)', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('kk');
+    });
+
+    render(
+      <Input
+        value="hello"
+        onChange={() => {}}
+        clearable
+        onClear={() => {}}
+      />,
+    );
+
+    // Exact native Kazakh string: the pre-R38-3 value was the Russian
+    // "Очистить", so this assertion can never pass against it.
+    expect(screen.getByRole('button', { name: 'Тазалау' })).toBeInTheDocument();
+  });
+
+  it('localizes uz-Cyrl natively instead of the carried-over Russian string (uz-Cyrl → Тозалаш)', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('uz-Cyrl');
+    });
+
+    render(
+      <Input
+        value="hello"
+        onChange={() => {}}
+        clearable
+        onClear={() => {}}
+      />,
+    );
+
+    // Exact native Cyrillic Uzbek string: the pre-R38-3 value was the
+    // Russian "Очистить", so this assertion can never pass against it.
+    expect(screen.getByRole('button', { name: 'Тозалаш' })).toBeInTheDocument();
+  });
+
   it('does not render a clear button when there is no value (ru)', async () => {
     await act(async () => {
       await i18n.changeLanguage('ru');
