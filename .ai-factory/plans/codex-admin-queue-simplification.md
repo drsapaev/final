@@ -1,13 +1,17 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 2.9 — T08.2b / #3581 merged; T08.2c PR #3596 open, corrected exact head awaiting checks.
-**Создан:** 30 сентября 2026. **Обновлён:** 4 октября 2026, 08:31 Asia/Tashkent.
+**Версия:** 3.0 — T08.2c / #3596 merged; bounded T08.3.1 PostgreSQL proof is locally validated.
+**Создан:** 30 сентября 2026. **Обновлён:** 5 октября 2026, 00:19 Asia/Tashkent.
+**Current task:** T08.3.1 — real PostgreSQL last-slot/replay/rollback proof for the legacy queue-token admission boundary.
+**Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-pg-proof\final`; branch `codex/aqs-T08.3-pg-proof`; base `origin/main` = `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`.
+**Scope:** one focused PG integration module plus these plan/checkpoint journals. Runtime, model, migration, feature flag, frontend, Docker/Compose and staging/production changes are not authorized by this subtask. V1 creation remains default-off.
+> Older T08.2c worktree, PR-open status and pending-check metadata below are historical and superseded by the confirmed #3596 merge.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Последний подтверждённый runtime merge:** `1ed6d05874c2ea205a625bb70879adb10b077be4`, PR #3576 / T08.2a; последующий документальный T08.2b PR #3581 merged as `742bf08bd82da5f2ab8160ce474bdeab5694aa26`.
 **Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; PR [#3596](https://github.com/drsapaev/final/pull/3596). Report implementation `718d4d65c5717528e8a93fb819fdf328c63bf772`; future-date compatibility fix `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`; OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`. Focused local checks pass (85 unit/OpenAPI, 4 selected integration). The docs-freshness CI failure on `fd9b1c793` was due to a final CRLF in the generated snapshot; it is removed to match exact app serialization. New exact-head checks pending.
 
-> **T00–T07, T08.1a, T08.1b, T08.2a и T08.2b — MERGED; T08.2c / PR #3596 OPEN; T08.3–T18 — PLANNED.** PR #3581 merged as `742bf08bd82da5f2ab8160ce474bdeab5694aa26`. T08.2c aligns read-side quota facts across public availability, QR, Admin status and aggregate limits, preserving advisory future-date semantics. Focused local tests pass; PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
+> **T00–T07, T08.1a, T08.1b, T08.2a, T08.2b и T08.2c — MERGED; T08.3.1 — VALIDATED locally, PR pending; T08.3.2–T08.3.3 and T09–T18 — PLANNED.** PR #3596 merged at `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`. T08.3.1 real-PostgreSQL local proof passed; later T08.3 QR-session/partial-result and direct GraphQL/lifecycle proofs remain pending. Staging/browser and production are outside this subtask.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -329,6 +333,30 @@ T08.1b implementation boundary: v1 identity check belongs on the shared `daily_q
 **Reporting:** queue length/issued/remaining/version раздельно; v1 remaining=max(0,max-count); legacy count unknown.
 **Stop:** active writer bypass/reset/no required PG/Telegram требует другого product contract. Допустим bounded adapter slice, не общий bot rewrite.
 **Evidence/logs:** writer coverage/transaction proof; safe WARN quota/identity, ERROR transaction, без tokens/patients.
+
+### T08.3 execution split — PostgreSQL proof checkpoints
+
+T08.3 spans several independent admission transaction owners. To keep each PR bounded and preserve a clear resume point, implement and merge these sub-tasks in order. Every sub-task uses synthetic rows and independent real PostgreSQL sessions; SQLite is not lock evidence. The creation flag remains default-off throughout.
+
+#### T08.3.1 — Legacy queue-token admission transaction
+
+**Status:** VALIDATED locally from base `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`; PR and exact-head CI pending.
+**Owner:** `backend/tests/integration/test_daily_queue_lock_parity_pg.py`; runtime is read-only.
+**Required proof:** independent token admissions contend for the last v1 daily-queue slot and produce exactly one new online entry/counter increment; a repeated exact-token identity returns the existing ticket with no second increment after the cap is full; rollback removes the uncommitted entry and restores the v1 counter and token usage together.
+**Stop:** runtime defect, missing shared quota boundary, ambiguous token/identity contract, or unavailable disposable PostgreSQL. Do not expand into runtime edits under this slice.
+**Evidence:** focused PostgreSQL module 5 passed; the two added tests separately proved one issuance at the last slot, no second counter increment on exact-token replay at a full cap, and rollback of entry/counter/token usage. Existing queue policy, GraphQL claim coordinator and online-window unit modules passed 65 tests. First local PG attempt was interrupted by a normal WSL Docker daemon shutdown; stable rerun completed all five tests. See `admin-queue-simplification/EVIDENCE.md` for exact commands/environment and limitations.
+
+#### T08.3.2 — QR join-session transaction and partial batches
+
+**Status:** PLANNED; depends on T08.3.1 merge.
+**Owner candidates:** `services/qr_queue/_sessions.py`, existing QR-session PG test owner or one newly gated focused test module.
+**Required proof:** lost-response replay returns the saved response without a second issuance; single/multiple queue writes and replay snapshot share the existing outer transaction; a permitted partial result commits only successful elements and accurately reports rejected elements/counter totals. Preserve the existing partial-result contract.
+
+#### T08.3.3 — Direct GraphQL and remaining reachable writer parity
+
+**Status:** PLANNED; depends on T08.3.2 merge.
+**Owner candidates:** `backend/app/graphql/mutations.py` plus a focused real-PG test owner and the T08.3 writer coverage table.
+**Required proof:** direct GraphQL last-slot behavior and a source-backed inventory of compatibility/API adapters; status changes, desk derivatives, transfers, deletion and replay never decrease/re-spend the independent issuance counter. Include only adapters proven mounted/reachable. If the legacy `/queue` writer lacks a quota boundary, stop and create a separately gated runtime sub-task.
 
 ### T09. Безопасная смена сегодняшнего кабинета
 
