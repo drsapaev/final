@@ -72,6 +72,11 @@ const en = {
     density_comfortable: 'Comfortable',
     density_spacious: 'Spacious',
   },
+  pagination: {
+    firstPage: 'First page',
+    page: 'Page {{page}}',
+    lastPage: 'Last page',
+  },
   common: {
     clear: 'Clear input',
     save: 'Сохранить',
