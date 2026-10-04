@@ -383,6 +383,54 @@ def test_concrete_qr_reports_v1_quota_from_persisted_issuances(db_session, monke
 
 
 @pytest.mark.unit
+def test_concrete_qr_keeps_future_date_advisory_available_at_quota(
+    db_session, monkeypatch
+):
+    import app.crud.clinic as clinic_crud
+    import app.services.qr_queue_service as qr_queue_service_module
+    import app.services.queue_service as queue_service_module
+    from app.models.clinic import Doctor
+    from app.models.online_queue import QueueToken
+    from app.services.qr_queue import QRQueueService
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.delenv("DISABLE_QUEUE_TIME_RESTRICTIONS", raising=False)
+    _fixed_tashkent_time(monkeypatch, queue_service_module, hour=8)
+    _fixed_tashkent_time(monkeypatch, qr_queue_service_module, hour=8)
+
+    doctor = Doctor(specialty="cardiology")
+    db_session.add(doctor)
+    db_session.flush()
+    future_day = date(2030, 1, 3)
+    queue = _make_v1_queue(db_session, day=future_day, doctor=doctor)
+    queue.max_online_entries = 1
+    queue.online_issued_count = 1
+    token = QueueToken(
+        token="synthetic-v1-future-quota-report",
+        day=future_day,
+        specialist_id=doctor.id,
+        expires_at=datetime(2030, 1, 4, 0, 0),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.flush()
+
+    result = QRQueueService(db_session)._check_online_time_restrictions(token.token)
+
+    # Future-date availability remains advisory as in the existing contract;
+    # the report still exposes that the persisted quota has no room left.
+    assert result["allowed"] is True, result
+    assert result["status"] == "available"
+    assert result["online_issued_count"] == 1
+    assert result["online_bookings_remaining"] == 0
+
+
+@pytest.mark.unit
 def test_rowless_concrete_qr_token_info_preserves_owner_default_quota(
     db_session, monkeypatch
 ):
