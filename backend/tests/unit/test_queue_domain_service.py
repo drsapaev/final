@@ -212,7 +212,7 @@ class TestQueueDomainService:
 
         assert exc_info.value.status_code == 404
 
-    def test_get_queue_limits_status_preserves_runtime_user_id_lookup(self) -> None:
+    def test_get_queue_limits_status_uses_doctor_id_for_daily_queue_lookup(self) -> None:
         doctor = SimpleNamespace(
             id=3,
             user_id=33,
@@ -233,7 +233,7 @@ class TestQueueDomainService:
                 return [doctor]
 
             def get_queue_by_specialist_day(self, *, specialist_id, day):
-                assert specialist_id == 33
+                assert specialist_id == doctor.id
                 assert day.isoformat() == "2026-03-07"
                 return queue
 
@@ -298,7 +298,7 @@ class TestQueueDomainService:
                 return [doctor]
 
             def get_queue_by_specialist_day(self, *, specialist_id, day):
-                assert specialist_id == 33
+                assert specialist_id == doctor.id
                 return queue
 
             def count_entries(self, *, queue_id):

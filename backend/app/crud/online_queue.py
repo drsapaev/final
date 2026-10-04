@@ -742,18 +742,30 @@ def check_queue_availability(
         db, daily_queue, day, specialist_id
     )
 
+    doctor = None
+    inactive_queue = None
+    if daily_queue is None:
+        doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+        if doctor is not None:
+            inactive_queue = (
+                queue_resource_routing.find_inactive_daily_queue_for_specialist(
+                    db, day, specialist_id, doctor.specialty
+                )
+            )
+
     window = online_admission_window(
-        daily_queue=daily_queue,
+        daily_queue=daily_queue or inactive_queue,
         settings=queue_settings,
     )
+    queue_length_source = daily_queue or inactive_queue
     queue_length = (
         db.query(OnlineQueueEntry)
         .filter(
-            OnlineQueueEntry.queue_id == daily_queue.id,
+            OnlineQueueEntry.queue_id == queue_length_source.id,
             OnlineQueueEntry.status.in_(["waiting", "called"]),
         )
         .count()
-        if daily_queue is not None
+        if queue_length_source is not None
         else 0
     )
 
@@ -770,8 +782,16 @@ def check_queue_availability(
             online_bookings_remaining = None
             # Preserve the legacy enforcement fallback for a falsy cap.
             max_online_entries = max_online_entries or 15
+    elif inactive_queue is not None:
+        # The persisted identity is inactive and cannot accept new joins.
+        # Its old issuance count may still be useful internally, but this
+        # availability response must not turn it into a fresh or usable quota.
+        max_online_entries = None
+        online_issued_count = None
+        online_bookings_remaining = None
     else:
-        doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+        if doctor is None:
+            doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
         resource = (
             queue_resource_routing.resolve_tag_resource(db, doctor.specialty)
             if doctor is not None and doctor.specialty
@@ -808,6 +828,13 @@ def check_queue_availability(
         "online_bookings_remaining": online_bookings_remaining,
     }
     window_result = evaluate_online_admission_window(day, current_time, window)
+    if inactive_queue is not None:
+        return {
+            "available": False,
+            "reason": "QUEUE_INACTIVE",
+            "message": "Онлайн-запись для этой очереди недоступна",
+            **window_fields,
+        }
     if window_result == "date_past":
         return {
             "available": False,

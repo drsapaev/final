@@ -143,13 +143,17 @@ def find_inactive_daily_queue_for_specialist(
     callers use this read-only lookup to avoid inventing a fresh quota from
     current defaults when such an identity already exists.
     """
+    doctor_query = db.query(DailyQueue).filter(
+        DailyQueue.day == day,
+        DailyQueue.specialist_id == specialist_id,
+        DailyQueue.active.is_(False),
+    )
+    if queue_tag is None:
+        doctor_query = doctor_query.filter(DailyQueue.queue_tag.is_(None))
+    else:
+        doctor_query = doctor_query.filter(DailyQueue.queue_tag == queue_tag)
     doctor_queue = (
-        db.query(DailyQueue)
-        .filter(
-            DailyQueue.day == day,
-            DailyQueue.specialist_id == specialist_id,
-            DailyQueue.active.is_(False),
-        )
+        doctor_query
         .order_by(DailyQueue.id.asc())
         .first()
     )
