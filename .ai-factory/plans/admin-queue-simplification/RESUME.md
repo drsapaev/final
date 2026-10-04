@@ -1,12 +1,12 @@
 # Resume — admin queue simplification
 
 Plan version: 2.9
-Last updated: 2026-10-04T08:21:17+05:00, Asia/Tashkent
+Last updated: 2026-10-04T08:31:13+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
 ## Current continuation checkpoint — T08.2c
 
-- Fresh base and worktree: `origin/main` = `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`; runtime report commit `718d4d65c5717528e8a93fb819fdf328c63bf772`, future-date correction `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`.
+- Fresh base and worktree: `origin/main` = `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`; runtime report commit `718d4d65c5717528e8a93fb819fdf328c63bf772`, future-date correction `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`, OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`.
 - T08.2b / PR #3581 MERGED at `742bf08bd82da5f2ab8160ce474bdeab5694aa26`; exact reviewed code head `5c32825355fba8bce3ef92a6fcf979a76567da0d`. Local `main` was synced after merge.
 - Current task T08.2c: implementation and focused validation are complete locally in `C:\final\_wt_aqs_t082c_availability` (`codex/aqs-T08.2c-availability`), code commit `718d4d65c5717528e8a93fb819fdf328c63bf772`, rebased on `origin/main` `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`.
 - Read contract: v1 reports persisted `online_issued_count`, frozen cap, and `max(0, cap-count)`; legacy issuance and remaining are null; `queue_length` independently counts waiting/called rows. The contract covers `/online-queue/status`, concrete QR status/info, Admin `/queue-status`, and `/queue-limits`. Clinic-wide QR overview has no singular quota; specialty aggregate reports mixed policy with unknown issuance/remaining when any member is legacy. Historical `current_usage` remains compatible.
@@ -14,7 +14,7 @@ Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576
 - Self-review caught and fixed a scope regression: the QR read report had started denying a future-date request at quota, although the approved plan preserves advisory availability for future dates. The regression failed before the fix and passes afterward. Focused validation now has 85 unit/OpenAPI passes, 1 warning; selected integration 4 passed, 167 deselected, 1 warning; scoped Ruff passes; generated TypeScript matches fresh `openapi-typescript 7.13.0` output after normalizing Windows CRLF to LF.
 - PR #3581 merge is reflected in this current checkpoint. The T08 v1 creation flag remains default-off; PostgreSQL concurrency proof is T08.3 and has not been run.
 - Scope remains read services/DTOs/OpenAPI/generated types/tests/docs. No admission writer, schema/migration, policy flag, queue identity, unrelated UI, staging or production edits. T08.3 PostgreSQL concurrency/replay proof is NOT_RUN and stays separate; v1 creation flag remains default-off.
-- PR #3596 was opened at initial head `3076ddf5` on base `9b8296f8`; that head will be superseded by the correction/checkpoint push. Update PR body, push only this branch, and then re-read exact head and checks; initial-head CI is not current. The generated 43-byte worktree-only `.secret_key`, temporary API output, and temporary dependency link were removed. `C:\final` remains dirty with unrelated derma/EMR/OpenAPI files; preserve and do not switch/update the main checkout.
+- PR #3596 is open; remote currently points to `fd9b1c793`, local code is `f8012a1cd`. The docs-freshness job failed on `fd9b1c793` because the generated OpenAPI snapshot had an extra final CRLF; exact app serialization differed only by that byte sequence, now removed. Prior checks are stale. Update the PR body, push this checkpoint, then re-read status on the resulting exact head. The generated 43-byte worktree-only `.secret_key`, temporary API output, and temporary dependency link were removed. `C:\final` remains dirty with unrelated derma/EMR/OpenAPI files; preserve and do not switch/update the main checkout.
 
 ## Historical continuation checkpoint — T08.2b (merged)
 
