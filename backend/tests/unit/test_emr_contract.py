@@ -91,8 +91,7 @@ class TestDermaPhaseCWriteBoundaryPin:
 
         payload = normalize_emr_data(
             self._derma_data(
-                {"cosmetic_procedures": [canonical_entry],
-                 "procedures": [legacy_entry]}
+                {"cosmetic_procedures": [canonical_entry], "procedures": [legacy_entry]}
             )
         )
 
@@ -103,9 +102,7 @@ class TestDermaPhaseCWriteBoundaryPin:
     def test_derma_legacy_only_becomes_canonical(self):
         legacy_entry = {"procedure_type": "Чистка"}
 
-        payload = normalize_emr_data(
-            self._derma_data({"procedures": [legacy_entry]})
-        )
+        payload = normalize_emr_data(self._derma_data({"procedures": [legacy_entry]}))
 
         sd = payload["specialty_data"]
         assert "procedures" not in sd
@@ -128,8 +125,7 @@ class TestDermaPhaseCWriteBoundaryPin:
         entry = {"procedure_type": "Что-то кардиологическое"}
 
         payload = normalize_emr_data(
-            {"specialty": "cardiology",
-             "specialty_data": {"procedures": [entry]}}
+            {"specialty": "cardiology", "specialty_data": {"procedures": [entry]}}
         )
 
         assert payload["specialty_data"]["procedures"] == [entry]
@@ -150,9 +146,7 @@ class TestDermaPhaseCWriteBoundaryPin:
     def test_idempotent_second_normalize_no_change(self):
         legacy_entry = {"procedure_type": "Пилинг"}
 
-        once = normalize_emr_data(
-            self._derma_data({"procedures": [legacy_entry]})
-        )
+        once = normalize_emr_data(self._derma_data({"procedures": [legacy_entry]}))
         twice = normalize_emr_data(once)
 
         assert twice == once

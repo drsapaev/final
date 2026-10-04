@@ -813,10 +813,7 @@ class TestDermaP3PhaseCSingleKeyContract:
         )
 
         assert (
-            _entries(
-                db_session, kind="procedure", source="emr", record_id=emr.id
-            )
-            == []
+            _entries(db_session, kind="procedure", source="emr", record_id=emr.id) == []
         )
 
         db_session.query(DermaHistoryEntry).delete()
@@ -824,10 +821,7 @@ class TestDermaP3PhaseCSingleKeyContract:
         rebuild_derma_history_entries(db_session.connection())
         # скоупинг по записи: чужие строки других тестов не входят в проверку
         assert (
-            _entries(
-                db_session, kind="procedure", source="emr", record_id=emr.id
-            )
-            == []
+            _entries(db_session, kind="procedure", source="emr", record_id=emr.id) == []
         )
         assert not any(
             "-legacy-" in e.payload["id"]
@@ -874,20 +868,14 @@ class TestDermaP3PhaseCSingleKeyContract:
         )
         db_session.commit()
         assert (
-            len(
-                _entries(
-                    db_session, kind="procedure", source="emr", record_id=emr.id
-                )
-            )
+            len(_entries(db_session, kind="procedure", source="emr", record_id=emr.id))
             == 3
         )
 
         counts = rebuild_derma_history_entries(db_session.connection())
         assert counts["emr_entries"] >= 2  # глобальный счётчик: могут быть
         # строки других тестов; предметная проверка — скоуп по записи ниже
-        procs = _entries(
-            db_session, kind="procedure", source="emr", record_id=emr.id
-        )
+        procs = _entries(db_session, kind="procedure", source="emr", record_id=emr.id)
         assert sorted(e.position for e in procs) == [0, 1]
         assert not any("-legacy-" in e.payload["id"] for e in procs)
 
@@ -914,11 +902,14 @@ class TestDermaP3PhaseCSingleKeyContract:
         emr = emr_v2_service.save(
             db_session,
             visit_id=visit.id,
-            data=self._both_keys_data() | {
+            data=self._both_keys_data()
+            | {
                 "specialty_data": {
-                    "cosmetic_procedures": [self._both_keys_data()
-                                            ["specialty_data"]
-                                            ["cosmetic_procedures"][0]],
+                    "cosmetic_procedures": [
+                        self._both_keys_data()["specialty_data"]["cosmetic_procedures"][
+                            0
+                        ]
+                    ],
                     "procedures": [legacy_entry],
                 }
             },
@@ -938,8 +929,7 @@ class TestDermaP3PhaseCSingleKeyContract:
         assert sorted(e.position for e in procs) == [0, 1]
         assert not any("-legacy-" in e.payload["id"] for e in procs)
         assert any(
-            e.payload["procedure_type"] == "Запись из старого клиента"
-            for e in procs
+            e.payload["procedure_type"] == "Запись из старого клиента" for e in procs
         )
 
     def test_p3c_position_contract_single_key(

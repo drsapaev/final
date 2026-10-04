@@ -61,7 +61,9 @@ SPECIALTY_SKELETONS: dict[str, dict[str, Any]] = {
 
 def normalize_specialty(value: str | None, *, default: str = "general") -> str:
     """Normalize any specialty alias into the canonical taxonomy."""
-    normalized_default = default.strip().lower() if isinstance(default, str) else "general"
+    normalized_default = (
+        default.strip().lower() if isinstance(default, str) else "general"
+    )
     normalized_default = SPECIALTY_ALIASES.get(normalized_default, normalized_default)
     if normalized_default not in CANONICAL_SPECIALTIES:
         normalized_default = "general"
@@ -294,5 +296,6 @@ def canonical_emr_to_legacy_payload(
         "is_draft": getattr(emr_record, "status", "draft") == "draft",
         "created_at": getattr(emr_record, "created_at", None),
         "updated_at": getattr(emr_record, "updated_at", None),
-        "saved_at": getattr(emr_record, "signed_at", None) or getattr(emr_record, "updated_at", None),
+        "saved_at": getattr(emr_record, "signed_at", None)
+        or getattr(emr_record, "updated_at", None),
     }
