@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "scenario_id": "api_ws_origin",
+      "goal": "Identify the canonical owner and resolution chain for frontend API and WebSocket origins.",
+      "query": "frontend API origin WebSocket URL resolution",
+      "topics": ["frontend", "api", "websocket", "origin"],
+      "source_paths": [
+        "frontend/src/api/runtime.ts",
+        "frontend/src/api/ws.ts"
+      ],
+      "expected_answer_terms": ["VITE_API_BASE_URL", "/api/v1", "buildWsUrl"],
+      "expected_owner_terms": ["frontend/src/api/runtime.ts", "frontend/src/api/ws.ts"],
+      "goal_terms": ["canonical owner", "WebSocket origins"],
+      "next_step_terms": ["no implementation", "follow-up"],
+      "expected_checks": ["canonical source review", "product tests not run"]
+    },
+    {
+      "scenario_id": "registrar_partial_payment",
+      "goal": "Identify the canonical persistence owner and transaction boundary for a Registrar partial payment.",
+      "query": "Registrar partial payment persistence transaction invoice balance",
+      "topics": ["registrar", "payment", "billing", "persistence"],
+      "source_paths": [
+        "backend/app/services/billing_service_pkg/_payments.py",
+        "backend/tests/unit/test_record_payment_migration.py"
+      ],
+      "expected_answer_terms": ["commit=False", "paid_amount", "PARTIALLY_PAID", "balance"],
+      "expected_owner_terms": ["billing_service_pkg/_payments.py", "test_record_payment_migration.py"],
+      "goal_terms": ["persistence owner", "partial payment"],
+      "next_step_terms": ["no implementation", "follow-up"],
+      "expected_checks": ["canonical source review", "product tests not run"]
+    },
+    {
+      "scenario_id": "telegram_token_storage",
+      "goal": "Identify the canonical Alembic and SQLAlchemy owners for Telegram staff link token storage.",
+      "query": "Telegram staff link token storage migration model",
+      "topics": ["telegram", "staff", "token", "migration", "model"],
+      "source_paths": [
+        "backend/alembic/versions/0025_telegram_staff_link_tokens.py",
+        "backend/app/models/telegram_config.py"
+      ],
+      "expected_answer_terms": ["0025_telegram_staff_link_tokens", "telegram_staff_link_tokens", "TelegramStaffLinkToken"],
+      "expected_owner_terms": ["0025_telegram_staff_link_tokens.py", "telegram_config.py"],
+      "goal_terms": ["Alembic", "SQLAlchemy owners", "staff link token storage"],
+      "next_step_terms": ["no implementation", "follow-up"],
+      "expected_checks": ["canonical source review", "product tests not run"]
+    }
+  ]
+}
