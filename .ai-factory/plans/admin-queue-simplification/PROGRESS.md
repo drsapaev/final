@@ -1,17 +1,17 @@
 # Progress
 
-Plan version: 2.7
+Plan version: 2.9
 Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 2026-10-01
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
-Current task: T08.2b — source inventory of remaining active admission adapters
-Current status: T08.2b PR #3581 OPEN. User authorized publishing the review and merging on 2026-10-04. After a documentation conflict with #3587, the branch was rebased onto 2e3519948534f956fac7f94c3b1822792f864f41. Upstream Task 103 is preserved; this inventory gate record is Task 104. Resolve the live PR HEAD/checks before merge. T08.2c/T08.3 remain planned; v1 creation stays default-off.
-Last completed task: T08.2a — MERGED (#3576, merge commit `1ed6d05874c2ea205a625bb70879adb10b077be4`)
-Worktree: C:\final\_wt_aqs_t082b_admission
-Branch: codex/aqs-T08.2b-admission
-Base commit: 2e3519948534f956fac7f94c3b1822792f864f41
-Current code commit: rebased source inventory commit c1c84f56a; resolve the live PR tip because journal commits follow it.
-Last updated: 2026-10-04T06:27:05+05:00, Asia/Tashkent
+Current task: T08.2c — availability/report parity
+Current status: T08.2b / PR #3581 MERGED at `742bf08bd82da5f2ab8160ce474bdeab5694aa26` (reviewed code HEAD `5c32825355fba8bce3ef92a6fcf979a76567da0d`). T08.2c implementation and local validation are complete in worktree `C:\final\_wt_aqs_t082c_availability`, branch `codex/aqs-T08.2c-availability`, base `742bf08bd82da5f2ab8160ce474bdeab5694aa26`. Unit/OpenAPI tests are 84/84; resource integration checks are 4/4; scoped Ruff, generated-type freshness and `git diff --check` pass. PR creation and exact-head CI/review remain. V1 creation remains default-off; PostgreSQL concurrency proof is T08.3.
+Last completed task: T08.2b — MERGED (#3581, merge commit `742bf08bd82da5f2ab8160ce474bdeab5694aa26`)
+Worktree: C:\final\_wt_aqs_t082c_availability
+Branch: codex/aqs-T08.2c-availability
+Base commit: 742bf08bd82da5f2ab8160ce474bdeab5694aa26
+Current code commit: 742bf08bd (runtime changes are uncommitted)
+Last updated: 2026-10-04T07:52:08+05:00, Asia/Tashkent
 
 > Historical checkpoint superseded: current T07 status and exact-head evidence are recorded in dated sections below and in RESUME.md; do not use the earlier snapshot as a continuation instruction.
 
@@ -26,7 +26,7 @@ Last updated: 2026-10-04T06:27:05+05:00, Asia/Tashkent
 | T06.1 | MERGED | `codex/aqs-T06-policy-schema` / [PR #3545](https://github.com/drsapaev/final/pull/3545) | `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` | `EVIDENCE.md#t06.1-merge-checkpoint` |
 | T06.2 | MERGED | `codex/aqs-T06.2-creation-policy` / [PR #3546](https://github.com/drsapaev/final/pull/3546) | `b804a71a6bad22400324e2236a3221317eac3158` | `EVIDENCE.md#t06.2-merge-checkpoint` |
 | T07 | MERGED | codex/aqs-T07-admission-window / PR #3557 | 425df11c7a84f0d1e7954df0d00415927212669a | EVIDENCE.md#t07-merge-and-t08-gate-source-audit |
-| T08 | IN_PROGRESS | T08.1a/#3571, T08.1b/#3572 and T08.2a/#3576 MERGED; T08.2b PR #3581 OPEN | `1ed6d05874c2ea205a625bb70879adb10b077be4` | EVIDENCE.md#t08.2a-merge-and-t08.2b-source-inventory |
+| T08 | IN_PROGRESS | T08.1a/#3571, T08.1b/#3572, T08.2a/#3576, T08.2b/#3581 MERGED; T08.2c locally validated, PR pending | `742bf08bd82da5f2ab8160ce474bdeab5694aa26` | EVIDENCE.md#t08.2c-implementation |
 | T09 | PLANNED | | | |
 | T10 | PLANNED | | | |
 | T11 | PLANNED | | | |
@@ -39,6 +39,15 @@ Last updated: 2026-10-04T06:27:05+05:00, Asia/Tashkent
 | T18 | PLANNED | | | |
 
 ## Current checkpoint
+
+- T08.2b / PR #3581 is confirmed MERGED at `742bf08bd82da5f2ab8160ce474bdeab5694aa26`; its reviewed code head was `5c32825355fba8bce3ef92a6fcf979a76567da0d`. No runtime files changed in that PR.
+- T08.2c implementation is locally complete: v1 reports persisted issuance/capacity and `max(0, cap-issued)`; legacy issuance and remaining are null; queue length is a separate waiting/called count. The same facts now appear in concrete QR/status, Admin status and specialty aggregate reports. Mixed clinic-wide QR overviews expose no single queue quota. Aggregate `current_usage` remains backward-compatible (all rows), while `queue_length` is active waiting/called rows.
+- Validation: focused unit/OpenAPI modules **84 passed, 1 warning**; resource status/QR/Admin aggregate integrations **4 passed, 167 deselected, 1 warning**; changed Python Ruff checks pass; generated TypeScript comparison is byte-identical; `git diff --check` passes. The integration file has a pre-existing I001 outside this patch, so only that file's Ruff check used `--ignore I001`; no formatter-wide rewrite was made. Staging, browser QA and PostgreSQL concurrency checks are NOT_RUN; T08.3 owns the latter.
+- Canonical read paths: `daily_queue_creation_policy.online_admission_window`; `QueueBusinessService.check_queue_limits` (read-only reference); `crud.online_queue.check_queue_availability`; `QueueDomainService.get_queue_limits_status`; QR `QRQueueService._check_online_time_restrictions` and `get_qr_token_info`; `QueueLimitsApiService.get_limits_status`; their DTOs/OpenAPI. No active frontend consumer of the status/limits endpoints was found.
+- Execution mode: mandatory `gate_known_root_cause`, root `backend/app/crud/online_queue.py`. Initial invocation accidentally ran from `C:\final`; corrected worktree invocation returned `gate_misroute=true`, `narrow_override`, `override_used=true`, first-touch only that CRUD file. The approved T08.2c contract is the manual basis for the bounded read/DTO/test scope. No further gate call.
+- Actual scope includes read services/DTOs, OpenAPI snapshot, generated TypeScript API types, focused tests and plan/evidence. Admission writers, GraphQL, model/schema/migration, quota flag, numbering/ownership, clinical lifecycle, unrelated UI, staging and production config remain untouched.
+- Final inspection found unrelated uncommitted work in the main checkout (`derma.py`, `derma_history.py`, `emr_contract.py`, `test_derma_api.py`, `backend/openapi.json`, and `.gate_artifacts`); it is preserved and untouched. T08.2c remains isolated in its worktree. Next exact action: check remote `origin/main`, finish the code review, commit/push only this worktree, and open one T08.2c PR with explicit PostgreSQL/staging NOT_RUN evidence.
+- Stop if an overview requires a single quota across heterogeneous owners/policies, or verification shows a writer/schema/ownership change is needed. T08.3 remains a separate gate.
 
 - User confirmed that they merged PR #3576 themselves. GitHub reports it merged at `1ed6d05874c2ea205a625bb70879adb10b077be4`; exact code HEAD was `35b6943cce8c0295b8e9a68077cb881c73fcda20`. Current base is fresh `origin/main` `4e6f125f17c637fc27296e2d0ec9d23f5d376775` in `C:\final\_wt_aqs_t082b_admission`.
 - T08.2b source inventory: legacy `/queue/legacy/join`, mounted `/online-queue/join`, QR `/queue/join/complete` (single and multiple), and permanent-direction sessions all delegate successful admissions to `QueueBusinessService.join_queue_with_token`. It checks the DailyQueue lock-refreshed quota, increments v1 only for a new entry, and keeps entry/counter/session outcome in the existing transaction boundary. GraphQL was the only confirmed independent successful writer and is quota-aware after #3576.

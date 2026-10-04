@@ -1,10 +1,24 @@
 # Resume — admin queue simplification
 
-Plan version: 2.7
-Last updated: 2026-10-04T06:27:05+05:00, Asia/Tashkent
+Plan version: 2.9
+Last updated: 2026-10-04T07:52:08+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
-## Current continuation checkpoint — T08.2b
+## Current continuation checkpoint — T08.2c
+
+- Fresh base and worktree: `origin/main` = `742bf08bd82da5f2ab8160ce474bdeab5694aa26`; `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`.
+- T08.2b / PR #3581 MERGED at `742bf08bd82da5f2ab8160ce474bdeab5694aa26`; exact reviewed code head `5c32825355fba8bce3ef92a6fcf979a76567da0d`. Local `main` was synced after merge.
+- Current task T08.2c: implementation and focused validation are complete locally in `C:\final\_wt_aqs_t082c_availability` (`codex/aqs-T08.2c-availability`), based on merged #3581 commit `742bf08bd82da5f2ab8160ce474bdeab5694aa26`.
+- Read contract: v1 reports persisted `online_issued_count`, frozen cap, and `max(0, cap-count)`; legacy issuance and remaining are null; `queue_length` independently counts waiting/called rows. The contract covers `/online-queue/status`, concrete QR status/info, Admin `/queue-status`, and `/queue-limits`. Clinic-wide QR overview has no singular quota; specialty aggregate reports mixed policy with unknown issuance/remaining when any member is legacy. Historical `current_usage` remains compatible.
+- Gate: correct worktree invocation used `--known-root-cause backend/app/crud/online_queue.py`; result was `gate_misroute=true`, `narrow_override`, `override_used=true`, first-touch only that CRUD file. The first attempt ran from `C:\final` accidentally. The explicit user-approved T08.2c scope is the manual basis for the bounded read-path/DTO/tests override. Do not invoke the gate again.
+- Focused validation: unit/OpenAPI modules 84 passed, 1 warning; resource status/QR/Admin aggregate integrations 4 passed, 167 deselected, 1 warning. Scoped Ruff passes; one existing I001 outside the integration patch was excluded for that large file. OpenAPI is updated and generated TypeScript comparison is byte-identical. `git diff --check` passes with only the expected Windows LF-to-CRLF warning for generated `api.ts`.
+- PR #3581 merge is reflected in this current checkpoint. The T08 v1 creation flag remains default-off; PostgreSQL concurrency proof is T08.3 and has not been run.
+- Scope remains read services/DTOs/OpenAPI/generated types/tests/docs. No admission writer, schema/migration, policy flag, queue identity, unrelated UI, staging or production edits. T08.3 PostgreSQL concurrency/replay proof is NOT_RUN and stays separate; v1 creation flag remains default-off.
+- The generated 43-byte worktree-only `.secret_key` was removed after validation. Final inspection found unrelated dirty main-checkout files from other work; preserve them and do not switch/update `C:\final`. Next exact action: check remote `origin/main`, review the final worktree diff, commit/push this branch and open the single-purpose PR with staging/PostgreSQL NOT_RUN stated.
+
+## Historical continuation checkpoint — T08.2b (merged)
+
+> Superseded: PR #3581 is merged. This earlier pre-merge continuation is retained as history; do not follow its OPEN/merge instructions.
 
 - Current fresh base: origin/main = 2e3519948534f956fac7f94c3b1822792f864f41, after #3587. Worktree C:\final\_wt_aqs_t082b_admission; branch codex/aqs-T08.2b-admission. The intervening main changes do not modify the inventoried queue admission paths.
 - T08.2a / PR #3576 exact code HEAD `35b6943cce8c0295b8e9a68077cb881c73fcda20`; user-confirmed merge commit `1ed6d05874c2ea205a625bb70879adb10b077be4`. Its prior local validation was 7 unit and 17 GraphQL integration tests; applicable CI on that exact HEAD passed as recorded in the PR. Skipped path-aware jobs are not passes.

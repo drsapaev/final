@@ -232,6 +232,205 @@ def test_public_status_reports_same_v1_cutoff_as_availability(db_session, monkey
     assert rowless["end_time"] == "09:00"
     assert rowless_status.within_hours is False
     assert rowless_status.policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION
+    assert rowless["queue_length"] == 0
+    assert rowless["max_online_entries"] == rowless_doctor.max_online_per_day
+    assert rowless["online_issued_count"] == 0
+    assert rowless["online_bookings_remaining"] == rowless_doctor.max_online_per_day
+
+
+@pytest.mark.unit
+def test_v1_availability_uses_issued_counter_instead_of_live_queue_length(
+    db_session, monkeypatch
+):
+    import app.crud.clinic as clinic_crud
+    import app.crud.online_queue as online_queue_crud
+    from app.models.clinic import Doctor
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setattr(online_queue_crud, "get_queue_settings", lambda db: settings)
+    _fixed_tashkent_time(monkeypatch, online_queue_crud, hour=8)
+
+    doctor = Doctor(specialty="cardiology")
+    db_session.add(doctor)
+    db_session.flush()
+    queue = _make_v1_queue(db_session, day=date(2030, 1, 2), doctor=doctor)
+    queue.max_online_entries = 2
+    queue.online_issued_count = 2
+    db_session.flush()
+
+    result = online_queue_crud.check_queue_availability(
+        db_session, queue.day, doctor.id
+    )
+
+    assert result["available"] is False
+    assert result["reason"] == "QUEUE_FULL"
+    assert result["queue_length"] == 0
+    assert result["policy_version"] == ONLINE_ISSUANCES_V1_POLICY_VERSION
+    assert result["max_online_entries"] == 2
+    assert result["online_issued_count"] == 2
+    assert result["online_bookings_remaining"] == 0
+
+
+@pytest.mark.unit
+def test_legacy_availability_ignores_completed_entries_for_active_limit(
+    db_session, monkeypatch
+):
+    import app.crud.clinic as clinic_crud
+    import app.crud.online_queue as online_queue_crud
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setattr(online_queue_crud, "get_queue_settings", lambda db: settings)
+    _fixed_tashkent_time(monkeypatch, online_queue_crud, hour=8)
+
+    doctor = Doctor(specialty="cardiology")
+    db_session.add(doctor)
+    db_session.flush()
+    queue = DailyQueue(
+        day=date(2030, 1, 2),
+        specialist_id=doctor.id,
+        queue_tag=None,
+        active=True,
+        policy_version=LEGACY_POLICY_VERSION,
+        online_start_time="07:00",
+        online_end_time="09:00",
+        max_online_entries=1,
+    )
+    db_session.add(queue)
+    db_session.flush()
+    db_session.add(
+        OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_name="Synthetic Patient",
+            source="online",
+            status="served",
+        )
+    )
+    db_session.flush()
+
+    result = online_queue_crud.check_queue_availability(
+        db_session, queue.day, doctor.id
+    )
+
+    assert result["available"] is True
+    assert result["queue_length"] == 0
+    assert result["policy_version"] == LEGACY_POLICY_VERSION
+    assert result["online_issued_count"] is None
+    assert result["online_bookings_remaining"] is None
+
+
+@pytest.mark.unit
+def test_concrete_qr_reports_v1_quota_from_persisted_issuances(db_session, monkeypatch):
+    import app.crud.clinic as clinic_crud
+    import app.services.qr_queue_service as qr_queue_service_module
+    import app.services.queue_service as queue_service_module
+    from app.api.v1.endpoints.qr_queue._helpers import QRTokenInfoResponse
+    from app.models.clinic import Doctor
+    from app.models.online_queue import QueueToken
+    from app.services.qr_queue import QRQueueService
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.delenv("DISABLE_QUEUE_TIME_RESTRICTIONS", raising=False)
+    _fixed_tashkent_time(monkeypatch, queue_service_module, hour=8)
+    _fixed_tashkent_time(monkeypatch, qr_queue_service_module, hour=8)
+
+    doctor = Doctor(specialty="cardiology")
+    db_session.add(doctor)
+    db_session.flush()
+    queue = _make_v1_queue(db_session, day=date(2030, 1, 2), doctor=doctor)
+    queue.max_online_entries = 3
+    queue.online_issued_count = 2
+    token = QueueToken(
+        token="synthetic-v1-quota-report",
+        day=queue.day,
+        specialist_id=doctor.id,
+        expires_at=datetime(2030, 1, 3, 0, 0),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.flush()
+
+    service = QRQueueService(db_session)
+    result = service._check_online_time_restrictions(token.token)
+    token_info = service.get_qr_token_info(token.token)
+    response = QRTokenInfoResponse(**token_info)
+
+    assert result["allowed"] is True, result
+    assert result["current_entries"] == 0
+    assert result["max_online_entries"] == 3
+    assert result["online_issued_count"] == 2
+    assert result["online_bookings_remaining"] == 1
+    assert response.max_online_entries == 3
+    assert response.online_issued_count == 2
+    assert response.online_bookings_remaining == 1
+
+
+@pytest.mark.unit
+def test_rowless_concrete_qr_token_info_preserves_owner_default_quota(
+    db_session, monkeypatch
+):
+    import app.crud.clinic as clinic_crud
+    import app.services.qr_queue_service as qr_queue_service_module
+    import app.services.queue_service as queue_service_module
+    from app.api.v1.endpoints.qr_queue._helpers import QRTokenInfoResponse
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue, QueueToken
+    from app.services.qr_queue import QRQueueService
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
+    monkeypatch.delenv("DISABLE_QUEUE_TIME_RESTRICTIONS", raising=False)
+    _fixed_tashkent_time(monkeypatch, queue_service_module, hour=8)
+    _fixed_tashkent_time(monkeypatch, qr_queue_service_module, hour=8)
+
+    doctor = Doctor(specialty="cardiology", max_online_per_day=4)
+    db_session.add(doctor)
+    db_session.flush()
+    token = QueueToken(
+        token="synthetic-rowless-quota-report",
+        day=date(2030, 1, 2),
+        specialist_id=doctor.id,
+        expires_at=datetime(2030, 1, 3, 0, 0),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.flush()
+
+    service = QRQueueService(db_session)
+    info = service.get_qr_token_info(token.token)
+    response = QRTokenInfoResponse(**info)
+
+    assert (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.specialist_id == doctor.id, DailyQueue.day == token.day)
+        .first()
+        is None
+    )
+    assert response.max_online_entries == 4
+    assert response.online_issued_count == 0
+    assert response.online_bookings_remaining == 4
 
 
 @pytest.mark.unit
@@ -273,6 +472,9 @@ def test_specific_qr_precheck_rejects_v1_at_exact_cutoff(db_session, monkeypatch
     assert result["status"] == "after_end_time"
     assert result["policy_version"] == ONLINE_ISSUANCES_V1_POLICY_VERSION
     assert result["end_time"] == "09:00"
+    assert result["max_online_entries"] == 15
+    assert result["online_issued_count"] == 0
+    assert result["online_bookings_remaining"] == 15
 
 
 @pytest.mark.unit
@@ -344,7 +546,7 @@ def test_clinic_wide_qr_uses_any_available_queue_in_mixed_legacy_day(
     import app.crud.clinic as clinic_crud
     import app.services.qr_queue_service as qr_queue_service_module
     from app.models.clinic import Doctor
-    from app.models.online_queue import DailyQueue, QueueToken
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
     from app.services.qr_queue import QRQueueService
 
     settings = {
@@ -360,7 +562,7 @@ def test_clinic_wide_qr_uses_any_available_queue_in_mixed_legacy_day(
     legacy_doctor = Doctor(specialty="dermatology")
     db_session.add_all([v1_doctor, legacy_doctor])
     db_session.flush()
-    _make_v1_queue(db_session, day=day, doctor=v1_doctor)
+    v1_queue = _make_v1_queue(db_session, day=day, doctor=v1_doctor)
     db_session.add(
         DailyQueue(
             day=day,
@@ -372,6 +574,22 @@ def test_clinic_wide_qr_uses_any_available_queue_in_mixed_legacy_day(
             online_end_time="09:00",
             max_online_entries=15,
         )
+    )
+    db_session.add_all(
+        [
+            OnlineQueueEntry(
+                queue_id=v1_queue.id,
+                number=1,
+                status="waiting",
+                source="online",
+            ),
+            OnlineQueueEntry(
+                queue_id=v1_queue.id,
+                number=2,
+                status="called",
+                source="registrar",
+            ),
+        ]
     )
     token = QueueToken(
         token="synthetic-clinicwide-mixed-policy",
@@ -390,6 +608,11 @@ def test_clinic_wide_qr_uses_any_available_queue_in_mixed_legacy_day(
     assert result["status"] == "available"
     assert result["policy_version"] == LEGACY_POLICY_VERSION
     assert result["end_time"] is None
+    assert result.get("max_online_entries") is None
+    assert result.get("online_issued_count") is None
+    assert result.get("online_bookings_remaining") is None
+    assert result["current_entries"] == 1
+    assert result["queue_length"] == 2
 
 
 @pytest.mark.unit
