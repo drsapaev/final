@@ -35,6 +35,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.core.pii_masker import mask_phone
 from app.crud import clinic as crud_clinic
 from app.crud import queue_resource_routing
 from app.crud.clinic import get_queue_settings
@@ -487,10 +488,12 @@ def join_online_queue_multiple(
                         },
                     )
                     patient_id = new_patient.id
+                    # #3579 follow-up: телефон нового пациента не пишется
+                    # в открытом виде (PII-политика: только хвост номера).
                     logger.info(
                         "[join_online_queue_multiple] ✅ Создан новый пациент ID=%d для телефона %s",
                         patient_id,
-                        phone,
+                        mask_phone(phone),
                     )
 
             # Создаем запись в очереди с одинаковым queue_time
