@@ -110,6 +110,11 @@ const ru = {
     density_spacious: 'Просторно',
   },
   // ─── Common actions ──────────────────────────────────────────────────────
+  pagination: {
+    firstPage: 'Первая страница',
+    page: 'Страница {page}',
+    lastPage: 'Последняя страница',
+  },
   common: {
     clear: 'Очистить',
     save: 'Сохранить',
