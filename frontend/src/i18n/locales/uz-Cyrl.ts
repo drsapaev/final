@@ -78,7 +78,7 @@ const uzCyrl = {
   },
   pagination: {
     firstPage: 'Биринчи саҳифа',
-    page: 'Саҳифа {{page}}',
+    page: 'Саҳифа {page}',
     lastPage: 'Охирги саҳифа',
   },
   common: {
