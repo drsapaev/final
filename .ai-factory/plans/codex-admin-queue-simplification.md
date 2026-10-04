@@ -1,13 +1,13 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 2.9 — T08.2b / #3581 merged; T08.2c implementation and focused local verification complete, PR pending.
-**Создан:** 30 сентября 2026. **Обновлён:** 4 октября 2026, 08:09 Asia/Tashkent.
+**Версия:** 2.9 — T08.2b / #3581 merged; T08.2c PR #3596 open, exact-head checks pending.
+**Создан:** 30 сентября 2026. **Обновлён:** 4 октября 2026, 08:21 Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Последний подтверждённый runtime merge:** `1ed6d05874c2ea205a625bb70879adb10b077be4`, PR #3576 / T08.2a; последующий документальный T08.2b PR #3581 merged as `742bf08bd82da5f2ab8160ce474bdeab5694aa26`.
-**Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; code commit `718d4d65c5717528e8a93fb819fdf328c63bf772`. T08.2c implementation, focused tests, scoped lint, normalized generated-type comparison и committed diff checks готовы локально; PR ещё не создан.
+**Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; PR [#3596](https://github.com/drsapaev/final/pull/3596). Report implementation `718d4d65c5717528e8a93fb819fdf328c63bf772`; future-date compatibility fix `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`. Focused local checks pass (85 unit/OpenAPI, 4 selected integration); exact current PR-head checks pending after corrective push.
 
-> **T00–T07, T08.1a, T08.1b, T08.2a и T08.2b — MERGED; T08.2c locally validated, PR pending; T08.3–T18 — PLANNED.** PR #3581 merged as `742bf08bd82da5f2ab8160ce474bdeab5694aa26`. T08.2c aligns read-side quota facts across public availability, QR, Admin status and aggregate limits. Focused local tests pass; PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
+> **T00–T07, T08.1a, T08.1b, T08.2a и T08.2b — MERGED; T08.2c / PR #3596 OPEN; T08.3–T18 — PLANNED.** PR #3581 merged as `742bf08bd82da5f2ab8160ce474bdeab5694aa26`. T08.2c aligns read-side quota facts across public availability, QR, Admin status and aggregate limits, preserving advisory future-date semantics. Focused local tests pass; PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
