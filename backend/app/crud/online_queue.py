@@ -741,7 +741,8 @@ def check_queue_availability(
         # this doctor/day with another tag, so resolve that below; an inactive
         # row with a different tag is not this QR's identity.
         daily_queue = queue_identity.filter(
-            DailyQueue.queue_tag == doctor.specialty
+            DailyQueue.queue_tag == doctor.specialty,
+            DailyQueue.active.is_(True),
         ).first()
     else:
         daily_queue = queue_identity.filter(DailyQueue.queue_tag.is_(None)).first()
