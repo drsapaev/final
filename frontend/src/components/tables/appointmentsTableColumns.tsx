@@ -1338,7 +1338,8 @@ export const buildAppointmentsTableColumns = ({
           ) : null}
 
           {canPrint ? (
-            <Tooltip content={t('misc.eat_print')}>\n              <button
+            <Tooltip content={t('misc.eat_print')}>
+              <button
               className="action-button"
               onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                 e.preventDefault();
@@ -1351,7 +1352,8 @@ export const buildAppointmentsTableColumns = ({
               }}
               aria-label={t('misc.eat_print')}>
               <FileText size={14} />
-            </button>\n            </Tooltip>
+            </button>
+            </Tooltip>
           ) : null}
 
           {canComplete ? (
@@ -1394,7 +1396,8 @@ export const buildAppointmentsTableColumns = ({
               compact={true} />
           ) : null}
 
-          <Tooltip content={t('misc.eat_view')}>\n            <button
+          <Tooltip content={t('misc.eat_view')}>
+            <button
             className="action-button"
             onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
               e.preventDefault();
@@ -1408,9 +1411,11 @@ export const buildAppointmentsTableColumns = ({
             }}
             aria-label={t('misc.eat_view')}>
             <Eye size={14} />
-          </button>\n          </Tooltip>
+          </button>
+          </Tooltip>
 
-          <Tooltip content={t('misc.eat_edit')}>\n            <button
+          <Tooltip content={t('misc.eat_edit')}>
+            <button
             className="action-button"
             onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
               e.preventDefault();
@@ -1424,11 +1429,13 @@ export const buildAppointmentsTableColumns = ({
             }}
             aria-label={t('misc.eat_edit')}>
             <Edit size={14} />
-          </button>\n          </Tooltip>
+          </button>
+          </Tooltip>
 
           {/* EMR (doctor view) */}
           {canViewEmr ? (
-            <Tooltip content={t('misc.eat_view_emr')}>\n              <button
+            <Tooltip content={t('misc.eat_view_emr')}>
+              <button
               className="action-button action-button--primary"
               onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                 e.preventDefault();
@@ -1441,13 +1448,15 @@ export const buildAppointmentsTableColumns = ({
               }}
               aria-label={t('misc.eat_view_emr')}>
               <FileText size={14} />
-            </button>\n            </Tooltip>
+            </button>
+            </Tooltip>
           ) : null}
 
           {/* UX Audit Registrar #4: inline кнопки Cancel и Reschedule.
               Раньше только через context menu — недоступно на touch-устройствах. */}
           {canReschedule ? (
-            <Tooltip content={t('misc.eat_reschedule')}>\n              <button
+            <Tooltip content={t('misc.eat_reschedule')}>
+              <button
               className="action-button"
               onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                 e.preventDefault();
@@ -1460,11 +1469,13 @@ export const buildAppointmentsTableColumns = ({
               }}
               aria-label={t('misc.eat_reschedule_aria')}>
               <CalendarClock size={14} />
-            </button>\n            </Tooltip>
+            </button>
+            </Tooltip>
           ) : null}
 
           {canCancel ? (
-            <Tooltip content={t('misc.eat_cancel')}>\n              <button
+            <Tooltip content={t('misc.eat_cancel')}>
+              <button
               className="action-button"
               onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                 e.preventDefault();
@@ -1477,10 +1488,12 @@ export const buildAppointmentsTableColumns = ({
               }}
               aria-label={t('misc.eat_cancel_aria')}>
               <X size={14} />
-            </button>\n            </Tooltip>
+            </button>
+            </Tooltip>
           ) : null}
 
-          <Tooltip content={t('misc.eat_more')}>\n            <button
+          <Tooltip content={t('misc.eat_more')}>
+            <button
             className="action-button"
             onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
               e.preventDefault();
@@ -1493,7 +1506,8 @@ export const buildAppointmentsTableColumns = ({
             }}
             aria-label={t('misc.eat_more')}>
             <MoreHorizontal size={14} />
-          </button>\n          </Tooltip>
+          </button>
+          </Tooltip>
 
           {canScheduleNext ? (
             <button
