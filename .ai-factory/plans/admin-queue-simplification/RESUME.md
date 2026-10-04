@@ -1,17 +1,17 @@
 # Resume — admin queue simplification
 
 Plan version: 2.9
-Last updated: 2026-10-04T18:20:58+05:00, Asia/Tashkent
+Last updated: 2026-10-04T18:43:30+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
-## Authoritative current checkpoint — five P2 fixes for PR #3596 (2026-10-04)
+## Authoritative current checkpoint — five P2 fixes pushed, code-head CI passed (2026-10-04)
 
-- PR #3596 remains OPEN and mergeable. Verified remote HEAD `db2b4f97164a1f57488b0898da8f038d4fdf9d98`, base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. Worktree: `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`.
+- PR #3596 remains OPEN and mergeable. Verified remote HEAD `4d301ad64208af81de53b1c7bf88f6735473b6da`, base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. Worktree: `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`.
 - This follow-up fixes the five confirmed P2s from `.scratch/PR3596_REVIEW.md`: routed inactive owner resolution, exact-tag validation of inactive status, resource-first identity routing, rowless quota parity with queue creation defaults, and retained waiting/called count for inactive QR identities.
 - Source/test paths changed: `backend/app/crud/online_queue.py`, `backend/app/crud/queue_resource_routing.py`, `backend/app/services/qr_queue/_queue_ops.py`, `backend/app/services/queue_domain_service.py`, `backend/tests/unit/test_online_admission_window.py`, and `backend/tests/unit/test_queue_domain_service.py`. Only the three plan journals are additionally allowed for tracked changes. Preserve `.scratch/` and `.pr-body-T08.2c.md`; do not stage them.
 - Gate: `gate_known_root_cause` on `backend/app/services/queue_domain_service.py` returned `narrow_override`, `gate_misroute=false`, `override_used=true`, no handoff. The bounded manual basis is the user's request to fix these five review findings in #3596 plus the approved T08.2c read/report contract. Stop if scope reaches admission writers, schema/model/migration, frontend, policy rollout, staging or production.
-- Current local checks: two focused unit modules **57 passed, 1 warning** using SQLite fixtures; scoped Ruff, Python compile, and `git diff --check` pass. Local database fixtures only; PostgreSQL race tests, staging/browser validation, production behavior, and fresh GitHub CI are NOT_RUN.
-- Current code is still uncommitted and remote HEAD has not moved. Next: commit only the six code/test and three plan files, push to the existing PR branch, inspect fresh exact-head CI, then update and validate the PR body. Keep PR #3596 open; no human review/merge was requested here. Do not begin T08.3 until the #3596 cycle closes.
+- Local checks: two focused unit modules **57 passed, 1 warning** using SQLite fixtures; scoped Ruff, Python compile, focused formatter ranges, and `git diff --check` pass. The PR body gate passed 19 unit tests, both sample bodies, and the updated body. Exact-head CI on code commit `4d301ad` finished **31 success, 12 skipped, 0 failure**; previous `db2b4f9` results are historical. PostgreSQL race tests, staging/browser validation, and production behavior are NOT_RUN.
+- Commit `4d301ad64208af81de53b1c7bf88f6735473b6da` is pushed. All commit hooks passed except `check-added-large-files`, skipped after Windows Application Control blocked its executable (`WinError 4551`). The PR body currently says CI is running and must be refreshed. Next: push the final evidence-only update, update and validate the PR body for its exact HEAD, then recheck exact-head CI. Keep PR #3596 open for the user's review/merge decision. Do not begin T08.3 until the #3596 cycle closes.
 
 ## Current continuation checkpoint — T08.2c exact-head validation
 

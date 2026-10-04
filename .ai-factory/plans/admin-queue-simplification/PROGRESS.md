@@ -5,14 +5,14 @@ Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 20
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T08.2c — availability/report parity
-Current status: T08.2b / PR #3581 MERGED at `742bf08bd82da5f2ab8160ce474bdeab5694aa26`. T08.2c / PR #3596 is OPEN and mergeable at current remote HEAD `db2b4f97164a1f57488b0898da8f038d4fdf9d98`, base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. Five confirmed P2 report/identity defects from the current review are fixed locally in the same PR branch; focused checks pass (57 tests, Ruff, Python compile, diff check). These changes are not yet committed or pushed, and no fresh CI applies. Worktree `C:\final\_wt_aqs_t082c_availability`, branch `codex/aqs-T08.2c-availability`. Next: finish scope/evidence checkpoint, commit only approved source/tests/journals, push to #3596, verify checks for the resulting exact HEAD and keep the PR open for the user's merge/review decision. T08.3 must wait for this PR cycle to close; v1 creation stays default-off and PostgreSQL concurrency proof belongs to T08.3.
+Current status: T08.2b / PR #3581 MERGED at `742bf08bd82da5f2ab8160ce474bdeab5694aa26`. T08.2c / PR #3596 remains OPEN and mergeable at exact remote HEAD `4d301ad64208af81de53b1c7bf88f6735473b6da`, base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. The five requested P2 fixes and focused regressions are committed and pushed; local tests and PR-body quality checks pass. Exact-head CI on `4d301ad` completed with 31 successful checks, 12 skipped checks, 0 failures. Skips are recorded below and are not passes. Worktree `C:\final\_wt_aqs_t082c_availability`, branch `codex/aqs-T08.2c-availability`. Next: publish the final evidence checkpoint and recheck its new exact HEAD. Keep the PR open for the user's review/merge decision. T08.3 must wait for this PR cycle to close; v1 creation stays default-off and PostgreSQL concurrency proof belongs to T08.3.
 Last completed task: T08.2b — MERGED (#3581, merge commit `742bf08bd82da5f2ab8160ce474bdeab5694aa26`)
 Worktree: C:\final\_wt_aqs_t082c_availability
 Branch: codex/aqs-T08.2c-availability
 Base commit: 3da3e0ddaa1cf7afed7732905c6699ec4fafada5
-Current code commit: `db2b4f97164a1f57488b0898da8f038d4fdf9d98` (remote PR base for this five-P2 follow-up; local changes are uncommitted)
-Current evidence checkpoint: five P2 regressions locally validated on the working tree; exact PR CI is pending until push
-Last updated: 2026-10-04T18:20:58+05:00, Asia/Tashkent
+Current code commit: `4d301ad64208af81de53b1c7bf88f6735473b6da` (five P2 fixes, pushed to PR #3596)
+Current evidence checkpoint: exact-head GitHub CI on code commit `4d301ad` passed (31 success, 12 skipped, 0 failures); final journal-only checkpoint is pending push and recheck
+Last updated: 2026-10-04T18:43:30+05:00, Asia/Tashkent
 
 > Historical checkpoint superseded: current T07 status and exact-head evidence are recorded in dated sections below and in RESUME.md; do not use the earlier snapshot as a continuation instruction.
 
@@ -27,7 +27,7 @@ Last updated: 2026-10-04T18:20:58+05:00, Asia/Tashkent
 | T06.1 | MERGED | `codex/aqs-T06-policy-schema` / [PR #3545](https://github.com/drsapaev/final/pull/3545) | `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` | `EVIDENCE.md#t06.1-merge-checkpoint` |
 | T06.2 | MERGED | `codex/aqs-T06.2-creation-policy` / [PR #3546](https://github.com/drsapaev/final/pull/3546) | `b804a71a6bad22400324e2236a3221317eac3158` | `EVIDENCE.md#t06.2-merge-checkpoint` |
 | T07 | MERGED | codex/aqs-T07-admission-window / PR #3557 | 425df11c7a84f0d1e7954df0d00415927212669a | EVIDENCE.md#t07-merge-and-t08-gate-source-audit |
-| T08 | IN_PROGRESS | T08.1a/#3571, T08.1b/#3572, T08.2a/#3576, T08.2b/#3581 MERGED; T08.2c / PR #3596 OPEN, rebased code follow-ups `ba148e83` + `210a11fd`, #3596 CI passed on `38d1fa5`; documentation-head recheck and independent review pending | | EVIDENCE.md#t08.2c-exact-head-ci-and-review-readiness |
+| T08 | IN_PROGRESS | T08.1a/#3571, T08.1b/#3572, T08.2a/#3576, T08.2b/#3581 MERGED; T08.2c / PR #3596 OPEN at `4d301ad`; exact-head CI on this code commit: 31 success, 12 skipped, 0 failures. Final journal checkpoint and its exact-head CI recheck pending. | | EVIDENCE.md (latest T08.2c entry) |
 | T09 | PLANNED | | | |
 | T10 | PLANNED | | | |
 | T11 | PLANNED | | | |
@@ -41,14 +41,15 @@ Last updated: 2026-10-04T18:20:58+05:00, Asia/Tashkent
 
 ## Current checkpoint
 
-### Authoritative continuation — five P2 fixes pending commit/push (2026-10-04)
+### Authoritative continuation — five P2 fixes pushed, code-head CI passed (2026-10-04)
 
-- PR #3596 is OPEN and mergeable; verified remote HEAD is `db2b4f97164a1f57488b0898da8f038d4fdf9d98`, base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. Worktree/branch are `C:\final\_wt_aqs_t082c_availability` / `codex/aqs-T08.2c-availability`.
+- PR #3596 is OPEN and mergeable; verified remote HEAD is `4d301ad64208af81de53b1c7bf88f6735473b6da`, base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. Worktree/branch are `C:\final\_wt_aqs_t082c_availability` / `codex/aqs-T08.2c-availability`.
 - Fixed exactly five confirmed review P2s: inactive queue identity falls back to the wrong owner axis in Admin status; public status accepts an inactive queue with the wrong tag; inactive doctor identity can shadow an active QueueResource; rowless status reports a cap different from the constructor defaults; inactive QR status discards retained waiting/called queue length. See the latest dated EVIDENCE entry for path-by-path mapping.
 - Actual runtime/test modifications are restricted to `backend/app/crud/online_queue.py`, `backend/app/crud/queue_resource_routing.py`, `backend/app/services/qr_queue/_queue_ops.py`, `backend/app/services/queue_domain_service.py`, `backend/tests/unit/test_online_admission_window.py`, and `backend/tests/unit/test_queue_domain_service.py`. Allowed checkpoint files are this file, `RESUME.md`, and `EVIDENCE.md`; local scope note is `.scratch/PR3596_FIX_SCOPE.md` and must not be committed.
 - Mandatory gate result: `gate_known_root_cause` / bounded `narrow_override`, root `backend/app/services/queue_domain_service.py`, `gate_misroute=false`, `override_used=true`, `handoff_required=false`. The repo-approved T08.2c read/report scope and exact five review findings justify the narrow sibling-path scope; no admission writer, schema/migration/model, frontend, staging or production path is allowed.
-- Final focused local checks on current source: `test_online_admission_window.py` plus `test_queue_domain_service.py` — **57 passed, 1 warning** (SQLite fixtures); scoped Ruff **PASS**; `py_compile` **PASS**; `git diff --check` **PASS**. PostgreSQL concurrency, staging/browser and production checks are NOT_RUN and not needed for these read-only fixes; T08.3 owns PostgreSQL admission proof.
-- State: local fixes and this checkpoint are uncommitted; remote is still at `db2b4f9`; fresh CI is NOT_RUN. Do not publish a review or merge. Next exact action: inspect staged paths, commit the six source/test files and three plan journals only, push the existing PR branch, then check CI on the resulting exact head and refresh the matching PR body. Keep `C:\final` untouched and do not start T08.3 until #3596 is closed.
+- Final focused local checks on committed code: `test_online_admission_window.py` plus `test_queue_domain_service.py` — **57 passed, 1 warning** (SQLite fixtures); scoped Ruff **PASS**; `py_compile` **PASS**; focused formatter ranges **PASS**; `git diff --check` **PASS**. The PR body gate passed 19 unit tests, both documented sample bodies, and the actual updated PR body. PostgreSQL concurrency, staging/browser and production checks are NOT_RUN; T08.3 owns PostgreSQL admission proof.
+- Commit `4d301ad64208af81de53b1c7bf88f6735473b6da` is pushed to the existing PR branch. All applicable commit hooks passed except `check-added-large-files`, skipped because Windows Application Control blocked its executable (`WinError 4551`). Exact-head GitHub CI on this code-bearing commit completed: **31 success, 12 skipped, 0 failure**. The `db2b4f9` checks are historical. The PR body still says CI is running and must be refreshed after the evidence-only checkpoint.
+- Next exact action: commit and push the final evidence-only update, refresh and validate the PR body for the resulting exact head, then check that exact head's applicable CI. Do not publish a code review or merge. Keep `C:\final` untouched and do not start T08.3 until #3596 closes.
 
 - T08.2b / PR #3581 is confirmed MERGED at `742bf08bd82da5f2ab8160ce474bdeab5694aa26`; its reviewed code head was `5c32825355fba8bce3ef92a6fcf979a76567da0d`.
 - Four additional exact-head P2 report/identity findings were fixed in `ba148e83`, and a related inactive doctor-owned status case was caught and fixed in `210a11fd`: Admin queue status now looks up `DailyQueue` by `Doctor.id`; inactive doctor-queue detection matches the exact nullable tag; Admin aggregates and public status no longer advertise fresh quota for inactive identities. Fail-first reproduced all five assertions for the four findings and the follow-up doctor-owned case; all 56 tests in the three affected unit modules pass (1 warning), as do scoped Ruff, `py_compile`, and `git diff --check` on the rebased tree.

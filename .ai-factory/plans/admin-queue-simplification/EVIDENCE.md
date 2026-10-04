@@ -2,7 +2,7 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
-Current plan: version 2.3. T00–T06.2 are confirmed MERGED; T07 PR #3557 is open; T08–T18 remain PLANNED. The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver. Start with [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md); timestamped historical entries preserve their original state/SHA.
+Current plan: version 2.9. T00–T07 are confirmed MERGED; T08 is IN_PROGRESS with PR #3596/T08.2c OPEN; T09–T18 remain PLANNED. The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver. Start with [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md); timestamped historical entries preserve their original state/SHA.
 
 ## T00 — 2026-09-30
 
@@ -1632,4 +1632,18 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: PostgreSQL concurrency/replay/partial-result proof remains assigned to T08.3; staging/browser and production behavior were NOT_RUN. No deferral was requested. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off.
 - Next exact action: stage only the six source/test paths and three plan journal paths; commit and push the existing PR branch; verify exact-head CI; refresh the PR body against that exact commit. Keep #3596 open for the user's merge decision and do not begin T08.3 until this PR cycle closes.
 - PR: https://github.com/drsapaev/final/pull/3596
+- Merge commit: none.
+
+## T08.2c five review P2 fixes — code-head CI passed — 2026-10-04T18:43:30+05:00
+
+- Commit under test: `4d301ad64208af81de53b1c7bf88f6735473b6da`, branch `codex/aqs-T08.2c-availability`, PR #3596; base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. GitHub confirmed PR OPEN and mergeable at this exact head. Previous CI on `db2b4f9` is historical for these changes.
+- Code changes: fixes all five review P2s in read/report behavior: Admin status retains inactive routed identity; public status ignores an inactive row for a different tag; resource routing wins over stale doctor identity; rowless public cap matches QR construction defaults; inactive QR returns retained waiting/called queue length. Five regressions were added across the existing focused unit modules.
+- Committed paths are the four approved read/report runtime files, two focused unit files, and the three plan journals. `.scratch/PR3596_FIX_SCOPE.md` and `.pr-body-T08.2c.md` remain local/untracked and were not committed. No admission writer, model, schema/migration, frontend, staging or production configuration changed.
+- Local validation on the committed code contents: `scripts/run_backend_pytest.ps1 tests/unit/test_online_admission_window.py tests/unit/test_queue_domain_service.py -q --tb=short` — **57 passed, 1 warning**, SQLite fixtures; scoped Ruff **PASS**; `py_compile` **PASS**; Ruff formatter on both added test ranges **PASS**; `git diff --check` **PASS**. PR-body gate `scripts/run_pr_review_gate_checks.py --body-file .pr-body-T08.2c.md --author codex` — **PASS**, 19 unit tests plus both documented samples and actual body.
+- Commit hooks: merge-conflict, private-key, EOF/trailing-whitespace, Gitleaks, Ruff, Ruff-format and Black **PASS**. `check-added-large-files` could not start due Windows Application Control `WinError 4551`; only this hook was skipped on commit retry and it is not claimed as passed.
+- PR body: updated through GitHub to summarize the five fixes, report commit `4d301ad`, and mark exact-head CI as in progress. It must be refreshed after the final journal-only checkpoint. No review or merge action was submitted.
+- Exact-head GitHub check snapshot on code-bearing commit `4d301ad`: **31 SUCCESS, 12 SKIPPED, 0 FAILURE, 0 IN_PROGRESS**. Successful checks: Notifications; PR Required Gate; Frontend–Backend Parity; lifecycle recommendation; PR Review Quality Gate; CodeQL; Gitleaks; context boundary; code quality; Telegram Mini App Release Gate; documentation generation; Backend tests; Frontend lint/build/unit/E2E; security scan; role-system; Regression Audit; Locale Key Parity; GitGuardian; CI Scope; leaked-secret scan; hardcoded Russian detector; Python/Actions/JavaScript-Typescript analysis; Python formatting report; and frontend lint report. Duplicate Quality Gate/lifecycle runs are separate successful jobs.
+- Path-aware skipped checks on `4d301ad`: k6 load tests; staging readiness; integration tests; production readiness; Docker build; unified-workflow security scan; two failure notifications; metadata checks; nightly DAST; classify-and-route; Supabase Preview. These are skips, not passes; they do not represent PostgreSQL concurrency or staging proof.
+- PostgreSQL concurrency/replay/partial-result proof, staging/browser validation, and production behavior remain **NOT_RUN**. No deferral is requested; `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off.
+- Next exact action: commit and push this final evidence-only update, refresh and validate the PR body against the resulting exact HEAD, then check that new HEAD's applicable CI. Keep #3596 open for the user's review/merge decision; do not start T08.3 before the PR cycle closes.
 - Merge commit: none.
