@@ -73,6 +73,7 @@ const en = {
     density_spacious: 'Spacious',
   },
   common: {
+    clear: 'Clear input',
     save: 'Сохранить',
     save_draft: 'Сохранить черновик',
     cancel: 'Отмена',

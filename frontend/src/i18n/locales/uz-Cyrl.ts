@@ -77,6 +77,7 @@ const uzCyrl = {
     density_spacious: 'Кенг',
   },
   common: {
+    clear: 'Тозалаш',
     save: 'Сохранить',
     save_draft: 'Сохранить черновик',
     cancel: 'Отмена',
