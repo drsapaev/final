@@ -1,11 +1,11 @@
 # План исправления и упрощения административной настройки очередей
 
 **Версия:** 2.9 — T08.2b / #3581 merged; T08.2c implementation and focused local verification complete, PR pending.
-**Создан:** 30 сентября 2026. **Обновлён:** 4 октября 2026, 07:52 Asia/Tashkent.
+**Создан:** 30 сентября 2026. **Обновлён:** 4 октября 2026, 08:09 Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Последний подтверждённый runtime merge:** `1ed6d05874c2ea205a625bb70879adb10b077be4`, PR #3576 / T08.2a; последующий документальный T08.2b PR #3581 merged as `742bf08bd82da5f2ab8160ce474bdeab5694aa26`.
-**Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `742bf08bd82da5f2ab8160ce474bdeab5694aa26`. T08.2c implementation, focused tests, scoped lint и diff/codegen checks готовы локально; PR ещё не создан.
+**Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; code commit `718d4d65c5717528e8a93fb819fdf328c63bf772`. T08.2c implementation, focused tests, scoped lint, normalized generated-type comparison и committed diff checks готовы локально; PR ещё не создан.
 
 > **T00–T07, T08.1a, T08.1b, T08.2a и T08.2b — MERGED; T08.2c locally validated, PR pending; T08.3–T18 — PLANNED.** PR #3581 merged as `742bf08bd82da5f2ab8160ce474bdeab5694aa26`. T08.2c aligns read-side quota facts across public availability, QR, Admin status and aggregate limits. Focused local tests pass; PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
