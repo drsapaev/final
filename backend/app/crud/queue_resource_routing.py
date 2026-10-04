@@ -129,6 +129,57 @@ def find_active_tag_queue(db: Session, day: date, queue_tag: str) -> DailyQueue 
     )
 
 
+def find_inactive_daily_queue_for_specialist(
+    db: Session,
+    day: date,
+    specialist_id: int,
+    queue_tag: str | None,
+) -> DailyQueue | None:
+    """Find a prior inactive identity behind a concrete specialist QR.
+
+    A missing active queue does not prove that the owner/day identity is
+    unused: v1 queue creation deliberately rejects replacement of inactive
+    doctor or resource rows so its issuance counter cannot reset. Report
+    callers use this read-only lookup to avoid inventing a fresh quota from
+    current defaults when such an identity already exists.
+    """
+    doctor_queue = (
+        db.query(DailyQueue)
+        .filter(
+            DailyQueue.day == day,
+            DailyQueue.specialist_id == specialist_id,
+            DailyQueue.active.is_(False),
+        )
+        .order_by(DailyQueue.id.asc())
+        .first()
+    )
+    if doctor_queue is not None:
+        return doctor_queue
+
+    if not queue_tag:
+        return None
+
+    resource = (
+        db.query(QueueResource)
+        .filter(QueueResource.queue_tag == queue_tag)
+        .order_by(QueueResource.id.asc())
+        .first()
+    )
+    if resource is None:
+        return None
+
+    return (
+        db.query(DailyQueue)
+        .filter(
+            DailyQueue.day == day,
+            DailyQueue.queue_resource_id == resource.id,
+            DailyQueue.active.is_(False),
+        )
+        .order_by(DailyQueue.id.asc())
+        .first()
+    )
+
+
 def ensure_daily_queue_identity_is_new(
     db: Session,
     *,
