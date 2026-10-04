@@ -119,6 +119,7 @@ const Tooltip = ({
   const handleMouseLeave = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
     setIsVisible(false);
     // Даем время на анимацию исчезновения
