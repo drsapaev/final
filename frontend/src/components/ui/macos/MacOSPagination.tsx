@@ -27,7 +27,6 @@ const MacOSPagination = ({
   className,
   style
 }: MacOSPaginationProps) => {
-  const { t } = useTranslation();
   void showPrevNext;
   const sizeStyles = {
     sm: {
@@ -171,7 +170,7 @@ const MacOSPagination = ({
         onBlur={handleBlur}
         style={buttonStyle(false, currentPage === 1)}
         disabled={currentPage === 1}
-        aria-label={t('pagination.firstPage', { defaultValue: 'Первая страница' })}>
+        aria-label="Первая страница">
         
           1
         </button>
@@ -193,7 +192,7 @@ const MacOSPagination = ({
         onFocus={handleFocus}
         onBlur={handleBlur}
         style={buttonStyle(page === currentPage)}
-        aria-label={t('pagination.page', { page, defaultValue: 'Страница {{page}}' })}
+        aria-label={`Страница ${page}`}
         aria-current={page === currentPage ? 'page' : undefined}>
         
           {page}
@@ -216,7 +215,7 @@ const MacOSPagination = ({
         onBlur={handleBlur}
         style={buttonStyle(false, currentPage === totalPages)}
         disabled={currentPage === totalPages}
-        aria-label={t('pagination.lastPage', { defaultValue: 'Последняя страница' })}>
+        aria-label="Последняя страница">
         
           {totalPages}
         </button>
