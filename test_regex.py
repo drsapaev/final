@@ -3,7 +3,7 @@ import re
 text = """
 ## Validation
 - Targeted tests or smoke run: Ran `pnpm lint:check` and `pnpm test --run src/components/ui/macos/__tests__/`. Also ran `node scripts/audit-icon-only-controls.mjs --root src/ --include-components`
-- Result: All tests passed.
+- Result: All tests passed
 - Not checked: None
 """
 
