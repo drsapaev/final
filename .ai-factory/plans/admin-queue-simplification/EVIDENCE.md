@@ -1651,6 +1651,14 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Next exact action: add the in-scope independent-session PostgreSQL tests, run them only on disposable local PostgreSQL, then record exact test results. Stop and re-gate if a runtime fix is needed.
 - PR: none. Merge commit: none.
 
+## T08.3.1 PR opened — 2026-10-05T00:28:28+05:00
+
+- Commit under review: `465dc814eb97e567dc1c130539bc5f5037ed69e9`; branch `codex/aqs-T08.3-pg-proof`; base `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`.
+- PR: [#3599](https://github.com/drsapaev/final/pull/3599), OPEN; created after local validation. No review or merge has been submitted.
+- The PR body passed `scripts/run_pr_review_gate_checks.py --body-env PR_BODY --author codex`: 19 validator tests, both sample bodies and the live body passed. The initial body attempt exposed three empty required Validation fields; those fields were filled before PR creation and the final local body gate passed.
+- GitHub exact-head checks at PR creation: PENDING / mergeable=false. Do not treat local tests or PR creation as CI completion. Check exact HEAD again after the next status change.
+- Next action: monitor checks for `465dc814eb97e567dc1c130539bc5f5037ed69e9`, address in-scope failures in PR #3599, and stop at green for the user's merge decision. No T08.3.2 work until this PR cycle is merged and the base is synced.
+
 ## T08.3.1 local PostgreSQL proof — 2026-10-05T00:19:27+05:00
 
 - Commit under test: base `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`; local worktree branch `codex/aqs-T08.3-pg-proof`. The test and journal edits are still uncommitted; no PR exists yet.

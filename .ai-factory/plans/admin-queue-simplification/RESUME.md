@@ -1,10 +1,10 @@
 # Resume — admin queue simplification
 
 Plan version: 3.0
-Last updated: 2026-10-05T00:19:27+05:00, Asia/Tashkent
+Last updated: 2026-10-05T00:28:28+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user authorized continuing the plan, confirmed PR #3596 was merged, and said continue. GitHub merge commit: `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`.
 
-## Current continuation checkpoint — T08.3.1 PostgreSQL quota race proof (2026-10-05T00:19:27+05:00)
+## Current continuation checkpoint — T08.3.1 PostgreSQL quota race proof (2026-10-05T00:28:28+05:00)
 
 - PR #3596 / T08.2c is MERGED at `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`. Fresh isolated worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-pg-proof\final`; branch `codex/aqs-T08.3-pg-proof`; base `origin/main` is the merge commit above.
 - Current bounded subtask T08.3.1 adds real independent-PostgreSQL-session proof for the existing queue-token admission transaction: simultaneous independent patients competing for the last v1 slot, exact-token duplicate retry after capacity is consumed, and rollback of `entry + online_issued_count + token usage`. This does not certify the separate QR-session response snapshot/partial-batch transaction or direct GraphQL writer; those remain later T08.3 subtasks.
@@ -14,7 +14,7 @@ Execution permission: IMPLEMENTATION_ACTIVE; user authorized continuing the plan
 - `QUEUE_POLICY_V2_CREATION_ENABLED` stays default-off. Use synthetic test rows in a disposable local PostgreSQL database only; staging, production and patient data are out of scope.
 - Added two independent-session tests in the approved PostgreSQL module. Against the disposable PostgreSQL 16 database on loopback, the full module passed **5/5** (including two new tests); an earlier isolated rerun of the existing mixed-creator case passed **1/1**. The initial full-module attempt was interrupted by WSL/Docker shutdown (daemon received normal termination; no OOM); subsequent run used a held WSL session and completed. Record that first run as an environment interruption, not source evidence.
 - Existing focused quota/window/GraphQL unit tests passed **65/65** with explicit `DATABASE_URL=sqlite:///:memory:`. Scoped Ruff, `py_compile`, and `git diff --check` passed. The initial unit-launch attempt without `DATABASE_URL` failed during collection and was corrected; it is not a product failure.
-- Current status: locally `VALIDATED`, no PR yet. Next exact action: inspect diff/status, commit only the approved test and plan journals, open a bounded PR for T08.3.1, and verify exact-head CI. Stop if CI exposes a product/runtime defect; obtain a new gate before runtime edits. Do not merge without separate user authorization.
+- Code/test commit `465dc814e` is pushed in PR #3599: https://github.com/drsapaev/final/pull/3599. A documentation checkpoint is now included in the same PR. At creation the exact-head CI was pending; re-read the latest PR head and checks after pushing the checkpoint. Current status is `PR_OPEN`. Stop if CI exposes a product/runtime defect; obtain a new gate before runtime edits. Do not merge #3599 or begin T08.3.2 without separate user authorization and a completed PR cycle.
 
 ## Superseded checkpoint — T08.2c five P2 fixes pushed, exact-head CI passed (2026-10-04)
 
