@@ -74,7 +74,7 @@ const kk = {
   },
   pagination: {
     firstPage: 'Бірінші бет',
-    page: 'Бет {{page}}',
+    page: 'Бет {page}',
     lastPage: 'Соңғы бет',
   },
   common: {
