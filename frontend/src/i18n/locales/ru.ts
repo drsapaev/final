@@ -112,7 +112,7 @@ const ru = {
   // ─── Common actions ──────────────────────────────────────────────────────
   pagination: {
     firstPage: 'Первая страница',
-    page: 'Страница {{page}}',
+    page: 'Страница {page}',
     lastPage: 'Последняя страница',
   },
   common: {
