@@ -74,7 +74,7 @@ const uzLatn = {
   },
   pagination: {
     firstPage: 'Birinchi sahifa',
-    page: 'Sahifa {{page}}',
+    page: 'Sahifa {page}',
     lastPage: 'Oxirgi sahifa',
   },
   common: {
