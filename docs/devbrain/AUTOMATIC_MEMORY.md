@@ -18,6 +18,14 @@ Do not capture PHI, credentials, raw chat transcripts, or other sensitive materi
 4. If writes are unavailable or disallowed, read memory if permitted, continue only within the original task rules, and say that no new checkpoint was saved. A reported check is agent-reported evidence, not proof of merge, deployment, or overall system health.
 5. A returned task hint never authorizes continuing that task. Its exact `task_id` must be supplied by the user or existing task context.
 
+## Client instructions
+
+Codex and ZCode read the repository-root `AGENTS.md`; no separate ZCode adapter is required. ZCode does not scan child directories or expand `@import` / `@include`, so keep its bootstrap instructions in that root file. It does not read Claude's `CLAUDE.md` import during normal tasks. See the [ZCode Agent documentation](https://zcode.z.ai/en/docs/agents).
+
+ZCode's built-in Project Memory is separate from DevBrain, machine-local, off by default, and uses extra tokens. The DevBrain integration does not enable or depend on it. Keep it disabled when isolating DevBrain memory behavior or avoiding duplicate memory usage.
+
+Claude uses the literal `CLAUDE.md` import; Cursor's always-applied project rule points to `AGENTS.md`. Client runtime checks are recorded separately in `DEVBRAIN_STATUS.md`.
+
 ## Portable curated knowledge
 
 `docs/devbrain/memory/curated.json` is the reviewed, tracked memory shared by clones through Git. It contains only repo-scoped facts or lessons, relative source anchors, and author-pinned SHA-256 values; it has no worktree paths or task/session metadata. Recall merges it with local records. A dirty curated file or dirty anchor is labeled `worktree_only`; a changed or missing clean anchor suppresses the full claim and marks the record stale. `status` and `export` report malformed curated data as `DEGRADED`. Promoting local knowledge into this file is a normal reviewed repository change, not an automatic helper write.

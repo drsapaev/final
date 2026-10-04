@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Primary operational rules for repo-aware agents. `CLAUDE.md` and Cursor rules import this file; narrower canonical source, tests, migrations, and runbooks resolve ambiguity.
+Primary operational rules for repo-aware agents. ZCode reads this root file directly; Claude and Cursor adapters point to it. Narrower canonical source, tests, migrations, and runbooks resolve ambiguity.
 
 ## Project anchors
 

@@ -14,6 +14,7 @@ against the current checkout before relying on optional retrieval artifacts.
 | Codex adapter | configured; runtime unverified | Repo instructions are present; a new-session call/recall check remains pending. |
 | Claude adapter | configured; runtime unverified | Claude CLI was not found on PATH; no installation was attempted. |
 | Cursor adapter | configured; runtime unverified | Cursor application CLI is present, but a fresh Agent chat call/recall check remains pending. |
+| ZCode | configured via root `AGENTS.md`; runtime unverified | [ZCode reads workspace `AGENTS.md` directly](https://zcode.z.ai/en/docs/agents), but its CLI was not found on PATH here. Built-in Project Memory is a separate optional feature; DevBrain does not enable it. |
 | `ai/langgraph/scripts/agent_gate.py` | active | Deterministic execution guard for tasks routed through gate modes. |
 | LlamaIndex | dormant | Legacy local lexical retrieval. Do not run by default. |
 | LightRAG | dormant | Legacy relationship retrieval. Do not run by default. |
