@@ -730,11 +730,21 @@ def check_queue_availability(
     # Find the exact queue surface before evaluating its policy. A v1 row
     # owns its frozen window; a missing row uses the defaults selected for
     # the next creation.
-    daily_queue = (
-        db.query(DailyQueue)
-        .filter(and_(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id))
-        .first()
+    doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+    queue_identity = db.query(DailyQueue).filter(
+        DailyQueue.day == day,
+        DailyQueue.specialist_id == specialist_id,
     )
+    if doctor is not None and doctor.specialty:
+        # Public status has no tag parameter; specialty is the canonical
+        # destination. Preserve untagged legacy rows as a fallback, but never
+        # let a different arbitrary tag define this QR's identity.
+        daily_queue = (
+            queue_identity.filter(DailyQueue.queue_tag == doctor.specialty).first()
+            or queue_identity.filter(DailyQueue.queue_tag.is_(None)).first()
+        )
+    else:
+        daily_queue = queue_identity.filter(DailyQueue.queue_tag.is_(None)).first()
 
     # QD-2C (Codex round-3 P1): resource-owned очередь тега реестра;
     # round-5 P1: предпочтение активной поверхности
@@ -742,19 +752,30 @@ def check_queue_availability(
         db, daily_queue, day, specialist_id
     )
 
-    doctor = None
     inactive_queue = None
     if daily_queue is not None and not daily_queue.active:
-        inactive_queue = daily_queue
-        daily_queue = None
-    if daily_queue is None and inactive_queue is None:
-        doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
-        if doctor is not None:
-            inactive_queue = (
-                queue_resource_routing.find_inactive_daily_queue_for_specialist(
-                    db, day, specialist_id, doctor.specialty
-                )
+        expected_inactive = (
+            queue_resource_routing.find_inactive_daily_queue_for_specialist(
+                db,
+                day,
+                specialist_id,
+                daily_queue.queue_tag,
             )
+        )
+        # The active-only resource route may supersede this doctor candidate;
+        # accept an inactive row only when it is the routed identity.
+        inactive_queue = (
+            expected_inactive
+            if expected_inactive is not None and expected_inactive.id == daily_queue.id
+            else None
+        )
+        daily_queue = None
+    if daily_queue is None and inactive_queue is None and doctor is not None:
+        inactive_queue = (
+            queue_resource_routing.find_inactive_daily_queue_for_specialist(
+                db, day, specialist_id, doctor.specialty
+            )
+        )
 
     window = online_admission_window(
         daily_queue=daily_queue or inactive_queue,
@@ -795,21 +816,27 @@ def check_queue_availability(
     else:
         if doctor is None:
             doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
-        resource = (
-            queue_resource_routing.resolve_tag_resource(db, doctor.specialty)
-            if doctor is not None and doctor.specialty
-            else None
-        )
-        owner_default = (
-            resource.max_online_per_day
-            if resource is not None
-            else getattr(doctor, "max_online_per_day", None)
-        )
         if doctor is None:
             max_online_entries = None
             online_issued_count = None
             online_bookings_remaining = None
         else:
+            resource = (
+                queue_resource_routing.resolve_tag_resource(db, doctor.specialty)
+                if doctor.specialty
+                else None
+            )
+            owner_default = (
+                resource.max_online_per_day if resource is not None else None
+            )
+            if owner_default is None:
+                # Match assign_queue_token's get_or_create defaults for this
+                # concrete QR: it persists the clinic's specialty cap, falling
+                # back to default_max_slots, not Doctor.max_online_per_day.
+                owner_default = queue_settings.get("max_per_day", {}).get(
+                    doctor.specialty or "clinic",
+                    queue_settings.get("default_max_slots", 15),
+                )
             max_online_entries = 15 if owner_default is None else owner_default
             if window.policy_version == "daily_online_issuances_v1":
                 online_issued_count = 0

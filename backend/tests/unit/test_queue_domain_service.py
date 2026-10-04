@@ -212,7 +212,9 @@ class TestQueueDomainService:
 
         assert exc_info.value.status_code == 404
 
-    def test_get_queue_limits_status_uses_doctor_id_for_daily_queue_lookup(self) -> None:
+    def test_get_queue_limits_status_uses_doctor_id_for_daily_queue_lookup(
+        self,
+    ) -> None:
         doctor = SimpleNamespace(
             id=3,
             user_id=33,
@@ -411,3 +413,51 @@ class TestQueueDomainService:
         assert payload["code_to_name"]["L77"] == "Расширенный лабораторный профиль"
         assert payload["category_mapping"]["laboratory"] == "L"
         assert payload["specialty_aliases"]["derma"] == "dermatology"
+
+
+@pytest.mark.unit
+def test_get_queue_limits_status_preserves_inactive_resource_identity(db_session):
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
+
+    tag = "synthetic-admin-inactive-resource"
+    doctor = Doctor(specialty=tag, max_online_per_day=15)
+    resource = QueueResource(
+        code=tag,
+        queue_tag=tag,
+        display_name="SYNTHETIC admin resource",
+        active=True,
+        max_online_per_day=15,
+    )
+    db_session.add_all([doctor, resource])
+    db_session.flush()
+    day = date(2030, 1, 2)
+    queue = DailyQueue(
+        day=day,
+        queue_resource_id=resource.id,
+        queue_tag=tag,
+        active=False,
+        policy_version="daily_online_issuances_v1",
+        online_start_time="07:00",
+        online_end_time="09:00",
+        max_online_entries=4,
+        online_issued_count=4,
+    )
+    db_session.add(queue)
+    db_session.flush()
+    db_session.add(
+        OnlineQueueEntry(queue_id=queue.id, number=1, source="online", status="waiting")
+    )
+    db_session.flush()
+
+    result = QueueDomainService(
+        db_session,
+        get_settings=lambda db: {"max_per_day": {tag: 15}},
+    ).get_queue_limits_status(day=day, specialty=tag)[0]
+
+    assert result["queue_id"] == queue.id
+    assert result["policy_version"] == "daily_online_issuances_v1"
+    assert result["online_issued_count"] == 4
+    assert result["online_bookings_remaining"] == 0
+    assert result["queue_length"] == 1
+    assert result["online_available"] is False

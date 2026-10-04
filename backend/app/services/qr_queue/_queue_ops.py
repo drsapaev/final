@@ -729,7 +729,12 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                         "message": "Очередь не активна",
                         "status": "queue_inactive",
                         "target_date": target_date.isoformat(),
-                        "queue_length": 0,
+                        "queue_length": self.db.query(OnlineQueueEntry)
+                        .filter(
+                            OnlineQueueEntry.queue_id == inactive_identity.id,
+                            OnlineQueueEntry.status.in_(["waiting", "called"]),
+                        )
+                        .count(),
                         "policy_version": None,
                         "max_online_entries": None,
                         "online_issued_count": None,

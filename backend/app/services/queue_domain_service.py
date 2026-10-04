@@ -282,10 +282,26 @@ class QueueDomainService:
                 )
                 queue_opened = daily_queue.opened_at is not None
             else:
-                daily_queue = self.read_repository.get_queue_by_specialist_day(
-                    specialist_id=doctor.id,
-                    day=day,
+                inactive_queue = (
+                    queue_resource_routing.find_inactive_daily_queue_for_specialist(
+                        self.db, day, doctor.id, doctor.specialty
+                    )
+                    if isinstance(self.db, Session)
+                    else None
                 )
+                if inactive_queue is not None:
+                    daily_queue = inactive_queue
+                else:
+                    daily_queue = self.read_repository.get_queue_by_specialist_day(
+                        specialist_id=doctor.id,
+                        day=day,
+                    )
+                    # A stale doctor row does not own a currently routed
+                    # resource identity and cannot be advertised as available.
+                    if daily_queue is not None and not getattr(
+                        daily_queue, "active", True
+                    ):
+                        daily_queue = None
                 current_entries = 0
                 queue_length = 0
                 queue_opened = False
@@ -315,32 +331,54 @@ class QueueDomainService:
                     else None
                 )
             else:
-                # Before a queue exists, the owner default is the cap used by
-                # the next constructor. Registry resources take precedence for
-                # specialty tags, matching the runtime queue owner resolver.
-                resource = (
-                    queue_resource_routing.resolve_tag_resource(
-                        self.db, doctor.specialty
+                inactive_queue = None
+                if isinstance(self.db, Session):
+                    inactive_queue = (
+                        queue_resource_routing.find_inactive_daily_queue_for_specialist(
+                            self.db, day, doctor.id, doctor.specialty
+                        )
                     )
-                    if doctor.specialty and isinstance(self.db, Session)
-                    else None
-                )
-                owner_cap = (
-                    resource.max_online_per_day
-                    if resource is not None
-                    else getattr(doctor, "max_online_per_day", None)
-                )
-                if owner_cap is None:
-                    owner_cap = max_per_day_settings.get(doctor.specialty)
-                max_entries = 15 if owner_cap is None else owner_cap
-                if policy_version == LEGACY_POLICY_VERSION:
-                    # Preserve the established legacy admission fallback.
-                    max_entries = max_entries or 15
-                online_issued_count = (
-                    0
-                    if policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION
-                    else None
-                )
+                if inactive_queue is not None:
+                    # Preserve the identity and saved quota of an inactive
+                    # queue; it cannot be represented as a fresh rowless one.
+                    daily_queue = inactive_queue
+                    current_entries = self.read_repository.count_entries(
+                        queue_id=daily_queue.id
+                    )
+                    queue_length = self.read_repository.count_active_entries(
+                        queue_id=daily_queue.id
+                    )
+                    queue_opened = daily_queue.opened_at is not None
+                else:
+                    daily_queue = None
+                    current_entries = 0
+                    queue_length = 0
+                    queue_opened = False
+                if daily_queue is None:
+                    # Before a queue exists, the owner default is the cap used
+                    # by the next constructor. Registry resources take priority.
+                    resource = (
+                        queue_resource_routing.resolve_tag_resource(
+                            self.db, doctor.specialty
+                        )
+                        if doctor.specialty and isinstance(self.db, Session)
+                        else None
+                    )
+                    owner_cap = (
+                        resource.max_online_per_day
+                        if resource is not None
+                        else getattr(doctor, "max_online_per_day", None)
+                    )
+                    if owner_cap is None:
+                        owner_cap = max_per_day_settings.get(doctor.specialty)
+                    max_entries = 15 if owner_cap is None else owner_cap
+                    if policy_version == LEGACY_POLICY_VERSION:
+                        max_entries = max_entries or 15
+                    online_issued_count = (
+                        0
+                        if policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION
+                        else None
+                    )
 
             online_bookings_remaining = (
                 max(0, max_entries - online_issued_count)
@@ -373,7 +411,11 @@ class QueueDomainService:
                     "online_bookings_remaining": online_bookings_remaining,
                     "limit_reached": limit_reached,
                     "queue_opened": queue_opened,
-                    "online_available": not queue_opened and not limit_reached,
+                    "online_available": (
+                        (daily_queue is None or getattr(daily_queue, "active", True))
+                        and not queue_opened
+                        and not limit_reached
+                    ),
                 }
             )
 

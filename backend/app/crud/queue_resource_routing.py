@@ -143,6 +143,22 @@ def find_inactive_daily_queue_for_specialist(
     callers use this read-only lookup to avoid inventing a fresh quota from
     current defaults when such an identity already exists.
     """
+    # Resolve the owner axis using the same active registry switch as queue
+    # creation. A stale doctor-owned row must not shadow a resource identity:
+    # the resource constructor checks only the resource/day identity.
+    resource = resolve_tag_resource(db, queue_tag)
+    if resource is not None:
+        return (
+            db.query(DailyQueue)
+            .filter(
+                DailyQueue.day == day,
+                DailyQueue.queue_resource_id == resource.id,
+                DailyQueue.active.is_(False),
+            )
+            .order_by(DailyQueue.id.asc())
+            .first()
+        )
+
     doctor_query = db.query(DailyQueue).filter(
         DailyQueue.day == day,
         DailyQueue.specialist_id == specialist_id,
@@ -152,36 +168,7 @@ def find_inactive_daily_queue_for_specialist(
         doctor_query = doctor_query.filter(DailyQueue.queue_tag.is_(None))
     else:
         doctor_query = doctor_query.filter(DailyQueue.queue_tag == queue_tag)
-    doctor_queue = (
-        doctor_query
-        .order_by(DailyQueue.id.asc())
-        .first()
-    )
-    if doctor_queue is not None:
-        return doctor_queue
-
-    if not queue_tag:
-        return None
-
-    resource = (
-        db.query(QueueResource)
-        .filter(QueueResource.queue_tag == queue_tag)
-        .order_by(QueueResource.id.asc())
-        .first()
-    )
-    if resource is None:
-        return None
-
-    return (
-        db.query(DailyQueue)
-        .filter(
-            DailyQueue.day == day,
-            DailyQueue.queue_resource_id == resource.id,
-            DailyQueue.active.is_(False),
-        )
-        .order_by(DailyQueue.id.asc())
-        .first()
-    )
+    return doctor_query.order_by(DailyQueue.id.asc()).first()
 
 
 def ensure_daily_queue_identity_is_new(

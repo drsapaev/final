@@ -1094,3 +1094,208 @@ def test_clinic_wide_qr_reports_length_when_all_queues_are_opened(
     assert result["max_online_entries"] is None
     assert result["online_issued_count"] is None
     assert result["online_bookings_remaining"] is None
+
+
+@pytest.mark.unit
+def test_public_status_ignores_inactive_queue_for_another_tag(db_session, monkeypatch):
+    import app.crud.clinic as clinic_crud
+    import app.crud.online_queue as online_queue_crud
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+        "max_per_day": {"synthetic-current-tag": 4},
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setattr(online_queue_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
+    _fixed_tashkent_time(monkeypatch, online_queue_crud, hour=8)
+
+    doctor = Doctor(specialty="synthetic-current-tag")
+    db_session.add(doctor)
+    db_session.flush()
+    db_session.add(
+        DailyQueue(
+            day=date(2030, 1, 2),
+            specialist_id=doctor.id,
+            queue_tag="synthetic-other-tag",
+            active=False,
+            policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+            online_start_time="07:00",
+            online_end_time="09:00",
+            max_online_entries=4,
+            online_issued_count=4,
+        )
+    )
+    db_session.flush()
+
+    result = online_queue_crud.check_queue_availability(
+        db_session, date(2030, 1, 2), doctor.id
+    )
+
+    assert result["available"] is True
+    assert result["policy_version"] == ONLINE_ISSUANCES_V1_POLICY_VERSION
+    assert result["online_issued_count"] == 0
+    assert result["online_bookings_remaining"] == 4
+
+
+@pytest.mark.unit
+def test_inactive_identity_resolution_prefers_active_resource_owner(db_session):
+    from app.crud.queue_resource_routing import find_inactive_daily_queue_for_specialist
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue, QueueResource
+
+    tag = "synthetic-active-resource-axis"
+    doctor = Doctor(specialty=tag)
+    resource = QueueResource(
+        code=tag,
+        queue_tag=tag,
+        display_name="SYNTHETIC resource",
+        active=True,
+        max_online_per_day=6,
+    )
+    db_session.add_all([doctor, resource])
+    db_session.flush()
+    db_session.add(
+        DailyQueue(
+            day=date(2030, 1, 2),
+            specialist_id=doctor.id,
+            queue_tag=tag,
+            active=False,
+            policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+            online_start_time="07:00",
+            online_end_time="09:00",
+            max_online_entries=6,
+            online_issued_count=2,
+        )
+    )
+    db_session.flush()
+
+    assert (
+        find_inactive_daily_queue_for_specialist(
+            db_session, date(2030, 1, 2), doctor.id, tag
+        )
+        is None
+    )
+
+
+@pytest.mark.unit
+def test_rowless_public_status_uses_qr_creation_cap(db_session, monkeypatch):
+    import app.crud.clinic as clinic_crud
+    import app.crud.online_queue as online_queue_crud
+    import app.services.queue_service as queue_service_module
+    import app.services.queue_svc._core as queue_core
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue
+    from app.services.queue_service import QueueBusinessService
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+        "max_per_day": {"synthetic-rowless-cap": 3},
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setattr(online_queue_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setattr(queue_core, "get_queue_settings", lambda db: settings)
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
+    _fixed_tashkent_time(monkeypatch, online_queue_crud, hour=8)
+    _fixed_tashkent_time(monkeypatch, queue_service_module, hour=8)
+
+    doctor = Doctor(specialty="synthetic-rowless-cap", max_online_per_day=12)
+    db_session.add(doctor)
+    db_session.flush()
+    day = date(2030, 1, 2)
+    report = online_queue_crud.check_queue_availability(db_session, day, doctor.id)
+    QueueBusinessService().assign_queue_token(
+        db_session,
+        specialist_id=doctor.id,
+        department=doctor.specialty,
+        generated_by_user_id=None,
+        target_date=day,
+        commit=False,
+    )
+    created_queue = (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.specialist_id == doctor.id, DailyQueue.day == day)
+        .one()
+    )
+
+    assert report["max_online_entries"] == 3
+    assert created_queue.max_online_entries == report["max_online_entries"]
+
+
+@pytest.mark.unit
+def test_inactive_resource_qr_reports_retained_queue_length(db_session, monkeypatch):
+    import app.crud.clinic as clinic_crud
+    import app.services.qr_queue_service as qr_service_module
+    import app.services.queue_service as queue_service_module
+    from app.models.clinic import Doctor
+    from app.models.online_queue import (
+        DailyQueue,
+        OnlineQueueEntry,
+        QueueResource,
+        QueueToken,
+    )
+    from app.services.qr_queue import QRQueueService
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.delenv("DISABLE_QUEUE_TIME_RESTRICTIONS", raising=False)
+    _fixed_tashkent_time(monkeypatch, qr_service_module, hour=8)
+    _fixed_tashkent_time(monkeypatch, queue_service_module, hour=8)
+
+    tag = "synthetic-inactive-resource-length"
+    doctor = Doctor(specialty=tag)
+    resource = QueueResource(
+        code=tag,
+        queue_tag=tag,
+        display_name="SYNTHETIC resource",
+        active=True,
+        max_online_per_day=4,
+    )
+    db_session.add_all([doctor, resource])
+    db_session.flush()
+    day = date(2030, 1, 2)
+    queue = DailyQueue(
+        day=day,
+        queue_resource_id=resource.id,
+        queue_tag=tag,
+        active=False,
+        policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+        online_start_time="07:00",
+        online_end_time="09:00",
+        max_online_entries=4,
+        online_issued_count=1,
+    )
+    db_session.add(queue)
+    db_session.flush()
+    db_session.add(
+        OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            source="online",
+            status="waiting",
+        )
+    )
+    token = QueueToken(
+        token="SYNTHETIC-inactive-resource-length",
+        day=day,
+        specialist_id=doctor.id,
+        expires_at=datetime(2030, 1, 3),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.flush()
+
+    result = QRQueueService(db_session).get_qr_token_info(token.token)
+
+    assert result["status"] == "queue_inactive"
+    assert result["queue_length"] == 1

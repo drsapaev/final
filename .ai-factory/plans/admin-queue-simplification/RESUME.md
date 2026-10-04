@@ -1,10 +1,21 @@
 # Resume — admin queue simplification
 
 Plan version: 2.9
-Last updated: 2026-10-04T11:15:31+05:00, Asia/Tashkent
+Last updated: 2026-10-04T18:20:58+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
+## Authoritative current checkpoint — five P2 fixes for PR #3596 (2026-10-04)
+
+- PR #3596 remains OPEN and mergeable. Verified remote HEAD `db2b4f97164a1f57488b0898da8f038d4fdf9d98`, base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. Worktree: `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`.
+- This follow-up fixes the five confirmed P2s from `.scratch/PR3596_REVIEW.md`: routed inactive owner resolution, exact-tag validation of inactive status, resource-first identity routing, rowless quota parity with queue creation defaults, and retained waiting/called count for inactive QR identities.
+- Source/test paths changed: `backend/app/crud/online_queue.py`, `backend/app/crud/queue_resource_routing.py`, `backend/app/services/qr_queue/_queue_ops.py`, `backend/app/services/queue_domain_service.py`, `backend/tests/unit/test_online_admission_window.py`, and `backend/tests/unit/test_queue_domain_service.py`. Only the three plan journals are additionally allowed for tracked changes. Preserve `.scratch/` and `.pr-body-T08.2c.md`; do not stage them.
+- Gate: `gate_known_root_cause` on `backend/app/services/queue_domain_service.py` returned `narrow_override`, `gate_misroute=false`, `override_used=true`, no handoff. The bounded manual basis is the user's request to fix these five review findings in #3596 plus the approved T08.2c read/report contract. Stop if scope reaches admission writers, schema/model/migration, frontend, policy rollout, staging or production.
+- Current local checks: two focused unit modules **57 passed, 1 warning** using SQLite fixtures; scoped Ruff, Python compile, and `git diff --check` pass. Local database fixtures only; PostgreSQL race tests, staging/browser validation, production behavior, and fresh GitHub CI are NOT_RUN.
+- Current code is still uncommitted and remote HEAD has not moved. Next: commit only the six code/test and three plan files, push to the existing PR branch, inspect fresh exact-head CI, then update and validate the PR body. Keep PR #3596 open; no human review/merge was requested here. Do not begin T08.3 until the #3596 cycle closes.
+
 ## Current continuation checkpoint — T08.2c exact-head validation
+
+> Historical and superseded by the authoritative checkpoint above. Its former next-action and exact-head check statements do not describe the current local diff.
 
 - Worktree/base: `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`; `origin/main`: `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. Code follow-ups are `ba148e83b23e6d675e6b6b38896a51de67ee3540` and `210a11fde1919a9aa025d1bc023fb9a60b7f3598`. GitHub PR #3596 is OPEN and mergeable on base `3da3e0dd`. Exact PR HEAD `38d1fa533b6006c5010d9131652b38e1b18b842e` has passed applicable CI; skipped path-aware jobs are recorded as NOT_RUN. A documentation-only status update is being prepared; after it is pushed, recheck CI on that new exact head.
 - New findings and fixes: Admin `queue-status` used `Doctor.user_id` instead of `Doctor.id`; inactive doctor identity lookup ignored exact `queue_tag`; Admin aggregate and public `/online-queue/status` synthesized a fresh v1 quota when only an inactive resource-owned queue existed. A follow-up fail-first check caught the same public-status error when an inactive doctor-owned row is returned directly. The read paths now use the correct owner identity, return unknown quota for inactive identities, and mark the public status unavailable with no slots.
