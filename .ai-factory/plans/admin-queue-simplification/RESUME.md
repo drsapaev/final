@@ -1,10 +1,21 @@
 # Resume — admin queue simplification
 
 Plan version: 2.9
-Last updated: 2026-10-04T08:31:13+05:00, Asia/Tashkent
+Last updated: 2026-10-04T09:13:47+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
-## Current continuation checkpoint — T08.2c
+## Current continuation checkpoint — T08.2c review fixes
+
+- Worktree/base: `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`; base and current `origin/main` are `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`.
+- Code commit: `98025bf35545227ba0862cfe1a9fc10e14105df2`. It fixes all five automated P2 findings on PR #3596: deduplicate rowless quota by QueueResource; retain clinic-wide queue length on closed-window early returns; preserve online-only `current_entries` and numeric legacy `remaining_slots`; include saved `policy_version` when reception is open; and report quota unknown when an inactive resource identity blocks replacement.
+- Fail-first reproduced 5 failures / 35 passes. Fixed-code focused modules: **40 passed / 1 warning**; five named review regressions after the commit-hook formatting pass: **5 passed / 35 deselected / 1 warning**. Scoped Ruff, Python compile, and diff whitespace checks passed. Temporary SQLite fixtures only; no PostgreSQL or staging proof.
+- Gate result: `gate_known_root_cause` on `_queue_ops.py` returned `narrow_override`, `gate_misroute=false`, `override_used=true`, with only `_queue_ops.py` in first touch. The approved T08.2c contract and five exact PR findings are the bounded basis for the sibling helper/service/test paths. No third gate call. Commit hooks passed except `ruff-format`/Black, skipped after their initial automatic formatting touched unrelated legacy regions; unrelated formatting was removed.
+- GitHub still reports PR #3596 at the old exact head `7ac67296e22c0562b75c944df5b161ede77262c`; the new code and journal/body checkpoint are not pushed yet. On that old head, Backend tests passed, Frontend E2E failed one unrelated Lab dirty-guard timeout (60 passed, 1 failed); all old-head checks are stale for the code commit. No independent review or merge is claimed.
+- Next exact action: `.pr-body-T08.2c.md` passed its 19-check local quality gate. Commit only the plan evidence/progress/resume updates, update GitHub from this validated body, push code + journal to PR #3596, then inspect all required CI and review state on the new exact head. Keep merge on hold while required checks or independent review are unresolved. Do not start T08.3 before this PR cycle closes; do not enable the v1 flag or touch staging/production.
+
+## Historical continuation checkpoint — T08.2c pre-review
+
+> Superseded by the review-fix checkpoint above. The exact-head, next-step, and check-status statements below describe the earlier checkpoint only.
 
 - Fresh base and worktree: `origin/main` = `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`; runtime report commit `718d4d65c5717528e8a93fb819fdf328c63bf772`, future-date correction `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`, OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`.
 - T08.2b / PR #3581 MERGED at `742bf08bd82da5f2ab8160ce474bdeab5694aa26`; exact reviewed code head `5c32825355fba8bce3ef92a6fcf979a76567da0d`. Local `main` was synced after merge.
