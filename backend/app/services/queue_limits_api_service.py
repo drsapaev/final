@@ -74,6 +74,7 @@ class QueueLimitsApiService:
             # ровно один раз (usage/кап), счёт врачей остаётся
             # раздельным (doctors_count).
             counted_queue_ids: set[int] = set()
+            counted_rowless_resource_ids: set[int] = set()
             for doctor in spec_data["doctors"]:
                 # Codex round-5 P2: a doctor may hold several ACTIVE queues
                 # for today under different tags (the quick-call surface
@@ -140,6 +141,10 @@ class QueueLimitsApiService:
                         if doctor.specialty and isinstance(self.db, Session)
                         else None
                     )
+                    if resource is not None:
+                        if resource.id in counted_rowless_resource_ids:
+                            continue
+                        counted_rowless_resource_ids.add(resource.id)
                     owner_cap = (
                         resource.max_online_per_day
                         if resource is not None
