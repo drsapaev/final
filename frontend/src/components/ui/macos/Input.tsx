@@ -1,6 +1,7 @@
 import React, { type CSSProperties, type FocusEvent, type MouseEvent, type ComponentType } from 'react';
 import { XCircle } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
+import Tooltip from './Tooltip';
 type InputSize = 'sm' | 'md' | 'lg';
 type InputVariant = 'default' | 'filled' | 'error';
 type IconPosition = 'left' | 'right';
@@ -150,11 +151,14 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
     if (props.onBlur) props.onBlur(e);
   };
 
-  const clearButtonStyle: CSSProperties = {
+  const clearButtonTooltipStyle: CSSProperties = {
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
-    right: hasRightIcon ? '40px' : '12px',
+    right: hasRightIcon ? '40px' : '12px'
+  };
+
+  const clearButtonStyle: CSSProperties = {
     background: 'none',
     border: 'none',
     padding: '2px',
@@ -185,10 +189,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
         {...props}
       />
       {showClearButton && (
-        <button
+        <Tooltip
+          content={t('common.clear', { defaultValue: 'Clear input' })}
+          style={clearButtonTooltipStyle}>
+          <button
           type="button"
           aria-label={t('common.clear', { defaultValue: 'Clear input' })}
-          title={t('common.clear', { defaultValue: 'Clear input' })}
           style={clearButtonStyle}
           onClick={(e: MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
@@ -211,8 +217,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
             e.currentTarget.style.opacity = '0.7';
           }}
         >
-          <XCircle size={16} />
+          <XCircle size={16} aria-hidden="true" />
         </button>
+        </Tooltip>
       )}
     </div>
   );

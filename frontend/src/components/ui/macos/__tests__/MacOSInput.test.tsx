@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import i18n from '@/i18n';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import Input from '../Input';
 
 /**
@@ -16,6 +17,8 @@ import Input from '../Input';
  * as an exact string, so old ("Clear input" in every language) and new
  * (localized) behavior can never pass at the same time.
  */
+const renderInput = (ui: React.ReactElement) => render(<ThemeProvider>{ui}</ThemeProvider>);
+
 describe('Input', () => {
   afterEach(async () => {
     await act(async () => {
@@ -29,7 +32,7 @@ describe('Input', () => {
     });
     const onClear = vi.fn();
 
-    render(
+    renderInput(
       <Input
         value="hello"
         onChange={() => {}}
@@ -50,7 +53,7 @@ describe('Input', () => {
       await i18n.changeLanguage('en');
     });
 
-    render(
+    renderInput(
       <Input
         value="hello"
         onChange={() => {}}
@@ -67,7 +70,7 @@ describe('Input', () => {
       await i18n.changeLanguage('uz-Latn');
     });
 
-    render(
+    renderInput(
       <Input
         value="hello"
         onChange={() => {}}
@@ -84,7 +87,7 @@ describe('Input', () => {
       await i18n.changeLanguage('kk');
     });
 
-    render(
+    renderInput(
       <Input
         value="hello"
         onChange={() => {}}
@@ -103,7 +106,7 @@ describe('Input', () => {
       await i18n.changeLanguage('uz-Cyrl');
     });
 
-    render(
+    renderInput(
       <Input
         value="hello"
         onChange={() => {}}
@@ -122,7 +125,7 @@ describe('Input', () => {
       await i18n.changeLanguage('ru');
     });
 
-    render(
+    renderInput(
       <Input
         value=""
         onChange={() => {}}
