@@ -820,20 +820,14 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
 
             max_entries = max_online_entries
             current_entries = queue_length
-            quota_reached = (
-                online_issued_count >= max_entries
-                if policy_version == "daily_online_issuances_v1"
-                else current_entries >= max_entries
-            )
 
             return {
-                "allowed": not quota_reached,
-                "message": (
-                    "Достигнут дневной лимит онлайн-записей"
-                    if quota_reached
-                    else f"Запись на {target_date.strftime('%d.%m.%Y')} доступна"
-                ),
-                "status": "limit_reached" if quota_reached else "available",
+                # Future-date availability has historically been advisory.
+                # Keep it available here while still exposing saved quota
+                # facts; the final admission path owns enforcement.
+                "allowed": True,
+                "message": f"Запись на {target_date.strftime('%d.%m.%Y')} доступна",
+                "status": "available",
                 **window_fields,
                 "max_online_entries": max_entries,
                 "online_issued_count": online_issued_count,
