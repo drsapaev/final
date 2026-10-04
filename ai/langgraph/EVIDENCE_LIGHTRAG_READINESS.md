@@ -3582,3 +3582,15 @@ the default for DevBrain wrappers and keep LlamaIndex/LightRAG opt-in.
 - Follow-up: improve gate routing for bounded multi-client bootstrap and
   portable-memory integration work so it includes the named helper and docs
   owners. No LightRAG query-quality evaluation was performed.
+
+## Task 104 - T08.2b remaining admission adapter inventory gate — 2026-10-03
+
+### Gate observation
+- The initial T08.2b task described auditing active online-admission writers outside GraphQL after PR #3576. The gate returned `gate_ok` / `gate_misroute=false` but proposed `backend/app/services/queue_service.py`, `backend/app/models/online_queue.py`, `backend/tests/unit/test_queue_time_window.py`, and unrelated Admin Telegram/frontend files; that set did not cover the mounted admission routes in the task.
+- After source inspection confirmed `backend/app/services/queue_svc/_operations.py:QueueBusinessService.join_queue_with_token` as the common online writer, the only permitted known-root retry used `--known-root-cause backend/app/services/queue_svc/_operations.py`. It returned `narrow_override`, `gate_misroute=true`, `override_used=true`, and included the confirmed operations file plus generic model/window/Telegram files.
+- Fields: `gate_misroute=true` based on the actual mismatch; `override_used=true`; `known_root_cause_file=backend/app/services/queue_svc/_operations.py`.
+- No third gate invocation. No runtime patch was justified: legacy token, compatibility online, QR session and permanent-address admission all use the canonical writer; GraphQL was already fixed in merged PR #3576. The user-approved T08 coverage table is the basis for a docs-only source inventory and this record.
+
+### Manual reconstruction
+- Active successful admission routes and transaction/replay boundaries are recorded in the T08.2b evidence table. `crud.online_queue.join_online_queue` has no active caller; Telegram's current callback does not reach a persisted writer; staff derivation and `/queue/open` are not independent online admissions.
+- Follow-up: gate routing should resolve the T08 adapter coverage table and mounted FastAPI routes before selecting Telegram or generic queue-window tests. This evidence does not authorize a broader gate/tooling patch in T08.2b.

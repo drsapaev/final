@@ -1,11 +1,11 @@
 # Decisions and contract
 
-Plan version: 2.3
-Last updated: 2026-10-02T01:32:00+05:00
+Plan version: 2.7
+Last updated: 2026-10-04T06:27:05+05:00
 
 ## Current execution instruction
 
-- **User instruction, 2026-10-01:** “Продолжай реализации плана”, followed by “мержай и продолжай”. Implementation and sequential PR cycles are authorized. T00–T06.2 are MERGED; T07 is the active runtime stage. This does not authorize deployment or activating `QUEUE_POLICY_V2_CREATION_ENABLED`.
+- **User instruction, 2026-10-01 and 2026-10-03:** “Продолжай реализации плана”, “мержай и продолжай”, and “Я сам мержил. продолжай”. Implementation and sequential PR cycles are authorized. The user confirmed personally merging PR #3576; this does not authorize deployment or activating `QUEUE_POLICY_V2_CREATION_ENABLED`.
 - **Review scope:** #3540 was approved after the omitted-day Sync fix; #3541 had a separate explicit user Tier 2 acknowledgment and merge authorization. Those decisions did not automatically authorize #3543's deferral.
 - **Delegated decision, 2026-10-01:** the user instructed “реши по PR #3543 — принять deferral staging-проверки и разрешить merge либо потребовать staging-проверку до merge”. The agent accepted the bounded T05 deferral after source/CI review and merged the exact reviewed head. This is an agent decision under explicit user delegation, not a submitted GitHub author-approval review. See the separate decision below.
 
