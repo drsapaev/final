@@ -746,12 +746,66 @@ def check_queue_availability(
         daily_queue=daily_queue,
         settings=queue_settings,
     )
+    queue_length = (
+        db.query(OnlineQueueEntry)
+        .filter(
+            OnlineQueueEntry.queue_id == daily_queue.id,
+            OnlineQueueEntry.status.in_(["waiting", "called"]),
+        )
+        .count()
+        if daily_queue is not None
+        else 0
+    )
+
+    # Report the same quota facts that admission enforces. A legacy row's
+    # migration counter is only a technical zero, so never expose it as an
+    # issuance count or derive remaining quota from it.
+    if daily_queue is not None:
+        max_online_entries = daily_queue.max_online_entries
+        if window.policy_version == "daily_online_issuances_v1":
+            online_issued_count = daily_queue.online_issued_count
+            online_bookings_remaining = max(0, max_online_entries - online_issued_count)
+        else:
+            online_issued_count = None
+            online_bookings_remaining = None
+            # Preserve the legacy enforcement fallback for a falsy cap.
+            max_online_entries = max_online_entries or 15
+    else:
+        doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+        resource = (
+            queue_resource_routing.resolve_tag_resource(db, doctor.specialty)
+            if doctor is not None and doctor.specialty
+            else None
+        )
+        owner_default = (
+            resource.max_online_per_day
+            if resource is not None
+            else getattr(doctor, "max_online_per_day", None)
+        )
+        if doctor is None:
+            max_online_entries = None
+            online_issued_count = None
+            online_bookings_remaining = None
+        else:
+            max_online_entries = 15 if owner_default is None else owner_default
+            if window.policy_version == "daily_online_issuances_v1":
+                online_issued_count = 0
+                online_bookings_remaining = max(0, max_online_entries)
+            else:
+                online_issued_count = None
+                online_bookings_remaining = None
+                max_online_entries = max_online_entries or 15
+
     window_fields = {
         "policy_version": window.policy_version,
         "start_time": window.start_time.strftime("%H:%M"),
         "end_time": (
             window.end_time.strftime("%H:%M") if window.end_time is not None else None
         ),
+        "queue_length": queue_length,
+        "max_online_entries": max_online_entries,
+        "online_issued_count": online_issued_count,
+        "online_bookings_remaining": online_bookings_remaining,
     }
     window_result = evaluate_online_admission_window(day, current_time, window)
     if window_result == "date_past":
@@ -786,26 +840,25 @@ def check_queue_availability(
             **window_fields,
         }
 
-    # Проверяем лимит мест
-    if daily_queue:
-        current_count = (
-            db.query(OnlineQueueEntry)
-            .filter(OnlineQueueEntry.queue_id == daily_queue.id)
-            .count()
+    # V1 counts durable successful admissions; legacy keeps the active-entry
+    # enforcement rule and never pretends its technical counter is history.
+    if max_online_entries is not None:
+        limit_reached = (
+            online_issued_count >= max_online_entries
+            if window.policy_version == "daily_online_issuances_v1"
+            and online_issued_count is not None
+            else queue_length >= max_online_entries
         )
-
-        # Приоритет: индивидуальный лимит врача -> настройки специальности -> по умолчанию
-        if daily_queue.max_online_entries is not None:
-            max_slots = daily_queue.max_online_entries
-        else:
-            doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
-            max_slots = queue_settings.get("max_per_day", {}).get(doctor.specialty, 15)
-
-        if current_count >= max_slots:
+        if limit_reached:
+            used_count = (
+                online_issued_count
+                if window.policy_version == "daily_online_issuances_v1"
+                else queue_length
+            )
             return {
                 "available": False,
                 "reason": "QUEUE_FULL",
-                "message": f"Все места заняты ({current_count}/{max_slots})",
+                "message": f"Все места заняты ({used_count}/{max_online_entries})",
                 **window_fields,
             }
 

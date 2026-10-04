@@ -5318,6 +5318,7 @@ def test_queue_limits_aggregate_clinic_day_resource_usage(
         "app.services.queue_limits_api_service.clinic_today",
         lambda db: clinic_day,
     )
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
 
     try:
         user = _make_user(db_session, username="lab_res_kk2", role="Resource")
@@ -5333,6 +5334,10 @@ def test_queue_limits_aggregate_clinic_day_resource_usage(
         limits = service.get_queue_limits(specialty="lab")
         lab_row = next(r for r in limits if r["specialty"] == "lab")
         assert lab_row["current_usage"] == 2
+        assert lab_row["queue_length"] == 2
+        assert lab_row["policy_version"] == "daily_online_issuances_v1"
+        assert lab_row["online_issued_count"] == 0
+        assert lab_row["online_bookings_remaining"] == 25
         assert lab_row["aggregate_max_per_day"] == 25
     finally:
         _durable_cleanup(db_session, "lab_res_kk2")

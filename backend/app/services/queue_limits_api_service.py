@@ -7,7 +7,13 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
+from app.crud import queue_resource_routing
 from app.crud.clinic import clinic_today, get_queue_settings, update_queue_settings
+from app.crud.daily_queue_creation_policy import (
+    LEGACY_POLICY_VERSION,
+    ONLINE_ISSUANCES_V1_POLICY_VERSION,
+    policy_version_for_new_queue,
+)
 from app.crud.queue_resource_routing import (
     resolve_registry_tag_queue_for_specialist,
 )
@@ -56,7 +62,12 @@ class QueueLimitsApiService:
         )
         for spec_data in specialties.values():
             total_usage = 0
+            queue_length = 0
             aggregate_cap = 0
+            policy_versions: set[str] = set()
+            online_issued_count = 0
+            online_bookings_remaining = 0
+            quota_is_known = True
             # Codex round-11 P2: несколько активных врачей одной
             # registry-backed специальности резолвят ОДНУ общую
             # (today, tag)-поверхность — каждая считается в агрегат
@@ -95,18 +106,66 @@ class QueueLimitsApiService:
                     total_usage += self.repository.count_entries(
                         queue_id=daily_queue.id
                     )
+                    count_active = getattr(
+                        self.repository,
+                        "count_active_entries",
+                        self.repository.count_entries,
+                    )
+                    queue_length += count_active(queue_id=daily_queue.id)
+                    policy_version = getattr(
+                        daily_queue, "policy_version", LEGACY_POLICY_VERSION
+                    )
+                    policy_versions.add(policy_version)
                     # enforcement reads the persisted per-queue cap
                     # (check_queue_limits -> max_online_entries) — the
                     # admin aggregate must sum THAT. Falsy -> 15 mirrors
                     # the enforcement fallback.
-                    aggregate_cap += daily_queue.max_online_entries or 15
+                    persisted_cap = daily_queue.max_online_entries
+                    cap = 15 if persisted_cap is None else persisted_cap
+                    if policy_version == LEGACY_POLICY_VERSION:
+                        cap = cap or 15
+                        quota_is_known = False
+                    else:
+                        issued = daily_queue.online_issued_count
+                        online_issued_count += issued
+                        online_bookings_remaining += max(0, cap - issued)
+                    aggregate_cap += cap
                 if not queues:
-                    # No queue yet: the join would create one with the
-                    # doctor's own per-doctor default (Doctor.
-                    # max_online_per_day, column default 15).
-                    aggregate_cap += doctor.max_online_per_day or 15
+                    # A rowless owner uses fresh owner defaults and the
+                    # creation policy selected for its next daily queue.
+                    resource = (
+                        queue_resource_routing.resolve_tag_resource(
+                            self.db, doctor.specialty
+                        )
+                        if doctor.specialty and isinstance(self.db, Session)
+                        else None
+                    )
+                    owner_cap = (
+                        resource.max_online_per_day
+                        if resource is not None
+                        else getattr(doctor, "max_online_per_day", None)
+                    )
+                    if owner_cap is None:
+                        owner_cap = max_per_day_settings.get(doctor.specialty)
+                    cap = 15 if owner_cap is None else owner_cap
+                    policy_version = policy_version_for_new_queue()
+                    policy_versions.add(policy_version)
+                    if policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION:
+                        online_bookings_remaining += max(0, cap)
+                    else:
+                        cap = cap or 15
+                        quota_is_known = False
+                    aggregate_cap += cap
             spec_data["current_usage"] = total_usage
+            spec_data["queue_length"] = queue_length
             spec_data["aggregate_cap"] = aggregate_cap
+            spec_data["policy_versions"] = policy_versions
+            spec_data["online_issued_count"] = (
+                online_issued_count if quota_is_known else None
+            )
+            spec_data["online_bookings_remaining"] = (
+                online_bookings_remaining if quota_is_known else None
+            )
 
         result: list[dict] = []
         for spec_name, spec_data in specialties.items():
@@ -124,6 +183,16 @@ class QueueLimitsApiService:
                     "start_number": start_numbers_settings.get(spec_name, 1),
                     "enabled": True,
                     "current_usage": spec_data["current_usage"],
+                    "queue_length": spec_data["queue_length"],
+                    "policy_version": (
+                        next(iter(spec_data["policy_versions"]))
+                        if len(spec_data["policy_versions"]) == 1
+                        else "mixed"
+                    ),
+                    "online_issued_count": spec_data["online_issued_count"],
+                    "online_bookings_remaining": spec_data[
+                        "online_bookings_remaining"
+                    ],
                     "doctors_count": len(spec_data["doctors"]),
                     "aggregate_max_per_day": spec_data["aggregate_cap"],
                     "last_updated": datetime.now(UTC),

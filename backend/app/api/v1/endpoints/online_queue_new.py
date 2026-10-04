@@ -221,6 +221,10 @@ def check_queue_status(
             ),
             queue_end_time=availability.get("end_time"),
             policy_version=availability.get("policy_version", "legacy"),
+            queue_length=availability.get("queue_length", 0),
+            max_online_entries=availability.get("max_online_entries"),
+            online_issued_count=availability.get("online_issued_count"),
+            online_bookings_remaining=availability.get("online_bookings_remaining"),
             opened_at=queue_status.get("opened_at"),
         )
 
