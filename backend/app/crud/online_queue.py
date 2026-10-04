@@ -744,7 +744,10 @@ def check_queue_availability(
 
     doctor = None
     inactive_queue = None
-    if daily_queue is None:
+    if daily_queue is not None and not daily_queue.active:
+        inactive_queue = daily_queue
+        daily_queue = None
+    if daily_queue is None and inactive_queue is None:
         doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
         if doctor is not None:
             inactive_queue = (
