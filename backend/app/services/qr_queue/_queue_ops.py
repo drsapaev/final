@@ -14,9 +14,12 @@ from app.crud.daily_queue_creation_policy import (
     online_admission_window,
 )
 from app.crud.queue_resource_routing import (
+    find_inactive_daily_queue_for_specialist,
     prefer_registry_surface,
     resolve_registry_tag_queue_for_specialist,
+    resolve_tag_resource,
 )
+from app.models.clinic import Doctor
 from app.services.qr_queue._base import *  # noqa: F401, F403
 from app.services.qr_queue._base import QRQueueServiceMixinBase, _now
 
@@ -502,6 +505,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                         else None
                     ),
                     "target_date": target_date.isoformat(),
+                    "queue_length": 0,
                 }
                 window_result = evaluate_online_admission_window(
                     target_date, now, window
@@ -538,12 +542,27 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "message": f"Запись на {target_date.strftime('%d.%m.%Y')} доступна",
                     "status": "available",
                     **window_fields,
-                    "max_entries": 15,
+                    "max_entries": None,
                     "current_entries": 0,
-                    "remaining_slots": 15,
+                    "max_online_entries": None,
+                    "online_issued_count": None,
+                    "online_bookings_remaining": None,
+                    "remaining_slots": None,
                     "target_date": target_date.isoformat(),
                     "warning": "Очереди еще не созданы, но запись разрешена",
                 }
+
+            overview_queue_ids = [queue.id for queue in daily_queues]
+            overview_queue_length = (
+                self.db.query(OnlineQueueEntry)
+                .filter(
+                    OnlineQueueEntry.queue_id.in_(overview_queue_ids),
+                    OnlineQueueEntry.status.in_(["waiting", "called"]),
+                )
+                .count()
+                if overview_queue_ids
+                else 0
+            )
 
             # A clinic-wide QR is an overview before the patient selects a
             # concrete owner. Never let the first DailyQueue row impose its
@@ -590,6 +609,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                         else None
                     ),
                     "target_date": target_date.isoformat(),
+                    "queue_length": overview_queue_length,
                 }
                 return {
                     "allowed": False,
@@ -615,6 +635,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                         else None
                     ),
                     "target_date": target_date.isoformat(),
+                    "queue_length": overview_queue_length,
                 }
                 return {
                     "allowed": False,
@@ -629,6 +650,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "allowed": False,
                     "message": "Запись закрыта - прием уже открыт",
                     "status": "closed_reception_opened",
+                    "queue_length": overview_queue_length,
                 }
             else:
                 return {
@@ -636,6 +658,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "message": f"Нельзя записаться на прошедшую дату ({target_date:%d.%m.%Y})",
                     "status": "date_past",
                     "target_date": target_date.isoformat(),
+                    "queue_length": overview_queue_length,
                 }
         else:
             # Для конкретного специалиста ищем его очередь
@@ -681,7 +704,108 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 )
                 for q in all_queues:
                     logger.debug(f"    - ID={q.id}, day={q.day}, active={q.active}")
-                return {"allowed": False, "message": "Очередь не активна"}
+                doctor = (
+                    self.db.query(Doctor)
+                    .filter(Doctor.id == qr_token.specialist_id)
+                    .first()
+                )
+                resource = (
+                    resolve_tag_resource(self.db, doctor.specialty)
+                    if doctor is not None and doctor.specialty
+                    else None
+                )
+                inactive_identity = find_inactive_daily_queue_for_specialist(
+                    self.db,
+                    target_date,
+                    qr_token.specialist_id,
+                    doctor.specialty if doctor is not None else None,
+                )
+                if inactive_identity is not None:
+                    # The identity guard prevents a replacement queue from
+                    # resetting this persisted counter. Do not report current
+                    # defaults as a fresh quota for that inactive identity.
+                    return {
+                        "allowed": False,
+                        "message": "Очередь не активна",
+                        "status": "queue_inactive",
+                        "target_date": target_date.isoformat(),
+                        "queue_length": 0,
+                        "policy_version": None,
+                        "max_online_entries": None,
+                        "online_issued_count": None,
+                        "online_bookings_remaining": None,
+                    }
+                owner_default = (
+                    resource.max_online_per_day
+                    if resource is not None
+                    else getattr(doctor, "max_online_per_day", None)
+                )
+                max_online_entries = 15 if owner_default is None else owner_default
+                window = online_admission_window(
+                    daily_queue=None,
+                    settings=queue_settings,
+                )
+                is_v1 = window.policy_version == "daily_online_issuances_v1"
+                return {
+                    "allowed": False,
+                    "message": "Очередь не активна",
+                    "status": "queue_inactive",
+                    "policy_version": window.policy_version,
+                    "start_time": window.start_time.strftime("%H:%M"),
+                    "end_time": (
+                        window.end_time.strftime("%H:%M")
+                        if window.end_time is not None
+                        else None
+                    ),
+                    "queue_length": 0,
+                    "max_online_entries": max_online_entries,
+                    "online_issued_count": 0 if is_v1 else None,
+                    "online_bookings_remaining": (
+                        max(0, max_online_entries) if is_v1 else None
+                    ),
+                    "max_entries": max_online_entries,
+                    "current_entries": 0,
+                    "remaining_slots": max_online_entries,
+                }
+
+            queue_length = (
+                self.db.query(OnlineQueueEntry)
+                .filter(
+                    OnlineQueueEntry.queue_id == daily_queue.id,
+                    OnlineQueueEntry.status.in_(["waiting", "called"]),
+                )
+                .count()
+            )
+            current_entries = (
+                self.db.query(OnlineQueueEntry)
+                .filter(
+                    OnlineQueueEntry.queue_id == daily_queue.id,
+                    OnlineQueueEntry.source == "online",
+                    OnlineQueueEntry.status.in_(["waiting", "called"]),
+                )
+                .count()
+            )
+            policy_version = getattr(daily_queue, "policy_version", "legacy")
+            max_online_entries = daily_queue.max_online_entries
+            if policy_version == "daily_online_issuances_v1":
+                online_issued_count = daily_queue.online_issued_count
+                online_bookings_remaining = max(
+                    0, max_online_entries - online_issued_count
+                )
+            else:
+                online_issued_count = None
+                online_bookings_remaining = None
+                # Preserve the established legacy admission fallback.
+                max_online_entries = max_online_entries or 15
+            concrete_quota_fields = {
+                "queue_length": queue_length,
+                "policy_version": policy_version,
+                "max_online_entries": max_online_entries,
+                "online_issued_count": online_issued_count,
+                "online_bookings_remaining": online_bookings_remaining,
+                "current_entries": current_entries,
+                "remaining_slots": max_online_entries - current_entries,
+            }
 
             # Проверяем, открыт ли прием
             if daily_queue.opened_at:
@@ -689,6 +813,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "allowed": False,
                     "message": "Запись закрыта - прием уже открыт",
                     "status": "closed_reception_opened",
+                    **concrete_quota_fields,
                 }
 
         window = online_admission_window(
@@ -705,33 +830,52 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             ),
             "target_date": target_date.isoformat(),
         }
+        is_clinic_wide = qr_token.is_clinic_wide or qr_token.specialist_id is None
+        if is_clinic_wide:
+            window_fields.update(
+                {
+                    "queue_length": overview_queue_length,
+                    "max_online_entries": None,
+                    "online_issued_count": None,
+                    "online_bookings_remaining": None,
+                }
+            )
+        else:
+            window_fields.update(concrete_quota_fields)
 
         # Future dates retain the current contract: the same-day clock
         # boundaries do not reject a future booking.
         if target_date > today:
-            if daily_queue:
-                max_entries = getattr(daily_queue, "max_online_entries", 15)
-                current_entries = (
-                    self.db.query(OnlineQueueEntry)
-                    .filter(
-                        OnlineQueueEntry.queue_id == daily_queue.id,
-                        OnlineQueueEntry.source == "online",
-                        OnlineQueueEntry.status.in_(["waiting", "called"]),
-                    )
-                    .count()
-                )
-            else:
-                max_entries = 15
-                current_entries = 0
+            if is_clinic_wide:
+                return {
+                    "allowed": True,
+                    "message": f"Запись на {target_date.strftime('%d.%m.%Y')} доступна",
+                    "status": "available",
+                    **window_fields,
+                    "max_online_entries": None,
+                    "online_issued_count": None,
+                    "online_bookings_remaining": None,
+                    "max_entries": None,
+                    "current_entries": None,
+                    "remaining_slots": None,
+                }
+
+            max_entries = max_online_entries
 
             return {
+                # Future-date availability has historically been advisory.
+                # Keep it available here while still exposing saved quota
+                # facts; the final admission path owns enforcement.
                 "allowed": True,
                 "message": f"Запись на {target_date.strftime('%d.%m.%Y')} доступна",
                 "status": "available",
                 **window_fields,
+                "max_online_entries": max_entries,
+                "online_issued_count": online_issued_count,
+                "online_bookings_remaining": online_bookings_remaining,
+                "remaining_slots": concrete_quota_fields["remaining_slots"],
                 "max_entries": max_entries,
                 "current_entries": current_entries,
-                "remaining_slots": max_entries - current_entries,
             }
 
         window_result = evaluate_online_admission_window(target_date, now, window)
@@ -761,18 +905,11 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
 
         # Проверяем лимит записей
         # ✅ ИСПРАВЛЕНИЕ: Для общего QR не проверяем строгий лимит (будет проверяться при создании записей)
-        if qr_token.is_clinic_wide or qr_token.specialist_id is None:
-            # Для общего QR используем значения из первой очереди для информации (если есть)
-            max_entries = (
-                getattr(daily_queue, "max_online_entries", 15) if daily_queue else 15
-            )
+        if is_clinic_wide:
+            # A clinic-wide overview can contain different owners and policy
+            # versions; it has a queue length but no single queue quota.
             # Подсчитываем общее количество онлайн записей на эту дату
-            all_queues_ids = [
-                q.id
-                for q in self.db.query(DailyQueue)
-                .filter(DailyQueue.day == target_date, DailyQueue.active == True)
-                .all()
-            ]
+            all_queues_ids = overview_queue_ids
             current_entries = (
                 self.db.query(OnlineQueueEntry)
                 .filter(
@@ -784,26 +921,33 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 if all_queues_ids
                 else 0
             )
+            queue_length = overview_queue_length
+            max_entries = None
+            online_issued_count = None
+            online_bookings_remaining = None
         else:
-            # Для конкретного специалиста проверяем лимит его очереди
-            max_entries = getattr(daily_queue, "max_online_entries", 15)
-            current_entries = (
-                self.db.query(OnlineQueueEntry)
-                .filter(
-                    OnlineQueueEntry.queue_id == daily_queue.id,
-                    OnlineQueueEntry.source == "online",
-                    OnlineQueueEntry.status.in_(["waiting", "called"]),
-                )
-                .count()
+            max_entries = max_online_entries
+            online_issued_count = concrete_quota_fields["online_issued_count"]
+            online_bookings_remaining = concrete_quota_fields[
+                "online_bookings_remaining"
+            ]
+            quota_reached = (
+                online_issued_count >= max_entries
+                if policy_version == "daily_online_issuances_v1"
+                else current_entries >= max_entries
             )
 
-            if current_entries >= max_entries:
+            if quota_reached:
                 return {
                     "allowed": False,
                     "message": f"Достигнут лимит записей ({max_entries})",
                     "status": "limit_reached",
                     "max_entries": max_entries,
                     "current_entries": current_entries,
+                    "max_online_entries": max_entries,
+                    "online_issued_count": online_issued_count,
+                    "online_bookings_remaining": online_bookings_remaining,
+                    "remaining_slots": concrete_quota_fields["remaining_slots"],
                     **window_fields,
                 }
 
@@ -814,5 +958,10 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             **window_fields,
             "max_entries": max_entries,
             "current_entries": current_entries,
-            "remaining_slots": max_entries - current_entries,
+            "max_online_entries": max_entries,
+            "online_issued_count": online_issued_count,
+            "online_bookings_remaining": online_bookings_remaining,
+            "remaining_slots": (
+                None if is_clinic_wide else concrete_quota_fields["remaining_slots"]
+            ),
         }

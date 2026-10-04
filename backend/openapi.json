@@ -101845,6 +101845,42 @@
               }
             ],
             "title": "Countdown Text"
+          },
+          "max_online_entries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Online Entries",
+            "description": "Лимит только для выбранной дневной очереди; null для общего обзора"
+          },
+          "online_issued_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Issued Count",
+            "description": "Успешные online-выдачи v1; null для legacy/общего обзора"
+          },
+          "online_bookings_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Bookings Remaining",
+            "description": "Остаток v1-квоты; null для legacy/общего обзора"
           }
         },
         "type": "object",
@@ -102368,6 +102404,41 @@
             "type": "integer",
             "title": "Current Usage"
           },
+          "queue_length": {
+            "type": "integer",
+            "title": "Queue Length"
+          },
+          "policy_version": {
+            "type": "string",
+            "enum": [
+              "legacy",
+              "daily_online_issuances_v1",
+              "mixed"
+            ],
+            "title": "Policy Version"
+          },
+          "online_issued_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Issued Count"
+          },
+          "online_bookings_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Bookings Remaining"
+          },
           "doctors_count": {
             "type": "integer",
             "title": "Doctors Count"
@@ -102396,6 +102467,10 @@
           "start_number",
           "enabled",
           "current_usage",
+          "queue_length",
+          "policy_version",
+          "online_issued_count",
+          "online_bookings_remaining",
           "doctors_count",
           "aggregate_max_per_day",
           "last_updated"
@@ -103188,6 +103263,47 @@
             "title": "Policy Version",
             "description": "Политика допуска действующей или будущей очереди"
           },
+          "queue_length": {
+            "type": "integer",
+            "title": "Queue Length",
+            "description": "Число ожидающих и вызванных записей, независимо от источника"
+          },
+          "max_online_entries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Online Entries",
+            "description": "Лимит выбранной дневной очереди; null, если владелец не разрешён"
+          },
+          "online_issued_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Issued Count",
+            "description": "Успешные независимые online-выдачи для v1; null для legacy"
+          },
+          "online_bookings_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Bookings Remaining",
+            "description": "Остаток v1-квоты max_online_entries - online_issued_count; null для legacy"
+          },
           "opened_at": {
             "anyOf": [
               {
@@ -103210,7 +103326,11 @@
           "current_time",
           "queue_start_time",
           "queue_end_time",
-          "policy_version"
+          "policy_version",
+          "queue_length",
+          "max_online_entries",
+          "online_issued_count",
+          "online_bookings_remaining"
         ],
         "title": "QueueStatusCheck",
         "description": "Проверка статуса очереди"
@@ -117434,13 +117554,58 @@
             "format": "date",
             "title": "Day"
           },
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
           "current_entries": {
             "type": "integer",
             "title": "Current Entries"
           },
+          "queue_length": {
+            "type": "integer",
+            "title": "Queue Length"
+          },
           "max_entries": {
             "type": "integer",
             "title": "Max Entries"
+          },
+          "policy_version": {
+            "type": "string",
+            "enum": [
+              "legacy",
+              "daily_online_issuances_v1"
+            ],
+            "title": "Policy Version"
+          },
+          "online_issued_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Issued Count"
+          },
+          "online_bookings_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Bookings Remaining"
           },
           "limit_reached": {
             "type": "boolean",
@@ -117462,8 +117627,13 @@
           "specialty",
           "cabinet",
           "day",
+          "queue_id",
           "current_entries",
+          "queue_length",
           "max_entries",
+          "policy_version",
+          "online_issued_count",
+          "online_bookings_remaining",
           "limit_reached",
           "queue_opened",
           "online_available"

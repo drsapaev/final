@@ -1,13 +1,13 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 2.7 — T08.2b / #3581 remains open; user authorized review publication and merge, pending fresh-head CI.
-**Создан:** 30 сентября 2026. **Обновлён:** 4 октября 2026, 06:27 Asia/Tashkent.
+**Версия:** 2.9 — T08.2b / #3581 merged; T08.2c PR #3596 open, corrected exact head awaiting checks.
+**Создан:** 30 сентября 2026. **Обновлён:** 4 октября 2026, 08:31 Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
-**Последний подтверждённый runtime merge:** `1ed6d05874c2ea205a625bb70879adb10b077be4`, PR #3576 / T08.2a; пользователь подтвердил, что выполнил merge самостоятельно.
-**Текущий worktree:** C:\final\_wt_aqs_t082b_admission; codex/aqs-T08.2b-admission; fresh base 2e3519948534f956fac7f94c3b1822792f864f41. PR #3581 rebased after #3587; upstream Task 103 preserved, queue inventory gate renumbered Task 104. Resolve live HEAD/checks before authorized merge; older head checkpoints are historical.
+**Последний подтверждённый runtime merge:** `1ed6d05874c2ea205a625bb70879adb10b077be4`, PR #3576 / T08.2a; последующий документальный T08.2b PR #3581 merged as `742bf08bd82da5f2ab8160ce474bdeab5694aa26`.
+**Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; PR [#3596](https://github.com/drsapaev/final/pull/3596). Report implementation `718d4d65c5717528e8a93fb819fdf328c63bf772`; future-date compatibility fix `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`; OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`. Focused local checks pass (85 unit/OpenAPI, 4 selected integration). The docs-freshness CI failure on `fd9b1c793` was due to a final CRLF in the generated snapshot; it is removed to match exact app serialization. New exact-head checks pending.
 
-> **T00–T07, T08.1a, T08.1b и T08.2a — MERGED; T08.2b — IN_PROGRESS; T08.2c–T18 — PLANNED.** PR #3557 merged as `425df11c7a84f0d1e7954df0d00415927212669a`; PR #3571 as `d397656c7f597d72d6a6c92676cd204aff72d4d8`; PR #3572 as `95ff3b4752a091f22f9702977d611a3b6d9f1595`; PR #3576 as `1ed6d05874c2ea205a625bb70879adb10b077be4`. T08.2a added the persisted quota check to the sole confirmed direct writer, GraphQL. T08.2b is verifying that mounted adapters share the canonical writer and classifying non-admission paths. PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
+> **T00–T07, T08.1a, T08.1b, T08.2a и T08.2b — MERGED; T08.2c / PR #3596 OPEN; T08.3–T18 — PLANNED.** PR #3581 merged as `742bf08bd82da5f2ab8160ce474bdeab5694aa26`. T08.2c aligns read-side quota facts across public availability, QR, Admin status and aggregate limits, preserving advisory future-date semantics. Focused local tests pass; PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -292,6 +292,14 @@ next exact action; checks to rerun after next change.
 **Anchors:** `services/queue_domain_service.py:allocate_ticket`; `queue_svc/_operations.py:join_queue_with_token`, `check_queue_limits`, `get_next_queue_number`, batch prelocks; `services/queue_claim_service.py`; `crud/queue_resource_routing.py` claim/registry locks.
 
 Срезы: **T08.1a** canonical token quota; **T08.1b** v1 identity/recreation guard; **T08.2a** GraphQL direct writer; **T08.2b** remaining active admission adapters after source proof; **T08.2c** availability/report parity; **T08.3** PG concurrency/replay/partial proof. V1 не включать при неполном покрытии; facade-only change GraphQL не покрывает. Current T08.2a must keep its first PR limited to GraphQL and its focused tests. Telegram remains inventory-only unless a live issuance path is proven; the current source audit says its callback fails before a queue write.
+
+#### T08.2c — Availability and report parity
+
+**Scope:** read-only reporting across `GET /online-queue/status`, concrete QR availability/info, Admin `GET /queue-status`, and specialty aggregate `GET /queue-limits`; corresponding Pydantic/OpenAPI/generated TypeScript contracts and focused tests. Do not change admission writers, queue identity, schemas, or the creation flag.
+
+**Contract:** V1 uses the saved daily-queue cap and `online_issued_count`; remaining is `max(0, cap - issued)`. `queue_length` separately counts waiting/called entries, regardless of source. Legacy issued/remaining are null because the migrated zero does not prove history; the legacy active-entry enforcement semantics remain. A clinic-wide QR overview that combines owners or policies must not expose one queue's cap/count/remaining. Specialty aggregates expose `policy_version=mixed` and null issuance/remaining when a legacy member makes the sum unknown. Preserve historical aggregate `current_usage`; add active `queue_length` separately. Rowless reports use the owner defaults that the next queue constructor would consume.
+
+**Acceptance:** response values agree with the canonical quota/window owner; zero cap remains zero for v1; canceled/completed legacy rows do not become a fabricated issued count; mixed overview/aggregate values are explicitly unknown; OpenAPI and generated types match DTOs; focused unit/OpenAPI and resource integration tests pass. PostgreSQL concurrency remains T08.3, and staging is not a prerequisite claimed by this read-only slice.
 
 V1 transaction contract:
 
