@@ -152,6 +152,75 @@ class TestQueueLimitsApiService:
         assert result["online_issued_count"] == 0
         assert result["online_bookings_remaining"] == 4
 
+    def test_inactive_shared_resource_identity_does_not_advertise_fresh_quota(
+        self, db_session, monkeypatch
+    ):
+        import app.services.queue_limits_api_service as limits_service_module
+        from app.models.clinic import Doctor
+        from app.models.online_queue import DailyQueue, QueueResource
+
+        day = date(2030, 1, 2)
+        doctors = [
+            Doctor(specialty="synthetic-inactive-shared-resource"),
+            Doctor(specialty="synthetic-inactive-shared-resource"),
+        ]
+        resource = QueueResource(
+            code="synthetic-inactive-shared-resource",
+            queue_tag="synthetic-inactive-shared-resource",
+            display_name="Synthetic inactive shared resource",
+            active=True,
+            max_online_per_day=4,
+        )
+        db_session.add_all([*doctors, resource])
+        db_session.flush()
+        inactive_queue = DailyQueue(
+            day=day,
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=resource.queue_tag,
+            active=False,
+            policy_version="daily_online_issuances_v1",
+            online_start_time="07:00",
+            online_end_time="09:00",
+            max_online_entries=4,
+            online_issued_count=3,
+        )
+        db_session.add(inactive_queue)
+        db_session.flush()
+        monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
+        monkeypatch.setattr(limits_service_module, "clinic_today", lambda _db: day)
+
+        class Repository:
+            def list_active_doctors(self, *, specialty):
+                assert specialty == "synthetic-inactive-shared-resource"
+                return doctors
+
+            def list_active_daily_queues(self, *, day, specialist_id):
+                assert day == date(2030, 1, 2)
+                return []
+
+            def count_entries(self, *, queue_id):
+                raise AssertionError("inactive identity is not an active queue")
+
+            def count_active_entries(self, *, queue_id):
+                raise AssertionError("inactive identity is not an active queue")
+
+        service = QueueLimitsApiService(
+            db=db_session,
+            repository=Repository(),
+            get_settings=lambda _db: {"max_per_day": {}, "start_numbers": {}},
+        )
+
+        result = service.get_queue_limits(
+            specialty="synthetic-inactive-shared-resource"
+        )[0]
+
+        assert result["doctors_count"] == 2
+        assert result["aggregate_max_per_day"] == 4
+        assert result["policy_version"] == "daily_online_issuances_v1"
+        assert result["online_issued_count"] is None
+        assert result["online_bookings_remaining"] is None
+
     def test_queue_status_falls_back_to_username_when_full_name_missing(self, db_session):
         service = QueueLimitsApiService(
             db_session,

@@ -214,7 +214,8 @@ def check_queue_status(
         return QueueStatusCheck(
             queue_open=queue_status.get("queue_open", False),
             within_hours=availability.get("available", False),
-            has_slots=not availability.get("reason") == "QUEUE_FULL",
+            has_slots=availability.get("reason")
+            not in {"QUEUE_FULL", "QUEUE_INACTIVE"},
             current_time=current_time.replace(tzinfo=None),
             queue_start_time=availability.get(
                 "start_time", f"{queue_settings.get('queue_start_hour', 7):02d}:00"

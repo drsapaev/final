@@ -259,9 +259,6 @@ class QueueDomainService:
 
         result: list[dict[str, Any]] = []
         for doctor in doctors:
-            # Preserve current runtime behavior: limits read paths resolve DailyQueue
-            # by Doctor.user_id even though DailyQueue.specialist_id is modeled
-            # against doctors.id.
             # QD-2C (Codex round-10 P2): registry-tag врач — usage/кап/
             # открытость читаются с (day, tag)-ПОВЕРХНОСТИ (могла быть
             # создана ресурсной после переключения), иначе отчёт
@@ -286,7 +283,7 @@ class QueueDomainService:
                 queue_opened = daily_queue.opened_at is not None
             else:
                 daily_queue = self.read_repository.get_queue_by_specialist_day(
-                    specialist_id=doctor.user_id,
+                    specialist_id=doctor.id,
                     day=day,
                 )
                 current_entries = 0

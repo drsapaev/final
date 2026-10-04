@@ -145,6 +145,31 @@ class QueueLimitsApiService:
                         if resource.id in counted_rowless_resource_ids:
                             continue
                         counted_rowless_resource_ids.add(resource.id)
+                    inactive_queue = (
+                        queue_resource_routing.find_inactive_daily_queue_for_specialist(
+                            self.db, today, doctor.id, doctor.specialty
+                        )
+                        if isinstance(self.db, Session)
+                        else None
+                    )
+                    if inactive_queue is not None:
+                        # A missing ACTIVE row does not mean this identity is
+                        # unused: admission blocks replacement to preserve its
+                        # issuance counter. Report its persisted cap/policy,
+                        # but do not advertise a freshly reset quota.
+                        policy_version = getattr(
+                            inactive_queue, "policy_version", LEGACY_POLICY_VERSION
+                        )
+                        policy_versions.add(policy_version)
+                        persisted_cap = getattr(
+                            inactive_queue, "max_online_entries", None
+                        )
+                        cap = 15 if persisted_cap is None else persisted_cap
+                        if policy_version == LEGACY_POLICY_VERSION:
+                            cap = cap or 15
+                        aggregate_cap += cap
+                        quota_is_known = False
+                        continue
                     owner_cap = (
                         resource.max_online_per_day
                         if resource is not None
