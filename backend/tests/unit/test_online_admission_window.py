@@ -341,6 +341,48 @@ def test_public_status_does_not_synthesize_quota_for_inactive_resource_identity(
 
 
 @pytest.mark.unit
+def test_public_status_rejects_inactive_doctor_owned_queue(db_session, monkeypatch):
+    import app.api.v1.endpoints.online_queue_new as online_queue_endpoint
+    import app.crud.clinic as clinic_crud
+    import app.crud.online_queue as online_queue_crud
+    from app.models.clinic import Doctor
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+    }
+    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setattr(online_queue_crud, "get_queue_settings", lambda db: settings)
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
+    _fixed_tashkent_time(monkeypatch, online_queue_crud, hour=8)
+    _fixed_tashkent_time(monkeypatch, online_queue_endpoint, hour=8)
+
+    doctor = Doctor(specialty="synthetic-inactive-doctor-queue")
+    db_session.add(doctor)
+    db_session.flush()
+    queue = _make_v1_queue(db_session, day=date(2030, 1, 2), doctor=doctor)
+    queue.active = False
+    queue.online_issued_count = 3
+    db_session.flush()
+
+    availability = online_queue_crud.check_queue_availability(
+        db_session, queue.day, doctor.id
+    )
+    public_status = online_queue_endpoint.check_queue_status(
+        day=queue.day, specialist_id=doctor.id, db=db_session
+    )
+
+    assert availability["available"] is False
+    assert availability["reason"] == "QUEUE_INACTIVE"
+    assert availability["max_online_entries"] is None
+    assert availability["online_issued_count"] is None
+    assert availability["online_bookings_remaining"] is None
+    assert public_status.within_hours is False
+    assert public_status.has_slots is False
+
+
+@pytest.mark.unit
 def test_inactive_doctor_identity_lookup_matches_exact_queue_tag(db_session):
     from app.crud.queue_resource_routing import find_inactive_daily_queue_for_specialist
     from app.models.clinic import Doctor
