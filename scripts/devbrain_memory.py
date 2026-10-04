@@ -146,16 +146,23 @@ def txt(v,label,limit=MAX_TEXT,empty=True):
 def ident(v,label):
     if not isinstance(v,str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}",v): raise MemError("invalid "+label)
     return v
+def anchor_relative(root,s):
+    if not isinstance(s,str) or Path(s).is_absolute() or any(part in {".",".."} for part in Path(s).parts): raise MemError("anchor path rejected")
+    rel=Path(s).as_posix()
+    path_parts=Path(rel).parts
+    if not rel or not path_parts or "\\" in s or ":" in s: raise MemError("anchor path rejected")
+    parts=[x.lower() for x in path_parts]; name=parts[-1]
+    blocked={".git",".venv","venv","node_modules","storage","uploads","upload","backup","backups","dumps","output","test-results","transcript","transcripts","credential","credentials","secret","secrets","token","tokens","patients","patient","patient-data","phi"}
+    # Schema/source filenames may describe token handling without containing credential data.
+    if any(a in blocked or a.startswith(".env") for a in parts) or any(w in name for w in ("credential","secret","backup","dump","transcript")) or Path(name).suffix.lower() in {".pem",".key",".sql",".dump"}: raise MemError("anchor path rejected")
+    return rel
 def no_anchor(root,s):
-    if not isinstance(s,str) or Path(s).is_absolute() or ".." in Path(s).parts: raise MemError("anchor path rejected")
-    p=root/s
+    rel=anchor_relative(root,s); p=root/rel
     try: resolved=p.resolve(strict=True)
     except OSError: raise MemError("anchor path rejected")
     if root not in resolved.parents or not resolved.is_file(): raise MemError("anchor path rejected")
-    rel=resolved.relative_to(root); parts=[x.lower() for x in rel.parts]; name=parts[-1]
-    blocked={".git",".venv","venv","node_modules","storage","uploads","upload","backup","backups","dumps","output","test-results","transcript","transcripts","credential","credentials","secret","secrets","token","tokens","patients","patient","patient-data","phi"}
-    if any(a in blocked or a.startswith(".env") for a in parts) or any(w in name for w in ("credential","secret","token","backup","dump","transcript")) or Path(name).suffix.lower() in {".pem",".key",".sql",".dump"}: raise MemError("anchor path rejected")
-    return resolved,rel.as_posix()
+    actual=resolved.relative_to(root).as_posix()
+    return resolved,actual
 def anchor_meta(root,items):
     if not isinstance(items,list) or len(items)>8: raise MemError("invalid anchors")
     result=[]
@@ -216,13 +223,67 @@ def source_state(root,a):
         p,rel=no_anchor(root,a["path"])
         if a.get("state")=="worktree_only": return "worktree_only"
         if a.get("worktree") and Path(a["worktree"]).resolve()!=root: return "worktree_only"
-        return "sources_match" if hashlib.sha256(p.read_bytes()).hexdigest()==a.get("sha256") else "source_changed"
+        current=hashlib.sha256(p.read_bytes()).hexdigest()
+        dirty=bool(git("status","--porcelain","--untracked-files=all","--ignored=matching","--",rel,cwd=root))
+        if dirty: return "worktree_only"
+        return "sources_match" if current==a.get("sha256") else "source_changed"
     except Exception: return "source_missing"
+
+def curated_records(root):
+    """Read portable, tracked knowledge. Hashes in the file are author-pinned."""
+    path=root/"docs"/"devbrain"/"memory"/"curated.json"
+    try:
+        if not path.exists() and not path.is_symlink(): return [],[]
+        if path.is_symlink() or getattr(path.lstat(),"st_file_attributes",0)&0x400: return [],["curated.json:path_rejected"]
+        resolved=path.resolve(strict=True)
+        if root not in resolved.parents or not resolved.is_file(): return [],["curated.json:path_rejected"]
+        if resolved.stat().st_size>65536: return [],["curated.json:oversized"]
+        raw=resolved.read_bytes()
+        data=json.loads(raw.decode("utf-8"))
+        if not isinstance(data,dict) or set(data)!={"schema_version","knowledge"} or data["schema_version"]!=1: raise ValueError
+        source=data["knowledge"]
+        if not isinstance(source,list) or len(source)>100: raise ValueError
+        try: curated_dirty=bool(git("status","--porcelain","--untracked-files=all","--ignored=matching","--","docs/devbrain/memory/curated.json",cwd=root))
+        except MemError: curated_dirty=True
+        result=[]; seen=set()
+        required={"schema_version","id","key","kind","topic","summary","tags","scope","source_type","evidence_summary","anchors","supersedes"}
+        for item in source:
+            if not isinstance(item,dict) or set(item)!=required or item.get("kind") not in {"fact","lesson"} or item.get("scope")!="repo": raise ValueError
+            if not isinstance(item.get("anchors"),list) or not item["anchors"] or len(item["anchors"])>8: raise ValueError
+            anchors=[]
+            for anchor in item["anchors"]:
+                if not isinstance(anchor,dict) or set(anchor)!={"path","sha256"} or not isinstance(anchor.get("sha256"),str) or not re.fullmatch(r"[0-9a-f]{64}",anchor["sha256"]): raise ValueError
+                rel=anchor_relative(root,anchor["path"])
+                if rel!=anchor["path"]: raise ValueError
+                target=root/rel
+                if target.exists() or target.is_symlink(): no_anchor(root,rel)
+                else:
+                    parent=root
+                    for part in Path(rel).parts[:-1]:
+                        parent=parent/part
+                        if not parent.exists() and not parent.is_symlink(): break
+                        resolved=parent.resolve(strict=True)
+                        if root not in resolved.parents: raise ValueError
+                anchors.append({"path":rel,"sha256":anchor["sha256"],"state":"sources_match","worktree":None})
+            clean=dict(item); clean["anchors"]=anchors
+            if curated_dirty:
+                clean["scope"]="worktree"
+                for anchor in clean["anchors"]: anchor["state"]="worktree_only"
+            if not stored_knowledge_valid(clean): raise ValueError
+            if clean["id"] in seen: raise ValueError
+            seen.add(clean["id"])
+            for value in (clean["key"],clean["topic"],clean["summary"],clean["evidence_summary"],*clean["tags"]):
+                if SECRET.search(value): raise ValueError
+            result.append(clean)
+        return result,[]
+    except Exception:
+        return [],["curated.json:invalid"]
 def ranking(item,terms):
-    words=norm(" ".join([item.get("key",""),item.get("topic",""),item.get("summary","")," ".join(item.get("tags",[]))]))
+    words=norm(" ".join([item.get("key",""),item.get("topic",""),item.get("summary","")," ".join(item.get("tags",[]))," ".join(a.get("path","") for a in item.get("anchors",[]))]))
     return len(words&terms)
-def status(base):
-    rows,err=records(base); return {"status":"DEGRADED" if err else "OK","event_count":len(rows),"corrupt_count":len(err),"errors":err[:20]}
+def status(root,base):
+    rows,err=records(base); curated,curated_err=curated_records(root); errors=err+curated_err
+    return {"status":"DEGRADED" if errors else "OK","event_count":len(rows),"corrupt_count":len(err),"curated_count":len(curated),"errors":errors[:20]}
 def main():
     if hasattr(sys.stdout,"reconfigure"): sys.stdout.reconfigure(encoding="utf-8")
     ap=argparse.ArgumentParser(); ap.add_argument("action",choices=["begin","recall","capture","status","export"]); ap.add_argument("--task-id"); ap.add_argument("--query",default=""); ap.add_argument("--topics",default=""); ap.add_argument("--input-file"); ap.add_argument("--json",action="store_true"); args=ap.parse_args()
@@ -235,7 +296,7 @@ def main():
             else: raw=sys.stdin.buffer.read(MAX_IN+1)
             x=read_payload(raw)
         else: x={}
-        if args.action=="status": out=status(base)
+        if args.action=="status": out=status(root,base)
         elif args.action=="begin":
             query=x.get("query",args.query); topics=x.get("topics",args.topics)
             cp=checkpoint_data({"goal":x.get("goal") or args.query,"status":"in_progress"})
@@ -283,6 +344,9 @@ def capture(root,base,x):
         known={}
         for e in rows:
             for item in e.get("knowledge",[]): known.setdefault(item.get("id"),[]).append(item)
+        curated,curated_errors=curated_records(root)
+        if curated_errors: raise MemError("curated memory unavailable")
+        for item in curated: known.setdefault(item.get("id"),[]).append(item)
         clean_ids=set()
         for item in clean:
             if item.get("id") in clean_ids: raise MemError("duplicate knowledge id in request")
@@ -297,26 +361,27 @@ def capture(root,base,x):
         cp=checkpoint_data(x.get("checkpoint",{}),current.get("checkpoint") if current else None)
         ev=new_event(root,task,rev+1,cp,clean,idem,current.get("event_id") if current else None,digest); append_event(base,ev); return {"result":"OK","revision":rev+1,"event_id":ev["event_id"]}
 def recall(root,base,q):
-    rows,errs=records(base); task=q.get("task_id"); terms=norm(str(q.get("query",""))+" "+str(q.get("topics","")))
+    rows,errs=records(base); curated,curated_err=curated_records(root); errs.extend(curated_err); task=q.get("task_id"); terms=norm(str(q.get("query",""))+" "+str(q.get("topics","")))
     if task: ident(task,"task_id")
     invalid=bool(task and not task_chain(rows,task)[1])
     selected=[e for e in rows if not task or e.get("task_id")==task]
     candidates=[]; latest_by_key={}
-    for e in selected:
-        for k in e.get("knowledge",[]):
-            if not task and k.get("scope")=="task": continue
-            state=[source_state(root,a) for a in k.get("anchors",[])]
-            if k.get("scope")=="worktree" and e.get("worktree"):
-                try:
-                    if Path(e["worktree"]).resolve()!=root: state.append("worktree_only")
-                except OSError: state.append("worktree_only")
-            k=dict(k); k["provenance_state"]="source_changed" if "source_changed" in state else ("source_missing" if "source_missing" in state else ("worktree_only" if "worktree_only" in state else "sources_match"))
-            k["current_assertion"]=k["provenance_state"]=="sources_match" and k.get("scope")=="repo" and k.get("kind") in {"fact","lesson"} and bool(k.get("anchors"))
-            if k["provenance_state"] in ("source_changed","source_missing"):
-                k.pop("summary",None); k["summary_omitted"]=True
-            if k["provenance_state"]=="worktree_only": k["scope"]="worktree"
-            k["_rank_words"]=" ".join([k.get("key",""),k.get("topic",""),k.get("summary","")," ".join(k.get("tags",[]))," ".join(a.get("path","") for a in k.get("anchors",[]))])
-            latest_by_key.setdefault(k.get("key"),[]).append(k); candidates.append(k)
+    sources=[(e,k,"local") for e in selected for k in e.get("knowledge",[])] + [(None,k,"curated") for k in curated]
+    for e,k,origin in sources:
+        if not task and k.get("scope")=="task": continue
+        state=[source_state(root,a) for a in k.get("anchors",[])]
+        if k.get("scope")=="worktree" and e and e.get("worktree"):
+            try:
+                if Path(e["worktree"]).resolve()!=root: state.append("worktree_only")
+            except OSError: state.append("worktree_only")
+        k=dict(k); k["provenance_state"]="source_changed" if "source_changed" in state else ("source_missing" if "source_missing" in state else ("worktree_only" if "worktree_only" in state else "sources_match"))
+        k["origin"]=origin
+        k["current_assertion"]=k["provenance_state"]=="sources_match" and k.get("scope")=="repo" and k.get("kind") in {"fact","lesson"} and bool(k.get("anchors"))
+        if k["provenance_state"] in ("source_changed","source_missing"):
+            k.pop("summary",None); k["summary_omitted"]=True
+        if k["provenance_state"]=="worktree_only": k["scope"]="worktree"
+        k["_rank_words"]=" ".join([k.get("key",""),k.get("topic",""),k.get("summary","")," ".join(k.get("tags",[]))," ".join(a.get("path","") for a in k.get("anchors",[]))])
+        latest_by_key.setdefault(k.get("key"),[]).append(k); candidates.append(k)
     superseded={ref for item in candidates for ref in item.get("supersedes",[])}
     candidates=[item for item in candidates if item.get("id") not in superseded]
     remaining={}
@@ -341,21 +406,21 @@ def recall(root,base,q):
     if len(candidates)>5: result["omitted_count"]=len(candidates)-5
     return result
 def export(root,base):
-    rows,errs=records(base); chosen={}
-    for e in rows:
-        for k in e.get("knowledge",[]):
-            states=[source_state(root,a) for a in k.get("anchors",[])]
-            if k.get("scope")!="repo" or any(s in ("source_changed","source_missing","worktree_only") for s in states): continue
-            portable={a:v for a,v in k.items() if a not in {"provenance_state","current_assertion"}}
-            portable["anchors"]=[{a:v for a,v in anc.items() if a in ("path","sha256","state")} for anc in portable.get("anchors",[])]
-            chosen[portable.get("id")]=portable
+    rows,errs=records(base); curated,curated_err=curated_records(root); errs.extend(curated_err); chosen={}
+    source_items=[k for e in rows for k in e.get("knowledge",[])] + curated
+    for k in source_items:
+        states=[source_state(root,a) for a in k.get("anchors",[])]
+        if k.get("scope")!="repo" or any(s in ("source_changed","source_missing","worktree_only") for s in states): continue
+        portable={a:v for a,v in k.items() if a not in {"provenance_state","current_assertion"}}
+        portable["anchors"]=[{a:v for a,v in anc.items() if a in ("path","sha256","state")} for anc in portable.get("anchors",[])]
+        chosen[portable.get("id")]=portable
     items=list(chosen.values())[-100:]; bykey={}
     superseded={ref for k in items for ref in k.get("supersedes",[])}
     items=[k for k in items if k.get("id") not in superseded]; bykey={}
     for k in items: bykey.setdefault(k.get("key"),[]).append(k)
     superseded={ref for k in items for ref in k.get("supersedes",[])}
     conflicts=[key for key,group in bykey.items() if len({k.get("summary") for k in group if k.get("id") not in superseded})>1]
-    return {"status":"DEGRADED" if errs else "OK","knowledge":items,"conflicts":conflicts}
+    return {"status":"DEGRADED" if errs else "OK","knowledge":items,"conflicts":conflicts,"errors":errs[:10]}
 def bound(out):
     omitted=0
     while len(compact(out).encode("utf-8"))+1>MAX_OUT:

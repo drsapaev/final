@@ -5,7 +5,7 @@ This file is the responsibility map for the repository DevBrain. It prevents age
 ## Final DevBrain Definition
 
 ```text
-DevBrain = repository memory + local task checkpoints + execution guardrails + PR/CI evidence.
+DevBrain = portable repository memory + local task checkpoints + execution guardrails + PR/CI evidence.
 Codex/ChatGPT = reasoning + execution engine.
 ```
 
@@ -16,11 +16,12 @@ DevBrain is an assisted-development system. The active model reasons and execute
 | Component | Unique function | Inputs | Outputs | When to use | When not to use | Must not override | Health check | Overlap risk | Boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Model / Codex / ChatGPT | Reasoning and execution engine | User task, repo files, DevBrain context, validation output | Plans, patches, reviews, summaries, commands | All tasks needing judgment or implementation | As durable memory or source of truth | Source, tests, migrations, AGENTS, PR gates | Human/evidence review, tests, CI | Model may rely on stale chat memory | Use repo evidence for durable facts |
-| `AGENTS.md` | Operating law and mode policy | Repo-level safety rules, strict triggers | Required behavior for agents before editing | Every repo-aware task | Long history, status, task logs | Product source/tests, narrower safety rules | File exists; referenced by inventory | Can grow into memory dump | Keep short and operational |
-| `PROJECT_MEMORY.md` | Compact canonical project memory | Repeated ownership facts, known failure patterns | Durable SSOT decisions and ownership chains | Risky, graph-heavy, ownership-sensitive work | One-off notes, status, raw chat | Executable source, tests, migrations | Inventory and retrieval refresh | Can become a journal | Store repeated durable facts only |
+| `AGENTS.md` | Operating law, mode policy, and agent-called memory lifecycle | Repo-level safety rules, strict triggers | Required behavior for agents before editing | Every repo-aware task | Long history, status, task logs | Product source/tests, narrower safety rules | File exists; referenced by inventory | Can grow into memory dump | Keep short and operational |
+| `PROJECT_MEMORY.md` | Compact canonical project memory | Repeated ownership facts, known failure patterns | Durable ownership decisions and recurring failure patterns | Risky, graph-heavy, ownership-sensitive work | One-off notes, status, raw chat | Executable source, tests, migrations | Inventory | Can become a journal | Store repeated durable facts only |
+| `docs/devbrain/memory/curated.json` | Portable repo facts and lessons | Reviewed source-backed knowledge with relative anchors and pinned hashes | Bounded shared recall across clones through Git | When a confirmed fact should travel with the repo | Task state, machine/session paths, raw chat, PHI/PII, secrets | Current source, tests, migrations, user authorization | Helper recall/export and anchor freshness | Can be mistaken for instructions or current when stale | Advisory data; promote through reviewed PR |
 | `DEVBRAIN_STATUS.md` | Current layer status and acceptance evidence | Smoke, inventory, acceptance, artifact commits | Active/dormant/missing status, limitations | Before trusting optional retrieval artifacts | Domain ownership truth | Source, tests, PROJECT_MEMORY | `devbrain_inventory.ps1`, regression matrix | Can be mistaken for canonical memory | Store status, not product truth |
 | AI Factory | Operational file memory | Logs, dossiers, patches, contracts, plans, skill context | Resume-friendly working context and evidence | Dossiers, rollout notes, patch evidence, task history | Project-wide canonical facts unless promoted | PROJECT_MEMORY, AGENTS, source/tests | Filesystem inventory | Can duplicate PROJECT_MEMORY | Promote repeated facts to PROJECT_MEMORY |
-| Local memory helper | Shared checkpoint and knowledge store for one clone's linked worktrees | Agent-provided task checkpoint and source-backed knowledge | Bounded recall packet and task recovery | When explicitly invoked for a task | Synchronizing independent clones or replacing source verification | AGENTS, canonical source/tests, explicit permission rules | `scripts/run_devbrain_memory.ps1 -Action Status` | Treated as system instruction or cross-machine memory | Advisory data; source truth and authorization stay unchanged |
+| Local memory helper | Shared checkpoint and knowledge store for one clone's linked worktrees | Agent-provided task checkpoint and source-backed knowledge | Bounded recall packet and task recovery | Under the `AGENTS.md` lifecycle at task start/continuation, milestones, blockers, and handoff/final | Background conversation analysis, synchronizing independent clones, or replacing source verification | AGENTS, canonical source/tests, explicit permission rules | `scripts/run_devbrain_memory.ps1 -Action Status` | Treated as system instruction or cross-machine memory | Advisory data; source truth and authorization stay unchanged |
 | LlamaIndex | Dormant legacy lexical retrieval | Manifest sources and optional local index | Source locations and lexical anchors | Explicit `-IncludeRetrieval` diagnostics only | Default task routing or ownership decisions | ADR-0007, agent_gate, source/tests | `devbrain_regression_matrix.ps1 -IncludeRetrieval` | Mistaken for current/active memory | Dormant; may be missing or stale |
 | LightRAG | Dormant legacy relationship retrieval | Manifest focus sources and optional local graph | Relationship hints and validation targets | Explicit `-IncludeRetrieval` diagnostics only | Default task routing or deterministic execution | ADR-0007, agent_gate, AGENTS, source/tests | `devbrain_regression_matrix.ps1 -IncludeRetrieval` | Mistaken for current/active memory | Dormant; may be missing or stale |
 | LangGraph / `agent_gate.py` | Deterministic routing and execution guardrails | Task text, known root cause, repo paths, strict rules | Mode, first-touch files, stop conditions, validation targets | Risky execution, DB/migration, RBAC, payment, queue, Telegram security/storage, CI/deploy | Simple known-root-cause local edits | Source/tests, user-confirmed narrow override | `devbrain_acceptance.ps1` | Can over-gate simple work | Strict only when risk requires |
@@ -31,21 +32,21 @@ DevBrain is an assisted-development system. The active model reasons and execute
 
 ## Boundary Rules
 
-- `Automatic local memory != retrieval`: task checkpoints and selected knowledge are stored separately from the dormant LlamaIndex/LightRAG indexes.
+- `Automatic local memory != legacy retrieval`: agent-called checkpoints/local knowledge and tracked curated facts are separate from dormant LlamaIndex/LightRAG indexes.
 - `LlamaIndex != LightRAG`: if explicitly inspected, LlamaIndex provides lexical lookup and LightRAG relationship hints; neither is current project truth.
 - `LightRAG != agent_gate`: LightRAG suggests relationship context; `agent_gate.py` sets deterministic execution boundaries for risky work.
 - `AGENTS.md != PROJECT_MEMORY`: `AGENTS.md` is operating law; `PROJECT_MEMORY.md` is compact durable project memory.
 - `AI Factory != PROJECT_MEMORY`: AI Factory stores operational logs, dossiers, and patch evidence; PROJECT_MEMORY stores repeated canonical ownership facts.
 - `Skills != AGENTS`: skills advise by domain; `AGENTS.md` and project source/tests remain stronger authority.
 - `CI != reasoning`: CI proves checks and evidence discipline; it does not decide architecture or product intent.
-- `Model != durable memory`: the active model reasons from evidence; durable memory must be written into repo-owned memory files.
+- `Model != durable memory`: the active model reasons from evidence; durable repository facts belong in reviewed memory files, while task state belongs in the local helper.
 
 ## Mode Routing
 
 | Task type | Components to use | Do not use |
 | --- | --- | --- |
 | Simple narrow task | Model/Codex, `AGENTS.md`, source/tests | Full gate, LightRAG, dossier ritual |
-| Graph-heavy task | `PROJECT_MEMORY.md`, local task recall, canonical sources/tests, AI Factory dossier if useful | Assuming dormant LlamaIndex/LightRAG are available |
+| Graph-heavy task | `PROJECT_MEMORY.md`, exact-task recall, relevant curated facts, canonical sources/tests, AI Factory dossier if useful | Assuming dormant LlamaIndex/LightRAG are available |
 | Risky execution task | `AGENTS.md`, `PROJECT_MEMORY.md`, `agent_gate.py`, relevant skills, narrow validation | Skills or LightRAG as override authority |
 | Known root-cause task | `agent_gate.py --known-root-cause` only if risky; otherwise direct execute with explicit boundary | Repeated gate retries after confirmed misroute |
 | DB/Alembic migration task | `AGENTS.md`, `PROJECT_MEMORY.md`, `agent_gate.py` migration mode, Alembic validation | Telegram/UI/status routing as first-touch |

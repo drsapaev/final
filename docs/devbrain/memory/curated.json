@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "knowledge": [
+    {
+      "schema_version": 1,
+      "id": "curated-api-ws-origin",
+      "key": "frontend-api-ws-origin",
+      "kind": "fact",
+      "topic": "frontend API and WebSocket origin",
+      "summary": "An explicit VITE_API_BASE_URL selects the API origin; otherwise runtime resolution uses the browser origin for non-localhost or the Vite proxy and falls back to the configured local API origin. API paths use /api/v1. WebSocket protocol and host derive from that API origin, and ws.ts builds client paths with buildWsUrl.",
+      "tags": ["api", "origin", "websocket", "ws", "frontend", "VITE_API_BASE_URL"],
+      "scope": "repo",
+      "source_type": "source",
+      "evidence_summary": "Runtime URL resolution and the WebSocket client use the shared runtime origin helpers.",
+      "anchors": [
+        {"path": "frontend/src/api/runtime.ts", "sha256": "6d7bef9cb6e306ba0c180f7039bfec6590992f8ff441234d9c2671ea5200742d"},
+        {"path": "frontend/src/api/ws.ts", "sha256": "7e62c8fc53b844b34121a573a59927b89da064318b01f291f5ad6e7fa8ffe36a"}
+      ],
+      "supersedes": []
+    },
+    {
+      "schema_version": 1,
+      "id": "curated-queue-ws-cleanup",
+      "key": "queue-websocket-disconnect-cleanup",
+      "kind": "fact",
+      "topic": "queue WebSocket disconnect",
+      "summary": "When /ws/queue receive exits on disconnect or an unexpected receive error, the handler must leave the loop, cancel its heartbeat, and remove the socket from its room. The focused regression asserts one receive, heartbeat cancellation, room cleanup, and that token/error canaries are not logged.",
+      "tags": ["queue", "websocket", "disconnect", "heartbeat", "room", "logging"],
+      "scope": "repo",
+      "source_type": "test",
+      "evidence_summary": "The queue handler and parameterized disconnect regression cover cleanup and log safety.",
+      "anchors": [
+        {"path": "backend/app/ws/queue_ws.py", "sha256": "922157bf25f31744412cb5f407ce17c85c05dc3d70914d00e9824ce7e3a87333"},
+        {"path": "backend/tests/unit/test_queue_ws_disconnect.py", "sha256": "f22bb2270448827eb0a218109633a80679467256d7648350444923cba1f8ae72"}
+      ],
+      "supersedes": []
+    },
+    {
+      "schema_version": 1,
+      "id": "curated-registrar-partial-payment",
+      "key": "registrar-partial-payment-persistence",
+      "kind": "fact",
+      "topic": "Registrar billing persistence",
+      "summary": "record_payment creates the payment with commit=False, updates the invoice paid_amount, balance, and status in the same transaction, then commits and refreshes. The partial-payment regression checks PARTIALLY_PAID and the remaining balance.",
+      "tags": ["registrar", "payment", "partial", "invoice", "persistence", "billing"],
+      "scope": "repo",
+      "source_type": "test",
+      "evidence_summary": "The canonical billing service and focused partial-payment test establish the persistence boundary.",
+      "anchors": [
+        {"path": "backend/app/services/billing_service_pkg/_payments.py", "sha256": "1bc22873a38f8ae646b3b8068e9feb427ec201ac81611a43a410184d61c107e2"},
+        {"path": "backend/tests/unit/test_record_payment_migration.py", "sha256": "c312c39256b65c2f283bff470b0a209b7adbf7a1aa829e11ba69490e6f5a660d"}
+      ],
+      "supersedes": []
+    },
+    {
+      "schema_version": 1,
+      "id": "curated-telegram-staff-token-migration",
+      "key": "telegram-staff-token-storage-migration",
+      "kind": "fact",
+      "topic": "Telegram staff token storage",
+      "summary": "Alembic revision 0025_telegram_staff_link_tokens creates the telegram_staff_link_tokens table, and TelegramStaffLinkToken is its SQLAlchemy model. Verify current migration-chain state before relying on deployment status.",
+      "tags": ["telegram", "staff", "token", "storage", "migration", "alembic", "model"],
+      "scope": "repo",
+      "source_type": "source",
+      "evidence_summary": "The creating migration and mapped model are present in the current source tree.",
+      "anchors": [
+        {"path": "backend/alembic/versions/0025_telegram_staff_link_tokens.py", "sha256": "e86a8d21f08be785c582ed382b508300bcaa2ab26891509ec75f93a2239d8f27"},
+        {"path": "backend/app/models/telegram_config.py", "sha256": "c2568859491a4b1517c08fe0e9eda0520d1eeb40c83b8fb03652cdabbe26e9cb"}
+      ],
+      "supersedes": []
+    },
+    {
+      "schema_version": 1,
+      "id": "curated-derma-mixed-order-index",
+      "key": "derma-history-mixed-direction-order",
+      "kind": "lesson",
+      "topic": "dermatology history read model",
+      "summary": "The derma history order is entry_date DESC, created_at DESC, source ASC, record_id DESC, position ASC. A fully ascending index does not satisfy this mixed-direction order and can force a temp-btree sort; index directions must match the query order. The focused read-model test pins the endpoint order.",
+      "tags": ["derma", "history", "order by", "index", "mixed direction", "temp-btree", "performance"],
+      "scope": "repo",
+      "source_type": "source",
+      "evidence_summary": "The endpoint, model indexes, migration, and read-model order test encode the ordering contract and its index lesson.",
+      "anchors": [
+        {"path": "backend/app/api/v1/endpoints/derma.py", "sha256": "0136e3bcbc9916777efbc49a105a4df5fe12dcc962b0f3c02a7b69e1c5cc977e"},
+        {"path": "backend/app/models/derma_history.py", "sha256": "011adc1b51e2b9a3db5dd9305c7d14fbbb4e6295361bcbd8b9e8007c46232626"},
+        {"path": "backend/alembic/versions/0076_derma_history_read_order.py", "sha256": "b4ccc9f26cbd1bcd7d6dd7ebccdbb128b9001096de5abe716b2836ba8e4cfdd6"},
+        {"path": "backend/tests/integration/test_derma_history_read_model.py", "sha256": "0b6bf2eff8cc043c0482a58c8bacb849de4e18b12fb1b1af3b89bd5a56dd2aff"}
+      ],
+      "supersedes": []
+    },
+    {
+      "schema_version": 1,
+      "id": "curated-session-worktrees-synthetic-staging",
+      "key": "session-worktree-production-staging-boundary",
+      "kind": "fact",
+      "topic": "agent worktrees and staging",
+      "summary": "Agent sessions use separate worktrees. Production deploys only from a clean, synced main tree. Staging is an isolated WSL Compose project with separate data and synthetic fixtures; treat each stack as ephemeral, tear it down after validation, and preserve it only for a recorded failure investigation. Check state before use. A deployment or system-health claim requires the full staging validation runbook.",
+      "tags": ["worktree", "production", "staging", "synthetic", "deploy", "validation"],
+      "scope": "repo",
+      "source_type": "documentation",
+      "evidence_summary": "The session-worktree runbook defines checkout, production, and synthetic-staging boundaries; the staging runbook defines required validation.",
+      "anchors": [
+        {"path": "docs/runbooks/AGENT_SESSION_WORKTREES.md", "sha256": "fc5686861c5fbe5e47402a9302aeca35ee136611db2d6fb668dd0bc0ff8b47f8"},
+        {"path": "docs/runbooks/STAGING_VALIDATION.md", "sha256": "2582391e7ab7709f98b742a5ee23f1ddf2767269173864c9cfdc711d04ffe20a"}
+      ],
+      "supersedes": []
+    }
+  ]
+}

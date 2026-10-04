@@ -10,7 +10,8 @@ Route memory to the narrowest durable layer that can use it.
 
 - One-off observation -> log or dossier.
 - Repeated ownership fact -> `docs/devbrain/PROJECT_MEMORY.md`.
-- Current task state and source-backed local knowledge -> the shared local store through `scripts/run_devbrain_memory.ps1`.
+- Current task state and source-backed local knowledge -> the shared local store through `scripts/run_devbrain_memory.ps1`, following the lifecycle in `AGENTS.md`.
+- Reviewed repo-wide facts/lessons portable through Git -> `docs/devbrain/memory/curated.json` with pinned source hashes.
 - Repeated gate misroute -> `agent_gate.py` routing rule plus acceptance scenario.
 - Retrieval/index status -> `docs/devbrain/DEVBRAIN_STATUS.md`.
 - Durable agent behavior rule -> `AGENTS.md`.
@@ -34,20 +35,26 @@ For intentional memory-health canaries, use
 `.ai-factory/logs/memory-probes.md` unless a repeated lesson from the probe must
 be promoted through the normal routing table.
 
-### Local task memory helper
+### Automatic task memory protocol
 
-Use `scripts/run_devbrain_memory.ps1` for task checkpoints and bounded local
-recall. Its store is shared by worktrees of this clone, but not by independent
-clones or computers. Checkpoints are task state, not repository-wide policy.
-Save only confirmed engineering knowledge; source hashes describe their file
-state, while source files, tests, migrations, and user authorization remain
-authoritative.
+Repo-aware agents call `scripts/run_devbrain_memory.ps1` for task checkpoints
+and bounded local recall under the lifecycle in `AGENTS.md`. Begin only a new
+substantive task; use exact-task recall to continue; capture at boundaries,
+milestones, blockers, and before handoff/final. This is an agent instruction,
+not a client event hook or background conversation analyzer.
 
-The helper supports `begin` for a new substantive task, `recall` for a known
-task, and `capture` after meaningful progress or before handoff. Use `status`
-for store health. Agent startup automation is a separate integration step.
-Promote stable cross-task decisions to `PROJECT_MEMORY.md` through a reviewed
-repository change; local capture does not edit tracked files.
+The store is shared by worktrees of this clone, but not independent clones or
+computers. Checkpoints are task state, not repository policy. Source hashes
+describe file state; source, tests, migrations, runbooks, and user
+authorization remain authoritative. Never store PHI/PII, credentials,
+transcripts, or large raw output.
+
+`curated.json` stores reviewed, repo-scoped facts/lessons with relative anchors
+and pinned SHA-256 values. It has no worktree or session metadata. The helper
+reads it with local memory; stale sources suppress the claim and uncommitted
+curated files are worktree-only hints. Local capture never edits tracked files.
+Promote durable ownership decisions/failure patterns to `PROJECT_MEMORY.md`
+and portable source-backed facts to `curated.json` through a reviewed change.
 
 ## Memory Targets
 
@@ -79,6 +86,13 @@ Good fit:
 - queue/payment/notification/Telegram/routing SSOT facts.
 
 Update this when the same fact is likely to matter again.
+
+### `docs/devbrain/memory/curated.json`
+
+Use for compact, source-backed repo facts or lessons that should travel with
+the repository. Every record needs relative source anchors and author-pinned
+hashes. Never put task/session state, machine paths, raw transcripts, PHI/PII,
+or secrets here; update through a normal reviewed PR.
 
 ### `docs/devbrain/DEVBRAIN_STATUS.md`
 
@@ -188,6 +202,7 @@ CI gates should enforce process and safety. They should not become a substitute 
 | Knowledge type | Memory target | Update trigger | Reindex needed | Validation |
 | --- | --- | --- | --- | --- |
 | One-off task observation | Local task checkpoint or `.ai-factory/logs` / `.ai-factory/dossiers` | Resume state or useful context from one task | No for local checkpoints; legacy index only by explicit request | `run_devbrain_memory.ps1 -Action Recall` or dossier review |
+| Portable source-backed fact/lesson | `docs/devbrain/memory/curated.json` | Confirmed fact should travel with Git | No | Helper recall/export plus anchor hash and source review |
 | Repeated ownership fact | `docs/devbrain/PROJECT_MEMORY.md` | Same fact affects multiple tasks | No for normal work; legacy index only by explicit request | Source/test review; default `devbrain_refresh_memory.ps1` |
 | Durable agent behavior rule | `AGENTS.md` | Rule must affect all agents before editing | No for normal work; legacy index only by explicit request | `git diff --check`; default regression matrix |
 | Retrieval/index status | `docs/devbrain/DEVBRAIN_STATUS.md` | Explicit diagnostic or artifact metadata changes | No; historical status text does not make an index fresh | `devbrain_inventory.ps1 -IncludeRetrieval`; inspect artifact metadata |
