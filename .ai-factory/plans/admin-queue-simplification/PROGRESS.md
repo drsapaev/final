@@ -1,17 +1,18 @@
 # Progress
 
-Plan version: 2.7
+Plan version: 2.9
 Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 2026-10-01
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
-Current task: T08.2b — source inventory of remaining active admission adapters
-Current status: T08.2b PR #3581 OPEN. User authorized publishing the review and merging on 2026-10-04. After a documentation conflict with #3587, the branch was rebased onto 2e3519948534f956fac7f94c3b1822792f864f41. Upstream Task 103 is preserved; this inventory gate record is Task 104. Resolve the live PR HEAD/checks before merge. T08.2c/T08.3 remain planned; v1 creation stays default-off.
-Last completed task: T08.2a — MERGED (#3576, merge commit `1ed6d05874c2ea205a625bb70879adb10b077be4`)
-Worktree: C:\final\_wt_aqs_t082b_admission
-Branch: codex/aqs-T08.2b-admission
-Base commit: 2e3519948534f956fac7f94c3b1822792f864f41
-Current code commit: rebased source inventory commit c1c84f56a; resolve the live PR tip because journal commits follow it.
-Last updated: 2026-10-04T06:27:05+05:00, Asia/Tashkent
+Current task: T08.2c — availability/report parity
+Current status: T08.2b / PR #3581 MERGED at `742bf08bd82da5f2ab8160ce474bdeab5694aa26`. T08.2c / PR #3596 remains OPEN and mergeable at exact remote HEAD `068fdbede3d08e0bfbd1384ecea7f27cf02827ed`, base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. The five requested P2 fixes and focused regressions are committed and pushed; local tests and PR-body quality checks pass. Exact-head CI on current HEAD completed with 31 successful checks, 12 skipped checks, 0 failures. Skips are recorded below and are not passes. Worktree `C:\final\_wt_aqs_t082c_availability`, branch `codex/aqs-T08.2c-availability`. PR body now records the completed exact-head CI. Keep the PR open for the user's review/merge decision. T08.3 must wait for this PR cycle to close; v1 creation stays default-off and PostgreSQL concurrency proof belongs to T08.3.
+Last completed task: T08.2b — MERGED (#3581, merge commit `742bf08bd82da5f2ab8160ce474bdeab5694aa26`)
+Worktree: C:\final\_wt_aqs_t082c_availability
+Branch: codex/aqs-T08.2c-availability
+Base commit: 3da3e0ddaa1cf7afed7732905c6699ec4fafada5
+Current code commit: `4d301ad64208af81de53b1c7bf88f6735473b6da` (five P2 fixes, pushed to PR #3596)
+Current evidence checkpoint: `068fdbede3d08e0bfbd1384ecea7f27cf02827ed`; exact-head GitHub CI passed (31 success, 12 skipped, 0 failures), PR body refreshed and validated
+Last updated: 2026-10-04T19:07:37+05:00, Asia/Tashkent
 
 > Historical checkpoint superseded: current T07 status and exact-head evidence are recorded in dated sections below and in RESUME.md; do not use the earlier snapshot as a continuation instruction.
 
@@ -26,7 +27,7 @@ Last updated: 2026-10-04T06:27:05+05:00, Asia/Tashkent
 | T06.1 | MERGED | `codex/aqs-T06-policy-schema` / [PR #3545](https://github.com/drsapaev/final/pull/3545) | `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` | `EVIDENCE.md#t06.1-merge-checkpoint` |
 | T06.2 | MERGED | `codex/aqs-T06.2-creation-policy` / [PR #3546](https://github.com/drsapaev/final/pull/3546) | `b804a71a6bad22400324e2236a3221317eac3158` | `EVIDENCE.md#t06.2-merge-checkpoint` |
 | T07 | MERGED | codex/aqs-T07-admission-window / PR #3557 | 425df11c7a84f0d1e7954df0d00415927212669a | EVIDENCE.md#t07-merge-and-t08-gate-source-audit |
-| T08 | IN_PROGRESS | T08.1a/#3571, T08.1b/#3572 and T08.2a/#3576 MERGED; T08.2b PR #3581 OPEN | `1ed6d05874c2ea205a625bb70879adb10b077be4` | EVIDENCE.md#t08.2a-merge-and-t08.2b-source-inventory |
+| T08 | IN_PROGRESS | T08.1a/#3571, T08.1b/#3572, T08.2a/#3576, T08.2b/#3581 MERGED; T08.2c / PR #3596 OPEN at `068fdbed`; exact-head CI: 31 success, 12 skipped, 0 failures. Awaiting the user's review/merge decision. | | EVIDENCE.md (latest T08.2c entry) |
 | T09 | PLANNED | | | |
 | T10 | PLANNED | | | |
 | T11 | PLANNED | | | |
@@ -39,6 +40,28 @@ Last updated: 2026-10-04T06:27:05+05:00, Asia/Tashkent
 | T18 | PLANNED | | | |
 
 ## Current checkpoint
+
+### Authoritative continuation — five P2 fixes pushed, exact-head CI passed (2026-10-04)
+
+- PR #3596 is OPEN and mergeable; verified remote HEAD is `068fdbede3d08e0bfbd1384ecea7f27cf02827ed`, base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. Worktree/branch are `C:\final\_wt_aqs_t082c_availability` / `codex/aqs-T08.2c-availability`.
+- Fixed exactly five confirmed review P2s: inactive queue identity falls back to the wrong owner axis in Admin status; public status accepts an inactive queue with the wrong tag; inactive doctor identity can shadow an active QueueResource; rowless status reports a cap different from the constructor defaults; inactive QR status discards retained waiting/called queue length. See the latest dated EVIDENCE entry for path-by-path mapping.
+- Actual runtime/test modifications are restricted to `backend/app/crud/online_queue.py`, `backend/app/crud/queue_resource_routing.py`, `backend/app/services/qr_queue/_queue_ops.py`, `backend/app/services/queue_domain_service.py`, `backend/tests/unit/test_online_admission_window.py`, and `backend/tests/unit/test_queue_domain_service.py`. Allowed checkpoint files are this file, `RESUME.md`, and `EVIDENCE.md`; local scope note is `.scratch/PR3596_FIX_SCOPE.md` and must not be committed.
+- Mandatory gate result: `gate_known_root_cause` / bounded `narrow_override`, root `backend/app/services/queue_domain_service.py`, `gate_misroute=false`, `override_used=true`, `handoff_required=false`. The repo-approved T08.2c read/report scope and exact five review findings justify the narrow sibling-path scope; no admission writer, schema/migration/model, frontend, staging or production path is allowed.
+- Final focused local checks on committed code: `test_online_admission_window.py` plus `test_queue_domain_service.py` — **57 passed, 1 warning** (SQLite fixtures); scoped Ruff **PASS**; `py_compile` **PASS**; focused formatter ranges **PASS**; `git diff --check` **PASS**. The PR body gate passed 19 unit tests, both documented sample bodies, and the actual updated PR body. PostgreSQL concurrency, staging/browser and production checks are NOT_RUN; T08.3 owns PostgreSQL admission proof.
+- Commit `4d301ad64208af81de53b1c7bf88f6735473b6da` contains the five fixes. Current PR HEAD `068fdbede3d08e0bfbd1384ecea7f27cf02827ed` is an evidence-only checkpoint and exact-head GitHub CI completed: **31 success, 12 skipped, 0 failure**. The PR body was refreshed to state this and passed the local body gate (19 tests and documented samples) and remote PR Review Quality Gate. Skipped path-aware jobs include staging/production readiness, integration, Docker, k6 load, metadata, selected security/DAST, Supabase Preview, and failure notifications; they are not passes.
+- Next exact action: await the user's independent review and merge decision for PR #3596. Do not publish a review or merge. Keep `C:\final` untouched and do not start T08.3 until #3596 closes.
+
+- T08.2b / PR #3581 is confirmed MERGED at `742bf08bd82da5f2ab8160ce474bdeab5694aa26`; its reviewed code head was `5c32825355fba8bce3ef92a6fcf979a76567da0d`.
+- Four additional exact-head P2 report/identity findings were fixed in `ba148e83`, and a related inactive doctor-owned status case was caught and fixed in `210a11fd`: Admin queue status now looks up `DailyQueue` by `Doctor.id`; inactive doctor-queue detection matches the exact nullable tag; Admin aggregates and public status no longer advertise fresh quota for inactive identities. Fail-first reproduced all five assertions for the four findings and the follow-up doctor-owned case; all 56 tests in the three affected unit modules pass (1 warning), as do scoped Ruff, `py_compile`, and `git diff --check` on the rebased tree.
+- T08.2c report contract is implemented across concrete QR/status, Admin status, and specialty aggregates: v1 exposes the persisted cap/counter and clamped remaining quota; legacy issuance/remaining stay unknown; active waiting/called queue length is separate; mixed clinic-wide overviews expose no singular quota. Existing `current_usage`, `current_entries`, and numeric legacy `remaining_slots` meanings are preserved. Future-date availability remains advisory as before.
+- Five automated P2 findings were reproduced and fixed in `98025bf35545227ba0862cfe1a9fc10e14105df2`: duplicate rowless resource quota; lost clinic-wide queue length on early returns; changed legacy compatibility fields; missing opened-queue policy version; fabricated quota for an inactive resource identity. Fail-first was 5 failed / 35 passed; focused post-fix modules 40 passed / 1 warning; five new regression selections 5 passed / 35 deselected / 1 warning. Focused pre-review report/OpenAPI set was 85 passed / 1 warning; selected resource integration cases 4 passed / 167 deselected / 1 warning. Scoped Ruff, py_compile, OpenAPI freshness, TypeScript freshness, and `git diff --check` passed.
+- Previous exact GitHub state: rebased PR #3596 HEAD `38d1fa533b6006c5010d9131652b38e1b18b842e` passed applicable Backend, Frontend E2E/unit/lint/build, OpenAPI/docs, parity, PR Required, quality, security/secret, CodeQL, regression, context-boundary, role-system, locale, lifecycle, PR-body, and Telegram gates. Path-aware skips included staging/production readiness, Docker, integration, load, metadata, nightly DAST and Supabase; skipped jobs are not passes. This check set is exact for `38d1fa5`; the documentation-only status update being prepared will require a fresh check on its own head before merge.
+- Path-aware checks skipped (not passed): staging/production readiness, Docker build, integration tests, load tests, and other skipped jobs shown by `gh pr checks`. This read/report-only slice has no staging deferral or staging proof. PostgreSQL concurrency/replay/partial-result proof remains T08.3. The v1 creation flag remains default-off.
+- The nine automated review findings (five prior plus four new P2s) and the adjacent inactive-doctor case are covered by the regression suite. GitHub `reviewDecision` is empty; no independent human approval or merge is recorded. The PR remains open.
+- No staging, PostgreSQL race test, production access, deployment, flag activation, ownership/numbering, admission-writer, schema, or clinical-lifecycle change occurred. The broad 171-case resource runtime integration module remains NOT_RUN for this follow-up.
+- Commit hooks: the initial commit attempt showed Windows Application Control blocks the local Gitleaks and Black executables (`WinError 4551`). Ruff-format also made unrelated formatting changes in four legacy-file regions; those hook-only changes were removed from the worktree. The successful source commit skipped only `gitleaks`, `ruff-format`, and `black`; the other applicable hooks passed. Exact-head GitHub secret checks are still required.
+- The current exact PR head `38d1fa533b6006c5010d9131652b38e1b18b842e` has passed applicable CI, with path-aware skips listed above. Next exact action: amend the evidence checkpoint, verify and lease-push it, publish the matching PR body, then confirm applicable checks on the resulting exact PR head. Do not self-approve or merge #3596; wait for independent human review. Do not begin T08.3 until this PR cycle closes.
+- Stop on any indication that the aggregate requires a singular quota across heterogeneous owners/policies, or that a writer/schema/ownership change is necessary. T08.3 remains separate.
 
 - User confirmed that they merged PR #3576 themselves. GitHub reports it merged at `1ed6d05874c2ea205a625bb70879adb10b077be4`; exact code HEAD was `35b6943cce8c0295b8e9a68077cb881c73fcda20`. Current base is fresh `origin/main` `4e6f125f17c637fc27296e2d0ec9d23f5d376775` in `C:\final\_wt_aqs_t082b_admission`.
 - T08.2b source inventory: legacy `/queue/legacy/join`, mounted `/online-queue/join`, QR `/queue/join/complete` (single and multiple), and permanent-direction sessions all delegate successful admissions to `QueueBusinessService.join_queue_with_token`. It checks the DailyQueue lock-refreshed quota, increments v1 only for a new entry, and keeps entry/counter/session outcome in the existing transaction boundary. GraphQL was the only confirmed independent successful writer and is quota-aware after #3576.

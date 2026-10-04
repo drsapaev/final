@@ -468,6 +468,31 @@ class TokensMixin(QRQueueServiceMixinBase):
                 ),
             }
             result.update(time_check)
+            is_clinic_wide = qr_token.is_clinic_wide or qr_token.specialist_id is None
+            if is_clinic_wide:
+                # A clinic-wide QR is an overview over multiple queue owners
+                # and policy versions, not a single quota-bearing queue.
+                result["max_online_entries"] = None
+                result["online_issued_count"] = None
+                result["online_bookings_remaining"] = None
+            elif daily_queue is not None:
+                result["max_online_entries"] = (
+                    daily_queue.max_online_entries
+                    if daily_queue.policy_version == "daily_online_issuances_v1"
+                    else daily_queue.max_online_entries or 15
+                )
+                if daily_queue.policy_version == "daily_online_issuances_v1":
+                    result["online_issued_count"] = daily_queue.online_issued_count
+                    result["online_bookings_remaining"] = max(
+                        0,
+                        daily_queue.max_online_entries
+                        - daily_queue.online_issued_count,
+                    )
+                else:
+                    result["online_issued_count"] = None
+                    result["online_bookings_remaining"] = None
+            # For a concrete token without a daily queue, preserve the
+            # owner-default quota facts returned by _check_online_time_restrictions.
             logger.debug(
                 f"[QRQueueService.get_qr_token_info] Ответ сформирован успешно: {result}"
             )
@@ -580,5 +605,3 @@ class TokensMixin(QRQueueServiceMixinBase):
         self.db.commit()
 
         return True
-
-
