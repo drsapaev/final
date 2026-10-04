@@ -1,5 +1,6 @@
 import React, { useState, type ReactNode, type CSSProperties } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { useTranslation } from '@/i18n/useTranslation';
 interface MacOSStatCardProps {
   title?: ReactNode;
   value?: ReactNode;
@@ -36,6 +37,7 @@ const MacOSStatCard = ({
   className,
   style
 }: MacOSStatCardProps) => {
+  const { t } = useTranslation();
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -207,7 +209,7 @@ const MacOSStatCard = ({
   };
 
   const renderLoading = () => (
-    <div style={cardStyle} role="status" aria-live="polite" aria-busy="true">
+    <div style={cardStyle} role="status" aria-live="polite" aria-busy="true" aria-label={t('common.loading')}>
       <div style={headerStyle} aria-hidden="true">
         <div style={{ 
           width: '60%', 
