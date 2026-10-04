@@ -111,6 +111,7 @@ PROCEDURE_PAYLOAD = {
 
 # --- P2-4b: unified history surface (EMR specialty_data + legacy fallback) ---
 
+
 def _create_emr(
     db_session,
     *,
@@ -363,7 +364,9 @@ class TestDermaApi:
         own_patient = _create_patient(db_session, label="own")
         other_patient = _create_patient(db_session, label="other")
         own_visit = _create_visit(db_session, patient=own_patient, doctor=own_doctor)
-        other_visit = _create_visit(db_session, patient=other_patient, doctor=other_doctor)
+        other_visit = _create_visit(
+            db_session, patient=other_patient, doctor=other_doctor
+        )
         own_exam = DermaExamination(
             patient_id=own_patient.id,
             visit_id=own_visit.id,
@@ -567,7 +570,9 @@ class TestDermaEmrHistory:
         own_patient = _create_patient(db_session, label="p24bown")
         other_patient = _create_patient(db_session, label="p24bother")
         own_visit = _create_visit(db_session, patient=own_patient, doctor=own_doctor)
-        other_visit = _create_visit(db_session, patient=other_patient, doctor=other_doctor)
+        other_visit = _create_visit(
+            db_session, patient=other_patient, doctor=other_doctor
+        )
         emr_own = _create_emr(
             db_session,
             patient=own_patient,
@@ -632,7 +637,9 @@ class TestDermaEmrHistory:
         """P2-4b: пустой черновик ЭМК дерматологии (скелет без данных) и
         мусорные записи процедур не создают строк истории; total честно
         отражает отсутствие EMR-строк."""
-        empty_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        empty_visit = _create_visit(
+            db_session, patient=test_patient, doctor=test_doctor
+        )
         _create_emr(
             db_session,
             patient=test_patient,
@@ -749,9 +756,7 @@ class TestDermaEmrHistory:
         assert last_payload["total"] == records_count
         assert len(last_payload["items"]) == 5
         # the oldest rows (beyond the former 500-candidate window) survive
-        oldest_dates = [
-            item["examination_date"] for item in last_payload["items"]
-        ]
+        oldest_dates = [item["examination_date"] for item in last_payload["items"]]
         assert max(oldest_dates) == (date.today() - timedelta(days=500)).isoformat()
         assert min(oldest_dates) == (date.today() - timedelta(days=504)).isoformat()
 
@@ -971,7 +976,9 @@ class TestDermaP3PhaseCSingleKeyApi:
         """Non-list arrays, empty arrays and entries without a usable type
         produce zero rows; total/pages stay honest."""
         # NB: emr_records.visit_id is UNIQUE — one EMR per visit.
-        first_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        first_visit = _create_visit(
+            db_session, patient=test_patient, doctor=test_doctor
+        )
         _create_emr(
             db_session,
             patient=test_patient,
@@ -985,7 +992,9 @@ class TestDermaP3PhaseCSingleKeyApi:
                 },
             },
         )
-        second_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        second_visit = _create_visit(
+            db_session, patient=test_patient, doctor=test_doctor
+        )
         _create_emr(
             db_session,
             patient=test_patient,

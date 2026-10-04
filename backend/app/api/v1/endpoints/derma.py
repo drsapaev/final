@@ -214,9 +214,7 @@ async def get_skin_examinations(
             getattr(user, "id", None),
             patient_id is not None,
         )
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post(
@@ -306,9 +304,7 @@ async def get_cosmetic_procedures(
             "[derma.procedures] failed to list procedures user_id=%s",
             getattr(user, "id", None),
         )
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post(
@@ -382,12 +378,14 @@ async def create_price_override(
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/price-overrides", summary="Получить изменения цен", response_model=list[PriceOverrideResponse])
+@router.get(
+    "/price-overrides",
+    summary="Получить изменения цен",
+    response_model=list[PriceOverrideResponse],
+)
 async def get_price_overrides(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
@@ -428,9 +426,7 @@ async def get_price_overrides(
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/photo-gallery", summary="Фотогалерея", response_model=dict[str, Any])
@@ -445,6 +441,4 @@ async def get_photo_gallery(
     try:
         return {"message": "Фотогалерея будет доступна в следующей версии"}
     except Exception:
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
