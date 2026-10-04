@@ -1,11 +1,11 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 2.6 — T07, T08.1a, T08.1b and T08.2a are merged; T08.2b evidence PR #3581 is open.
-**Создан:** 30 сентября 2026. **Обновлён:** 3 октября 2026, 23:33 Asia/Tashkent.
+**Версия:** 2.7 — T08.2b / #3581 remains open; user authorized review publication and merge, pending fresh-head CI.
+**Создан:** 30 сентября 2026. **Обновлён:** 4 октября 2026, 06:27 Asia/Tashkent.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Последний подтверждённый runtime merge:** `1ed6d05874c2ea205a625bb70879adb10b077be4`, PR #3576 / T08.2a; пользователь подтвердил, что выполнил merge самостоятельно.
-**Текущий worktree:** `C:\final\_wt_aqs_t082b_admission`, ветка `codex/aqs-T08.2b-admission`, база `origin/main` `c0ea82be6698828a3b040d9a516a48e132b8261d`; T08.2b проверяет оставшиеся admission paths по source, без runtime изменений. PR #3581 rebased and lease-pushed; latest known head `bfa1c81603dc077451f9447be4c08a1ecfefeb88` has checks running and must be verified again after the journal update.
+**Текущий worktree:** C:\final\_wt_aqs_t082b_admission; codex/aqs-T08.2b-admission; fresh base 2e3519948534f956fac7f94c3b1822792f864f41. PR #3581 rebased after #3587; upstream Task 103 preserved, queue inventory gate renumbered Task 104. Resolve live HEAD/checks before authorized merge; older head checkpoints are historical.
 
 > **T00–T07, T08.1a, T08.1b и T08.2a — MERGED; T08.2b — IN_PROGRESS; T08.2c–T18 — PLANNED.** PR #3557 merged as `425df11c7a84f0d1e7954df0d00415927212669a`; PR #3571 as `d397656c7f597d72d6a6c92676cd204aff72d4d8`; PR #3572 as `95ff3b4752a091f22f9702977d611a3b6d9f1595`; PR #3576 as `1ed6d05874c2ea205a625bb70879adb10b077be4`. T08.2a added the persisted quota check to the sole confirmed direct writer, GraphQL. T08.2b is verifying that mounted adapters share the canonical writer and classifying non-admission paths. PostgreSQL concurrency and staging/browser proof remain NOT_RUN.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.

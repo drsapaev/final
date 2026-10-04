@@ -1,12 +1,12 @@
 # Resume — admin queue simplification
 
-Plan version: 2.6
-Last updated: 2026-10-03T23:33:16+05:00, Asia/Tashkent
+Plan version: 2.7
+Last updated: 2026-10-04T06:27:05+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
 ## Current continuation checkpoint — T08.2b
 
-- Current fresh base: `origin/main` = `c0ea82be6698828a3b040d9a516a48e132b8261d` (DevBrain PR #3580 after unrelated Derma PR #3567); worktree `C:\final\_wt_aqs_t082b_admission`; branch `codex/aqs-T08.2b-admission`. The source inventory itself was reviewed against `4e6f125f17c637fc27296e2d0ec9d23f5d376775`; neither intervening main change touches queue paths.
+- Current fresh base: origin/main = 2e3519948534f956fac7f94c3b1822792f864f41, after #3587. Worktree C:\final\_wt_aqs_t082b_admission; branch codex/aqs-T08.2b-admission. The intervening main changes do not modify the inventoried queue admission paths.
 - T08.2a / PR #3576 exact code HEAD `35b6943cce8c0295b8e9a68077cb881c73fcda20`; user-confirmed merge commit `1ed6d05874c2ea205a625bb70879adb10b077be4`. Its prior local validation was 7 unit and 17 GraphQL integration tests; applicable CI on that exact HEAD passed as recorded in the PR. Skipped path-aware jobs are not passes.
 - T08.2b is an evidence-only source inventory because no uncovered active independent writer was found. The legacy token endpoint, compatibility online endpoint, QR session completion (single/multiple), and permanent-direction session all use the canonical token allocator. GraphQL was the only direct independent writer and is now covered by #3576.
 - Non-writers classified: old CRUD `join_online_queue` has no app caller and the old router is unmounted; the mounted Telegram callback fails before a database write; `/queue/open` manages queue state but issues no entry and already takes the canonical creation lock; registrar/service additions and transfers are derivatives excluded by D1.
@@ -14,7 +14,7 @@ Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576
 - First-touch docs only: canonical plan, PROGRESS, RESUME, DECISIONS, EVIDENCE, and one factual append to `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md`. Runtime sources and tests are read-only. Target validation: source/route coverage table plus `git diff --check`; stop if any uncovered successful writer, ambiguous partial-result behavior, or need for wider runtime/API scope appears.
 - PostgreSQL concurrency/replay/partial-result proof remains T08.3. Availability/report parity remains T08.2c. `QUEUE_POLICY_V2_CREATION_ENABLED` stays default-off; staging and production were not used.
 - The local PR review body gate passed (19 unit checks, both documented samples, and the current body); `git diff --check` passed. No runtime tests were applicable.
-- PR #3581 is OPEN: https://github.com/drsapaev/final/pull/3581. Its initial evidence commit `f12b30abb193c27259ef865fe44c71841a74e240` was rebased after main advanced by PRs #3567 and #3580; source inventory commit is now `66e0c6e48`. A same-file evidence-log conflict was resolved by preserving upstream Task 102 and renumbering this gate record to Task 103. The rebased branch was lease-pushed to `c0ea82be6698828a3b040d9a516a48e132b8261d`; latest known PR head is `bfa1c81603dc077451f9447be4c08a1ecfefeb88`. Resolve the live current head because this journal update may advance it.
+- PR #3581 is OPEN: https://github.com/drsapaev/final/pull/3581. User authorized review publication and merge. Rebased source-inventory commit: c1c84f56a. The append conflict preserves upstream automatic-memory Task 103 and this inventory as Task 104. Previous exact-head checkpoints are historical; resolve live HEAD/checks before merge. GitHub refused author APPROVE; publish the technical verdict as a COMMENT review without representing it as independent approval.
 - Next exact action: push this journal update, verify PR #3581 base/head, and wait for applicable checks and merge. After merge, sync a fresh worktree before T08.2c.
 
 ## Historical continuation checkpoint — T08.2a (merged)

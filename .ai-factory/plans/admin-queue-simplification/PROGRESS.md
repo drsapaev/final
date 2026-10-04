@@ -1,17 +1,17 @@
 # Progress
 
-Plan version: 2.6
+Plan version: 2.7
 Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 2026-10-01
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T08.2b — source inventory of remaining active admission adapters
-Current status: T08.2a / PR #3576 is user-confirmed MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`. T08.2b source audit on `origin/main` `4e6f125f17c637fc27296e2d0ec9d23f5d376775` found the mounted legacy token, compatibility online, QR-session, and permanent-address paths delegate to `QueueBusinessService.join_queue_with_token`; GraphQL was the only confirmed independent successful writer and is now quota-aware. No T08.2b runtime patch is indicated. Main advanced through PR #3567 and #3580 to `c0ea82be6698828a3b040d9a516a48e132b8261d`; the branch was rebased and lease-pushed, preserving upstream Task 102 and this task as Task 103 in the DevBrain log. PR #3581 remains OPEN; the latest known head is `bfa1c81603dc077451f9447be4c08a1ecfefeb88` and checks have restarted. This journal update may advance the head, so resolve it live. Do not mark T08.2b MERGED until its PR is merged.
+Current status: T08.2b PR #3581 OPEN. User authorized publishing the review and merging on 2026-10-04. After a documentation conflict with #3587, the branch was rebased onto 2e3519948534f956fac7f94c3b1822792f864f41. Upstream Task 103 is preserved; this inventory gate record is Task 104. Resolve the live PR HEAD/checks before merge. T08.2c/T08.3 remain planned; v1 creation stays default-off.
 Last completed task: T08.2a — MERGED (#3576, merge commit `1ed6d05874c2ea205a625bb70879adb10b077be4`)
 Worktree: C:\final\_wt_aqs_t082b_admission
 Branch: codex/aqs-T08.2b-admission
-Base commit: c0ea82be6698828a3b040d9a516a48e132b8261d
-Current code commit: rebased source inventory commit `66e0c6e48`; resolve the PR branch tip live because journal-only commits may follow it.
-Last updated: 2026-10-03T23:33:16+05:00
+Base commit: 2e3519948534f956fac7f94c3b1822792f864f41
+Current code commit: rebased source inventory commit c1c84f56a; resolve the live PR tip because journal commits follow it.
+Last updated: 2026-10-04T06:27:05+05:00, Asia/Tashkent
 
 > Historical checkpoint superseded: current T07 status and exact-head evidence are recorded in dated sections below and in RESUME.md; do not use the earlier snapshot as a continuation instruction.
 
