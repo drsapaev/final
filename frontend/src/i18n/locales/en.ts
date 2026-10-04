@@ -74,7 +74,7 @@ const en = {
   },
   pagination: {
     firstPage: 'First page',
-    page: 'Page {{page}}',
+    page: 'Page {page}',
     lastPage: 'Last page',
   },
   common: {
