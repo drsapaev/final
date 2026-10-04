@@ -1,10 +1,19 @@
 # Resume — admin queue simplification
 
 Plan version: 2.9
-Last updated: 2026-10-04T09:30:31+05:00, Asia/Tashkent
+Last updated: 2026-10-04T10:27:26+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
-## Current continuation checkpoint — T08.2c exact-head CI passed
+## Current continuation checkpoint — T08.2c four additional review fixes
+
+- Worktree/base: `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`; base `origin/main`: `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`. Previous exact PR HEAD `b04c7e0a25019e2a0eca5d52994ee136012598e3` passed applicable CI; local review follow-ups are commits `4ddd3f429ada87be459c01e4f6e9a5c9ffe430c9` and `210abf7f42507a0dc343b8c5f2560a1bd91d3e0b`, with exact-head CI pending.
+- New findings and fixes: Admin `queue-status` used `Doctor.user_id` instead of `Doctor.id`; inactive doctor identity lookup ignored exact `queue_tag`; Admin aggregate and public `/online-queue/status` synthesized a fresh v1 quota when only an inactive resource-owned queue existed. A follow-up fail-first check caught the same public-status error when an inactive doctor-owned row is returned directly. The read paths now use the correct owner identity, return unknown quota for inactive identities, and mark the public status unavailable with no slots.
+- Fail-first reproduced five focused regression assertions for the four PR findings and one additional doctor-owned case. The three affected unit modules pass **56 tests, 1 warning** on SQLite fixtures. Scoped Ruff, Python compile check, and `git diff --check` pass. The local run used a non-connecting PostgreSQL-shaped bootstrap DSN only because app import requires `DATABASE_URL`; test fixtures created and used SQLite databases. No PostgreSQL, staging, browser, admission writer, schema, rollout flag, or production behavior was tested or changed.
+- Commit hooks: Windows Application Control blocked local Gitleaks and Black (`WinError 4551`); Ruff-format attempted unrelated legacy-file formatting that was discarded. The source commit skipped only these three hooks; other applicable hooks passed. GitHub exact-head secret scanning must be checked after push.
+- Earlier exact-head CI on `b04c7e0` is historical only; it does not validate `210abf7f`. PR #3596 remains OPEN; no independent human approval or merge is recorded. No staging deferral is requested or accepted. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off. T08.3 still owns PostgreSQL concurrency/replay/partial-result proof.
+- Next exact action: run `git diff --check`, commit the journal checkpoint, update and validate the existing PR body, push, and inspect all applicable checks on the new exact HEAD. Keep the PR open until independent human review; do not start T08.3 before this PR cycle closes.
+
+## Historical continuation checkpoint — T08.2c exact-head CI passed (superseded)
 
 - Worktree/base: `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`; base/current `origin/main`: `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; exact PR HEAD: `d1a5cc6fe27de4104ca79fb307d1a0aaa23f0620`.
 - Runtime review-fix commit: `98025bf35545227ba0862cfe1a9fc10e14105df2`. Five automated P2 findings are fixed and regression-tested: duplicate rowless QueueResource capacity; clinic-wide queue length lost on early returns; compatibility of `current_entries`/legacy `remaining_slots`; missing persisted policy in opened-queue responses; and invented quota for inactive identity.
