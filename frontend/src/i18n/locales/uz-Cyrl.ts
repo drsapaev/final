@@ -76,6 +76,11 @@ const uzCyrl = {
     density_comfortable: 'Стандарт',
     density_spacious: 'Кенг',
   },
+  pagination: {
+    firstPage: 'Биринчи саҳифа',
+    page: 'Саҳифа {{page}}',
+    lastPage: 'Охирги саҳифа',
+  },
   common: {
     clear: 'Тозалаш',
     save: 'Сохранить',
