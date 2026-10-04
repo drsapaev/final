@@ -698,6 +698,20 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: CI/current-head PR checks not yet run because the PR has not been opened. Synthetic staging, T05-deferred browser/timing coverage, T06.2 constructors/admission writers, and the production pre-deploy checklist remain NOT_RUN.
 - PR: not opened.
 - Merge commit: none.
+
+## T08.2c exact-head validation and PR status — 2026-10-04T09:30:31+05:00
+
+- Commit under test: `d1a5cc6fe27de4104ca79fb307d1a0aaa23f0620`; runtime review-fix commit: `98025bf35545227ba0862cfe1a9fc10e14105df2`; base: `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`.
+- Environment: GitHub Actions on exact PR #3596 HEAD, plus local Windows worktree `C:\final\_wt_aqs_t082c_availability`. PR #3596 is OPEN and mergeable; current `reviewDecision` is empty.
+- Execution mode: validation/checkpoint only. Allowed paths for this checkpoint: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md` and existing PR body. Actual local changed paths for this checkpoint are those three documents; the PR body was edited separately via GitHub.
+- Original failures: the five automated P2 findings are recorded in the preceding section. They were reproduced before their runtime corrections; focused post-fix tests pass. The stale prior-head E2E Lab dirty-guard timeout did not reproduce on exact head `d1a5cc6`.
+- Exact-head CI result: **PASS** for Backend tests (11m47s); Frontend E2E (13m21s); Frontend unit, lint, and build; OpenAPI documentation/freshness; Frontend–Backend parity; PR Required Gate; PR Review Quality Gate; CodeQL; quality analysis; context-boundary; role-system; security scan; Gitleaks/GitGuardian; locale checks; Telegram Mini App release gate; regression audit; and notification check.
+- Path-aware skips (not passes): staging readiness, production readiness, Docker build, integration tests, load tests, the unified-workflow security scan, Supabase preview, nightly DAST, and notification-on-failure jobs. Skips do not make this a staging, deployment, integration, or PostgreSQL proof.
+- Local validation carried forward from runtime commit: focused report/OpenAPI tests 85 passed / 1 warning; review-fix modules 40 passed / 1 warning; five review regressions 5 passed / 35 deselected / 1 warning; selected resource integration tests 4 passed / 167 deselected / 1 warning; scoped Ruff, `py_compile`, generated OpenAPI and TypeScript freshness, and `git diff --check` passed. The broad 171-case resource integration suite was stopped before tests and remains NOT_RUN.
+- PR body: the final published wording passed GitHub PR Review Quality Gate on this exact head. A local re-run of the body checker after the two status-only sentence edits was NOT_RUN because this session could not locate Python 3.11+; the earlier 19-check local run passed on the prior body version.
+- Result: runtime fixes and exact-head applicable CI pass. Staging/browser and PostgreSQL concurrency/replay/partial-result validation are NOT_RUN; PostgreSQL proof is assigned to T08.3. No deferral is requested or accepted. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off. No independent human approval or merge is recorded.
+- Next exact action: push the current documentation checkpoint, update the PR body so it records completed exact-head CI rather than “running,” then verify the resulting PR Review Quality Gate and current review status. Keep the PR open pending independent human review.
+- Merge commit: none.
 - Next exact action: rerun compileall and `git diff --check`, review the full diff and plan ledger, commit/open the T06.1 PR, then inspect checks for that exact PR head. Do not start T06.2 until T06.1 is merged and the worktree is synced.
 
 ## T06.1 PR open — 2026-10-01T17:55:43+05:00

@@ -1,17 +1,18 @@
 # Resume — admin queue simplification
 
 Plan version: 2.9
-Last updated: 2026-10-04T09:13:47+05:00, Asia/Tashkent
+Last updated: 2026-10-04T09:30:31+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
 
-## Current continuation checkpoint — T08.2c review fixes
+## Current continuation checkpoint — T08.2c exact-head CI passed
 
-- Worktree/base: `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`; base and current `origin/main` are `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`.
-- Code commit: `98025bf35545227ba0862cfe1a9fc10e14105df2`. It fixes all five automated P2 findings on PR #3596: deduplicate rowless quota by QueueResource; retain clinic-wide queue length on closed-window early returns; preserve online-only `current_entries` and numeric legacy `remaining_slots`; include saved `policy_version` when reception is open; and report quota unknown when an inactive resource identity blocks replacement.
-- Fail-first reproduced 5 failures / 35 passes. Fixed-code focused modules: **40 passed / 1 warning**; five named review regressions after the commit-hook formatting pass: **5 passed / 35 deselected / 1 warning**. Scoped Ruff, Python compile, and diff whitespace checks passed. Temporary SQLite fixtures only; no PostgreSQL or staging proof.
-- Gate result: `gate_known_root_cause` on `_queue_ops.py` returned `narrow_override`, `gate_misroute=false`, `override_used=true`, with only `_queue_ops.py` in first touch. The approved T08.2c contract and five exact PR findings are the bounded basis for the sibling helper/service/test paths. No third gate call. Commit hooks passed except `ruff-format`/Black, skipped after their initial automatic formatting touched unrelated legacy regions; unrelated formatting was removed.
-- GitHub still reports PR #3596 at the old exact head `7ac67296e22c0562b75c944df5b161ede77262c`; the new code and journal/body checkpoint are not pushed yet. On that old head, Backend tests passed, Frontend E2E failed one unrelated Lab dirty-guard timeout (60 passed, 1 failed); all old-head checks are stale for the code commit. No independent review or merge is claimed.
-- Next exact action: `.pr-body-T08.2c.md` passed its 19-check local quality gate. Commit only the plan evidence/progress/resume updates, update GitHub from this validated body, push code + journal to PR #3596, then inspect all required CI and review state on the new exact head. Keep merge on hold while required checks or independent review are unresolved. Do not start T08.3 before this PR cycle closes; do not enable the v1 flag or touch staging/production.
+- Worktree/base: `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`; base/current `origin/main`: `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; exact PR HEAD: `d1a5cc6fe27de4104ca79fb307d1a0aaa23f0620`.
+- Runtime review-fix commit: `98025bf35545227ba0862cfe1a9fc10e14105df2`. Five automated P2 findings are fixed and regression-tested: duplicate rowless QueueResource capacity; clinic-wide queue length lost on early returns; compatibility of `current_entries`/legacy `remaining_slots`; missing persisted policy in opened-queue responses; and invented quota for inactive identity.
+- Focused local evidence: fail-first 5 failed / 35 passed; post-fix modules 40 passed / 1 warning; five review regressions 5 passed / 35 deselected / 1 warning; earlier focused report/OpenAPI set 85 passed / 1 warning; selected resource integrations 4 passed / 167 deselected / 1 warning. Ruff, `py_compile`, OpenAPI and TypeScript freshness, and `git diff --check` passed. SQLite fixtures only.
+- Exact-head CI on `d1a5cc6` passes: Backend tests, Frontend E2E (**13m21s**; old Lab dirty-guard timeout did not recur), Frontend unit/lint/build, OpenAPI docs, Frontend–Backend parity, PR Required Gate, PR Review Quality Gate, CodeQL, quality, security, context boundary, role system, Gitleaks/GitGuardian, locales, Telegram release gate, and regression audit. Path-aware skipped checks include staging/production readiness, Docker, integration, load, and selected security/deployment checks; they are skips, not passes.
+- GitHub PR #3596 is OPEN and mergeable; base is `9b8296f8…`; `reviewDecision` is empty. No independent human approval or merge exists. Staging/browser and PostgreSQL concurrency/replay/partial-result proof remain NOT_RUN; PostgreSQL proof belongs to T08.3. No staging deferral is requested or accepted. The v1 creation flag remains default-off.
+- Current PR body was updated to identify `d1a5cc6` and say CI is running; that status is now stale. A remote PR Review Quality Gate passed on the published body, but local re-run of the body checker after status-only edits was NOT_RUN because Python 3.11+ was unavailable in this session.
+- Next exact action: commit and push this documentation-only status checkpoint, update the PR body with the completed exact-head check results, then recheck PR body quality and exact HEAD/status. Do not self-approve or merge #3596; wait for independent human review. Do not start T08.3 until this PR cycle closes.
 
 ## Historical continuation checkpoint — T08.2c pre-review
 
