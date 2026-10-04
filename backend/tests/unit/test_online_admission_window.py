@@ -362,6 +362,7 @@ def test_public_status_rejects_inactive_doctor_owned_queue(db_session, monkeypat
     db_session.add(doctor)
     db_session.flush()
     queue = _make_v1_queue(db_session, day=date(2030, 1, 2), doctor=doctor)
+    queue.queue_tag = doctor.specialty
     queue.active = False
     queue.online_issued_count = 3
     db_session.flush()
@@ -1140,6 +1141,139 @@ def test_public_status_ignores_inactive_queue_for_another_tag(db_session, monkey
     assert result["policy_version"] == ONLINE_ISSUANCES_V1_POLICY_VERSION
     assert result["online_issued_count"] == 0
     assert result["online_bookings_remaining"] == 4
+
+
+@pytest.mark.unit
+def test_public_status_reuses_active_doctor_day_queue_with_another_tag(
+    db_session, monkeypatch
+):
+    import app.crud.clinic as clinic_crud
+    import app.crud.online_queue as online_queue_crud
+    import app.services.queue_service as queue_service_module
+    import app.services.queue_svc._core as queue_core
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue
+    from app.services.queue_service import QueueBusinessService
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+        "max_per_day": {"cardiology": 10},
+    }
+    for module in (clinic_crud, online_queue_crud, queue_core):
+        monkeypatch.setattr(module, "get_queue_settings", lambda db: settings)
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
+    _fixed_tashkent_time(monkeypatch, online_queue_crud, hour=8)
+    _fixed_tashkent_time(monkeypatch, queue_service_module, hour=8)
+
+    day = date(2030, 1, 2)
+    doctor = Doctor(specialty="cardiology", active=True, max_online_per_day=12)
+    db_session.add(doctor)
+    db_session.flush()
+    persisted_queue = DailyQueue(
+        day=day,
+        specialist_id=doctor.id,
+        queue_tag="SYNTHETIC-procedures",
+        active=True,
+        policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+        online_start_time="07:00",
+        online_end_time="09:00",
+        max_online_entries=2,
+        online_issued_count=2,
+    )
+    db_session.add(persisted_queue)
+    db_session.flush()
+
+    report = online_queue_crud.check_queue_availability(db_session, day, doctor.id)
+    queue_service = QueueBusinessService()
+    queue_service.assign_queue_token(
+        db_session,
+        specialist_id=doctor.id,
+        target_date=day,
+        department=None,
+        generated_by_user_id=None,
+        commit=False,
+    )
+    selected_queue = queue_service.get_or_create_daily_queue(
+        db_session, day=day, specialist_id=doctor.id, queue_tag=doctor.specialty
+    )
+
+    assert selected_queue.id == persisted_queue.id
+    assert report["available"] is False
+    assert report["reason"] == "QUEUE_FULL"
+    assert report["max_online_entries"] == persisted_queue.max_online_entries
+    assert report["online_issued_count"] == persisted_queue.online_issued_count
+    assert report["online_bookings_remaining"] == 0
+
+
+@pytest.mark.unit
+def test_public_status_ignores_inactive_untagged_queue_for_new_tagged_identity(
+    db_session, monkeypatch
+):
+    import app.crud.clinic as clinic_crud
+    import app.crud.online_queue as online_queue_crud
+    import app.services.queue_service as queue_service_module
+    import app.services.queue_svc._core as queue_core
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue
+    from app.services.queue_service import QueueBusinessService
+
+    settings = {
+        "timezone": "Asia/Tashkent",
+        "queue_start_hour": 7,
+        "auto_close_time": "09:00",
+        "max_per_day": {"cardiology": 10},
+    }
+    for module in (clinic_crud, online_queue_crud, queue_core):
+        monkeypatch.setattr(module, "get_queue_settings", lambda db: settings)
+    monkeypatch.setenv("QUEUE_POLICY_V2_CREATION_ENABLED", "true")
+    _fixed_tashkent_time(monkeypatch, online_queue_crud, hour=8)
+    _fixed_tashkent_time(monkeypatch, queue_service_module, hour=8)
+
+    day = date(2030, 1, 2)
+    doctor = Doctor(specialty="cardiology", active=True)
+    db_session.add(doctor)
+    db_session.flush()
+    old_queue = DailyQueue(
+        day=day,
+        specialist_id=doctor.id,
+        queue_tag=None,
+        active=False,
+        policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+        online_start_time="07:00",
+        online_end_time="09:00",
+        max_online_entries=2,
+        online_issued_count=2,
+    )
+    db_session.add(old_queue)
+    db_session.flush()
+
+    report = online_queue_crud.check_queue_availability(db_session, day, doctor.id)
+    QueueBusinessService().assign_queue_token(
+        db_session,
+        specialist_id=doctor.id,
+        target_date=day,
+        department=None,
+        generated_by_user_id=None,
+        commit=False,
+    )
+    created_queue = (
+        db_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == day,
+            DailyQueue.specialist_id == doctor.id,
+            DailyQueue.queue_tag == doctor.specialty,
+            DailyQueue.active.is_(True),
+        )
+        .one()
+    )
+
+    assert created_queue.id != old_queue.id
+    assert report["available"] is True
+    assert report["policy_version"] == ONLINE_ISSUANCES_V1_POLICY_VERSION
+    assert report["online_issued_count"] == 0
+    assert report["online_bookings_remaining"] == created_queue.max_online_entries
 
 
 @pytest.mark.unit

@@ -737,12 +737,12 @@ def check_queue_availability(
     )
     if doctor is not None and doctor.specialty:
         # Public status has no tag parameter; specialty is the canonical
-        # destination. Preserve untagged legacy rows as a fallback, but never
-        # let a different arbitrary tag define this QR's identity.
-        daily_queue = (
-            queue_identity.filter(DailyQueue.queue_tag == doctor.specialty).first()
-            or queue_identity.filter(DailyQueue.queue_tag.is_(None)).first()
-        )
+        # destination. The canonical creator may reuse an active queue for
+        # this doctor/day with another tag, so resolve that below; an inactive
+        # row with a different tag is not this QR's identity.
+        daily_queue = queue_identity.filter(
+            DailyQueue.queue_tag == doctor.specialty
+        ).first()
     else:
         daily_queue = queue_identity.filter(DailyQueue.queue_tag.is_(None)).first()
 
@@ -751,6 +751,24 @@ def check_queue_availability(
     daily_queue = queue_resource_routing.prefer_registry_surface(
         db, daily_queue, day, specialist_id
     )
+
+    # Match QueueBusinessService.get_or_create_daily_queue's doctor-owner
+    # fallback: when no active resource owns the tag, any active doctor/day
+    # queue is reused even if its stored routing tag differs. Keep a resolved
+    # registry surface ahead of this fallback.
+    if (
+        doctor is not None
+        and doctor.specialty
+        and queue_resource_routing.resolve_tag_resource(db, doctor.specialty) is None
+        and (daily_queue is None or not daily_queue.active)
+    ):
+        active_doctor_day_queue = (
+            queue_identity.filter(DailyQueue.active.is_(True))
+            .order_by(DailyQueue.id.asc())
+            .first()
+        )
+        if active_doctor_day_queue is not None:
+            daily_queue = active_doctor_day_queue
 
     inactive_queue = None
     if daily_queue is not None and not daily_queue.active:
