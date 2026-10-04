@@ -77,7 +77,9 @@ const Tooltip = ({
 
   const triggerRef: RefObject<HTMLDivElement | null> = useRef<HTMLDivElement | null>(null);
   const tooltipRef: RefObject<HTMLDivElement | null> = useRef<HTMLDivElement | null>(null);
-  const timeoutRef: RefObject<ReturnType<typeof setTimeout> | null> = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showTimeoutRef: RefObject<ReturnType<typeof setTimeout> | null> = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimeoutRef: RefObject<ReturnType<typeof setTimeout> | null> = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isRenderedRef = useRef(false);
 
   // Position calculations
   const positionMap: Record<TooltipPosition, TooltipPositionMap> = {
@@ -98,13 +100,29 @@ const Tooltip = ({
       setMouseCoords({ x: e.clientX, y: e.clientY });
     }
 
-    timeoutRef.current = setTimeout(() => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+
+      if (isRenderedRef.current) {
+        setIsVisible(true);
+        return;
+      }
+    }
+
+    if (showTimeoutRef.current) {
+      clearTimeout(showTimeoutRef.current);
+    }
+
+    showTimeoutRef.current = setTimeout(() => {
+      showTimeoutRef.current = null;
       const rect = triggerRef.current?.getBoundingClientRect();
       if (rect) {
         setCoords({
           x: rect.left + rect.width / 2,
           y: rect.top + rect.height / 2
         });
+        isRenderedRef.current = true;
         setShouldRender(true);
       }
     }, delay);
@@ -117,21 +135,30 @@ const Tooltip = ({
   };
 
   const handleMouseLeave = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
+    if (showTimeoutRef.current) {
+      clearTimeout(showTimeoutRef.current);
+      showTimeoutRef.current = null;
     }
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+    }
+
     setIsVisible(false);
     // Даем время на анимацию исчезновения
-    setTimeout(() => {
-      if (!timeoutRef.current) setShouldRender(false);
+    hideTimeoutRef.current = setTimeout(() => {
+      hideTimeoutRef.current = null;
+      isRenderedRef.current = false;
+      setShouldRender(false);
     }, 200);
   };
 
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+      if (showTimeoutRef.current) {
+        clearTimeout(showTimeoutRef.current);
+      }
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
       }
     };
   }, []);
