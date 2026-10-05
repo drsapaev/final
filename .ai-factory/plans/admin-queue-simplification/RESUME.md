@@ -1,5 +1,18 @@
 # Resume — admin queue simplification
 
+## Current continuation checkpoint — T08.3.2 post-merge P2 follow-up (2026-10-05T17:23:29+05:00)
+
+- PR #3600 is merged at `b3bd5272389da88513cc1ac23985b390489554f9`. Fresh `origin/main` is `ba03fdfb8d14d38a68a2d16df93145562cd87c63`; it contains the merge and QR PostgreSQL tests.
+- Current branch: `codex/aqs-T08.3.2-clockfix`, from a clean managed worktree at that base. The sole code owner is `backend/tests/integration/test_qr_family_phone_identity.py`; no runtime changes are authorized.
+- Follow-up: the four new QR v1 tests used a real clock with a persisted `23:59` cutoff. `_fixed_v1_admission_day` freezes the queue-service clock at noon Asia/Tashkent, and the tests seed queues/tokens with that same fixed clinic day. It preserves the actual admission-window check.
+- Gate: `gate_known_root_cause` was run from `ai/langgraph` against the confirmed test owner. It returned `gate_ok`/`execute`, `handoff_required=true`, and listed the test module plus unrelated Docker/Compose paths in first-touch. Its execution prompt was read. The explicit user request and approved T08.3.2 scope authorize the test module and plan checkpoint updates; only those paths were used. Runtime and ops remain denied. Gate reported `gate_misroute=false`, `override_used=false`.
+- Allowed: `backend/tests/integration/test_qr_family_phone_identity.py`; `.ai-factory/plans/codex-admin-queue-simplification.md`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,EVIDENCE}.md`. Denied: runtime, model, migration, API, frontend, ops/Docker, unrelated tests, generated output, shared staging and production/live data.
+- Validation: the whole module passed **11/11** on disposable PostgreSQL 16 with no skips after holding the task's WSL process throughout the test command. Ruff, Black check, `py_compile`, and `git diff --check` passed. A prior run lost its disposable DB after WSL idled and returned all skips; it is NOT_RUN. A second attempt failed before tests because that interpreter lacked psycopg2. The successful runner used Python 3.11.9 and the installed psycopg3 dialect.
+- The temporary DB container was removed and the task-owned WSL holder stopped. No staging/production stack was started or changed.
+- Next: complete evidence/plan status updates, commit and push this follow-up, open one PR, and inspect exact-head checks. Wait for review/merge decision before T08.3.3.
+
+> The checkpoint below is historical and predates the #3600 merge and its deterministic-clock follow-up.
+
 ## Current continuation checkpoint — T08.3.2 (2026-10-05T13:48:16+05:00)
 
 - T08.3.1 / PR #3599 is merged at `a452c54e5851611476c1b2ac3e3298aeff467eca`. Fresh worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-2-qr-session\final`, branch `codex/aqs-T08.3.2-qr-session`, base `origin/main`/HEAD `34ca6e59080dc679a6c7f921ac88a6aacb34e996`; clean before this checkpoint.

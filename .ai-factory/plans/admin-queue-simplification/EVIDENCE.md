@@ -4,6 +4,24 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 
 Historical index snapshot from version 2.9: T00–T07 were confirmed MERGED; T08 was IN_PROGRESS with PR #3596/T08.2c OPEN; T09–T18 were PLANNED. This snapshot is superseded by the current checkpoint below and in [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md). The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver.
 
+## T08.3.2 clock follow-up — 2026-10-05T17:23:29+05:00
+
+- Purpose: fix the post-merge P2 from review of PR #3600. Four new tests seeded v1 queues with an `online_end_time` of 23:59 but used the real clinic clock; they could fail during the final minute.
+- Base/branch: fresh `origin/main` `ba03fdfb8d14d38a68a2d16df93145562cd87c63`, containing PR #3600 merge `b3bd5272389da88513cc1ac23985b390489554f9`; branch `codex/aqs-T08.3.2-clockfix`; managed worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-2-clockfix\final`.
+- Execution mode: `gate_known_root_cause` for the confirmed test owner. The gate returned `gate_ok`/`execute`, `handoff_required=true`, `gate_misroute=false`, `override_used=false`, while its first-touch list also named unrelated Docker/Compose files. Its execution prompt was read. The user's explicit “исправляй” request and approved T08.3.2 test-only scope authorized the existing PG test file and these plan journals; only those paths were used. No gate miss is claimed; no runtime or ops file changed.
+- Allowed paths: `backend/tests/integration/test_qr_family_phone_identity.py`; `.ai-factory/plans/codex-admin-queue-simplification.md`; this plan's `PROGRESS.md`, `RESUME.md`, and `EVIDENCE.md`.
+- Denied paths: `backend/app/**`, models, migrations, API, frontend, `ops/**`, Docker/Compose, unrelated tests, generated output, shared staging, production/live data.
+- Change: added `_fixed_v1_admission_day`, which freezes the supported `queue_service.datetime.now(tz)` clinic clock at 12:00 Asia/Tashkent. The four new single/multi replay/rollback tests seed their queue and token with the fixture's same day. The actual v1 admission-window checks remain enabled.
+- Validation: `scripts/run_backend_pytest.ps1 tests/integration/test_qr_family_phone_identity.py -q` — **11 passed, 0 skipped, 1 warning** on PostgreSQL 16. The fixture created and upgraded its UUID-named scratch database and dropped it on teardown. The disposable database was bound only to loopback port 55435; its task-owned container was removed after the successful run.
+- Static checks: scoped Ruff check — PASS; Black `--check` — PASS; `py_compile` — PASS; `git diff --check` — PASS.
+- Failed/invalid attempts: first two pytest invocations failed before collection because the selected interpreters lacked `psycopg2`; the successful run used Python 3.11.9 with `postgresql+psycopg` for the app connection and the fixture's local `postgresql://` admin URI. An unheld-WSL attempt then returned 11 skipped after its temporary database disappeared; that run is NOT_RUN, not a pass. The successful rerun held the task-owned WSL process for the entire command. Its holder and PostgreSQL container were removed afterward.
+- Scope check: only the test module and four plan/checkpoint files changed. No staging Compose project, application runtime, schema, feature flag, frontend or production service was used or changed.
+- Remaining limitation: no staging/browser/full-system validation; this is a deterministic test-only follow-up. No GitHub CI result exists yet because its PR has not been opened.
+- PR: pending creation.
+- Merge commit: none.
+
+> The following T08.3.2 entry is the pre-merge record; its `PR_OPEN`/no-merge fields are historical and superseded by the clock-follow-up checkpoint above.
+
 ## T08.3.2 — 2026-10-05T13:48:16+05:00
 
 - Commit under test: code/test commit `b3ca1a270aa8ac2b0808487a398442acb39c6466` on branch `codex/aqs-T08.3.2-qr-session`, based on `34ca6e59080dc679a6c7f921ac88a6aacb34e996`.

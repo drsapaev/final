@@ -1,5 +1,29 @@
 # Progress
 
+## Current authoritative checkpoint — T08.3.2 post-merge P2 follow-up (2026-10-05T17:23:29+05:00)
+
+Plan version: 3.5
+Execution permission: IMPLEMENTATION_ACTIVE — user asked “исправляй” for the confirmed P2 in the merged #3600 tests.
+Current task: remove wall-clock dependence from the four QR-session v1 PostgreSQL tests.
+Current status: VALIDATED locally; follow-up PR not yet opened.
+Branch: `codex/aqs-T08.3.2-clockfix`; base `origin/main` = `ba03fdfb8d14d38a68a2d16df93145562cd87c63`; merge #3600 = `b3bd5272389da88513cc1ac23985b390489554f9`.
+Mode: `gate_known_root_cause`. Gate output was `gate_ok` / `execute`, `handoff_required=true`, with the confirmed test module plus unrelated Docker/Compose paths in first-touch; `gate_misroute=false`, `override_used=false`. Its execution prompt was read. The user's explicit P2 fix request and approved T08.3.2 test-only scope authorize this existing PG test module and plan checkpoint updates; only those paths were used. No runtime/ops changes.
+Canonical anchors: `backend/tests/integration/test_qr_family_phone_identity.py`; queue admission clock seam `backend/app/services/queue_svc/_base.py::_now` and `backend/app/services/queue_service.py::datetime`; T08.3.2 in the canonical plan; `docs/runbooks/AGENT_SESSION_WORKTREES.md` and `docs/runbooks/WSL_STAGING_SESSION.md`.
+Allowed paths: the QR PG test module and this plan's canonical document plus `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`.
+Denied paths: runtime, models, migrations, API, frontend, `ops/**`, Docker/Compose, generated output, unrelated tests, shared staging and production/live data.
+Actual source change: fixed-clinic-day fixture freezes the queue service clock at 12:00 Asia/Tashkent; the four new tests pass that same day to synthetic queue/token seed helpers. This keeps real v1 window enforcement active and avoids the 23:59 cutoff flake.
+Validation: PostgreSQL 16 module **11 passed, 0 skipped, 1 warning** using a unique Alembic-upgraded scratch DB on loopback. Ruff, Black check, `py_compile`, and `git diff --check` passed. The initial run without a held WSL session returned 11 skipped after its disposable DB disappeared; it is recorded as NOT_RUN, not a pass. The successful rerun held the task-owned WSL process for the full test command; its container and holder were removed afterward.
+Stop conditions: any need to change runtime behavior or edit outside the approved test/docs scope; inability to keep the queue clock and seeded day consistent; DB isolation failure.
+Next exact action: finish journal updates, commit/push the scoped follow-up, open one PR, then verify checks on its exact head and wait for review/merge decision. Do not start T08.3.3 until this follow-up PR cycle is merged.
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T08.3.2 | MERGED | [PR #3600](https://github.com/drsapaev/final/pull/3600) | `b3bd5272389da88513cc1ac23985b390489554f9` | `EVIDENCE.md#t08.3.2` |
+| T08.3.2-P2 | VALIDATED | `codex/aqs-T08.3.2-clockfix` / PR pending | | `EVIDENCE.md#t0832-clock-follow-up` |
+| T08.3.3 | PLANNED | | | |
+
+> The checkpoint below is historical: it predates the merge of #3600 and the P2 follow-up recorded above.
+
 ## Current authoritative checkpoint — T08.3.2 (2026-10-05T13:48:16+05:00)
 
 Plan version: 3.4
