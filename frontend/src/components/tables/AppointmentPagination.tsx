@@ -26,6 +26,7 @@ const AppointmentPagination = ({
   t?: TFunc;
 }) => {
   const { t: useT } = useTranslation();
+  void t;
 
   if (totalItems === 0) return null;
 
