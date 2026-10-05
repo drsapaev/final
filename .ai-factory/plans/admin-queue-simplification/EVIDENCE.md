@@ -16,8 +16,24 @@ Historical index snapshot from version 2.9: T00–T07 were confirmed MERGED; T08
 - Static checks: scoped Ruff check — PASS; Black `--check` — PASS; `py_compile` — PASS; `git diff --check` — PASS.
 - Failed/invalid attempts: first two pytest invocations failed before collection because the selected interpreters lacked `psycopg2`; the successful run used Python 3.11.9 with `postgresql+psycopg` for the app connection and the fixture's local `postgresql://` admin URI. An unheld-WSL attempt then returned 11 skipped after its temporary database disappeared; that run is NOT_RUN, not a pass. The successful rerun held the task-owned WSL process for the entire command. Its holder and PostgreSQL container were removed afterward.
 - Scope check: only the test module and four plan/checkpoint files changed. No staging Compose project, application runtime, schema, feature flag, frontend or production service was used or changed.
-- Remaining limitation: no staging/browser/full-system validation; this is a deterministic test-only follow-up. No GitHub CI result exists yet because its PR has not been opened.
-- PR: pending creation.
+- Remaining limitation: no staging/browser/full-system validation; this is a deterministic test-only follow-up. GitHub CI was pending when this local-validation record was first written; the PR-open state is recorded in the next checkpoint.
+- PR: see the PR #3607 checkpoint below.
+- Merge commit: none.
+
+## T08.3.2 clock follow-up PR #3607 — 2026-10-05T17:32:11+05:00
+
+- Commit under test: code/test commit `ae0bd8a7f24b27f7b1981911b2b9ecfaec9ede2f`; branch `codex/aqs-T08.3.2-clockfix`; base `ba03fdfb8d14d38a68a2d16df93145562cd87c63`; PR [#3607](https://github.com/drsapaev/final/pull/3607) targets `main`.
+- Environment: local managed worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-2-clockfix\final`; synthetic disposable PostgreSQL 16 evidence is recorded above. No staging or production was used.
+- Execution mode: `gate_known_root_cause`; see the preceding task evidence. Gate output was `gate_ok`/`execute`, `handoff_required=true`, `gate_misroute=false`, `override_used=false`; execution prompt read.
+- Allowed paths and actual changed paths: existing QR PostgreSQL test module and this plan's canonical plan, `PROGRESS.md`, `RESUME.md`, and `EVIDENCE.md`. Denied runtime, model, migration, API, frontend, Docker/Compose, staging, generated output, and production/live paths remain untouched.
+- Original failure and fix: four new QR v1 PostgreSQL tests used a live clinic clock with a `23:59` cutoff. The code commit freezes the queue-service clock at noon Asia/Tashkent and seeds the same fixed clinic day, preserving the real admission-window logic.
+- Validation command: `scripts/run_backend_pytest.ps1 tests/integration/test_qr_family_phone_identity.py -q` against the task's unique disposable PostgreSQL 16 scratch DB.
+- Result: PASS — 11 passed, 0 skipped, 1 warning. Ruff, Black check, `py_compile`, and `git diff --check` passed on the code-bearing commit. PR-body quality gate passed after creation preparation: 19 validator tests, documented samples, and actual PR body.
+- Exact-head GitHub checks: pending; query after the journal checkpoint is pushed. Staging/browser/full-system validation: NOT_RUN, outside this deterministic test-only slice.
+- Scope check: no runtime behavior, schema, feature flag, shared staging, production service or patient data changed. Test DB container and WSL holder were removed after validation.
+- Remaining limitation: this PR proves test determinism only; it is not system-health or staging evidence. Do not mark MERGED until GitHub confirms merge.
+- Next exact action: push the plan checkpoint update, inspect checks on the resulting exact PR HEAD, update the PR evidence if needed, then wait for the user's review/merge decision. Do not start T08.3.3 before this PR cycle closes.
+- PR: https://github.com/drsapaev/final/pull/3607
 - Merge commit: none.
 
 > The following T08.3.2 entry is the pre-merge record; its `PR_OPEN`/no-merge fields are historical and superseded by the clock-follow-up checkpoint above.
