@@ -1,20 +1,20 @@
 # Progress
 
-## Current authoritative checkpoint — T08.3.2 clock P2 correction (2026-10-05T18:45:14+05:00)
+## Current authoritative checkpoint — T08.3.2 clock P2 correction (2026-10-05T18:49:46+05:00)
 
 Plan version: 3.8
 Current task: fix the remaining QR-session clock seam in PR #3607.
-Current status: VALIDATED locally, not yet committed/pushed — PR #3607 remains open at pre-fix HEAD `055af9ae0b2f12bd20d3681f91e89359d364a4de`.
-Branch: `codex/aqs-T08.3.2-clockfix`; base `origin/main` = `ba03fdfb8d14d38a68a2d16df93145562cd87c63`.
+Current status: VALIDATED locally; code/evidence correction commit `8c8ac83e5ab16185404bf6c901aea15041214195` is local after rebase and awaits push. PR #3607 remote still points at pre-fix HEAD `055af9ae0b2f12bd20d3681f91e89359d364a4de`.
+Branch: `codex/aqs-T08.3.2-clockfix`; rebased onto fresh `origin/main` = `c1781c46a1b03c3404604542bcc9c4c9951f4c89` (dependency-only PR #3608).
 Mode: `gate_known_root_cause`. The mandatory rerun returned `narrow_override`, `execute`, `handoff_required=true`, `gate_misroute=true`, `override_used=true`; known owner `backend/tests/integration/test_qr_family_phone_identity.py`. The generated prompt was read. Its first-touch also listed unrelated ops/packaging files. Narrow basis: user explicitly requested correction of the review P2; approved T08.3.2 scope permits this existing test module and its plan journals only. No third gate run; no runtime/ops changes.
 Canonical anchors: `backend/tests/integration/test_qr_family_phone_identity.py`; `backend/app/services/queue_svc/_base.py::_now`; `backend/app/services/qr_queue/_base.py::_now`; `backend/app/services/qr_queue/_sessions.py::start_join_session`; current T08.3.2 plan/evidence.
 Allowed paths: QR PostgreSQL test module and this plan's canonical document, `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`.
 Denied paths: `backend/app/**`, models, migrations, API, frontend, `ops/**`, Docker/Compose, unrelated tests, generated output, shared staging, production/live data.
 Confirmed defect: patching only `queue_service.datetime` leaves `qr_queue_service.datetime` live. A read-only probe of the real QR window check at 23:59:30 returned `after_end_time` while queue service time was 12:00.
 Change in progress: patch both public clock facades to one clinic-local noon; add a focused assertion that both facades report the same frozen time. The four existing tests already pass the matching clinic day to their seed helpers.
-Validation: focused clock-facade test PASS (1 passed, 11 deselected); full module PASS on disposable PostgreSQL 16 (12 passed, 0 skipped, 1 warning); Ruff check, Ruff format check, `py_compile`, and `git diff --check` PASS. Black check NOT_RUN because Black is not installed in either configured Python environment; Ruff formatter reports the file is formatted. Task-owned PostgreSQL container on loopback port 55435 and WSL holder were removed. GitHub checks for the correction are pending a push.
+Validation: focused clock-facade test PASS (1 passed, 11 deselected); full module PASS on disposable PostgreSQL 16 (12 passed, 0 skipped, 1 warning); Ruff check, Ruff format check, `py_compile`, and `git diff --check` PASS. Commit hooks including Black and gitleaks PASS. The disposable PostgreSQL container on loopback port 55435 and WSL holder were removed. GitHub checks for the correction await the push.
 Stop conditions: any runtime edit, unclear clock ownership, unavailable isolated PG, or required path outside approved test/docs scope.
-Next exact action: inspect the final diff, commit and push the correction in PR #3607, then inspect applicable checks on its resulting HEAD.
+Next exact action: finalize this plan checkpoint, push the rebased branch to PR #3607 with an expected-head lease, then inspect applicable checks on its resulting HEAD.
 
 > Previous checkpoints below are chronological evidence and are superseded by this active correction checkpoint.
 

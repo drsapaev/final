@@ -1,14 +1,14 @@
 # Resume — admin queue simplification
 
-## Current continuation checkpoint — QR and queue clock seam correction (2026-10-05T18:45:14+05:00)
+## Current continuation checkpoint — QR and queue clock seam correction (2026-10-05T18:49:46+05:00)
 
-- PR #3607 remains OPEN in managed worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-2-clockfix\final`, branch `codex/aqs-T08.3.2-clockfix`; pre-fix HEAD was `055af9ae0b2f12bd20d3681f91e89359d364a4de`, base `ba03fdfb8d14d38a68a2d16df93145562cd87c63`.
+- PR #3607 remains OPEN. Managed worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-2-clockfix\final`, branch `codex/aqs-T08.3.2-clockfix`; correction commit is `8c8ac83e5ab16185404bf6c901aea15041214195`, rebased onto `origin/main` `c1781c46a1b03c3404604542bcc9c4c9951f4c89` after dependency-only PR #3608. The remote PR has not yet been updated and still points at `055af9ae0b2f12bd20d3681f91e89359d364a4de`.
 - Review found a reproducible P2: `_fixed_v1_admission_day` freezes `queue_service.datetime` only, while `QRQueueService.start_join_session` calls `get_qr_token_info` and `_check_online_time_restrictions`; the latter uses the separate `qr_queue_service.datetime` facade. A read-only mocked-DB probe made the queue clock noon and QR check 23:59:30; it returned `after_end_time`.
 - Execution boundary: test-only. The mandatory `gate_known_root_cause` retry was run before edits from `ai/langgraph` with the confirmed test owner. It returned `narrow_override` / `execute`, `handoff_required=true`, `gate_misroute=true`, `override_used=true`; prompt read. Its unrelated ops/packaging first-touch paths are denied. The explicit user instruction and approved T08.3.2 test/evidence scope authorize the existing integration test and plan journals only. Do not retry the gate or edit runtime/ops.
 - Current patch: apply the identical FrozenDateTime to `queue_service` and `qr_queue_service`; add a focused test asserting both facades return the fixed noon. Preserve live token expiry checks and the actual queue-window logic. Four PG tests continue to seed matching queue/token clinic day.
 - Allowed: `backend/tests/integration/test_qr_family_phone_identity.py`; `.ai-factory/plans/codex-admin-queue-simplification.md`; this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: runtime, models, migrations, API, frontend, ops/Docker, unrelated tests, generated output, staging and production.
-- Validation: focused clock-facade test PASS (1 passed, 11 deselected); full module PASS on disposable PostgreSQL 16 (12 passed, 0 skipped, 1 warning); Ruff check, Ruff format check, `py_compile`, and `git diff --check` PASS. Black check NOT_RUN because Black is absent from both configured Python environments. Disposable PostgreSQL container and WSL holder were removed. Staging/browser remain NOT_RUN because this is a test-only fix.
-- Next: inspect final diff, commit/push to #3607, then check the resulting PR HEAD.
+- Validation: focused clock-facade test PASS (1 passed, 11 deselected); full module PASS on disposable PostgreSQL 16 (12 passed, 0 skipped, 1 warning); Ruff check, Ruff format check, `py_compile`, `git diff --check`, commit hooks including Black and gitleaks PASS. Disposable PostgreSQL container and WSL holder were removed. Staging/browser remain NOT_RUN because this is a test-only fix.
+- Next: finish this evidence checkpoint, push rebased branch to #3607 with a lease against the known remote head, then check the resulting PR HEAD.
 - Do not merge or start T08.3.3 without the user's separate instruction after review and green checks.
 
 ## Current continuation checkpoint — T08.3.2 post-merge P2 follow-up (2026-10-05T17:38:38+05:00)
