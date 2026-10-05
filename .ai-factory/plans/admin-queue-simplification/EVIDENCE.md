@@ -2,7 +2,73 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
+## T08.3.2 PR #3607 review correction — 2026-10-05T18:49:46+05:00
+
+- Review finding: the first clock fix patched `queue_service.datetime` only. The QR session start path performs a separate time-window check through `qr_queue_service.datetime`; a read-only mocked-database probe set the queue clock to noon and QR clock to 23:59:30 and observed `after_end_time`.
+- Execution mode: `gate_known_root_cause`, rerun before editing against `backend/tests/integration/test_qr_family_phone_identity.py`. Result: `narrow_override`, mode `execute`, `handoff_required=true`, `gate_misroute=true`, `override_used=true`; the generated execution prompt was read. The first-touch list also contained unrelated ops/packaging files. The explicit user request and plan-approved T08.3.2 evidence/test boundary allow only the existing QR PG module and these four plan journals. No further retry; no runtime/ops changes.
+- Allowed paths: `backend/tests/integration/test_qr_family_phone_identity.py`; canonical plan; `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: runtime, schema, API, frontend, ops/Docker, unrelated tests, generated output, staging and production/live data.
+- Fix: patch the same frozen datetime facade into both `queue_service` and `qr_queue_service`; add a focused assertion that both service clocks show clinic-local noon. Existing token expiry evaluation remains wall-clock based and seeded token expiry remains based on real current time; the fix targets the two explicit admission clock facades only.
+- Validation: `scripts/run_backend_pytest.ps1 tests/integration/test_qr_family_phone_identity.py -k fixed_v1_admission_day -q` with import-only `DATABASE_URL=sqlite:///:memory:` — PASS, 1 passed, 11 deselected, 1 warning. Full `scripts/run_backend_pytest.ps1 tests/integration/test_qr_family_phone_identity.py -q -rs` against task-owned disposable PostgreSQL 16 on loopback port 55435 — PASS, 12 passed, 0 skipped, 1 warning. Scoped Ruff, Ruff format, `py_compile`, and `git diff --check` — PASS. Commit hooks for Ruff, Ruff format, Black, and gitleaks — PASS. The disposable PostgreSQL container and WSL holder were removed.
+- Initial attempts: the first focused pytest invocation lacked `DATABASE_URL` and stopped during application import; no test ran. The first lint attempt found two unsorted local imports, fixed before Ruff and formatter checks passed. No test failure remains.
+- Rebase: after fetch, fresh `origin/main` advanced only by dependency PR #3608 (`c1781c46a1b03c3404604542bcc9c4c9951f4c89`). The managed feature branch was rebased cleanly on that commit; no application/test change was introduced by the dependency commit. Correction commit: `8c8ac83e5ab16185404bf6c901aea15041214195`.
+- Remaining: branch push and exact-head GitHub checks are pending. Staging/browser/full-system validation was not run for this test-only correction.
+- Scope: only this integration test and the four plan/checkpoint files. No staging or production used.
+- PR: [#3607](https://github.com/drsapaev/final/pull/3607), still OPEN; rebased correction awaits push. No merge.
+
+### Exact-head checks after correction — 2026-10-05T19:02:17+05:00
+
+- PR HEAD: `bfbbff88915227dd726db5b6fd5273046c0df7ac`; base: `c1781c46a1b03c3404604542bcc9c4c9951f4c89`; PR state OPEN, mergeable, clean.
+- Result from the Code Review CI provider: **19 success, 18 skipped, 0 failure, 0 in progress**; no annotations. Successes include Backend tests, Code Quality, Context Boundary Integrity, PR Required Gate, Frontend–Backend Parity, PR Review Quality Gate, PR lifecycle recommendation, CodeQL languages/security, gitleaks/GitGuardian, Python formatting, CI Scope, security scan and notifications. Skips include staging/production readiness, k6, integration/Docker, frontend unit/build/lint/e2e, Telegram Mini App release, docs/metadata, DAST, Supabase Preview, classify-and-route and failure notifications. Skipped jobs are not passes.
+- This checkpoint changes plan/evidence only. Push it, then query CI for its new exact HEAD before treating the PR cycle as green.
+
+### Final PR description/checkpoint state — 2026-10-05T19:21:23+05:00
+
+- Code Review provider confirmed exact PR HEAD `5fd78c4b3c78f4e4c8dfa2a7e18160c0edd00dff`: 17 success, 18 skipped, 0 failure, 0 in progress; no annotations. PR is OPEN, CLEAN, mergeable; base `c1781c46a1b03c3404604542bcc9c4c9951f4c89`.
+- PR description was rewritten to reflect the two frozen clock facades, 12/12 PostgreSQL test result, current skipped checks, and test-only scope. `scripts/run_pr_review_gate_checks.py --body-file .scratch/pr3607_body.md` passed 19 validator tests, both documented samples, and the PR body. PR Review Quality Gate and lifecycle checks passed after edit.
+- This progress-only commit will change the PR head again; query the new HEAD before final merge readiness. No formal GitHub review was submitted and no merge occurred.
+
 Historical index snapshot from version 2.9: T00–T07 were confirmed MERGED; T08 was IN_PROGRESS with PR #3596/T08.2c OPEN; T09–T18 were PLANNED. This snapshot is superseded by the current checkpoint below and in [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md). The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver.
+
+## T08.3.2 clock follow-up — 2026-10-05T17:23:29+05:00
+
+- Purpose: fix the post-merge P2 from review of PR #3600. Four new tests seeded v1 queues with an `online_end_time` of 23:59 but used the real clinic clock; they could fail during the final minute.
+- Base/branch: fresh `origin/main` `ba03fdfb8d14d38a68a2d16df93145562cd87c63`, containing PR #3600 merge `b3bd5272389da88513cc1ac23985b390489554f9`; branch `codex/aqs-T08.3.2-clockfix`; managed worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-2-clockfix\final`.
+- Execution mode: `gate_known_root_cause` for the confirmed test owner. The gate returned `gate_ok`/`execute`, `handoff_required=true`, `gate_misroute=false`, `override_used=false`, while its first-touch list also named unrelated Docker/Compose files. Its execution prompt was read. The user's explicit “исправляй” request and approved T08.3.2 test-only scope authorized the existing PG test file and these plan journals; only those paths were used. No gate miss is claimed; no runtime or ops file changed.
+- Allowed paths: `backend/tests/integration/test_qr_family_phone_identity.py`; `.ai-factory/plans/codex-admin-queue-simplification.md`; this plan's `PROGRESS.md`, `RESUME.md`, and `EVIDENCE.md`.
+- Denied paths: `backend/app/**`, models, migrations, API, frontend, `ops/**`, Docker/Compose, unrelated tests, generated output, shared staging, production/live data.
+- Change: added `_fixed_v1_admission_day`, which freezes the supported `queue_service.datetime.now(tz)` clinic clock at 12:00 Asia/Tashkent. The four new single/multi replay/rollback tests seed their queue and token with the fixture's same day. The actual v1 admission-window checks remain enabled.
+- Validation: `scripts/run_backend_pytest.ps1 tests/integration/test_qr_family_phone_identity.py -q` — **11 passed, 0 skipped, 1 warning** on PostgreSQL 16. The fixture created and upgraded its UUID-named scratch database and dropped it on teardown. The disposable database was bound only to loopback port 55435; its task-owned container was removed after the successful run.
+- Static checks: scoped Ruff check — PASS; Black `--check` — PASS; `py_compile` — PASS; `git diff --check` — PASS.
+- Failed/invalid attempts: first two pytest invocations failed before collection because the selected interpreters lacked `psycopg2`; the successful run used Python 3.11.9 with `postgresql+psycopg` for the app connection and the fixture's local `postgresql://` admin URI. An unheld-WSL attempt then returned 11 skipped after its temporary database disappeared; that run is NOT_RUN, not a pass. The successful rerun held the task-owned WSL process for the entire command. Its holder and PostgreSQL container were removed afterward.
+- Scope check: only the test module and four plan/checkpoint files changed. No staging Compose project, application runtime, schema, feature flag, frontend or production service was used or changed.
+- Remaining limitation: no staging/browser/full-system validation; this is a deterministic test-only follow-up. GitHub CI was pending when this local-validation record was first written; the PR-open state is recorded in the next checkpoint.
+- PR: see the PR #3607 checkpoint below.
+- Merge commit: none.
+
+## T08.3.2 clock follow-up PR #3607 — 2026-10-05T17:32:11+05:00
+
+- Commit under test: code/test commit `ae0bd8a7f24b27f7b1981911b2b9ecfaec9ede2f`; branch `codex/aqs-T08.3.2-clockfix`; base `ba03fdfb8d14d38a68a2d16df93145562cd87c63`; PR [#3607](https://github.com/drsapaev/final/pull/3607) targets `main`.
+- Environment: local managed worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-2-clockfix\final`; synthetic disposable PostgreSQL 16 evidence is recorded above. No staging or production was used.
+- Execution mode: `gate_known_root_cause`; see the preceding task evidence. Gate output was `gate_ok`/`execute`, `handoff_required=true`, `gate_misroute=false`, `override_used=false`; execution prompt read.
+- Allowed paths and actual changed paths: existing QR PostgreSQL test module and this plan's canonical plan, `PROGRESS.md`, `RESUME.md`, and `EVIDENCE.md`. Denied runtime, model, migration, API, frontend, Docker/Compose, staging, generated output, and production/live paths remain untouched.
+- Original failure and fix: four new QR v1 PostgreSQL tests used a live clinic clock with a `23:59` cutoff. The code commit freezes the queue-service clock at noon Asia/Tashkent and seeds the same fixed clinic day, preserving the real admission-window logic.
+- Validation command: `scripts/run_backend_pytest.ps1 tests/integration/test_qr_family_phone_identity.py -q` against the task's unique disposable PostgreSQL 16 scratch DB.
+- Result: PASS — 11 passed, 0 skipped, 1 warning. Ruff, Black check, `py_compile`, and `git diff --check` passed on the code-bearing commit. PR-body quality gate passed after creation preparation: 19 validator tests, documented samples, and actual PR body.
+- Exact-head GitHub checks: pending; query after the journal checkpoint is pushed. Staging/browser/full-system validation: NOT_RUN, outside this deterministic test-only slice.
+- Scope check: no runtime behavior, schema, feature flag, shared staging, production service or patient data changed. Test DB container and WSL holder were removed after validation.
+- Remaining limitation: this PR proves test determinism only; it is not system-health or staging evidence. Do not mark MERGED until GitHub confirms merge.
+- Next exact action: push the plan checkpoint update, inspect checks on the resulting exact PR HEAD, update the PR evidence if needed, then wait for the user's review/merge decision. Do not start T08.3.3 before this PR cycle closes.
+- PR: https://github.com/drsapaev/final/pull/3607
+- Merge commit: none.
+
+### Exact-head checks on PR #3607 — 2026-10-05T17:38:38+05:00
+
+- Checked exact PR HEAD `d4d1524aa96f7260825b6f0caf1b9cb724044490` against base `ba03fdfb8d14d38a68a2d16df93145562cd87c63`; PR was OPEN and mergeable.
+- Result: **10 SUCCESS, 4 SKIPPED, 0 FAILURE, 0 IN_PROGRESS**. Successes: CodeQL Analyze (actions, JavaScript/TypeScript, Python), CodeQL, PR Review Quality Gate, PR lifecycle recommendation, Gitleaks workflow/scan, GitGuardian and security scan. Skips: `classify-and-route`, Supabase Preview and two failure-notification jobs. Skips are not passes.
+- PR body was updated with this exact-head result and passed `scripts/run_pr_review_gate_checks.py --body-file .scratch/t0832_clockfix_pr_body.md`: all 19 validator tests, both documented samples and the actual body passed. The body edit reran the lifecycle recommendation and PR Review Quality Gate; both passed.
+- Next: commit this evidence-only checkpoint and verify checks on its resulting exact PR HEAD. The evidence-only commit may create a new PR head; do not claim its checks from the `d4d1524` result above.
+
+> The following T08.3.2 entry is the pre-merge record; its `PR_OPEN`/no-merge fields are historical and superseded by the clock-follow-up checkpoint above.
 
 ## T08.3.2 — 2026-10-05T13:48:16+05:00
 

@@ -1,5 +1,47 @@
 # Progress
 
+## Current authoritative checkpoint — T08.3.2 clock P2 correction (2026-10-05T19:21:23+05:00)
+
+Plan version: 3.9
+Current task: fix the remaining QR-session clock seam in PR #3607.
+Current status: PR_OPEN, locally validated and exact-head CI green. Code correction `8c8ac83e5ab16185404bf6c901aea15041214195`; latest branch checkpoint before this final record is `5fd78c4b3c78f4e4c8dfa2a7e18160c0edd00dff`. PR #3607 is OPEN, mergeable, clean against base `c1781c46a1b03c3404604542bcc9c4c9951f4c89`.
+Branch: `codex/aqs-T08.3.2-clockfix`; rebased onto fresh `origin/main` (dependency-only PR #3608).
+Mode: `gate_known_root_cause`. The mandatory rerun returned `narrow_override`, `execute`, `handoff_required=true`, `gate_misroute=true`, `override_used=true`; known owner `backend/tests/integration/test_qr_family_phone_identity.py`. The generated prompt was read. Its first-touch also listed unrelated ops/packaging files. Narrow basis: user explicitly requested correction of the review P2; approved T08.3.2 scope permits this existing test module and its plan journals only. No third gate run; no runtime/ops changes.
+Canonical anchors: `backend/tests/integration/test_qr_family_phone_identity.py`; `backend/app/services/queue_svc/_base.py::_now`; `backend/app/services/qr_queue/_base.py::_now`; `backend/app/services/qr_queue/_sessions.py::start_join_session`; current T08.3.2 plan/evidence.
+Allowed paths: QR PostgreSQL test module and this plan's canonical document, `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`.
+Denied paths: `backend/app/**`, models, migrations, API, frontend, `ops/**`, Docker/Compose, unrelated tests, generated output, shared staging, production/live data.
+Confirmed defect: patching only `queue_service.datetime` leaves `qr_queue_service.datetime` live. A read-only probe of the real QR window check at 23:59:30 returned `after_end_time` while queue service time was 12:00.
+Change in progress: patch both public clock facades to one clinic-local noon; add a focused assertion that both facades report the same frozen time. The four existing tests already pass the matching clinic day to their seed helpers.
+Validation: focused clock-facade test PASS (1 passed, 11 deselected); full module PASS on disposable PostgreSQL 16 (12 passed, 0 skipped, 1 warning); Ruff check, Ruff format check, `py_compile`, and `git diff --check` PASS. Commit hooks including Black and gitleaks PASS. Disposable PostgreSQL and WSL holder were removed. GitHub checks on exact HEAD `5fd78c4b3c78f4e4c8dfa2a7e18160c0edd00dff`: **17 success, 18 skipped, 0 failure, 0 in progress**. Skipped jobs: staging/production readiness, k6, integration/Docker, frontend unit/build/lint/e2e, Telegram release, docs/metadata, DAST, Supabase Preview, classify-and-route, and two failure notifications. Skips are not passes. PR description update passed its local 19-test validator; follow-up quality/lifecycle checks passed.
+Stop conditions: any runtime edit, unclear clock ownership, unavailable isolated PG, or required path outside approved test/docs scope.
+Next exact action: commit and push this current progress checkpoint, then verify the new documentation-only HEAD checks and refresh the PR description's head reference. Wait for the user's review/merge decision; do not merge or start T08.3.3 without separate user instruction.
+
+> Previous checkpoints below are chronological evidence and are superseded by this active correction checkpoint.
+
+## Current authoritative checkpoint — T08.3.2 post-merge P2 follow-up (2026-10-05T17:38:38+05:00)
+
+Plan version: 3.7
+Execution permission: IMPLEMENTATION_ACTIVE — user asked “исправляй” for the confirmed P2 in the merged #3600 tests.
+Current task: remove wall-clock dependence from the four QR-session v1 PostgreSQL tests.
+Current status: PR_OPEN — [PR #3607](https://github.com/drsapaev/final/pull/3607), code/test commit `ae0bd8a7f24b27f7b1981911b2b9ecfaec9ede2f`; exact PR HEAD `d4d1524aa96f7260825b6f0caf1b9cb724044490` passed 10 checks, 4 were skipped, 0 failed. A new documentation-only checkpoint will require checking its resulting HEAD.
+Branch: `codex/aqs-T08.3.2-clockfix`; base `origin/main` = `ba03fdfb8d14d38a68a2d16df93145562cd87c63`; merge #3600 = `b3bd5272389da88513cc1ac23985b390489554f9`.
+Mode: `gate_known_root_cause`. Gate output was `gate_ok` / `execute`, `handoff_required=true`, with the confirmed test module plus unrelated Docker/Compose paths in first-touch; `gate_misroute=false`, `override_used=false`. Its execution prompt was read. The user's explicit P2 fix request and approved T08.3.2 test-only scope authorize this existing PG test module and plan checkpoint updates; only those paths were used. No runtime/ops changes.
+Canonical anchors: `backend/tests/integration/test_qr_family_phone_identity.py`; queue admission clock seam `backend/app/services/queue_svc/_base.py::_now` and `backend/app/services/queue_service.py::datetime`; T08.3.2 in the canonical plan; `docs/runbooks/AGENT_SESSION_WORKTREES.md` and `docs/runbooks/WSL_STAGING_SESSION.md`.
+Allowed paths: the QR PG test module and this plan's canonical document plus `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`.
+Denied paths: runtime, models, migrations, API, frontend, `ops/**`, Docker/Compose, generated output, unrelated tests, shared staging and production/live data.
+Actual source change: fixed-clinic-day fixture freezes the queue service clock at 12:00 Asia/Tashkent; the four new tests pass that same day to synthetic queue/token seed helpers. This keeps real v1 window enforcement active and avoids the 23:59 cutoff flake.
+Validation: PostgreSQL 16 module **11 passed, 0 skipped, 1 warning** using a unique Alembic-upgraded scratch DB on loopback. Ruff, Black check, `py_compile`, and `git diff --check` passed. The initial run without a held WSL session returned 11 skipped after its disposable DB disappeared; it is recorded as NOT_RUN, not a pass. The successful rerun held the task-owned WSL process for the full test command; its container and holder were removed afterward.
+Stop conditions: any need to change runtime behavior or edit outside the approved test/docs scope; inability to keep the queue clock and seeded day consistent; DB isolation failure.
+PR body quality gate passed (19 validator tests, samples and this body); PR #3607 is open and attached to this task. The exact-head check snapshot is recorded in `EVIDENCE.md`. Next exact action: push this evidence-only update and verify checks on the resulting PR HEAD; then wait for the user's review/merge decision. Do not start T08.3.3 until this follow-up PR cycle is merged.
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T08.3.2 | MERGED | [PR #3600](https://github.com/drsapaev/final/pull/3600) | `b3bd5272389da88513cc1ac23985b390489554f9` | `EVIDENCE.md#t08.3.2` |
+| T08.3.2-P2 | PR_OPEN | [`codex/aqs-T08.3.2-clockfix` / PR #3607](https://github.com/drsapaev/final/pull/3607) | | `EVIDENCE.md#t0832-clock-follow-up-pr-3607` |
+| T08.3.3 | PLANNED | | | |
+
+> The checkpoint below is historical: it predates the merge of #3600 and the P2 follow-up recorded above.
+
 ## Current authoritative checkpoint — T08.3.2 (2026-10-05T13:48:16+05:00)
 
 Plan version: 3.4
