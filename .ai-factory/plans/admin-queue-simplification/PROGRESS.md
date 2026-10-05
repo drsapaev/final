@@ -1,5 +1,21 @@
 # Progress
 
+## Current authoritative checkpoint — T08.3.1 (2026-10-05T00:28:28+05:00)
+
+Plan version: 3.0
+Execution permission: IMPLEMENTATION_ACTIVE — user authorized sequential plan implementation and explicitly said “GO merge, потом продолжай”.
+Current task: T08.3.1 — PostgreSQL proof for the legacy queue-token admission transaction
+Current status: PR_OPEN. T08.3.1 passed local PostgreSQL/unit/static validation; PR #3599 is open, with code/test commit `465dc814e`; exact-head GitHub CI is pending. PR #3596 / T08.2c merged at `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`. Fresh worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-pg-proof\final`; branch `codex/aqs-T08.3-pg-proof`; base `origin/main` = merge commit above. Current PR contains two PostgreSQL integration tests and the approved plan checkpoint journals.
+Mode: `gate_known_root_cause`; retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, root-cause test owner `backend/tests/integration/test_daily_queue_lock_parity_pg.py`. The first gate routed the generic “PostgreSQL” keyword to unrelated Docker/Compose packaging. Narrow scope basis: approved T08.3 plan requires independent PostgreSQL concurrency proof and does not authorize packaging changes.
+Allowed paths: `backend/tests/integration/test_daily_queue_lock_parity_pg.py`; `.ai-factory/plans/codex-admin-queue-simplification.md`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,EVIDENCE}.md`.
+Denied paths: `backend/app/**`, `backend/alembic/**`, `backend/app/models/**`, `frontend/**`, `ops/**`, `output/**`, `test-results/**`, `storage/**`, production/live data, and all other tests. If a runtime defect appears, stop and obtain a new gate before changing runtime.
+Completed: added independent PostgreSQL-session tests for last-slot contention, exact-token replay at a full cap, and caller rollback of entry/counter/token usage. The focused five-test PostgreSQL module passed; three existing quota/window/GraphQL unit modules passed; Ruff, `py_compile`, and `git diff --check` passed.
+Environment note: the first full-module run was interrupted when WSL stopped Docker (systemd logged a normal daemon termination; `OOMKilled=false`) and showed one mixed-creator unique violation followed by database-shutdown errors. Under a held WSL session, the mixed-creator regression passed alone and the entire module passed 5/5. Treat the first run as environment-interrupted, not as a source PASS or a confirmed runtime defect.
+Next exact action: verify checks on exact PR HEAD `465dc814eb97e567dc1c130539bc5f5037ed69e9`, fix any in-scope failures in this PR, and wait for the user's separate merge authorization. Do not begin T08.3.2 or merge #3599 without that authorization.
+Checks to rerun if changed: the focused PostgreSQL module, the three queue quota/window/GraphQL unit modules, scoped Ruff/`py_compile`, and `git diff --check`.
+
+> The T08.2c snapshot below is historical; its OPEN-PR and “do not start T08.3” instructions were superseded by the confirmed merge of PR #3596.
+
 Plan version: 2.9
 Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 2026-10-01
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE

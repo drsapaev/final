@@ -1634,6 +1634,47 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR: https://github.com/drsapaev/final/pull/3596
 - Merge commit: none.
 
+## T08.3.1 pre-work gate and scope checkpoint — 2026-10-04T23:48:38+05:00
+
+- Commit under test: `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`; branch `codex/aqs-T08.3-pg-proof`.
+- Environment: managed Windows worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-pg-proof\final`. Disposable PostgreSQL availability has not yet been checked. No production or staging endpoint was used.
+- Execution mode: `gate_known_root_cause` followed by `narrow_override`. First invocation selected unrelated Docker/Compose packaging because the task text contains “PostgreSQL”; its result incorrectly reported `gate_misroute=false`, `override_used=false`. The required retry used `--known-root-cause backend/tests/integration/test_daily_queue_lock_parity_pg.py` and returned `narrow_override`, `gate_misroute=true`, `override_used=true`. Its generated execution prompt was read.
+- Repo-approved override basis: T08.3 explicitly requires real PostgreSQL concurrency proof using independent sessions. It does not request staging packaging, Docker or Compose changes. The retry's unrelated packaging paths are excluded; the confirmed PG test owner and plan/checkpoint journals remain in scope.
+- Allowed paths: `backend/tests/integration/test_daily_queue_lock_parity_pg.py`; `.ai-factory/plans/codex-admin-queue-simplification.md`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,EVIDENCE}.md`.
+- Denied paths: application runtime, model/schema/migration, feature flag, frontend, Docker/Compose, generated output, staging/production and unrelated tests.
+- Owners read: `QueueBusinessService.join_queue_with_token` resolves identity before quota, locks and refreshes the daily queue row before quota checking, and writes the new entry, v1 count and token usage within the caller-owned transaction. Existing unit tests use SQLite and do not establish row-lock behavior.
+- Original evidence gap: no current real-PostgreSQL regression proves that two independent online token admissions competing for the final v1 slot result in exactly one issuance. PostgreSQL rollback and exact-token retry also need database-backed proof.
+- Actual changed paths at this checkpoint: `.ai-factory/plans/codex-admin-queue-simplification.md`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME}.md`. The PG test module is not edited yet.
+- Validation command: `ai/langgraph/scripts/run_agent_gate.ps1` with task “T08.3 PostgreSQL quota admission regression gap” and `--known-root-cause backend/tests/integration/test_daily_queue_lock_parity_pg.py`.
+- Result: gate scope established with an explicit narrow override. PostgreSQL test execution: **NOT_RUN**. No implementation or system-health claim is made.
+- Remaining limitation: this T08.3.1 slice covers the legacy queue-token service boundary only. QR session response replay/partial batch, direct GraphQL and lifecycle/non-decrement writer parity remain planned for later T08.3 subtasks.
+- Next exact action: add the in-scope independent-session PostgreSQL tests, run them only on disposable local PostgreSQL, then record exact test results. Stop and re-gate if a runtime fix is needed.
+- PR: none. Merge commit: none.
+
+## T08.3.1 PR opened — 2026-10-05T00:28:28+05:00
+
+- Commit under review: `465dc814eb97e567dc1c130539bc5f5037ed69e9`; branch `codex/aqs-T08.3-pg-proof`; base `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`.
+- PR: [#3599](https://github.com/drsapaev/final/pull/3599), OPEN; created after local validation. No review or merge has been submitted.
+- The PR body passed `scripts/run_pr_review_gate_checks.py --body-env PR_BODY --author codex`: 19 validator tests, both sample bodies and the live body passed. The initial body attempt exposed three empty required Validation fields; those fields were filled before PR creation and the final local body gate passed.
+- GitHub exact-head checks at PR creation: PENDING / mergeable=false. Do not treat local tests or PR creation as CI completion. Check exact HEAD again after the next status change.
+- Next action: monitor checks for `465dc814eb97e567dc1c130539bc5f5037ed69e9`, address in-scope failures in PR #3599, and stop at green for the user's merge decision. No T08.3.2 work until this PR cycle is merged and the base is synced.
+
+## T08.3.1 local PostgreSQL proof — 2026-10-05T00:19:27+05:00
+
+- Commit under test: base `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`; local worktree branch `codex/aqs-T08.3-pg-proof`. The test and journal edits are still uncommitted; no PR exists yet.
+- Environment: disposable local PostgreSQL 16 in owned container `aqs-t08-3-pg`, database `clinic_test_t08_3`, loopback port 55437; synthetic schema and synthetic rows created by the test fixture. WSL Ubuntu-24.04 was held active for the stable run. No staging, production, patient data, or production credentials were used.
+- Actual changed paths: `backend/tests/integration/test_daily_queue_lock_parity_pg.py`; `.ai-factory/plans/codex-admin-queue-simplification.md`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,EVIDENCE}.md`. Runtime, model, migration, feature flag, frontend, Docker/Compose, generated output and staging files were not changed.
+- Test additions: (1) two independent token admissions with distinct synthetic identities contend for a null-tag v1 queue with cap 1; exactly one online entry and counter increment succeed, the losing token remains unused, and an exact winning-token retry returns the same entry after capacity is full without a second increment; (2) a caller-owned PostgreSQL transaction is rolled back, then another session verifies entry count, `online_issued_count`, and token usage all return to zero.
+- Original failure/environment diagnosis: the first full-module attempt returned one unique-constraint failure in the existing mixed-creator test and four database-shutdown errors. PostgreSQL logs showed `FATAL: terminating connection due to administrator command`; Docker systemd logs showed dockerd received a normal `terminated` signal and completed graceful shutdown, with `OOMKilled=false`. This was caused by the WSL execution lifetime, not an established runtime defect. With a live WSL keepalive, the existing mixed-creator test passed by itself and the full module passed; do not use the interrupted first run as a product finding.
+- Validation command: `DATABASE_URL=postgresql+psycopg://<local-test-user>@127.0.0.1:55437/clinic_test_t08_3; .\scripts\run_backend_pytest.ps1 tests/integration/test_daily_queue_lock_parity_pg.py -vv -s`.
+- Result: **PASS — 5 passed, 1 warning in 56.33s** on PostgreSQL 16. The two new tests passed as part of this module; they had also passed in an earlier focused run (2 passed, 3 deselected). A focused rerun of the pre-existing mixed-creator case passed 1/1.
+- Additional validation: with explicit `DATABASE_URL=sqlite:///:memory:`, `scripts/run_backend_pytest.ps1 tests/unit/test_daily_queue_creation_policy.py tests/unit/test_graphql_queue_claim_coordinator.py tests/unit/test_online_admission_window.py -q --tb=short` — **65 passed, 1 warning**. Scoped `ruff check backend/tests/integration/test_daily_queue_lock_parity_pg.py` — PASS. `py -3.11 -m py_compile backend/tests/integration/test_daily_queue_lock_parity_pg.py` — PASS. `git diff --check` — PASS before the final journal update; rerun after all edits.
+- A first attempt at the unit command omitted `DATABASE_URL` and failed during collection with the repository's deliberate configuration guard; rerun with the explicit in-memory SQLite URL passed. No tests were skipped in the stable PostgreSQL module result.
+- Limitations: this proves the legacy queue-token service transaction only. QR-session response snapshot/replay and multi-target partial result, direct GraphQL, all writer/lifecycle non-decrement parity, CI exact-head status, staging/browser, and production were NOT_RUN. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off.
+- Result/status: T08.3.1 is **VALIDATED locally**; no PR opened and no merge requested/performed. The interrupted WSL run has not been misreported as a pass or as a source defect.
+- Next exact action: review final diff and status, commit only the approved test and journals, create a single-purpose PR, and verify its exact-head required CI. Do not merge without the user's separate authorization.
+- PR: none. Merge commit: none.
+
 ## T08.2c five review P2 fixes — code-head CI passed — 2026-10-04T18:43:30+05:00
 
 - Commit under test: `4d301ad64208af81de53b1c7bf88f6735473b6da`, branch `codex/aqs-T08.2c-availability`, PR #3596; base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. GitHub confirmed PR OPEN and mergeable at this exact head. Previous CI on `db2b4f9` is historical for these changes.

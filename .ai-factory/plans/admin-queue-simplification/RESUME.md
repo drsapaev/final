@@ -1,10 +1,22 @@
 # Resume — admin queue simplification
 
-Plan version: 2.9
-Last updated: 2026-10-04T19:07:37+05:00, Asia/Tashkent
-Execution permission: IMPLEMENTATION_ACTIVE; user confirmed they merged PR #3576 and said continue. GitHub confirms T08.2a / #3576 MERGED at `1ed6d05874c2ea205a625bb70879adb10b077be4`.
+Plan version: 3.0
+Last updated: 2026-10-05T00:28:28+05:00, Asia/Tashkent
+Execution permission: IMPLEMENTATION_ACTIVE; user authorized continuing the plan, confirmed PR #3596 was merged, and said continue. GitHub merge commit: `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`.
 
-## Authoritative current checkpoint — five P2 fixes pushed, exact-head CI passed (2026-10-04)
+## Current continuation checkpoint — T08.3.1 PostgreSQL quota race proof (2026-10-05T00:28:28+05:00)
+
+- PR #3596 / T08.2c is MERGED at `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`. Fresh isolated worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-pg-proof\final`; branch `codex/aqs-T08.3-pg-proof`; base `origin/main` is the merge commit above.
+- Current bounded subtask T08.3.1 adds real independent-PostgreSQL-session proof for the existing queue-token admission transaction: simultaneous independent patients competing for the last v1 slot, exact-token duplicate retry after capacity is consumed, and rollback of `entry + online_issued_count + token usage`. This does not certify the separate QR-session response snapshot/partial-batch transaction or direct GraphQL writer; those remain later T08.3 subtasks.
+- Owners reviewed: `QueueBusinessService.join_queue_with_token` in `backend/app/services/queue_svc/_operations.py` resolves identity before quota, locks and refreshes the daily queue before quota checking, then increments counter with entry and token usage in the same caller-owned transaction. Existing quota unit tests use SQLite and cannot prove these locks. PostgreSQL fixture owner: `backend/tests/integration/test_daily_queue_lock_parity_pg.py`.
+- Mandatory gate: first invocation misrouted “PostgreSQL” to Docker/Compose packaging (`gate_misroute=false`, `override_used=false`). The required retry with `--known-root-cause backend/tests/integration/test_daily_queue_lock_parity_pg.py` returned `narrow_override` (`gate_misroute=true`, `override_used=true`); its execution prompt was read. Narrow scope is based on the approved T08.3 plan: this PG test owner and the plan/checkpoint journals only; no runtime/schema/feature flag/deployment changes.
+- Allowed: `backend/tests/integration/test_daily_queue_lock_parity_pg.py`, `.ai-factory/plans/codex-admin-queue-simplification.md`, and `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,EVIDENCE}.md`. Denied: runtime, models, migrations, frontend, operations, generated output, storage and unrelated tests. If a real behavior defect appears, stop and re-gate before any runtime change.
+- `QUEUE_POLICY_V2_CREATION_ENABLED` stays default-off. Use synthetic test rows in a disposable local PostgreSQL database only; staging, production and patient data are out of scope.
+- Added two independent-session tests in the approved PostgreSQL module. Against the disposable PostgreSQL 16 database on loopback, the full module passed **5/5** (including two new tests); an earlier isolated rerun of the existing mixed-creator case passed **1/1**. The initial full-module attempt was interrupted by WSL/Docker shutdown (daemon received normal termination; no OOM); subsequent run used a held WSL session and completed. Record that first run as an environment interruption, not source evidence.
+- Existing focused quota/window/GraphQL unit tests passed **65/65** with explicit `DATABASE_URL=sqlite:///:memory:`. Scoped Ruff, `py_compile`, and `git diff --check` passed. The initial unit-launch attempt without `DATABASE_URL` failed during collection and was corrected; it is not a product failure.
+- Code/test commit `465dc814e` is pushed in PR #3599: https://github.com/drsapaev/final/pull/3599. A documentation checkpoint is now included in the same PR. At creation the exact-head CI was pending; re-read the latest PR head and checks after pushing the checkpoint. Current status is `PR_OPEN`. Stop if CI exposes a product/runtime defect; obtain a new gate before runtime edits. Do not merge #3599 or begin T08.3.2 without separate user authorization and a completed PR cycle.
+
+## Superseded checkpoint — T08.2c five P2 fixes pushed, exact-head CI passed (2026-10-04)
 
 - PR #3596 remains OPEN and mergeable. Verified remote HEAD `068fdbede3d08e0bfbd1384ecea7f27cf02827ed`, base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. Worktree: `C:\final\_wt_aqs_t082c_availability`; branch `codex/aqs-T08.2c-availability`.
 - This follow-up fixes the five confirmed P2s from `.scratch/PR3596_REVIEW.md`: routed inactive owner resolution, exact-tag validation of inactive status, resource-first identity routing, rowless quota parity with queue creation defaults, and retained waiting/called count for inactive QR identities.
