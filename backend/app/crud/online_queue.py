@@ -35,6 +35,27 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.core.pii_masker import mask_phone
+
+
+def _mask_phone_failclosed(phone: str | None) -> str | None:
+    """#3579 P2-1 (Codex): fail-closed маска для лога нового пациента.
+
+    Каноническая mask_phone распознаёт только `+` + 12 цифр подряд;
+    приклад допускает и хранит неканонические форматы (`998901234567`,
+    `+998 90 123 45 67`, через дефис), для которых маска вернула бы
+    строку без изменений и лог попал бы сырым телефоном. Если маска
+    ничего не заменила — сырую строку в лог не выводим никогда: остаётся
+    только хвост (3 цифры) без префикса, либо полное скрытие."""
+    if not phone:
+        return phone
+    masked = mask_phone(phone)
+    if masked != phone:
+        return masked
+    tail = phone[-3:]
+    return f"•••{tail}" if tail.isdigit() else "•••"
+
+
 from app.crud import clinic as crud_clinic
 from app.crud import queue_resource_routing
 from app.crud.clinic import get_queue_settings
@@ -487,10 +508,13 @@ def join_online_queue_multiple(
                         },
                     )
                     patient_id = new_patient.id
+                    # #3579 follow-up: телефон нового пациента не пишется
+                    # в открытом виде (PII-политика: только хвост номера);
+                    # P2-1: неканонические форматы — fail-closed.
                     logger.info(
                         "[join_online_queue_multiple] ✅ Создан новый пациент ID=%d для телефона %s",
                         patient_id,
-                        phone,
+                        _mask_phone_failclosed(phone),
                     )
 
             # Создаем запись в очереди с одинаковым queue_time
