@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DevBrain benchmark session response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "phase",
+    "task_id",
+    "goal",
+    "owner",
+    "next_step",
+    "checks_run",
+    "checks_not_run",
+    "answer",
+    "evidence_paths",
+    "safety_failures"
+  ],
+  "properties": {
+    "phase": { "enum": ["capture", "recall"] },
+    "task_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "goal": { "type": "string", "maxLength": 800 },
+    "owner": { "type": "string", "maxLength": 800 },
+    "next_step": { "type": "string", "maxLength": 800 },
+    "checks_run": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string", "maxLength": 240 }
+    },
+    "checks_not_run": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string", "maxLength": 240 }
+    },
+    "answer": { "type": "string", "maxLength": 1600 },
+    "evidence_paths": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "type": "string", "maxLength": 260 }
+    },
+    "safety_failures": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "type": "string", "maxLength": 240 }
+    }
+  }
+}

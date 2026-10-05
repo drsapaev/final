@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DevBrain memory benchmark scenario",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "goal",
+    "query",
+    "topics",
+    "source_paths",
+    "expected_answer_terms",
+    "expected_owner_terms",
+    "goal_terms",
+    "next_step_terms",
+    "expected_checks"
+  ],
+  "properties": {
+    "scenario_id": { "type": "string", "pattern": "^[a-z0-9_]{1,40}$" },
+    "goal": { "type": "string", "minLength": 8, "maxLength": 300 },
+    "query": { "type": "string", "minLength": 3, "maxLength": 300 },
+    "topics": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": { "type": "string", "maxLength": 64 }
+    },
+    "source_paths": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": { "type": "string", "pattern": "^(backend|frontend)/" }
+    },
+    "expected_answer_terms": { "$ref": "#/$defs/terms" },
+    "expected_owner_terms": { "$ref": "#/$defs/terms" },
+    "goal_terms": { "$ref": "#/$defs/terms" },
+    "next_step_terms": { "$ref": "#/$defs/terms" },
+    "expected_checks": { "$ref": "#/$defs/terms" }
+  },
+  "$defs": {
+    "terms": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": { "type": "string", "minLength": 1, "maxLength": 160 }
+    }
+  }
+}

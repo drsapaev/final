@@ -1,24 +1,2 @@
-# 🤖 ПРАВИЛА ДЛЯ ИИ-АГЕНТОВ В CURSOR
-
-## 🚨 КРИТИЧЕСКИ ВАЖНО - ЧИТАТЬ ПЕРЕД ЛЮБОЙ РАБОТОЙ!
-
-### 📖 ОБЯЗАТЕЛЬНАЯ ДОКУМЕНТАЦИЯ:
-- `docs/AUTHENTICATION_SYSTEM_FINAL_GUIDE.md` - ПОЛНОЕ руководство по системе
-- `docs/AUTHENTICATION_LAWS_FOR_AI.md` - ЗАКОНЫ для ИИ-агентов (ОБЯЗАТЕЛЬНО!)
-- `docs/ROLE_SYSTEM_PROTECTION.md` - Правила защиты системы
-
-### 🚨 АБСОЛЮТНЫЕ ЗАПРЕТЫ (НИКОГДА НЕ НАРУШАТЬ!):
-1. **НЕ НАРУШАТЬ** блокирующий 2FA флоу - токены выдаются ТОЛЬКО после верификации
-2. **НЕ ДУБЛИРОВАТЬ** модели ролей - использовать ТОЛЬКО `app/models/role_permission.py`
-3. **НЕ СМЕШИВАТЬ** схемы хеширования паролей - только argon2 для новых
-4. **НЕ ИСПОЛЬЗОВАТЬ** старую форму `Login.jsx` - только `LoginFormStyled.jsx`
-5. **НЕ УДАЛЯТЬ** критических пользователей (admin, registrar, doctor, cardio, derma, dentist)
-
-### ✅ ОБЯЗАТЕЛЬНЫЕ ДЕЙСТВИЯ:
-1. **ЧИТАТЬ** `docs/AUTHENTICATION_LAWS_FOR_AI.md` перед работой с аутентификацией
-2. **ЗАПУСКАТЬ** тесты: `python test_role_routing.py` после изменений ролей
-3. **ИСПОЛЬЗОВАТЬ** только унифицированные модели из `role_permission.py`
-4. **СЛЕДОВАТЬ** блокирующему 2FA флоу: login → pending_token → verify → access_token
-
-**ПОМНИТЕ: Лучше спросить, чем сломать систему!** 🛡️
-
+Repository-wide rules and automatic-memory lifecycle: `AGENTS.md`.
+Cursor always-applied bootstrap: `.cursor/rules/project-rules.mdc`.

@@ -72,7 +72,13 @@ const kk = {
     density_comfortable: 'Қалыпты',
     density_spacious: 'Кең',
   },
+  pagination: {
+    firstPage: 'Бірінші бет',
+    page: 'Бет {page}',
+    lastPage: 'Соңғы бет',
+  },
   common: {
+    clear: 'Тазалау',
     save: 'Сохранить',
     save_draft: 'Сохранить черновик',
     cancel: 'Отмена',

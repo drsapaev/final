@@ -1,6 +1,6 @@
 
 import { useRef, useState } from 'react';
-import { Paperclip } from 'lucide-react';
+import { Loader2, Paperclip } from 'lucide-react';
 import './FileUploader.css';
 import { validateFile } from '../../utils/fileValidator';  // PR-36 / P0-4
 import { toast } from 'react-toastify';
@@ -72,9 +72,14 @@ const FileUploader = ({ onUpload, disabled }: FileUploaderProps) => {
         onClick={() => fileInputRef.current?.click()}
         disabled={disabled || isValidating}
         title="Прикрепить файл"
-        aria-label="Прикрепить файл">
+        aria-label="Прикрепить файл"
+        aria-busy={isValidating}>
         
-                <Paperclip size={18} />
+                {isValidating ? (
+                  <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Paperclip size={18} aria-hidden="true" />
+                )}
             </button>
         </div>);
 

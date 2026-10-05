@@ -368,6 +368,10 @@ export default function HeaderNew() {
     // users keep landing.
     onClick={() => navigate(user ? brandHomePath || landingRoute : landingRoute)}
     title={t('legacy.hn_brand_title')}
+    // R38-3 (WCAG 2.5.3 Label in Name): the accessible name must CONTAIN the
+    // visible brand text (hdr-hide-xs span, collapsed only at <=480px), not
+    // replace it with the tooltip title — hence the composite name.
+    aria-label={`${t('legacy.hn_brand_text')} — ${t('legacy.hn_brand_title')}`}
     style={{
       color: 'var(--mac-text-primary)',
       fontWeight: 'var(--mac-font-weight-bold)',
@@ -399,6 +403,7 @@ export default function HeaderNew() {
           size="small"
           onClick={() => navigate(item.to)}
           title={item.label}
+          aria-label={item.label}
           style={{
             // HDR-POLISH-2: hdr-hide-xs removed — inline display:flex always
             // out-ranked the media rule, so the class never fired.
@@ -428,6 +433,7 @@ export default function HeaderNew() {
         variant="primary"
         size="small"
         title={t('legacy.hn_new_appointment_title')}
+        aria-label={t('legacy.hn_new_appointment_title')}
         onClick={() => {
           // HDR-FX-1 (P2-4): uniform behavior on every registrar surface —
           // dispatch the wizard event in place (the useRegistrarNavigation

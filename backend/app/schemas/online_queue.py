@@ -230,4 +230,19 @@ class QueueStatusCheck(BaseModel):
     policy_version: Literal["legacy", "daily_online_issuances_v1"] = Field(
         ..., description="Политика допуска действующей или будущей очереди"
     )
+    queue_length: int = Field(
+        ..., description="Число ожидающих и вызванных записей, независимо от источника"
+    )
+    max_online_entries: int | None = Field(
+        ...,
+        description="Лимит выбранной дневной очереди; null, если владелец не разрешён",
+    )
+    online_issued_count: int | None = Field(
+        ...,
+        description="Успешные независимые online-выдачи для v1; null для legacy",
+    )
+    online_bookings_remaining: int | None = Field(
+        ...,
+        description="Остаток v1-квоты max_online_entries - online_issued_count; null для legacy",
+    )
     opened_at: datetime | None = Field(None, description="Время открытия приема")

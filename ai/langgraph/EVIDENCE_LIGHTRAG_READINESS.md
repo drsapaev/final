@@ -3496,3 +3496,113 @@ was still open.
 - Follow-up: improve gate handling for bounded runtime-plus-regression tasks so
   an explicitly named service and its single target test can both be resolved
   without a broad known-root override.
+
+
+## Task 100 - T08 daily queue quota gate misroute
+
+### User task
+Continue T08 daily successful online issuance quota from the approved admin queue simplification plan.
+
+### Gate result
+- First gate mapped the queue quota/admission task to runtime packaging and staging Docker/Compose files.
+- One retry supplied backend/app/services/queue_domain_service.py from the plan anchor as --known-root-cause; gate returned narrow_override, still with unrelated packaging files and without the canonical operation mixin.
+- gate_misroute: yes
+- override_used: yes
+- Gate input known_root_cause_file: backend/app/services/queue_domain_service.py; source review shows this is a compatibility facade. Actual token admission owner is backend/app/services/queue_svc/_operations.py.
+- Manual scope basis: the user-approved detailed T08 plan explicitly names the queue allocator, token operation, claim/resource locks, adapters and PG validation. The first PR is narrowed to the canonical token operation and direct tests. No third gate attempt; no gate source change in this quota PR.
+
+### Manual reconstruction
+- join_queue_with_token already performs duplicate/claim resolution, tag claim lock, daily queue row lock/refresh, time and current active-entry limit checks, entry insertion with commit=False, token-use mutation, and either its own commit or caller-owned QR transaction.
+- online_issued_count is schema-backed but currently has only a zero initialization; no runtime increment/decrement path was found.
+- GraphQL is a distinct direct writer and is reserved for T08.2. Telegram callback can be reached but invokes missing QueueBusinessService.join_queue and fails before a database write. Registrar/staff derivation uses entry-creation paths outside independent online admission.
+- Follow-up: gate misses on T07 and T08 indicate a queue-service ownership routing rule should be reviewed separately; this evidence entry does not broaden the T08 patch.
+
+
+## Task 101 - T08.2a GraphQL quota gate routing — 2026-10-03
+
+### Gate observation
+- The first T08.2 gate identified the approved queue-quota plan but selected unrelated Admin Telegram management/webhook/manager files as first-touch and proposed Python compilation plus frontend build. The runtime root was confirmed separately in `backend/app/graphql/mutations.py:Mutation._join_queue_impl` and the explicit T08 GraphQL coverage row.
+- The one permitted `--known-root-cause backend/app/graphql/mutations.py` retry returned `narrow_override` with only that runtime module. It excluded the focused test and evidence checkpoint.
+- Gate fields: `gate_misroute=true` from the observed first-touch mismatch (the first tool result itself emitted `gate_misroute=false`); `override_used=true`; `known_root_cause_file=backend/app/graphql/mutations.py`.
+- Manual scope basis: the user-approved T08 plan explicitly requires GraphQL integration coverage and a transaction/counter contract. Scope is limited to this direct writer, its focused unit regression, and the plan evidence files. No third gate attempt and no gate source changes.
+
+### Source correction
+- Telegram remains only a source-classification reference for this quota slice. Existing evidence says its reachable callback calls a missing queue method and fails before a database write; this is not authorization to repair that flow under T08.2a.
+
+## Task 102 - DevBrain legacy wrapper scope misroute — 2026-10-03
+
+### User task
+Implement PR 2 of the approved automatic-memory plan: make file-backed memory
+the default for DevBrain wrappers and keep LlamaIndex/LightRAG opt-in.
+
+### Gate result
+- Initial gate returned `gate_ok` but listed only `ai/langgraph/scripts/agent_gate.py`
+  and `run_agent_gate.ps1` as first-touch files for a wrapper and documentation task.
+- One retry used `scripts/devbrain_refresh_memory.ps1` as the confirmed root
+  cause. It returned `narrow_override`, with `gate_misroute: yes` and
+  `override_used: yes`, but still listed only that one wrapper.
+- Manual scope basis: the user-approved PR 2 plan names the four wrappers,
+  focused tests, and DevBrain status/routing documents. No gate/router file was
+  included in the patch scope.
+
+### Source review and follow-up
+- ADR-0007 marks both legacy retrieval layers dormant, while the status document
+  and wrappers still described them as active and ran queries by default.
+- The local artifacts were absent in the inspected worktree; no legacy index
+  was created or queried during this review.
+- Gate/prompt helped identify the refresh wrapper as one root-cause file, but
+  missed the remaining wrappers, tests, and status-document owners.
+- LightRAG retrieval relevance was not evaluated; this was a gate scope-routing
+  miss, not a graph-query quality check.
+- Follow-up: review multi-wrapper DevBrain maintenance routing in a separate
+  approved task if the same misroute recurs. This PR does not change the gate.
+
+
+## Task 103 - DevBrain automatic-memory bootstrap scope misroute — 2026-10-03
+
+### Gate result
+- PR 3 of the user-approved automatic-memory plan covers the helper's portable
+  curated memory, repo bootstrap, Claude/Cursor adapters, and compact project
+  memory.
+- Initial gate returned `gate_ok` but limited first-touch files to the gate
+  implementation and launcher.
+- One `--known-root-cause scripts/devbrain_memory.py` retry returned
+  `narrow_override`, still omitted the agent/client bootstrap and their
+  documentation owners, and reported `gate_misroute=true` and
+  `override_used=true`.
+- Manual scope basis: the user's approved PR 3 plan explicitly names those
+  helper, bootstrap, adapter, and memory-doc paths. Gate/router files remain
+  outside this patch.
+
+### Manual reconstruction and follow-up
+- The portable-memory runtime owner is `scripts/devbrain_memory.py`; agent
+  lifecycle policy is `AGENTS.md`; Claude and Cursor consume repo-local
+  adapters; curated source facts are anchored to canonical code, tests, and
+  runbooks.
+- Follow-up: improve gate routing for bounded multi-client bootstrap and
+  portable-memory integration work so it includes the named helper and docs
+  owners. No LightRAG query-quality evaluation was performed.
+
+## Task 104 - T08.2b remaining admission adapter inventory gate — 2026-10-03
+
+### Gate observation
+- The initial T08.2b task described auditing active online-admission writers outside GraphQL after PR #3576. The gate returned `gate_ok` / `gate_misroute=false` but proposed `backend/app/services/queue_service.py`, `backend/app/models/online_queue.py`, `backend/tests/unit/test_queue_time_window.py`, and unrelated Admin Telegram/frontend files; that set did not cover the mounted admission routes in the task.
+- After source inspection confirmed `backend/app/services/queue_svc/_operations.py:QueueBusinessService.join_queue_with_token` as the common online writer, the only permitted known-root retry used `--known-root-cause backend/app/services/queue_svc/_operations.py`. It returned `narrow_override`, `gate_misroute=true`, `override_used=true`, and included the confirmed operations file plus generic model/window/Telegram files.
+- Fields: `gate_misroute=true` based on the actual mismatch; `override_used=true`; `known_root_cause_file=backend/app/services/queue_svc/_operations.py`.
+- No third gate invocation. No runtime patch was justified: legacy token, compatibility online, QR session and permanent-address admission all use the canonical writer; GraphQL was already fixed in merged PR #3576. The user-approved T08 coverage table is the basis for a docs-only source inventory and this record.
+
+### Manual reconstruction
+- Active successful admission routes and transaction/replay boundaries are recorded in the T08.2b evidence table. `crud.online_queue.join_online_queue` has no active caller; Telegram's current callback does not reach a persisted writer; staff derivation and `/queue/open` are not independent online admissions.
+- Follow-up: gate routing should resolve the T08 adapter coverage table and mounted FastAPI routes before selecting Telegram or generic queue-window tests. This evidence does not authorize a broader gate/tooling patch in T08.2b.
+
+## Task 105 - T08.2c availability/report read-contract gate — 2026-10-04
+
+### Gate observation
+- The T08.2c task concerns read-side quota/report parity across public availability, QR, Admin queue status, and specialty aggregate limits. Source and tests confirmed the owners span `backend/app/crud/online_queue.py`, `backend/app/services/queue_domain_service.py`, `backend/app/services/queue_limits_api_service.py`, `backend/app/services/qr_queue/_queue_ops.py`, their DTO/OpenAPI adapters, and focused tests.
+- The initial mandatory gate invocation was accidentally launched from `C:\final`; it did not inspect the active T08.2c worktree. The corrected invocation ran from `C:\final\_wt_aqs_t082c_availability\ai\langgraph` with `--known-root-cause backend/app/crud/online_queue.py` and returned `narrow_override`, listing only that CRUD file as first-touch.
+- Actual observed fields: `gate_misroute=true`, `override_used=true`, `known_root_cause_file=backend/app/crud/online_queue.py`. The gate omitted the queue-domain/admin aggregate readers, QR report path, DTO/OpenAPI schemas and regression tests needed by the user-approved T08.2c coverage contract. No third gate call was made.
+- Manual scope basis: the approved T08 plan's explicit T08.2c availability/report-parity requirement and read-contract boundaries. Runtime scope remained read-only; no admission writer, model, migration, feature flag or staging configuration was changed.
+
+### Manual reconstruction and follow-up
+- `online_queue.check_queue_availability` is the public availability read root. QR reports use `_queue_ops.py` and `_tokens.py`; Admin per-owner status is assembled by `QueueDomainService`; the specialty aggregate is assembled by `QueueLimitsApiService`. Corresponding contracts live in `QueueStatusCheck`, `QueueStatusResponse`, QR token response, and queue-limit DTOs/OpenAPI.
+- This is another confirmed queue-task routing miss after T07/T08.2a/T08.2b: a single known root did not expand to the report adapters/read-model owners named in the same task. Follow-up: improve gate mapping for multi-surface queue read/report contracts so it discovers all consumers and DTO tests from route/schema references. This evidence does not broaden T08.2c into a gate implementation change.

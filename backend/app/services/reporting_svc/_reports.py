@@ -296,7 +296,11 @@ class ReportsMixin(ReportingServiceMixinBase):
 
         except Exception as e:
             logger.error(f"Ошибка генерации ежедневной сводки: {e}")
-            return {"error": str(e)}
+            # CodeQL #1324 (py/stack-trace-exposure): в возвращаемый словарь
+            # (reporting_service.generate_daily_summary → GET /daily-summary)
+            # уходит только статический индикатор; детали исключения — в
+            # лог/Sentry, наружу — статик-detail эндпоинта (#3116).
+            return {"error": "internal_error"}
 
     # ===================== ФОРМАТИРОВАНИЕ ОТЧЕТОВ =====================
 

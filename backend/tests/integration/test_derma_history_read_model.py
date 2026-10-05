@@ -701,20 +701,20 @@ class TestAfterFlushJointState:
         assert by_record[second.id].doctor_id == test_doctor.id
 
 
-class TestDermaP3LegacyAliasProjection:
-    """Решение P3 по реконсиляции #3490/#3491 (rework #3508 на read model):
-    канонический ключ записи — specialty_data.cosmetic_procedures;
-    specialty_data.procedures — временный legacy READ alias (Phase A).
-    Проекция читает ОБА ключа полным union'ом без скрытия строк и без
-    дедупликации по содержимому (равенство содержимого не доказывает
-    тождественность клинических событий — review P2). Идентификаторы:
-    emr-<rid>-<index> (canonical) и emr-<rid>-legacy-<index> (alias);
-    position alias-записей смещена на длину canonical-массива —
-    уникальность (kind, source, record_id, position) и
-    canonical-раньше-legacy при тай-брейках порядка."""
+class TestDermaP3PhaseCSingleKeyContract:
+    """Решение P3 по реконсиляции #3490/#3491, Phase C: единственный ключ
+    записи косметологических процедур дермы —
+    specialty_data.cosmetic_procedures. Phase A (#3508) временно читала
+    legacy-ключ specialty_data.procedures как READ-alias; Phase C алиас
+    удалила: проекция читает только канонический ключ, а граница записи
+    (emr_contract.normalize_emr_data) переносит валидные legacy-записи
+    клиента в канонический ключ и снимает сам ключ. Гарантией того, что
+    под legacy-ключом не осталось клинических данных в активных записях,
+    служит Phase B verify-gate (scripts/audit_derma_legacy_procedures.py);
+    тесты ниже пинят поведение кода после Phase C."""
 
     @staticmethod
-    def _union_data() -> dict:
+    def _both_keys_data() -> dict:
         return {
             "specialty": "dermatology",
             "diagnosis": {"main": "Розацеа", "secondary": []},
@@ -747,9 +747,12 @@ class TestDermaP3LegacyAliasProjection:
             },
         }
 
-    def test_p3_union_projects_both_keys_with_distinct_ids_and_positions(
+    def test_p3c_projection_reads_only_canonical_key(
         self, db_session, test_patient, test_doctor, admin_user
     ):
+        """Запись с ОБОИМИ ключами (внешняя правка мимо границы записи):
+        проекция даёт строки только canonical-ключа — никаких
+        emr-<rid>-legacy-* id и никаких смещённых позиций."""
         visit = _add_visit(
             db_session,
             patient=test_patient,
@@ -758,75 +761,29 @@ class TestDermaP3LegacyAliasProjection:
         emr = _add_emr(
             db_session,
             visit=visit,
-            data=self._union_data(),
-            created_by=admin_user.id,
-        )
-
-        procs = _entries(db_session, kind="procedure", source="emr")
-        assert len(procs) == 4
-        assert sorted(e.payload["id"] for e in procs) == sorted(
-            [
-                f"emr-{emr.id}-0",
-                f"emr-{emr.id}-1",
-                f"emr-{emr.id}-legacy-0",
-                f"emr-{emr.id}-legacy-1",
-            ]
-        )
-        # position: canonical 0..1, legacy смещена на len(canonical)=2 → 2..3;
-        # уникальность (kind, source, record_id, position) — uq-констрейнт
-        # держится, обе записи одного ркорда сосуществуют
-        assert sorted(e.position for e in procs) == [0, 1, 2, 3]
-        assert all(e.record_id == emr.id for e in procs)
-        legacy_rows = [
-            e for e in procs if e.payload["id"].endswith(("-legacy-0", "-legacy-1"))
-        ]
-        assert sorted(e.payload["procedure_type"] for e in legacy_rows) == [
-            "Legacy процедура",
-            "Вторая legacy",
-        ]
-
-    def test_p3_identical_entries_across_keys_both_rows_persist(
-        self, db_session, test_patient, test_doctor, admin_user
-    ):
-        """Review P2: одинаковые словари в двух ключах — ДВЕ строки (не
-        дедуп по содержимому); uq-констрейнт не нарушен — позиции разные."""
-        identical = {
-            "procedure_date": date.today().isoformat(),
-            "procedure_type": "Идентичная процедура",
-            "area_treated": "Щёки",
-        }
-        visit = _add_visit(
-            db_session,
-            patient=test_patient,
-            doctor=test_doctor,
-        )
-        _add_emr(
-            db_session,
-            visit=visit,
-            data={
-                "specialty": "dermatology",
-                "diagnosis": {"main": "Розацеа", "secondary": []},
-                "specialty_data": {
-                    "cosmetic_procedures": [dict(identical)],
-                    "procedures": [dict(identical)],
-                },
-            },
+            data=self._both_keys_data(),
             created_by=admin_user.id,
         )
 
         procs = _entries(db_session, kind="procedure", source="emr")
         assert len(procs) == 2
-        # обе строки одного содержания, разные id/position
-        assert len({e.payload["id"] for e in procs}) == 2
-        assert len({e.position for e in procs}) == 2
+        assert sorted(e.payload["id"] for e in procs) == sorted(
+            [f"emr-{emr.id}-0", f"emr-{emr.id}-1"]
+        )
+        assert sorted(e.position for e in procs) == [0, 1]
+        assert all(e.record_id == emr.id for e in procs)
+        assert not any("-legacy-" in e.payload["id"] for e in procs)
+        assert sorted(e.payload["procedure_type"] for e in procs) == sorted(
+            ["Каноническая процедура", "Вторая каноническая"]
+        )
 
-    def test_p3_legacy_only_record_visible_via_flush_and_rebuild(
+    def test_p3c_legacy_only_record_not_projected(
         self, db_session, test_patient, test_doctor, admin_user
     ):
-        """Legacy-only запись видна через flush (listener) И через
-        rebuild_derma_history_entries — runbook-путь для УЖЕ хранимых
-        строк: после deploy фикса существующие ЭМК с legacy-ключом
-        попадают в историю пересчётом, без пересохранения ЭМК."""
+        """Legacy-only запись (внешняя правка) невидима проекции — и через
+        flush (listener), и через rebuild_derma_history_entries. Именно
+        поэтому Phase C мержится строго после Phase B verify-gate: данных
+        под legacy-ключом в активных записях быть не должно."""
         from app.services.derma_history_projection import (
             rebuild_derma_history_entries,
         )
@@ -836,7 +793,7 @@ class TestDermaP3LegacyAliasProjection:
             patient=test_patient,
             doctor=test_doctor,
         )
-        _add_emr(
+        emr = _add_emr(
             db_session,
             visit=visit,
             data={
@@ -855,34 +812,133 @@ class TestDermaP3LegacyAliasProjection:
             created_by=admin_user.id,
         )
 
-        procs = _entries(db_session, kind="procedure", source="emr")
-        assert len(procs) == 1
-        assert procs[0].payload["procedure_type"] == "Только legacy ключ"
-        assert procs[0].payload["id"].endswith("-legacy-0")
+        assert (
+            _entries(db_session, kind="procedure", source="emr", record_id=emr.id) == []
+        )
 
-        # имитация «строки, спроецированные ДО фикса»: сносим и пересчитываем
         db_session.query(DermaHistoryEntry).delete()
         db_session.commit()
-        assert _entries(db_session, kind="procedure") == []
+        rebuild_derma_history_entries(db_session.connection())
+        # скоупинг по записи: чужие строки других тестов не входят в проверку
+        assert (
+            _entries(db_session, kind="procedure", source="emr", record_id=emr.id) == []
+        )
+        assert not any(
+            "-legacy-" in e.payload["id"]
+            for e in _entries(db_session, kind="procedure", source="emr")
+        )
 
-        counts = rebuild_derma_history_entries(db_session.connection())
-        assert counts["emr_entries"] >= 1
-        procs = _entries(db_session, kind="procedure", source="emr")
-        assert len(procs) == 1
-        assert procs[0].payload["procedure_type"] == "Только legacy ключ"
-
-    def test_p3_position_is_source_array_position_not_dense_display_index(
+    def test_p3c_rebuild_drops_previously_projected_alias_rows(
         self, db_session, test_patient, test_doctor, admin_user
     ):
-        """Owner P2 (round-3, head 6eef00e9d): position — стабильная
-        позиция записи в ИСХОДНОМ массиве источника, а не плотный индекс
-        отображаемых строк. Кейс вердикта: canonical [valid, invalid,
-        valid] + legacy [valid] → positions {0, 2, 3}, а не {0, 1, 2}:
-        invalid-запись (пустой procedure_type) пропускается БЕЗ
-        пересчёта позиций соседей. Гарантии при разрывах:
-        уникальность (kind, source, record_id, position),
-        canonical-раньше-legacy, id-суффикс и position в одном
-        source-индексном пространстве."""
+        """Runbook-переход: строки, спроецированные ДО Phase C с
+        legacy-позициями, удаляются полным пересчётом (projection больше
+        их не производит — паритет по построению)."""
+        from app.services.derma_history_projection import (
+            rebuild_derma_history_entries,
+        )
+
+        visit = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+        )
+        emr = _add_emr(
+            db_session,
+            visit=visit,
+            data=self._both_keys_data(),
+            created_by=admin_user.id,
+        )
+        # «старая» alias-строка, как её спроецировала бы Phase A
+        db_session.add(
+            DermaHistoryEntry(
+                kind="procedure",
+                source="emr",
+                record_id=emr.id,
+                position=2,
+                patient_id=emr.patient_id,
+                visit_id=emr.visit_id,
+                entry_date=date.today(),
+                created_at=emr.created_at,
+                payload={
+                    "id": f"emr-{emr.id}-legacy-0",
+                    "procedure_type": "Legacy процедура",
+                },
+            )
+        )
+        db_session.commit()
+        assert (
+            len(_entries(db_session, kind="procedure", source="emr", record_id=emr.id))
+            == 3
+        )
+
+        counts = rebuild_derma_history_entries(db_session.connection())
+        assert counts["emr_entries"] >= 2  # глобальный счётчик: могут быть
+        # строки других тестов; предметная проверка — скоуп по записи ниже
+        procs = _entries(db_session, kind="procedure", source="emr", record_id=emr.id)
+        assert sorted(e.position for e in procs) == [0, 1]
+        assert not any("-legacy-" in e.payload["id"] for e in procs)
+
+    def test_p3c_write_boundary_merges_legacy_key_into_canonical(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        """Граница записи (emr_contract.normalize_emr_data): сохранение
+        через ПРОДАКШН-путь emr_v2_service.save с legacy-ключом переносит
+        записи в канонический ключ и снимает ключ — данные не теряются и
+        не остаются невидимыми; read model проецирует перенесённые записи
+        каноническими id/позициями."""
+        from app.services.emr_v2_service import emr_v2_service
+
+        visit = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+        )
+        legacy_entry = {
+            "procedure_date": date.today().isoformat(),
+            "procedure_type": "Запись из старого клиента",
+            "area_treated": "Шея",
+        }
+        emr = emr_v2_service.save(
+            db_session,
+            visit_id=visit.id,
+            data=self._both_keys_data()
+            | {
+                "specialty_data": {
+                    "cosmetic_procedures": [
+                        self._both_keys_data()["specialty_data"]["cosmetic_procedures"][
+                            0
+                        ]
+                    ],
+                    "procedures": [legacy_entry],
+                }
+            },
+            user_id=admin_user.id,
+            row_version=0,
+        )
+        db_session.refresh(emr)
+        specialty_data = emr.data["specialty_data"]
+        assert "procedures" not in specialty_data
+        assert specialty_data["cosmetic_procedures"] == [
+            self._both_keys_data()["specialty_data"]["cosmetic_procedures"][0],
+            legacy_entry,
+        ]
+
+        procs = _entries(db_session, kind="procedure", source="emr")
+        assert len(procs) == 2
+        assert sorted(e.position for e in procs) == [0, 1]
+        assert not any("-legacy-" in e.payload["id"] for e in procs)
+        assert any(
+            e.payload["procedure_type"] == "Запись из старого клиента" for e in procs
+        )
+
+    def test_p3c_position_contract_single_key(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        """Контракт position (review P2, round-3) в одноключевой проекции:
+        position — стабильная позиция в ИСХОДНОМ массиве
+        cosmetic_procedures, invalid-записи не перенумеровывают соседей:
+        [valid, invalid, valid] → positions {0, 2}, id emr-<rid>-{0,2}."""
         visit = _add_visit(
             db_session,
             patient=test_patient,
@@ -914,78 +970,6 @@ class TestDermaP3LegacyAliasProjection:
                             "area_treated": "Нос",
                         },
                     ],
-                    "procedures": [
-                        {
-                            "procedure_date": date.today().isoformat(),
-                            "procedure_type": "Legacy процедура",
-                            "area_treated": "Шея",
-                        }
-                    ],
-                },
-            },
-            created_by=admin_user.id,
-        )
-
-        procs = _entries(db_session, kind="procedure", source="emr")
-        assert len(procs) == 3  # 2 canonical valid + 1 legacy valid
-
-        by_id = {e.payload["id"]: e for e in procs}
-        assert sorted(by_id) == sorted(
-            [f"emr-{emr.id}-0", f"emr-{emr.id}-2", f"emr-{emr.id}-legacy-0"]
-        )
-        # Контракт вердикта: positions {0, 2, 3} — разрыв на пропущенной
-        # invalid-записи сохранён, плотность НЕ гарантируется
-        assert sorted(e.position for e in procs) == [0, 2, 3]
-        # id-суффикс и position живут в одном индексном пространстве
-        # источника: canonical position == source index
-        assert by_id[f"emr-{emr.id}-0"].position == 0
-        assert by_id[f"emr-{emr.id}-2"].position == 2
-        # legacy: len(canonical_entries)=3 + source index 0
-        assert by_id[f"emr-{emr.id}-legacy-0"].position == 3
-        # уникальность (kind, source, record_id, position) при разрывах
-        assert len({e.position for e in procs}) == 3
-        assert all(e.record_id == emr.id for e in procs)
-        # тай-брейк порядка: canonical-раньше-legacy даже с разрывами
-        assert max(
-            e.position for e in procs if "-legacy-" not in e.payload["id"]
-        ) < min(e.position for e in procs if "-legacy-" in e.payload["id"])
-
-    def test_p3_position_gap_in_legacy_array_keeps_source_indices(
-        self, db_session, test_patient, test_doctor, admin_user
-    ):
-        """Обратная сторона того же контракта: invalid-записи в LEGACY
-        массиве тоже не перенумеровывают соседей — canonical [valid] +
-        legacy [не-словарь, valid] → positions {0, 2}: canonical 0,
-        legacy len(canonical)=1 + source index 1 = 2; id остаётся
-        emr-<rid>-legacy-1 (source-индекс), а не legacy-0."""
-        visit = _add_visit(
-            db_session,
-            patient=test_patient,
-            doctor=test_doctor,
-        )
-        emr = _add_emr(
-            db_session,
-            visit=visit,
-            data={
-                "specialty": "dermatology",
-                "diagnosis": {"main": "Розацеа", "secondary": []},
-                "specialty_data": {
-                    "cosmetic_procedures": [
-                        {
-                            "procedure_date": date.today().isoformat(),
-                            "procedure_type": "Единственная каноническая",
-                            "area_treated": "Щёки",
-                        }
-                    ],
-                    "procedures": [
-                        # invalid: не словарь → пропускается
-                        "повреждённая запись (не словарь)",
-                        {
-                            "procedure_date": date.today().isoformat(),
-                            "procedure_type": "Legacy вторая",
-                            "area_treated": "Шея",
-                        },
-                    ],
                 },
             },
             created_by=admin_user.id,
@@ -994,13 +978,8 @@ class TestDermaP3LegacyAliasProjection:
         procs = _entries(db_session, kind="procedure", source="emr")
         assert len(procs) == 2
         by_id = {e.payload["id"]: e for e in procs}
-        assert sorted(by_id) == sorted([f"emr-{emr.id}-0", f"emr-{emr.id}-legacy-1"])
-        # canonical 0; legacy: len(canonical)=1 + source index 1 → 2
+        assert sorted(by_id) == sorted([f"emr-{emr.id}-0", f"emr-{emr.id}-2"])
         assert by_id[f"emr-{emr.id}-0"].position == 0
-        assert by_id[f"emr-{emr.id}-legacy-1"].position == 2
-        assert sorted(e.position for e in procs) == [0, 2]
-        # keyset-порядок чтения от разрывов не зависит: legacy всё ещё
-        # после canonical при тай-брейках
-        assert (
-            by_id[f"emr-{emr.id}-0"].position < by_id[f"emr-{emr.id}-legacy-1"].position
-        )
+        assert by_id[f"emr-{emr.id}-2"].position == 2
+        assert len({e.position for e in procs}) == 2
+        assert all(e.record_id == emr.id for e in procs)

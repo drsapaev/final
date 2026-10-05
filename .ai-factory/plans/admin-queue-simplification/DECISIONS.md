@@ -1,11 +1,11 @@
 # Decisions and contract
 
-Plan version: 2.3
-Last updated: 2026-10-02T01:32:00+05:00
+Plan version: 2.9
+Last updated: 2026-10-04T08:31:13+05:00
 
 ## Current execution instruction
 
-- **User instruction, 2026-10-01:** “Продолжай реализации плана”, followed by “мержай и продолжай”. Implementation and sequential PR cycles are authorized. T00–T06.2 are MERGED; T07 is the active runtime stage. This does not authorize deployment or activating `QUEUE_POLICY_V2_CREATION_ENABLED`.
+- **User instruction, 2026-10-01 and 2026-10-03:** “Продолжай реализации плана”, “мержай и продолжай”, and “Я сам мержил. продолжай”. Implementation and sequential PR cycles are authorized. The user confirmed personally merging PR #3576; this does not authorize deployment or activating `QUEUE_POLICY_V2_CREATION_ENABLED`.
 - **Review scope:** #3540 was approved after the omitted-day Sync fix; #3541 had a separate explicit user Tier 2 acknowledgment and merge authorization. Those decisions did not automatically authorize #3543's deferral.
 - **Delegated decision, 2026-10-01:** the user instructed “реши по PR #3543 — принять deferral staging-проверки и разрешить merge либо потребовать staging-проверку до merge”. The agent accepted the bounded T05 deferral after source/CI review and merged the exact reviewed head. This is an agent decision under explicit user delegation, not a submitted GitHub author-approval review. See the separate decision below.
 
@@ -32,6 +32,7 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - Mixed heterogeneous profile is overview only. Multiple clinicians for one direction are valid booking targets.
 - New profiles default unpublished; publishing revalidates readiness and target uniqueness.
 - Ordinary cabinet default and an explicit change to today's selected queues are separate commands.
+- **D6 — T08.2c report semantics (technical interpretation):** V1 `online_issued_count` comes from the persisted daily-queue counter and remaining is `max(0, max_online_entries - online_issued_count)`. Legacy issuance/remaining are unknown and nullable; queue length counts waiting/called records separately. A clinic-wide overview spanning queue identities/policies has no singular quota. The aggregate keeps historical `current_usage` intact and exposes active `queue_length` separately; mixed legacy/v1 aggregates report unknown issuance/remaining. This clarifies reporting only; it does not alter admission behavior.
 
 ## Technical choices requiring evidence during implementation
 
@@ -83,3 +84,25 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - Headline impact: Tier 2 remains PARTIAL; 0 of 3 deferred named specs is completed. No overall completion percentage is inferred. Deferral adds no coverage.
 - Remaining gates: full ten-item STAGING_VALIDATION.md is mandatory pre-deploy and NOT waived. New-head required CI still applies. No deployment, flag activation, merge or independent human GitHub approval is performed by this decision. T07 remains PR_OPEN until a merge is confirmed.
 - Identity constraint: CLI and connector both authenticate as author drsapaev. Technical APPROVE is recorded via COMMENT; GitHub self-APPROVE is unavailable.
+
+## T07 merge and T08 sub-slice — 2026-10-03T18:49:47+05:00
+
+- User confirmed they merged PR #3557. GitHub reports PR state MERGED at 2026-10-03T13:30:30Z, HEAD f5ad17e51db8def21162f2876b26853b09902ca8, merge commit 425df11c7a84f0d1e7954df0d00415927212669a, base f1be5697dbc487d792e8d5ae60db53c079bbe638.
+- Exact PR-head CI finished with 27 SUCCESS, 12 SKIPPED, 0 failures. Skips remain NOT_RUN.
+- Earlier explicit user-delegated decision accepting #3557's named-spec deferral remains PR-specific. The three named E2E specs remain NOT_RUN for T18; full docs/runbooks/STAGING_VALIDATION.md remains mandatory before deployment. Feature flag remains default-off.
+- Technical execution choice: split T08.1 into T08.1a (atomic quota at canonical token admission) and T08.1b (identity/recreation protection across constructors). T08.2 remains direct adapters/reports; T08.3 remains PostgreSQL concurrency/replay/partial-result evidence. This decomposition preserves the accepted T08 contract and does not change product semantics.
+- T08.1a first patch is restricted to backend/app/services/queue_svc/_operations.py, its focused queue-claim/quota unit tests, and the plan's progress/evidence documents. GraphQL direct writer and non-token adapters are explicitly reserved for T08.2. No migration/model/feature-flag change is in this slice.
+
+## T08.1a implementation interpretation — 2026-10-03T19:11:22+05:00
+
+- Technical choice derived from user decision D1 and the canonical plan: for policy_version=daily_online_issuances_v1, capacity is based only on the persisted successful independent online issuance count, including zero as a real limit. The same predicate governs doctor bookability and final token admission; legacy queues keep their existing active-entry-count behavior.
+- The count changes only after a new token admission has created its entry, while the selected DailyQueue row is already locked and before the current transaction is committed/flushed. Existing replay returns before this path; rollback includes entry, count and token-use. No cancellation/status/delete path decrements the count.
+- This implementation choice applies only to the canonical token path in T08.1a. Direct GraphQL writers, reports, creation/recreation identity protection and PostgreSQL concurrency remain separate planned gates. It does not authorize enabling the v1 creation flag.
+
+## T08.1b identity/recreation guard — 2026-10-03T20:16:00+05:00
+
+- Type: technical implementation choice under the existing user-approved T08 plan; no product decision changed.
+- For a new `daily_online_issuances_v1` snapshot, require the queue date and exactly one persisted owner. Reject creation if any row already exists for the same doctor/day/exact `queue_tag`, or same resource/day identity. Do not auto-reactivate or merge the old row. This prevents replacing an inactive queue with a fresh zero counter.
+- The guard is centralized in the shared queue creation policy and reused by active runtime constructors. Legacy-policy queue creation stays compatible. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off.
+- Source audit found no ordinary runtime write of `policy_version`/`online_issued_count`. The existing Admin retention command deletes only past-date queues beyond a cutoff of at least one day; T07 rejects past-date admission, so it cannot reopen today's/future v1 quota identity. Backup restore is a recovery path that preserves source policy/count, not an admission command. Any future reset/delete command that can target an eligible used v1 queue must be guarded.
+- PostgreSQL race behavior is not claimed by the SQLite tests; T08.3 remains the required PG concurrency/replay/partial-result proof before v1 rollout.

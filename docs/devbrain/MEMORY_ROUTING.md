@@ -1,6 +1,6 @@
 # DevBrain Memory Routing
 
-This file is the routing table for durable project memory. It keeps DevBrain useful as project memory, retrieval, routing, guardrails, and evidence without turning every observation into global policy.
+This file routes durable repository memory and machine-local task memory without turning every observation into global policy.
 
 For component responsibilities and boundaries, use `docs/devbrain/DEV_BRAIN_ROLE_MAP.md`.
 
@@ -10,6 +10,8 @@ Route memory to the narrowest durable layer that can use it.
 
 - One-off observation -> log or dossier.
 - Repeated ownership fact -> `docs/devbrain/PROJECT_MEMORY.md`.
+- Current task state and source-backed local knowledge -> the shared local store through `scripts/run_devbrain_memory.ps1`, following the lifecycle in `AGENTS.md`.
+- Reviewed repo-wide facts/lessons portable through Git -> `docs/devbrain/memory/curated.json` with pinned source hashes.
 - Repeated gate misroute -> `agent_gate.py` routing rule plus acceptance scenario.
 - Retrieval/index status -> `docs/devbrain/DEVBRAIN_STATUS.md`.
 - Durable agent behavior rule -> `AGENTS.md`.
@@ -32,6 +34,27 @@ For intentional memory-health canaries, use
 `docs/devbrain/MEMORY_PROBE_PROTOCOL.md`. Memory probe entries belong in
 `.ai-factory/logs/memory-probes.md` unless a repeated lesson from the probe must
 be promoted through the normal routing table.
+
+### Automatic task memory protocol
+
+Repo-aware agents call `scripts/run_devbrain_memory.ps1` for task checkpoints
+and bounded local recall under the lifecycle in `AGENTS.md`. Begin only a new
+substantive task; use exact-task recall to continue; capture at boundaries,
+milestones, blockers, and before handoff/final. This is an agent instruction,
+not a client event hook or background conversation analyzer.
+
+The store is shared by worktrees of this clone, but not independent clones or
+computers. Checkpoints are task state, not repository policy. Source hashes
+describe file state; source, tests, migrations, runbooks, and user
+authorization remain authoritative. Never store PHI/PII, credentials,
+transcripts, or large raw output.
+
+`curated.json` stores reviewed, repo-scoped facts/lessons with relative anchors
+and pinned SHA-256 values. It has no worktree or session metadata. The helper
+reads it with local memory; stale sources suppress the claim and uncommitted
+curated files are worktree-only hints. Local capture never edits tracked files.
+Promote durable ownership decisions/failure patterns to `PROJECT_MEMORY.md`
+and portable source-backed facts to `curated.json` through a reviewed change.
 
 ## Memory Targets
 
@@ -63,6 +86,13 @@ Good fit:
 - queue/payment/notification/Telegram/routing SSOT facts.
 
 Update this when the same fact is likely to matter again.
+
+### `docs/devbrain/memory/curated.json`
+
+Use for compact, source-backed repo facts or lessons that should travel with
+the repository. Every record needs relative source anchors and author-pinned
+hashes. Never put task/session state, machine paths, raw transcripts, PHI/PII,
+or secrets here; update through a normal reviewed PR.
 
 ### `docs/devbrain/DEVBRAIN_STATUS.md`
 
@@ -123,9 +153,10 @@ Good fit:
 
 Only promote a memory fact into `agent_gate.py` after it is stable enough to automate.
 
-### LlamaIndex
+### LlamaIndex (dormant legacy retrieval)
 
-LlamaIndex is local fallback retrieval. It remembers what is in its manifest and generated local index.
+LlamaIndex is dormant under ADR-0007. Its manifest and generated local index
+are not part of default task startup, inventory, regression, or refresh.
 
 Good fit:
 - source location;
@@ -133,11 +164,14 @@ Good fit:
 - "where is X implemented?";
 - docs/runbooks/source file lookup.
 
-It does not remember chat unless the chat decision is written into an indexed repo file.
+Missing artifacts are not created by diagnostic commands. An explicit
+`devbrain_refresh_memory.ps1 -RefreshRetrieval` may write ignored local index
+storage. It does not make LlamaIndex active or change the durable policy.
 
-### LightRAG
+### LightRAG (dormant legacy retrieval)
 
-LightRAG is relationship retrieval. It remembers relationship concepts, canonical anchors, first-touch files, verification targets, and generated local graph artifacts.
+LightRAG is dormant under ADR-0007. Its manifest and generated local graph are
+not part of default task startup, inventory, regression, or refresh.
 
 Good fit:
 - ownership chains;
@@ -145,7 +179,10 @@ Good fit:
 - repeated cross-file relationships;
 - migration/queue/payment/notification/Telegram/routing ownership.
 
-It does not create durable project memory on its own. It builds graph artifacts from indexed repo sources.
+Diagnostic commands do not create a missing graph. An explicit
+`devbrain_refresh_memory.ps1 -RefreshRetrieval` may export ignored local
+artifacts from an existing graph. Neither acceptance output nor artifact
+presence changes the durable dormant policy.
 
 ### CI / PR Gates
 
@@ -164,16 +201,17 @@ CI gates should enforce process and safety. They should not become a substitute 
 
 | Knowledge type | Memory target | Update trigger | Reindex needed | Validation |
 | --- | --- | --- | --- | --- |
-| One-off task observation | `.ai-factory/logs` or `.ai-factory/dossiers` | Useful context discovered once | Yes, if the file is indexed and trusted retrieval needs it | Dossier/log reviewed; optional retrieval refresh |
-| Repeated ownership fact | `docs/devbrain/PROJECT_MEMORY.md` | Same ownership fact affects multiple tasks | Yes | `devbrain_refresh_memory.ps1`; regression matrix |
-| Durable agent behavior rule | `AGENTS.md` | Rule must affect all agents before editing | Yes | `git diff --check`; regression matrix if DevBrain behavior changes |
-| Retrieval/index status | `docs/devbrain/DEVBRAIN_STATUS.md` | Smoke, acceptance, artifact, or inventory status changes | No, if status-only bookkeeping; yes if source/memory changed | Official status flow; regression matrix |
-| Repeated gate misroute | `ai/langgraph/scripts/agent_gate.py` plus acceptance scenario | Same routing bug appears more than once or hits risky domain | Yes | `devbrain_acceptance.ps1`; regression matrix |
+| One-off task observation | Local task checkpoint or `.ai-factory/logs` / `.ai-factory/dossiers` | Resume state or useful context from one task | No for local checkpoints; legacy index only by explicit request | `run_devbrain_memory.ps1 -Action Recall` or dossier review |
+| Portable source-backed fact/lesson | `docs/devbrain/memory/curated.json` | Confirmed fact should travel with Git | No | Helper recall/export plus anchor hash and source review |
+| Repeated ownership fact | `docs/devbrain/PROJECT_MEMORY.md` | Same fact affects multiple tasks | No for normal work; legacy index only by explicit request | Source/test review; default `devbrain_refresh_memory.ps1` |
+| Durable agent behavior rule | `AGENTS.md` | Rule must affect all agents before editing | No for normal work; legacy index only by explicit request | `git diff --check`; default regression matrix |
+| Retrieval/index status | `docs/devbrain/DEVBRAIN_STATUS.md` | Explicit diagnostic or artifact metadata changes | No; historical status text does not make an index fresh | `devbrain_inventory.ps1 -IncludeRetrieval`; inspect artifact metadata |
+| Repeated gate misroute | `ai/langgraph/scripts/agent_gate.py` plus acceptance scenario | Same routing bug appears more than once or hits risky domain | No for default checks | `devbrain_acceptance.ps1`; default regression matrix |
 | Risky domain stop condition | `AGENTS.md`, `PROJECT_MEMORY.md`, or `agent_gate.py` | Stop condition should be durable | Yes | Gate acceptance; targeted scenario |
 | Historical patch evidence | `.ai-factory/patches` | PR/patch completed and evidence may matter later | Optional | Patch note review; PR checks |
 | Graph-heavy research | `.ai-factory/dossiers` | Context packet needed for multi-file/risky task | Optional | Dossier has anchors, first-touch, validation |
-| LlamaIndex source lookup | `ai/llamaindex/data/manifest.json` source files | Indexed source set changes | Yes | `ai/llamaindex/scripts/run_smoke.ps1` |
-| LightRAG relationship concept | `ai/lightrag/data/manifest.json` priority focus source or indexed memory/source | Ownership graph needs a stable concept | Yes | `ai/lightrag/scripts/run_acceptance.ps1`; artifact check |
+| LlamaIndex source lookup | Dormant legacy manifest/index | Explicit request to maintain local lexical retrieval | Only for that local index | `devbrain_refresh_memory.ps1 -RefreshRetrieval`; review ignored artifact metadata |
+| LightRAG relationship concept | Dormant legacy manifest/graph | Explicit request to maintain local relationship retrieval | Only for that local graph/artifacts | `devbrain_refresh_memory.ps1 -RefreshRetrieval`; review ignored artifact metadata |
 | PR evidence discipline | `.github/pull_request_template.md`, PR gate scripts, workflows | Review evidence requirement changes | No, unless indexed docs changed | PR review gate; CI |
 
 ## Promotion Rules
@@ -182,15 +220,23 @@ CI gates should enforce process and safety. They should not become a substitute 
 2. Promote only when the same fact has repeated value.
 3. Do not promote one-off observations into global agent rules.
 4. Do not promote stale docs over executable source, tests, migrations, or route registries.
-5. When memory changes affect retrieval, run:
+5. For normal task memory, use the local helper and keep the checkpoint scoped to its task. The default health check is:
 
 ```powershell
 .\scripts\devbrain_refresh_memory.ps1
 ```
 
+It checks file-backed memory and portable guardrails only. Run dormant legacy
+indexes only when explicitly requested:
+
+```powershell
+.\scripts\devbrain_refresh_memory.ps1 -RefreshRetrieval
+```
+
 ## Retrieval Refresh Rules
 
-Run the refresh wrapper after changes to:
+The default refresh does not ingest or query legacy indexes. `-RefreshRetrieval`
+is an explicit opt-in for maintaining ignored local artifacts after changes to:
 
 - `AGENTS.md`;
 - `docs/devbrain/PROJECT_MEMORY.md`;
@@ -202,4 +248,6 @@ Run the refresh wrapper after changes to:
 - `ai/lightrag/data/manifest.json`;
 - `agent_gate.py` or guardrail acceptance behavior.
 
-For product code changes, refresh only when the change affects canonical ownership, route contracts, migrations, queue/payment/notification/Telegram/EMR/lab ownership, or other graph-heavy retrieval anchors.
+For product code changes, do not refresh dormant retrieval by default. If a user
+explicitly requests it, keep generated output in ignored local storage and do
+not infer current system readiness from a successful smoke or acceptance run.

@@ -1,27 +1,37 @@
-# Markdown Indexing Policy
+# Legacy Markdown Indexing Policy
 
-Purpose: keep DevBrain aware of durable markdown knowledge without turning
-retrieval into an index of every temporary note.
+This policy applies only to the dormant LlamaIndex and LightRAG tools described
+by ADR-0007. It does not govern the local automatic-memory store, which keeps
+task checkpoints and selected knowledge outside the repository tree.
 
-This policy is about local retrieval ingest, not model training. LlamaIndex and
-LightRAG remember only repository files that are included in their manifests and
-refreshed locally.
+## Default behavior
 
-## Core Rule
+Legacy retrieval is dormant. Inventory, coverage, regression, and refresh skip
+index reads or writes unless explicitly requested. A missing index is never
+created by a diagnostic command, and the presence of an index or successful
+smoke run does not change the durable dormant policy.
 
-Index markdown by durability and retrieval value.
+Use the opt-in commands only when deliberately inspecting or maintaining a
+legacy index:
 
-- LlamaIndex should cover broad durable markdown for source lookup.
-- LightRAG should stay curated around ownership, routing, and relationship
-  knowledge.
-- Temporary or stale markdown should not become trusted DevBrain memory just
-  because it exists.
+```powershell
+.\scripts\devbrain_inventory.ps1 -IncludeRetrieval
+.\scripts\devbrain_markdown_index_coverage.ps1 -IncludeRetrieval
+.\scripts\devbrain_regression_matrix.ps1 -IncludeRetrieval
+.\scripts\devbrain_refresh_memory.ps1 -RefreshRetrieval
+```
 
-## Tiers
+Explicit freshness checks read commit metadata from the generated artifacts,
+not old Markdown status claims. Refresh uses the canonical Python launcher and
+does not pass `--update-status`. Generated output remains in ignored local
+storage and must not be committed.
 
-### Tier 1: Broad LlamaIndex Markdown
+## Optional legacy coverage tiers
 
-These files are expected to be covered by LlamaIndex:
+If retrieval is explicitly reactivated for a local investigation, retain the
+old coverage split:
+
+### Broad LlamaIndex sources
 
 - `AGENTS.md`
 - `docs/devbrain/*.md`
@@ -31,56 +41,25 @@ These files are expected to be covered by LlamaIndex:
 - `.ai-factory/dossiers/*.md`
 - `.ai-factory/patches/*.md`
 
-Use this tier for "where is this documented?" and local source lookup.
-
-### Tier 2: Curated LightRAG Markdown
-
-These files should enter LightRAG only when they carry durable relationship or
-ownership value:
+### Curated LightRAG sources
 
 - `docs/devbrain/PROJECT_MEMORY.md`
 - `docs/devbrain/MEMORY_ROUTING.md`
 - `docs/devbrain/DEV_BRAIN_ROLE_MAP.md`
 - `docs/devbrain/MARKDOWN_INDEXING_POLICY.md`
-- runbooks that define ownership or routing behavior
-- AI Factory logs/dossiers promoted by memory routing
+- runbooks with durable ownership or routing rules
+- AI Factory logs or dossiers explicitly promoted through memory routing
 
-Use this tier for "which owner/first-touch/validation chain applies?"
+Do not index generated docs, stale exploratory drafts, archive snapshots,
+temporary notes, or historical reports without current operational value.
 
-### Tier 3: Not Indexed By Default
+## Optional legacy indexing workflow
 
-Do not automatically trust:
+When a local legacy index is intentionally maintained:
 
-- generated docs;
-- stale exploratory drafts;
-- archive snapshots;
-- temporary notes;
-- large historical reports with no current operational value.
-
-Promote them through `docs/devbrain/MEMORY_ROUTING.md` before relying on them.
-
-## New Markdown Workflow
-
-When a new `.md` file is created:
-
-1. Decide whether it is durable memory, temporary evidence, or generated output.
-2. If it belongs under a Tier 1 directory, LlamaIndex should cover it through
-   directory indexing.
-3. If it contains ownership or routing relationships, add a curated LightRAG
-   source or priority focus concept.
-4. Run:
-
-```powershell
-.\scripts\devbrain_markdown_index_coverage.ps1
-.\scripts\devbrain_refresh_memory.ps1
-```
-
-5. Check that `.\scripts\devbrain_regression_matrix.ps1` has no unexpected
-   stale-index or markdown-coverage warnings.
-
-## Non-Goals
-
-- Do not index every markdown file in the repository by default.
-- Do not use retrieval results as authority over source code, tests, migrations,
-  route registries, or CI gates.
-- Do not commit generated LlamaIndex or LightRAG storage/artifacts.
+1. Decide whether the Markdown is durable, temporary evidence, or generated.
+2. Run coverage with `-IncludeRetrieval`.
+3. Run refresh with `-RefreshRetrieval` only when the artifacts should be rebuilt.
+4. Inspect generated artifact commit metadata and keep the output ignored.
+5. Treat retrieved content as a hint; source, tests, migrations, route
+   registries, and CI gates remain authoritative.

@@ -72,7 +72,13 @@ const uzLatn = {
     density_comfortable: 'Standart',
     density_spacious: 'Keng',
   },
+  pagination: {
+    firstPage: 'Birinchi sahifa',
+    page: 'Sahifa {page}',
+    lastPage: 'Oxirgi sahifa',
+  },
   common: {
+    clear: 'Tozalash',
     save: 'Saqlash',
     save_draft: 'Qoralamani saqlash',
     cancel: 'Bekor qilish',

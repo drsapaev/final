@@ -1,220 +1,30 @@
 # Project Memory
 
-Canonical compact memory for DevBrain routing and guardrails. Keep this file short and operational. Do not turn `AGENTS.md` into a full history dump; update this file when project-wide ownership decisions change.
+Compact router for durable ownership decisions and confirmed failure patterns. Keep task checkpoints in local automatic memory; keep implementation truth in current source, tests, migrations, and runbooks. See [bootstrap rule preservation](BOOTSTRAP_RULE_PRESERVATION.md).
 
-## Core SSOT Decisions
+## Stable ownership
 
-- Backend business rules are the source of truth for payment, queue, RBAC, EMR, lab, Telegram security, and persistence behavior.
-- Frontend is presentation and interaction orchestration unless a route-specific adapter is explicitly documented as a read model.
-- Route registry ownership starts from `frontend/src/routing/routeRegistry.ts`.
-- Database shape ownership starts from SQLAlchemy models plus Alembic revisions, not endpoint text or UI assumptions.
-- CI and PR gates are repository safety infrastructure and must not be bypassed to save time.
-- AI Factory, dossiers, evidence logs, and skills are advisory memory layers; executable source and tests still win when they conflict.
+- Backend services own payment, queue, authorization, clinical, lab, notification, Telegram-security, and persistence behavior. Frontend code presents API-owned decisions unless an explicit read-model contract says otherwise.
+- Database truth is SQLAlchemy model + schema contract + Alembic revision + validation/tests. Route truth starts at `frontend/src/routing/routeRegistry.ts`; role truth starts at `backend/app/models/role_permission.py`.
+- Queue identity/fairness follows profile → specialist/doctor mapping → backend queue ordering → API contract → presentation. Keep payment and visit/queue statuses separate.
+- Telegram token storage/security is model → migration → expiry/single-use service behavior → Bot API/UI. Bot UX does not own storage.
+- Notification types and delivery semantics start at the catalog/producer and user preference policy; consumers do not invent event types.
 
-## Known Ownership Chains
+## Recurrent failure patterns
 
-- DB persistence: `SQLAlchemy model -> schema/table contract -> Alembic revision -> DB validation -> tests`.
-- Local dev runtime: `clinic_dev Postgres -> Alembic upgrade/reset/seed -> backend 18000 -> frontend 5173 -> browser smoke`.
-- Registrar payment/status: `backend service/persistence -> API DTO/read model -> frontend adapter/table -> print/payment UI`.
-- Queue identity/fairness: `profile/specialist/doctor mapping -> queue service ordering -> API contract -> frontend presentation`.
-- Notifications: `event catalog -> producer service -> user preference/anti-noise policy -> delivery adapter -> frontend consumer`.
-- Telegram token/security: `token model/storage -> Alembic revision -> service expiry/single-use checks -> webhook/command UX`.
-- Routing: `routeRegistry.ts -> route guards/layouts -> role panels -> links/navigation`.
+- Keyword routing can misclassify migration/storage work as Telegram, queue, status, endpoint, or UI work. Find the canonical writer and its direct tests before editing.
+- An all-ascending index cannot serve a mixed-direction `ORDER BY`; mirror the query directions or inspect the query plan. See `backend/app/api/v1/endpoints/derma.py` and migration `0076_derma_history_read_order.py`.
+- Session SQLAlchemy listeners must be registered from a module loaded by every relevant entry point, not only an endpoint import. Verify startup/import paths and focused tests.
+- A closed `/ws/queue` socket must leave the receive loop, cancel heartbeat, and leave its room. See `backend/tests/unit/test_queue_ws_disconnect.py`.
 
-## Known Failure Patterns
+## Local runtime contour
 
-- Keyword routing can misclassify storage or migration tasks as Telegram, queue, status, endpoint, or UI tasks.
-- Multi-hop ownership is often missed when a change spans UI, endpoint, service, persistence, and tests.
-- Manual reconstruction repeats when dossiers/evidence are not consulted before graph-heavy work.
-- Existing migrations can be tempting to edit, but already-applied revisions must remain immutable.
-- Frontend presentation code must not invent backend-owned values such as payment status, queue ordering, role policy, or appointment time.
-- Broad audit findings should be converted into small PR slices before implementation.
-- A closed `/ws/queue` connection once retried receive errors in a tight loop, flooding logs and consuming CPU while unrelated panels waited. Preserve exit, heartbeat cancellation, room cleanup, and the focused disconnect regression test.
-- First-screen latency means time until content appears, not FastAPI startup. Separate browser bundle/API waterfalls, backend queries, and WebSocket load before changing infrastructure; keep inactive panel tabs off the initial path.
-- An all-ASC index does NOT serve a mixed-direction ORDER BY (e.g. DESC, DESC, ASC, DESC, ASC): the planner falls back to a temp-btree sort of the whole set, silently turning O(page) reads into O(N log N). Index columns must mirror the ORDER BY directions (#3506, derma history read model).
-- Session-scoped SQLAlchemy event listeners (after_flush) must be registered from a module every entry point imports (app/db/base.py), never from an endpoint's import of the listener module — removing that import silently disables the projection (#3506).
+- Manual local development uses PostgreSQL `clinic_dev`, an explicit PostgreSQL `DATABASE_URL`, and confirmed reset/seed flags; do not rely on SQLite fallbacks. Local 2FA bypass flags are manual smoke aids only, never production-like configuration. See [PostgreSQL dev database](../dev/POSTGRES_DEV_DATABASE.md) and [local onboarding](../runbooks/LOCAL_DEV_ONBOARDING.md).
+- WSL staging is a separate Compose project/database with synthetic fixtures only. Run `Preflight` before build and use `Session` for the full long-running validation; skipped PG cases are not success, image/mount identity is not served-revision proof, and uptime reset alone does not prove OOM. See [session worktrees](../runbooks/AGENT_SESSION_WORKTREES.md) and [WSL staging session](../runbooks/WSL_STAGING_SESSION.md).
 
-## Strict Operating Rules
+## DevBrain routing
 
-- Use direct execution only for narrow known-root-cause tasks with no risky domain or ownership ambiguity.
-- Use dossier or handoff for graph-heavy, mixed-contract, or ownership-sensitive work.
-- GPT-6 may use `advisory_gate` for UI/API work that does not change DB schema/migrations, authentication/RBAC/security, production configuration/deployment, queue ownership/fairness, or clinical lifecycle/signature rules. In that mode, the gate is optional context; source, tests, user scope, and explicit boundaries decide the patch.
-- Keep mandatory gate use for DB schema/migrations, authentication/RBAC/security, production configuration/deployment, and queue ownership/fairness or clinical lifecycle/signature changes. Other agent models follow the existing gate process.
-- For mandatory gate work, if the gate misroutes, retry once with `--known-root-cause`; if it still misses the confirmed file, use a narrow override only with an approved basis and report it. Advisory-mode misroutes do not block a well-grounded task.
-- Do not silently expand scope. Stop when the required file set exceeds the manually declared patch boundary; for GPT-6 advisory work, the gate's first-touch list is not that boundary.
-- Every PR needs evidence: local validation, `git diff --check`, PR scope/impact notes, and green GitHub checks when opened.
-
-## Local Dev Runtime Contour
-
-- Manual local UI/dev runs use PostgreSQL, not SQLite.
-- Use a disposable local database such as `clinic_dev` for local manual testing and browser QA.
-- Canonical local ports are backend `18000` and frontend `5173`.
-- Dev DB reset/seed belongs to the manual CLI tooling documented in `docs/dev/POSTGRES_DEV_DATABASE.md` and `docs/runbooks/LOCAL_DEV_ONBOARDING.md`.
-- Set `DATABASE_URL` explicitly to a PostgreSQL URL for `clinic_dev`; do not rely on fallback database behavior.
-- Dev reset/seed commands must keep safety confirmations such as `--confirm-dev-reset`, `--confirm-dev-seed`, and `--confirm-db-name clinic_dev`.
-- Local 2FA bypass flags are manual smoke-test aids only and must not be used in production-like environments.
-- Isolated Linux staging runs in WSL2 Ubuntu 24.04 Docker on this Windows host, with its own Compose project, database, ports, and synthetic data; production remains the Windows main tree on backend `:18000`. See `docs/runbooks/AGENT_SESSION_WORKTREES.md`.
-- Use the worktree's `ops/scripts/wsl_staging.ps1 -Action Preflight` before WSL staging builds and `Session` for the entire validation. Reported recurring failures and strict PG mode's audited-suite boundary are documented in `docs/runbooks/WSL_STAGING_SESSION.md`; unavailable prerequisites/skipped mandatory PG cases are not success, mount/image identity is not served-revision proof, and uptime resets alone do not prove OOM.
-
-## Migration / Alembic Ownership Rules
-
-- SQLAlchemy model without a matching table/migration is migration ownership, not endpoint, webhook, queue, status, or UI ownership.
-- If a model exists and the table is missing, first-touch must include a new Alembic revision under `backend/alembic/versions/`.
-- Never edit an already-applied migration as a substitute for creating a new revision.
-- Treat the existing model and previous revision as read-only references unless the user explicitly changes the model contract.
-- Validate Alembic chain state with heads/history review and disposable/test database upgrade when available.
-- Stop on multi-head ambiguity, existing target table, destructive migration requirements, or model/table mismatch.
-
-## Queue Identity Rules
-
-- Queue ordering and fairness belong to backend queue services and persistence.
-- Do not infer queue identity from labels, display names, frontend filters, or QR text alone.
-- Preserve the distinction between specialist, profile, doctor, and ticket identity.
-- Frontend queue changes should remain presentation-only unless an API contract change is explicitly planned.
-
-## Payment / Status Separation
-
-- Payment state and visit/queue status are separate domains.
-- Frontend must not normalize or invent backend payment status values.
-- Registrar/cashier UI should display backend-owned payment state and route actions through canonical payment endpoints/services.
-- Print/receipt behavior must not become the source of truth for payment completion.
-
-## Notification Catalog Ownership
-
-- Notification event types belong to the catalog/producer contract first.
-- Producer services must emit catalog-backed events rather than ad hoc strings.
-- User preferences and anti-noise behavior must be checked before adding notifications.
-- Frontend notification UI consumes catalog-backed events and must not invent delivery semantics.
-
-## Telegram Token / Security Ownership
-
-- Bot UX/webhook design is separate from token storage/security ownership.
-- Staff link tokens, webhook secrets, bot tokens, and one-time tokens are security-sensitive.
-- Do not hardcode secrets, expose tokens in logs, weaken expiry, or weaken single-use guarantees.
-- Telegram tasks mentioning Alembic, SQLAlchemy, table missing, Postgres SSOT, storage migration, create table, link token storage, or revision use DB ownership first.
-- Use `telegram-bot-builder` only after confirming the task is Bot API/UX/webhook work rather than storage/migration/security root cause.
-
-## Route Registry SSOT
-
-- Start route work from `frontend/src/routing/routeRegistry.ts`.
-- Preserve canonical routes, aliases, guards, and role ownership.
-- Do not create duplicate navigation truth in page components, tests, or docs.
-- Stop when a route change implies RBAC, backend contract, or legacy redirect behavior not covered by the current scope.
-
-## Z.ai Cleanup Sprint (2026-07-03 → 2026-07-04)
-
-Large multi-PR cleanup sprint executed via Z.ai (Claude Sonnet 4.5 + GitHub
-PAT). All PRs merged to main. Facts below are durable and supersede any
-older assumption that conflicts with them.
-
-### Security posture (as of 2026-07-04 sprint — historical snapshot, verify before relying)
-
-- **Bandit**: 0 HIGH, 0 MEDIUM findings (CI blocks on MEDIUM+ via `bandit -ll`)
-- **pip-audit**: 0 CVEs in `backend/requirements.txt` (CI blocks via `pip-audit --strict -r requirements.txt`)
-- **safety**: report-only (cross-validation; pip-audit is the strict gate)
-- **gitleaks**: scans full repo history on every push/PR + daily 03:30 UTC
-- **Dependabot**: 5 ecosystems (pip, npm root, npm frontend, github-actions, docker)
-- **CVEs closed in V5**: python-jose 3.3→3.4 (5 CVEs), jinja2 3.1.0→3.1.6 (5 CVEs)
-- **npm audit**: 7 vulnerabilities (5 high, 2 critical) → 0 (PR #1796)
-
-### Monitoring (Sentry)
-
-- **Frontend DSN** (committed, public send-only): `https://57fde20209e223ec5a4a96e3a5a59fa2@o4511673323749376.ingest.us.sentry.io/4511673366282240`
-- **Backend DSN** (committed, public send-only): `https://65b5195082de2f0522c27dd6695536b7@o4511673323749376.ingest.us.sentry.io/4511673347670016`
-- Sentry org ID: `o4511673323749376`, region: US
-- PII scrubbing in 3 layers: `pii_masker.py` (code) → `PIIMaskingFilter` (logs) → `beforeSend` (Sentry)
-- 30+ medical field names redacted: iin, passport, phone, email, diagnosis, complaints, prescription, allergies, etc.
-- `SENTRY_AUTH_TOKEN` (for source map upload) is CI-only secret, NOT committed
-
-### AI subsystem — feature flags + safety contract
-
-- **18 AI endpoints** gated by feature flags via `Depends(RequireAiFeature("flag_key"))`
-- Endpoints: `ai_gateway.py` (9), `emr_ai_enhanced.py` (7), `ai_chat.py` (1), `phrase_suggest.py` (1)
-- **Fail-open policy**: missing flag = endpoint proceeds (avoid breaking prod on first deploy)
-- **8 default flags** seeded by `backend/app/scripts/seed_ai_feature_flags.py`:
-  ai_complaint_analysis, ai_icd10_suggestion, ai_smart_template, ai_smart_suggestions,
-  ai_chat_assistant, ai_phrase_suggest, telegram_mini_app_enabled, online_queue_enabled
-- `ai_safety_meta()` returns `requires_doctor_confirmation: True` on every AI response
-- Playwright spec `frontend/e2e/ai-safety-guardrails.spec.ts` — 6 contract tests, nightly CI
-
-### Background jobs (arq + Redis)
-
-- arq worker replaced dead Celery stub (celery was never in requirements)
-- 3 jobs: `send_visit_reminder`, `run_data_retention`, `generate_scheduled_report`
-- Worker in `ops/docker-compose.yml` + `ops/compose.staging.yml` (5 services: postgres + backend + frontend + redis + worker)
-- Cron: daily 03:00 UTC data retention
-- Retry policy: 3 tries, exp backoff (10s/60s/300s)
-- `send_visit_reminder` calls `NotificationService.send_confirmation_reminder()` (Telegram/SMS/email)
-
-### Repo hygiene
-
-- **0 stray `.py` at repo root** (was 37 before P0.4)
-- **0 stray `.py` at `backend/` root** (was 97 before V5)
-- **6 canonical root .md files**: README, CHANGELOG, SECURITY, AGENTS, CLAUDE, MIGRATIONS
-- 64 status/fix/phase reports archived to `docs/archive/{phase-reports,fix-summaries,reports,setup-guides}/`
-- Pre-commit hooks: gitleaks, ruff, ruff-format, black, eslint, no-stray-root-tests, no-stray-backend-root-scripts, no-db-files, no-env-files
-- 4 GitHub labels created: `p0-incident`, `dr-drill`, `ai-safety`, `auto-generated`
-
-### CI/CD workflows (current)
-
-- `ci-cd-unified.yml` — main pipeline (backend pytest + frontend lint/unit/build + parity + e2e)
-- `security-scan.yml` — bandit -ll (MEDIUM+ blocking) + pip-audit --strict (CVE blocking) + safety (report-only)
-- `gitleaks.yml` — full repo secret scan, SARIF to GitHub Security
-- `role-system-check.yml` — RBAC matrix test
-- `pr-review-quality-gate.yml` — PR body template enforcement (catch-22 resolved by #1787)
-- `dr-drill.yml` — weekly Sunday 04:00 UTC backup restore test
-- `ai-safety-guardrails.yml` — nightly 02:30 UTC AI safety contract regression
-- `weekly-maintenance.yml` — npm audit + pip-audit + architecture tests
-- Deleted in V5: `monitoring.yml` (fake "✅ Доступна" reports), `load-testing.yml` (always passed)
-
-### MANDATORY pre-deploy validation
-
-- `docs/runbooks/STAGING_VALIDATION.md` — 10 checks (Sentry, DR drill, AI kill-switch, AI safety, arq, PII, pre-commit, tests, build)
-- `scripts/smoke_test_staging.sh` — automated version
-- Referenced in 4 entry points: `AGENTS.md`, `CLAUDE.md`, `README.md`, `.cursor/rules/project-rules.mdc`
-- Agent contract: MUST NOT claim "it works" without running all 10 checks
-
-### New modules added (need tests maintained)
-
-- `backend/app/core/pii_masker.py` — PII scrubbing (35 unit tests in `test_pii_masker.py`)
-- `backend/app/core/sentry.py` — backend Sentry init
-- `backend/app/services/wait_time_predictor.py` — ML bucket-average model (20 tests)
-- `backend/app/services/ai_feature_gating.py` — `RequireAiFeature` dependency
-- `backend/app/synthetic_seed.py` — bulk fake data generator (15 tests)
-- `backend/app/scripts/dr_drill.py` — DR drill (backup restore + smoke test)
-- `backend/app/scripts/seed_ai_feature_flags.py` — 8 default flags
-- `backend/app/tasks/` — arq package (scheduler.py, worker.py)
-- `frontend/src/services/sentry.js` — frontend Sentry init + PII scrubbing
-- `frontend/e2e/ai-safety-guardrails.spec.ts` — 6 contract tests
-- `mcp-servers/synthetic_data_server.py` — stdlib MCP server for IDE test data gen
-
-### Known issues / debt
-
-- **Frontend CI failures on main**: Frontend lint/build/unit tests failing after #1792/#1793 CSS migration. Partially fixed by #1795-#1799. Verify before deploy.
-- **PR Review Quality Gate**: requires literal "not applicable" on its own line per section. Body validator is strict — see `docs/runbooks/pr-review-samples/docs-only-pr.md` for format.
-- **PAT rotation**: Z.ai PATs were used in chat history. User must rotate. New PATs are fine-grained, repo-scoped, expire.
-- **LightRAG**: dormant. PowerShell-only scripts, doesn't work in CI/Linux. See ADR-0007.
-- **safety CLI**: unstable options across v3 minor versions. pip-audit is the strict gate now.
-
-### Z.ai PR index (commit → PR → what)
-
-- `6e60819f` #1781 — P0+P1+P2+V2 (28 commits): security/CI/monitoring/AI safety
-- `cce9edaa` #1787 — hotfix: PR review gate catch-22 (legacy tests path)
-- `1f038914` #1786 — V3: 60+ unit tests + 17 bandit HIGH fixes
-- `79b4e19a` #1788 — V4: 53 bandit MEDIUM fixes + CI threshold MEDIUM+
-- `ba29d5ef` #1790 — hotfix: @sentry/vite → @sentry/vite-plugin
-- `8913f313` #1789 — cloud follow-up #1 (useVisitLifecycle, ADR-0002/0003)
-- `b94a4656` #1793 — cloud follow-up #2 (shared helpers, ADR-0004/0005/0006, +17 tests)
-- `2d73f805` #1792 — Phase 2 CSS migration (CashierPanel + DoctorPanel)
-- `d51ed330` #1791 — V5: 10 CVE fixes + pip-audit strict + 97 backend root scripts moved
-- `70f5c4d5` #1794 — Sentry setup runbook + DSNs committed
-- `383610f5` #1795 — bandit HIGH fixes (B701 jinja2 autoescape + B324 weak hash)
-- `9bd8120b` #1796 — npm audit: 7 vulns → 0
-- `85e1914a` #1797 — eslint auto-fix single quotes (229 warnings)
-- `efe9e833` #1798 — no-unused-vars ignore underscore-prefixed
-- `ab990286` #1799 — remove 3 genuinely unused imports
-- `940e0f19` #1800 — staging validation runbook + smoke test script
-- `dab544d1` #1801 — fix 3 failing GitHub Actions workflows
-- `1451c72a` #1802 — gitleaks allowlist (50→0 findings)
-- `c02631e3` #1803 — re-apply Phase 2 + Phase 3 (lost during #1791 force-push)
-- `1aeef136` #1805 — fix qr_queue visit_id None → is_(None) SQL filter
+- New agent sessions follow [automatic memory](AUTOMATIC_MEMORY.md); shared portable facts live in [`memory/curated.json`](memory/curated.json), local task state lives outside the checkout, and local evidence never overrides current source.
+- Check [status](DEVBRAIN_STATUS.md), [memory routing](MEMORY_ROUTING.md), and [role map](DEV_BRAIN_ROLE_MAP.md) with filesystem evidence before graph-heavy or ownership-sensitive work.
+- LlamaIndex and LightRAG are legacy dormant retrieval unless current artifacts and acceptance evidence say otherwise. Do not claim a unified brain without the recorded acceptance gate.
+- July 2026 Z.ai sprint notes are historical snapshots in [`archive/2026-07-zai-cleanup-sprint.md`](archive/2026-07-zai-cleanup-sprint.md); verify any operational fact before relying on it.
