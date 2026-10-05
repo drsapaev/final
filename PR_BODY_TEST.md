@@ -5,22 +5,22 @@
 **♿ Accessibility:** Added internationalized `aria-label`s replacing hardcoded Russian text, and wrapped disabled buttons in `<span>` elements so that tooltips still trigger via pointer events even when the pagination reaches the first or last page.
 
 ## Cyclic Execution Evidence
-Not applicable because this is a UI-only tooltip text change.
+not applicable - this is a UI-only tooltip text change.
 
 ## Contract Impact
-Not applicable because there is no API contract impact.
+not applicable - there is no API contract impact.
 
 ## RBAC / Permissions
-Not applicable because there are no permission changes.
+not applicable - there are no permission changes.
 
 ## Notification / Realtime
-Not applicable because there are no realtime components modified.
+not applicable - there are no realtime components modified.
 
 ## Frontend Resilience
-Not applicable because there is no state loading mechanism changed.
+not applicable - there is no state loading mechanism changed.
 
 ## Scope Gate
-Not applicable because this is a localized UI change for tooltips.
+not applicable - this is a localized UI change for tooltips.
 
 ## Validation
-Not applicable because there is no validation logic affected.
+not applicable - there is no validation logic affected.
