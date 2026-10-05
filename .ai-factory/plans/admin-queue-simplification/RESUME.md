@@ -1,6 +1,6 @@
 # Resume — admin queue simplification
 
-## Current continuation checkpoint — T08.3.2 (2026-10-05T13:41:40+05:00)
+## Current continuation checkpoint — T08.3.2 (2026-10-05T13:48:16+05:00)
 
 - T08.3.1 / PR #3599 is merged at `a452c54e5851611476c1b2ac3e3298aeff467eca`. Fresh worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-2-qr-session\final`, branch `codex/aqs-T08.3.2-qr-session`, base `origin/main`/HEAD `34ca6e59080dc679a6c7f921ac88a6aacb34e996`; clean before this checkpoint.
 - Current slice is test-only. The approved contract is now locally validated with independent real-PostgreSQL evidence for exact replay without a second issuance, single and multi outer-transaction rollback, and permitted partial multi-target success/error/counter persistence. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off. No runtime code changed.
@@ -9,10 +9,10 @@
 - Allowed: `backend/tests/integration/test_qr_family_phone_identity.py`, `.ai-factory/plans/codex-admin-queue-simplification.md`, and this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: runtime, models, migrations, frontend, ops, generated output, storage, unrelated tests, shared staging and production/live data.
 - Final local evidence: the complete QR family/transaction PG module passed **11/11** on PostgreSQL 16 after Alembic upgrade in a unique scratch DB; allocator-boundary unit module passed **4/4** on its declared SQLite fixture; Ruff check, `py_compile`, `ruff format --check`, `black --check`, and `git diff --check` passed. The pre-commit Black hook normalized a few earlier long lines in this same module; two assertion messages were shortened to align both formatters. These edits are formatting/text-only; the final 11-test run preceded them.
 - Harness note: tests were run while a WSL process was held open, against a temporary PostgreSQL container with a random per-run password and the module's unique scratch database. Container was removed afterward and `docker ps` was empty. An earlier run without the held WSL process skipped due to connection timeout; a later 10-test run passed before the eleventh rollback case was added. Only the final 11/11 run covers current test code.
-- Current state: code/test commit `b3ca1a270aa8ac2b0808487a398442acb39c6466` is pushed and PR #3600 is open. This journal update will create a new PR head; next exact action: push it, verify checks for that exact PR HEAD, then wait for independent human review. Do not merge or start T08.3.3 without the PR cycle closing and separate authorization.
+- Current state: code/test commit `b3ca1a270aa8ac2b0808487a398442acb39c6466` is pushed and PR #3600 is open. After correcting the required PR body, applicable CI, security, and quality checks passed at exact HEAD `27fccddc509f5e7557f57d1038c84dcd2eeae954`; path-aware jobs were skipped. This journal update will create a new PR head; next exact action: push it, verify checks for that exact PR HEAD, then wait for independent human review. Do not merge or start T08.3.3 without the PR cycle closing and separate authorization.
 
-Plan version: 3.3
-Last updated: 2026-10-05T13:41:40+05:00, Asia/Tashkent
+Plan version: 3.4
+Last updated: 2026-10-05T13:48:16+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user authorized continuing the plan, confirmed PR #3596 was merged, and said continue. GitHub merge commit: `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`.
 
 ## Current continuation checkpoint — T08.3.1 PostgreSQL quota race proof (2026-10-05T00:28:28+05:00)
