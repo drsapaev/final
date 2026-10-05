@@ -1,17 +1,18 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.0 — T08.2c / #3596 merged; bounded T08.3.1 PostgreSQL proof is in PR #3599.
-**Создан:** 30 сентября 2026. **Обновлён:** 5 октября 2026, 00:28 Asia/Tashkent.
-**Current task:** T08.3.1 — real PostgreSQL last-slot/replay/rollback proof for the legacy queue-token admission boundary.
-**Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-pg-proof\final`; branch `codex/aqs-T08.3-pg-proof`; base `origin/main` = `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`.
+**Версия:** 3.2 — T08.3.1 / #3599 merged; T08.3.2 QR-session PostgreSQL proof locally validated, PR preparation underway.
+**Создан:** 30 сентября 2026. **Обновлён:** 5 октября 2026, 13:38 Asia/Tashkent.
+**Current task:** T08.3.2 — real PostgreSQL transaction/replay/partial-result proof for QR join sessions.
+**Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-2-qr-session\final`; branch `codex/aqs-T08.3.2-qr-session`; base `origin/main` = `34ca6e59080dc679a6c7f921ac88a6aacb34e996`.
 **Scope:** one focused PG integration module plus these plan/checkpoint journals. Runtime, model, migration, feature flag, frontend, Docker/Compose and staging/production changes are not authorized by this subtask. V1 creation remains default-off.
-> Older T08.2c worktree, PR-open status and pending-check metadata below are historical and superseded by the confirmed #3596 merge.
+> The T08.2c worktree, PR-open status and pending-check metadata below are historical and superseded by the confirmed #3596 merge.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
-**Последний подтверждённый runtime merge:** `1ed6d05874c2ea205a625bb70879adb10b077be4`, PR #3576 / T08.2a; последующий документальный T08.2b PR #3581 merged as `742bf08bd82da5f2ab8160ce474bdeab5694aa26`.
+**Последний подтверждённый runtime merge:** `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`, PR #3596 / T08.2c. Последующий T08.3.1 PR #3599 добавил PostgreSQL tests и был merged as `a452c54e5851611476c1b2ac3e3298aeff467eca`.
+> Следующие две строки — исторический снимок метаданных T08.2c, оставленный для прослеживаемости; текущие ветка и статус указаны выше.
 **Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; PR [#3596](https://github.com/drsapaev/final/pull/3596). Report implementation `718d4d65c5717528e8a93fb819fdf328c63bf772`; future-date compatibility fix `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`; OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`. Focused local checks pass (85 unit/OpenAPI, 4 selected integration). The docs-freshness CI failure on `fd9b1c793` was due to a final CRLF in the generated snapshot; it is removed to match exact app serialization. New exact-head checks pending.
 
-> **T00–T07, T08.1a, T08.1b, T08.2a, T08.2b и T08.2c — MERGED; T08.3.1 — PR_OPEN (#3599); T08.3.2–T08.3.3 and T09–T18 — PLANNED.** PR #3596 merged at `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`. T08.3.1 real-PostgreSQL local proof passed; PR #3599 has code/test commit `465dc814e`; exact-head CI is pending for the current PR head. Later T08.3 QR-session/partial-result and direct GraphQL/lifecycle proofs remain pending. Staging/browser and production are outside this subtask.
+> **T00–T07, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c and T08.3.1 — MERGED; T08.3.2 — VALIDATED locally, PR not yet open; T08.3.3 and T09–T18 — PLANNED.** T08.3.1 / PR #3599 merged at `a452c54e5851611476c1b2ac3e3298aeff467eca`. T08.3.2 is a test-only PostgreSQL verification slice in `codex/aqs-T08.3.2-qr-session`; see the current `RESUME.md` and `PROGRESS.md` checkpoints for exact scope and gate routing.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -348,9 +349,11 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 
 #### T08.3.2 — QR join-session transaction and partial batches
 
-**Status:** PLANNED; depends on T08.3.1 merge.
-**Owner candidates:** `services/qr_queue/_sessions.py`, existing QR-session PG test owner or one newly gated focused test module.
+**Status:** VALIDATED locally; PR not yet open. T08.3.1 / PR #3599 merged at `a452c54e5851611476c1b2ac3e3298aeff467eca`.
+**Owner:** `backend/tests/integration/test_qr_family_phone_identity.py` for synthetic disposable PostgreSQL transaction tests; `backend/app/services/qr_queue/_sessions.py` is canonical runtime reference and remains read-only unless a separate gate authorizes a fix.
 **Required proof:** lost-response replay returns the saved response without a second issuance; single/multiple queue writes and replay snapshot share the existing outer transaction; a permitted partial result commits only successful elements and accurately reports rejected elements/counter totals. Preserve the existing partial-result contract.
+**Execution boundary:** test/evidence-only. The mandatory gate misrouted to Docker/Compose on its first run; its required `--known-root-cause backend/app/services/qr_queue/_sessions.py` retry returned `narrow_override` but retained unrelated packaging paths and omitted a test owner. Apply only the explicit approved-plan scope in the current checkpoint journals; report the misroute. If tests expose a runtime defect, stop and re-gate before any runtime edit.
+**Local evidence:** focused QR-session PostgreSQL module 11 passed; allocator-boundary unit test 4 passed; scoped Ruff, `py_compile`, `ruff format --check`, `black --check` and `git diff --check` passed. The first pre-commit applied formatting-only changes to several old long lines in the same module; two assertion messages were shortened to align the Black and Ruff formatters. No test logic changed after the PostgreSQL run. See `admin-queue-simplification/EVIDENCE.md#t08.3.2`.
 
 #### T08.3.3 — Direct GraphQL and remaining reachable writer parity
 
