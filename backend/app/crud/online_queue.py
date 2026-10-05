@@ -512,8 +512,7 @@ def join_online_queue_multiple(
                     # в открытом виде (PII-политика: только хвост номера);
                     # P2-1: неканонические форматы — fail-closed.
                     logger.info(
-                        "[join_online_queue_multiple] ✅ Создан новый пациент ID=%d для телефона %s",
-                        patient_id,
+                        "[join_online_queue_multiple] ✅ Создан новый пациент для телефона %s",
                         _mask_phone_failclosed(phone),
                     )
 
