@@ -36,6 +36,13 @@ Historical index snapshot from version 2.9: T00–T07 were confirmed MERGED; T08
 - PR: https://github.com/drsapaev/final/pull/3607
 - Merge commit: none.
 
+### Exact-head checks on PR #3607 — 2026-10-05T17:38:38+05:00
+
+- Checked exact PR HEAD `d4d1524aa96f7260825b6f0caf1b9cb724044490` against base `ba03fdfb8d14d38a68a2d16df93145562cd87c63`; PR was OPEN and mergeable.
+- Result: **10 SUCCESS, 4 SKIPPED, 0 FAILURE, 0 IN_PROGRESS**. Successes: CodeQL Analyze (actions, JavaScript/TypeScript, Python), CodeQL, PR Review Quality Gate, PR lifecycle recommendation, Gitleaks workflow/scan, GitGuardian and security scan. Skips: `classify-and-route`, Supabase Preview and two failure-notification jobs. Skips are not passes.
+- PR body was updated with this exact-head result and passed `scripts/run_pr_review_gate_checks.py --body-file .scratch/t0832_clockfix_pr_body.md`: all 19 validator tests, both documented samples and the actual body passed. The body edit reran the lifecycle recommendation and PR Review Quality Gate; both passed.
+- Next: commit this evidence-only checkpoint and verify checks on its resulting exact PR HEAD. The evidence-only commit may create a new PR head; do not claim its checks from the `d4d1524` result above.
+
 > The following T08.3.2 entry is the pre-merge record; its `PR_OPEN`/no-merge fields are historical and superseded by the clock-follow-up checkpoint above.
 
 ## T08.3.2 — 2026-10-05T13:48:16+05:00

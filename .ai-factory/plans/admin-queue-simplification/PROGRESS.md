@@ -1,11 +1,11 @@
 # Progress
 
-## Current authoritative checkpoint — T08.3.2 post-merge P2 follow-up (2026-10-05T17:32:11+05:00)
+## Current authoritative checkpoint — T08.3.2 post-merge P2 follow-up (2026-10-05T17:38:38+05:00)
 
-Plan version: 3.6
+Plan version: 3.7
 Execution permission: IMPLEMENTATION_ACTIVE — user asked “исправляй” for the confirmed P2 in the merged #3600 tests.
 Current task: remove wall-clock dependence from the four QR-session v1 PostgreSQL tests.
-Current status: PR_OPEN — [PR #3607](https://github.com/drsapaev/final/pull/3607), code/test commit `ae0bd8a7f24b27f7b1981911b2b9ecfaec9ede2f`; exact-head GitHub checks are pending.
+Current status: PR_OPEN — [PR #3607](https://github.com/drsapaev/final/pull/3607), code/test commit `ae0bd8a7f24b27f7b1981911b2b9ecfaec9ede2f`; exact PR HEAD `d4d1524aa96f7260825b6f0caf1b9cb724044490` passed 10 checks, 4 were skipped, 0 failed. A new documentation-only checkpoint will require checking its resulting HEAD.
 Branch: `codex/aqs-T08.3.2-clockfix`; base `origin/main` = `ba03fdfb8d14d38a68a2d16df93145562cd87c63`; merge #3600 = `b3bd5272389da88513cc1ac23985b390489554f9`.
 Mode: `gate_known_root_cause`. Gate output was `gate_ok` / `execute`, `handoff_required=true`, with the confirmed test module plus unrelated Docker/Compose paths in first-touch; `gate_misroute=false`, `override_used=false`. Its execution prompt was read. The user's explicit P2 fix request and approved T08.3.2 test-only scope authorize this existing PG test module and plan checkpoint updates; only those paths were used. No runtime/ops changes.
 Canonical anchors: `backend/tests/integration/test_qr_family_phone_identity.py`; queue admission clock seam `backend/app/services/queue_svc/_base.py::_now` and `backend/app/services/queue_service.py::datetime`; T08.3.2 in the canonical plan; `docs/runbooks/AGENT_SESSION_WORKTREES.md` and `docs/runbooks/WSL_STAGING_SESSION.md`.
@@ -14,7 +14,7 @@ Denied paths: runtime, models, migrations, API, frontend, `ops/**`, Docker/Compo
 Actual source change: fixed-clinic-day fixture freezes the queue service clock at 12:00 Asia/Tashkent; the four new tests pass that same day to synthetic queue/token seed helpers. This keeps real v1 window enforcement active and avoids the 23:59 cutoff flake.
 Validation: PostgreSQL 16 module **11 passed, 0 skipped, 1 warning** using a unique Alembic-upgraded scratch DB on loopback. Ruff, Black check, `py_compile`, and `git diff --check` passed. The initial run without a held WSL session returned 11 skipped after its disposable DB disappeared; it is recorded as NOT_RUN, not a pass. The successful rerun held the task-owned WSL process for the full test command; its container and holder were removed afterward.
 Stop conditions: any need to change runtime behavior or edit outside the approved test/docs scope; inability to keep the queue clock and seeded day consistent; DB isolation failure.
-PR body quality gate passed (19 validator tests, samples and this body); PR #3607 is open and attached to this task. Next exact action: verify checks on the final exact PR head, update PR evidence/status as needed, and wait for the user's review/merge decision. Do not start T08.3.3 until this follow-up PR cycle is merged.
+PR body quality gate passed (19 validator tests, samples and this body); PR #3607 is open and attached to this task. The exact-head check snapshot is recorded in `EVIDENCE.md`. Next exact action: push this evidence-only update and verify checks on the resulting PR HEAD; then wait for the user's review/merge decision. Do not start T08.3.3 until this follow-up PR cycle is merged.
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
