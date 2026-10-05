@@ -34,11 +34,12 @@ reachable. SQLite is never a substitute here. SYNTHETIC data only.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import threading
 import uuid
-from datetime import UTC, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -149,7 +150,9 @@ def pg_engine():
 
         engine = create_engine(sa_url, future=True)
         with engine.connect() as conn:
-            version = conn.execute(text("select version_num from alembic_version")).scalar()
+            version = conn.execute(
+                text("select version_num from alembic_version")
+            ).scalar()
         assert version, "alembic_version must be present after upgrade"
         yield engine
     finally:
@@ -250,9 +253,7 @@ def _join(session, token: str, patient_name: str, phone: str) -> dict:
 
     svc = QRQueueService(session)
     start = svc.start_join_session(token)
-    return svc.complete_join_session(
-        start["session_token"], patient_name, phone
-    )
+    return svc.complete_join_session(start["session_token"], patient_name, phone)
 
 
 def _entry_by_number(session, queue_id: int, number: int):
@@ -284,9 +285,7 @@ def _no_time_gate(monkeypatch):
     """Time-window must never block these tests."""
     from app.services.queue_svc import QueueBusinessService
 
-    monkeypatch.setattr(
-        QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0)
-    )
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
     from app.services.queue_svc._base import QueueBusinessServiceMixinBase
 
     monkeypatch.setattr(
@@ -300,27 +299,25 @@ def test_family_member_gets_own_card_and_own_ticket(pg_session, pg_engine):
     world = _seed_join_world(pg_session, "fam")
     from app.models.patient import Patient
 
-    result_a = _join(pg_session, world["token"], "SYNTHETIC-First Famtest", "+998900111222")
-    assert result_a["success"] is True, result_a
-    entry_a = _entry_by_number(
-        pg_session, world["queue_id"], result_a["queue_number"]
+    result_a = _join(
+        pg_session, world["token"], "SYNTHETIC-First Famtest", "+998900111222"
     )
+    assert result_a["success"] is True, result_a
+    entry_a = _entry_by_number(pg_session, world["queue_id"], result_a["queue_number"])
     patient_a_id = entry_a.patient_id
     assert patient_a_id is not None
 
-    result_b = _join(pg_session, world["token"], "SYNTHETIC-Second Famtest", "+998900111222")
-    assert result_b["success"] is True, result_b
-    entry_b = _entry_by_number(
-        pg_session, world["queue_id"], result_b["queue_number"]
+    result_b = _join(
+        pg_session, world["token"], "SYNTHETIC-Second Famtest", "+998900111222"
     )
+    assert result_b["success"] is True, result_b
+    entry_b = _entry_by_number(pg_session, world["queue_id"], result_b["queue_number"])
     patient_b_id = entry_b.patient_id
 
     # THE defect (base): patient B was glued to A's card and B received
     # A's ticket through the phone-only dedup.
-    assert patient_b_id != patient_a_id, (
-        "second family member attached to the first member's card"
-    )
-    assert entry_b.id != entry_a.id, "second family member got the first member's ticket"
+    assert patient_b_id != patient_a_id, "family members need separate cards"
+    assert entry_b.id != entry_a.id, "family members need separate tickets"
     assert result_b["queue_number"] != result_a["queue_number"]
 
     # The entries are bound to the right cards.
@@ -341,9 +338,13 @@ def test_repeat_join_same_person_reuses_entry(pg_session, pg_engine):
     rejoining gets their existing entry, no second entry is created."""
     world = _seed_join_world(pg_session, "rep")
 
-    first = _join(pg_session, world["token"], "SYNTHETIC-Repeat Person", "+998900333444")
+    first = _join(
+        pg_session, world["token"], "SYNTHETIC-Repeat Person", "+998900333444"
+    )
     assert first["success"] is True
-    second = _join(pg_session, world["token"], "SYNTHETIC-Repeat Person", "+998900333444")
+    second = _join(
+        pg_session, world["token"], "SYNTHETIC-Repeat Person", "+998900333444"
+    )
     assert second["success"] is True
     # The rejoin returned the SAME ticket (no new entry, no renumbering).
     assert second["queue_number"] == first["queue_number"], (first, second)
@@ -555,12 +556,8 @@ def test_concurrent_family_members_on_separate_connections(pg_engine):
 
     assert not errors, errors
     check = Session()
-    entry_a = _entry_by_number(
-        check, world["queue_id"], results["a"]["queue_number"]
-    )
-    entry_b = _entry_by_number(
-        check, world["queue_id"], results["b"]["queue_number"]
-    )
+    entry_a = _entry_by_number(check, world["queue_id"], results["a"]["queue_number"])
+    entry_b = _entry_by_number(check, world["queue_id"], results["b"]["queue_number"])
     assert entry_a is not None and entry_b is not None
     assert entry_a.patient_id != entry_b.patient_id
     assert entry_a.id != entry_b.id
@@ -617,3 +614,378 @@ def test_concurrent_same_person_double_submit_single_entry(pg_engine):
     entries = _entries_for_queue(check, world["queue_id"])
     assert len(entries) == 1
     check.close()
+
+
+def _set_v1_queue_cap(session, queue_id: int, cap: int) -> None:
+    from app.crud.daily_queue_creation_policy import (
+        ONLINE_ISSUANCES_V1_POLICY_VERSION,
+    )
+    from app.models.online_queue import DailyQueue
+
+    queue = session.query(DailyQueue).filter(DailyQueue.id == queue_id).one()
+    queue.policy_version = ONLINE_ISSUANCES_V1_POLICY_VERSION
+    queue.max_online_entries = cap
+    queue.online_issued_count = 0
+    queue.online_start_time = "00:00"
+    queue.online_end_time = "23:59"
+    session.commit()
+
+
+def _seed_multi_v1_world(session, suffix: str) -> dict:
+    """Seed two directly selectable, synthetic v1 queues and a clinic QR token."""
+    from app.core.security import get_password_hash
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue, QueueToken
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+
+    day = _clinic_day()
+    owners: dict[str, dict] = {}
+    for label, cap in (("blocked", 0), ("accepted", 3)):
+        specialty = f"rq0832{label}_{suffix}"
+        username = f"t0832_{suffix}_{label}"
+        user = User(
+            username=username,
+            email=f"{username}@example.com",
+            full_name=f"SYNTHETIC-T08.3.2 {label}",
+            hashed_password=get_password_hash("t0832-synthetic-password"),
+            role="Doctor",
+            is_active=True,
+        )
+        session.add(user)
+        session.flush()
+        doctor = Doctor(
+            user_id=user.id,
+            specialty=specialty,
+            cabinet="T08.3.2",
+            active=True,
+        )
+        session.add(doctor)
+        session.flush()
+        session.add(
+            QueueProfile(
+                key=specialty,
+                title=f"SYNTHETIC-T08.3.2 {label}",
+                title_ru=f"SYNTHETIC-T08.3.2 {label}",
+                queue_tags=[specialty],
+                department_key=specialty,
+                display_order=90,
+                is_active=True,
+                show_on_qr_page=True,
+            )
+        )
+        session.flush()
+        queue = DailyQueue(
+            day=day,
+            specialist_id=doctor.id,
+            queue_tag=specialty,
+            active=True,
+            max_online_entries=cap,
+            policy_version="daily_online_issuances_v1",
+            online_issued_count=0,
+            online_start_time="00:00",
+            online_end_time="23:59",
+        )
+        session.add(queue)
+        session.flush()
+        owners[label] = {"doctor_id": doctor.id, "queue_id": queue.id}
+
+    local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
+    token = QueueToken(
+        token=f"t0832-clinic-{suffix}-{uuid.uuid4().hex[:10]}",
+        day=day,
+        is_clinic_wide=True,
+        department="common",
+        expires_at=local_now + timedelta(hours=2),
+        active=True,
+    )
+    session.add(token)
+    session.commit()
+    return {"token": token.token, "day": day, **owners}
+
+
+def test_qr_session_lost_response_replays_snapshot_without_second_issuance(
+    pg_engine, monkeypatch
+):
+    """A fresh PostgreSQL session replays the committed response byte-for-value."""
+    from app.models.online_queue import (
+        DailyQueue,
+        OnlineQueueEntry,
+        QueueJoinSession,
+    )
+    from app.services.qr_queue import QRQueueService
+
+    Session = sessionmaker(bind=pg_engine, future=True)
+    setup = Session()
+    world = _seed_join_world(setup, "t0832replay")
+    _set_v1_queue_cap(setup, world["queue_id"], cap=4)
+    setup.close()
+
+    first_writer = Session()
+    first_service = QRQueueService(first_writer)
+    monkeypatch.setattr(
+        first_service, "_update_queue_statistics", lambda *_args, **_kwargs: None
+    )
+    start = first_service.start_join_session(world["token"])
+    first_response = first_service.complete_join_session(
+        start["session_token"],
+        "SYNTHETIC-T08.3.2 Replay Patient",
+        "+998900832201",
+    )
+    first_writer.close()  # emulate a lost HTTP response / closed worker session
+
+    retry_session = Session()
+    retry_service = QRQueueService(retry_session)
+    replay = retry_service.complete_join_session(
+        start["session_token"],
+        "SYNTHETIC-T08.3.2 Replay Patient",
+        "+998900832201",
+    )
+    assert replay.pop("replayed") is True
+    assert replay == first_response
+    retry_session.rollback()
+    retry_session.close()
+
+    check = Session()
+    queue = check.get(DailyQueue, world["queue_id"])
+    entries = (
+        check.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.queue_id == world["queue_id"])
+        .all()
+    )
+    attempt = (
+        check.query(QueueJoinSession)
+        .filter(QueueJoinSession.session_token == start["session_token"])
+        .one()
+    )
+    assert len(entries) == 1
+    assert queue.online_issued_count == 1
+    assert attempt.status == "joined_v2"
+    assert json.loads(attempt.response_snapshot) == first_response
+    check.close()
+
+
+def test_qr_single_join_rolls_back_entry_counter_patient_and_session_together(
+    pg_engine, monkeypatch
+):
+    """A failure after allocation but before outer commit exposes no partial write."""
+    from app.models.online_queue import (
+        DailyQueue,
+        OnlineQueueEntry,
+        QueueJoinSession,
+    )
+    from app.models.patient import Patient
+    from app.services.qr_queue import QRQueueService
+
+    Session = sessionmaker(bind=pg_engine, future=True)
+    setup = Session()
+    world = _seed_join_world(setup, "t0832rollback")
+    _set_v1_queue_cap(setup, world["queue_id"], cap=4)
+    setup.close()
+
+    writer = Session()
+    service = QRQueueService(writer)
+    monkeypatch.setattr(service, "_update_queue_statistics", lambda *_a, **_k: None)
+    start = service.start_join_session(world["token"])
+    phone = "+998900832202"
+
+    def fail_after_allocation(_session):
+        # The writer sees the issued entry and increment before the injected
+        # failure, proving these writes are pending inside its open transaction.
+        pending_queue = writer.get(DailyQueue, world["queue_id"])
+        assert pending_queue.online_issued_count == 1
+        assert (
+            writer.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == world["queue_id"])
+            .count()
+            == 1
+        )
+        raise RuntimeError("synthetic failure before join-session outer commit")
+
+    monkeypatch.setattr(
+        service, "_extend_joined_expires_to_horizon", fail_after_allocation
+    )
+    with pytest.raises(RuntimeError, match="before join-session outer commit"):
+        service.complete_join_session(
+            start["session_token"], "SYNTHETIC-T08.3.2 Rollback Patient", phone
+        )
+
+    # A different PostgreSQL connection must still see the committed pending
+    # envelope and no patient, ticket or quota use while the writer is open.
+    observer = Session()
+    queue = observer.get(DailyQueue, world["queue_id"])
+    attempt = (
+        observer.query(QueueJoinSession)
+        .filter(QueueJoinSession.session_token == start["session_token"])
+        .one()
+    )
+    assert attempt.status == "pending"
+    assert attempt.response_snapshot is None
+    assert queue.online_issued_count == 0
+    assert (
+        observer.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.queue_id == world["queue_id"])
+        .count()
+        == 0
+    )
+    assert observer.query(Patient).filter(Patient.phone == phone).count() == 0
+    observer.close()
+
+    writer.rollback()
+    writer.close()
+
+
+def test_qr_multi_join_commits_successful_partial_result_and_replays_snapshot(
+    pg_engine, monkeypatch
+):
+    """A mixed eligible/full batch commits only its success and exact response."""
+    from app.models.online_queue import (
+        DailyQueue,
+        OnlineQueueEntry,
+        QueueJoinSession,
+    )
+    from app.services.qr_queue import QRQueueService
+
+    Session = sessionmaker(bind=pg_engine, future=True)
+    setup = Session()
+    world = _seed_multi_v1_world(setup, "partial")
+    setup.close()
+
+    payload = {
+        "specialist_ids": [
+            world["blocked"]["doctor_id"],
+            world["accepted"]["doctor_id"],
+        ],
+        "patient_name": "SYNTHETIC-T08.3.2 Partial Patient",
+        "phone": "+998900832203",
+        "specialist_entity_types": ["doctor", "doctor"],
+    }
+    writer = Session()
+    service = QRQueueService(writer)
+    monkeypatch.setattr(service, "_update_queue_statistics", lambda *_a, **_k: None)
+    start = service.start_join_session(world["token"])
+    first_response = service.complete_join_session_multiple(
+        start["session_token"], **payload
+    )
+    writer.close()
+
+    assert first_response["success"] is True
+    assert len(first_response["entries"]) == 1
+    assert (
+        first_response["entries"][0]["specialist_id"] == world["accepted"]["doctor_id"]
+    )
+    assert len(first_response["errors"]) == 1
+    assert first_response["errors"][0]["specialist_id"] == world["blocked"]["doctor_id"]
+    assert first_response["errors"][0]["error"]
+
+    retry_session = Session()
+    replay = QRQueueService(retry_session).complete_join_session_multiple(
+        start["session_token"], **payload
+    )
+    assert replay.pop("replayed") is True
+    assert replay == first_response
+    retry_session.rollback()
+    retry_session.close()
+
+    check = Session()
+    accepted_queue = check.get(DailyQueue, world["accepted"]["queue_id"])
+    blocked_queue = check.get(DailyQueue, world["blocked"]["queue_id"])
+    accepted_entries = (
+        check.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.queue_id == accepted_queue.id)
+        .all()
+    )
+    blocked_entries = (
+        check.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.queue_id == blocked_queue.id)
+        .all()
+    )
+    attempt = (
+        check.query(QueueJoinSession)
+        .filter(QueueJoinSession.session_token == start["session_token"])
+        .one()
+    )
+    assert len(accepted_entries) == 1
+    assert accepted_queue.online_issued_count == 1
+    assert blocked_entries == []
+    assert blocked_queue.online_issued_count == 0
+    assert attempt.status == "joined_v2"
+    assert json.loads(attempt.response_snapshot) == first_response
+    check.close()
+
+
+def test_qr_multi_join_rolls_back_partial_writes_and_snapshot_together(
+    pg_engine, monkeypatch
+):
+    """A pre-commit failure rolls back even the successful element of a partial batch."""
+    from app.models.online_queue import (
+        DailyQueue,
+        OnlineQueueEntry,
+        QueueJoinSession,
+    )
+    from app.models.patient import Patient
+    from app.services.qr_queue import QRQueueService
+
+    Session = sessionmaker(bind=pg_engine, future=True)
+    setup = Session()
+    world = _seed_multi_v1_world(setup, "multirollback")
+    setup.close()
+
+    payload = {
+        "specialist_ids": [
+            world["blocked"]["doctor_id"],
+            world["accepted"]["doctor_id"],
+        ],
+        "patient_name": "SYNTHETIC-T08.3.2 Multi Rollback Patient",
+        "phone": "+998900832204",
+        "specialist_entity_types": ["doctor", "doctor"],
+    }
+    writer = Session()
+    service = QRQueueService(writer)
+    monkeypatch.setattr(service, "_update_queue_statistics", lambda *_a, **_k: None)
+    start = service.start_join_session(world["token"])
+
+    def fail_after_partial_allocations(_session):
+        # The accepted element and its counter exist only inside this transaction.
+        pending_queue = writer.get(DailyQueue, world["accepted"]["queue_id"])
+        assert pending_queue.online_issued_count == 1
+        assert (
+            writer.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == pending_queue.id)
+            .count()
+            == 1
+        )
+        raise RuntimeError("synthetic multi failure before outer commit")
+
+    monkeypatch.setattr(
+        service,
+        "_extend_joined_expires_to_horizon",
+        fail_after_partial_allocations,
+    )
+    with pytest.raises(RuntimeError, match="before outer commit"):
+        service.complete_join_session_multiple(start["session_token"], **payload)
+
+    observer = Session()
+    accepted_queue = observer.get(DailyQueue, world["accepted"]["queue_id"])
+    blocked_queue = observer.get(DailyQueue, world["blocked"]["queue_id"])
+    attempt = (
+        observer.query(QueueJoinSession)
+        .filter(QueueJoinSession.session_token == start["session_token"])
+        .one()
+    )
+    assert accepted_queue.online_issued_count == 0
+    assert blocked_queue.online_issued_count == 0
+    assert (
+        observer.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.queue_id == accepted_queue.id)
+        .count()
+        == 0
+    )
+    assert attempt.status == "pending"
+    assert attempt.response_snapshot is None
+    assert (
+        observer.query(Patient).filter(Patient.phone == payload["phone"]).count() == 0
+    )
+    observer.close()
+    writer.rollback()
+    writer.close()

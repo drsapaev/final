@@ -72,9 +72,10 @@ class DermaProcedureOut(ORMModel):
 #   source="emr"    — rows projected out of dermatology EMRRecord (emr/v2,
 #                     data.specialty == "dermatology"); id is the synthetic
 #                     string "emr-<emr_record_id>" (procedures append
-#                     "-<index>" per entry inside specialty_data.cosmetic_procedures,
-#                     or "-legacy-<index>" for entries of the transitional
-#                     legacy alias key specialty_data.procedures — P3 decision);
+#                     "-<index>" per entry inside the single canonical key
+#                     specialty_data.cosmetic_procedures — P3 decision,
+#                     Phase C: the transitional legacy alias key
+#                     specialty_data.procedures is no longer projected);
 #   source="legacy" — read-only rows of the closed legacy tables
 #                     derma_examinations / derma_procedures (id int).
 class DermaExaminationHistoryOut(DermaExaminationOut):

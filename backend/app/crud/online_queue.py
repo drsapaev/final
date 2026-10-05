@@ -35,6 +35,27 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.core.pii_masker import mask_phone
+
+
+def _mask_phone_failclosed(phone: str | None) -> str | None:
+    """#3579 P2-1 (Codex): fail-closed маска для лога нового пациента.
+
+    Каноническая mask_phone распознаёт только `+` + 12 цифр подряд;
+    приклад допускает и хранит неканонические форматы (`998901234567`,
+    `+998 90 123 45 67`, через дефис), для которых маска вернула бы
+    строку без изменений и лог попал бы сырым телефоном. Если маска
+    ничего не заменила — сырую строку в лог не выводим никогда: остаётся
+    только хвост (3 цифры) без префикса, либо полное скрытие."""
+    if not phone:
+        return phone
+    masked = mask_phone(phone)
+    if masked != phone:
+        return masked
+    tail = phone[-3:]
+    return f"•••{tail}" if tail.isdigit() else "•••"
+
+
 from app.crud import clinic as crud_clinic
 from app.crud import queue_resource_routing
 from app.crud.clinic import get_queue_settings
@@ -487,10 +508,13 @@ def join_online_queue_multiple(
                         },
                     )
                     patient_id = new_patient.id
+                    # #3579 follow-up: телефон нового пациента не пишется
+                    # в открытом виде (PII-политика: только хвост номера);
+                    # P2-1: неканонические форматы — fail-closed.
                     logger.info(
                         "[join_online_queue_multiple] ✅ Создан новый пациент ID=%d для телефона %s",
                         patient_id,
-                        phone,
+                        _mask_phone_failclosed(phone),
                     )
 
             # Создаем запись в очереди с одинаковым queue_time
@@ -730,11 +754,22 @@ def check_queue_availability(
     # Find the exact queue surface before evaluating its policy. A v1 row
     # owns its frozen window; a missing row uses the defaults selected for
     # the next creation.
-    daily_queue = (
-        db.query(DailyQueue)
-        .filter(and_(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id))
-        .first()
+    doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+    queue_identity = db.query(DailyQueue).filter(
+        DailyQueue.day == day,
+        DailyQueue.specialist_id == specialist_id,
     )
+    if doctor is not None and doctor.specialty:
+        # Public status has no tag parameter; specialty is the canonical
+        # destination. The canonical creator may reuse an active queue for
+        # this doctor/day with another tag, so resolve that below; an inactive
+        # row with a different tag is not this QR's identity.
+        daily_queue = queue_identity.filter(
+            DailyQueue.queue_tag == doctor.specialty,
+            DailyQueue.active.is_(True),
+        ).first()
+    else:
+        daily_queue = queue_identity.filter(DailyQueue.queue_tag.is_(None)).first()
 
     # QD-2C (Codex round-3 P1): resource-owned очередь тега реестра;
     # round-5 P1: предпочтение активной поверхности
@@ -742,18 +777,137 @@ def check_queue_availability(
         db, daily_queue, day, specialist_id
     )
 
+    # Match QueueBusinessService.get_or_create_daily_queue's doctor-owner
+    # fallback: when no active resource owns the tag, any active doctor/day
+    # queue is reused even if its stored routing tag differs. Keep a resolved
+    # registry surface ahead of this fallback.
+    if (
+        doctor is not None
+        and doctor.specialty
+        and queue_resource_routing.resolve_tag_resource(db, doctor.specialty) is None
+        and (daily_queue is None or not daily_queue.active)
+    ):
+        active_doctor_day_queue = (
+            queue_identity.filter(DailyQueue.active.is_(True))
+            .order_by(DailyQueue.id.asc())
+            .first()
+        )
+        if active_doctor_day_queue is not None:
+            daily_queue = active_doctor_day_queue
+
+    inactive_queue = None
+    if daily_queue is not None and not daily_queue.active:
+        expected_inactive = (
+            queue_resource_routing.find_inactive_daily_queue_for_specialist(
+                db,
+                day,
+                specialist_id,
+                daily_queue.queue_tag,
+            )
+        )
+        # The active-only resource route may supersede this doctor candidate;
+        # accept an inactive row only when it is the routed identity.
+        inactive_queue = (
+            expected_inactive
+            if expected_inactive is not None and expected_inactive.id == daily_queue.id
+            else None
+        )
+        daily_queue = None
+    if daily_queue is None and inactive_queue is None and doctor is not None:
+        inactive_queue = (
+            queue_resource_routing.find_inactive_daily_queue_for_specialist(
+                db, day, specialist_id, doctor.specialty
+            )
+        )
+
     window = online_admission_window(
-        daily_queue=daily_queue,
+        daily_queue=daily_queue or inactive_queue,
         settings=queue_settings,
     )
+    queue_length_source = daily_queue or inactive_queue
+    queue_length = (
+        db.query(OnlineQueueEntry)
+        .filter(
+            OnlineQueueEntry.queue_id == queue_length_source.id,
+            OnlineQueueEntry.status.in_(["waiting", "called"]),
+        )
+        .count()
+        if queue_length_source is not None
+        else 0
+    )
+
+    # Report the same quota facts that admission enforces. A legacy row's
+    # migration counter is only a technical zero, so never expose it as an
+    # issuance count or derive remaining quota from it.
+    if daily_queue is not None:
+        max_online_entries = daily_queue.max_online_entries
+        if window.policy_version == "daily_online_issuances_v1":
+            online_issued_count = daily_queue.online_issued_count
+            online_bookings_remaining = max(0, max_online_entries - online_issued_count)
+        else:
+            online_issued_count = None
+            online_bookings_remaining = None
+            # Preserve the legacy enforcement fallback for a falsy cap.
+            max_online_entries = max_online_entries or 15
+    elif inactive_queue is not None:
+        # The persisted identity is inactive and cannot accept new joins.
+        # Its old issuance count may still be useful internally, but this
+        # availability response must not turn it into a fresh or usable quota.
+        max_online_entries = None
+        online_issued_count = None
+        online_bookings_remaining = None
+    else:
+        if doctor is None:
+            doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+        if doctor is None:
+            max_online_entries = None
+            online_issued_count = None
+            online_bookings_remaining = None
+        else:
+            resource = (
+                queue_resource_routing.resolve_tag_resource(db, doctor.specialty)
+                if doctor.specialty
+                else None
+            )
+            owner_default = (
+                resource.max_online_per_day if resource is not None else None
+            )
+            if owner_default is None:
+                # Match assign_queue_token's get_or_create defaults for this
+                # concrete QR: it persists the clinic's specialty cap, falling
+                # back to default_max_slots, not Doctor.max_online_per_day.
+                owner_default = queue_settings.get("max_per_day", {}).get(
+                    doctor.specialty or "clinic",
+                    queue_settings.get("default_max_slots", 15),
+                )
+            max_online_entries = 15 if owner_default is None else owner_default
+            if window.policy_version == "daily_online_issuances_v1":
+                online_issued_count = 0
+                online_bookings_remaining = max(0, max_online_entries)
+            else:
+                online_issued_count = None
+                online_bookings_remaining = None
+                max_online_entries = max_online_entries or 15
+
     window_fields = {
         "policy_version": window.policy_version,
         "start_time": window.start_time.strftime("%H:%M"),
         "end_time": (
             window.end_time.strftime("%H:%M") if window.end_time is not None else None
         ),
+        "queue_length": queue_length,
+        "max_online_entries": max_online_entries,
+        "online_issued_count": online_issued_count,
+        "online_bookings_remaining": online_bookings_remaining,
     }
     window_result = evaluate_online_admission_window(day, current_time, window)
+    if inactive_queue is not None:
+        return {
+            "available": False,
+            "reason": "QUEUE_INACTIVE",
+            "message": "Онлайн-запись для этой очереди недоступна",
+            **window_fields,
+        }
     if window_result == "date_past":
         return {
             "available": False,
@@ -786,26 +940,25 @@ def check_queue_availability(
             **window_fields,
         }
 
-    # Проверяем лимит мест
-    if daily_queue:
-        current_count = (
-            db.query(OnlineQueueEntry)
-            .filter(OnlineQueueEntry.queue_id == daily_queue.id)
-            .count()
+    # V1 counts durable successful admissions; legacy keeps the active-entry
+    # enforcement rule and never pretends its technical counter is history.
+    if max_online_entries is not None:
+        limit_reached = (
+            online_issued_count >= max_online_entries
+            if window.policy_version == "daily_online_issuances_v1"
+            and online_issued_count is not None
+            else queue_length >= max_online_entries
         )
-
-        # Приоритет: индивидуальный лимит врача -> настройки специальности -> по умолчанию
-        if daily_queue.max_online_entries is not None:
-            max_slots = daily_queue.max_online_entries
-        else:
-            doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
-            max_slots = queue_settings.get("max_per_day", {}).get(doctor.specialty, 15)
-
-        if current_count >= max_slots:
+        if limit_reached:
+            used_count = (
+                online_issued_count
+                if window.policy_version == "daily_online_issuances_v1"
+                else queue_length
+            )
             return {
                 "available": False,
                 "reason": "QUEUE_FULL",
-                "message": f"Все места заняты ({current_count}/{max_slots})",
+                "message": f"Все места заняты ({used_count}/{max_online_entries})",
                 **window_fields,
             }
 

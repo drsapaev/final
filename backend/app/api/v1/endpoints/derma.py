@@ -214,9 +214,7 @@ async def get_skin_examinations(
             getattr(user, "id", None),
             patient_id is not None,
         )
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post(
@@ -273,13 +271,14 @@ async def get_cosmetic_procedures(
     total_cost=None — цена не хранится в ЭМК, и строки закрытой
     legacy-таблицы derma_procedures, source="legacy"), материализуемая
     при записи, а не пересчитываемая в памяти на каждый запрос.
-    Канонический ключ записи — specialty_data.cosmetic_procedures
-    (решение P3 по реконсиляции #3490/#3491); legacy-ключ
-    specialty_data.procedures читается проекцией временно как alias
-    (Phase A): полный union без скрытия строк, записи без стабильного ID
-    не дедуплицируются по содержимому — возможные дубликаты устраняются
-    в Phase B (миграция данных с журналированием), удаление алиаса —
-    Phase C (после аудита хранимых данных).
+    Канонический ключ записи — единственный —
+    specialty_data.cosmetic_procedures (решение P3 по реконсиляции
+    #3490/#3491; Phase A временно читала legacy-ключ
+    specialty_data.procedures как READ-alias, Phase C алиас удалила:
+    projection и граница записи emr_contract.normalize_emr_data
+    работают только с каноническим ключом, наличие данных под
+    legacy-ключом в активных записях исключено Phase B verify-gate —
+    scripts/audit_derma_legacy_procedures.py).
     Скоупинг пациентов идентичен прежнему контракту. Пагинация —
     канонический конверт page/size/total/pages (контракт GET /files):
     total точен по обоим источникам, без скрытых усечений.
@@ -305,9 +304,7 @@ async def get_cosmetic_procedures(
             "[derma.procedures] failed to list procedures user_id=%s",
             getattr(user, "id", None),
         )
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post(
@@ -381,12 +378,14 @@ async def create_price_override(
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/price-overrides", summary="Получить изменения цен", response_model=list[PriceOverrideResponse])
+@router.get(
+    "/price-overrides",
+    summary="Получить изменения цен",
+    response_model=list[PriceOverrideResponse],
+)
 async def get_price_overrides(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
@@ -427,9 +426,7 @@ async def get_price_overrides(
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/photo-gallery", summary="Фотогалерея", response_model=dict[str, Any])
@@ -444,6 +441,4 @@ async def get_photo_gallery(
     try:
         return {"message": "Фотогалерея будет доступна в следующей версии"}
     except Exception:
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")

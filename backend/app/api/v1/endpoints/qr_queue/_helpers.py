@@ -197,6 +197,18 @@ class QRTokenInfoResponse(BaseModel):
     minutes_until_open: int | None = Field(default=None, ge=0)
     opens_at_datetime: str | None = None
     countdown_text: str | None = None
+    max_online_entries: int | None = Field(
+        None,
+        description="Лимит только для выбранной дневной очереди; null для общего обзора",
+    )
+    online_issued_count: int | None = Field(
+        None,
+        description="Успешные online-выдачи v1; null для legacy/общего обзора",
+    )
+    online_bookings_remaining: int | None = Field(
+        None,
+        description="Остаток v1-квоты; null для legacy/общего обзора",
+    )
 
 
 class JoinSessionStartRequest(BaseModel):
@@ -434,5 +446,3 @@ class CancelServiceResponse(BaseModel):
 
 
 # ===================== ЭНДПОИНТЫ =====================
-
-
