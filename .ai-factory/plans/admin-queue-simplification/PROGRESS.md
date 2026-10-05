@@ -1,6 +1,27 @@
 # Progress
 
-## Current authoritative checkpoint — T08.3.2 clock P2 correction (2026-10-05T19:21:23+05:00)
+## Current authoritative checkpoint — T08.3.3 GraphQL quota proof (2026-10-05T20:53:02+05:00)
+
+Plan version: 3.12
+Execution permission: user authorized implementation of the full plan, then asked to fix and continue; PR #3607 was explicitly authorized and is now merged.
+Current task: T08.3.3 — direct GraphQL last-slot quota proof and source-backed reachable-writer parity.
+Current status: VALIDATED locally; PR not yet opened. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-3-graphql\final`, branch `codex/aqs-T08.3.3-graphql`, base `origin/main` / HEAD `589520ae132313ca9488f3994be8d28f6041975a` before the task commit. The main checkout fast-forwarded to the same commit; unrelated untracked `.gate_artifacts/` was preserved.
+Mode: mandatory `gate`. Initial gate and its one `--known-root-cause backend/app/graphql/mutations.py` retry both returned `Mode: migration`, first-touch `backend/alembic/versions/0078_*.py`, because the description mentioned the writer evidence “table”. The generated execution prompt was read. The machine result did not set `gate_misroute`, but its Alembic route conflicts with the explicit test-only T08.3.3 plan; after the required retry, apply a narrow override grounded in the user's approved plan. Report `gate_misroute=true` (observed) and `override_used=true` (manual scope override); do not edit the router or migration.
+Canonical anchors: T08.3.3 in `codex-admin-queue-simplification.md`; `backend/app/graphql/mutations.py::_join_queue_impl`; `backend/tests/integration/test_daily_queue_lock_parity_pg.py`; `backend/app/services/queue_api_service.py::get_or_create_daily_queue`; `backend/app/repositories/queue_api_repository.py`; T08 writer coverage table in `EVIDENCE.md`.
+Allowed paths: `backend/tests/integration/test_daily_queue_lock_parity_pg.py`; `.ai-factory/plans/codex-admin-queue-simplification.md`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,EVIDENCE}.md`.
+Read-only references: `backend/app/graphql/mutations.py`; `backend/app/services/queue_api_service.py`; `backend/app/repositories/queue_api_repository.py`; existing GraphQL resolver tests and queue admission source. If the test exposes a runtime gap, stop and create a separately gated runtime task.
+Denied paths: `backend/app/**` runtime edits; `backend/alembic/**`; `backend/app/models/**`; frontend; ops/Docker; unrelated tests; generated output; staging and production/live data; feature flag changes.
+Completed: PR #3607 merged at `589520ae132313ca9488f3994be8d28f6041975a`; exact reviewed head `37eb0d4b5d8628bdd8598990ad93a0f4093a7c96` had 17 success, 18 skipped and 0 failure; main synchronized after checking no tracked edits or process executable rooted in `C:\final`. Added and passed the new direct GraphQL PostgreSQL contention/replay regression. The full PG module passed 6/6 with zero skips; the focused GraphQL quota unit cases passed 3/3. Completed the mounted-writer and counter-mutation source inventory; no runtime gap found in this test/evidence slice.
+Changed and locally validated: `backend/tests/integration/test_daily_queue_lock_parity_pg.py` plus the canonical plan and progress/evidence journals. No runtime/model/migration/API code changed. Disposable PostgreSQL 16 container and task keepalive were stopped/removed; loopback port 55437 was released; temporary synthetic password file was removed.
+Validation complete: `ruff check`, `ruff format --check`, `black --check`, `py_compile`, and `git diff --check` all passed. Ruff and Black initially disagreed on three existing diagnostic-only assertions; concise `repr` messages now satisfy both without changing predicates. Initial launcher/formatter invocations were corrected; final whole-file checks pass.
+Remaining: commit, push, open the single-purpose PR, then verify exact-head checks and wait for review. No staging/production check is claimed.
+Blocker: none currently. Stop if PostgreSQL isolation is unavailable, the GraphQL resolver requires a runtime change, a reachable writer lacks the canonical quota boundary, or ownership/identity is ambiguous.
+Next exact action: create the T08.3.3 PR from this branch without merging it.
+Checks to rerun after the next change: after journal/PR metadata updates, rerun `git diff --check`; after a new commit, verify exact-head GitHub checks. Any code change requires repeating the PG module and focused GraphQL quota unit cases.
+
+> Historical checkpoint below: T08.3.2 clock P2 correction before PR #3607 merged.
+
+## Historical checkpoint — T08.3.2 clock P2 correction (2026-10-05T19:21:23+05:00)
 
 Plan version: 3.9
 Current task: fix the remaining QR-session clock seam in PR #3607.
@@ -37,8 +58,8 @@ PR body quality gate passed (19 validator tests, samples and this body); PR #360
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T08.3.2 | MERGED | [PR #3600](https://github.com/drsapaev/final/pull/3600) | `b3bd5272389da88513cc1ac23985b390489554f9` | `EVIDENCE.md#t08.3.2` |
-| T08.3.2-P2 | PR_OPEN | [`codex/aqs-T08.3.2-clockfix` / PR #3607](https://github.com/drsapaev/final/pull/3607) | | `EVIDENCE.md#t0832-clock-follow-up-pr-3607` |
-| T08.3.3 | PLANNED | | | |
+| T08.3.2-P2 | MERGED | [PR #3607](https://github.com/drsapaev/final/pull/3607) | `589520ae132313ca9488f3994be8d28f6041975a` | `EVIDENCE.md#t0832-pr-3607-merged` |
+| T08.3.3 | IN_PROGRESS | `codex/aqs-T08.3.3-graphql` | | `EVIDENCE.md#t0833-gate-and-scope` |
 
 > The checkpoint below is historical: it predates the merge of #3600 and the P2 follow-up recorded above.
 
