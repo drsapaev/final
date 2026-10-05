@@ -1,10 +1,10 @@
 # Progress
 
-## Current authoritative checkpoint — T08.3.2 clock P2 correction (2026-10-05T19:02:17+05:00)
+## Current authoritative checkpoint — T08.3.2 clock P2 correction (2026-10-05T19:21:23+05:00)
 
 Plan version: 3.9
 Current task: fix the remaining QR-session clock seam in PR #3607.
-Current status: PR_OPEN — correction commit `8c8ac83e5ab16185404bf6c901aea15041214195` and evidence checkpoint `bfbbff88915227dd726db5b6fd5273046c0df7ac` are pushed. PR #3607 is OPEN, mergeable, and clean against base `c1781c46a1b03c3404604542bcc9c4c9951f4c89`.
+Current status: PR_OPEN, locally validated and exact-head CI green. Code correction `8c8ac83e5ab16185404bf6c901aea15041214195`; latest branch checkpoint before this final record is `5fd78c4b3c78f4e4c8dfa2a7e18160c0edd00dff`. PR #3607 is OPEN, mergeable, clean against base `c1781c46a1b03c3404604542bcc9c4c9951f4c89`.
 Branch: `codex/aqs-T08.3.2-clockfix`; rebased onto fresh `origin/main` (dependency-only PR #3608).
 Mode: `gate_known_root_cause`. The mandatory rerun returned `narrow_override`, `execute`, `handoff_required=true`, `gate_misroute=true`, `override_used=true`; known owner `backend/tests/integration/test_qr_family_phone_identity.py`. The generated prompt was read. Its first-touch also listed unrelated ops/packaging files. Narrow basis: user explicitly requested correction of the review P2; approved T08.3.2 scope permits this existing test module and its plan journals only. No third gate run; no runtime/ops changes.
 Canonical anchors: `backend/tests/integration/test_qr_family_phone_identity.py`; `backend/app/services/queue_svc/_base.py::_now`; `backend/app/services/qr_queue/_base.py::_now`; `backend/app/services/qr_queue/_sessions.py::start_join_session`; current T08.3.2 plan/evidence.
@@ -12,9 +12,9 @@ Allowed paths: QR PostgreSQL test module and this plan's canonical document, `PR
 Denied paths: `backend/app/**`, models, migrations, API, frontend, `ops/**`, Docker/Compose, unrelated tests, generated output, shared staging, production/live data.
 Confirmed defect: patching only `queue_service.datetime` leaves `qr_queue_service.datetime` live. A read-only probe of the real QR window check at 23:59:30 returned `after_end_time` while queue service time was 12:00.
 Change in progress: patch both public clock facades to one clinic-local noon; add a focused assertion that both facades report the same frozen time. The four existing tests already pass the matching clinic day to their seed helpers.
-Validation: focused clock-facade test PASS (1 passed, 11 deselected); full module PASS on disposable PostgreSQL 16 (12 passed, 0 skipped, 1 warning); Ruff check, Ruff format check, `py_compile`, and `git diff --check` PASS. Commit hooks including Black and gitleaks PASS. The disposable PostgreSQL container on loopback port 55435 and WSL holder were removed. GitHub checks on exact HEAD `bfbbff88915227dd726db5b6fd5273046c0df7ac`: **19 success, 18 skipped, 0 failure, 0 in progress**. Skipped jobs: staging/production readiness, k6, integration/Docker, frontend unit/build/lint/e2e, Telegram release, docs/metadata, DAST, Supabase Preview, classify-and-route, and two failure notifications. Skips are not passes.
+Validation: focused clock-facade test PASS (1 passed, 11 deselected); full module PASS on disposable PostgreSQL 16 (12 passed, 0 skipped, 1 warning); Ruff check, Ruff format check, `py_compile`, and `git diff --check` PASS. Commit hooks including Black and gitleaks PASS. Disposable PostgreSQL and WSL holder were removed. GitHub checks on exact HEAD `5fd78c4b3c78f4e4c8dfa2a7e18160c0edd00dff`: **17 success, 18 skipped, 0 failure, 0 in progress**. Skipped jobs: staging/production readiness, k6, integration/Docker, frontend unit/build/lint/e2e, Telegram release, docs/metadata, DAST, Supabase Preview, classify-and-route, and two failure notifications. Skips are not passes. PR description update passed its local 19-test validator; follow-up quality/lifecycle checks passed.
 Stop conditions: any runtime edit, unclear clock ownership, unavailable isolated PG, or required path outside approved test/docs scope.
-Next exact action: commit and push this evidence-only checkpoint to PR #3607; it will create a new HEAD, so query checks again. Then update the PR description with the latest source and validation evidence. Do not merge or start T08.3.3 without separate user instruction.
+Next exact action: commit and push this current progress checkpoint, then verify the new documentation-only HEAD checks and refresh the PR description's head reference. Wait for the user's review/merge decision; do not merge or start T08.3.3 without separate user instruction.
 
 > Previous checkpoints below are chronological evidence and are superseded by this active correction checkpoint.
 

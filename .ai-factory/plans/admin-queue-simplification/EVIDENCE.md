@@ -21,6 +21,12 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Result from the Code Review CI provider: **19 success, 18 skipped, 0 failure, 0 in progress**; no annotations. Successes include Backend tests, Code Quality, Context Boundary Integrity, PR Required Gate, Frontend–Backend Parity, PR Review Quality Gate, PR lifecycle recommendation, CodeQL languages/security, gitleaks/GitGuardian, Python formatting, CI Scope, security scan and notifications. Skips include staging/production readiness, k6, integration/Docker, frontend unit/build/lint/e2e, Telegram Mini App release, docs/metadata, DAST, Supabase Preview, classify-and-route and failure notifications. Skipped jobs are not passes.
 - This checkpoint changes plan/evidence only. Push it, then query CI for its new exact HEAD before treating the PR cycle as green.
 
+### Final PR description/checkpoint state — 2026-10-05T19:21:23+05:00
+
+- Code Review provider confirmed exact PR HEAD `5fd78c4b3c78f4e4c8dfa2a7e18160c0edd00dff`: 17 success, 18 skipped, 0 failure, 0 in progress; no annotations. PR is OPEN, CLEAN, mergeable; base `c1781c46a1b03c3404604542bcc9c4c9951f4c89`.
+- PR description was rewritten to reflect the two frozen clock facades, 12/12 PostgreSQL test result, current skipped checks, and test-only scope. `scripts/run_pr_review_gate_checks.py --body-file .scratch/pr3607_body.md` passed 19 validator tests, both documented samples, and the PR body. PR Review Quality Gate and lifecycle checks passed after edit.
+- This progress-only commit will change the PR head again; query the new HEAD before final merge readiness. No formal GitHub review was submitted and no merge occurred.
+
 Historical index snapshot from version 2.9: T00–T07 were confirmed MERGED; T08 was IN_PROGRESS with PR #3596/T08.2c OPEN; T09–T18 were PLANNED. This snapshot is superseded by the current checkpoint below and in [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md). The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver.
 
 ## T08.3.2 clock follow-up — 2026-10-05T17:23:29+05:00
