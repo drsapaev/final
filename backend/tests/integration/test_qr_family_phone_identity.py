@@ -296,8 +296,8 @@ def _no_time_gate(monkeypatch):
 
 @pytest.fixture
 def _fixed_v1_admission_day(monkeypatch) -> date:
-    """Freeze the queue service's clinic clock inside v1's test window."""
-    from app.services import queue_service
+    """Freeze queue and QR admission clocks inside v1's test window."""
+    from app.services import qr_queue_service, queue_service
 
     timezone = ZoneInfo("Asia/Tashkent")
     clinic_day = datetime.now(timezone).date()
@@ -310,10 +310,28 @@ def _fixed_v1_admission_day(monkeypatch) -> date:
                 return frozen_now.replace(tzinfo=None)
             return frozen_now.astimezone(tz)
 
-    # QueueBusinessServiceMixinBase._now reads this module-level clock. Keep
-    # the production admission-window check active, but independent of wall time.
+    # Both admission paths use these public clock facades: the queue service
+    # allocator and QR session start. Keep their real window checks active,
+    # while making the test independent of wall time.
     monkeypatch.setattr(queue_service, "datetime", FrozenDateTime)
+    monkeypatch.setattr(qr_queue_service, "datetime", FrozenDateTime)
     return clinic_day
+
+
+def test_fixed_v1_admission_day_freezes_both_clock_facades(
+    _fixed_v1_admission_day,
+):
+    from app.services import qr_queue_service, queue_service
+
+    clinic_timezone = ZoneInfo("Asia/Tashkent")
+    expected_now = datetime.combine(
+        _fixed_v1_admission_day,
+        time(12, 0),
+        tzinfo=clinic_timezone,
+    )
+
+    assert queue_service.datetime.now(clinic_timezone) == expected_now
+    assert qr_queue_service.datetime.now(clinic_timezone) == expected_now
 
 
 def test_family_member_gets_own_card_and_own_ticket(pg_session, pg_engine):

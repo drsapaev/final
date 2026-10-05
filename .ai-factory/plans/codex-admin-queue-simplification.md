@@ -1,19 +1,19 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.7 — T08.3.2 / #3600 merged; deterministic-clock P2 follow-up is PR #3607.
-**Создан:** 30 сентября 2026. **Обновлён:** 5 октября 2026, 17:38 Asia/Tashkent.
-**Current task:** T08.3.2 post-merge P2 follow-up — make four QR-session PostgreSQL tests independent of wall-clock time.
+**Версия:** 3.8 — T08.3.2 / #3600 merged; PR #3607 clock-scope correction in progress.
+**Создан:** 30 сентября 2026. **Обновлён:** 5 октября 2026, 18:45 Asia/Tashkent.
+**Current task:** Complete deterministic QR and queue admission clocks for the four QR-session PostgreSQL tests.
 **Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-2-clockfix\final`; branch `codex/aqs-T08.3.2-clockfix`; base `origin/main` = `ba03fdfb8d14d38a68a2d16df93145562cd87c63`.
 **Scope:** one focused PG integration module plus these plan/checkpoint journals. Runtime, model, migration, feature flag, frontend, Docker/Compose and staging/production changes are not authorized by this subtask. V1 creation remains default-off.
 > The T08.2c worktree, PR-open status and pending-check metadata below are historical and superseded by the confirmed #3596 merge.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Последний подтверждённый runtime merge:** `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`, PR #3596 / T08.2c. Последующий T08.3.1 PR #3599 добавил PostgreSQL tests и был merged as `a452c54e5851611476c1b2ac3e3298aeff467eca`.
-**Последующий test-only merge:** PR #3600 / T08.3.2 merged at `b3bd5272389da88513cc1ac23985b390489554f9`; deterministic-clock P2 follow-up is [PR #3607](https://github.com/drsapaev/final/pull/3607), with exact-head checks pending.
+**Последующий test-only merge:** PR #3600 / T08.3.2 merged at `b3bd5272389da88513cc1ac23985b390489554f9`; [PR #3607](https://github.com/drsapaev/final/pull/3607) is open. Review found that the existing fixture froze only `queue_service.datetime`; this correction also freezes `qr_queue_service.datetime` and asserts both seams.
 > Следующие две строки — исторический снимок метаданных T08.2c, оставленный для прослеживаемости; текущие ветка и статус указаны выше.
 **Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; PR [#3596](https://github.com/drsapaev/final/pull/3596). Report implementation `718d4d65c5717528e8a93fb819fdf328c63bf772`; future-date compatibility fix `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`; OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`. Focused local checks pass (85 unit/OpenAPI, 4 selected integration). The docs-freshness CI failure on `fd9b1c793` was due to a final CRLF in the generated snapshot; it is removed to match exact app serialization. New exact-head checks pending.
 
-> **T00–T07, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1 and T08.3.2 — MERGED; T08.3.2-P2 clock follow-up — PR_OPEN (#3607); T08.3.3 and T09–T18 — PLANNED.** PR #3600 / T08.3.2 merged at `b3bd5272389da88513cc1ac23985b390489554f9`. The follow-up freezes the queue service's clinic clock at midday and seeds the same clinic day in its four QR v1 tests. The PostgreSQL module passed 11 tests with no skips; static checks passed; PR body quality validation passed. Exact PR HEAD `d4d1524aa96f7260825b6f0caf1b9cb724044490` had 10 successful checks, 4 skipped, 0 failed; a later evidence-only checkpoint will require fresh checks. See the current PROGRESS/RESUME checkpoint and `EVIDENCE.md#t0832-clock-follow-up-pr-3607`.
+> **T00–T07, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1 and T08.3.2 — MERGED; T08.3.2-P2 clock follow-up — PR_OPEN (#3607); T08.3.3 and T09–T18 — PLANNED.** PR #3600 / T08.3.2 merged at `b3bd5272389da88513cc1ac23985b390489554f9`. Review found the PR #3607 fixture omitted the QR service clock facade. The correction now freezes and checks both queue and QR clocks. Local targeted PostgreSQL and static checks pass; Black was unavailable. Exact-head CI awaits push. See PROGRESS/RESUME and `EVIDENCE.md#t0832-pr-3607-review-correction`.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -350,11 +350,11 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 
 #### T08.3.2 — QR join-session transaction and partial batches
 
-**Status:** MERGED — [PR #3600](https://github.com/drsapaev/final/pull/3600), merge commit `b3bd5272389da88513cc1ac23985b390489554f9`. Its post-merge P2 follow-up is [PR #3607](https://github.com/drsapaev/final/pull/3607); local validation passed and exact-head checks are pending.
+**Status:** MERGED — [PR #3600](https://github.com/drsapaev/final/pull/3600), merge commit `b3bd5272389da88513cc1ac23985b390489554f9`. Its post-merge P2 follow-up is [PR #3607](https://github.com/drsapaev/final/pull/3607), with a clock-facade review correction in progress.
 **Owner:** `backend/tests/integration/test_qr_family_phone_identity.py` for synthetic disposable PostgreSQL transaction tests; `backend/app/services/qr_queue/_sessions.py` is canonical runtime reference and remains read-only unless a separate gate authorizes a fix.
 **Required proof:** lost-response replay returns the saved response without a second issuance; single/multiple queue writes and replay snapshot share the existing outer transaction; a permitted partial result commits only successful elements and accurately reports rejected elements/counter totals. Preserve the existing partial-result contract.
 **Execution boundary:** test/evidence-only. The merged PR added real PostgreSQL tests for single/multi transaction rollback, response replay and partial result. A post-merge P2 found four new tests relied on the live clinic time with a `23:59` cutoff. Follow-up adds a fixed midday clock and explicit matching queue day to those tests; runtime remains read-only. See `admin-queue-simplification/EVIDENCE.md#t0832-clock-follow-up`.
-**Local evidence:** original focused PostgreSQL module passed 11 tests. After the deterministic-clock fix the complete module again passed **11 passed, 0 skipped** on disposable PostgreSQL 16; Ruff, Black check, `py_compile` and `git diff --check` passed. The earlier run that returned 11 skips after WSL idled is not counted. PR #3607 is open; its body quality gate passed; exact PR HEAD `d4d1524aa96f7260825b6f0caf1b9cb724044490` had 10 successful checks, 4 skipped, 0 failed. The current evidence-only checkpoint will trigger checks on a new HEAD.
+**Local evidence:** the corrected module passed **12 tests, 0 skipped** on disposable PostgreSQL 16; the focused clock assertion, Ruff, Ruff format, `py_compile`, and diff check passed. Black check was not run because the package was unavailable. The earlier exact-head CI does not cover this correction; query checks after push. See `admin-queue-simplification/EVIDENCE.md#t0832-pr-3607-review-correction`.
 
 #### T08.3.3 — Direct GraphQL and remaining reachable writer parity
 

@@ -2,6 +2,18 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
+## T08.3.2 PR #3607 review correction — 2026-10-05T18:45:14+05:00
+
+- Review finding: the first clock fix patched `queue_service.datetime` only. The QR session start path performs a separate time-window check through `qr_queue_service.datetime`; a read-only mocked-database probe set the queue clock to noon and QR clock to 23:59:30 and observed `after_end_time`.
+- Execution mode: `gate_known_root_cause`, rerun before editing against `backend/tests/integration/test_qr_family_phone_identity.py`. Result: `narrow_override`, mode `execute`, `handoff_required=true`, `gate_misroute=true`, `override_used=true`; the generated execution prompt was read. The first-touch list also contained unrelated ops/packaging files. The explicit user request and plan-approved T08.3.2 evidence/test boundary allow only the existing QR PG module and these four plan journals. No further retry; no runtime/ops changes.
+- Allowed paths: `backend/tests/integration/test_qr_family_phone_identity.py`; canonical plan; `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: runtime, schema, API, frontend, ops/Docker, unrelated tests, generated output, staging and production/live data.
+- Fix: patch the same frozen datetime facade into both `queue_service` and `qr_queue_service`; add a focused assertion that both service clocks show clinic-local noon. Existing token expiry evaluation remains wall-clock based and seeded token expiry remains based on real current time; the fix targets the two explicit admission clock facades only.
+- Validation: `scripts/run_backend_pytest.ps1 tests/integration/test_qr_family_phone_identity.py -k fixed_v1_admission_day -q` with import-only `DATABASE_URL=sqlite:///:memory:` — PASS, 1 passed, 11 deselected, 1 warning. Full `scripts/run_backend_pytest.ps1 tests/integration/test_qr_family_phone_identity.py -q -rs` against task-owned disposable PostgreSQL 16 on loopback port 55435 — PASS, 12 passed, 0 skipped, 1 warning. Scoped Ruff, Ruff format, `py_compile`, and `git diff --check` — PASS. Black check NOT_RUN because Black is absent from both configured Python environments. The disposable PostgreSQL container and WSL holder were removed.
+- Initial attempts: the first focused pytest invocation lacked `DATABASE_URL` and stopped during application import; no test ran. The first lint attempt found two unsorted local imports, fixed before Ruff and formatter checks passed. No test failure remains.
+- Remaining: exact-head GitHub checks await the push. Staging/browser/full-system validation was not run for this test-only correction.
+- Scope: only this integration test and the four plan/checkpoint files. No staging or production used.
+- PR: [#3607](https://github.com/drsapaev/final/pull/3607), still OPEN; no new commit or merge yet.
+
 Historical index snapshot from version 2.9: T00–T07 were confirmed MERGED; T08 was IN_PROGRESS with PR #3596/T08.2c OPEN; T09–T18 were PLANNED. This snapshot is superseded by the current checkpoint below and in [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md). The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver.
 
 ## T08.3.2 clock follow-up — 2026-10-05T17:23:29+05:00
