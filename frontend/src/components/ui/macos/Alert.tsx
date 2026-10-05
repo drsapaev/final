@@ -99,7 +99,7 @@ const Alert = ({
         {dismissible && (
           <button
             onClick={onDismiss}
-            aria-label={t('common.close')}
+            aria-label={t('common.close', { defaultValue: 'Close' })}
             style={{
               border: 'none',
               background: 'transparent',
@@ -110,7 +110,7 @@ const Alert = ({
               opacity: 0.6
             }}
           >
-            <X size={16} />
+            <X size={16} aria-hidden="true" />
           </button>
         )}
       </div>
