@@ -5,8 +5,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-
 from app.services import queue_domain_service as domain_module
+
 from app.services.queue_domain_service import (
     QueueDomainReadError,
     QueueDomainService,
@@ -212,9 +212,7 @@ class TestQueueDomainService:
 
         assert exc_info.value.status_code == 404
 
-    def test_get_queue_limits_status_uses_doctor_id_for_daily_queue_lookup(
-        self,
-    ) -> None:
+    def test_get_queue_limits_status_preserves_runtime_user_id_lookup(self) -> None:
         doctor = SimpleNamespace(
             id=3,
             user_id=33,
@@ -222,12 +220,7 @@ class TestQueueDomainService:
             cabinet="101",
             user=SimpleNamespace(full_name="Doctor Test"),
         )
-        queue = SimpleNamespace(
-            id=9,
-            opened_at=None,
-            policy_version="legacy",
-            max_online_entries=5,
-        )
+        queue = SimpleNamespace(id=9, opened_at=None)
 
         class Repository:
             def list_active_doctors(self, *, specialty):
@@ -235,15 +228,11 @@ class TestQueueDomainService:
                 return [doctor]
 
             def get_queue_by_specialist_day(self, *, specialist_id, day):
-                assert specialist_id == doctor.id
+                assert specialist_id == 33
                 assert day.isoformat() == "2026-03-07"
                 return queue
 
             def count_entries(self, *, queue_id):
-                assert queue_id == 9
-                return 4
-
-            def count_active_entries(self, *, queue_id):
                 assert queue_id == 9
                 return 4
 
@@ -266,69 +255,12 @@ class TestQueueDomainService:
                 "cabinet": "101",
                 "day": date(2026, 3, 7),
                 "current_entries": 4,
-                "queue_length": 4,
-                "queue_id": 9,
                 "max_entries": 5,
-                "policy_version": "legacy",
-                "online_issued_count": None,
-                "online_bookings_remaining": None,
                 "limit_reached": False,
                 "queue_opened": False,
                 "online_available": True,
             }
         ]
-
-    def test_get_queue_limits_status_uses_v1_counter_for_availability(self) -> None:
-        doctor = SimpleNamespace(
-            id=3,
-            user_id=33,
-            specialty="cardio",
-            cabinet="101",
-            max_online_per_day=7,
-            user=SimpleNamespace(full_name="Doctor Test"),
-        )
-        queue = SimpleNamespace(
-            id=9,
-            opened_at=None,
-            policy_version="daily_online_issuances_v1",
-            max_online_entries=2,
-            online_issued_count=2,
-        )
-
-        class Repository:
-            def list_active_doctors(self, *, specialty):
-                return [doctor]
-
-            def get_queue_by_specialist_day(self, *, specialist_id, day):
-                assert specialist_id == doctor.id
-                return queue
-
-            def count_entries(self, *, queue_id):
-                assert queue_id == 9
-                return 0
-
-            def count_active_entries(self, *, queue_id):
-                assert queue_id == 9
-                return 0
-
-        service = QueueDomainService(
-            db="db",
-            read_repository=Repository(),
-            get_settings=lambda db: {"max_per_day": {"cardio": 7}},
-        )
-
-        result = service.get_queue_limits_status(
-            day=date(2026, 3, 7),
-            specialty="cardio",
-        )
-
-        assert result[0]["queue_length"] == 0
-        assert result[0]["policy_version"] == "daily_online_issuances_v1"
-        assert result[0]["max_entries"] == 2
-        assert result[0]["online_issued_count"] == 2
-        assert result[0]["online_bookings_remaining"] == 0
-        assert result[0]["limit_reached"] is True
-        assert result[0]["online_available"] is False
 
     def test_allocate_ticket_delegates_create_entry_mode(self, monkeypatch) -> None:
         db = Mock()
@@ -413,51 +345,3 @@ class TestQueueDomainService:
         assert payload["code_to_name"]["L77"] == "Расширенный лабораторный профиль"
         assert payload["category_mapping"]["laboratory"] == "L"
         assert payload["specialty_aliases"]["derma"] == "dermatology"
-
-
-@pytest.mark.unit
-def test_get_queue_limits_status_preserves_inactive_resource_identity(db_session):
-    from app.models.clinic import Doctor
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
-
-    tag = "synthetic-admin-inactive-resource"
-    doctor = Doctor(specialty=tag, max_online_per_day=15)
-    resource = QueueResource(
-        code=tag,
-        queue_tag=tag,
-        display_name="SYNTHETIC admin resource",
-        active=True,
-        max_online_per_day=15,
-    )
-    db_session.add_all([doctor, resource])
-    db_session.flush()
-    day = date(2030, 1, 2)
-    queue = DailyQueue(
-        day=day,
-        queue_resource_id=resource.id,
-        queue_tag=tag,
-        active=False,
-        policy_version="daily_online_issuances_v1",
-        online_start_time="07:00",
-        online_end_time="09:00",
-        max_online_entries=4,
-        online_issued_count=4,
-    )
-    db_session.add(queue)
-    db_session.flush()
-    db_session.add(
-        OnlineQueueEntry(queue_id=queue.id, number=1, source="online", status="waiting")
-    )
-    db_session.flush()
-
-    result = QueueDomainService(
-        db_session,
-        get_settings=lambda db: {"max_per_day": {tag: 15}},
-    ).get_queue_limits_status(day=day, specialty=tag)[0]
-
-    assert result["queue_id"] == queue.id
-    assert result["policy_version"] == "daily_online_issuances_v1"
-    assert result["online_issued_count"] == 4
-    assert result["online_bookings_remaining"] == 0
-    assert result["queue_length"] == 1
-    assert result["online_available"] is False

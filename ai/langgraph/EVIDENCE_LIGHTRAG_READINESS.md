@@ -3594,15 +3594,3 @@ the default for DevBrain wrappers and keep LlamaIndex/LightRAG opt-in.
 ### Manual reconstruction
 - Active successful admission routes and transaction/replay boundaries are recorded in the T08.2b evidence table. `crud.online_queue.join_online_queue` has no active caller; Telegram's current callback does not reach a persisted writer; staff derivation and `/queue/open` are not independent online admissions.
 - Follow-up: gate routing should resolve the T08 adapter coverage table and mounted FastAPI routes before selecting Telegram or generic queue-window tests. This evidence does not authorize a broader gate/tooling patch in T08.2b.
-
-## Task 105 - T08.2c availability/report read-contract gate — 2026-10-04
-
-### Gate observation
-- The T08.2c task concerns read-side quota/report parity across public availability, QR, Admin queue status, and specialty aggregate limits. Source and tests confirmed the owners span `backend/app/crud/online_queue.py`, `backend/app/services/queue_domain_service.py`, `backend/app/services/queue_limits_api_service.py`, `backend/app/services/qr_queue/_queue_ops.py`, their DTO/OpenAPI adapters, and focused tests.
-- The initial mandatory gate invocation was accidentally launched from `C:\final`; it did not inspect the active T08.2c worktree. The corrected invocation ran from `C:\final\_wt_aqs_t082c_availability\ai\langgraph` with `--known-root-cause backend/app/crud/online_queue.py` and returned `narrow_override`, listing only that CRUD file as first-touch.
-- Actual observed fields: `gate_misroute=true`, `override_used=true`, `known_root_cause_file=backend/app/crud/online_queue.py`. The gate omitted the queue-domain/admin aggregate readers, QR report path, DTO/OpenAPI schemas and regression tests needed by the user-approved T08.2c coverage contract. No third gate call was made.
-- Manual scope basis: the approved T08 plan's explicit T08.2c availability/report-parity requirement and read-contract boundaries. Runtime scope remained read-only; no admission writer, model, migration, feature flag or staging configuration was changed.
-
-### Manual reconstruction and follow-up
-- `online_queue.check_queue_availability` is the public availability read root. QR reports use `_queue_ops.py` and `_tokens.py`; Admin per-owner status is assembled by `QueueDomainService`; the specialty aggregate is assembled by `QueueLimitsApiService`. Corresponding contracts live in `QueueStatusCheck`, `QueueStatusResponse`, QR token response, and queue-limit DTOs/OpenAPI.
-- This is another confirmed queue-task routing miss after T07/T08.2a/T08.2b: a single known root did not expand to the report adapters/read-model owners named in the same task. Follow-up: improve gate mapping for multi-surface queue read/report contracts so it discovers all consumers and DTO tests from route/schema references. This evidence does not broaden T08.2c into a gate implementation change.

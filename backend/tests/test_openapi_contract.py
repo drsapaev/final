@@ -149,69 +149,6 @@ def test_openapi_documents_online_booking_policy_and_cutoff_contract(
     )
 
 
-def test_openapi_documents_separate_queue_length_and_online_quota_facts(
-    client: TestClient,
-) -> None:
-    schema = _get_openapi_schema(client)
-    components = schema["components"]["schemas"]
-
-    status_ref = schema["paths"]["/api/v1/online-queue/status"]["get"][
-        "responses"
-    ]["200"]["content"]["application/json"]["schema"]["$ref"]
-    status_contract = components[status_ref.rsplit("/", 1)[-1]]
-    assert {
-        "queue_length",
-        "max_online_entries",
-        "online_issued_count",
-        "online_bookings_remaining",
-        "policy_version",
-    }.issubset(status_contract["required"])
-    for nullable_field in (
-        "max_online_entries",
-        "online_issued_count",
-        "online_bookings_remaining",
-    ):
-        assert any(
-            branch.get("type") == "null"
-            for branch in status_contract["properties"][nullable_field]["anyOf"]
-        )
-
-    qr_contract = components["QRTokenInfoResponse"]
-    assert {
-        "max_online_entries",
-        "online_issued_count",
-        "online_bookings_remaining",
-    }.issubset(qr_contract["properties"])
-
-    admin_ref = schema["paths"]["/api/v1/admin/queue-status"]["get"][
-        "responses"
-    ]["200"]["content"]["application/json"]["schema"]["items"]["$ref"]
-    admin_contract = components[admin_ref.rsplit("/", 1)[-1]]
-    assert {
-        "queue_id",
-        "queue_length",
-        "policy_version",
-        "online_issued_count",
-        "online_bookings_remaining",
-    }.issubset(admin_contract["required"])
-
-    limits_ref = schema["paths"]["/api/v1/admin/queue-limits"]["get"][
-        "responses"
-    ]["200"]["content"]["application/json"]["schema"]["items"]["$ref"]
-    limits_contract = components[limits_ref.rsplit("/", 1)[-1]]
-    assert {
-        "queue_length",
-        "policy_version",
-        "online_issued_count",
-        "online_bookings_remaining",
-    }.issubset(limits_contract["required"])
-    assert limits_contract["properties"]["policy_version"]["enum"] == [
-        "legacy",
-        "daily_online_issuances_v1",
-        "mixed",
-    ]
-
-
 def test_openapi_queue_cabinet_response_exposes_typed_owner_fields(
     client: TestClient,
 ) -> None:

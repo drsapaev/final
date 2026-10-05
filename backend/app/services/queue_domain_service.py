@@ -11,11 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.crud import queue_resource_routing
 from app.crud.clinic import get_queue_settings
-from app.crud.daily_queue_creation_policy import (
-    LEGACY_POLICY_VERSION,
-    ONLINE_ISSUANCES_V1_POLICY_VERSION,
-    policy_version_for_new_queue,
-)
 from app.repositories.queue_read_repository import QueueReadRepository
 from app.services.queue_service import queue_service
 from app.services.queue_status import REORDER_ACTIVE_RAW_STATUSES
@@ -259,6 +254,9 @@ class QueueDomainService:
 
         result: list[dict[str, Any]] = []
         for doctor in doctors:
+            # Preserve current runtime behavior: limits read paths resolve DailyQueue
+            # by Doctor.user_id even though DailyQueue.specialist_id is modeled
+            # against doctors.id.
             # QD-2C (Codex round-10 P2): registry-tag врач — usage/кап/
             # открытость читаются с (day, tag)-ПОВЕРХНОСТИ (могла быть
             # создана ресурсной после переключения), иначе отчёт
@@ -277,122 +275,24 @@ class QueueDomainService:
                 current_entries = self.read_repository.count_entries(
                     queue_id=daily_queue.id
                 )
-                queue_length = self.read_repository.count_active_entries(
-                    queue_id=daily_queue.id
-                )
                 queue_opened = daily_queue.opened_at is not None
-            else:
-                inactive_queue = (
-                    queue_resource_routing.find_inactive_daily_queue_for_specialist(
-                        self.db, day, doctor.id, doctor.specialty
-                    )
-                    if isinstance(self.db, Session)
-                    else None
+                max_entries = (
+                    daily_queue.max_online_entries
+                    or max_per_day_settings.get(doctor.specialty, 15)
                 )
-                if inactive_queue is not None:
-                    daily_queue = inactive_queue
-                else:
-                    daily_queue = self.read_repository.get_queue_by_specialist_day(
-                        specialist_id=doctor.id,
-                        day=day,
-                    )
-                    # A stale doctor row does not own a currently routed
-                    # resource identity and cannot be advertised as available.
-                    if daily_queue is not None and not getattr(
-                        daily_queue, "active", True
-                    ):
-                        daily_queue = None
+            else:
+                daily_queue = self.read_repository.get_queue_by_specialist_day(
+                    specialist_id=doctor.user_id,
+                    day=day,
+                )
                 current_entries = 0
-                queue_length = 0
                 queue_opened = False
                 if daily_queue:
                     current_entries = self.read_repository.count_entries(
                         queue_id=daily_queue.id
                     )
-                    queue_length = self.read_repository.count_active_entries(
-                        queue_id=daily_queue.id
-                    )
                     queue_opened = daily_queue.opened_at is not None
-
-            policy_version = (
-                getattr(daily_queue, "policy_version", LEGACY_POLICY_VERSION)
-                if daily_queue is not None
-                else policy_version_for_new_queue()
-            )
-            if daily_queue is not None:
-                persisted_cap = getattr(daily_queue, "max_online_entries", None)
-                max_entries = 15 if persisted_cap is None else persisted_cap
-                if policy_version == LEGACY_POLICY_VERSION:
-                    # Match the legacy allocator's falsy-cap fallback.
-                    max_entries = max_entries or 15
-                online_issued_count = (
-                    daily_queue.online_issued_count
-                    if policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION
-                    else None
-                )
-            else:
-                inactive_queue = None
-                if isinstance(self.db, Session):
-                    inactive_queue = (
-                        queue_resource_routing.find_inactive_daily_queue_for_specialist(
-                            self.db, day, doctor.id, doctor.specialty
-                        )
-                    )
-                if inactive_queue is not None:
-                    # Preserve the identity and saved quota of an inactive
-                    # queue; it cannot be represented as a fresh rowless one.
-                    daily_queue = inactive_queue
-                    current_entries = self.read_repository.count_entries(
-                        queue_id=daily_queue.id
-                    )
-                    queue_length = self.read_repository.count_active_entries(
-                        queue_id=daily_queue.id
-                    )
-                    queue_opened = daily_queue.opened_at is not None
-                else:
-                    daily_queue = None
-                    current_entries = 0
-                    queue_length = 0
-                    queue_opened = False
-                if daily_queue is None:
-                    # Before a queue exists, the owner default is the cap used
-                    # by the next constructor. Registry resources take priority.
-                    resource = (
-                        queue_resource_routing.resolve_tag_resource(
-                            self.db, doctor.specialty
-                        )
-                        if doctor.specialty and isinstance(self.db, Session)
-                        else None
-                    )
-                    owner_cap = (
-                        resource.max_online_per_day
-                        if resource is not None
-                        else getattr(doctor, "max_online_per_day", None)
-                    )
-                    if owner_cap is None:
-                        owner_cap = max_per_day_settings.get(doctor.specialty)
-                    max_entries = 15 if owner_cap is None else owner_cap
-                    if policy_version == LEGACY_POLICY_VERSION:
-                        max_entries = max_entries or 15
-                    online_issued_count = (
-                        0
-                        if policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION
-                        else None
-                    )
-
-            online_bookings_remaining = (
-                max(0, max_entries - online_issued_count)
-                if policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION
-                and online_issued_count is not None
-                else None
-            )
-            limit_reached = (
-                online_issued_count >= max_entries
-                if policy_version == ONLINE_ISSUANCES_V1_POLICY_VERSION
-                and online_issued_count is not None
-                else queue_length >= max_entries
-            )
-            queue_id = daily_queue.id if daily_queue is not None else None
+                max_entries = max_per_day_settings.get(doctor.specialty, 15)
             result.append(
                 {
                     "doctor_id": doctor.id,
@@ -402,19 +302,12 @@ class QueueDomainService:
                     "specialty": doctor.specialty,
                     "cabinet": doctor.cabinet,
                     "day": day,
-                    "queue_id": queue_id,
                     "current_entries": current_entries,
-                    "queue_length": queue_length,
                     "max_entries": max_entries,
-                    "policy_version": policy_version,
-                    "online_issued_count": online_issued_count,
-                    "online_bookings_remaining": online_bookings_remaining,
-                    "limit_reached": limit_reached,
+                    "limit_reached": current_entries >= max_entries,
                     "queue_opened": queue_opened,
                     "online_available": (
-                        (daily_queue is None or getattr(daily_queue, "active", True))
-                        and not queue_opened
-                        and not limit_reached
+                        not queue_opened and current_entries < max_entries
                     ),
                 }
             )

@@ -557,7 +557,6 @@ def _clear_replay_cache():
 def queue_admission_open(monkeypatch):
     """Keep admission unrelated tests independent of the clinic's wall clock."""
     from app.crud import clinic as clinic_crud
-    from app.crud import online_queue as crud_online_queue
     from app.services.queue_svc import _base as queue_base
     from app.services.queue_svc import _core as queue_core
     from app.services.queue_svc import _operations as queue_operations
@@ -569,11 +568,6 @@ def queue_admission_open(monkeypatch):
         return {**settings, "queue_start_hour": 0, "auto_close_time": "23:59"}
 
     monkeypatch.setattr(clinic_crud, "get_queue_settings", _open_settings)
-    # app.crud.online_queue binds get_queue_settings at module level
-    # (join_online_queue_multiple calls it directly), so it needs its own
-    # patch - without it the admission gate falls back to the DB default
-    # start hour and tests stay wall-clock dependent (PR #3597 P2-2).
-    monkeypatch.setattr(crud_online_queue, "get_queue_settings", _open_settings)
     monkeypatch.setattr(queue_base, "get_queue_settings", _open_settings)
     monkeypatch.setattr(queue_core, "get_queue_settings", _open_settings)
     monkeypatch.setattr(queue_operations, "get_queue_settings", _open_settings)

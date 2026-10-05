@@ -55,17 +55,6 @@ class QueueLimitsRepository:
             .count()
         )
 
-    def count_active_entries(self, *, queue_id: int) -> int:
-        """Count queue length using the same active statuses as legacy admission."""
-        return (
-            self.db.query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.queue_id == queue_id,
-                OnlineQueueEntry.status.in_(("waiting", "called")),
-            )
-            .count()
-        )
-
     def list_active_daily_queues(
         self, *, day: date, specialist_id: int
     ) -> list[DailyQueue]:

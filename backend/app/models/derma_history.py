@@ -2,16 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import (
-    JSON,
-    Date,
-    DateTime,
-    Index,
-    Integer,
-    String,
-    UniqueConstraint,
-    text,
-)
+from sqlalchemy import JSON, Date, DateTime, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
@@ -51,9 +42,8 @@ class DermaHistoryEntry(Base):
     # id EMR-записи или id строки legacy-таблицы (уникален внутри (kind, source))
     record_id: Mapped[int] = mapped_column(Integer, nullable=False)
     # позиция внутри записи: для процедур — индекс в ИСХОДНОМ массиве
-    # источника (индекс в specialty_data.cosmetic_procedures; Phase C:
-    # legacy-alias больше не проецируется), не плотный display-индекс —
-    # разрывы при пропуске invalid-записей допустимы;
+    # источника (canonical: index; alias: len(canonical)+index), не плотный
+    # display-индекс — разрывы при пропуске invalid-записей допустимы;
     # 0 для остальных kind
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     patient_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)

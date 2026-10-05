@@ -116,17 +116,6 @@ class QueueReadRepository:
             .count()
         )
 
-    def count_active_entries(self, *, queue_id: int) -> int:
-        """Queue length used by the legacy admission rule and status reports."""
-        return (
-            self.db.query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.queue_id == queue_id,
-                OnlineQueueEntry.status.in_(("waiting", "called")),
-            )
-            .count()
-        )
-
     def list_snapshot_entries(
         self,
         *,

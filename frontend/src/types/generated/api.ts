@@ -16858,14 +16858,13 @@ export type paths = {
          *     total_cost=None — цена не хранится в ЭМК, и строки закрытой
          *     legacy-таблицы derma_procedures, source="legacy"), материализуемая
          *     при записи, а не пересчитываемая в памяти на каждый запрос.
-         *     Канонический ключ записи — единственный —
-         *     specialty_data.cosmetic_procedures (решение P3 по реконсиляции
-         *     #3490/#3491; Phase A временно читала legacy-ключ
-         *     specialty_data.procedures как READ-alias, Phase C алиас удалила:
-         *     projection и граница записи emr_contract.normalize_emr_data
-         *     работают только с каноническим ключом, наличие данных под
-         *     legacy-ключом в активных записях исключено Phase B verify-gate —
-         *     scripts/audit_derma_legacy_procedures.py).
+         *     Канонический ключ записи — specialty_data.cosmetic_procedures
+         *     (решение P3 по реконсиляции #3490/#3491); legacy-ключ
+         *     specialty_data.procedures читается проекцией временно как alias
+         *     (Phase A): полный union без скрытия строк, записи без стабильного ID
+         *     не дедуплицируются по содержимому — возможные дубликаты устраняются
+         *     в Phase B (миграция данных с журналированием), удаление алиаса —
+         *     Phase C (после аудита хранимых данных).
          *     Скоупинг пациентов идентичен прежнему контракту. Пагинация —
          *     канонический конверт page/size/total/pages (контракт GET /files):
          *     total точен по обоим источникам, без скрытых усечений.
@@ -35744,21 +35743,6 @@ export type components = {
             opens_at_datetime?: string | null;
             /** Countdown Text */
             countdown_text?: string | null;
-            /**
-             * Max Online Entries
-             * @description Лимит только для выбранной дневной очереди; null для общего обзора
-             */
-            max_online_entries?: number | null;
-            /**
-             * Online Issued Count
-             * @description Успешные online-выдачи v1; null для legacy/общего обзора
-             */
-            online_issued_count?: number | null;
-            /**
-             * Online Bookings Remaining
-             * @description Остаток v1-квоты; null для legacy/общего обзора
-             */
-            online_bookings_remaining?: number | null;
         };
         /**
          * QrData
@@ -35972,17 +35956,6 @@ export type components = {
             enabled: boolean;
             /** Current Usage */
             current_usage: number;
-            /** Queue Length */
-            queue_length: number;
-            /**
-             * Policy Version
-             * @enum {string}
-             */
-            policy_version: "legacy" | "daily_online_issuances_v1" | "mixed";
-            /** Online Issued Count */
-            online_issued_count: number | null;
-            /** Online Bookings Remaining */
-            online_bookings_remaining: number | null;
             /** Doctors Count */
             doctors_count: number;
             /** Aggregate Max Per Day */
@@ -36362,26 +36335,6 @@ export type components = {
              * @enum {string}
              */
             policy_version: "legacy" | "daily_online_issuances_v1";
-            /**
-             * Queue Length
-             * @description Число ожидающих и вызванных записей, независимо от источника
-             */
-            queue_length: number;
-            /**
-             * Max Online Entries
-             * @description Лимит выбранной дневной очереди; null, если владелец не разрешён
-             */
-            max_online_entries: number | null;
-            /**
-             * Online Issued Count
-             * @description Успешные независимые online-выдачи для v1; null для legacy
-             */
-            online_issued_count: number | null;
-            /**
-             * Online Bookings Remaining
-             * @description Остаток v1-квоты max_online_entries - online_issued_count; null для legacy
-             */
-            online_bookings_remaining: number | null;
             /**
              * Opened At
              * @description Время открытия приема
@@ -41524,23 +41477,10 @@ export type components = {
              * Format: date
              */
             day: string;
-            /** Queue Id */
-            queue_id: number | null;
             /** Current Entries */
             current_entries: number;
-            /** Queue Length */
-            queue_length: number;
             /** Max Entries */
             max_entries: number;
-            /**
-             * Policy Version
-             * @enum {string}
-             */
-            policy_version: "legacy" | "daily_online_issuances_v1";
-            /** Online Issued Count */
-            online_issued_count: number | null;
-            /** Online Bookings Remaining */
-            online_bookings_remaining: number | null;
             /** Limit Reached */
             limit_reached: boolean;
             /** Queue Opened */

@@ -61,9 +61,7 @@ SPECIALTY_SKELETONS: dict[str, dict[str, Any]] = {
 
 def normalize_specialty(value: str | None, *, default: str = "general") -> str:
     """Normalize any specialty alias into the canonical taxonomy."""
-    normalized_default = (
-        default.strip().lower() if isinstance(default, str) else "general"
-    )
+    normalized_default = default.strip().lower() if isinstance(default, str) else "general"
     normalized_default = SPECIALTY_ALIASES.get(normalized_default, normalized_default)
     if normalized_default not in CANONICAL_SPECIALTIES:
         normalized_default = "general"
@@ -115,38 +113,7 @@ def normalize_emr_data(
         specialty,
         payload.get("specialty_data"),
     )
-    if specialty == "dermatology":
-        _pin_derma_single_procedures_key(payload["specialty_data"])
     return payload
-
-
-def _pin_derma_single_procedures_key(specialty_data: dict[str, Any]) -> None:
-    """Phase C (P3 #3490/#3491): контрактный пин одного ключа записи процедур.
-
-    Канонический ключ косметологических процедур дермы —
-    specialty_data.cosmetic_procedures; legacy-ключ specialty_data.procedures
-    (эпоха #3491) больше не читается проекцией истории (Phase C удалила
-    READ-alias). Чтобы сохранение старым клиентом не оставило клинические
-    данные молча невидимыми, на границе записи валидные записи legacy-ключа
-    переносятся в канонический ключ (append, без дедупликации — та же
-    семантика, что у Phase B normalize в
-    scripts/audit_derma_legacy_procedures.py), сам ключ удаляется.
-    Идемпотентно: после Phase B в активных записях ключа нет; правило
-    защищает от рецидива. Вызывается ТОЛЬКО для дерматологии — у других
-    специальностей ключ specialty_data.procedures своей семантики не имеет
-    и не затрагивается.
-    """
-    if "procedures" not in specialty_data:
-        return
-    legacy = specialty_data.pop("procedures")
-    if not isinstance(legacy, list):
-        # аномальный тип значения (не массив) — не переносим содержимое,
-        # ключ уже снят: мусорное значение не должно блокировать сохранение
-        return
-    canonical_raw = specialty_data.get("cosmetic_procedures")
-    canonical = list(canonical_raw) if isinstance(canonical_raw, list) else []
-    canonical.extend(legacy)
-    specialty_data["cosmetic_procedures"] = canonical
 
 
 def extract_diagnosis_main(data: dict[str, Any] | None) -> str | None:
@@ -296,6 +263,5 @@ def canonical_emr_to_legacy_payload(
         "is_draft": getattr(emr_record, "status", "draft") == "draft",
         "created_at": getattr(emr_record, "created_at", None),
         "updated_at": getattr(emr_record, "updated_at", None),
-        "saved_at": getattr(emr_record, "signed_at", None)
-        or getattr(emr_record, "updated_at", None),
+        "saved_at": getattr(emr_record, "signed_at", None) or getattr(emr_record, "updated_at", None),
     }

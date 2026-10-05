@@ -1,7 +1,7 @@
 # Decisions and contract
 
-Plan version: 2.9
-Last updated: 2026-10-04T08:31:13+05:00
+Plan version: 2.7
+Last updated: 2026-10-04T06:27:05+05:00
 
 ## Current execution instruction
 
@@ -32,7 +32,6 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - Mixed heterogeneous profile is overview only. Multiple clinicians for one direction are valid booking targets.
 - New profiles default unpublished; publishing revalidates readiness and target uniqueness.
 - Ordinary cabinet default and an explicit change to today's selected queues are separate commands.
-- **D6 — T08.2c report semantics (technical interpretation):** V1 `online_issued_count` comes from the persisted daily-queue counter and remaining is `max(0, max_online_entries - online_issued_count)`. Legacy issuance/remaining are unknown and nullable; queue length counts waiting/called records separately. A clinic-wide overview spanning queue identities/policies has no singular quota. The aggregate keeps historical `current_usage` intact and exposes active `queue_length` separately; mixed legacy/v1 aggregates report unknown issuance/remaining. This clarifies reporting only; it does not alter admission behavior.
 
 ## Technical choices requiring evidence during implementation
 

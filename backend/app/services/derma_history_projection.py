@@ -3,12 +3,10 @@
 Каноническая серверная агрегация #3494 объединяет два read-only источника:
 дерма-ЭМК (emr/v2, specialty_data) и закрытые legacy-таблицы. Этот модуль —
 единственное место, где определена проекция обоих источников в строки
-истории (HistoryOut). Процедуры ЭМК читаются по единому каноническому
-ключу specialty_data.cosmetic_procedures (решение P3 по реконсиляции
-#3490/#3491; Phase A временно читала legacy-ключ specialty_data.procedures
-как READ-alias — Phase C удалила алиас: гарантией отсутствия данных под
-legacy-ключом служит Phase B — аудит, нормализация и verify-gate
-операторским скриптом scripts/audit_derma_legacy_procedures.py).
+истории (HistoryOut). Процедуры ЭМК читаются union'ом двух ключей
+specialty_data: канонический cosmetic_procedures + временный legacy
+READ-alias procedures (решение P3 по реконсиляции #3490/#3491, Phase A;
+полный union без скрытия строк, без дедупликации по содержимому).
 До появления read model эндпоинты derma.py считали
 эту проекцию на каждый запрос в памяти (P2 ретро-ревью #3494); теперь те же
 функции питают производную таблицу derma_history_entries:
@@ -253,28 +251,34 @@ def _procedure_history_row(
 def _emr_procedure_items(
     records: list[Any], visits: dict[int, Any]
 ) -> list[tuple[DermaProcedureHistoryOut, int, int]]:
-    """Проекция процедур: (row, record_id, position) — один канонический ключ.
+    """Проекция процедур: (row, record_id, position) — union двух ключей.
 
     Канонический ключ записи — specialty_data.cosmetic_procedures (решение
-    P3 по реконсиляции #3490/#3491; так пишет merged-редактор #3490/#3494).
-    Legacy-ключ specialty_data.procedures (эпоха #3491) читался как
-    transitional READ alias в Phase A — Phase C алиас УДАЛЁН:
-    projection читает только канонический ключ, строки legacy-ключа не
-    проецируются. Гарантией того, что под legacy-ключом не осталось
-    клинических данных, служит Phase B (аудит + нормализация + verify-gate:
-    scripts/audit_derma_legacy_procedures.py, rc=0 = в активных дерма-ЭМК
-    ключа нет); защита от рецидива — пин границы записи в
-    emr_contract.normalize_emr_data (валидные legacy-записи клиента
-    переносятся в канонический ключ при сохранении).
-    Идентификаторы строк: emr-<rid>-<index>. Контракт position
-    (review P2, round-3): position — стабильная позиция записи в её
-    ИСХОДНОМ массиве (индекс в cosmetic_procedures), а не плотный
-    display-индекс. Invalid-записи (не-словарь / без procedure_type)
-    пропускаются БЕЗ пересчёта позиций соседей: разрывы допустимы
-    ([valid, invalid, valid] → 0, 2), плотность НЕ гарантируется и не
-    требуется — порядок чтения keyset (entry_date, created_at, source,
-    record_id, position) от разрывов не зависит. Гарантируется
-    уникальность (kind, source, record_id, position).
+    P3 по реконсиляции #3490/#3491: так пишет merged-редактор #3490/#3494);
+    legacy-ключ specialty_data.procedures (эпоха #3491) читается временно
+    как transitional READ alias (Phase A миграции P3): legacy-записи
+    проецируются так же и ПОЛНОСТЬЮ — union никогда не прячет строку.
+    Записи не несут стабильного идентификатора, поэтому равенство
+    содержимого не доказывает тождественность клинических событий
+    (review P2): две одинаково описанные процедуры обе остаются видимыми;
+    разбор реально задублированных записей — Phase B (миграция данных с
+    ручным ревью и журналированием), удаление алиаса — Phase C (только
+    после аудита хранимых данных). Идентификаторы строк:
+    emr-<rid>-<index> (canonical) и emr-<rid>-legacy-<index> (alias).
+    Контракт position (review P2, round-3): position — стабильная
+    позиция записи в её ИСХОДНОМ массиве (canonical: индекс в
+    cosmetic_procedures; alias: len(canonical_entries) + индекс в
+    procedures), а не плотный индекс отображаемых строк. Invalid-записи
+    (не-словарь / без procedure_type) пропускаются БЕЗ пересчёта
+    позиций соседей: разрывы допустимы ([valid, invalid, valid] +
+    [alias] → 0, 2, 3), плотность НЕ гарантируется и не требуется —
+    порядок чтения keyset (entry_date, created_at, source, record_id,
+    position) от разрывов не зависит, а id-суффикс и position живут в
+    одном индексном пространстве источника. Гарантируются:
+    уникальность (kind, source, record_id, position) — canonical-индексы
+    строго меньше len(canonical), alias-позиции не меньше — и
+    canonical-раньше-legacy при тай-брейках порядка чтения (тот же
+    порядок, что in-memory union прежней endpoint-реализации #3508).
     """
     items: list[tuple[DermaProcedureHistoryOut, int, int]] = []
     for record in records:
@@ -286,7 +290,9 @@ def _emr_procedure_items(
         canonical_entries = (
             canonical_entries if isinstance(canonical_entries, list) else []
         )
-        if not canonical_entries:
+        legacy_entries = specialty_data.get("procedures")
+        legacy_entries = legacy_entries if isinstance(legacy_entries, list) else []
+        if not canonical_entries and not legacy_entries:
             continue
         visit = visits.get(record.visit_id)
         fallback_date = history_exam_date(visit, record)
@@ -303,6 +309,26 @@ def _emr_procedure_items(
                     ),
                     record.id,
                     index,
+                )
+            )
+        # Без исключения по содержимому: одинаково описанные записи в двух
+        # массивах могут быть двумя отдельными клиническими событиями;
+        # скрытие одной — риск потери данных, который read-путь не имеет
+        # права брать на себя (review P2).
+        legacy_offset = len(canonical_entries)
+        for index, entry in enumerate(legacy_entries):
+            if not isinstance(entry, dict):
+                continue
+            procedure_type = entry.get("procedure_type")
+            if not isinstance(procedure_type, str) or not procedure_type.strip():
+                continue
+            items.append(
+                (
+                    _procedure_history_row(
+                        record, visit, fallback_date, entry, f"legacy-{index}"
+                    ),
+                    record.id,
+                    legacy_offset + index,
                 )
             )
     return items

@@ -4,7 +4,7 @@ API для управления лимитами онлайн-очередей
 
 import logging
 from datetime import date, datetime
-from typing import Any, Literal, NoReturn
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -71,10 +71,6 @@ class QueueLimitResponse(BaseModel):
     start_number: int
     enabled: bool
     current_usage: int
-    queue_length: int
-    policy_version: Literal["legacy", "daily_online_issuances_v1", "mixed"]
-    online_issued_count: int | None
-    online_bookings_remaining: int | None
     doctors_count: int
     # D-2 display-fix (Codex round-1 P2): the aggregate cap the admin UI
     # shows for a multi-doctor specialty — max_per_day x doctors_count.
@@ -93,13 +89,8 @@ class QueueStatusResponse(BaseModel):
     specialty: str
     cabinet: str | None
     day: date
-    queue_id: int | None
     current_entries: int
-    queue_length: int
     max_entries: int
-    policy_version: Literal["legacy", "daily_online_issuances_v1"]
-    online_issued_count: int | None
-    online_bookings_remaining: int | None
     limit_reached: bool
     queue_opened: bool
     online_available: bool
