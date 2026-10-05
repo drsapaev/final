@@ -15,6 +15,12 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Scope: only this integration test and the four plan/checkpoint files. No staging or production used.
 - PR: [#3607](https://github.com/drsapaev/final/pull/3607), still OPEN; rebased correction awaits push. No merge.
 
+### Exact-head checks after correction — 2026-10-05T19:02:17+05:00
+
+- PR HEAD: `bfbbff88915227dd726db5b6fd5273046c0df7ac`; base: `c1781c46a1b03c3404604542bcc9c4c9951f4c89`; PR state OPEN, mergeable, clean.
+- Result from the Code Review CI provider: **19 success, 18 skipped, 0 failure, 0 in progress**; no annotations. Successes include Backend tests, Code Quality, Context Boundary Integrity, PR Required Gate, Frontend–Backend Parity, PR Review Quality Gate, PR lifecycle recommendation, CodeQL languages/security, gitleaks/GitGuardian, Python formatting, CI Scope, security scan and notifications. Skips include staging/production readiness, k6, integration/Docker, frontend unit/build/lint/e2e, Telegram Mini App release, docs/metadata, DAST, Supabase Preview, classify-and-route and failure notifications. Skipped jobs are not passes.
+- This checkpoint changes plan/evidence only. Push it, then query CI for its new exact HEAD before treating the PR cycle as green.
+
 Historical index snapshot from version 2.9: T00–T07 were confirmed MERGED; T08 was IN_PROGRESS with PR #3596/T08.2c OPEN; T09–T18 were PLANNED. This snapshot is superseded by the current checkpoint below and in [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md). The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver.
 
 ## T08.3.2 clock follow-up — 2026-10-05T17:23:29+05:00
