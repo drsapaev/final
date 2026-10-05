@@ -48,7 +48,9 @@ def join_setup(db_session):
     return doctor, token
 
 
-def test_new_patient_log_masks_phone(db_session, join_setup, caplog):
+def test_new_patient_log_masks_phone(
+    db_session, join_setup, queue_admission_open, caplog
+):
     """Новый пациент: лог содержит маскированный телефон и НЕ содержит
     полный номер; постановка в очередь работает как прежде."""
     doctor, token = join_setup
@@ -89,7 +91,7 @@ def test_new_patient_log_masks_phone(db_session, join_setup, caplog):
 
 
 def test_repeat_join_with_same_phone_stays_masked_and_dedupes(
-    db_session, join_setup, caplog
+    db_session, join_setup, queue_admission_open, caplog
 ):
     """Повторная постановка с тем же телефоном: дубликат по сырому номеру
     (dedupe-ветка), и строка 'Создан новый пациент' второй раз не пишется."""
@@ -125,7 +127,7 @@ def test_repeat_join_with_same_phone_stays_masked_and_dedupes(
 
 
 def test_new_patient_log_call_goes_through_mask_phone(
-    db_session, join_setup, monkeypatch, caplog
+    db_session, join_setup, queue_admission_open, monkeypatch, caplog
 ):
     """Дискриминатор source-уровня: строка лога нового пациента обязана
     проходить через app.crud.online_queue.mask_phone. Глобальный
@@ -163,3 +165,34 @@ def test_new_patient_log_call_goes_through_mask_phone(
     assert "<MASKED-13>" in patient_log_records[0].getMessage(), patient_log_records[
         0
     ].getMessage()
+
+
+def test_new_patient_log_failclosed_for_noncanonical_formats(
+    db_session, join_setup, queue_admission_open, caplog
+):
+    """P2-1 (Codex): приклад допускает и хранит неканонические форматы
+    телефона; mask_phone их не распознаёт — лог обязан быть fail-closed
+    (никакого сырого номера, только хвост/скрытие)."""
+    doctor, token = join_setup
+    for phone in ("998901234567", "+998 90 123 45 67", "+998-90-123-45-67"):
+        with caplog.at_level(logging.INFO, logger="app.crud.online_queue"):
+            result = join_online_queue_multiple(
+                db_session,
+                token=token.token,
+                specialist_ids=[doctor.id],
+                phone=phone,
+                patient_name="Синтетический Пациент Лога",
+            )
+        assert result["success"] is True, (phone, result)
+
+        patient_log_records = [
+            record
+            for record in caplog.records
+            if "Создан новый пациент" in record.getMessage()
+        ]
+        assert len(patient_log_records) == 1, (phone, caplog.records)
+        message = patient_log_records[0].getMessage()
+        assert phone not in message, f"raw phone leaked for {phone!r}: {message!r}"
+        assert "•••" in message, f"fail-closed mask expected: {message!r}"
+        db_session.rollback()
+        caplog.clear()
