@@ -1,7 +1,7 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.12 — PR #3607 merged; T08.3.3 GraphQL PostgreSQL proof locally validated.
-**Создан:** 30 сентября 2026. **Обновлён:** 5 октября 2026, 20:53 Asia/Tashkent.
+**Версия:** 3.13 — PR #3607 merged; T08.3.3 PR #3609 open.
+**Создан:** 30 сентября 2026. **Обновлён:** 5 октября 2026, 21:01 Asia/Tashkent.
 **Current task:** T08.3.3 — prove direct GraphQL last-slot quota behavior and complete the source-backed reachable-writer inventory.
 **Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-3-graphql\final`; branch `codex/aqs-T08.3.3-graphql`; base `origin/main` = merge commit `589520ae132313ca9488f3994be8d28f6041975a`.
 **Scope:** focused real-PostgreSQL tests plus these plan/checkpoint journals. GraphQL and compatibility writer code are read-only references; runtime, model, migration, feature flag, frontend, Docker/Compose and staging/production changes are not authorized in this slice. If evidence identifies a runtime gap, stop and create a separately gated task. V1 creation remains default-off.
@@ -13,7 +13,7 @@
 > Следующие две строки — исторический снимок метаданных T08.2c, оставленный для прослеживаемости; текущие ветка и статус указаны выше.
 **Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; PR [#3596](https://github.com/drsapaev/final/pull/3596). Report implementation `718d4d65c5717528e8a93fb819fdf328c63bf772`; future-date compatibility fix `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`; OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`. Focused local checks pass (85 unit/OpenAPI, 4 selected integration). The docs-freshness CI failure on `fd9b1c793` was due to a final CRLF in the generated snapshot; it is removed to match exact app serialization. New exact-head checks pending.
 
-> **T00–T07, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1, T08.3.2 and T08.3.2-P2 — MERGED; T08.3.3 — locally VALIDATED, PR not yet opened; T09–T18 — PLANNED.** PR #3607 merged at `589520ae132313ca9488f3994be8d28f6041975a`. Its exact HEAD had 17 successful checks, 18 skipped, 0 failed; path-aware skips are not passes. T08.3.3 starts from this fresh main commit. See PROGRESS/RESUME and the T08.3.3 entry in `EVIDENCE.md`.
+> **T00–T07, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1, T08.3.2 and T08.3.2-P2 — MERGED; T08.3.3 — PR_OPEN (#3609); T09–T18 — PLANNED.** PR #3607 merged at `589520ae132313ca9488f3994be8d28f6041975a`. Its exact HEAD had 17 successful checks, 18 skipped, 0 failed; path-aware skips are not passes. T08.3.3 starts from this fresh main commit. See PROGRESS/RESUME and the T08.3.3 entry in `EVIDENCE.md`.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -358,7 +358,7 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 
 #### T08.3.3 — Direct GraphQL and remaining reachable writer parity
 
-**Status:** locally VALIDATED; started after the T08.3.2 post-merge P2 follow-up [PR #3607](https://github.com/drsapaev/final/pull/3607) merged at `589520ae132313ca9488f3994be8d28f6041975a`. T08.3.3 PR is not yet open.
+**Status:** PR_OPEN — [PR #3609](https://github.com/drsapaev/final/pull/3609), initial head `ef4b5780f85c302a7a1ac99d5f3aedf496a7c84d`; started after the T08.3.2 post-merge P2 follow-up [PR #3607](https://github.com/drsapaev/final/pull/3607) merged at `589520ae132313ca9488f3994be8d28f6041975a`.
 **Owner candidates:** `backend/app/graphql/mutations.py` plus a focused real-PG test owner and the T08.3 writer coverage table.
 **Required proof:** direct GraphQL last-slot behavior and a source-backed inventory of compatibility/API adapters; status changes, desk derivatives, transfers, deletion and replay never decrease/re-spend the independent issuance counter. Include only adapters proven mounted/reachable. If the legacy `/queue` writer lacks a quota boundary, stop and create a separately gated runtime sub-task.
 **Execution boundary:** test/evidence-only. GraphQL mutation and reachable-writer code are read-only. The initial mandatory gate and its single known-owner retry both selected an Alembic revision despite this test-only scope; the generated migration prompt was read. After the required retry, apply a narrow override grounded in the user-approved plan. Do not change the router or edit a migration. Record the observed gate misroute and override in `PROGRESS.md` and `EVIDENCE.md`.

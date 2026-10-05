@@ -1,6 +1,6 @@
 # Resume — admin queue simplification
 
-## Current continuation checkpoint — T08.3.3 GraphQL quota proof (2026-10-05T20:53:02+05:00)
+## Current continuation checkpoint — T08.3.3 GraphQL quota proof (2026-10-05T21:01:30+05:00)
 
 - PR #3607 is merged at `589520ae132313ca9488f3994be8d28f6041975a` from exact reviewed HEAD `37eb0d4b5d8628bdd8598990ad93a0f4093a7c96`. Its exact-head checks were 17 success, 18 skipped and 0 failures; skipped jobs are not passes. Main and the new task worktree are at the merge commit.
 - Current worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-3-graphql\final`, branch `codex/aqs-T08.3.3-graphql`, clean at start. `C:\final` was fast-forwarded after confirming no tracked edits; its unrelated `.gate_artifacts/` remains untouched.
@@ -12,7 +12,8 @@
 - Validation: targeted GraphQL PostgreSQL case **1 passed, 5 deselected, 2 warnings**; full PG module **6 passed, 0 skipped, 1 warning**; focused GraphQL quota unit cases **3 passed, 4 deselected, 1 warning**; Ruff check, Ruff-format check, Black check, `py_compile`, and `git diff --check` **PASS**. Ruff and Black initially disagreed on three diagnostic-only assertions; concise `repr` messages now satisfy both without changing assertion predicates. No staging or production environment was accessed.
 - Source inventory: mounted legacy and compatibility token routes plus QR-session and permanent-address completion use the canonical allocator; mounted GraphQL `joinQueue` is the only independent successful admission writer. The only runtime count mutation sites are the canonical token allocator and GraphQL, each incrementing once on a new successful v1 issuance. Replay returns/rejects before a second count increment; status edits, delete, staff service additions and transfer copies do not write the counter. Deprecated `crud.online_queue.join_online_queue` is not reachable because its old router is unmounted and no caller exists.
 - Disposable database/container, WSL keepalive and synthetic password file were removed; port 55437 is released.
-- Next: commit/push and open a dedicated PR. Do not merge it or enable `QUEUE_POLICY_V2_CREATION_ENABLED`. If any future review or check reveals a runtime gap, stop and create a separately gated task.
+- PR #3609 is open at initial head `ef4b5780f85c302a7a1ac99d5f3aedf496a7c84d`, based on main `589520ae132313ca9488f3994be8d28f6041975a`. The initial CI snapshot is still running/queued; the status journal update will change PR HEAD, so fetch checks again after pushing it. No formal review or merge has been submitted.
+- Next: commit/push the PR-open checkpoint and inspect exact-head checks. Do not merge it or enable `QUEUE_POLICY_V2_CREATION_ENABLED`. If any future review or check reveals a runtime gap, stop and create a separately gated task.
 
 ## Historical checkpoint — QR and queue clock seam correction (2026-10-05T19:21:23+05:00)
 
