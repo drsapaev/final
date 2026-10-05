@@ -4,9 +4,9 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 
 Historical index snapshot from version 2.9: T00–T07 were confirmed MERGED; T08 was IN_PROGRESS with PR #3596/T08.2c OPEN; T09–T18 were PLANNED. This snapshot is superseded by the current checkpoint below and in [RESUME.md](RESUME.md) and [PROGRESS.md](PROGRESS.md). The accepted #3543 deferral is not PASS and never automatically authorizes another PR or validation waiver.
 
-## T08.3.2 — 2026-10-05T13:38:15+05:00
+## T08.3.2 — 2026-10-05T13:41:40+05:00
 
-- Commit under test: worktree diff based on `34ca6e59080dc679a6c7f921ac88a6aacb34e996`; branch `codex/aqs-T08.3.2-qr-session`; no implementation commit yet.
+- Commit under test: code/test commit `b3ca1a270aa8ac2b0808487a398442acb39c6466` on branch `codex/aqs-T08.3.2-qr-session`, based on `34ca6e59080dc679a6c7f921ac88a6aacb34e996`.
 - Environment: Windows backend venv Python 3.11.9; WSL Docker 29.1.3; temporary PostgreSQL 16 container bound to an otherwise-free loopback port; random one-run credential held only in the test process. Existing PG fixture created a UUID-named synthetic scratch database and ran `alembic upgrade head`; teardown dropped the scratch database and removed the container. The final run ended with no containers in `docker ps`.
 - Execution mode: `gate_known_root_cause` after one misrouted mandatory-gate attempt. First result selected unrelated Docker/Compose packaging (`gate_misroute=false`, `override_used=false`, `handoff_required=true`). The required retry used known owner `backend/app/services/qr_queue/_sessions.py` and returned `narrow_override` (`gate_misroute=true`, `override_used=true`, `handoff_required=true`); its execution prompt was read. The task's explicit approved T08.3.2 plan is the narrow-override basis; work was limited to the existing QR PG test module and plan journals. No runtime code changed.
 - Allowed paths: `backend/tests/integration/test_qr_family_phone_identity.py`, `.ai-factory/plans/codex-admin-queue-simplification.md`, `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,EVIDENCE}.md`.
@@ -17,8 +17,8 @@ Historical index snapshot from version 2.9: T00–T07 were confirmed MERGED; T08
 - Additional validation: `scripts/run_backend_pytest.ps1 tests/unit/test_qr_queue_service_allocator_boundary.py -q` — **4 passed, 1 warning** using the unit suite's SQLite fixture; scoped Ruff check — PASS; `py_compile` — PASS; `git diff --check` — PASS.
 - Formatting follow-up: the first pre-commit run applied Black to a few existing long lines in this same module and stopped before creating a commit. Two existing assertion messages were shortened to resolve the Black/Ruff formatter disagreement. `ruff format --check`, `black --check`, and `ruff check` then all passed; the formatting-only edits do not change test behavior.
 - Scope check: no change to `backend/app/services/qr_queue/_sessions.py`; no schema, data outside the random scratch DB, feature-flag, staging or production changes. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off.
-- Remaining limitation: no staging/browser, full system validation, CI, or production behavior claim; this slice adds real-PG tests only. Exact PR-head CI is not yet run because no PR exists. The final formatting-only rewrite happened after the 11-test PostgreSQL run; no logic changed.
-- PR: none yet.
+- Remaining limitation: no staging/browser, full system validation, or production behavior claim; this slice adds real-PG tests only. Exact PR-head CI is pending until the journal checkpoint is pushed. The final formatting-only rewrite happened after the 11-test PostgreSQL run; no logic changed.
+- PR: [#3600](https://github.com/drsapaev/final/pull/3600), open on code/test commit `b3ca1a270aa8ac2b0808487a398442acb39c6466`.
 - Merge commit: none.
 
 ## T00 — 2026-09-30

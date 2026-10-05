@@ -1,11 +1,11 @@
 # Progress
 
-## Current authoritative checkpoint — T08.3.2 (2026-10-05T13:38:15+05:00)
+## Current authoritative checkpoint — T08.3.2 (2026-10-05T13:41:40+05:00)
 
 Plan version: 3.1
 Execution permission: IMPLEMENTATION_ACTIVE — user said “продолжай” after T08.3.1 merged.
 Current task: T08.3.2 — real PostgreSQL proof for QR join-session transaction, replay snapshot and partial batches.
-Current status: VALIDATED locally; final scope review passed, no commit or PR yet. Managed worktree base is `34ca6e59080dc679a6c7f921ac88a6aacb34e996`; branch `codex/aqs-T08.3.2-qr-session`.
+Current status: PR_OPEN — [PR #3600](https://github.com/drsapaev/final/pull/3600), code/test commit `b3ca1a270aa8ac2b0808487a398442acb39c6466`; exact-head checks pending after this documentation checkpoint. Managed worktree base is `34ca6e59080dc679a6c7f921ac88a6aacb34e996`; branch `codex/aqs-T08.3.2-qr-session`.
 Mode: `gate_known_root_cause`. First mandatory gate routed to unrelated Docker/Compose packaging (`gate_misroute=false`, `override_used=false`, `handoff_required=true`). Required one retry with confirmed owner `backend/app/services/qr_queue/_sessions.py` returned `narrow_override` (`gate_misroute=true`, `override_used=true`, `handoff_required=true`). Its execution prompt was read. The returned first-touch list still contains unrelated packaging files and omits a test owner; apply the plan-approved narrow scope below. This is an explicit gate misroute/override and must be reported.
 Narrow override basis: the user's approved T08.3 plan explicitly allows the QR session service to remain read-only while adding real PostgreSQL proof in an existing QR-session PG test module or one newly gated module. No runtime behavior change is authorized by this checkpoint. If evidence reveals a runtime defect, stop and obtain a fresh gate before any runtime edit.
 Canonical anchors: `.ai-factory/plans/codex-admin-queue-simplification.md` T08.3.2; `backend/app/services/qr_queue/_sessions.py` (`complete_join_session`, `complete_join_session_multiple`, replay snapshot); `backend/tests/integration/test_qr_family_phone_identity.py` (synthetic scratch-PostgreSQL fixture and QR session flows); `backend/app/services/queue_domain_service.py` and focused allocator/quota tests as read-only references; `docs/runbooks/AGENT_SESSION_WORKTREES.md`; `docs/runbooks/CODEX_SUPERPOWERS_GUARD.md`.
@@ -14,12 +14,12 @@ Denied paths: `backend/app/**` (including `_sessions.py`), `backend/alembic/**`,
 Validation: full `backend/tests/integration/test_qr_family_phone_identity.py` against a disposable PostgreSQL 16 container — **11 passed, 1 warning**; `backend/tests/unit/test_qr_queue_service_allocator_boundary.py` on its SQLite fixtures — **4 passed, 1 warning**; scoped Ruff check, `py_compile`, `ruff format --check`, `black --check`, and `git diff --check` — PASS. Pre-commit Black normalized a few old long lines in this module; two assertion messages were shortened to keep Black/Ruff formatting aligned, with no behavior change.
 Stop conditions: gate-approved path mismatch; any runtime defect; test fixture cannot prove independent PostgreSQL sessions or cannot guarantee disposable DB isolation; unclear partial-result contract; production/staging data access; database/service instability.
 Completed checks: exact lost-response replay returns the saved response without another issuance; pre-commit injected failures in both single and multi flows leave the committed session, patient, entry and issuance counter untouched; a permitted partial multi-target result commits only the accepted item, reports the rejected item, persists exact snapshot and replays without counter changes. The first PG-connected runs exposed only test-fixture setup issues (v1 time window, missing QR profiles, then non-unique synthetic profile keys); those fixtures were corrected and the final full-module run passed.
-Next exact action: stage the formatter-adjusted test file and plan journals, commit and push one focused PR, inspect exact-head CI, then wait for the user's review/merge decision. Do not merge or start T08.3.3 without the PR cycle closing and separate authorization.
+Next exact action: commit and push this PR-status checkpoint, inspect checks on the resulting exact PR HEAD, and wait for the user's review/merge decision. Do not merge or start T08.3.3 without the PR cycle closing and separate authorization.
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T08.3.1 | MERGED | PR #3599 | `a452c54e5851611476c1b2ac3e3298aeff467eca` | `EVIDENCE.md#t08.3.1` |
-| T08.3.2 | VALIDATED | `codex/aqs-T08.3.2-qr-session` | | `EVIDENCE.md#t08.3.2` |
+| T08.3.2 | PR_OPEN | [PR #3600](https://github.com/drsapaev/final/pull/3600) | | `EVIDENCE.md#t08.3.2` |
 | T08.3.3 | PLANNED | | | |
 
 ## Current authoritative checkpoint — T08.3.1 (2026-10-05T00:28:28+05:00)
