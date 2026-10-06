@@ -35,6 +35,7 @@ from app.crud import (
 from app.db.session import get_db
 from app.models.user import User
 from app.models.user_profile import UserProfile
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 
 crud_appointment = _importlib.import_module("app.crud.appointment")
 crud_patient = _importlib.import_module("app.crud.patient")
@@ -67,6 +68,7 @@ def _appointment_datetime(appointment: Any) -> datetime:
     else:
         appt_time = time.min
     return datetime.combine(appt_date, appt_time)
+
 
 router = APIRouter()
 
@@ -240,9 +242,7 @@ async def get_doctor_schedule(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/services/search", response_model=dict[str, Any])
@@ -320,9 +320,7 @@ async def get_service_categories(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ==================== ОЧЕРЕДИ ====================
@@ -371,10 +369,7 @@ async def get_queues_status(
                     ),
                     specialty=(
                         queue.queue_tag
-                        if (
-                            queue.queue_resource_id is not None
-                            and queue.queue_tag
-                        )
+                        if (queue.queue_resource_id is not None and queue.queue_tag)
                         else _doctor_specialty(doctor)
                     ),
                     current_number=current_number,
@@ -388,9 +383,7 @@ async def get_queues_status(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/queues/my-position", response_model=dict[str, Any])
@@ -436,10 +429,7 @@ async def get_my_queue_position(
                     ),
                     "specialty": (
                         queue.queue_tag
-                        if (
-                            queue.queue_resource_id is not None
-                            and queue.queue_tag
-                        )
+                        if (queue.queue_resource_id is not None and queue.queue_tag)
                         else _doctor_specialty(doctor)
                     ),
                     "my_number": position.number,
@@ -454,9 +444,7 @@ async def get_my_queue_position(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ==================== УПРАВЛЕНИЕ ЗАПИСЯМИ ====================
@@ -549,6 +537,28 @@ async def reschedule_appointment(
                 hour=int(time_parts[0]), minute=int(time_parts[1])
             )
 
+        # Atomic slot reservation (audit P0, PR-0b): this endpoint previously
+        # wrote the new date/time with no occupancy check and no per-doctor
+        # lock, so a mobile patient could land on an already-booked slot and
+        # concurrent reschedules could double-book. Ordering follows the
+        # documented writer contract (app/services/appointment_slot_guard.py):
+        # the FOR UPDATE lock is taken BEFORE the occupancy pre-check. The
+        # doctor is fixed here (no reassignment), so no eligibility check —
+        # same rule as PUT /appointments/{id}.
+        if appointment.doctor_id:
+            lock_doctor_for_slot_reservation(db, appointment.doctor_id)
+            if crud_appointment.appointment.is_time_slot_occupied(
+                db,
+                doctor_id=appointment.doctor_id,
+                appointment_date=new_datetime.date(),
+                appointment_time=new_datetime.strftime("%H:%M"),
+                exclude_appointment_id=appointment.id,
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Это время уже занято у выбранного врача",
+                )
+
         success = crud_appointment.reschedule_appointment(
             db,
             appointment_id=request.appointment_id,
@@ -614,9 +624,7 @@ async def submit_feedback(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ==================== ЭКСТРЕННАЯ ПОМОЩЬ ====================
@@ -673,9 +681,7 @@ async def emergency_contact(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ==================== ПРОФИЛЬ И НАСТРОЙКИ ====================
@@ -745,9 +751,7 @@ async def update_profile(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/profile/avatar", response_model=dict[str, Any])
@@ -804,9 +808,7 @@ async def upload_avatar(
         raise
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/settings/notifications", response_model=dict[str, Any])
@@ -839,9 +841,7 @@ async def update_notification_settings(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/settings/notifications", response_model=dict[str, Any])
@@ -863,9 +863,7 @@ async def get_notification_settings(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ==================== ДОПОЛНИТЕЛЬНЫЕ ENDPOINTS ====================
@@ -908,9 +906,7 @@ async def get_clinic_info(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api_extended.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/version", response_model=dict[str, Any])
