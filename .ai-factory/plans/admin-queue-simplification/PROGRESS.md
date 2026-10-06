@@ -1,12 +1,12 @@
-## Current authoritative checkpoint — T09.2 generated API freshness fix (2026-10-06T13:20+05:00)
+## Current authoritative checkpoint — T09.2 code-head CI passed (2026-10-06T13:39+05:00)
 
-Plan version: 3.29
-Current task/status: T09.2 / PR_OPEN — [PR #3614](https://github.com/drsapaev/final/pull/3614). Generated API freshness correction commit: `80e5ad8`; not yet pushed.
+Plan version: 3.30
+Current task/status: T09.2 / PR_OPEN — [PR #3614](https://github.com/drsapaev/final/pull/3614). Generated API freshness correction commit: `80e5ad8`; evidence checkpoint commit: `ca6a1ba8e34ab02cb8773ca38256c33b22516895`.
 Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`
 Branch: `codex/aqs-T09.2-cabinet-apply`
 Base commit: `1d146d857e1570ff2259975f081f80dc0b31ae82` (merged PR #3613; synchronized with `origin/main`)
-Current PR code commit: `80e5ad8`; current remote HEAD before this fix is `c177ad21aeaaa6a81f87dc5a71ba629d35f0d2f2`.
-Last updated: 2026-10-06T13:20+05:00
+Latest verified PR HEAD before this journal-only refresh: `ca6a1ba8e34ab02cb8773ca38256c33b22516895`; base `1d146d857e1570ff2259975f081f80dc0b31ae82`.
+Last updated: 2026-10-06T13:39+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -14,11 +14,11 @@ Last updated: 2026-10-06T13:20+05:00
 | T09.2 | PR_OPEN | [PR #3614](https://github.com/drsapaev/final/pull/3614) | | `EVIDENCE.md#t092-generated-api-freshness-correction` |
 
 ## Current checkpoint
-- Completed: PR #3613 merged and `origin/main` synchronized; T09.2 apply behavior and its post-sync validation remain recorded in EVIDENCE. On superseded code HEAD `3260efc`, GitHub run `37433626477` found the generated-type freshness failure: generator output differed by the missing blank separator after the header. The pinned `openapi-typescript@7.13.0` output now matches the complete committed artifact after Windows CRLF normalization. Correction commit `80e5ad8` changes only `frontend/src/types/generated/api.ts`.
-- Changed but not verified: correction is committed locally but not pushed; PR remote HEAD is still `c177ad21`. Exact pinned generation comparison and `git diff --cached --check` passed before commit. All commit hooks passed except ESLint, explicitly skipped because the local hook could not fetch its missing package; hosted lint on the corrected PR HEAD is still required. A nested `npm exec … npm run` attempt failed to expose its temporary binary to `npx` and is not a generator pass.
-- Remaining: update and push this evidence checkpoint with the one-line correction, inspect applicable checks on that exact new HEAD, then obtain independent review. Staging/browser/full system-health remain NOT_RUN; deferral acknowledgement is unchecked and no deferral has been accepted.
-- Blocker: merge remains on hold until exact-head CI and independent review pass and a separate Tier 2 staging/deferral decision is made. No staging or production validation is claimed.
-- Next exact action: push the generated-type fix and checkpoint together, then inspect and wait for checks on the resulting exact PR HEAD. Do not merge from this checkpoint.
+- Completed: PR #3613 merged and `origin/main` synchronized; T09.2 apply behavior and post-sync validation remain recorded in EVIDENCE. Correction commit `80e5ad8` fixes generated API freshness; pinned generator output matches the complete artifact. Exact code/evidence HEAD `ca6a1ba8e34ab02cb8773ca38256c33b22516895` passed run `37435553039`: 26 success, 13 skipped, 0 failure, 0 pending. Backend, Frontend E2E/lint/type-check/unit/build, OpenAPI freshness, Code Quality, parity, context-boundary, security and required gate passed. Two duplicate lifecycle/review-quality runs were cancelled; their replacement runs passed.
+- Changed but not verified: PR body candidate and this journal now record the exact-head results; the body gate passed 19 tests and both samples. Remote description and journal checkpoint are not yet pushed. The resulting documentation-only head needs a fresh check snapshot. Commit-time ESLint was skipped because the local package is unavailable; hosted Frontend lint passed. Staging/browser/full system-health remain NOT_RUN; no deferral has been accepted.
+- Remaining: validate and push the evidence/PR-body checkpoint, verify resulting exact-head checks, then obtain independent review and a separate explicit Tier 2 staging/deferral decision.
+- Blocker: merge remains on hold pending independent review and the staging/deferral decision. No staging or production validation is claimed.
+- Next exact action: update remote PR description, commit/push this evidence update, and inspect the resulting exact HEAD. Do not merge from this checkpoint.
 - Checks to rerun after any runtime/generated change: exact CI generated-types freshness, frontend lint/type-check, and `git diff --check`; prior focused cabinet + disposable PostgreSQL evidence remains valid because this fix changes no API schema or runtime code.
 
 ## Prior checkpoint — T09.1 continuation decision (superseded)
