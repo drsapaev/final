@@ -23,6 +23,17 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Result: locally `VALIDATED`; no commit or PR yet. Do not report staging/system acceptance. Next exact action: final scope review, checkpoint capture, commit/push and open PR; then await exact-head CI and human merge direction.
 - PR / merge commit: pending.
 
+## T09.1 PR #3612 opened — 2026-10-06T06:33+05:00
+
+- Code commit under review: `4457244a4a3967a0de95fbb1f7c007377415f6e9`; base `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`; branch `codex/aqs-T09.1-cabinet-preview`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`. Draft PR #3612: https://github.com/drsapaev/final/pull/3612.
+- Scope is the read-only preview/DTO/service/repository/API endpoint, focused tests, generated OpenAPI/TypeScript artifacts, and plan journals. Ten paths only. No UI, apply, audit write, model/migration, default/bulk/sync mutation, staging or production changes.
+- Focused tests rerun after the final code-only test cleanup: cabinet service + OpenAPI contract modules **49 passed, 1 warning** with import-only `DATABASE_URL=sqlite:///:memory:`. Existing repository query coverage uses its temporary unit SQLite fixture; this is not PostgreSQL evidence.
+- Ruff, Ruff format, Black, Python compile, `git diff --check`, and standalone generated TypeScript check passed on the code commit. `npm run generate:api-types` could not resolve worktree dependencies through WSL npx; the pinned installed `openapi-typescript 7.13.0` generated the artifact from `C:\final\frontend`.
+- Commit hooks: large-file/conflict/private-key/JSON/EOF/whitespace/gitleaks/Ruff/Ruff-format/Black and repository hygiene hooks passed. The frontend ESLint wrapper is misconfigured: it changes to `frontend/` but passes the staged path with its `frontend/` prefix, so ESLint cannot find the file. Its comment claims this prefix is stripped, but the command does not do so. Direct ESLint invocation finds the generated API types are intentionally ignored by `frontend/eslint.config.js`; standalone TypeScript validation passed. Only this wrapper was skipped on commit; no code lint failure is claimed.
+- Exact-head review and hosted CI are pending. Full frontend type-check/build, PostgreSQL, staging, and production remain **NOT_RUN**. No human GitHub review or merge was submitted.
+- Next exact action: run `aif-review` against PR #3612, inspect checks on the exact current head, fix any in-scope findings, then refresh this evidence. Do not begin T09.2 before this PR cycle closes and main is synchronized.
+- Merge commit: none.
+
 ## T08.3.3 PR #3609 merged — 2026-10-05T22:10+05:00
 
 - Exact reviewed PR HEAD: `4e6c15402eb14a69a0daf9ae6d3503d5759b2c67`; merge commit: `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`.
