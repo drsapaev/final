@@ -48,6 +48,7 @@ import asyncio
 import base64
 import hashlib
 import heapq
+import hmac
 import json
 import logging
 import re
@@ -340,6 +341,22 @@ def redact_redis_url(url: str) -> str:
 def payload_hash(body: bytes | None) -> str:
     """Canonical request-body hash binding a key to its payload (Codex R2 #3092)."""
     return hashlib.sha256(body or b"").hexdigest()
+
+
+def _idempotency_key_log_fingerprint(key: str) -> str:
+    """Return a stable, non-reversible log identifier for a caller-owned key.
+
+    HMAC prevents low-entropy or accidentally sensitive key values from being
+    recovered by guessing against ordinary log access. The domain prefix keeps
+    this diagnostic fingerprint separate from other uses of ``SECRET_KEY``.
+    """
+    from app.core.config import settings
+
+    return hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        b"idempotency-key-log-v1:" + key.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()[:16]
 
 
 def _user_authorized_in_db(
@@ -1995,6 +2012,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
             return _principal_refusal_response()
 
+        key_fingerprint = _idempotency_key_log_fingerprint(idempotency_key)
+
         # Round-3 (owner P2): the idempotency identity is the OPERATION, not
         # just the principal — method + normalized path join the namespace,
         # so one key can never alias two different operations that share a
@@ -2026,8 +2045,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         if patient_fall_through:
             logger.warning(
                 "Idempotency replay policy: no ACTIVE Patient card; bypassing replay, "
-                "endpoint guards decide: user=%s key=%s path=%s",
-                canonical_id, idempotency_key, request.url.path,
+                "endpoint guards decide: user=%s key_fingerprint=%s path=%s",
+                canonical_id, key_fingerprint, request.url.path,
             )
             return await call_next(request)
         if patient_scope and patient_user_active is False:
@@ -2040,8 +2059,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             # replayed, and the endpoint never starts.
             logger.warning(
                 "Idempotency replay policy: DEACTIVATED patient account; refusing "
-                "keyed write (non-executing, audited): user=%s key=%s path=%s",
-                canonical_id, idempotency_key, request.url.path,
+                "keyed write (non-executing, audited): user=%s key_fingerprint=%s path=%s",
+                canonical_id, key_fingerprint, request.url.path,
             )
             return _principal_refusal_response()
 
@@ -2102,8 +2121,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         if claim is not None and claim.required and not claim.try_available():
             logger.warning(
                 "Idempotency coordination unavailable (required Redis down): "
-                "user=%s key=%s path=%s — refusing keyed write",
-                user_id, idempotency_key, request.url.path,
+                "user=%s key_fingerprint=%s path=%s — refusing keyed write",
+                user_id, key_fingerprint, request.url.path,
             )
             return Response(
                 status_code=503,
@@ -2171,9 +2190,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 if claim is not None and claim.required:
                     logger.warning(
                         "Idempotency scope binding unresolved (required Redis degraded "
-                        "after the initial gate): user=%s key=%s path=%s — refusing "
+                        "after the initial gate): user=%s key_fingerprint=%s path=%s — refusing "
                         "keyed write",
-                        canonical_id, idempotency_key, request.url.path,
+                        canonical_id, key_fingerprint, request.url.path,
                     )
                     return Response(
                         status_code=503,
@@ -2199,9 +2218,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 else:
                     logger.warning(
                         "Idempotency scope binding unknown while coordination is "
-                        "degraded: user=%s key=%s path=%s — refusing conservatively "
+                        "degraded: user=%s key_fingerprint=%s path=%s — refusing conservatively "
                         "(the key may be bound in Redis only)",
-                        canonical_id, idempotency_key, request.url.path,
+                        canonical_id, key_fingerprint, request.url.path,
                     )
                     return Response(
                         status_code=503,
@@ -2216,9 +2235,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     )
             if bound_scope != patient_scope:
                 logger.warning(
-                    "Idempotency scope mismatch: key=%s bound to %s but current "
+                    "Idempotency scope mismatch: key_fingerprint=%s bound to %s but current "
                     "card scope is %s — refusing: user=%s path=%s",
-                    idempotency_key,
+                    key_fingerprint,
                     bound_scope,
                     patient_scope,
                     canonical_id,
@@ -2242,9 +2261,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
         if local_mismatch:
             logger.warning(
-                "Idempotency payload mismatch (local): user=%s key=%s path=%s — refusing to replay "
+                "Idempotency payload mismatch (local): user=%s key_fingerprint=%s path=%s — refusing to replay "
                 "the original success for changed data",
-                user_id, idempotency_key, request.url.path,
+                user_id, key_fingerprint, request.url.path,
             )
             return self._payload_mismatch_response()
         if cached is not None:
@@ -2266,8 +2285,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
             if not authorized:
                 logger.warning(
-                    "Idempotency replay refused (principal not authorized): user=%s key=%s path=%s",
-                    user_id, idempotency_key, request.url.path,
+                    "Idempotency replay refused (principal not authorized): user=%s key_fingerprint=%s path=%s",
+                    user_id, key_fingerprint, request.url.path,
                 )
                 # Codex R8 #3092 (P1): НЕИСПОЛНЯЮЩИЙ отказ — эндпоинт не
                 # запускается, снапшот не эвиктится (восстановление после
@@ -2278,8 +2297,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 permitted is None and (cached_role is None or current_role == cached_role)
             ):
                 logger.info(
-                    "Idempotency hit: user=%s key=%s method=%s path=%s — returning cached response",
-                    user_id, idempotency_key, request.method, request.url.path,
+                    "Idempotency hit: user=%s key_fingerprint=%s method=%s path=%s — returning cached response",
+                    user_id, key_fingerprint, request.method, request.url.path,
                 )
                 # Round-10 (owner P2, PR #3340): the endpoint never runs on a
                 # replay — the per-patient trail records THIS attempt here
@@ -2294,8 +2313,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # an allowed role, the same-key retry replays again instead
                 # of re-executing the write.
                 logger.warning(
-                    "Idempotency replay refused (endpoint policy): user=%s key=%s path=%s (stored=%s current=%s) — falling through",
-                    user_id, idempotency_key, request.url.path, cached_role, current_role,
+                    "Idempotency replay refused (endpoint policy): user=%s key_fingerprint=%s path=%s (stored=%s current=%s) — falling through",
+                    user_id, key_fingerprint, request.url.path, cached_role, current_role,
                 )
                 return await call_next(request)
             # permitted is None (policy unknown) AND the role label changed:
@@ -2304,8 +2323,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             # operations drop ONLY the snapshot from the atomic entry — the
             # card binding is unchanged and keeps guarding the key.
             logger.warning(
-                "Idempotency replay refused (role changed since execution, policy unknown): user=%s key=%s path=%s (%s -> %s) — re-executing",
-                user_id, idempotency_key, request.url.path, cached_role, current_role,
+                "Idempotency replay refused (role changed since execution, policy unknown): user=%s key_fingerprint=%s path=%s (%s -> %s) — re-executing",
+                user_id, key_fingerprint, request.url.path, cached_role, current_role,
             )
             if patient_scope and origin_ns:
                 _local_patient_outcome_forget_snapshot(origin_ns, idempotency_key, patient_scope)
@@ -2324,8 +2343,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             if replayed is not None:
                 if stored_hash and stored_hash != incoming_hash:
                     logger.warning(
-                        "Idempotency payload mismatch (distributed): user=%s key=%s path=%s",
-                        user_id, idempotency_key, request.url.path,
+                        "Idempotency payload mismatch (distributed): user=%s key_fingerprint=%s path=%s",
+                        user_id, key_fingerprint, request.url.path,
                     )
                     return self._payload_mismatch_response()
                 # Codex R3/R4 #3092: authorization + role binding before
@@ -2338,8 +2357,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 )
                 if not authorized:
                     logger.warning(
-                        "Idempotency distributed replay refused (principal not authorized): user=%s key=%s path=%s",
-                        user_id, idempotency_key, request.url.path,
+                        "Idempotency distributed replay refused (principal not authorized): user=%s key_fingerprint=%s path=%s",
+                        user_id, key_fingerprint, request.url.path,
                     )
                     # Codex R8 #3092 (P1): неисполняющий отказ, снапшот хранится.
                     return _principal_refusal_response()
@@ -2348,8 +2367,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     permitted is None and (stored_role is None or current_role == stored_role)
                 ):
                     logger.info(
-                        "Idempotency distributed replay: user=%s key=%s path=%s",
-                        user_id, idempotency_key, request.url.path,
+                        "Idempotency distributed replay: user=%s key_fingerprint=%s path=%s",
+                        user_id, key_fingerprint, request.url.path,
                     )
                     # Round-10 (owner P2, PR #3340): same audit contract for
                     # the cross-worker snapshot — every patient-scope replay
@@ -2362,8 +2381,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # to require_roles (403 + audit); snapshot KEPT (see the
                     # local-cache branch).
                     logger.warning(
-                        "Idempotency distributed replay refused (endpoint policy): user=%s key=%s path=%s (stored=%s current=%s) — falling through",
-                        user_id, idempotency_key, request.url.path, stored_role, current_role,
+                        "Idempotency distributed replay refused (endpoint policy): user=%s key_fingerprint=%s path=%s (stored=%s current=%s) — falling through",
+                        user_id, key_fingerprint, request.url.path, stored_role, current_role,
                     )
                     return await call_next(request)
                 # permitted is None (policy unknown) AND role changed:
@@ -2371,8 +2390,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # re-executes and re-stores with the fresh role. Round-7:
                 # patient operations drop ONLY the atomic entry's snapshot.
                 logger.warning(
-                    "Idempotency distributed replay refused (role changed since execution, policy unknown): user=%s key=%s path=%s (%s -> %s) — re-executing",
-                    user_id, idempotency_key, request.url.path, stored_role, current_role,
+                    "Idempotency distributed replay refused (role changed since execution, policy unknown): user=%s key_fingerprint=%s path=%s (%s -> %s) — re-executing",
+                    user_id, key_fingerprint, request.url.path, stored_role, current_role,
                 )
                 claim.forget_response(user_id, idempotency_key)
                 if patient_scope and origin_ns:
@@ -2442,9 +2461,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 if legacy_hash and legacy_hash != incoming_hash:
                     logger.warning(
                         "Idempotency payload mismatch (legacy namespace): "
-                        "user=%s key=%s path=%s",
+                        "user=%s key_fingerprint=%s path=%s",
                         canonical_id,
-                        idempotency_key,
+                        key_fingerprint,
                         request.url.path,
                     )
                     return "mismatch"
@@ -2456,9 +2475,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 if not authorized:
                     logger.warning(
                         "Idempotency legacy replay refused (principal not authorized): "
-                        "user=%s key=%s path=%s",
+                        "user=%s key_fingerprint=%s path=%s",
                         canonical_id,
-                        idempotency_key,
+                        key_fingerprint,
                         request.url.path,
                     )
                     return "unauthorized"
@@ -2479,9 +2498,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # fresh request; the legacy snapshot is KEPT.
                     logger.warning(
                         "Idempotency legacy replay refused (endpoint policy): "
-                        "user=%s key=%s path=%s (stored=%s current=%s) — falling through",
+                        "user=%s key_fingerprint=%s path=%s (stored=%s current=%s) — falling through",
                         canonical_id,
-                        idempotency_key,
+                        key_fingerprint,
                         request.url.path,
                         legacy_role,
                         current_role,
@@ -2525,10 +2544,10 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     if legacy_foreign_op:
                         logger.info(
                             "Idempotency legacy snapshot belongs to another operation; "
-                            "skipping user-only replay: user=%s key=%s path=%s "
+                            "skipping user-only replay: user=%s key_fingerprint=%s path=%s "
                             "(legacy op=%s)",
                             canonical_id,
-                            idempotency_key,
+                            key_fingerprint,
                             request.url.path,
                             legacy_op_scope,
                         )
@@ -2574,9 +2593,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                             )
                             logger.info(
                                 "Idempotency legacy replay migrated to current namespace: "
-                                "user=%s key=%s path=%s",
+                                "user=%s key_fingerprint=%s path=%s",
                                 canonical_id,
-                                idempotency_key,
+                                key_fingerprint,
                                 request.url.path,
                             )
                             _release_legacy_fence()
@@ -2606,9 +2625,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     if claim.required and not claim.try_available():
                         logger.warning(
                             "Idempotency coordination unavailable while fencing legacy "
-                            "claim (required Redis degraded): user=%s key=%s path=%s — "
+                            "claim (required Redis degraded): user=%s key_fingerprint=%s path=%s — "
                             "refusing keyed write",
-                            canonical_id, idempotency_key, request.url.path,
+                            canonical_id, key_fingerprint, request.url.path,
                         )
                         return Response(
                             status_code=503,
@@ -2664,9 +2683,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                             )
                             logger.info(
                                 "Idempotency legacy replay migrated to current namespace: "
-                                "user=%s key=%s path=%s",
+                                "user=%s key_fingerprint=%s path=%s",
                                 canonical_id,
-                                idempotency_key,
+                                key_fingerprint,
                                 request.url.path,
                             )
                             return legacy_resp
@@ -2681,9 +2700,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         # outcome. The stale snapshot is KEPT.
                         logger.warning(
                             "Idempotency legacy snapshot role binding stale while an old "
-                            "worker may still be executing: user=%s key=%s path=%s — "
+                            "worker may still be executing: user=%s key_fingerprint=%s path=%s — "
                             "refusing in-flight",
-                            canonical_id, idempotency_key, request.url.path,
+                            canonical_id, key_fingerprint, request.url.path,
                         )
                         return Response(
                             status_code=409,
@@ -2704,9 +2723,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         # on top of the running one).
                         logger.warning(
                             "Idempotency legacy claim still in flight (pre-deploy worker): "
-                            "user=%s key=%s path=%s — refusing",
+                            "user=%s key_fingerprint=%s path=%s — refusing",
                             canonical_id,
-                            idempotency_key,
+                            key_fingerprint,
                             request.url.path,
                         )
                         return Response(
@@ -2725,17 +2744,17 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         # outcome is unknown (R9 reconcile).
                         logger.warning(
                             "Idempotency legacy execution intent without outcome "
-                            "(pre-deploy attempt): user=%s key=%s path=%s — refusing",
+                            "(pre-deploy attempt): user=%s key_fingerprint=%s path=%s — refusing",
                             canonical_id,
-                            idempotency_key,
+                            key_fingerprint,
                             request.url.path,
                         )
                         return self._uncertain_outcome_response()
                     logger.warning(
                         "Idempotency legacy claim still in flight (pre-deploy worker): "
-                        "user=%s key=%s path=%s — refusing",
+                        "user=%s key_fingerprint=%s path=%s — refusing",
                         canonical_id,
-                        idempotency_key,
+                        key_fingerprint,
                         request.url.path,
                     )
                     return Response(
@@ -2772,8 +2791,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     )
                     if not authorized:
                         logger.warning(
-                            "Idempotency post-inflight replay refused (principal not authorized): user=%s key=%s path=%s",
-                            user_id, idempotency_key, request.url.path,
+                            "Idempotency post-inflight replay refused (principal not authorized): user=%s key_fingerprint=%s path=%s",
+                            user_id, key_fingerprint, request.url.path,
                         )
                         _release_legacy_fence()
                         return _principal_refusal_response()
@@ -2782,14 +2801,14 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         permitted is None and stored_role is not None and current_role != stored_role
                     ):
                         logger.warning(
-                            "Idempotency post-inflight replay refused (role not permitted): user=%s key=%s path=%s",
-                            user_id, idempotency_key, request.url.path,
+                            "Idempotency post-inflight replay refused (role not permitted): user=%s key_fingerprint=%s path=%s",
+                            user_id, key_fingerprint, request.url.path,
                         )
                         _release_legacy_fence()
                         return await call_next(request)
                     logger.info(
-                        "Idempotency distributed replay (post-inflight): user=%s key=%s",
-                        user_id, idempotency_key,
+                        "Idempotency distributed replay (post-inflight): user=%s key_fingerprint=%s",
+                        user_id, key_fingerprint,
                     )
                     # Round-6: the outcome that JUST completed is dual-written
                     # to the legacy namespace by its round-6 executor, so a
@@ -2804,8 +2823,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         _audit_patient_replay(request, patient_scope)
                     return replayed
                 logger.warning(
-                    "Idempotency conflict: key=%s user=%s is in flight on another worker",
-                    idempotency_key, user_id,
+                    "Idempotency conflict: key_fingerprint=%s user=%s is in flight on another worker",
+                    key_fingerprint, user_id,
                 )
                 # Round-6: the executing worker is a NEW worker (it holds the
                 # new-namespace claim). KEEP our legacy fence — it is the only
@@ -2853,8 +2872,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 )
                 if not authorized:
                     logger.warning(
-                        "Idempotency post-acquire replay refused (principal not authorized): user=%s key=%s path=%s",
-                        user_id, idempotency_key, request.url.path,
+                        "Idempotency post-acquire replay refused (principal not authorized): user=%s key_fingerprint=%s path=%s",
+                        user_id, key_fingerprint, request.url.path,
                     )
                     # Codex R8 #3092 (P1): неисполняющий отказ, снапшот хранится.
                     claim.release(user_id, idempotency_key, claim_token)
@@ -2865,8 +2884,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     permitted is None and (stored_role is None or current_role == stored_role)
                 ):
                     logger.info(
-                        "Idempotency distributed replay (post-acquire): user=%s key=%s path=%s",
-                        user_id, idempotency_key, request.url.path,
+                        "Idempotency distributed replay (post-acquire): user=%s key_fingerprint=%s path=%s",
+                        user_id, key_fingerprint, request.url.path,
                     )
                     claim.release(user_id, idempotency_key, claim_token)
                     _release_legacy_fence()
@@ -2882,8 +2901,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # внутри call_next даст штатный 403 + аудит, снапшот
                     # ХРАНИТСЯ (тот же контракт, что и в ветках выше).
                     logger.warning(
-                        "Idempotency post-acquire replay refused (endpoint policy): user=%s key=%s path=%s (stored=%s current=%s)",
-                        user_id, idempotency_key, request.url.path, stored_role, current_role,
+                        "Idempotency post-acquire replay refused (endpoint policy): user=%s key_fingerprint=%s path=%s (stored=%s current=%s)",
+                        user_id, key_fingerprint, request.url.path, stored_role, current_role,
                     )
                     claim.release(user_id, idempotency_key, claim_token)
                     _release_legacy_fence()
@@ -2893,8 +2912,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # ИСПОЛНЕНИЕ под НАШИМ claim (владение уже захвачено), исход
                 # перезапишется с актуальной ролью — далее штатный путь.
                 logger.warning(
-                    "Idempotency post-acquire replay refused (role changed since execution, policy unknown): user=%s key=%s path=%s (%s -> %s) — re-executing",
-                    user_id, idempotency_key, request.url.path, stored_role, current_role,
+                    "Idempotency post-acquire replay refused (role changed since execution, policy unknown): user=%s key_fingerprint=%s path=%s (%s -> %s) — re-executing",
+                    user_id, key_fingerprint, request.url.path, stored_role, current_role,
                 )
                 claim.forget_response(user_id, idempotency_key)
                 _idempotency_cache.invalidate(user_id, idempotency_key)
@@ -2935,9 +2954,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 )
                 if rebound == _SCOPE_BINDING_RESOLVED and bound_now != patient_scope:
                     logger.warning(
-                        "Idempotency scope re-assert lost to another card: key=%s "
+                        "Idempotency scope re-assert lost to another card: key_fingerprint=%s "
                         "bound to %s, current %s — refusing: user=%s path=%s",
-                        idempotency_key,
+                        key_fingerprint,
                         bound_now,
                         patient_scope,
                         canonical_id,
@@ -2946,9 +2965,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     return self._scope_mismatch_response()
                 logger.warning(
                     "Idempotency scope re-assert unconfirmed before execution: "
-                    "user=%s key=%s path=%s — refusing keyed write",
+                    "user=%s key_fingerprint=%s path=%s — refusing keyed write",
                     canonical_id,
-                    idempotency_key,
+                    key_fingerprint,
                     request.url.path,
                 )
                 return Response(
@@ -3038,8 +3057,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # is_active), коммитил корзину БЕЗ сохранения исхода — потерянный
                 # ответ с тем же ключом дублировал визиты/счета/очередь.
                 logger.warning(
-                    "Idempotency execute path refused pre-execution (principal not authorized): user=%s key=%s path=%s",
-                    user_id, idempotency_key, request.url.path,
+                    "Idempotency execute path refused pre-execution (principal not authorized): user=%s key_fingerprint=%s path=%s",
+                    user_id, key_fingerprint, request.url.path,
                 )
                 if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                     claim.release(user_id, idempotency_key, claim_token)
@@ -3063,8 +3082,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 uncertain_outcome = _local_execution_intent_exists(user_id, idempotency_key)
             if uncertain_outcome:
                 logger.warning(
-                    "Idempotency execution intent without a stored outcome (retry refused): user=%s key=%s path=%s",
-                    user_id, idempotency_key, request.url.path,
+                    "Idempotency execution intent without a stored outcome (retry refused): user=%s key_fingerprint=%s path=%s",
+                    user_id, key_fingerprint, request.url.path,
                 )
                 if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                     claim.release(user_id, idempotency_key, claim_token)
@@ -3118,8 +3137,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                             )
                             if not replay_authorized:
                                 logger.warning(
-                                    "Idempotency lease-lapse replay refused (principal not authorized): user=%s key=%s path=%s",
-                                    user_id, idempotency_key, request.url.path,
+                                    "Idempotency lease-lapse replay refused (principal not authorized): user=%s key_fingerprint=%s path=%s",
+                                    user_id, key_fingerprint, request.url.path,
                                 )
                                 return _principal_refusal_response()
                             # Привязка роли — тот же контракт R4/R6, что и на
@@ -3133,8 +3152,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                                 permitted is None and (stored_role is None or replay_role == stored_role)
                             ):
                                 logger.info(
-                                    "Idempotency replay after lease lapse (outcome stored by the new owner): user=%s key=%s path=%s",
-                                    user_id, idempotency_key, request.url.path,
+                                    "Idempotency replay after lease lapse (outcome stored by the new owner): user=%s key_fingerprint=%s path=%s",
+                                    user_id, key_fingerprint, request.url.path,
                                 )
                                 # Merged-#3340 follow-up (owner P2): the
                                 # lease-lapse replay serves the stored patient
@@ -3145,8 +3164,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                                     _audit_patient_replay(request, patient_scope)
                                 return replayed
                         logger.warning(
-                            "Idempotency lease lapsed before execution (ownership lost): user=%s key=%s path=%s",
-                            user_id, idempotency_key, request.url.path,
+                            "Idempotency lease lapsed before execution (ownership lost): user=%s key_fingerprint=%s path=%s",
+                            user_id, key_fingerprint, request.url.path,
                         )
                         return Response(
                             status_code=409,
@@ -3217,8 +3236,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 if claim.required and not intent_confirmed:
                     logger.warning(
                         "Idempotency execution intent NOT confirmed in distributed store: "
-                        "user=%s key=%s path=%s — refusing keyed write",
-                        user_id, idempotency_key, request.url.path,
+                        "user=%s key_fingerprint=%s path=%s — refusing keyed write",
+                        user_id, key_fingerprint, request.url.path,
                     )
                     if claim_acquired and claim_token is not None:
                         claim.release(user_id, idempotency_key, claim_token)
@@ -3269,9 +3288,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # (уникальный tokenless_marker — чужой не задевается).
                     logger.warning(
                         "Idempotency tokenless attempt refused over a foreign intent marker: "
-                        "user=%s key=%s path=%s",
+                        "user=%s key_fingerprint=%s path=%s",
                         user_id,
-                        idempotency_key,
+                        key_fingerprint,
                         request.url.path,
                     )
                     # PR 3319 (codex P2): False означает и NX-конфликт, и
@@ -3324,8 +3343,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         # check above proved it was ours), release the claim.
                         logger.warning(
                             "Idempotency legacy fence lost before execution: "
-                            "user=%s key=%s path=%s — refusing in-flight",
-                            user_id, idempotency_key, request.url.path,
+                            "user=%s key_fingerprint=%s path=%s — refusing in-flight",
+                            user_id, key_fingerprint, request.url.path,
                         )
                         if claim_acquired and claim_token is not None:
                             claim.clear_execution_intent_if_owner(
@@ -3355,9 +3374,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         # client retries the same key after recovery.
                         logger.warning(
                             "Idempotency legacy intent NOT confirmed (required Redis "
-                            "degraded between intent marks): user=%s key=%s path=%s — "
+                            "degraded between intent marks): user=%s key_fingerprint=%s path=%s — "
                             "refusing keyed write",
-                            user_id, idempotency_key, request.url.path,
+                            user_id, key_fingerprint, request.url.path,
                         )
                         if claim_acquired and claim_token is not None:
                             claim.clear_execution_intent_if_owner(
@@ -3397,8 +3416,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # call_next: fail closed, ничего не исполняем.
                 logger.warning(
                     "Idempotency coordination lost before execution: "
-                    "user=%s key=%s path=%s — refusing keyed write",
-                    user_id, idempotency_key, request.url.path,
+                    "user=%s key_fingerprint=%s path=%s — refusing keyed write",
+                    user_id, key_fingerprint, request.url.path,
                 )
                 if claim_acquired and claim_token is not None:
                     claim.release(user_id, idempotency_key, claim_token)
@@ -3592,9 +3611,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # same-key retry reconciles (409 uncertain_outcome).
                     logger.warning(
                         "Idempotency outcome NOT durably stored (Redis degraded after "
-                        "commit): user=%s key=%s path=%s — keeping unknown-outcome "
+                        "commit): user=%s key_fingerprint=%s path=%s — keeping unknown-outcome "
                         "guards (intents + legacy fence)",
-                        user_id, idempotency_key, request.url.path,
+                        user_id, key_fingerprint, request.url.path,
                     )
                     return Response(
                         content=body_bytes,
@@ -3636,8 +3655,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     if legacy_fence_ns is not None:
                         _clear_local_execution_intent(legacy_fence_ns, idempotency_key)
                 logger.info(
-                    "Idempotency cached: user=%s key=%s method=%s path=%s status=%s",
-                    user_id, idempotency_key, request.method, request.url.path, response.status_code,
+                    "Idempotency cached: user=%s key_fingerprint=%s method=%s path=%s status=%s",
+                    user_id, key_fingerprint, request.method, request.url.path, response.status_code,
                 )
                 # Return a fresh Response with the same body (so client can read it)
                 return Response(
