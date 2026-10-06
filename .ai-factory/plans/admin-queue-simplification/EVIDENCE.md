@@ -2126,6 +2126,15 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Status: rebased commits not yet pushed; new exact-head CI is NOT_RUN. Previous PR-head checks are informational only. Tier 2 staging/backend-dependent E2E, manual viewport/accessibility review, T18 and full STAGING_VALIDATION remain NOT_RUN. No deferral, review or merge decision is accepted.
 - Next exact action: verify remote branch remains at `49b5490db94966f98f5be9356e9fb2aecd67f8dd`, push via `--force-with-lease`, refresh and validate PR body, then inspect all exact-head jobs. Do not merge or begin T10.
 
+## T09.3 final main advancement before force-push — 2026-10-06T22:41+05:00
+
+- New base: `origin/main` advanced from `b95bb2d20357741dabacaaee09bc28323eeaae33` to `dda38b4668e244adbb01c5556863826c2c240ce4` after PR #3622. That commit only changes `docs/plans/2026-09-28-kosmed-site-data-audit.md`; no T09.3 source/test/API file changed.
+- Rebase: replayed the six T09.3 commits onto `dda38b4668e244adbb01c5556863826c2c240ce4`; no conflicts. Runtime commit is now `5617ea88ca6f14cff3fb0c4faf2b940f313f6a7a`; focused test correction is `f1697f509479cd77dc79e545c4e6e1f26d7455fc`; local checkpoint HEAD before this entry is `49b235cae993706bd455db16e115657cb26ab875`.
+- Validation carry-forward: the final rebase added only the single external audit-plan line described above; T09.3 source tree and generated contract are byte-for-byte the same as the immediately preceding validated rebase. The 30 focused backend passes, OpenAPI equality, API types freshness and `git diff --check` are recorded immediately above and remain applicable to the unchanged T09.3 code. New exact-head GitHub CI must still run after the final push.
+- Remote state before the next push: PR #3620 head `959d15bd4deb5f9e87e7e7898ef59a8d6a633e15`; PR base has advanced and `mergeStateStatus=BEHIND`. No remote branch movement was observed.
+- Updated `.scratch/PR-T09.3.md` with the latest base and post-rebase validation evidence; `scripts/run_pr_review_gate_checks.py --body-file .scratch/PR-T09.3.md --author codex` returned PASS. This candidate is local until `gh pr edit` publishes it.
+- Next exact action: after this checkpoint is committed, use `--force-with-lease` requiring remote head `959d15bd4deb5f9e87e7e7898ef59a8d6a633e15`, refresh the PR body on the final main base, and inspect all newly triggered checks. Tier 2 remains NOT_RUN; no deferral/review/merge decision is accepted.
+
 ## PR #3614 exact-head checks and PR-body refresh — 2026-10-06T16:26+05:00
 
 - Commit under test: `3cd2bf1103cd5759c49d9ca73ad8fed4ac686a1f`, PR #3614, base `1d146d857e1570ff2259975f081f80dc0b31ae82`.
