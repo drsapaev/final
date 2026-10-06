@@ -2149,3 +2149,35 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Next exact action: push this documentation checkpoint and inspect the resulting docs-only exact-head checks; then await independent review and the staging/deferral decision.
 - PR: https://github.com/drsapaev/final/pull/3614
 - Merge commit: none.
+
+## T09.3 — latest-main rebase and repeated local validation — 2026-10-06T23:15+05:00
+
+- Execution mode: continuation of the already approved T09.3 narrow override; documentation/checkpoint refresh only. Runtime paths are unchanged.
+- Base: origin/main advanced from dda38b4668e244adbb01c5556863826c2c240ce4 to 2eb87a1d16063c4ba412cb695b87a56349243da7. The upstream range updates two frontend dependency lock entries and adds a CodeQL suppression comment beside an already masked queue phone log. None of these paths overlap T09.3 implementation/test/API files.
+- Rebase: cleanly rebased T09.3 onto 2eb87a1d16063c4ba412cb695b87a56349243da7. Runtime commit: 901d1dd50696ecfc73606b612241a92c1a83a4be; focused regression correction: c3dcc62a5bda62acc9167a613df7248c11da0503; pre-checkpoint local HEAD: 6e2ec6e930df3a2a788306b7f69394cb8424c18b.
+- Local validation on the latest rebased source:
+  - scripts/run_backend_pytest.ps1 tests/unit/test_queue_cabinet_management_api_service.py tests/integration/test_admin_linkage_cleanup.py -q --tb=short — **30 passed, 1 warning**.
+  - Full app.openapi() output byte-equal to committed backend/openapi.json — **PASS**.
+  - npm run generate:api-types:check with process PATH pinned to C:\Program Files\Git\bin / Windows Git Bash / Node 24 — **PASS**. First shell resolution used WSL bash and failed before generation; rerun with Windows Git Bash passed.
+  - git diff --check — **PASS** before this journal-only refresh.
+- Remote state: PR #3620 is OPEN, base still dda38b4668e244adbb01c5556863826c2c240ce4, head f75318c8dde25a2383d62c258204dd5ac6d2b688; both gh pr view and git ls-remote confirmed the branch ref before push. Current local rebase is not on GitHub yet.
+- Prior exact-head evidence: run 37505922179 passed **28 success, 13 skipped, 0 failed, 0 pending** on prior HEAD f75318c8. Those results do not certify current rebased commit IDs. New exact-head GitHub CI is **NOT_RUN** until push.
+- Tier 2 staging/live backend E2E, manual viewport/accessibility, T18 and full STAGING_VALIDATION.md remain **NOT_RUN**. No Tier-2 deferral, review, or merge decision is accepted.
+- Scope check: implementation/test/API changes are unchanged; only T09.3 checkpoint journals and PR evidence text are being refreshed. No staging, production, live app, credentials or patient data were used.
+- Next exact action: validate the refreshed PR body, recheck remote is still f75318c8dde25a2383d62c258204dd5ac6d2b688, push with --force-with-lease, and inspect every exact-head check. Do not start T10 until PR #3620 closes and main is synchronized.
+
+## T09.3 — second main advancement, exact-head CI and local rebase validation — 2026-10-06T23:42+05:00
+
+- Previous exact-head CI: run 37510851862 on 2ba3f7d28ec2c2b2db33fc92c3d7b2f15368ec6c completed **28 success, 13 skipped, 0 failed, 0 pending**. Backend tests, Frontend E2E (13m36s), unit/build/lint, Code Quality, OpenAPI/types freshness, parity, Context Boundary, PR Required Gate, PR Review Quality Gate, lifecycle, security and secret scans passed. Path-aware/unrelated skips are not passes.
+- Main advanced during that run from 2eb87a1d16063c4ba412cb695b87a56349243da7 to d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc by PR #3621. Upstream changes are limited to mobile_api_extended.py and its integration test; T09.3 files do not overlap.
+- Rebase: replayed eight T09.3 commits onto d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc without conflicts. Runtime commit: c13c317c8d7be2cfe96ca51113f6bb35595d49cc; focused test correction: 043573f03aa1656b78db865c6ba32070291b30af; pre-journal-update local HEAD: f832f6262530fe7fa67a858198acf303efb7670b.
+- Latest local validation:
+  - Initial focused test invocation failed before collection because DATABASE_URL was absent in the new shell. Rerun with DATABASE_URL set to an unreachable synthetic URL at 127.0.0.1:1 used the existing test fixtures: **30 passed, 1 warning**.
+  - app.openapi() generated from source byte-matches backend/openapi.json — **PASS**.
+  - npm run generate:api-types:check with PATH pinned to C:\Program Files\Git\bin / Windows Git Bash / Node 24 — **PASS**; git reports no content delta after index refresh.
+  - git diff --check — **PASS**.
+- Remote before next push: main ref d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc and PR branch 2ba3f7d28ec2c2b2db33fc92c3d7b2f15368ec6c. GitHub PR view still showed baseRefOid 2eb87a1d and BEHIND before the new rebase was pushed.
+- Current rebased exact-head CI is **NOT_RUN**. Previous run 37510851862 is evidence only for 2ba3f7d2 and does not certify the current commit IDs.
+- Tier 2 staging/live backend E2E, manual viewport/accessibility, T18 and full STAGING_VALIDATION.md remain **NOT_RUN**. No Tier-2 deferral, review or merge decision is accepted.
+- Scope check: PR source/test/API changes remain in the T09.3 allowlist; upstream mobile API/testing changes are preserved from main. No staging, production, live app, credentials or patient data were used.
+- Next exact action: refresh and validate PR body for new base/head, recheck remote refs, push using --force-with-lease expecting old head 2ba3f7d28ec2c2b2db33fc92c3d7b2f15368ec6c, then inspect all checks on the new exact HEAD.
