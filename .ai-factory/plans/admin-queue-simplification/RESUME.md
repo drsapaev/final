@@ -1,3 +1,13 @@
+## Resume — PR #3614 review fixes
+
+Current branch remains `codex/aqs-T09.2-cabinet-apply` in the existing review worktree at `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`, starting HEAD `04becac5ef9e6bcecc8cd16bc2aa3cbd1b89ba09`, base `1d146d857e1570ff2259975f081f80dc0b31ae82`. PR #3614 is open.
+
+The user asked to fix the two confirmed review findings. Mandatory gate ran from `ai/langgraph` and returned `gate_ok / execute`, no misroute, handoff required. Read its prompt. Do not touch its unrelated generic queue/model/time-window first-touch files. The narrow runtime/test paths used are the display call service, cabinet apply endpoint and existing cabinet service unit-test module; canonical plan journals are updated. Defaults, nurse station assignments, ownership, legacy writers, frontend, ops and staging are unchanged.
+
+Findings: after apply changes a doctor queue's same-day cabinet, the display call still used the Doctor default; expected old-cabinet values were stripped despite being opaque preview snapshots. Planned fix: call uses `queue.cabinet_number or doctor.cabinet` to align with existing resource fallback; request preserves exact `expected_cabinet_number`, while new cabinet normalization stays. Regression tests exercise apply→display call and exact whitespace preview→apply.
+
+Local fix evidence: three focused regressions passed (3 passed, 16 deselected, one existing provider deprecation warning); Ruff check, `py_compile`, and `git diff --check` passed. The first whitespace test attempt failed because the SQLite fixture disables autoflush; adding an explicit fixture flush made it represent an already-persisted legacy value, and the regression passed. Existing disposable-PostgreSQL command evidence was not rerun; database locking/audit code is unchanged. Staging/browser remain NOT_RUN and no deferral is accepted. Next: commit and push only the allowed paths, then verify the new exact-head checks. Do not merge or begin T09.3.
+
 ## Current continuation checkpoint — T09.2 exact code-head CI passed (2026-10-06T13:39+05:00)
 
 - PR #3613 was merged by the user at `1d146d857e1570ff2259975f081f80dc0b31ae82`; local `main` and `origin/main` are synchronized to that commit. Its safe idempotency-key log fingerprint resolves the earlier T09.2 scope hold; details remain in historical evidence.

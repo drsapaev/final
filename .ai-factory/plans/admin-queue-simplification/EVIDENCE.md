@@ -1999,3 +1999,29 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Next exact action: commit and push this documentation-only checkpoint, verify exact-head checks for the resulting PR head, and leave #3596 open for the user's review/merge decision.
 - PR: https://github.com/drsapaev/final/pull/3596
 - Merge commit: none.
+## PR #3614 review-fix local validation — 2026-10-06
+
+- Commit under test: source diff from PR head `04becac5ef9e6bcecc8cd16bc2aa3cbd1b89ba09`; not yet committed/pushed at this checkpoint.
+- Environment: local Windows worktree; SQLite synthetic unit fixtures. No WSL, staging, live application or production data.
+- Execution mode: the mandatory gate and allowed/denied paths are recorded in the preceding pre-edit checkpoint. Actual runtime/test changes stayed inside its three directly relevant first-touch paths; plan journals were updated.
+- Actual changed paths: cabinet apply request DTO, display call service, focused cabinet management service test module; canonical plan/progress/resume/evidence/decision journals.
+- Original failure: preview preserved a whitespace-bearing legacy `cabinet_number`, but request DTO stripped it before exact stale-state comparison. After successful apply, doctor display calls still announced `Doctor.cabinet` instead of the changed day queue cabinet.
+- Validation command: `scripts/run_backend_pytest.ps1` through the repository launcher, targeted to `test_queue_cabinet_management_api_service.py` with `-k 'applied_doctor_daily_cabinet or whitespace_bearing or apply_request_requires'`.
+- Result: **PASS — 3 passed, 16 deselected, 1 existing provider deprecation warning.** This covers apply → display response/broadcast using the daily doctor queue cabinet; exact whitespace-bearing preview → Pydantic → apply; and request shape. Initial P2 test attempt failed because the test session disables autoflush; an explicit flush now models a previously committed legacy value and the same regression passes.
+- Other validation: scoped Ruff check **PASS**; `py_compile` for all three changed Python files **PASS**; `git diff --check` **PASS**.
+- Scope check: no models, migrations, queue writers/defaults, station assignment, frontend, ops, shared staging or production changed. Previous PostgreSQL apply/locking/audit evidence is unchanged and not rerun because this patch changes no DB transaction logic.
+- Remaining limitation: new hosted checks cannot run until push. Staging/browser/full-system validation remains NOT_RUN; no deferral accepted. The existing Tier-2 and merge holds remain.
+- Next exact action: commit and push the allowed files to PR #3614, then verify CI on the resulting head and update its evidence/body.
+
+## PR #3614 review-fix pre-edit checkpoint — 2026-10-06
+
+- Mode: mandatory `gate` for a clinic-today queue cabinet command and call destination.
+- Gate command: `ai/langgraph/scripts/run_agent_gate.ps1` from this worktree's `ai/langgraph`; task described only the two reviewed defects and bounded target files. Result: `gate_ok`, `mode=execute`, `handoff_required=true`, `gate_misroute=false`, `override_used=false`. The generated execution prompt was read. First-touch included the intended display call service, cabinet endpoint and cabinet service test module, plus unrelated generic queue-service/model/queue-time paths. Only the three directly relevant first-touch paths and canonical plan journals are in scope; unrelated paths remain denied.
+- Canonical anchors: T09.2/T09.3 plan; cabinet endpoint/service/repository/tests; display call service; DailyQueue queue-cabinet field; queue ownership ADR. Root/user authorization: user requested fixing the P1 and P2 from PR #3614 review.
+- Allowed runtime/tests: `backend/app/services/display_websocket_api_service.py`, `backend/app/api/v1/endpoints/queue_cabinet_management.py`, `backend/tests/unit/test_queue_cabinet_management_api_service.py`. Allowed documentation: plan, PROGRESS, RESUME, EVIDENCE and DECISIONS.
+- Denied: models/migrations, queue/default writers, nurse station assignment semantics, legacy cabinet writers, unrelated runtime/tests, frontend, ops, shared staging and production.
+- Pre-edit source evidence: display call's resource branch reads the queue cabinet with owner-default fallback, but its doctor branch reads only `Doctor.cabinet`; apply changes only the daily queue row. Preview returns persisted cabinet verbatim, while apply request validation previously stripped expected old values before exact equality.
+- Intended regression coverage: actual cabinet preview/apply followed by actual display call announces the new day's doctor queue cabinet while leaving the owner default intact; whitespace-bearing persisted preview value survives request parsing and applies successfully. Existing stale-value rejection remains unchanged.
+- Stop: if any necessary additional writer/consumer path, ownership ambiguity or denied surface is identified; do not stretch this PR silently.
+- Validation at checkpoint: source review and synthetic repro confirmed both defects. Four focused tests passed during review but did not cover these cases. No implementation checks run yet. Staging/browser NOT_RUN; no deferral accepted.
+- Next: implement only the recorded changes; then run targeted tests, `py_compile` and diff check, and record results separately.

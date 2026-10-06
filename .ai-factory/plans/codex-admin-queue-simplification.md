@@ -1,7 +1,7 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.29 — T09.2 PR #3614 open; hosted checks and independent review pending.
-**Создан:** 30 сентября 2026. **Обновлён:** 6 октября 2026, 13:04 Asia/Tashkent.
+**Версия:** 3.32 — T09.2 PR #3614 review fixes locally validated; pending push and exact-head checks.
+**Создан:** 30 сентября 2026. **Обновлён:** 6 октября 2026, 15:28 Asia/Tashkent.
 **Current task:** T09.2 — implement explicit clinic-today cabinet reassignment with stale-state protection and atomic audit.
 **Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`; branch `codex/aqs-T09.2-cabinet-apply`; base `origin/main` at merge commit `1d146d857e1570ff2259975f081f80dc0b31ae82`.
 **Scope:** T09.2 apply request/response, locking and strict audit in the cabinet service/repository/endpoint; focused unit/API/OpenAPI tests and an isolated PostgreSQL integration proof; generated OpenAPI/API types if needed; canonical plan checkpoints. No model/migration, global audit-service or idempotency middleware edits, frontend runtime, legacy default/bulk/sync writers, ops, shared staging, production or live data. T09.3 owns UI and legacy-writer containment. Queue owner/history/future queues/default cabinet/numbers/status/queue time remain unchanged.
@@ -399,6 +399,7 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 - **Prior stop resolved:** the raw-key logging issue was isolated in historical evidence and fixed by the separately scoped, user-merged PR #3613. Current middleware uses a non-reversible log fingerprint. No middleware change was added to T09.2 and its allowlist was not expanded. Stop if a new raw-key path, incompatible lock order, non-atomic audit, required out-of-scope writer change, or missing PG isolation is found.
 - **PR body gate:** `scripts/run_pr_review_gate_checks.py --body-file .scratch/PR-T09.2.md --author codex` passed 19 unit tests, both documented sample bodies and the T09.2 candidate body. Tier 2 is documented as NOT RUN with reviewer acknowledgement left pending; this is not a deferral acceptance.
 - **Stop:** if status/execution writers reveal incompatible deadlock ordering, the audit cannot be atomic, an out-of-allowlist writer must change to guarantee safety, PG isolation is unavailable, or a called/active target is proposed for transfer. Record any failure as NOT_RUN/FAIL; do not widen paths silently.
+- **Review-fix checkpoint:** review on HEAD `04becac5ef9e6bcecc8cd16bc2aa3cbd1b89ba09` found P1 doctor display calls ignore the reassigned daily cabinet and P2 apply strips the expected old-cabinet snapshot. The user requested both fixes. A mandatory gate on 2026-10-06 returned `gate_ok / execute / handoff_required`; prompt read. This bounded follow-up may change only `display_websocket_api_service.py`, the apply DTO in `queue_cabinet_management.py`, `test_queue_cabinet_management_api_service.py`, and these plan journals. See current PROGRESS/EVIDENCE. Preserve defaults, nurse station behavior, legacy writers, schema, frontend, ops and staging. No staging deferral accepted.
 
 1. Разделить owner default save и explicit queue-ID clinic-today apply; history/future/defaults не затрагивать.
 2. Read-only preview: typed owner/day/old-new/waiting count. Apply: expected old state/reason/stable command replay identity по project pattern; форму записать до edit.

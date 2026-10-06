@@ -216,6 +216,139 @@ class TestQueueCabinetManagementApiService:
         assert resource_queue.cabinet_number == "201"
         assert state == {"committed": False, "rolled_back": True, "audits": []}
 
+    @pytest.mark.asyncio
+    async def test_applied_doctor_daily_cabinet_is_announced_on_display_call(
+        self, db_session, admin_user, monkeypatch
+    ):
+        from unittest.mock import AsyncMock
+
+        from app.api.v1.endpoints.queue_cabinet_management import (
+            CabinetReassignmentApplyRequest,
+        )
+        from app.services.display_websocket_api_service import (
+            DisplayWebSocketApiService,
+        )
+
+        clinic_day = date(2026, 10, 6)
+        monkeypatch.setattr(
+            "app.services.queue_cabinet_management_api_service.clinic_today",
+            lambda _db: clinic_day,
+        )
+        doctor, _resource, doctor_queue, _resource_queue, _yesterday_queue = (
+            self._seed_reassignment_targets(db_session, clinic_day)
+        )
+        entry = OnlineQueueEntry(
+            queue_id=doctor_queue.id,
+            number=17,
+            status="waiting",
+            patient_name="SYNTHETIC-display-target",
+        )
+        db_session.add(entry)
+        db_session.flush()
+
+        cabinet_service = QueueCabinetManagementApiService(db_session)
+        preview = cabinet_service.preview_cabinet_reassignment(
+            queue_ids=[doctor_queue.id], new_cabinet_number="305"
+        )
+        apply_request = CabinetReassignmentApplyRequest(
+            targets=[
+                {
+                    "queue_id": item["queue_id"],
+                    "expected_owner_type": item["owner_type"],
+                    "expected_owner_id": item["owner_id"],
+                    "expected_cabinet_number": item["old_cabinet_number"],
+                }
+                for item in preview["items"]
+            ],
+            new_cabinet_number="305",
+            reason_code="room_unavailable",
+        )
+        cabinet_service.apply_cabinet_reassignment(
+            targets=[target.model_dump() for target in apply_request.targets],
+            new_cabinet_number=apply_request.new_cabinet_number,
+            reason_code=apply_request.reason_code,
+            actor_user_id=admin_user.id,
+            actor_role="Admin",
+            request_id="synthetic-review-display-cabinet",
+        )
+
+        manager = SimpleNamespace(connections=[], broadcast_patient_call=AsyncMock())
+        display_service = DisplayWebSocketApiService(
+            db=None,
+            repository=SimpleNamespace(
+                get_queue_entry=lambda _entry_id: SimpleNamespace(
+                    id=entry.id,
+                    number=entry.number,
+                    patient_name=entry.patient_name,
+                    status="waiting",
+                    called_at=None,
+                    queue=doctor_queue,
+                ),
+                save=lambda: None,
+            ),
+            manager_provider=lambda: manager,
+        )
+        result = await display_service.call_patient(
+            entry_id=entry.id,
+            board_ids=[],
+            current_user=SimpleNamespace(id=admin_user.id, role="Admin"),
+        )
+
+        assert result["call_data"]["cabinet"] == "305"
+        assert manager.broadcast_patient_call.await_args.kwargs["cabinet"] == "305"
+        assert doctor.cabinet == "900"
+
+    def test_apply_accepts_exact_whitespace_bearing_preview_cabinet(
+        self, db_session, admin_user, monkeypatch
+    ):
+        from app.api.v1.endpoints.queue_cabinet_management import (
+            CabinetReassignmentApplyRequest,
+        )
+
+        clinic_day = date(2026, 10, 6)
+        monkeypatch.setattr(
+            "app.services.queue_cabinet_management_api_service.clinic_today",
+            lambda _db: clinic_day,
+        )
+        _doctor, _resource, doctor_queue, _resource_queue, _yesterday_queue = (
+            self._seed_reassignment_targets(db_session, clinic_day)
+        )
+        doctor_queue.cabinet_number = " 101 "
+        db_session.flush()
+
+        cabinet_service = QueueCabinetManagementApiService(db_session)
+        preview = cabinet_service.preview_cabinet_reassignment(
+            queue_ids=[doctor_queue.id], new_cabinet_number="301"
+        )
+        old_snapshot = preview["items"][0]["old_cabinet_number"]
+        assert old_snapshot == " 101 "
+
+        apply_request = CabinetReassignmentApplyRequest(
+            targets=[
+                {
+                    "queue_id": doctor_queue.id,
+                    "expected_owner_type": "doctor",
+                    "expected_owner_id": preview["items"][0]["owner_id"],
+                    "expected_cabinet_number": old_snapshot,
+                }
+            ],
+            new_cabinet_number=" 301 ",
+            reason_code="room_unavailable",
+        )
+        assert apply_request.targets[0].expected_cabinet_number == old_snapshot
+        assert apply_request.new_cabinet_number == "301"
+        result = cabinet_service.apply_cabinet_reassignment(
+            targets=[target.model_dump() for target in apply_request.targets],
+            new_cabinet_number=apply_request.new_cabinet_number,
+            reason_code=apply_request.reason_code,
+            actor_user_id=admin_user.id,
+            actor_role="Admin",
+            request_id="synthetic-review-whitespace-snapshot",
+        )
+
+        assert result["changed_queue_ids"] == [doctor_queue.id]
+        assert doctor_queue.cabinet_number == "301"
+
     def test_apply_cabinet_reassignment_rolls_back_if_strict_audit_insert_fails(
         self, monkeypatch
     ):
@@ -318,11 +451,11 @@ class TestQueueCabinetManagementApiService:
                 reason_code="room_unavailable",
             )
         request = CabinetReassignmentApplyRequest(
-            targets=[target],
+            targets=[target | {"expected_cabinet_number": " 101 "}],
             new_cabinet_number=" 301 ",
             reason_code="room_unavailable",
         )
-        assert request.targets[0].expected_cabinet_number is None
+        assert request.targets[0].expected_cabinet_number == " 101 "
         assert request.new_cabinet_number == "301"
 
     def test_apply_endpoint_requires_key_and_admin_role(

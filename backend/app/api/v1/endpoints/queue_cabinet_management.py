@@ -157,11 +157,6 @@ class CabinetReassignmentApplyTarget(BaseModel):
     expected_owner_id: Annotated[int, Field(gt=0, strict=True)]
     expected_cabinet_number: str | None = Field(..., max_length=20)
 
-    @field_validator("expected_cabinet_number")
-    @classmethod
-    def normalize_expected_cabinet(cls, value: str | None) -> str | None:
-        return value.strip() if value is not None else None
-
 
 class CabinetReassignmentApplyRequest(BaseModel):
     targets: list[CabinetReassignmentApplyTarget] = Field(min_length=1)

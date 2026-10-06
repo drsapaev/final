@@ -164,7 +164,10 @@ class DisplayWebSocketApiService:
         else:
             doctor = queue.specialist
             doctor_name = doctor.user.full_name if doctor and doctor.user else "Врач"
-            cabinet = doctor.cabinet if doctor else None
+            # DailyQueue is the saved clinic-day service location. Its
+            # explicit assignment takes precedence over the owner's default,
+            # matching the resource-owned call path and preserving D2.
+            cabinet = queue.cabinet_number or (doctor.cabinet if doctor else None)
 
         manager = self._manager_provider()
         await manager.broadcast_patient_call(
@@ -184,7 +187,9 @@ class DisplayWebSocketApiService:
                 "cabinet": cabinet,
                 "called_at": queue_entry.called_at.isoformat(),
             },
-            "boards_notified": len(board_ids) if board_ids else len(manager.connections),
+            "boards_notified": (
+                len(board_ids) if board_ids else len(manager.connections)
+            ),
         }
 
     def get_department_queue_state_payload(self, *, department: str) -> dict:
