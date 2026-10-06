@@ -84,7 +84,7 @@ from app.models import (  # noqa: F401 - register the complete metadata
     VisitService,
 )
 from app.models.clinic import ClinicSettings
-from app.models.online_queue import DailyQueue
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.repositories.queue_limits_repository import QueueLimitsRepository
 from app.repositories.visit_confirmation_repository import (
     VisitConfirmationRepository,
@@ -380,9 +380,7 @@ def test_mixed_creators_serialize_on_one_canonical_scope(lock_parity_engine):
             f"forked {len(rows)} active queues for one (day, doctor): "
             f"{[(r.id, r.queue_tag) for r in rows]}"
         )
-        assert set(queue_ids) == {
-            rows[0].id
-        }, f"workers saw different queues: {sorted(queue_ids)} vs {rows[0].id}"
+        assert set(queue_ids) == {rows[0].id}, repr(queue_ids)
 
 
 @pytest.mark.integration
@@ -436,9 +434,7 @@ def test_helper_scope_blocks_the_canonical_service_scope(lock_parity_engine):
         )
         assert service_error == []
         holder.commit()  # releases the transaction-scoped advisory lock
-        assert service_done.wait(
-            timeout=60
-        ), f"the canonical service never finished: {service_error!r}"
+        assert service_done.wait(timeout=60), repr(service_error)
         thread.join(timeout=30)
         assert service_error == []
         assert len(created_queue_id) == 1
@@ -503,9 +499,7 @@ def test_regression_shape_without_parity_is_loud(lock_parity_engine):
         )
         writer_a.commit()  # the conflict materializes for the second writer
         thread.join(timeout=60)
-        assert (
-            outcome.get("b") == "integrity"
-        ), f"the unserialized duplicate insert did not fail loudly: {outcome!r}"
+        assert outcome.get("b") == "integrity", repr(outcome)
     finally:
         writer_a.rollback()
         writer_b.rollback()
@@ -657,3 +651,129 @@ def test_v1_token_admission_rollback_reverts_entry_counter_and_token_usage(
         assert queue.online_issued_count == 0
         assert token_usage == 0
         assert entry_count == 0
+
+
+@pytest.mark.integration
+def test_graphql_v1_last_slot_is_serialized_and_duplicate_does_not_respend(
+    lock_parity_engine, monkeypatch
+):
+    """The independent GraphQL writer cannot issue two tickets for the last
+    v1 slot, and retrying the winning patient does not spend the counter again.
+
+    Calls ``Mutation._join_queue_impl`` from two worker threads. Its patched
+    session factory still opens independent PostgreSQL sessions; the barrier
+    releases both requests together immediately before resolver execution.
+    """
+    from contextlib import contextmanager
+    from datetime import date, datetime, time
+    from types import SimpleNamespace
+    from zoneinfo import ZoneInfo
+
+    from app.crud.daily_queue_creation_policy import (
+        ONLINE_ISSUANCES_V1_POLICY_VERSION,
+    )
+    from app.graphql import mutations as gql_mutations
+    from app.graphql.types import QueueEntryInput
+
+    clinic_zone = ZoneInfo("Asia/Tashkent")
+    day = date(2026, 10, 5)
+    fixed_now = datetime.combine(day, time(8, 0), tzinfo=clinic_zone)
+    doctor_id = _seed_doctor(lock_parity_engine)
+    suffix = uuid.uuid4().hex[:8]
+
+    with Session(lock_parity_engine) as seed:
+        patients = [
+            Patient(
+                last_name=f"SYNTHETIC-GQL-{suffix}-{index}",
+                first_name="SYNTHETIC",
+                middle_name="TEST",
+                phone=f"DEV-DEMO-{suffix}-{index}",
+                email=f"synthetic-gql-{suffix}-{index}@example.com",
+            )
+            for index in range(2)
+        ]
+        seed.add_all(patients)
+        seed.flush()
+        patient_ids = [int(patient.id) for patient in patients]
+        queue = DailyQueue(
+            day=day,
+            specialist_id=doctor_id,
+            queue_tag=None,
+            active=True,
+            opened_at=None,
+            max_online_entries=1,
+            policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+            online_issued_count=0,
+            online_start_time="07:00",
+            online_end_time="09:00",
+        )
+        seed.add(queue)
+        seed.flush()
+        queue_id = int(queue.id)
+        seed.commit()
+
+    class _FixedGraphQLDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz is None:
+                return fixed_now.replace(tzinfo=None)
+            return fixed_now.astimezone(tz)
+
+    monkeypatch.setattr(gql_mutations, "datetime", _FixedGraphQLDateTime)
+    ready = threading.Barrier(2)
+
+    @contextmanager
+    def _barrier_session():
+        with Session(lock_parity_engine) as session:
+            ready.wait(timeout=20)
+            yield session
+
+    monkeypatch.setattr(gql_mutations, "get_db_session", _barrier_session)
+    info = SimpleNamespace(context=None)
+
+    def _join(patient_id: int):
+        return gql_mutations.Mutation._join_queue_impl(
+            info,
+            QueueEntryInput(
+                patient_id=patient_id,
+                doctor_id=doctor_id,
+                queue_tag=None,
+            ),
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(_join, patient_id) for patient_id in patient_ids]
+        responses = [future.result(timeout=45) for future in futures]
+
+    winners = [
+        (patient_id, response)
+        for patient_id, response in zip(patient_ids, responses, strict=True)
+        if response.success
+    ]
+    losers = [response for response in responses if not response.success]
+    assert len(winners) == 1, responses
+    assert len(losers) == 1, responses
+    assert losers[0].errors == ["QUEUE_LIMIT_EXCEEDED"]
+    assert winners[0][1].queue_entry.number == 1
+
+    @contextmanager
+    def _single_session():
+        with Session(lock_parity_engine) as session:
+            yield session
+
+    monkeypatch.setattr(gql_mutations, "get_db_session", _single_session)
+    retry = _join(winners[0][0])
+    assert retry.success is False
+    assert retry.errors == ["ALREADY_IN_QUEUE"]
+
+    with Session(lock_parity_engine) as verify:
+        persisted_queue = verify.get(DailyQueue, queue_id)
+        entries = (
+            verify.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == queue_id)
+            .all()
+        )
+        assert persisted_queue.online_issued_count == 1
+        assert len(entries) == 1
+        assert entries[0].patient_id == winners[0][0]
+        assert entries[0].source == "online"

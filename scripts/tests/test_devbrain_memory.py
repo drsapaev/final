@@ -53,12 +53,27 @@ class MemoryTests(unittest.TestCase):
   p=self.runmem("begin",{"goal":"Different request","idempotency_key":"begin-once"},expected=2)
   self.assertEqual(p["error"],"idempotency key content mismatch")
  def test_task_isolation_linked_worktrees_and_portable_export(self):
-  self.capture("one",checkpoint=dict(CP,goal="Task one")); self.capture("two",checkpoint=dict(CP,goal="Task two"))
+  private=dict(KN,id="private-one",key="private-one",scope="task",topic="private",summary="Needle other task detail")
+  self.capture("one",knowledge=[private],checkpoint=dict(CP,goal="Task one",next_step="One next step")); self.capture("two",checkpoint=dict(CP,goal="Task two Needle",next_step="Two next step"))
   linked=self.base/"linked"; linked2=self.base/"linked2"
   subprocess.run(["git","-C",str(self.root),"worktree","add","-qb","branch1",str(linked)],check=True)
   subprocess.run(["git","-C",str(self.root),"worktree","add","-qb","branch2",str(linked2)],check=True)
-  self.assertEqual(self.runmem("recall",cwd=linked,extra=("--task-id","one"))["checkpoint"]["goal"],"Task one")
-  self.assertEqual(self.runmem("recall",cwd=linked2,extra=("--task-id","two"))["checkpoint"]["goal"],"Task two")
+  for query in ((), ("--query","Needle")):
+   with self.subTest(query=query):
+    own=self.runmem("recall",cwd=linked,extra=("--task-id","one",*query))
+    self.assertEqual((own["checkpoint"]["goal"],own["checkpoint"]["next_step"],own["revision"]),("Task one","One next step",1))
+    self.assertEqual(own["active_tasks"],[])
+  other=self.runmem("recall",cwd=linked2,extra=("--task-id","two")); self.assertEqual(other["checkpoint"]["goal"],"Task two Needle"); self.assertEqual(other["active_tasks"],[])
+  missing=self.runmem("recall",extra=("--task-id","missing")); self.assertIsNone(missing["checkpoint"]); self.assertEqual(missing["active_tasks"],[])
+  discovery=self.runmem("recall",extra=("--query","Needle")); self.assertIsNone(discovery["checkpoint"]); self.assertLessEqual(len(discovery["active_tasks"]),2)
+  self.assertEqual([item["task_id"] for item in discovery["active_tasks"]],["two"])
+  self.assertNotIn("private-one",[item["id"] for item in discovery["knowledge"]])
+ def test_invalid_empty_task_ids_do_not_fall_back_to_discovery(self):
+  self.capture("active",checkpoint=dict(CP,goal="Active task should not be suggested"))
+  for task_id in ("", "   "):
+   with self.subTest(task_id=repr(task_id)):
+    result=self.runmem("recall",extra=("--task-id",task_id),expected=2)
+    self.assertIn("error",result)
   ex=self.runmem("export"); text=json.dumps(ex); self.assertNotIn(str(self.root),text); self.assertNotIn("task_id",text); self.assertNotIn("event_id",text)
  def test_incomplete_writes_leave_previous_checkpoint_readable(self):
   self.capture("recover",checkpoint=dict(CP,next_step="Last durable point"))
@@ -135,6 +150,7 @@ class MemoryTests(unittest.TestCase):
   recalled=self.runmem("recall",extra=("--task-id","decision"))["knowledge"][0]
   self.assertFalse(recalled["current_assertion"]); self.assertEqual(recalled["provenance_state"],"sources_match")
  def test_schema_values_and_revision_parent_integrity(self):
+  self.capture("other-active",checkpoint=dict(CP,goal="Valid active task"))
   invalid=dict(KN,scope="anywhere")
   p=subprocess.run([sys.executable,str(SCRIPT),"capture"],cwd=self.root,input=json.dumps({"task_id":"bad-scope","expected_revision":0,"checkpoint":CP,"knowledge":[invalid]}).encode(),capture_output=True)
   self.assertEqual(p.returncode,2)
@@ -145,7 +161,7 @@ class MemoryTests(unittest.TestCase):
    e=json.loads(f.read_text())
    if e.get("task_id")=="chain" and e.get("revision")==2: e["parent_event_id"]="wrong-parent"; f.write_text(json.dumps(e))
   self.assertEqual(self.runmem("status")["status"],"DEGRADED")
-  r=self.runmem("recall",extra=("--task-id","chain")); self.assertEqual(r["status"],"DEGRADED"); self.assertEqual(r["task_error"],"revision_chain_invalid"); self.assertIsNone(r["checkpoint"])
+  r=self.runmem("recall",extra=("--task-id","chain")); self.assertEqual(r["status"],"DEGRADED"); self.assertEqual(r["task_error"],"revision_chain_invalid"); self.assertIsNone(r["checkpoint"]); self.assertEqual(r["active_tasks"],[])
  def test_ignored_anchors_and_task_scoped_recall(self):
   (self.root/".gitignore").write_text("ignored.py\n"); subprocess.run(["git","-C",str(self.root),"add",".gitignore"],check=True); subprocess.run(["git","-C",str(self.root),"commit","-qm","ignore fixture"],check=True)
   (self.root/"ignored.py").write_text("private local source\n")
@@ -169,6 +185,13 @@ class MemoryTests(unittest.TestCase):
   self.assertLessEqual(len(encoded),8192); self.assertGreater(result.get("omitted_count",0),0)
   stdout=subprocess.run([sys.executable,str(SCRIPT),"recall","--query","huge"],cwd=self.root,capture_output=True,check=True).stdout
   self.assertLessEqual(len(stdout),8192)
+ def test_begin_discovers_repository_knowledge_without_other_task_hints(self):
+  self.capture("older-task",checkpoint=dict(CP,goal="Unrelated assignment"))
+  repo_fact=dict(KN,id="repo-startup",key="repo-startup",topic="startup",summary="Startup discovery guidance for this repository")
+  self.capture("repo-fact",knowledge=[repo_fact],checkpoint=dict(CP,goal="Repository knowledge source",status="completed"))
+  result=self.runmem("begin",{"goal":"Start startup work","query":"startup"})
+  self.assertEqual(result["recall"]["active_tasks"],[])
+  self.assertEqual(result["recall"]["knowledge"][0]["id"],"repo-startup")
  def test_unicode_topics_rank_knowledge(self):
   russian=dict(KN,id="ru",key="\u043e\u0447\u0435\u0440\u0435\u0434\u044c-\u0432\u0440\u0430\u0447\u0430",topic="\u043e\u0447\u0435\u0440\u0435\u0434\u044c",summary="\u0412\u043b\u0430\u0434\u0435\u043b\u0435\u0446 \u043e\u0447\u0435\u0440\u0435\u0434\u0438 \u043e\u043f\u0440\u0435\u0434\u0435\u043b\u044f\u0435\u0442\u0441\u044f \u0441\u0435\u0440\u0432\u0435\u0440\u043e\u043c",tags=["\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0442\u0443\u0440\u0430"],anchors=["source.py"])
   self.capture("russian",knowledge=[russian])
@@ -240,6 +263,14 @@ class MemoryTests(unittest.TestCase):
   self.assertEqual(uppercase_status.returncode,0,uppercase_status.stderr); self.assertEqual(json.loads(uppercase_status.stdout)["status"],"OK")
   p=subprocess.run(["pwsh","-NoProfile","-File",str(LAUNCHER),"-Action","begin","-Query","not-a-match","-Topics","queue"],cwd=self.root,input="{}",text=True,capture_output=True)
   self.assertEqual(p.returncode,0,p.stderr); result=json.loads(p.stdout); self.assertEqual(result["checkpoint"]["goal"],"not-a-match"); self.assertEqual(result["recall"]["knowledge"][0]["key"],"queue-owner")
+  for task_id in ("", "   "):
+   with self.subTest(task_id=repr(task_id)):
+    invalid=subprocess.run(["pwsh","-NoProfile","-File",str(LAUNCHER),"-Action","recall","-TaskId",task_id],cwd=self.root,text=True,capture_output=True,timeout=10)
+    self.assertEqual(invalid.returncode,2); self.assertEqual(json.loads(invalid.stderr),{"error":"invalid task_id"})
+  exact=subprocess.run(["pwsh","-NoProfile","-File",str(LAUNCHER),"-Action","recall","-TaskId","seed"],cwd=self.root,text=True,capture_output=True,timeout=10)
+  self.assertEqual(exact.returncode,0,exact.stderr); exact_result=json.loads(exact.stdout); self.assertEqual(exact_result["checkpoint"]["goal"],CP["goal"]); self.assertEqual(exact_result["active_tasks"],[])
+  discovery=subprocess.run(["pwsh","-NoProfile","-File",str(LAUNCHER),"-Action","recall","-Query","queue"],cwd=self.root,text=True,capture_output=True,timeout=10)
+  self.assertEqual(discovery.returncode,0,discovery.stderr); self.assertEqual(json.loads(discovery.stdout)["active_tasks"][0]["task_id"],"seed")
   no_stdin=subprocess.run(["pwsh","-NoProfile","-File",str(LAUNCHER),"-Action","begin","-Query","no stdin needed"],cwd=self.root,text=True,capture_output=True,timeout=10)
   self.assertEqual(no_stdin.returncode,0,no_stdin.stderr); self.assertEqual(json.loads(no_stdin.stdout)["checkpoint"]["goal"],"no stdin needed")
 
