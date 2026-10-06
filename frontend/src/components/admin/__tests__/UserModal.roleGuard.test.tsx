@@ -72,19 +72,29 @@ afterEach(() => {
   apiGet.mockClear();
 });
 
+// The role list resolves through an async API mock, and radix opens the
+// Select portal asynchronously - under CI load a synchronous trigger lookup
+// and a first-option findAllByRole raced both (issue #3564). Wait for the
+// trigger to exist and for the canonical option instead of any first option.
+const findRoleTrigger = async () =>
+  await waitFor(() => {
+    const trigger = screen
+      .getAllByRole('button')
+      .find((el) => el.getAttribute('aria-haspopup') === 'listbox');
+    expect(trigger).toBeDefined();
+    return trigger as HTMLElement;
+  });
+
 const openRoleSelect = async () => {
-  const selectTrigger = screen
-    .getAllByRole('button')
-    .find((el) => el.getAttribute('aria-haspopup') === 'listbox');
-  fireEvent.click(selectTrigger as HTMLElement);
-  return screen.findAllByRole('option');
+  fireEvent.click(await findRoleTrigger());
+  await screen.findByRole('option', { name: 'Врач' }, { timeout: 4000 });
+  return screen.getAllByRole('option');
 };
 
 const pickDoctorRole = async () => {
-  const options = await openRoleSelect();
-  const doctor = options.find((el) => el.textContent === 'Врач');
-  expect(doctor).toBeDefined();
-  fireEvent.click(doctor as HTMLElement);
+  fireEvent.click(await findRoleTrigger());
+  const doctor = await screen.findByRole('option', { name: 'Врач' }, { timeout: 4000 });
+  fireEvent.click(doctor);
 };
 
 describe('UserModal legacy doctor-role guard (create mode)', () => {
