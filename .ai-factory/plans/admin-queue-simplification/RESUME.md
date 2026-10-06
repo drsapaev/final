@@ -1,6 +1,16 @@
 # Resume — admin queue simplification
 
-## Current continuation checkpoint — T08.3.3 GraphQL quota proof (2026-10-05T21:10:45+05:00)
+## Current continuation checkpoint — T09.1 cabinet preview (2026-10-05T22:44:35+05:00)
+
+- PR #3609 is merged at `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`. Exact HEAD had 17 successful checks, 18 skipped, 0 failures; skipped checks are not passes. Main and the fresh T09.1 worktree are at that merge commit.
+- Current worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`, branch `codex/aqs-T09.1-cabinet-preview`, based at `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`; implementation is uncommitted. Main was fast-forwarded; unrelated `.gate_artifacts/` was left untouched.
+- Scope: T09.1 read-only preview/DTO only. Allowed: cabinet management service/repository/endpoint, focused tests, generated `backend/openapi.json` and `frontend/src/types/generated/api.ts`, and canonical plan journals. No apply command, audit write, frontend runtime/UI, defaults, bulk/sync mutation, model/migration, ops, staging, or production changes.
+- Gate: mandatory gate and its one `--known-root-cause backend/app/services/queue_cabinet_management_api_service.py` retry both selected Alembic `0078_*.py`; prompts read. Confirmed route mismatch: this slice is a read-only preview with no schema change. After the required retry, the narrow override is limited to the approved paths. Record `gate_misroute=true`, `override_used=true`; do not rerun or alter the gate router.
+- Implemented: typed Admin-only preview DTO/endpoint; explicit unique queue IDs; clinic-day validation; typed doctor/resource owner and saved default; old/new cabinet; waiting-only count; structured blockers for called/in-service/diagnostics, legacy raw `in_progress`, and active clinical execution. Repository reads are batched and do not select patient fields.
+- Validation: focused cabinet service plus OpenAPI contract modules **49 passed, 1 warning**; Ruff, Ruff format, Black, Python compile, diff check and standalone generated TypeScript check **PASS**. Exact npm generator script failed because worktree dependencies are absent and WSL npx could not resolve `typescript`; installed pinned generator `openapi-typescript 7.13.0` from `C:\final\frontend` generated the allowed artifact successfully. PostgreSQL, staging and full frontend checks remain `NOT_RUN`.
+- Next: final diff/scope review, update DevBrain checkpoint, commit/push T09.1, open PR, and await exact-head CI and the user's merge direction. Do not start T09.2 before T09.1 is merged and main is synced.
+
+## Historical checkpoint — T08.3.3 GraphQL quota proof (2026-10-05T21:10:45+05:00)
 
 - PR #3607 is merged at `589520ae132313ca9488f3994be8d28f6041975a` from exact reviewed HEAD `37eb0d4b5d8628bdd8598990ad93a0f4093a7c96`. Its exact-head checks were 17 success, 18 skipped and 0 failures; skipped jobs are not passes. Main and the new task worktree are at the merge commit.
 - Current worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-3-graphql\final`, branch `codex/aqs-T08.3.3-graphql`, clean at start. `C:\final` was fast-forwarded after confirming no tracked edits; its unrelated `.gate_artifacts/` remains untouched.

@@ -2,6 +2,34 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
+## T09.1 gate and scope — 2026-10-05T22:10+05:00
+
+- Base/commit under test: fresh `origin/main`, merge commit `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92` for PR #3609. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`; branch `codex/aqs-T09.1-cabinet-preview`.
+- Execution mode: mandatory `gate` for queue mutation/audit domain. Initial invocation and one required retry with `--known-root-cause backend/app/services/queue_cabinet_management_api_service.py` both routed to `Mode: migration`, first-touch `backend/alembic/versions/0078_*.py`; both generated prompts were read. The scope is a read-only preview/DTO with no storage. Observed agent classification: `gate_misroute=true`, `override_used=true` after the retry, grounded in the approved full plan. No third run, gate-router edit, migration, or model change.
+- Pre-edit boundary: allowed paths are cabinet service/repository/endpoint, focused service/API tests, generated `backend/openapi.json` and `frontend/src/types/generated/api.ts`, and this plan plus `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: frontend runtime; models/migrations; audit writers; defaults, bulk and sync writers; unrelated files; ops, other generated output, staging and production/live data.
+- Source anchors: `queue_cabinet_management_api_service.py`; `queue_cabinet_management_api_repository.py`; `queue_cabinet_management.py`; `queue_domain_service.py::_build_cabinet_payload`; `queue_status.py`; `models/service_execution.py`; existing focused service tests.
+- Source facts: queue-day cabinet is `DailyQueue.cabinet_number`; typed resource owner is identified through `queue_resource_id`; waiting count must be distinct from called/active rows. Called/in-service/diagnostics queue entries and `ServiceExecution.status == in_progress` block reassignment. The preview returns no patient fields and performs no writes.
+- Validation: read-only source inspection; plan checkpoint `git diff --check` **PASS**. See the T09.1 local validation entry below for implementation evidence. Staging: `NOT_RUN`.
+- Stop conditions: unclear owner or queue identity; patient/clinical data needed; preview requires writes; implementation needs apply/audit/persistence; any required path outside the allowlist.
+
+## T09.1 read-only preview implementation — 2026-10-05T22:44+05:00
+
+- Base under test: merge commit `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`; branch `codex/aqs-T09.1-cabinet-preview`.
+- Changed paths: cabinet preview service/repository/endpoint; focused service tests; generated `backend/openapi.json` and `frontend/src/types/generated/api.ts`; this plan plus `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. No model, migration, default writer, existing update/bulk/sync writer, audit writer, or frontend runtime changed.
+- Behavior: preview requires a non-empty list of unique positive queue IDs and an explicit new-cabinet field; OpenAPI publishes the list/item constraints. It queries only those IDs, rejects missing and non-clinic-today queues, and reports clinic day, typed owner/default, day cabinet old/new and waiting count. Called, in-service, diagnostics, legacy status alias `in_progress`, and linked active `ServiceExecution` block apply. Queries select no patient fields and the preview writes nothing.
+- Validation command: `scripts/run_backend_pytest.ps1 tests/unit/test_queue_cabinet_management_api_service.py tests/test_openapi_contract.py -q` with import-only `DATABASE_URL=sqlite:///:memory:` — **49 passed, 1 warning**. The repository regression ran against the existing temporary SQLite unit fixture, not PostgreSQL.
+- Static/generated checks: scoped Ruff check, Ruff format check, Black check, Python compile, and `git diff --check` — **PASS**. OpenAPI was generated from `app.openapi()` with test-only SQLite configuration. Pinned `openapi-typescript 7.13.0` generated the TypeScript artifact; standalone `tsc --ignoreConfig --noEmit --strict --target ES2020 src/types/generated/api.ts` — **PASS**.
+- Limitation: `npm run generate:api-types` **FAILED** in the worktree because its WSL-side `npx` cache could not resolve `typescript` and the worktree has no `node_modules`. The allowed generated file was produced with the same pinned executable already installed in `C:\final\frontend`. Full frontend type-check/build, CI, disposable PostgreSQL, staging and production were **NOT_RUN**.
+- Result: locally `VALIDATED`; no commit or PR yet. Do not report staging/system acceptance. Next exact action: final scope review, checkpoint capture, commit/push and open PR; then await exact-head CI and human merge direction.
+- PR / merge commit: pending.
+
+## T08.3.3 PR #3609 merged — 2026-10-05T22:10+05:00
+
+- Exact reviewed PR HEAD: `4e6c15402eb14a69a0daf9ae6d3503d5759b2c67`; merge commit: `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`.
+- GitHub checks at exact reviewed HEAD: 17 success, 18 skipped, 0 failures. Skipped jobs are not counted as passes.
+- Local `main` fast-forwarded to the merge commit. Managed T08.3.3 worktree was archived with the PR attachment. Unrelated `.gate_artifacts/` in `C:\final` was preserved.
+- Result: `MERGED`; no T09 runtime validation is implied by this record.
+
 ## T08.3.2-P2 post-merge clock correction — PR #3607 merged (2026-10-05T20:09+05:00)
 
 - Commit under test: PR #3607 exact HEAD `37eb0d4b5d8628bdd8598990ad93a0f4093a7c96`; base `c1781c46a1b03c3404604542bcc9c4c9951f4c89`. Merge commit: `589520ae132313ca9488f3994be8d28f6041975a`, confirmed by GitHub at `2026-10-05T15:09:16Z`.

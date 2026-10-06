@@ -12,6 +12,11 @@ from app.crud.clinic import clinic_today
 from app.repositories.queue_cabinet_management_api_repository import (
     QueueCabinetManagementApiRepository,
 )
+from app.services.queue_status import (
+    POSITION_VISIBLE_RAW_STATUSES,
+    QUEUE_STATUS_ALIASES,
+    normalize_queue_status,
+)
 
 
 @dataclass
@@ -142,6 +147,127 @@ class QueueCabinetManagementApiService:
             raise QueueCabinetManagementDomainError(404, "Очередь не найдена")
 
         return self._build_queue_payload(queue)
+
+    @staticmethod
+    def _preview_owner(queue) -> dict[str, Any]:
+        resource_id = getattr(queue, "queue_resource_id", None)
+        if resource_id is not None:
+            resource = getattr(queue, "queue_resource", None)
+            if resource is None:
+                raise QueueCabinetManagementDomainError(
+                    409, "Не удалось однозначно определить владельца очереди"
+                )
+            return {
+                "owner_type": "resource",
+                "owner_id": resource_id,
+                "owner_name": resource.display_name,
+                "owner_default_cabinet": resource.default_cabinet,
+            }
+
+        specialist_id = getattr(queue, "specialist_id", None)
+        specialist = getattr(queue, "specialist", None)
+        if specialist_id is None or specialist is None:
+            raise QueueCabinetManagementDomainError(
+                409, "Не удалось однозначно определить владельца очереди"
+            )
+
+        user = getattr(specialist, "user", None)
+        owner_name = (
+            (getattr(user, "full_name", None) or getattr(user, "username", None))
+            if user is not None
+            else None
+        ) or f"Специалист #{specialist_id}"
+        return {
+            "owner_type": "doctor",
+            "owner_id": specialist_id,
+            "owner_name": owner_name,
+            "owner_default_cabinet": getattr(specialist, "cabinet", None),
+        }
+
+    def preview_cabinet_reassignment(
+        self, *, queue_ids: list[int], new_cabinet_number: str | None
+    ) -> dict[str, Any]:
+        """Read-only preview; actual reassignment belongs to the T09.2 command."""
+        if (
+            not queue_ids
+            or any(type(queue_id) is not int or queue_id <= 0 for queue_id in queue_ids)
+            or len(set(queue_ids)) != len(queue_ids)
+        ):
+            raise QueueCabinetManagementDomainError(
+                422, "Укажите уникальные положительные ID очередей"
+            )
+
+        clinic_day = clinic_today(self.db)
+        queues = self.repository.list_daily_queues_by_ids(queue_ids=queue_ids)
+        queues_by_id = {queue.id: queue for queue in queues}
+        if len(queues_by_id) != len(queue_ids):
+            raise QueueCabinetManagementDomainError(
+                404, "Одна или несколько очередей не найдены"
+            )
+        if any(queue.day != clinic_day for queue in queues):
+            raise QueueCabinetManagementDomainError(
+                409, "Preview доступен только для очередей текущего дня клиники"
+            )
+
+        waiting_counts = self.repository.count_waiting_entries_by_queue_ids(
+            queue_ids=queue_ids
+        )
+        blocking_canonical_statuses = {
+            status for status in POSITION_VISIBLE_RAW_STATUSES if status != "waiting"
+        }
+        blocking_statuses = tuple(
+            sorted(
+                blocking_canonical_statuses
+                | {
+                    raw_status
+                    for raw_status, canonical_status in QUEUE_STATUS_ALIASES.items()
+                    if canonical_status in blocking_canonical_statuses
+                }
+            )
+        )
+        entry_statuses = self.repository.list_entry_statuses_by_queue_ids(
+            queue_ids=queue_ids,
+            statuses=blocking_statuses,
+        )
+        queues_with_active_execution = (
+            self.repository.list_queue_ids_with_active_service_execution(
+                queue_ids=queue_ids
+            )
+        )
+
+        items: list[dict[str, Any]] = []
+        for queue_id in queue_ids:
+            queue = queues_by_id[queue_id]
+            blocking_reasons: list[str] = []
+            statuses = {
+                normalize_queue_status(status)
+                for status in entry_statuses.get(queue_id, set())
+            }
+            if "called" in statuses:
+                blocking_reasons.append("patient_called")
+            if statuses.intersection({"in_service", "diagnostics"}):
+                blocking_reasons.append("clinical_work_in_progress")
+            if queue_id in queues_with_active_execution:
+                blocking_reasons.append("active_service_execution")
+
+            items.append(
+                {
+                    "queue_id": queue_id,
+                    "queue_day": queue.day,
+                    **self._preview_owner(queue),
+                    "old_cabinet_number": queue.cabinet_number,
+                    "new_cabinet_number": new_cabinet_number,
+                    "waiting_count": waiting_counts.get(queue_id, 0),
+                    "blocking_reasons": blocking_reasons,
+                    "can_apply": not blocking_reasons,
+                }
+            )
+
+        return {
+            "clinic_day": clinic_day,
+            "items": items,
+            "can_apply": all(item["can_apply"] for item in items),
+        }
 
     def update_queue_cabinet_info(
         self,

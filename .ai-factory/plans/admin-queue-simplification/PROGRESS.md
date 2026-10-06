@@ -1,6 +1,28 @@
 # Progress
 
-## Current authoritative checkpoint — T08.3.3 GraphQL quota proof (2026-10-05T21:10:45+05:00)
+## Current authoritative checkpoint — T09.1 cabinet preview (2026-10-05T22:44:35+05:00)
+
+Plan version: 3.16
+Execution permission: user authorized implementation of the full plan and said “мёрж и продолжать”; PR #3609 has been merged. Continue T09.1 only in its approved read-only preview scope.
+Current task: T09.1 — read-only preview and typed DTO for an explicit clinic-today cabinet reassignment.
+Current status: VALIDATED locally; no PR yet. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`, branch `codex/aqs-T09.1-cabinet-preview`, base/current HEAD before commit `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92` (merge commit for PR #3609); implementation and plan edits are uncommitted. Main `C:\final` is synced to the same commit; unrelated untracked `.gate_artifacts/` is preserved.
+Mode: mandatory `gate` for queue mutation/audit domain. Initial gate and its one `--known-root-cause backend/app/services/queue_cabinet_management_api_service.py` retry both routed to migration / Alembic `0078_*.py`; generated prompts were read. This is a confirmed misroute because T09.1 is a read-only preview and adds no storage. After the required retry, use the narrow override grounded in the user's approved plan; record `gate_misroute=true`, `override_used=true`. Do not change the gate router or add a migration.
+Canonical anchors: T09 in `codex-admin-queue-simplification.md`; `backend/app/services/queue_cabinet_management_api_service.py`; `backend/app/repositories/queue_cabinet_management_api_repository.py`; `backend/app/api/v1/endpoints/queue_cabinet_management.py`; `backend/app/services/queue_domain_service.py::_build_cabinet_payload`; `backend/app/services/queue_status.py`; `backend/app/models/service_execution.py`; focused cabinet service tests.
+Allowed paths: the cabinet management service, repository, endpoint, `backend/tests/unit/test_queue_cabinet_management_api_service.py`, new focused integration tests if required, generated `backend/openapi.json` and `frontend/src/types/generated/api.ts`, and the canonical plan plus `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`.
+Reference-only / denied: frontend runtime; models and migrations; audit writers; doctor/resource default writers; legacy bulk and sync writes; unrelated APIs/tests; ops, other generated output, shared staging, production/live data. T09.1 must not add apply, audit, or mutation behavior.
+Completed: PR #3609 merged at `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`; GitHub reported 17 successful and 18 skipped checks, with no failed applicable check. Main synchronized. The prior worktree was archived. FastAPI and PostgreSQL skills were read. Typed owner semantics, waiting statuses, called/clinical blockers, and resource default writer were traced in source.
+Changed and validated locally: read-only Admin preview endpoint/DTO, batched repository reads, service policy, focused tests, OpenAPI snapshot, generated API types, and the four plan checkpoints. Preview uses clinic-local today; keeps day cabinet separate from doctor/resource default; counts only waiting entries; blocks called, active clinical statuses (including legacy `in_progress`) and active `ServiceExecution`; rejects missing, duplicate, invalid-owner and non-today targets. No rows are written and no patient fields are returned.
+Validation: `tests/unit/test_queue_cabinet_management_api_service.py` plus `tests/test_openapi_contract.py` **49 passed, 1 warning**; Ruff check, Ruff format check, Black check, `py_compile`, `git diff --check`, and standalone TypeScript check for generated API types **PASS**. `backend/openapi.json` and `frontend/src/types/generated/api.ts` were regenerated. The repository query regression uses the existing temporary unit SQLite fixture; PostgreSQL and staging were **NOT_RUN**. The standard npm generator script could not resolve TypeScript through the WSL-side npx cache; the pinned installed `openapi-typescript 7.13.0` executable from `C:\final\frontend` generated the worktree artifact successfully. Full frontend type-check/build and hosted CI are pending.
+Blocker: none. Stop if a required field needs patient data, ownership is ambiguous, preview mutates state, any apply/audit behavior is required, or a path outside the allowlist is needed.
+Next exact action: review the final diff, refresh memory/evidence, commit and push the T09.1 branch, open its PR, then wait for exact-head CI and human merge direction. Do not begin T09.2 until this PR cycle is closed and main is synchronized.
+Checks to run before push: final `git diff --check` and commit hooks. After push: inspect exact-head checks; if code changes, repeat the focused backend/OpenAPI tests and generated contract checks.
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T08.3.3 | MERGED | PR #3609 | `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92` | `EVIDENCE.md#t0833-pr-3609-merged` |
+| T09.1 | IN_PROGRESS | `codex/aqs-T09.1-cabinet-preview` | | `EVIDENCE.md#t091-gate-and-scope` |
+
+## Historical checkpoint — T08.3.3 GraphQL quota proof (2026-10-05T21:10:45+05:00)
 
 Plan version: 3.12
 Execution permission: user authorized implementation of the full plan, then asked to fix and continue; PR #3607 was explicitly authorized and is now merged.

@@ -1,10 +1,10 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.15 — PR #3607 merged; PR #3609 checks passed on `e84fd4d7`.
-**Создан:** 30 сентября 2026. **Обновлён:** 5 октября 2026, 21:10 Asia/Tashkent.
-**Current task:** T08.3.3 — prove direct GraphQL last-slot quota behavior and complete the source-backed reachable-writer inventory.
-**Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-3-graphql\final`; branch `codex/aqs-T08.3.3-graphql`; base `origin/main` = merge commit `589520ae132313ca9488f3994be8d28f6041975a`.
-**Scope:** focused real-PostgreSQL tests plus these plan/checkpoint journals. GraphQL and compatibility writer code are read-only references; runtime, model, migration, feature flag, frontend, Docker/Compose and staging/production changes are not authorized in this slice. If evidence identifies a runtime gap, stop and create a separately gated task. V1 creation remains default-off.
+**Версия:** 3.18 — PR #3609 merged; T09.1 preview locally validated.
+**Создан:** 30 сентября 2026. **Обновлён:** 5 октября 2026, 22:44 Asia/Tashkent.
+**Current task:** T09.1 — implement a read-only typed preview for explicit same-day cabinet reassignment.
+**Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`; branch `codex/aqs-T09.1-cabinet-preview`; base `origin/main` and merge commit `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`.
+**Scope:** T09.1 preview/DTO/service/repository/endpoint, focused tests, generated API contract artifacts (`backend/openapi.json`, `frontend/src/types/generated/api.ts`) and these checkpoint journals. No apply, audit write, frontend runtime, default/bulk/sync mutation, model/migration, ops, shared staging or production changes. T09.2 owns locked apply/strict audit/replay; T09.3 owns UI and legacy-writer containment. Queue owner, history, future queues, default cabinet, numbers, statuses and queue time remain unchanged.
 > The T08.2c worktree, PR-open status and pending-check metadata below are historical and superseded by the confirmed #3596 merge.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
@@ -13,7 +13,7 @@
 > Следующие две строки — исторический снимок метаданных T08.2c, оставленный для прослеживаемости; текущие ветка и статус указаны выше.
 **Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; PR [#3596](https://github.com/drsapaev/final/pull/3596). Report implementation `718d4d65c5717528e8a93fb819fdf328c63bf772`; future-date compatibility fix `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`; OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`. Focused local checks pass (85 unit/OpenAPI, 4 selected integration). The docs-freshness CI failure on `fd9b1c793` was due to a final CRLF in the generated snapshot; it is removed to match exact app serialization. New exact-head checks pending.
 
-> **T00–T07, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1, T08.3.2 and T08.3.2-P2 — MERGED; T08.3.3 — PR_OPEN (#3609); T09–T18 — PLANNED.** PR #3607 merged at `589520ae132313ca9488f3994be8d28f6041975a`. Its exact HEAD had 17 successful checks, 18 skipped, 0 failed; path-aware skips are not passes. T08.3.3 starts from this fresh main commit. On PR #3609 head `e84fd4d7`, GitHub reports 10 success, 4 skipped, 0 failed; skipped checks are not passes. See PROGRESS/RESUME and the T08.3.3 entry in `EVIDENCE.md`.
+> **T00–T07, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1, T08.3.2, T08.3.2-P2 and T08.3.3 — MERGED; T09.1 — VALIDATED locally; T09.2–T18 — PLANNED.** PR #3609 merged at `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92` from exact reviewed HEAD `4e6c15402eb14a69a0daf9ae6d3503d5759b2c67`; exact-head checks were 17 success, 18 skipped, 0 failure. Skipped checks are not passes. T09.1 starts from this fresh main commit. Local tests/static checks passed; PostgreSQL, full frontend, hosted CI and staging remain pending/NOT_RUN. See PROGRESS/RESUME and T09.1 in EVIDENCE.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -358,12 +358,24 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 
 #### T08.3.3 — Direct GraphQL and remaining reachable writer parity
 
-**Status:** PR_OPEN — [PR #3609](https://github.com/drsapaev/final/pull/3609), current head `e84fd4d7edf7859ca5ea2534b65645149ed29e44`; started after the T08.3.2 post-merge P2 follow-up [PR #3607](https://github.com/drsapaev/final/pull/3607) merged at `589520ae132313ca9488f3994be8d28f6041975a`.
+**Status:** MERGED — [PR #3609](https://github.com/drsapaev/final/pull/3609), exact reviewed HEAD `4e6c15402eb14a69a0daf9ae6d3503d5759b2c67`, merge commit `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`.
 **Owner candidates:** `backend/app/graphql/mutations.py` plus a focused real-PG test owner and the T08.3 writer coverage table.
 **Required proof:** direct GraphQL last-slot behavior and a source-backed inventory of compatibility/API adapters; status changes, desk derivatives, transfers, deletion and replay never decrease/re-spend the independent issuance counter. Include only adapters proven mounted/reachable. If the legacy `/queue` writer lacks a quota boundary, stop and create a separately gated runtime sub-task.
 **Execution boundary:** test/evidence-only. GraphQL mutation and reachable-writer code are read-only. The initial mandatory gate and its single known-owner retry both selected an Alembic revision despite this test-only scope; the generated migration prompt was read. After the required retry, apply a narrow override grounded in the user-approved plan. Do not change the router or edit a migration. Record the observed gate misroute and override in `PROGRESS.md` and `EVIDENCE.md`.
 **Local proof:** a new independent-session PostgreSQL test proves GraphQL contention for a v1 last slot yields one successful issuance, one `QUEUE_LIMIT_EXCEEDED`, and an exact winning-patient retry without another issuance. The focused GraphQL quota unit cases also pass. The mounted-writer inventory confirms that QR session, legacy token and compatibility token adapters delegate to the canonical allocator; GraphQL is the only independent successful runtime admission writer. Status edits, row deletion, staff service additions and transfers do not mutate the persisted counter; the only runtime counter writes are one increment at each successful independent admission boundary. See the exact source anchors and limitations in `EVIDENCE.md`.
 **Local acceptance:** disposable PostgreSQL 16 module **6 passed, 0 skipped**; focused GraphQL quota unit cases **3 passed**; Ruff, full-file Ruff-format, Black, `py_compile` and `git diff --check` checks passed before PR preparation. No staging/production proof is claimed. Creation flag remains default-off.
+
+#### T09.1 — Read-only same-day cabinet reassignment preview
+
+**Status:** VALIDATED locally, uncommitted — worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`, branch `codex/aqs-T09.1-cabinet-preview`, based on merge commit `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`.
+**Purpose:** return safe preview facts for explicit clinic-today queue IDs: queue/day, typed doctor/resource owner, current/proposed cabinet, waiting count, and blocking reasons. It must not mutate, write audit, or expose patient data.
+**Gate:** mandatory gate and one required known-root retry both routed to Alembic `0078_*.py`, despite no schema or persistence in this slice. Prompts were read. After retry, apply only a narrow override grounded in the approved plan; record `gate_misroute=true`, `override_used=true`. Do not retry or edit the router.
+**Allowed:** cabinet service/repository/endpoint; focused cabinet preview tests; generated `backend/openapi.json` and `frontend/src/types/generated/api.ts`; this plan and `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. **Denied:** frontend runtime/UI, models/migrations, audit writes, apply behavior, defaults, bulk/sync mutation, unrelated paths, ops, staging and production.
+**Acceptance:** OpenAPI requires a non-empty explicit list of unique positive queue IDs and a cabinet target field; all IDs are validated as today's queues in clinic timezone; one typed doctor/resource owner; current versus proposed cabinet and owner default are separate; waiting count excludes called/active; called, in-service, diagnostics, legacy alias `in_progress`, or active clinical execution produce a blocker; stale/apply behavior remains T09.2. No writes or patient fields in this preview.
+**Implementation:** batched owner, waiting-count, entry-status and active-execution reads; Admin-only POST DTO. Generated OpenAPI and API TypeScript artifacts updated. Existing default/single/bulk/sync write paths remain untouched.
+**Local validation:** cabinet service and OpenAPI contract modules **49 passed, 1 warning**; Ruff, Ruff format, Black, Python compile, diff check and standalone TypeScript generated-file check **PASS**. Existing unit repository test used its temporary SQLite fixture. `npm run generate:api-types` did not complete because WSL npx lacked `typescript`; pinned installed `openapi-typescript 7.13.0` generated the same worktree artifact. Full frontend build/type-check, CI, PostgreSQL, staging and production: **NOT_RUN**. See `EVIDENCE.md#t091-read-only-preview-implementation`.
+**Next:** commit/push, open PR and wait for exact-head checks and human merge direction. No T09.2 until T09.1 PR is merged and main synchronized.
+**Stop:** ambiguous owner/day, patient data required, need for a write/audit, or any required out-of-scope path.
 
 ### T09. Безопасная смена сегодняшнего кабинета
 
