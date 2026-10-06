@@ -34,6 +34,18 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Next exact action: run `aif-review` against PR #3612, inspect checks on the exact current head, fix any in-scope findings, then refresh this evidence. Do not begin T09.2 before this PR cycle closes and main is synchronized.
 - Merge commit: none.
 
+## T09.1 contract review fixes and exact-head check — 2026-10-06T06:51+05:00
+
+- Latest code commit under review: `688023b80aa317db0fa2f08f8c0d16b26b4b330d`; base `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`; branch `codex/aqs-T09.1-cabinet-preview`; draft PR #3612: https://github.com/drsapaev/final/pull/3612.
+- Source review identified two P2 contract omissions: duplicate `queue_ids` were rejected at runtime but `uniqueItems` was absent from OpenAPI; actual 401/403/404/409 responses were not listed in OpenAPI. Commit `688023b8` adds `uniqueItems`, a typed `{detail: string}` error schema for those statuses, regenerated OpenAPI/TypeScript, and regression assertions. No other P0/P1/P2 remained after this fix.
+- Targeted validation on the corrected source: cabinet service + OpenAPI contract modules **49 passed, 1 warning** with import-only `DATABASE_URL=sqlite:///:memory:`. Existing repository query coverage is a temporary unit SQLite fixture, not PostgreSQL evidence. Ruff check/format, Black, Python compile, standalone generated TypeScript check and `git diff --check` passed.
+- Generation: `backend/openapi.json` regenerated via the repository generator with test-only SQLite import settings. WSL Node 18 through `npm run generate:api-types` failed with `RangeError: Invalid string length`; pinned `openapi-typescript 7.13.0` through Windows Node 24 regenerated `frontend/src/types/generated/api.ts`.
+- Commit hooks on `688023b8`: JSON, whitespace, conflict, secret, Gitleaks, Ruff, Ruff-format and Black passed. ESLint was skipped because its wrapper changes into `frontend/` but passes the original `frontend/...` staged path; generated API types are intentionally ignored by ESLint. The EOF fixer was skipped for canonical OpenAPI output, whose generator writes no trailing newline. These skips do not claim the respective hooks passed; standalone TS and OpenAPI contract checks passed.
+- Exact code-head GitHub/Code Review check inventory for `688023b80aa317db0fa2f08f8c0d16b26b4b330d`: **18 success, 4 skipped, 0 failed, 0 pending**. Skipped: two failure-notification jobs, `classify-and-route`, and `Supabase Preview`; skips are not passes. `PR Review Quality Gate` passed. The repository PR-body validator passed after the body was completed; its first draft failure was corrected.
+- Full frontend build/type-check, runtime Admin auth integration, PostgreSQL, staging/browser and production remain **NOT_RUN**. No staging deferral acceptance, GitHub APPROVE review, or merge is claimed. PR #3612 remains open as draft.
+- Next exact action: push this journal-only review checkpoint, inspect the resulting exact-head CI, then await the user's review/merge direction. Do not start T09.2 until #3612 is merged and main synchronized.
+- Merge commit: none.
+
 ## T08.3.3 PR #3609 merged — 2026-10-05T22:10+05:00
 
 - Exact reviewed PR HEAD: `4e6c15402eb14a69a0daf9ae6d3503d5759b2c67`; merge commit: `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`.
