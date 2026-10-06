@@ -155,10 +155,11 @@ class DisplayWebSocketApiService:
         # default_cabinet / админ-override) с фолбэком на реестр;
         # иначе вызванному пациенту не сообщается кабинет.
         queue = queue_entry.queue
+        daily_cabinet = getattr(queue, "cabinet_number", None)
         if getattr(queue, "queue_resource_id", None) is not None:
             resource = getattr(queue, "queue_resource", None)
             doctor_name = resource.display_name if resource is not None else "Врач"
-            cabinet = queue.cabinet_number or (
+            cabinet = daily_cabinet or (
                 resource.default_cabinet if resource is not None else None
             )
         else:
@@ -167,7 +168,7 @@ class DisplayWebSocketApiService:
             # DailyQueue is the saved clinic-day service location. Its
             # explicit assignment takes precedence over the owner's default,
             # matching the resource-owned call path and preserving D2.
-            cabinet = queue.cabinet_number or (doctor.cabinet if doctor else None)
+            cabinet = daily_cabinet or (doctor.cabinet if doctor else None)
 
         manager = self._manager_provider()
         await manager.broadcast_patient_call(

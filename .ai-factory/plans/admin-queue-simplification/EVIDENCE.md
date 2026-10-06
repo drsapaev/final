@@ -2025,3 +2025,17 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Stop: if any necessary additional writer/consumer path, ownership ambiguity or denied surface is identified; do not stretch this PR silently.
 - Validation at checkpoint: source review and synthetic repro confirmed both defects. Four focused tests passed during review but did not cover these cases. No implementation checks run yet. Staging/browser NOT_RUN; no deferral accepted.
 - Next: implement only the recorded changes; then run targeted tests, `py_compile` and diff check, and record results separately.
+
+## PR #3614 CI compatibility correction — 2026-10-06T15:51+05:00
+
+- Commit under test: `6803195ef0c39d6556831813713e48a34e7b4496`, PR #3614, base `1d146d857e1570ff2259975f081f80dc0b31ae82`.
+- Environment: GitHub Actions exact-head checks; local Windows managed worktree. No staging, live application or production data.
+- Execution mode: bounded continuation of the already-approved T09.2 mandatory gate. Existing first-touch allowlist unchanged. Only `backend/app/services/display_websocket_api_service.py` is changed in this follow-up; focused display test module is run read-only. Plan/progress/resume/evidence records are updated.
+- Original failure: the broad Backend tests job failed one test, `tests/unit/test_display_websocket_api_service.py::TestDisplayWebSocketApiService::test_doctor_calls_patient_by_linked_doctor_id_not_user_id`, because the P1 change accessed `queue.cabinet_number` directly on that test's legacy `SimpleNamespace`. The CI summary was 5343 passed, 1 failed, 65 skipped, 25 deselected, 3 xfailed, 126 warnings. Frontend E2E passed; all other completed applicable checks passed. `PR Required Gate` failed because Backend tests failed. No second failing test was reported.
+- Correction: read `daily_cabinet = getattr(queue, "cabinet_number", None)` once and use it in both doctor/resource call branches, preserving each existing owner-default fallback when absent/empty. No owner, display contract, writer, schema or queue lifecycle behavior changed.
+- Local validation: `scripts/run_backend_pytest.ps1` targeted to `test_display_websocket_api_service.py` and `test_queue_cabinet_management_api_service.py` — **27 passed, 1 existing provider warning**. Initial run stopped before collection because this shell had no `DATABASE_URL`; rerun used a fail-closed unreachable loopback-only PostgreSQL URL for module initialization and synthetic test fixtures. Ruff check, Ruff format check, `py_compile`, and `git diff --check` **PASS**.
+- Scope check: no test/runtime path outside the existing gate allowlist was changed. No model, migration, default/legacy writer, nurse-station assignment, frontend, ops, staging or production change.
+- Remaining limitation: correction is locally validated but not yet committed/pushed; hosted checks on this correction are NOT_RUN. Existing disposable-PostgreSQL apply/locking/audit evidence remains valid because this follow-up changes no transaction behavior. Staging/browser/full-system validation remains NOT_RUN; no Tier-2 deferral is accepted; merge remains HOLD.
+- Next exact action: commit and push this runtime compatibility correction and its canonical journal checkpoint on the existing PR branch; rerun exact-head checks, then update the PR evidence/body with that result.
+- PR: https://github.com/drsapaev/final/pull/3614
+- Merge commit: none.

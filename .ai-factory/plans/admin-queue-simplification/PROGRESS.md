@@ -1,26 +1,27 @@
-## Current checkpoint — PR #3614 review fixes locally validated (2026-10-06T15:28+05:00)
+## Current checkpoint — PR #3614 follow-up regression fix (2026-10-06T15:51+05:00)
 
-Plan version: 3.32
-Current task/status: T09.2 review fixes / VALIDATED (local only) — existing PR #3614.
+Plan version: 3.33
+Current task/status: T09.2 review fixes / VALIDATED (local only; CI correction pending push) — existing PR #3614.
 Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`
 Branch: `codex/aqs-T09.2-cabinet-apply`
 Base: `1d146d857e1570ff2259975f081f80dc0b31ae82`
-Starting HEAD: `04becac5ef9e6bcecc8cd16bc2aa3cbd1b89ba09`
+Starting HEAD: `6803195ef0c39d6556831813713e48a34e7b4496`
 
 - Review: one confirmed P1 (doctor display call ignores the reassigned DailyQueue cabinet) and one P2 (expected cabinet snapshot is stripped before equality check). User explicitly requested both fixes.
 - Mode: mandatory `gate`. `scripts/run_agent_gate.ps1` from `ai/langgraph` returned `gate_ok`, `execute`, `handoff_required=true`, `gate_misroute=false`, `override_used=false`. The generated execution prompt was read. Use only its directly relevant first-touch files: cabinet endpoint, display call service, and focused cabinet service test module. The unrelated queue service/model/queue-time paths stay denied.
-- Allowed runtime/tests: `backend/app/services/display_websocket_api_service.py`; `backend/app/api/v1/endpoints/queue_cabinet_management.py`; `backend/tests/unit/test_queue_cabinet_management_api_service.py`. Allowed records: this plan's PROGRESS, RESUME, EVIDENCE, DECISIONS, and main plan.
+- Allowed runtime/tests: `backend/app/services/display_websocket_api_service.py`; `backend/app/api/v1/endpoints/queue_cabinet_management.py`; `backend/tests/unit/test_queue_cabinet_management_api_service.py`. The existing display-service unit module may be run read-only. Allowed records: this plan's PROGRESS, RESUME, EVIDENCE, DECISIONS, and main plan.
 - Denied: schema/models/migrations, queue writers/defaults, nurse station assignment contract, legacy single/bulk/sync writers, unrelated display/queue paths, frontend, ops, shared staging, production, review publication, merge.
 - Chosen semantics: for display calls, a non-empty saved `DailyQueue.cabinet_number` is the day's service location and takes precedence over `Doctor.cabinet`; when the snapshot is null/empty, retain current doctor-default fallback. Owner defaults and other writers do not change.
+- Exact-head CI on `6803195ef0c39d6556831813713e48a34e7b4496`: Frontend E2E and other completed applicable checks passed, but Backend tests found one compatibility regression in `test_doctor_calls_patient_by_linked_doctor_id_not_user_id`: its `SimpleNamespace` queue has no `cabinet_number`. Fixed by reading the optional queue snapshot with `getattr` before the doctor/resource fallbacks.
 - Stop: if fixing the reviewed call needs any additional runtime owner/path, ownership is ambiguous, a denied surface must change, or testing requires shared/production data.
 
 ## Current checkpoint
-- Completed: independent review reproduced both defects; current PR HEAD/base/checks were verified. P1 now uses the daily queue cabinet snapshot when announcing doctor queue calls, retaining the doctor default fallback for an unset snapshot. P2 now preserves the exact expected cabinet snapshot while still normalizing the proposed value. Regression tests cover apply-to-display behavior and whitespace preview-to-apply. Evidence is in `EVIDENCE.md#pr-3614-review-fix-local-validation`.
-- Changed but not verified: code and test changes pass local focused validation. They are not yet committed or pushed; fresh hosted CI is therefore NOT_RUN.
-- Remaining: commit and push the bounded fix, verify new exact-head checks, refresh PR evidence/body as needed, then obtain fresh review and a separate staging/deferral decision.
+- Completed: independent review reproduced both defects; fixes for P1/P2 and their regressions are committed and pushed as `6803195ef0c39d6556831813713e48a34e7b4496`. Exact-head CI exposed one compatibility case in a pre-existing doctor display test. Follow-up optional-field read is locally validated.
+- Changed but not verified: `backend/app/services/display_websocket_api_service.py` has an uncommitted `getattr` compatibility correction; exact-head hosted checks for that correction have not run.
+- Remaining: commit and push the correction with this checkpoint, verify new exact-head checks, refresh PR evidence/body after the outcome, then obtain fresh review and a separate staging/deferral decision.
 - Blocker: staging remains NOT_RUN and no Tier-2 deferral is accepted; merge remains HOLD.
-- Next exact action: commit and push only the allowed runtime, unit-test and plan-journal files on the existing PR branch; then inspect fresh exact-head GitHub checks.
-- Checks passed locally: three focused regressions (3 passed, 16 deselected, 1 existing provider warning); Ruff check; `py_compile`; `git diff --check`. Disposable PostgreSQL lock/audit suite from the original implementation is carried forward, not rerun because this fix changes no transaction or DB behavior. Reassess exact-head CI and staging gate before merge.
+- Next exact action: commit and push the optional-snapshot correction plus canonical plan journals on the existing PR branch; then inspect fresh exact-head GitHub checks.
+- Checks passed locally: display and cabinet focused suites (27 passed, 1 existing provider warning); Ruff check and format check; `py_compile`; `git diff --check`. One initial local pytest attempt stopped before collection because the shell lacked `DATABASE_URL`; the rerun used a fail-closed, unreachable loopback URL while tests used synthetic fixtures. Disposable PostgreSQL lock/audit suite from the original implementation is carried forward; the correction does not change DB transaction behavior. Staging/browser remain NOT_RUN; no deferral accepted; merge remains HOLD.
 
 ## Current authoritative checkpoint — T09.2 code-head CI passed (2026-10-06T13:39+05:00)
 
