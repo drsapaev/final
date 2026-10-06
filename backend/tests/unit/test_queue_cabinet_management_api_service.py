@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.models.audit import AuditLog
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
@@ -22,6 +23,425 @@ from app.services.queue_cabinet_management_api_service import (
 
 @pytest.mark.unit
 class TestQueueCabinetManagementApiService:
+    def _seed_reassignment_targets(self, db_session, day: date):
+        user = User(
+            username="cabinet-apply-doctor",
+            full_name="Synthetic Cabinet Doctor",
+            hashed_password="!disabled:test",
+            role="Doctor",
+        )
+        db_session.add(user)
+        db_session.flush()
+        doctor = Doctor(user_id=user.id, specialty="cardiology", cabinet="900")
+        resource = QueueResource(
+            code="cabinet_apply_resource",
+            queue_tag="cabinet_apply",
+            display_name="Synthetic Cabinet Room",
+            default_cabinet="901",
+            active=True,
+        )
+        db_session.add_all([doctor, resource])
+        db_session.flush()
+        doctor_queue = DailyQueue(
+            day=day,
+            specialist_id=doctor.id,
+            cabinet_number="101",
+            active=True,
+        )
+        resource_queue = DailyQueue(
+            day=day,
+            queue_resource_id=resource.id,
+            queue_tag=resource.queue_tag,
+            cabinet_number="201",
+            active=True,
+        )
+        yesterday_queue = DailyQueue(
+            day=day.fromordinal(day.toordinal() - 1),
+            specialist_id=doctor.id,
+            cabinet_number="old-day",
+            active=True,
+        )
+        db_session.add_all([doctor_queue, resource_queue, yesterday_queue])
+        db_session.flush()
+        return doctor, resource, doctor_queue, resource_queue, yesterday_queue
+
+    def test_apply_cabinet_reassignment_updates_only_explicit_today_targets_and_audits(
+        self, db_session, admin_user, monkeypatch
+    ):
+        clinic_day = date(2026, 10, 6)
+        monkeypatch.setattr(
+            "app.services.queue_cabinet_management_api_service.clinic_today",
+            lambda _db: clinic_day,
+        )
+        doctor, resource, doctor_queue, resource_queue, yesterday_queue = (
+            self._seed_reassignment_targets(db_session, clinic_day)
+        )
+
+        result = QueueCabinetManagementApiService(
+            db_session
+        ).apply_cabinet_reassignment(
+            targets=[
+                {
+                    "queue_id": doctor_queue.id,
+                    "expected_owner_type": "doctor",
+                    "expected_owner_id": doctor.id,
+                    "expected_cabinet_number": "101",
+                },
+                {
+                    "queue_id": resource_queue.id,
+                    "expected_owner_type": "resource",
+                    "expected_owner_id": resource.id,
+                    "expected_cabinet_number": "201",
+                },
+            ],
+            new_cabinet_number="301",
+            reason_code="room_unavailable",
+            actor_user_id=admin_user.id,
+            actor_role="Admin",
+            request_id="synthetic-request-apply-1",
+        )
+
+        assert result["clinic_day"] == clinic_day
+        assert result["changed_queue_ids"] == [doctor_queue.id, resource_queue.id]
+        assert result["unchanged_queue_ids"] == []
+        assert doctor_queue.cabinet_number == "301"
+        assert resource_queue.cabinet_number == "301"
+        assert doctor.cabinet == "900"
+        assert resource.default_cabinet == "901"
+        assert yesterday_queue.cabinet_number == "old-day"
+        audit_rows = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.event_type == "QUEUE_CABINET_REASSIGNMENT")
+            .order_by(AuditLog.entity_id)
+            .all()
+        )
+        assert [row.entity_id for row in audit_rows] == [
+            doctor_queue.id,
+            resource_queue.id,
+        ]
+        assert audit_rows[0].actor_user_id == admin_user.id
+        assert audit_rows[0].actor_role == "Admin"
+        assert audit_rows[0].payload == {
+            "queue_day": clinic_day.isoformat(),
+            "owner_type": "doctor",
+            "owner_id": doctor.id,
+            "old_cabinet_number": "101",
+            "new_cabinet_number": "301",
+            "reason_code": "room_unavailable",
+            "request_id": "synthetic-request-apply-1",
+        }
+
+    def test_apply_cabinet_reassignment_stale_target_changes_nothing(self, monkeypatch):
+        clinic_day = date(2026, 10, 6)
+        monkeypatch.setattr(
+            "app.services.queue_cabinet_management_api_service.clinic_today",
+            lambda _db: clinic_day,
+        )
+        doctor_queue = SimpleNamespace(
+            id=1,
+            day=clinic_day,
+            specialist_id=9,
+            queue_resource_id=None,
+            specialist=SimpleNamespace(
+                cabinet="900",
+                user=SimpleNamespace(full_name="Synthetic Doctor", username="doctor"),
+            ),
+            queue_resource=None,
+            cabinet_number="101",
+        )
+        resource_queue = SimpleNamespace(
+            id=2,
+            day=clinic_day,
+            specialist_id=None,
+            queue_resource_id=19,
+            specialist=None,
+            queue_resource=SimpleNamespace(
+                display_name="Synthetic Room", default_cabinet="901"
+            ),
+            cabinet_number="201",
+        )
+        state = {"committed": False, "rolled_back": False, "audits": []}
+
+        class Repository:
+            def lock_daily_queues_for_cabinet_reassignment(self, *, queue_ids):
+                assert queue_ids == [1, 2]
+                return [doctor_queue, resource_queue]
+
+            def lock_queue_entries_for_cabinet_reassignment(self, *, queue_ids):
+                assert queue_ids == [1, 2]
+                return []
+
+            def list_entry_statuses_by_queue_ids(self, **_kwargs):
+                return {}
+
+            def list_queue_ids_with_active_service_execution(self, **_kwargs):
+                return set()
+
+            def add_cabinet_reassignment_audit(self, **kwargs):
+                state["audits"].append(kwargs)
+
+            def commit(self):
+                state["committed"] = True
+
+            def rollback(self):
+                state["rolled_back"] = True
+
+        service = QueueCabinetManagementApiService(db=None, repository=Repository())
+
+        with pytest.raises(QueueCabinetManagementDomainError) as stale:
+            service.apply_cabinet_reassignment(
+                targets=[
+                    {
+                        "queue_id": 1,
+                        "expected_owner_type": "doctor",
+                        "expected_owner_id": 9,
+                        "expected_cabinet_number": "101",
+                    },
+                    {
+                        "queue_id": 2,
+                        "expected_owner_type": "resource",
+                        "expected_owner_id": 19,
+                        "expected_cabinet_number": "stale",
+                    },
+                ],
+                new_cabinet_number="301",
+                reason_code="room_unavailable",
+                actor_user_id=1,
+                actor_role="Admin",
+                request_id="synthetic-request-apply-stale",
+            )
+
+        assert stale.value.status_code == 409
+        assert doctor_queue.cabinet_number == "101"
+        assert resource_queue.cabinet_number == "201"
+        assert state == {"committed": False, "rolled_back": True, "audits": []}
+
+    def test_apply_cabinet_reassignment_rolls_back_if_strict_audit_insert_fails(
+        self, monkeypatch
+    ):
+        clinic_day = date(2026, 10, 6)
+        monkeypatch.setattr(
+            "app.services.queue_cabinet_management_api_service.clinic_today",
+            lambda _db: clinic_day,
+        )
+        doctor_queue = SimpleNamespace(
+            id=1,
+            day=clinic_day,
+            specialist_id=9,
+            queue_resource_id=None,
+            specialist=SimpleNamespace(
+                cabinet="900",
+                user=SimpleNamespace(full_name="Synthetic Doctor", username="doctor"),
+            ),
+            queue_resource=None,
+            cabinet_number="101",
+        )
+        state = {"committed": False, "rolled_back": False}
+
+        class Repository:
+            def lock_daily_queues_for_cabinet_reassignment(self, *, queue_ids):
+                assert queue_ids == [1]
+                return [doctor_queue]
+
+            def lock_queue_entries_for_cabinet_reassignment(self, *, queue_ids):
+                assert queue_ids == [1]
+                return []
+
+            def list_entry_statuses_by_queue_ids(self, **_kwargs):
+                return {}
+
+            def list_queue_ids_with_active_service_execution(self, **_kwargs):
+                return set()
+
+            def add_cabinet_reassignment_audit(self, **_kwargs):
+                raise RuntimeError("synthetic audit insert failure")
+
+            def commit(self):
+                state["committed"] = True
+
+            def rollback(self):
+                state["rolled_back"] = True
+                doctor_queue.cabinet_number = "101"
+
+        service = QueueCabinetManagementApiService(db=None, repository=Repository())
+
+        with pytest.raises(QueueCabinetManagementDomainError) as failed:
+            service.apply_cabinet_reassignment(
+                targets=[
+                    {
+                        "queue_id": 1,
+                        "expected_owner_type": "doctor",
+                        "expected_owner_id": 9,
+                        "expected_cabinet_number": "101",
+                    }
+                ],
+                new_cabinet_number="301",
+                reason_code="room_unavailable",
+                actor_user_id=1,
+                actor_role="Admin",
+                request_id="synthetic-request-apply-audit-failure",
+            )
+
+        assert failed.value.status_code == 500
+        assert doctor_queue.cabinet_number == "101"
+        assert state == {"committed": False, "rolled_back": True}
+
+    def test_apply_request_requires_explicit_unique_expected_state(self):
+        from pydantic import ValidationError
+
+        from app.api.v1.endpoints.queue_cabinet_management import (
+            CabinetReassignmentApplyRequest,
+        )
+
+        target = {
+            "queue_id": 5,
+            "expected_owner_type": "doctor",
+            "expected_owner_id": 9,
+            "expected_cabinet_number": None,
+        }
+        with pytest.raises(ValidationError):
+            CabinetReassignmentApplyRequest(
+                targets=[target, target],
+                new_cabinet_number="301",
+                reason_code="room_unavailable",
+            )
+        with pytest.raises(ValidationError):
+            CabinetReassignmentApplyRequest(
+                targets=[
+                    {
+                        key: value
+                        for key, value in target.items()
+                        if key != "expected_cabinet_number"
+                    }
+                ],
+                new_cabinet_number="301",
+                reason_code="room_unavailable",
+            )
+        request = CabinetReassignmentApplyRequest(
+            targets=[target],
+            new_cabinet_number=" 301 ",
+            reason_code="room_unavailable",
+        )
+        assert request.targets[0].expected_cabinet_number is None
+        assert request.new_cabinet_number == "301"
+
+    def test_apply_endpoint_requires_key_and_admin_role(
+        self, client, admin_auth_headers, registrar_auth_headers
+    ):
+        from app.main import app
+
+        path = "/api/v1/admin/queues/cabinet-info/apply"
+        body = {
+            "targets": [
+                {
+                    "queue_id": 5,
+                    "expected_owner_type": "doctor",
+                    "expected_owner_id": 9,
+                    "expected_cabinet_number": None,
+                }
+            ],
+            "new_cabinet_number": "301",
+            "reason_code": "room_unavailable",
+        }
+        missing_key = client.post(
+            path,
+            json=body,
+            headers=admin_auth_headers,
+        )
+        anonymous = client.post(
+            path,
+            json=body,
+            headers={"Idempotency-Key": "synthetic-cabinet-apply-anonymous"},
+        )
+        registrar = client.post(
+            path,
+            json=body,
+            headers=registrar_auth_headers
+            | {"Idempotency-Key": "synthetic-cabinet-apply-non-admin"},
+        )
+        oversized_key = client.post(
+            path,
+            json=body,
+            headers=admin_auth_headers | {"Idempotency-Key": "x" * 129},
+        )
+
+        assert missing_key.status_code == 422
+        assert anonymous.status_code == 401
+        assert registrar.status_code == 403
+        assert oversized_key.status_code == 400
+        assert oversized_key.json()["code"] == "idempotency_key_invalid"
+        operation = app.openapi()["paths"][path]["post"]
+        key_header = next(
+            item
+            for item in operation["parameters"]
+            if item["in"] == "header" and item["name"] == "Idempotency-Key"
+        )
+        assert key_header["required"] is True
+        assert key_header["schema"]["minLength"] == 1
+        assert key_header["schema"]["maxLength"] == 128
+        assert {"400", "401", "403", "404", "409", "422", "503"}.issubset(
+            operation["responses"]
+        )
+        invalid_key_schema = operation["responses"]["400"]["content"][
+            "application/json"
+        ]["schema"]["$ref"]
+        idempotency_error = app.openapi()["components"]["schemas"][
+            invalid_key_schema.rsplit("/", 1)[-1]
+        ]
+        assert idempotency_error["properties"]["code"]["enum"] == [
+            "idempotency_key_invalid",
+            "idempotency_unavailable",
+        ]
+
+    def test_apply_endpoint_same_key_replays_without_duplicate_audit(
+        self, client, db_session, admin_auth_headers, monkeypatch
+    ):
+        clinic_day = date(2026, 10, 6)
+        monkeypatch.setattr(
+            "app.services.queue_cabinet_management_api_service.clinic_today",
+            lambda _db: clinic_day,
+        )
+        doctor, _resource, doctor_queue, _resource_queue, _yesterday = (
+            self._seed_reassignment_targets(db_session, clinic_day)
+        )
+        headers = admin_auth_headers | {
+            "Idempotency-Key": "synthetic-cabinet-apply-replay-1"
+        }
+        body = {
+            "targets": [
+                {
+                    "queue_id": doctor_queue.id,
+                    "expected_owner_type": "doctor",
+                    "expected_owner_id": doctor.id,
+                    "expected_cabinet_number": "101",
+                }
+            ],
+            "new_cabinet_number": "302",
+            "reason_code": "administrative_correction",
+        }
+
+        first = client.post(
+            "/api/v1/admin/queues/cabinet-info/apply",
+            json=body,
+            headers=headers,
+        )
+        second = client.post(
+            "/api/v1/admin/queues/cabinet-info/apply",
+            json=body,
+            headers=headers,
+        )
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert second.json() == first.json()
+        assert doctor_queue.cabinet_number == "302"
+        assert (
+            db_session.query(AuditLog)
+            .filter(AuditLog.event_type == "QUEUE_CABINET_REASSIGNMENT")
+            .count()
+            == 1
+        )
+
     def test_preview_repository_batches_owner_waiting_and_active_status_reads(
         self, db_session
     ):

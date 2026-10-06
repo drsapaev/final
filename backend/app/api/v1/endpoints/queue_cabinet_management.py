@@ -6,7 +6,7 @@ import logging
 from datetime import date, datetime
 from typing import Annotated, Any, Literal, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
@@ -151,6 +151,73 @@ class CabinetReassignmentPreviewResponse(BaseModel):
     can_apply: bool
 
 
+class CabinetReassignmentApplyTarget(BaseModel):
+    queue_id: Annotated[int, Field(gt=0, strict=True)]
+    expected_owner_type: Literal["doctor", "resource"]
+    expected_owner_id: Annotated[int, Field(gt=0, strict=True)]
+    expected_cabinet_number: str | None = Field(..., max_length=20)
+
+    @field_validator("expected_cabinet_number")
+    @classmethod
+    def normalize_expected_cabinet(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+
+class CabinetReassignmentApplyRequest(BaseModel):
+    targets: list[CabinetReassignmentApplyTarget] = Field(min_length=1)
+    new_cabinet_number: str | None = Field(..., max_length=20)
+    reason_code: Literal[
+        "room_unavailable",
+        "equipment_issue",
+        "schedule_change",
+        "administrative_correction",
+    ]
+
+    @field_validator("targets")
+    @classmethod
+    def validate_unique_targets(
+        cls, value: list[CabinetReassignmentApplyTarget]
+    ) -> list[CabinetReassignmentApplyTarget]:
+        queue_ids = [target.queue_id for target in value]
+        if not queue_ids or len(set(queue_ids)) != len(queue_ids):
+            raise ValueError("targets must contain unique queue IDs")
+        return value
+
+    @field_validator("new_cabinet_number")
+    @classmethod
+    def normalize_new_cabinet(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("new_cabinet_number cannot be blank")
+        return normalized
+
+
+class CabinetReassignmentApplyResponse(BaseModel):
+    clinic_day: date
+    changed_queue_ids: list[int]
+    unchanged_queue_ids: list[int]
+    applied_at: datetime
+
+
+class CabinetReassignmentApplyError(BaseModel):
+    detail: str
+    code: (
+        Literal[
+            "idempotency_in_flight",
+            "idempotency_payload_mismatch",
+            "idempotency_uncertain_outcome",
+        ]
+        | None
+    ) = None
+
+
+class CabinetReassignmentIdempotencyError(BaseModel):
+    code: Literal["idempotency_key_invalid", "idempotency_unavailable"]
+    detail: str
+
+
 # ===================== ПОЛУЧЕНИЕ ИНФОРМАЦИИ О КАБИНЕТАХ =====================
 
 
@@ -247,6 +314,74 @@ def preview_cabinet_reassignment(
         raise
     except Exception as exc:
         _raise_queue_cabinet_internal_error("preview_cabinet_reassignment", exc)
+
+
+@router.post(
+    "/queues/cabinet-info/apply",
+    response_model=CabinetReassignmentApplyResponse,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "model": CabinetReassignmentIdempotencyError,
+            "description": "The idempotency key exceeds the middleware limit.",
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": CabinetReassignmentApplyError,
+            "description": "Authentication is required.",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": CabinetReassignmentApplyError,
+            "description": "The caller must have the Admin role.",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": CabinetReassignmentApplyError,
+            "description": "One or more requested queues were not found.",
+        },
+        status.HTTP_409_CONFLICT: {
+            "model": CabinetReassignmentApplyError,
+            "description": "Queue state changed or an active patient/clinical operation blocks reassignment.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": CabinetReassignmentApplyError,
+            "description": "The reassignment or its mandatory audit could not be committed.",
+        },
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "model": CabinetReassignmentIdempotencyError,
+            "description": "Required idempotency coordination is unavailable; no command is executed.",
+        },
+    },
+)
+def apply_cabinet_reassignment(
+    request: CabinetReassignmentApplyRequest,
+    http_request: Request,
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=1, max_length=128),
+    ],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Apply an explicit same-day reassignment; middleware provides keyed replay."""
+    # The key is required so the global middleware can bind/replay this command.
+    # It is intentionally neither persisted nor logged by this endpoint.
+    _ = idempotency_key
+    service = QueueCabinetManagementApiService(db)
+    try:
+        payload = service.apply_cabinet_reassignment(
+            targets=[target.model_dump() for target in request.targets],
+            new_cabinet_number=request.new_cabinet_number,
+            reason_code=request.reason_code,
+            actor_user_id=current_user.id,
+            actor_role=current_user.role,
+            request_id=getattr(http_request.state, "request_id", "unknown"),
+        )
+        return CabinetReassignmentApplyResponse(**payload)
+    except QueueCabinetManagementDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        service.rollback()
+        _raise_queue_cabinet_internal_error("apply_cabinet_reassignment", exc)
 
 
 @router.put("/queues/{queue_id}/cabinet-info", response_model=dict[str, Any])

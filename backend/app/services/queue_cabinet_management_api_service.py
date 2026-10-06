@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
@@ -16,6 +17,17 @@ from app.services.queue_status import (
     POSITION_VISIBLE_RAW_STATUSES,
     QUEUE_STATUS_ALIASES,
     normalize_queue_status,
+)
+
+logger = logging.getLogger(__name__)
+
+_CABINET_REASSIGNMENT_REASON_CODES = frozenset(
+    {
+        "room_unavailable",
+        "equipment_issue",
+        "schedule_change",
+        "administrative_correction",
+    }
 )
 
 
@@ -184,6 +196,47 @@ class QueueCabinetManagementApiService:
             "owner_default_cabinet": getattr(specialist, "cabinet", None),
         }
 
+    def _blocking_reasons_by_queue(
+        self, *, queue_ids: list[int]
+    ) -> dict[int, list[str]]:
+        blocking_canonical_statuses = {
+            status for status in POSITION_VISIBLE_RAW_STATUSES if status != "waiting"
+        }
+        blocking_statuses = tuple(
+            sorted(
+                blocking_canonical_statuses
+                | {
+                    raw_status
+                    for raw_status, canonical_status in QUEUE_STATUS_ALIASES.items()
+                    if canonical_status in blocking_canonical_statuses
+                }
+            )
+        )
+        entry_statuses = self.repository.list_entry_statuses_by_queue_ids(
+            queue_ids=queue_ids,
+            statuses=blocking_statuses,
+        )
+        queues_with_active_execution = (
+            self.repository.list_queue_ids_with_active_service_execution(
+                queue_ids=queue_ids
+            )
+        )
+        result: dict[int, list[str]] = {}
+        for queue_id in queue_ids:
+            blocking_reasons: list[str] = []
+            statuses = {
+                normalize_queue_status(status)
+                for status in entry_statuses.get(queue_id, set())
+            }
+            if "called" in statuses:
+                blocking_reasons.append("patient_called")
+            if statuses.intersection({"in_service", "diagnostics"}):
+                blocking_reasons.append("clinical_work_in_progress")
+            if queue_id in queues_with_active_execution:
+                blocking_reasons.append("active_service_execution")
+            result[queue_id] = blocking_reasons
+        return result
+
     def preview_cabinet_reassignment(
         self, *, queue_ids: list[int], new_cabinet_number: str | None
     ) -> dict[str, Any]:
@@ -212,43 +265,12 @@ class QueueCabinetManagementApiService:
         waiting_counts = self.repository.count_waiting_entries_by_queue_ids(
             queue_ids=queue_ids
         )
-        blocking_canonical_statuses = {
-            status for status in POSITION_VISIBLE_RAW_STATUSES if status != "waiting"
-        }
-        blocking_statuses = tuple(
-            sorted(
-                blocking_canonical_statuses
-                | {
-                    raw_status
-                    for raw_status, canonical_status in QUEUE_STATUS_ALIASES.items()
-                    if canonical_status in blocking_canonical_statuses
-                }
-            )
-        )
-        entry_statuses = self.repository.list_entry_statuses_by_queue_ids(
-            queue_ids=queue_ids,
-            statuses=blocking_statuses,
-        )
-        queues_with_active_execution = (
-            self.repository.list_queue_ids_with_active_service_execution(
-                queue_ids=queue_ids
-            )
-        )
+        blocking_reasons_by_queue = self._blocking_reasons_by_queue(queue_ids=queue_ids)
 
         items: list[dict[str, Any]] = []
         for queue_id in queue_ids:
             queue = queues_by_id[queue_id]
-            blocking_reasons: list[str] = []
-            statuses = {
-                normalize_queue_status(status)
-                for status in entry_statuses.get(queue_id, set())
-            }
-            if "called" in statuses:
-                blocking_reasons.append("patient_called")
-            if statuses.intersection({"in_service", "diagnostics"}):
-                blocking_reasons.append("clinical_work_in_progress")
-            if queue_id in queues_with_active_execution:
-                blocking_reasons.append("active_service_execution")
+            blocking_reasons = blocking_reasons_by_queue[queue_id]
 
             items.append(
                 {
@@ -268,6 +290,168 @@ class QueueCabinetManagementApiService:
             "items": items,
             "can_apply": all(item["can_apply"] for item in items),
         }
+
+    def apply_cabinet_reassignment(
+        self,
+        *,
+        targets: list[dict[str, Any]],
+        new_cabinet_number: str | None,
+        reason_code: str,
+        actor_user_id: int,
+        actor_role: str,
+        request_id: str,
+    ) -> dict[str, Any]:
+        """Apply an explicit same-day cabinet change with one strict audit boundary."""
+        queue_ids = [target.get("queue_id") for target in targets]
+        if (
+            not targets
+            or any(type(queue_id) is not int or queue_id <= 0 for queue_id in queue_ids)
+            or len(set(queue_ids)) != len(queue_ids)
+        ):
+            raise QueueCabinetManagementDomainError(
+                422, "Укажите уникальные положительные ID очередей"
+            )
+        if reason_code not in _CABINET_REASSIGNMENT_REASON_CODES:
+            raise QueueCabinetManagementDomainError(
+                422, "Укажите допустимую кодовую причину изменения кабинета"
+            )
+        if new_cabinet_number is not None:
+            new_cabinet_number = new_cabinet_number.strip()
+            if not new_cabinet_number or len(new_cabinet_number) > 20:
+                raise QueueCabinetManagementDomainError(
+                    422, "Номер кабинета должен содержать от 1 до 20 символов"
+                )
+
+        try:
+            # All command instances take queue rows first and in the same order.
+            queues = self.repository.lock_daily_queues_for_cabinet_reassignment(
+                queue_ids=queue_ids
+            )
+            queues_by_id = {queue.id: queue for queue in queues}
+            if len(queues_by_id) != len(queue_ids):
+                raise QueueCabinetManagementDomainError(
+                    404, "Одна или несколько очередей не найдены"
+                )
+
+            # Called/clinical transitions and ServiceExecution creation lock the
+            # queue-entry row. Taking every existing entry after its parent queue
+            # serializes those transitions and FK-backed execution inserts here.
+            self.repository.lock_queue_entries_for_cabinet_reassignment(
+                queue_ids=queue_ids
+            )
+
+            clinic_day = clinic_today(self.db)
+            if any(queue.day != clinic_day for queue in queues):
+                raise QueueCabinetManagementDomainError(
+                    409, "Изменять можно только очереди текущего дня клиники"
+                )
+
+            targets_by_id = {target["queue_id"]: target for target in targets}
+            owners_by_id: dict[int, dict[str, Any]] = {}
+            for queue_id in queue_ids:
+                queue = queues_by_id[queue_id]
+                target = targets_by_id[queue_id]
+                owner = self._preview_owner(queue)
+                owners_by_id[queue_id] = owner
+                if (
+                    owner["owner_type"] != target["expected_owner_type"]
+                    or owner["owner_id"] != target["expected_owner_id"]
+                    or queue.cabinet_number != target["expected_cabinet_number"]
+                ):
+                    logger.warning(
+                        "Cabinet reassignment rejected stale target queue_id=%s request_id=%s",
+                        queue_id,
+                        request_id,
+                    )
+                    raise QueueCabinetManagementDomainError(
+                        409,
+                        "Состояние очереди изменилось после preview; обновите данные",
+                    )
+
+            changed_ids = [
+                queue_id
+                for queue_id in queue_ids
+                if queues_by_id[queue_id].cabinet_number != new_cabinet_number
+            ]
+            blocking_reasons_by_queue = self._blocking_reasons_by_queue(
+                queue_ids=changed_ids
+            )
+            blocked_ids = [
+                queue_id
+                for queue_id, reasons in blocking_reasons_by_queue.items()
+                if reasons
+            ]
+            if blocked_ids:
+                logger.warning(
+                    "Cabinet reassignment rejected active queue state queue_ids=%s request_id=%s",
+                    blocked_ids,
+                    request_id,
+                )
+                raise QueueCabinetManagementDomainError(
+                    409,
+                    "Перенос заблокирован: по одной или нескольким очередям уже вызван пациент или идёт обслуживание",
+                )
+
+            changed_set = set(changed_ids)
+            for queue_id in sorted(changed_ids):
+                queue = queues_by_id[queue_id]
+                owner = owners_by_id[queue_id]
+                old_cabinet_number = queue.cabinet_number
+                queue.cabinet_number = new_cabinet_number
+                self.repository.add_cabinet_reassignment_audit(
+                    queue_id=queue_id,
+                    actor_user_id=actor_user_id,
+                    actor_role=actor_role,
+                    reason_code=reason_code,
+                    payload={
+                        "queue_day": queue.day.isoformat(),
+                        "owner_type": owner["owner_type"],
+                        "owner_id": owner["owner_id"],
+                        "old_cabinet_number": old_cabinet_number,
+                        "new_cabinet_number": new_cabinet_number,
+                        "reason_code": reason_code,
+                        "request_id": request_id,
+                    },
+                )
+
+            result = {
+                "clinic_day": clinic_day,
+                "changed_queue_ids": [
+                    queue_id for queue_id in queue_ids if queue_id in changed_set
+                ],
+                "unchanged_queue_ids": [
+                    queue_id for queue_id in queue_ids if queue_id not in changed_set
+                ],
+                "applied_at": datetime.now(UTC),
+            }
+            if changed_ids:
+                self.repository.commit()
+            else:
+                self.repository.rollback()
+            if changed_ids:
+                logger.info(
+                    "Cabinet reassignment applied actor_id=%s queue_ids=%s reason_code=%s request_id=%s",
+                    actor_user_id,
+                    result["changed_queue_ids"],
+                    reason_code,
+                    request_id,
+                )
+            return result
+        except QueueCabinetManagementDomainError:
+            self.repository.rollback()
+            raise
+        except Exception as exc:
+            self.repository.rollback()
+            logger.error(
+                "Cabinet reassignment failed actor_id=%s queue_ids=%s request_id=%s error_type=%s",
+                actor_user_id,
+                queue_ids,
+                request_id,
+                type(exc).__name__,
+            )
+            raise QueueCabinetManagementDomainError(
+                500, "Не удалось изменить кабинеты; данные не сохранены"
+            ) from exc
 
     def update_queue_cabinet_info(
         self,

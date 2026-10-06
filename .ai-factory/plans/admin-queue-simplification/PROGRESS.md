@@ -1,4 +1,27 @@
-# Progress
+## Current authoritative checkpoint — T09.2 ready for PR (2026-10-06T12:59+05:00)
+
+Plan version: 3.28
+Current task/status: T09.2 / VALIDATED. Implementation and focused local validation are complete; PR preparation is next.
+Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`
+Branch: `codex/aqs-T09.2-cabinet-apply`
+Base commit: `1d146d857e1570ff2259975f081f80dc0b31ae82` (merged PR #3613; synchronized with `origin/main`)
+Current commit under test: `1d146d857e1570ff2259975f081f80dc0b31ae82` plus uncommitted T09.2 changes.
+Last updated: 2026-10-06T12:59+05:00
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T09.1 | MERGED | [PR #3612](https://github.com/drsapaev/final/pull/3612) | `89b4888a013978182e45f34ac2e07a9679c497c9` | `EVIDENCE.md#t091-pr-3612-merged` |
+| T09.2 | VALIDATED | `codex/aqs-T09.2-cabinet-apply` | | `EVIDENCE.md#t092-resumed-after-pr-3613` |
+
+## Current checkpoint
+- Completed: PR #3613 merged and `origin/main` synchronized; its key-log redaction resolves the previous T09.2 scope hold. T09.2 implements explicit Admin apply, deterministic queue/entry locks, stale and active-state guards, strict same-transaction audit and replay. Post-sync focused checks: 97 passed, 9 skipped, 2 xfailed; disposable PostgreSQL integration: 8 passed, 0 skipped. OpenAPI and pinned TypeScript generation completed; Python static checks and `git diff --check` passed. Owned Redis/PostgreSQL were removed and WSL distro stopped after its npm installer became unresponsive.
+- Changed but not verified: T09.2 has not been committed or published; exact-head hosted checks and independent review are NOT_RUN. Browser/staging/full system-health remain NOT_RUN. Standard `npm run generate:api-types:check` could not run in the WSL-backed shell because its npx cache lacks TypeScript; the pinned direct generator command passed. The PR body passed the local review-quality gate (19 unit checks, both samples, and this body).
+- Remaining: final scope/diff review and last `git diff --check`; commit, push and open the T09.2 PR; inspect checks on its exact HEAD.
+- Blocker: none within T09.2 scope. The old global key-log hold is resolved by merged PR #3613. No staging or production validation is claimed.
+- Next exact action: review all tracked changes and the required PR template, then commit and open one T09.2 PR. Do not merge before independent review and applicable PR checks.
+- Checks to rerun after any runtime/generated change: focused cabinet unit/API/OpenAPI and service-boundary tests; disposable PostgreSQL apply integration; Ruff, Black, format, compile, OpenAPI generation, pinned TypeScript generation and `git diff --check`.
+
+## Prior checkpoint — T09.1 continuation decision (superseded)
 
 ## Current authoritative checkpoint — T09.1 continuation decision (2026-10-06T09:26+05:00)
 
@@ -29,7 +52,8 @@ Checks to run after this checkpoint is pushed: confirm exact-head backend, front
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T08.3.3 | MERGED | PR #3609 | `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92` | `EVIDENCE.md#t0833-pr-3609-merged` |
-| T09.1 | PR_OPEN | [PR #3612](https://github.com/drsapaev/final/pull/3612) · `codex/aqs-T09.1-cabinet-preview` | | `EVIDENCE.md#t091-final-review-and-exact-head-validation` |
+| T09.1 | MERGED | [PR #3612](https://github.com/drsapaev/final/pull/3612) | `89b4888a013978182e45f34ac2e07a9679c497c9` | `EVIDENCE.md#t091-pr-3612-merged` |
+| T09.2 | IN_PROGRESS | `codex/aqs-T09.2-cabinet-apply` | | `EVIDENCE.md#t092-pre-edit-gate-and-scope` |
 
 ## Historical checkpoint — T08.3.3 GraphQL quota proof (2026-10-05T21:10:45+05:00)
 

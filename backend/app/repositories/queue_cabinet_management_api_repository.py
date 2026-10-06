@@ -7,6 +7,7 @@ from datetime import date
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.models.audit import AuditLog
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.service_execution import STATUS_IN_PROGRESS, ServiceExecution
@@ -50,6 +51,66 @@ class QueueCabinetManagementApiRepository:
             .filter(DailyQueue.id.in_(queue_ids))
             .all()
         )
+
+    def lock_daily_queues_for_cabinet_reassignment(
+        self, *, queue_ids: list[int]
+    ) -> list[DailyQueue]:
+        """Lock explicit queue rows in stable order and refresh loaded state."""
+        if not queue_ids:
+            return []
+        return (
+            self.db.query(DailyQueue)
+            .options(
+                joinedload(DailyQueue.specialist).joinedload(Doctor.user),
+                joinedload(DailyQueue.queue_resource),
+            )
+            .filter(DailyQueue.id.in_(queue_ids))
+            .order_by(DailyQueue.id.asc())
+            .populate_existing()
+            .with_for_update(of=DailyQueue)
+            .all()
+        )
+
+    def lock_queue_entries_for_cabinet_reassignment(
+        self, *, queue_ids: list[int]
+    ) -> list[OnlineQueueEntry]:
+        """Lock entry state after queue rows, in deterministic queue/id order."""
+        if not queue_ids:
+            return []
+        return (
+            self.db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id.in_(queue_ids))
+            .order_by(OnlineQueueEntry.queue_id.asc(), OnlineQueueEntry.id.asc())
+            .populate_existing()
+            .with_for_update(of=OnlineQueueEntry)
+            .all()
+        )
+
+    def add_cabinet_reassignment_audit(
+        self,
+        *,
+        queue_id: int,
+        actor_user_id: int,
+        actor_role: str,
+        reason_code: str,
+        payload: dict,
+    ) -> None:
+        """Flush strict command audit without taking ownership of the transaction."""
+        self.db.add(
+            AuditLog(
+                action="cabinet_reassigned",
+                entity_type="daily_queue",
+                entity_id=queue_id,
+                actor_user_id=actor_user_id,
+                actor_role=actor_role,
+                actor_type="staff",
+                event_type="QUEUE_CABINET_REASSIGNMENT",
+                outcome="success",
+                reason_code={"code": reason_code},
+                payload=payload,
+            )
+        )
+        self.db.flush()
 
     def count_waiting_entries_by_queue_ids(
         self, *, queue_ids: list[int]
