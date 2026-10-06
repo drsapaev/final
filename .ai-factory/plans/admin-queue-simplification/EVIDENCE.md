@@ -43,7 +43,20 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Commit hooks on `688023b8`: JSON, whitespace, conflict, secret, Gitleaks, Ruff, Ruff-format and Black passed. ESLint was skipped because its wrapper changes into `frontend/` but passes the original `frontend/...` staged path; generated API types are intentionally ignored by ESLint. The EOF fixer was skipped for canonical OpenAPI output, whose generator writes no trailing newline. These skips do not claim the respective hooks passed; standalone TS and OpenAPI contract checks passed.
 - Exact code-head GitHub/Code Review check inventory for `688023b80aa317db0fa2f08f8c0d16b26b4b330d`: **18 success, 4 skipped, 0 failed, 0 pending**. Skipped: two failure-notification jobs, `classify-and-route`, and `Supabase Preview`; skips are not passes. `PR Review Quality Gate` passed. The repository PR-body validator passed after the body was completed; its first draft failure was corrected.
 - Full frontend build/type-check, runtime Admin auth integration, PostgreSQL, staging/browser and production remain **NOT_RUN**. No staging deferral acceptance, GitHub APPROVE review, or merge is claimed. PR #3612 remains open as draft.
-- Next exact action: push this journal-only review checkpoint, inspect the resulting exact-head CI, then await the user's review/merge direction. Do not start T09.2 until #3612 is merged and main synchronized.
+- This entry is superseded for the next action by the generator-parity correction record below; its exact code-head findings remain valid.
+- Merge commit: none.
+
+## T09.1 generator parity CI correction — 2026-10-06T07:06:39+05:00
+
+- Commit under test: PR #3612 docs checkpoint HEAD `adcbe1caf37cf1f9a5235e589c7fe584aabf8851`; code under review remains `688023b80aa317db0fa2f08f8c0d16b26b4b330d`; base `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`.
+- Execution mode: scoped correction within the approved T09.1 generated-contract allowlist. Allowed paths: `frontend/src/types/generated/api.ts` and plan checkpoints. No runtime/API schema change.
+- Original failure: exact-head GitHub job `Frontend lint` failed at `npm run generate:api-types:check`; lint and `tsc --noEmit` had passed. CI's canonical `frontend/scripts/generate-api-types.sh` prepends three header lines that were missing because the artifact had been emitted by invoking `openapi-typescript` directly.
+- Correction/validation: ran the repository generator with Git Bash, Node `v24.15.0`, and pinned `openapi-typescript 7.13.0`; staged artifact adds exactly those three canonical comments. `npm run generate:api-types:check` then passed locally. `git diff --cached --check` passed.
+- Actual changed paths for the correction: `frontend/src/types/generated/api.ts` (three generated comment lines); this evidence, progress, resume, and plan checkpoint. No other generated or runtime files changed.
+- Result: local generator parity **PASS**. The former exact-head `adcbe1ca` `Frontend lint` result is **FAIL** and will be superseded only by a passing run on the pushed corrective head. At correction time, backend tests and frontend E2E were still pending on `adcbe1ca`; do not count them as evidence for the next head.
+- Scope check: only the generated artifact and plan/evidence files; no staging, PostgreSQL, production, model, migration, runtime, or frontend UI changes.
+- Remaining limitation: push the correction and inspect all applicable CI on its exact new head. PostgreSQL/staging/browser remain **NOT_RUN**.
+- PR: https://github.com/drsapaev/final/pull/3612 (open draft).
 - Merge commit: none.
 
 ## T08.3.3 PR #3609 merged — 2026-10-05T22:10+05:00
