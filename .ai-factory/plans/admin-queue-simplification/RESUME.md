@@ -1,6 +1,14 @@
 # Resume — admin queue simplification
 
-## Current continuation checkpoint — T09.1 cabinet preview (2026-10-06T07:42:29+05:00)
+## Current continuation checkpoint — T09.1 decision (2026-10-06T09:26+05:00)
+
+- Read plan v3.23 and the authoritative PROGRESS entry. Reviewed PR #3612 HEAD `a8f7980b1d160726e169050a8bc8f8043294a36b`; code HEAD `390e14b40d6eafb462e05d07f777c1e063a36c14`. Current-head CI **26 success / 13 skipped / 0 failed / 0 pending**; source review has no outstanding P0/P1/P2. PR is OPEN/draft/mergeable, not merged.
+- The user requested a continuation decision. Agent technical disposition: accept the **PR-specific backend/staging deferral** in `EVIDENCE.md#t091-pr-3612-continuation-decision`; recommend completing #3612 review/merge. No human/GitHub review or merge/deployment is claimed. UI Tier 1/Tier 2 are not applicable to this backend-only unused preview.
+- Real-PG preview and runtime Admin/non-Admin API proof must resume in T09.2 **before its merge**, alongside stale-state, audit rollback, replay and called/active-execution checks. T09.3 owns connected UI acceptance; T18 and the full pre-deploy runbook remain mandatory. Deferred checks are NOT_RUN with zero completion credit; the deferral does not apply to later PRs.
+- This update changes only plan/journals and PR description under the existing T09.1 narrow override. Runtime, tests, generated contracts, migrations, ops, staging and production are unchanged; do not rerun the previously misrouted gate.
+- Next: push the decision checkpoint, inspect the resulting exact PR head checks, then complete the current PR cycle on user merge direction. Start T09.2 only after merge, cleanup and main synchronization. Preserve the existing worktree and unrelated `.gate_artifacts/`.
+
+## Historical checkpoint — T09.1 cabinet preview (2026-10-06T07:42:29+05:00)
 
 - PR #3609 is merged at `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`. T09.1 PR #3612 is open as a draft at HEAD `390e14b40d6eafb462e05d07f777c1e063a36c14`. Source review found no remaining P0/P1/P2. Exact-head rollup: 29 success, 13 skipped, 0 failed; backend, frontend lint/type-check/API parity, unit/build, E2E rerun, OpenAPI freshness, security and quality gates passed. The first E2E run had an unrelated lab-dirty-guard timeout; rerun passed. Latest PR body validation and hosted quality gate passed. Skips are not passes.
 - Current worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`, branch `codex/aqs-T09.1-cabinet-preview`, based at `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`. This final plan/evidence checkpoint is being committed; current PR body records exact-head results. Main `C:\final` was not changed; unrelated `.gate_artifacts/` remains untouched.

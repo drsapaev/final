@@ -2,6 +2,21 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
+## T09.1 PR #3612 continuation decision — 2026-10-06T09:26+05:00
+
+- Reviewed PR HEAD: `a8f7980b1d160726e169050a8bc8f8043294a36b`; code HEAD remains `390e14b40d6eafb462e05d07f777c1e063a36c14`. GitHub reports OPEN, draft, MERGEABLE. Current checks: **26 success, 13 skipped, 0 failure, 0 pending**. Earlier 29-check observations are historical snapshots and are not the current count.
+- Decision authority: the user requested an agent decision for continuation. This is the agent's technical disposition, not a fabricated human/GitHub approval and not a merge/deployment action. Source review has no outstanding P0/P1/P2.
+- Pre-edit boundary: continuation of the recorded T09.1 narrow override; no third gate run. Only this evidence log, PROGRESS, RESUME, the canonical plan and existing PR description may change. Runtime, generated API artifacts, tests, schema, auth policy, ops, staging, production and other agents' files remain unchanged. First stop: new code/diff or a required out-of-scope change.
+- **Disposition:** accept the following PR-specific backend/staging validation deferral for the unused read-only preview. UI Tier 1/Tier 2 are **not applicable**, because no frontend runtime changed. This disposition does not apply to T09.2, T09.3, other PRs, v1 activation or deployment.
+- **Original requirement:** real-PostgreSQL preview query verification; authenticated Admin success and non-Admin denial; synthetic staging/browser acceptance for the completed cabinet workflow. These checks remain **NOT_RUN**, not PASS.
+- **Reason:** scope decision to validate the additive preview together with its first command/consumer. T09.1 performs no writes, changes no schema/auth semantics, uses the existing Admin guard and has no runtime UI consumer. Infrastructure unavailability was not established in this session and is not claimed as the reason.
+- **Evidence:** focused service/ORM-repository/OpenAPI tests **49 passed, 1 warning** on unit SQLite fixtures; static/generator parity checks passed; current-head CI **26 success, 13 skipped, 0 failure**. The real-PG/auth/staging targets above were not run. CI frontend E2E is not their substitute.
+- **Owner / workstream:** admin-queue-simplification T09 executing agent; T09.2 owns real-PG command/preview and API auth proof, T09.3 owns the connected UI/browser workflow, T18 owns the full synthetic matrix.
+- **Resume condition:** before T09.2 merge, run real-PG preview plus atomic apply, stale conflict, mandatory-audit rollback, identical replay, called/active-execution blockers and Admin/non-Admin API checks. Before completing T09.3, validate its browser consumer. T18 and the full pre-deploy staging runbook remain mandatory before production deployment.
+- **Impact on headline completion:** deferred coverage receives **zero completion credit**. T09.1 remains PR_OPEN until confirmed merge; the overall T09 workflow and T18 acceptance remain incomplete. No headline completion percentage is increased by this decision.
+- Continuation: record this decision in the PR description, validate the documentation diff/body, push the journal-only checkpoint and inspect its checks. Recommend ending the #3612 PR cycle next; no merge is performed in this decision-only turn. Begin T09.2 only after confirmed merge, cleanup and main synchronization.
+- Validation of this new journal/body update: `git diff --check` **PASS**; `scripts/run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py','--body-file','.scratch/PR3612-continuation-decision.md','--author','codex')` **PASS** (19 unit checks, both samples and the actual PR body). The initial launcher invocation accidentally bound the script path to RequireModule; retrying with named PythonArgs passed. No runtime tests were repeated for this documentation-only change. Merge commit: none.
+
 ## T09.1 gate and scope — 2026-10-05T22:10+05:00
 
 - Base/commit under test: fresh `origin/main`, merge commit `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92` for PR #3609. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`; branch `codex/aqs-T09.1-cabinet-preview`.

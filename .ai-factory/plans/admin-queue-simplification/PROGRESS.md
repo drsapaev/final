@@ -1,6 +1,15 @@
 # Progress
 
-## Current authoritative checkpoint — T09.1 cabinet preview (2026-10-06T07:42:29+05:00)
+## Current authoritative checkpoint — T09.1 continuation decision (2026-10-06T09:26+05:00)
+
+Plan version: 3.23
+Current task/status: T09.1 / PR_OPEN — draft [PR #3612](https://github.com/drsapaev/final/pull/3612). Reviewed PR HEAD `a8f7980b1d160726e169050a8bc8f8043294a36b`; code HEAD `390e14b40d6eafb462e05d07f777c1e063a36c14`; current CI **26 success, 13 skipped, 0 failed, 0 pending**. No outstanding source-review P0/P1/P2.
+Decision: at the user's request for a continuation decision, the executing agent accepts a **#3612-specific backend/staging deferral** for this unused read-only preview. This is not a human/GitHub review, merge or deployment. UI Tier 1/Tier 2 are not applicable; no UI runtime changed. Full six-field record: `EVIDENCE.md#t091-pr-3612-continuation-decision`.
+Scope/mode: continuation of the existing T09.1 narrow override; documentation/PR-description only, no further gate run or scope expansion. Allowed edits: canonical plan, PROGRESS, RESUME, EVIDENCE and existing PR description. No runtime, test, generated API, migration, ops, auth-policy, staging or production changes.
+Deferred coverage: real-PG preview, runtime Admin/non-Admin API checks and synthetic workflow/browser acceptance remain NOT_RUN with zero completion credit. T09.2 must prove real-PG preview/apply, stale 409, audit rollback, replay and called/active safety **before its merge**; T09.3 must validate its UI consumer; T18/full pre-deploy staging remain mandatory. This deferral is not inherited by any later PR.
+Next exact action: validate/push this journal-only decision and check the resulting PR head. Recommend completing #3612 review/merge next; no merge in this decision-only turn. T09.2 starts only after confirmed merge, branch cleanup and main synchronization. Stop on new runtime changes, an unclear owner/contract, or a required out-of-scope path.
+
+## Historical checkpoint — T09.1 cabinet preview (2026-10-06T07:42:29+05:00)
 
 Plan version: 3.22
 Execution permission: user authorized implementation of the full plan and said “мёрж и продолжать”; PR #3609 has been merged. Continue T09.1 only in its approved read-only preview scope.
