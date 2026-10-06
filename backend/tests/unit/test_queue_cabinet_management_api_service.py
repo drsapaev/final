@@ -471,8 +471,19 @@ class TestQueueCabinetManagementApiService:
         ]["properties"]["queue_ids"]
 
         assert schema["minItems"] == 1
+        assert schema["uniqueItems"] is True
         item_schema = schema["items"]
         assert (
             item_schema.get("minimum", 0) > 0
             or item_schema.get("exclusiveMinimum") == 0
         )
+
+        responses = app.openapi()["paths"]["/api/v1/admin/queues/cabinet-info/preview"][
+            "post"
+        ]["responses"]
+        assert {"200", "401", "403", "404", "409", "422"}.issubset(responses)
+        for status_code in ("401", "403", "404", "409"):
+            assert (
+                responses[status_code]["content"]["application/json"]["schema"]["$ref"]
+                == "#/components/schemas/CabinetReassignmentPreviewError"
+            )

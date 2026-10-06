@@ -93,7 +93,10 @@ class BulkCabinetUpdateRequest(BaseModel):
 
 
 class CabinetReassignmentPreviewRequest(BaseModel):
-    queue_ids: list[Annotated[int, Field(gt=0, strict=True)]] = Field(min_length=1)
+    queue_ids: list[Annotated[int, Field(gt=0, strict=True)]] = Field(
+        min_length=1,
+        json_schema_extra={"uniqueItems": True},
+    )
     new_cabinet_number: str | None = Field(max_length=20)
 
     @field_validator("queue_ids")
@@ -116,6 +119,10 @@ class CabinetReassignmentPreviewRequest(BaseModel):
         if not normalized:
             raise ValueError("new_cabinet_number cannot be blank")
         return normalized
+
+
+class CabinetReassignmentPreviewError(BaseModel):
+    detail: str
 
 
 class CabinetReassignmentPreviewItem(BaseModel):
@@ -203,6 +210,24 @@ def get_queue_cabinet_info(
 @router.post(
     "/queues/cabinet-info/preview",
     response_model=CabinetReassignmentPreviewResponse,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": CabinetReassignmentPreviewError,
+            "description": "Authentication is required.",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": CabinetReassignmentPreviewError,
+            "description": "The caller must have the Admin role.",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": CabinetReassignmentPreviewError,
+            "description": "One or more requested queues were not found.",
+        },
+        status.HTTP_409_CONFLICT: {
+            "model": CabinetReassignmentPreviewError,
+            "description": "A target is not for clinic-local today or its owner is unavailable.",
+        },
+    },
 )
 def preview_cabinet_reassignment(
     request: CabinetReassignmentPreviewRequest,

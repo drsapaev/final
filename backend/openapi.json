@@ -9745,6 +9745,46 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetReassignmentPreviewError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller must have the Admin role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetReassignmentPreviewError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "One or more requested queues were not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetReassignmentPreviewError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A target is not for clinic-local today or its owner is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetReassignmentPreviewError"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -74004,6 +74044,19 @@
         "type": "object",
         "title": "CabinetInfo"
       },
+      "CabinetReassignmentPreviewError": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "CabinetReassignmentPreviewError"
+      },
       "CabinetReassignmentPreviewItem": {
         "properties": {
           "queue_id": {
@@ -74110,6 +74163,7 @@
             },
             "type": "array",
             "minItems": 1,
+            "uniqueItems": true,
             "title": "Queue Ids"
           },
           "new_cabinet_number": {
