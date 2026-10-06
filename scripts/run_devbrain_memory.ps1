@@ -6,6 +6,10 @@ param(
     [string]$TaskId
 )
 $ErrorActionPreference='Stop'
+if ($PSBoundParameters.ContainsKey('TaskId') -and [string]::IsNullOrWhiteSpace($TaskId)) {
+    [Console]::Error.WriteLine('{"error":"invalid task_id"}')
+    exit 2
+}
 $scriptDir=Split-Path -Parent $MyInvocation.MyCommand.Path
 $helper=Join-Path $scriptDir 'devbrain_memory.py'
 $argsList=[System.Collections.Generic.List[string]]::new()
@@ -18,6 +22,6 @@ if ($InputFile) {
 }
 if ($Query) { $argsList.Add('--query'); $argsList.Add($Query) }
 if ($Topics.Count) { $argsList.Add('--topics'); $argsList.Add(($Topics -join ' ')) }
-if ($TaskId) { $argsList.Add('--task-id'); $argsList.Add($TaskId) }
+if ($PSBoundParameters.ContainsKey('TaskId')) { $argsList.Add('--task-id'); $argsList.Add($TaskId) }
 & (Join-Path $scriptDir 'run_python.ps1') -PythonArgs $argsList.ToArray() 6>$null
 exit $LASTEXITCODE
