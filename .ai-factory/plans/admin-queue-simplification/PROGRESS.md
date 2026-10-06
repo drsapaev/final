@@ -1,4 +1,52 @@
-# Progress
+## Current checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
+
+Plan version: 3.34
+Current task/status: T09.2 review fixes / PR_OPEN — existing PR #3614.
+Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`
+Branch: `codex/aqs-T09.2-cabinet-apply`
+Base: `1d146d857e1570ff2259975f081f80dc0b31ae82`
+Latest code/evidence HEAD: `3cd2bf1103cd5759c49d9ca73ad8fed4ac686a1f`
+
+- Review: one confirmed P1 (doctor display call ignores the reassigned DailyQueue cabinet) and one P2 (expected cabinet snapshot is stripped before equality check). User explicitly requested both fixes.
+- Mode: mandatory `gate`. `scripts/run_agent_gate.ps1` from `ai/langgraph` returned `gate_ok`, `execute`, `handoff_required=true`, `gate_misroute=false`, `override_used=false`. The generated execution prompt was read. Use only its directly relevant first-touch files: cabinet endpoint, display call service, and focused cabinet service test module. The unrelated queue service/model/queue-time paths stay denied.
+- Allowed runtime/tests: `backend/app/services/display_websocket_api_service.py`; `backend/app/api/v1/endpoints/queue_cabinet_management.py`; `backend/tests/unit/test_queue_cabinet_management_api_service.py`. The existing display-service unit module may be run read-only. Allowed records: this plan's PROGRESS, RESUME, EVIDENCE, DECISIONS, and main plan.
+- Denied: schema/models/migrations, queue writers/defaults, nurse station assignment contract, legacy single/bulk/sync writers, unrelated display/queue paths, frontend, ops, shared staging, production, review publication, merge.
+- Chosen semantics: for display calls, a non-empty saved `DailyQueue.cabinet_number` is the day's service location and takes precedence over `Doctor.cabinet`; when the snapshot is null/empty, retain current doctor-default fallback. Owner defaults and other writers do not change.
+- CI follow-up: `6803195e` exposed an optional-field compatibility regression in `test_doctor_calls_patient_by_linked_doctor_id_not_user_id`; corrected with `getattr` and pushed in `3cd2bf11`.
+- Stop: if fixing the reviewed call needs any additional runtime owner/path, ownership is ambiguous, a denied surface must change, or testing requires shared/production data.
+
+## Current checkpoint
+- Completed: P1 and P2 fixes, compatibility correction, and regressions are committed and pushed in existing PR #3614. Latest code/evidence HEAD `3cd2bf11` passed exact-head checks: **30 success, 13 skipped, 0 failures, 0 pending**. PR body was refreshed and its review-quality/lifecycle checks passed.
+- Changed but not verified: no runtime/test edits remain. This documentation checkpoint must be pushed and its exact-head checks inspected.
+- Remaining: commit/push this final progress checkpoint, verify resulting documentation HEAD checks, then await independent review and a separate staging/deferral decision.
+- Blocker: staging remains NOT_RUN and no Tier-2 deferral is accepted; merge remains HOLD.
+- First E2E attempt failed one unrelated lab dirty-guard locator wait while Vite proxy returned `ECONNREFUSED`; failed-job attempt 2 passed. Skipped checks (13) include staging/readiness, integration, Docker, load, metadata, selected release/security jobs and notifications; skipped jobs are NOT_RUN, not passes.
+- Checks passed locally: display and cabinet focused suites (27 passed, 1 existing provider warning); Ruff check and format check; `py_compile`; `git diff --check`; commit hooks. PR-body validator passed 19 tests and both documented samples. Staging/browser/full system-health remain NOT_RUN; no deferral accepted; merge remains HOLD.
+
+## Current authoritative checkpoint — T09.2 code-head CI passed (2026-10-06T13:39+05:00)
+
+Plan version: 3.30
+Current task/status: T09.2 / PR_OPEN — [PR #3614](https://github.com/drsapaev/final/pull/3614). Generated API freshness correction commit: `80e5ad8`; evidence checkpoint commit: `ca6a1ba8e34ab02cb8773ca38256c33b22516895`.
+Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`
+Branch: `codex/aqs-T09.2-cabinet-apply`
+Base commit: `1d146d857e1570ff2259975f081f80dc0b31ae82` (merged PR #3613; synchronized with `origin/main`)
+Latest verified PR HEAD before this journal-only refresh: `ca6a1ba8e34ab02cb8773ca38256c33b22516895`; base `1d146d857e1570ff2259975f081f80dc0b31ae82`.
+Last updated: 2026-10-06T13:39+05:00
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T09.1 | MERGED | [PR #3612](https://github.com/drsapaev/final/pull/3612) | `89b4888a013978182e45f34ac2e07a9679c497c9` | `EVIDENCE.md#t091-pr-3612-merged` |
+| T09.2 | PR_OPEN | [PR #3614](https://github.com/drsapaev/final/pull/3614) | | `EVIDENCE.md#t092-generated-api-freshness-correction` |
+
+## Current checkpoint
+- Completed: PR #3613 merged and `origin/main` synchronized; T09.2 apply behavior and post-sync validation remain recorded in EVIDENCE. Correction commit `80e5ad8` fixes generated API freshness; pinned generator output matches the complete artifact. Exact code/evidence HEAD `ca6a1ba8e34ab02cb8773ca38256c33b22516895` passed run `37435553039`: 26 success, 13 skipped, 0 failure, 0 pending. Backend, Frontend E2E/lint/type-check/unit/build, OpenAPI freshness, Code Quality, parity, context-boundary, security and required gate passed. Two duplicate lifecycle/review-quality runs were cancelled; their replacement runs passed.
+- Changed but not verified: PR body candidate and this journal now record the exact-head results; the body gate passed 19 tests and both samples. Remote description and journal checkpoint are not yet pushed. The resulting documentation-only head needs a fresh check snapshot. Commit-time ESLint was skipped because the local package is unavailable; hosted Frontend lint passed. Staging/browser/full system-health remain NOT_RUN; no deferral has been accepted.
+- Remaining: validate and push the evidence/PR-body checkpoint, verify resulting exact-head checks, then obtain independent review and a separate explicit Tier 2 staging/deferral decision.
+- Blocker: merge remains on hold pending independent review and the staging/deferral decision. No staging or production validation is claimed.
+- Next exact action: update remote PR description, commit/push this evidence update, and inspect the resulting exact HEAD. Do not merge from this checkpoint.
+- Checks to rerun after any runtime/generated change: exact CI generated-types freshness, frontend lint/type-check, and `git diff --check`; prior focused cabinet + disposable PostgreSQL evidence remains valid because this fix changes no API schema or runtime code.
+
+## Prior checkpoint — T09.1 continuation decision (superseded)
 
 ## Current authoritative checkpoint — T09.1 continuation decision (2026-10-06T09:26+05:00)
 
@@ -29,7 +77,8 @@ Checks to run after this checkpoint is pushed: confirm exact-head backend, front
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T08.3.3 | MERGED | PR #3609 | `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92` | `EVIDENCE.md#t0833-pr-3609-merged` |
-| T09.1 | PR_OPEN | [PR #3612](https://github.com/drsapaev/final/pull/3612) · `codex/aqs-T09.1-cabinet-preview` | | `EVIDENCE.md#t091-final-review-and-exact-head-validation` |
+| T09.1 | MERGED | [PR #3612](https://github.com/drsapaev/final/pull/3612) | `89b4888a013978182e45f34ac2e07a9679c497c9` | `EVIDENCE.md#t091-pr-3612-merged` |
+| T09.2 | IN_PROGRESS | `codex/aqs-T09.2-cabinet-apply` | | `EVIDENCE.md#t092-pre-edit-gate-and-scope` |
 
 ## Historical checkpoint — T08.3.3 GraphQL quota proof (2026-10-05T21:10:45+05:00)
 
