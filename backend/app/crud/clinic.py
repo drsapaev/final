@@ -29,6 +29,38 @@ from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
 
 TICKET_PRINT_SETTINGS_CATEGORY = "print"
 TICKET_PRINT_SETTINGS_PREFIX = "ticket_print_"
+
+# Canonical keys for clinic-identity settings (category "clinic"). The setup
+# wizard writes the clinic_* spelling while the admin settings screen
+# historically saved the bare legacy spelling into the same category, so one
+# data point lived under two rows. Batch writes for this category are
+# normalized to canonical keys; migration 0078 copies existing legacy values
+# over without deleting any row.
+CLINIC_SETTING_KEY_ALIASES: dict[str, str] = {
+    "address": "clinic_address",
+    "phone": "clinic_phone",
+    "email": "clinic_email",
+    "timezone": "clinic_timezone",
+    "logo_url": "clinic_logo_url",
+}
+
+
+def normalize_clinic_setting_keys(settings: dict[str, Any]) -> dict[str, Any]:
+    """Map legacy clinic-setting keys to their canonical clinic_* spelling.
+
+    When a payload carries both spellings the canonical value wins, so a
+    stale frontend cannot resurrect a legacy row through a batch save.
+    """
+    normalized = dict(settings)
+    for legacy_key, canonical_key in CLINIC_SETTING_KEY_ALIASES.items():
+        if legacy_key not in normalized:
+            continue
+        legacy_value = normalized.pop(legacy_key)
+        if normalized.get(canonical_key) is None:
+            normalized[canonical_key] = legacy_value
+    return normalized
+
+
 TICKET_PRINT_SETTINGS_DEFAULTS: dict[str, bool] = {
     "show_clinic_name": True,
     "show_logo": False,
@@ -85,6 +117,9 @@ def update_settings_batch(
     db: Session, category: str, settings: dict[str, Any], user_id: int
 ) -> list[ClinicSettings]:
     """Массовое обновление настроек"""
+    if category == "clinic":
+        settings = normalize_clinic_setting_keys(settings)
+
     updated_settings = []
 
     for key, value in settings.items():
@@ -212,7 +247,7 @@ def get_doctors(
         # predicate must exclude them as well — trim(NULL) is NULL and
         # NULL != '' is not true, so NULL rows are excluded implicitly.
         query = query.filter(
-            func.trim(Doctor.specialty) != '',
+            func.trim(Doctor.specialty) != "",
             Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
         )
     if exclude_internal_only:
@@ -241,7 +276,9 @@ def get_doctor_by_user_id(db: Session, user_id: int) -> Doctor | None:
 
 
 def get_doctors_by_specialty(
-    db: Session, specialty: str, eligible_only: bool = False,
+    db: Session,
+    specialty: str,
+    eligible_only: bool = False,
     exclude_internal_only: bool = False,
 ) -> list[Doctor]:
     """Получить врачей по специальности
@@ -262,7 +299,7 @@ def get_doctors_by_specialty(
     ]
     if eligible_only:
         predicates += [
-            func.trim(Doctor.specialty) != '',
+            func.trim(Doctor.specialty) != "",
             Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
         ]
     query = db.query(Doctor)
@@ -787,9 +824,7 @@ def get_effective_queue_settings_report(
     # --- Owner axis (department scope): the chain value per doctor ----
     dept_doctor_ids: list[int] = []
     if department_id is not None:
-        dept = (
-            db.query(Department).filter(Department.id == department_id).first()
-        )
+        dept = db.query(Department).filter(Department.id == department_id).first()
         if dept is None:
             raise ValueError(f"department {department_id} not found")
 
@@ -798,16 +833,12 @@ def get_effective_queue_settings_report(
         # level import would be circular.
         from app.crud.queue_resource_routing import effective_day_start_number
 
-        doctors = (
-            db.query(Doctor).filter(Doctor.department_id == department_id).all()
-        )
+        doctors = db.query(Doctor).filter(Doctor.department_id == department_id).all()
         dept_doctor_ids = [int(d.id) for d in doctors]
 
         owner_overrides = []
         for d in doctors:
-            effective = effective_day_start_number(
-                db, doctor=d, queue_tag=tag
-            )
+            effective = effective_day_start_number(db, doctor=d, queue_tag=tag)
             owner_overrides.append(
                 {
                     "doctor_id": int(d.id),
@@ -816,7 +847,9 @@ def get_effective_queue_settings_report(
                     "start_number_online": int(d.start_number_online or 1),
                     "max_online_per_day": int(d.max_online_per_day or 0),
                     "effective_start_number": int(effective),
-                    "source": "owner" if int(d.start_number_online or 0) > 1 else "clinic",
+                    "source": (
+                        "owner" if int(d.start_number_online or 0) > 1 else "clinic"
+                    ),
                 }
             )
 
