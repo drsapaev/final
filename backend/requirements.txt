@@ -1,7 +1,7 @@
-fastapi>=0.121,<0.142
+fastapi>=0.121,<0.143
 uvicorn[standard]>=0.29,<0.55
 pydantic>=2.7,<2.14
-pydantic-settings>=2.14.1,<2.15
+pydantic-settings>=2.14.1,<2.16
 SQLAlchemy[asyncio]>=2.0,<2.2
 psycopg[binary]>=3.1,<4.0
 redis>=5.0,<8.0
