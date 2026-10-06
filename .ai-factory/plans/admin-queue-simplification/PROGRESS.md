@@ -1,29 +1,30 @@
-## Current checkpoint — PR #3620 regression correction committed locally; push and exact-head CI pending (2026-10-06T22:19+05:00)
+## Current checkpoint — PR #3620 behind new main; rebase required (2026-10-06T22:26+05:00)
 
-Plan version: 3.41
+Plan version: 3.43
 Current task: T09.3
-Current status: IN_PROGRESS (PR #3620 is open; stale test corrected in local commit; evidence checkpoint needs commit/push and hosted rerun)
+Current status: IN_PROGRESS (PR_OPEN; pushed head checks partly pending; branch behind current main)
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
-Base: origin/main c38533b352e792e723495744cb1f17f6a583fb4c
+PR base at last inspection: c38533b352e792e723495744cb1f17f6a583fb4c
+Fresh origin/main: b95bb2d20357741dabacaaee09bc28323eeaae33
 Runtime code commit: 8d77dfa3b06b0e9167faee7216c14b2601d11080
 Focused regression correction commit: 0556ab0626dc975ef46eac7ac3eb0bab832d5a22
-Current remote PR HEAD: 0e02ff20db8459e1f5728273fc058e7ab86ffd08 (push pending)
-Last updated: 2026-10-06T22:19+05:00
+Current pushed PR HEAD: 49b5490db94966f98f5be9356e9fb2aecd67f8dd
+PR: https://github.com/drsapaev/final/pull/3620
+Last updated: 2026-10-06T22:26+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
-| T09.3 | IN_PROGRESS | PR #3620 | | EVIDENCE.md#t093-ci-contract-test-follow-up |
+| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-ci-contract-test-follow-up |
 
 ## Current checkpoint
-- Completed: T09.3 code is based on c38533b352e792e723495744cb1f17f6a583fb4c. PR #3620 previous HEAD 0e02ff20db8459e1f5728273fc058e7ab86ffd08: Frontend E2E passed; Backend tests had 5,347 passed and one failed old HTTP 400 assertion. The failure is fixed in test-only commit 0556ab0626dc975ef46eac7ac3eb0bab832d5a22. Full integration module 7/7, targeted post-format 1/1, Ruff check/format, py_compile and diff check passed locally.
-- Changed but not verified: focused test correction is committed locally; four journal files are updated and unstaged. The correction has not been pushed, so hosted results still belong to 0e02ff20db8459e1f5728273fc058e7ab86ffd08.
-- Remaining: commit the evidence/body checkpoint, push branch to PR #3620, publish the refreshed PR body, then inspect required checks on the resulting exact HEAD.
+- Completed: PR #3620's pushed head 49b5490db94966f98f5be9356e9fb2aecd67f8dd has passing build, lint, unit tests, docs generation, security/secret scans, locale, role, context-boundary and audit checks. Backend tests, Frontend E2E and Code Quality were still pending at 22:26+05. Previous head 0e02ff20db8459e1f5728273fc058e7ab86ffd08 had one stale HTTP 400 assertion among 5,347 Backend passes; focused correction 0556ab0626dc975ef46eac7ac3eb0bab832d5a22 now asserts 409/no mutation.
+- Changed but not verified: `origin/main` advanced to b95bb2d20357741dabacaaee09bc28323eeaae33c7 while PR #3620 remains based on c38533b352e792e723495744cb1f17f6a583fb4c. Rebase is required before closure; no runtime conflict review or post-rebase tests have run yet.
+- Remaining: commit the corrected journal, rebase this own branch onto fresh origin/main, inspect/resolve only in-scope conflicts, rerun focused backend checks and verify the regenerated OpenAPI artifact, then inspect all new exact-head required checks. Fix only in-scope causes in PR #3620. Tier 1 requires successful Frontend E2E.
 - Blocker: PostgreSQL proof beyond hosted backend CI, task-owned staging, backend-dependent E2E, manual viewport review, T18 and full STAGING_VALIDATION.md are NOT_RUN. No T09.3 Tier-2 deferral is accepted.
-- Next exact action: commit the refreshed journals, push commits 0556ab062 and the evidence checkpoint, update/validate the PR body, then monitor the exact-head backend/E2E and required checks. Fix any in-scope failure in the same PR.
-- Do not start T10 before PR #3620 merges and local main is synchronized.
+- Next exact action: rebase the own worktree branch onto b95bb2d20357741dabacaaee09bc28323eeaae33c7, verify the merged OpenAPI document against the current API generator, rerun focused checks, push and inspect new exact-head CI. Do not merge or start T10 before the user closes this PR cycle and main is synchronized.
 
 ## Current checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
 

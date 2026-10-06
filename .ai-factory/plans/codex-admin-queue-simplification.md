@@ -1,11 +1,11 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.41 — T09.3 PR #3620 stale contract test corrected locally; evidence commit, push and exact-head CI pending.
-**Создан:** 30 сентября 2026. **Обновлён:** 6 октября 2026, 22:19 Asia/Tashkent.
+**Версия:** 3.43 — T09.3 PR #3620 must be rebased on current main.
+**Создан:** 30 сентября 2026. **Обновлён:** 6 октября 2026, 22:26 Asia/Tashkent.
 **Current task:** T09.3 — connect the Admin cabinet screen to explicit same-day preview/apply and prevent legacy writers from changing existing queue snapshots.
-**Current worktree:** C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final; branch codex/aqs-t093-cabinet-ui; PR #3620 base c38533b352e792e723495744cb1f17f6a583fb4c; previous remote HEAD 0e02ff20db8459e1f5728273fc058e7ab86ffd08; runtime commit 8d77dfa3b06b0e9167faee7216c14b2601d11080; focused test fix commit 0556ab0626dc975ef46eac7ac3eb0bab832d5a22.
+**Current worktree:** C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final; branch codex/aqs-t093-cabinet-ui; PR #3620 pushed HEAD 49b5490db94966f98f5be9356e9fb2aecd67f8dd was based on c38533b352e792e723495744cb1f17f6a583fb4c; fresh origin/main is b95bb2d20357741dabac7ac7ac7ac7ac7ac7ac7; runtime commit 8d77dfa3b06b0e9167faee7216c14b2601d11080; focused test fix commit 0556ab0626dc975ef46eac7ac3eb0bab832d5a22.
 **Scope:** T09.3 Admin cabinet screen, legacy single/bulk/sync cabinet-number writer containment, focused backend/frontend tests, generated OpenAPI/API types, and canonical plan checkpoints. No models/migrations, owner defaults, queue identity/number/status/time, nurse station, generic queue runtime, global middleware, routing, ops, staging or production changes. Earlier/future queue snapshots remain immutable; only the explicit T09.2 clinic-today command changes today's queue.
-> **Current disposition:** PR #3620 is open on c38533b352e792e723495744cb1f17f6a583fb4c, previous remote HEAD 0e02ff20db8459e1f5728273fc058e7ab86ffd08. Frontend E2E passed at that head; Backend tests had one stale HTTP 400 expectation (5,347 passed, 1 failed). The focused test-only correction is committed locally as 0556ab0626dc975ef46eac7ac3eb0bab832d5a22; full module passed 7/7, targeted test 1/1, Ruff/format/py_compile/diff checks pass. Evidence commit and push, followed by exact-head rerun, are pending. Tier 2 staging is NOT_RUN; no deferral accepted.
+> **Current disposition:** PR #3620 is open with pushed HEAD 49b5490db94966f98f5be9356e9fb2aecd67f8dd, based on c38533b352e792e723495744cb1f17f6a583fb4c; fresh origin/main advanced to b95bb2d20357741dabac7ac7ac7ac7ac7ac7ac7, so rebase is required. Runtime commit 8d77dfa3b06b0e9167faee7216c14b2601d11080 and focused test correction 0556ab0626dc975ef46eac7ac3eb0bab832d5a22 are pushed. The old HEAD 0e02ff20db8459e1f5728273fc058e7ab86ffd08 passed Frontend E2E and had one stale Backend HTTP 400 assertion (5,347 passes); the corrected test now expects the 409/no-mutation contract and passed locally 7/7, with focused scenario 1/1. On 49b5490, build/lint/unit/docs/security/locale/role/audit checks passed; Backend tests, Frontend E2E and Code Quality were pending at 22:26+05. Tier 2 remains NOT_RUN; no deferral accepted.
 > The T08.2c worktree, PR-open status and pending-check metadata below are historical and superseded by the confirmed #3596 merge.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
@@ -14,7 +14,7 @@
 > Следующие две строки — исторический снимок метаданных T08.2c, оставленный для прослеживаемости; текущие ветка и статус указаны выше.
 **Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; PR [#3596](https://github.com/drsapaev/final/pull/3596). Report implementation `718d4d65c5717528e8a93fb819fdf328c63bf772`; future-date compatibility fix `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`; OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`. Focused local checks pass (85 unit/OpenAPI, 4 selected integration). The docs-freshness CI failure on `fd9b1c793` was due to a final CRLF in the generated snapshot; it is removed to match exact app serialization. New exact-head checks pending.
 
-> **T00–T09.2, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1, T08.3.2, T08.3.2-P2 and T08.3.3 — MERGED; T09.3 — IN_PROGRESS; T10–T18 — PLANNED.** PR #3620 is open; test correction 0556ab0626dc975ef46eac7ac3eb0bab832d5a22 and evidence checkpoint are not yet pushed. Exact-head backend/E2E checks must pass before merge. Tier 2 deferral remains unaccepted.
+> **T00–T09.2, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1, T08.3.2, T08.3.2-P2 and T08.3.3 — MERGED; T09.3 — PR_OPEN; T10–T18 — PLANNED.** PR #3620 is based on old main and must be rebased; then target tests and exact-head CI must pass. Do not start T10 before PR #3620 merges and main is synchronized.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -413,7 +413,7 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 
 #### T09.3 execution checkpoint — Admin UI and legacy writer containment
 
-- **Status:** PR #3620 is open on c38533b352e792e723495744cb1f17f6a583fb4c, remote HEAD 0e02ff20db8459e1f5728273fc058e7ab86ffd08. Runtime code commit 8d77dfa3b06b0e9167faee7216c14b2601d11080. A focused integration test-only correction is committed locally as 0556ab0626dc975ef46eac7ac3eb0bab832d5a22; documentation checkpoint is being committed.
+- **Status:** PR #3620 is open on c38533b352e792e723495744cb1f17f6a583fb4c; runtime commit 8d77dfa3b06b0e9167faee7216c14b2601d11080, focused test correction 0556ab0626dc975ef46eac7ac3eb0bab832d5a22, and evidence checkpoint are pushed. New exact-head checks are pending.
 - **Mode and gate:** mandatory queue gate and one known-root retry, both misrouted. Retry returned narrow_override, gate_misroute=true, override_used=true, handoff_required=true; generated prompt was read. User-approved plan authorizes the recorded narrow override for cabinet endpoint/service, screen, focused tests and generated API contract. Do not run a third gate or touch unrelated generic queue/model paths.
 - **Allowed:** cabinet endpoint/service; Admin cabinet screen; focused backend/frontend tests; five locale files; OpenAPI/generated API types; T09.3 plan journals.
 - **Denied:** models/schema/migrations; owner defaults/unrelated writers; nurse station; queue status/number/queue_time; generic queue service/model; global auth/middleware; route registry; ops, shared staging and production.
@@ -421,7 +421,7 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 - **First exact-head CI:** Frontend E2E passed. Backend tests reported 5,347 passed, 1 failed, 65 skipped, 25 deselected and 3 xfailed; the single failure was an old focused integration assertion expecting HTTP 400 rather than the documented T09.3 HTTP 409 conflict.
 - **Correction:** test commit 0556ab0626dc975ef46eac7ac3eb0bab832d5a22 updates tests/integration/test_admin_linkage_cleanup.py to assert 409 for legacy cabinet PUT and omitted-day sync and verify current/historical snapshots remain unchanged. Full module passed 7/7, focused post-format case 1/1, Ruff/format, py_compile and git diff --check passed locally. No runtime change.
 - **NOT_RUN:** exact-head CI for correction; PostgreSQL proof beyond hosted suite; task-owned staging/backend-dependent E2E; manual viewport/accessibility review; T18 and full STAGING_VALIDATION.md. No T09.3 Tier-2 deferral is accepted.
-- **Next exact action:** commit journals, push both follow-up commits, refresh PR body, and inspect exact-head Backend/E2E and remaining checks. Do not begin T10 before PR merge and main synchronization.
+- **Next exact action:** inspect the current PR #3620 exact HEAD/checks, then update this checkpoint and PR body with confirmed results. Fix any remaining in-scope failure. Do not begin T10 before PR #3620 merges and main is synchronized.
 
 ### T10. Используемые связи профиля
 
