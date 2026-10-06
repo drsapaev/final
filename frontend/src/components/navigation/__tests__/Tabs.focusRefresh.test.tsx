@@ -116,8 +116,13 @@ describe('Tabs — RQ-27.a silent revalidation on return to the session', () => 
     await waitFor(() => {
       expect(profilesCallCount()).toBe(1);
     });
+    // The call counter reaches 1 when api.get is INVOKED; the strip renders
+    // only after the promise resolves and React commits - under CI load the
+    // synchronous read raced the commit (issue #3570). Wait for the strip.
+    await waitFor(() => {
+      expect(container.querySelectorAll('.tab-button.department').length).toBeGreaterThan(0);
+    });
     const before = container.querySelectorAll('.tab-button.department').length;
-    expect(before).toBeGreaterThan(0);
 
     vi.mocked(api.get).mockRejectedValue(new Error('offline during revalidation'));
     fireVisibilityChange();
@@ -154,7 +159,11 @@ describe('Tabs — RQ-27.a silent revalidation on return to the session', () => 
     await waitFor(() => {
       expect(profilesCallCount()).toBe(1);
     });
-    expect(container.querySelectorAll('.tab-button.department')).toHaveLength(2);
+    // Same call-vs-commit race as above: wait for the strip, do not read it
+    // synchronously right after the call-count wait.
+    await waitFor(() => {
+      expect(container.querySelectorAll('.tab-button.department')).toHaveLength(2);
+    });
     expect(onProfilesLoaded).toHaveBeenLastCalledWith(expect.objectContaining({ length: 2 }));
 
     // An administrator created a third profile in ANOTHER session: the
