@@ -112,3 +112,11 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - Under the existing D2 same-day assignment rule, `DailyQueue.cabinet_number` is the saved service location for that day's queue. An explicitly assigned non-empty value therefore takes precedence over `Doctor.cabinet` when announcing a called patient; the doctor default remains unchanged. Existing fallback applies when the daily snapshot is absent. This does not change nurse station assignments or other writers.
 - `expected_cabinet_number` is an optimistic-concurrency snapshot copied from preview, so preserve its exact value including whitespace. Normalize only the proposed `new_cabinet_number`.
 - Source: user request to fix the two confirmed PR #3614 review findings, supported by T09/D2 and current queue/display contracts. This decision is limited to the doctor display call and the T09.2 request validation.
+
+## T09.3 cabinet writer containment and UI retry — technical choices, 2026-10-06
+
+- Type: technical choices under the already user-approved D2/T09 plan; no product decision changed.
+- A saved `DailyQueue.cabinet_number` is that queue's snapshot. Legacy single/bulk/sync endpoints cannot rewrite it. The single and sync paths return an explicit 409; bulk preserves its per-row result contract and must not partially update floor/building metadata on a row rejected for cabinet mutation. The old sync command performs no queue query or mutation. Updating a Doctor/QueueResource default remains a separate existing operation and is not changed here.
+- The screen sends only one queue through the existing preview/apply command. Server-side clinic-day eligibility is authoritative; browser-local timezone never authorizes reassignment. An uncertain apply retries the exact request with its same idempotency key; a new key/body is used only for a new previewed action.
+- A selected historical/future date is display-only. Current queue rows remain read-only unless the backend preview/apply contract reports clinic-today eligibility. Existing owner, patient status, queue number and `queue_time` stay unchanged.
+- Source: D2, the approved T09/T09.3 scope, the existing T09.1/T09.2 contracts, and focused source/tests. This choice does not authorize changing owner defaults, unrelated writers, generic queue models/services or shared middleware.

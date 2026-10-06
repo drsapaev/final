@@ -1,4 +1,14 @@
-## Resume — PR #3614 review fixes
+## Current resume — T09.3 same-day cabinet UI (2026-10-06T21:05+05:00)
+
+User confirmed PR #3614 was merged. GitHub confirms merge commit `c2ccde2e46bbc115e816d4c383df93b1c8665ab1`. Continue T09.3 in `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-t093-cabinet-ui`. Implementation was started on `e5b2e6dfdd8393ffdada6a91b4ad4e186af362ae`; current `origin/main` is `ad0f98a7d001bf248bfb01610fdf0d3c1eb8a757`, after unrelated PR #3615. Rebase is required before publishing.
+
+This slice connects the Admin cabinet screen to the existing same-day preview/apply command and contains legacy single/bulk/sync cabinet-number writes so they cannot silently alter daily queue snapshots. Focused local validation has passed: backend cabinet unit tests 23/23; selected compatibility integration 1 passed with 170 deselected on a SQLite/temp fixture; frontend screen tests 7/7; type-check/build/scoped ESLint/`lint:check`/Ruff/`py_compile`/OpenAPI generation/diff check passed. The `npm run generate:api-types` WSL/Node 18 wrapper failed with Redocly `RangeError`; the same pinned generator succeeded under Windows Node 24. Preserve this as a tooling limitation.
+
+Mandatory queue gate and one known-root retry both misrouted. The retry reported `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; its prompt was read. The approved plan and user's continue instruction authorize only the boundary in `.scratch/T09.3-SCOPE.md`. Do not run a third gate. No unrelated generic queue/model files may be edited.
+
+Next exact action: rebase onto `origin/main`; inspect the full diff and scope; update commit/base data in these journals; rerun relevant checks if rebase affects source; commit/push/open the focused PR and inspect exact-head required checks. Do not start T10 until this PR cycle is merged and local main is synchronized. PostgreSQL proof, browser/viewport review, staging, T18, and full staging validation are NOT_RUN. No T09.3 staging deferral is accepted; no merge permission or review is recorded.
+
+## Historical resume — PR #3614 review fixes
 
 Current branch remains `codex/aqs-T09.2-cabinet-apply` in the existing review worktree at `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`. Latest code/evidence HEAD is `3cd2bf1103cd5759c49d9ca73ad8fed4ac686a1f`; base is `1d146d857e1570ff2259975f081f80dc0b31ae82`. PR #3614 is open.
 

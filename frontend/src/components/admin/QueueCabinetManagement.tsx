@@ -7,13 +7,12 @@ import {
   MapPin,
   RefreshCw,
   Search,
-  Sparkles,
   Users,
   X,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
-import { apiRequest } from '../../api/client';
+import { api, apiRequest } from '../../api/client';
 import logger from '../../utils/logger';
 import {
   Badge,
@@ -22,6 +21,8 @@ import {
   AppEmpty,
   AppError,
   Input,
+  Modal,
+  Select,
   StatCard,
 } from '../ui/macos';
 import { DataTable } from '../ui/DataTable';
@@ -33,6 +34,7 @@ const INITIAL_FILTERS = {
 };
 
 interface QueueRow {
+  id: number;
   day?: string;
   owner_type: 'doctor' | 'resource';
   owner_id: number;
@@ -49,6 +51,61 @@ interface QueueRow {
   doctor_has_cabinet?: boolean;
   integrity_warnings?: string[];
 }
+
+type ReassignmentReasonCode =
+  | 'room_unavailable'
+  | 'equipment_issue'
+  | 'schedule_change'
+  | 'administrative_correction';
+
+type ReassignmentBlockingReason =
+  | 'patient_called'
+  | 'clinical_work_in_progress'
+  | 'active_service_execution';
+
+const BLOCKING_REASON_TRANSLATION_KEYS: Record<ReassignmentBlockingReason, string> = {
+  patient_called: 'admin2.qcm_block_patient_called',
+  clinical_work_in_progress: 'admin2.qcm_block_clinical_work',
+  active_service_execution: 'admin2.qcm_block_active_execution',
+};
+
+interface ReassignmentPreviewItem {
+  queue_id: number;
+  owner_type: 'doctor' | 'resource';
+  owner_id: number;
+  owner_name: string;
+  old_cabinet_number: string | null;
+  new_cabinet_number: string | null;
+  waiting_count: number;
+  blocking_reasons: ReassignmentBlockingReason[];
+  can_apply: boolean;
+}
+
+interface ReassignmentPreview {
+  clinic_day: string;
+  items: ReassignmentPreviewItem[];
+  can_apply: boolean;
+}
+
+const createIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `cabinet-${Date.now()}-${Math.random().toString(36).slice(2, 14)}`;
+};
+
+const readSafeErrorDetail = (error: unknown): string | null => {
+  if (typeof error === 'string') return error;
+  if (!error || typeof error !== 'object') return null;
+  const detail = (error as { detail?: unknown }).detail;
+  return typeof detail === 'string' ? detail : null;
+};
+
+const readSafeErrorCode = (error: unknown): string | null => {
+  if (!error || typeof error !== 'object') return null;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' ? code : null;
+};
 
 // Summary values are derived from the same queue rows shown in the table.
 interface StatsSummary {
@@ -109,7 +166,15 @@ const QueueCabinetManagement = () => {
   const [queues, setQueues] = useState<QueueRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+  const [reassignmentQueue, setReassignmentQueue] = useState<QueueRow | null>(null);
+  const [newCabinetNumber, setNewCabinetNumber] = useState('');
+  const [reasonCode, setReasonCode] = useState<ReassignmentReasonCode>('administrative_correction');
+  const [reassignmentPreview, setReassignmentPreview] = useState<ReassignmentPreview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [applyOutcomeUnknown, setApplyOutcomeUnknown] = useState(false);
+  const [reassignmentError, setReassignmentError] = useState<string | null>(null);
+  const applyKeyRef = useRef<string | null>(null);
   const loadRequestSequence = useRef(0);
 
   const loadData = useCallback(async (filterSnapshot = INITIAL_FILTERS) => {
@@ -162,34 +227,120 @@ const QueueCabinetManagement = () => {
     await loadData(INITIAL_FILTERS);
   };
 
-  const syncFromDoctors = async () => {
-    setSyncing(true);
-    try {
-      const params = {
-        day: appliedFilters.day || undefined,
-        specialist_id: toOptionalNumber(appliedFilters.specialistId) ?? undefined,
-      };
-      const result = await apiRequest('POST', '/admin/queues/sync-cabinet-info', {
-        params,
-      });
+  const openReassignment = (queue: QueueRow) => {
+    setReassignmentQueue(queue);
+    setNewCabinetNumber(String(queue.cabinet_number ?? ''));
+    setReasonCode('administrative_correction');
+    setReassignmentPreview(null);
+    setReassignmentError(null);
+    setApplyOutcomeUnknown(false);
+    applyKeyRef.current = null;
+  };
 
-      const resultMessage = (result as Record<string, unknown> | null | undefined)?.message;
-      toast.success(
-        typeof resultMessage === 'string' && resultMessage
-          ? resultMessage
-          : t('admin2.qcm_sync_success'),
+  const closeReassignment = () => {
+    if (applying || applyOutcomeUnknown) return;
+    setReassignmentQueue(null);
+    setReassignmentPreview(null);
+    setReassignmentError(null);
+    applyKeyRef.current = null;
+  };
+
+  const updateReassignmentDraft = (nextCabinet: string, nextReason: ReassignmentReasonCode) => {
+    setNewCabinetNumber(nextCabinet);
+    setReasonCode(nextReason);
+    setReassignmentPreview(null);
+    setReassignmentError(null);
+    setApplyOutcomeUnknown(false);
+    applyKeyRef.current = null;
+  };
+
+  const previewReassignment = async () => {
+    if (!reassignmentQueue) return;
+    const normalizedCabinet = newCabinetNumber.trim();
+    const targetCabinet = normalizedCabinet || null;
+    setPreviewing(true);
+    setReassignmentError(null);
+    try {
+      const result = await apiRequest<ReassignmentPreview>(
+        'POST',
+        '/admin/queues/cabinet-info/preview',
+        {
+          data: {
+            queue_ids: [reassignmentQueue.id],
+            new_cabinet_number: targetCabinet,
+          },
+        },
       );
+      setReassignmentPreview(result);
+      applyKeyRef.current = createIdempotencyKey();
+    } catch (error: unknown) {
+      const detail = readSafeErrorDetail(error);
+      setReassignmentError(detail || t('admin2.qcm_preview_error'));
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const applyReassignment = async () => {
+    if (!reassignmentQueue || !reassignmentPreview?.can_apply) return;
+    const previewItem = reassignmentPreview.items.find(
+      (item) => item.queue_id === reassignmentQueue.id,
+    );
+    const idempotencyKey = applyKeyRef.current;
+    if (!previewItem || !idempotencyKey) {
+      setReassignmentError(t('admin2.qcm_preview_again'));
+      return;
+    }
+    const requestBody = {
+      targets: [
+        {
+          queue_id: previewItem.queue_id,
+          expected_owner_type: previewItem.owner_type,
+          expected_owner_id: previewItem.owner_id,
+          expected_cabinet_number: previewItem.old_cabinet_number,
+        },
+      ],
+      new_cabinet_number: previewItem.new_cabinet_number,
+      reason_code: reasonCode,
+    };
+
+    setApplying(true);
+    setApplyOutcomeUnknown(false);
+    setReassignmentError(null);
+    try {
+      await api.request({
+        method: 'POST',
+        url: '/admin/queues/cabinet-info/apply',
+        data: requestBody,
+        headers: { 'Idempotency-Key': idempotencyKey },
+      });
+      applyKeyRef.current = null;
+      setReassignmentQueue(null);
+      setReassignmentPreview(null);
+      toast.success(t('admin2.qcm_apply_success'));
       await loadData(appliedFilters);
     } catch (error: unknown) {
-      logger.error('Ошибка синхронизации кабинетов:', error);
-      const errorMessage = (error as Record<string, unknown> | null | undefined)?.message;
-      toast.error(
-        typeof errorMessage === 'string' && errorMessage
-          ? errorMessage
-          : t('admin2.qcm_sync_error'),
-      );
+      const response = (error as { response?: { status?: number; data?: unknown } })?.response;
+      const detail = readSafeErrorDetail(response?.data) || readSafeErrorDetail(error);
+      const errorCode = readSafeErrorCode(response?.data);
+      const statusCode = response?.status;
+      if (errorCode === 'idempotency_in_flight') {
+        // Keep the request body and key unchanged so a retry joins or replays it.
+        setApplyOutcomeUnknown(true);
+        setReassignmentError(t('admin2.qcm_apply_in_flight'));
+      } else if (statusCode && statusCode >= 400 && statusCode < 500) {
+        applyKeyRef.current = null;
+        setReassignmentPreview(null);
+        setApplyOutcomeUnknown(false);
+        setReassignmentError(detail || t('admin2.qcm_apply_error'));
+      } else {
+        // Keep the same payload and key available for a safe retry when the
+        // server may have committed but the response did not reach the browser.
+        setApplyOutcomeUnknown(true);
+        setReassignmentError(detail || t('admin2.qcm_apply_error'));
+      }
     } finally {
-      setSyncing(false);
+      setApplying(false);
     }
   };
 
@@ -330,6 +481,16 @@ const QueueCabinetManagement = () => {
               ) : null}
             </div>
           ),
+          actions: (
+            <Button
+              size="small"
+              variant="outline"
+              onClick={() => openReassignment(queue)}
+              disabled={!Number.isInteger(queue.id) || queue.id <= 0}
+            >
+              {t('admin2.qcm_reassign')}
+            </Button>
+          ),
         };
       }),
     [queues, t],
@@ -360,13 +521,6 @@ const QueueCabinetManagement = () => {
                 className="admin-d-inline-flex-ai-center-gap-8">
                 <RefreshCw className="w-4 h-4" />
                 {t('admin2.qcm_refresh')}
-              </Button>
-              <Button
-                onClick={syncFromDoctors}
-                disabled={syncing}
-                className="admin-d-inline-flex-ai-center-gap-8-bgc-blue-bd-none-1">
-                <Sparkles className="w-4 h-4" />
-                {syncing ? t('admin2.qcm_syncing') : t('admin2.qcm_sync_from_doctors')}
               </Button>
             </div>
           </div>
@@ -516,7 +670,8 @@ const QueueCabinetManagement = () => {
                 { key: 'cabinet_building', title: t('admin2.col_building'), sortable: false },
                 { key: 'entries_count', title: t('admin2.col_entries'), sortable: false },
                 { key: 'active', title: t('admin2.col_active'), sortable: false },
-                { key: 'sync_state', title: t('admin2.col_sync'), sortable: false },
+                { key: 'sync_state', title: t('admin2.qcm_snapshot_state'), sortable: false },
+                { key: 'actions', title: t('admin2.qcm_actions'), sortable: false },
               ]}
               data={tableRows}
               loading={loading}
@@ -526,7 +681,7 @@ const QueueCabinetManagement = () => {
               emptyState={
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="admin-p-40px-16px-ta-center-secondary">
                     {t('admin2.qcm_empty_table')}
                   </td>
@@ -536,6 +691,101 @@ const QueueCabinetManagement = () => {
           )}
         </div>
       </Card>
+      <Modal
+        isOpen={reassignmentQueue !== null}
+        onClose={closeReassignment}
+        title={t('admin2.qcm_reassign_title')}
+        size="default"
+        closeOnBackdrop={!applying && !applyOutcomeUnknown}
+        closeOnEscape={!applying && !applyOutcomeUnknown}
+        actions={(
+          <>
+            <Button variant="outline" onClick={closeReassignment} disabled={applying || applyOutcomeUnknown}>
+              {t('admin2.qcm_cancel')}
+            </Button>
+            {reassignmentPreview ? (
+              <Button
+                variant="primary"
+                onClick={() => void applyReassignment()}
+                disabled={!reassignmentPreview.can_apply || applying || previewing}
+                loading={applying}
+              >
+                {applyOutcomeUnknown ? t('admin2.qcm_retry_apply') : t('admin2.qcm_confirm_reassign')}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={() => void previewReassignment()}
+                disabled={previewing || applying}
+                loading={previewing}
+              >
+                {t('admin2.qcm_preview_reassign')}
+              </Button>
+            )}
+          </>
+        )}
+      >
+        {reassignmentQueue ? (
+          <div className="admin-d-grid-gap-16">
+            <p>{t('admin2.qcm_reassign_scope_hint')}</p>
+            <div>
+              <strong>{reassignmentQueue.owner_name}</strong>
+              {' · '}{reassignmentQueue.day || '—'}
+              {' · '}{reassignmentQueue.cabinet_number || t('admin2.qcm_not_specified')}
+            </div>
+            <div>
+              <label htmlFor="qcm-new-cabinet">{t('admin2.qcm_new_cabinet')}</label>
+              <Input
+                id="qcm-new-cabinet"
+                value={newCabinetNumber}
+                maxLength={20}
+                onChange={(event) => updateReassignmentDraft(event.target.value, reasonCode)}
+                disabled={applying || applyOutcomeUnknown}
+              />
+              <small>{t('admin2.qcm_clear_cabinet_hint')}</small>
+            </div>
+            <div>
+              <Select
+                id="qcm-reason-code"
+                label={t('admin2.qcm_reason')}
+                value={reasonCode}
+                options={[
+                  { value: 'room_unavailable', label: t('admin2.qcm_reason_room') },
+                  { value: 'equipment_issue', label: t('admin2.qcm_reason_equipment') },
+                  { value: 'schedule_change', label: t('admin2.qcm_reason_schedule') },
+                  { value: 'administrative_correction', label: t('admin2.qcm_reason_admin') },
+                ]}
+                onValueChange={(value) => {
+                  if (typeof value === 'string') {
+                    updateReassignmentDraft(newCabinetNumber, value as ReassignmentReasonCode);
+                  }
+                }}
+                disabled={applying || applyOutcomeUnknown}
+              />
+            </div>
+            {reassignmentPreview ? (
+              <div aria-live="polite">
+                <strong>{t('admin2.qcm_preview_result', { day: reassignmentPreview.clinic_day })}</strong>
+                {reassignmentPreview.items.map((item) => (
+                  <div key={item.queue_id}>
+                    {item.owner_name}: {item.old_cabinet_number || '—'} → {item.new_cabinet_number || '—'}
+                    {' · '}{t('admin2.qcm_waiting_count', { count: item.waiting_count })}
+                    {item.blocking_reasons.length > 0 ? (
+                      <ul role="alert">
+                        {item.blocking_reasons.map((reason) => (
+                          <li key={reason}>{t(BLOCKING_REASON_TRANSLATION_KEYS[reason])}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {applyOutcomeUnknown ? <p role="alert">{t('admin2.qcm_uncertain_outcome')}</p> : null}
+            {reassignmentError ? <p role="alert">{reassignmentError}</p> : null}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 };

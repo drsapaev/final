@@ -213,6 +213,10 @@ class CabinetReassignmentIdempotencyError(BaseModel):
     detail: str
 
 
+class QueueCabinetMutationError(BaseModel):
+    detail: str
+
+
 # ===================== ПОЛУЧЕНИЕ ИНФОРМАЦИИ О КАБИНЕТАХ =====================
 
 
@@ -379,7 +383,16 @@ def apply_cabinet_reassignment(
         _raise_queue_cabinet_internal_error("apply_cabinet_reassignment", exc)
 
 
-@router.put("/queues/{queue_id}/cabinet-info", response_model=dict[str, Any])
+@router.put(
+    "/queues/{queue_id}/cabinet-info",
+    response_model=dict[str, Any],
+    responses={
+        status.HTTP_409_CONFLICT: {
+            "model": QueueCabinetMutationError,
+            "description": "Existing daily queue cabinet snapshots can only be changed with the explicit reassignment command.",
+        }
+    },
+)
 def update_queue_cabinet_info(
     queue_id: int,
     cabinet_info: CabinetInfo,
@@ -440,18 +453,27 @@ def bulk_update_cabinet_info(
 # ===================== СИНХРОНИЗАЦИЯ С ТАБЛИЦЕЙ DOCTORS =====================
 
 
-@router.post("/queues/sync-cabinet-info", response_model=dict[str, Any])
+@router.post(
+    "/queues/sync-cabinet-info",
+    response_model=dict[str, Any],
+    responses={
+        status.HTTP_409_CONFLICT: {
+            "model": QueueCabinetMutationError,
+            "description": "Legacy synchronization into existing daily queues is disabled.",
+        }
+    },
+)
 def sync_cabinet_info_from_doctors(
     day: str | None = Query(
-        None, description="Дата для синхронизации (по умолчанию сегодня)"
+        None, description="Deprecated: existing daily queue snapshots are read-only"
     ),
     specialist_id: int | None = Query(None, description="ID конкретного специалиста"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
     """
-    Синхронизировать информацию о кабинетах из таблицы doctors
-    Доступно только администраторам
+    Keep the route for compatibility; callers receive 409 because queue-day
+    cabinet snapshots are no longer synchronized from owner defaults.
     """
     service = QueueCabinetManagementApiService(db)
     try:

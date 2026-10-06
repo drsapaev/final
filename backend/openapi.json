@@ -9718,6 +9718,16 @@
               }
             }
           },
+          "409": {
+            "description": "Existing daily queue cabinet snapshots can only be changed with the explicit reassignment command.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueCabinetMutationError"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -10003,7 +10013,7 @@
           "queue-cabinet-management"
         ],
         "summary": "Sync Cabinet Info From Doctors",
-        "description": "Синхронизировать информацию о кабинетах из таблицы doctors\nДоступно только администраторам",
+        "description": "Keep the route for compatibility; callers receive 409 because queue-day\ncabinet snapshots are no longer synchronized from owner defaults.",
         "operationId": "sync_cabinet_info_from_doctors_api_v1_admin_queues_sync_cabinet_info_post",
         "security": [
           {
@@ -10024,10 +10034,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Дата для синхронизации (по умолчанию сегодня)",
+              "description": "Deprecated: existing daily queue snapshots are read-only",
               "title": "Day"
             },
-            "description": "Дата для синхронизации (по умолчанию сегодня)"
+            "description": "Deprecated: existing daily queue snapshots are read-only"
           },
           {
             "name": "specialist_id",
@@ -10057,6 +10067,16 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Sync Cabinet Info From Doctors Api V1 Admin Queues Sync Cabinet Info Post"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Legacy synchronization into existing daily queues is disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueCabinetMutationError"
                 }
               }
             }
@@ -102533,6 +102553,19 @@
         "type": "object",
         "title": "QrData",
         "description": "QR code data for queue notifications."
+      },
+      "QueueCabinetMutationError": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "QueueCabinetMutationError"
       },
       "QueueCabinetResponse": {
         "properties": {

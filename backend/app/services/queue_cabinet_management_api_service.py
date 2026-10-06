@@ -69,13 +69,13 @@ class QueueCabinetManagementApiService:
         return self.repository.get_doctor(specialist_id)
 
     def _assign_queue_cabinet_number(self, queue, value: Any) -> None:
-        doctor = self._doctor_for_queue(queue)
-        if doctor and getattr(doctor, "cabinet", None):
-            raise QueueCabinetManagementDomainError(
-                400,
-                "Канонический номер кабинета нельзя менять из этой панели. Обновите кабинет в карточке врача и выполните синхронизацию.",
-            )
-        queue.cabinet_number = value
+        del queue, value
+        raise QueueCabinetManagementDomainError(
+            409,
+            "Сохранённый кабинет уже созданной очереди нельзя менять старой командой. "
+            "Для очереди текущего дня используйте предварительный просмотр "
+            "и отдельное подтверждение; будущие очереди используют стандарт владельца при создании.",
+        )
 
     def _build_queue_payload(self, queue) -> dict[str, Any]:
         queue_id = getattr(queue, "id", None)
@@ -551,58 +551,13 @@ class QueueCabinetManagementApiService:
         specialist_id: int | None,
         synced_by: str,
     ) -> dict[str, Any]:
-        if day:
-            day_obj = self._parse_date(
-                day,
-                error_detail="Неверный формат даты. Используйте YYYY-MM-DD",
-            )
-        else:
-            day_obj = clinic_today(self.db)
-
-        queues = self.repository.list_queues_for_day(
-            day_obj=day_obj,
-            specialist_id=specialist_id,
+        del day, specialist_id, synced_by
+        raise QueueCabinetManagementDomainError(
+            409,
+            "Синхронизация кабинетов в уже созданные очереди отключена. "
+            "Измените кабинет владельца для новых очередей или используйте "
+            "предварительный просмотр переназначения очереди текущего дня.",
         )
-
-        updated_count = 0
-        errors = []
-
-        for queue in queues:
-            try:
-                # QD-2C (Codex round-16 P2): resource/bridged очередь —
-                # кабинет принадлежит оси реестра (строка очереди /
-                # default_cabinet), НЕ синтетику-врачу: sync не должен
-                # затирать ресурсное назначение кабинета моста 0059
-                # (retained specialist_id у моста — legacy-мост, не
-                # владелец). Врач-очереди — байт-идентично.
-                if getattr(queue, "queue_resource_id", None) is not None:
-                    continue
-                doctor = self.repository.get_doctor(queue.specialist_id)
-                if doctor and doctor.cabinet and queue.cabinet_number != doctor.cabinet:
-                    queue.cabinet_number = doctor.cabinet
-                    updated_count += 1
-            except Exception as exc:  # noqa: BLE001
-                errors.append(
-                    {
-                        "queue_id": queue.id,
-                        "specialist_id": queue.specialist_id,
-                        "error": str(exc),
-                    }
-                )
-
-        if updated_count > 0:
-            self.repository.commit()
-
-        return {
-            "success": True,
-            "message": f"Синхронизировано {updated_count} очередей",
-            "updated_count": updated_count,
-            "total_queues": len(queues),
-            "errors": errors,
-            "sync_date": day_obj.isoformat(),
-            "synced_by": synced_by,
-            "synced_at": datetime.now(UTC).isoformat(),
-        }
 
     def get_cabinet_statistics(
         self,

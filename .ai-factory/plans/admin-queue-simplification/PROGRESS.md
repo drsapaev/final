@@ -1,3 +1,29 @@
+## Current checkpoint — T09.3 local validation; preparing PR (2026-10-06T21:05+05:00)
+
+Plan version: 3.35
+Current task: T09.3
+Current status: IN_PROGRESS (focused local validation passed; base sync, commit, push and PR checks pending)
+Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`
+Branch: `codex/aqs-t093-cabinet-ui`
+Implementation base: `e5b2e6dfdd8393ffdada6a91b4ad4e186af362ae` (includes merged PR #3614 at `c2ccde2e46bbc115e816d4c383df93b1c8665ab1`)
+Target base: `origin/main` `ad0f98a7d001bf248bfb01610fdf0d3c1eb8a757` (#3615; rebase pending)
+Current commit: uncommitted implementation and plan checkpoint
+Last updated: 2026-10-06T21:05:01+05:00
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T09.1 | MERGED | [PR #3612](https://github.com/drsapaev/final/pull/3612) | `89b4888a013978182e45f34ac2e07a9679c497c9` | `EVIDENCE.md#t091-pr-3612-merged` |
+| T09.2 | MERGED | [PR #3614](https://github.com/drsapaev/final/pull/3614) | `c2ccde2e46bbc115e816d4c383df93b1c8665ab1` | merge confirmed by GitHub and user |
+| T09.3 | IN_PROGRESS | `codex/aqs-t093-cabinet-ui` | | `EVIDENCE.md#t093-local-validation` |
+
+## Current checkpoint
+- Completed: PR #3614 merge confirmed. T09.3 same-day cabinet reassignment UI and legacy cabinet-number writer containment implemented. Focused checks pass: backend unit 23; selected SQLite/temp integration 1 (170 deselected); frontend screen 7; TypeScript, build, scoped ESLint, `lint:check`, Ruff, `py_compile`, OpenAPI generation and `git diff --check`.
+- Changed but not verified: worktree base is `e5b2e6df`; `origin/main` advanced to `ad0f98a7` by unrelated PR #3615. Rebase onto fresh main and final diff check remain.
+- Remaining: rebase; update final commit hashes; commit/push/open a single-purpose PR; inspect exact-head required checks.
+- Blocker: staging, PostgreSQL proof, browser/viewport review and T18 remain NOT_RUN. No T09.3 Tier-2 deferral is accepted.
+- Next exact action: rebase branch onto `origin/main`, resolve only in-scope conflicts if any, rerun focused validation if source conflicts occur, then commit and publish.
+- Checks to rerun after source changes: backend cabinet service unit module, selected sync integration test, frontend cabinet screen tests, type-check, scoped ESLint, build if UI sources change, OpenAPI/generated-type parity if contract files change, `git diff --check`.
+
 ## Current checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
 
 Plan version: 3.34
