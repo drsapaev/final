@@ -2040,6 +2040,62 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR: https://github.com/drsapaev/final/pull/3614
 - Merge commit: none.
 
+## T09.3 local validation — 2026-10-06T21:20+05:00
+
+- Commit under test: `1fe580665bf96770d58ab62125d255bca57c9e09`, rebased on `origin/main` `427b1b6e58efce42e574a72ea1f5673f4c32f126`. Source validation was run on the equivalent code tree before the final dependency-only rebase from #3601; the rebase introduced no conflicts and did not change T09.3 files.
+- Environment: Windows managed worktree; Python 3.11.9; frontend Node 24.15.0 for the pinned direct OpenAPI type generator. No staging, production, live application or patient data.
+- Execution mode: continuation of the already-approved mandatory queue gate. Both gate attempts misrouted; the single known-root retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. The generated prompt was read. The narrow override is limited to `.scratch/T09.3-SCOPE.md` and the approved T09.3 files; no third gate was run.
+- Allowed paths: cabinet endpoint/service; Admin cabinet screen and its focused test; cabinet service/runtime tests; five locale files; OpenAPI/generated API types; this plan and its four journals. Denied: models/schema/migrations, owner-default or unrelated queue writers, generic queue service/model, nurse station, global middleware, routes, ops, staging and production.
+- Actual changed paths: `backend/app/api/v1/endpoints/queue_cabinet_management.py`; `backend/app/services/queue_cabinet_management_api_service.py`; `backend/openapi.json`; `backend/tests/integration/test_queue_resource_runtime_switch.py`; `backend/tests/unit/test_queue_cabinet_management_api_service.py`; `frontend/src/components/admin/QueueCabinetManagement.tsx`; its focused test; five locale files; `frontend/src/types/generated/api.ts`; and this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`, `DECISIONS.md`, and main plan.
+- Original behavior: the Admin panel's Sync action could write cabinet defaults into existing queue-day snapshots. Legacy single/bulk writers also changed those snapshots. The UI did not make the explicit preview/confirm/reason/replay flow the normal same-day command.
+- Validation commands and results:
+  - `scripts/run_backend_pytest.ps1 tests/unit/test_queue_cabinet_management_api_service.py` — **23 passed, 1 warning**.
+  - `scripts/run_backend_pytest.ps1 tests/integration/test_queue_resource_runtime_switch.py -k test_cabinet_sync_rejects_existing_day_snapshots` — **1 passed, 170 deselected, 1 warning**. This fixture uses SQLite/temp DB and is not PostgreSQL proof.
+  - From `frontend`: `npm run test:run -- src/components/admin/__tests__/QueueCabinetManagement.test.tsx` — **7 passed**.
+  - `npm run type-check` — **PASS**; `npm run lint:check` — **PASS, 3511 existing warnings and 0 errors**; changed screen/locales direct ESLint — **0 errors** (locale files contain existing quote warnings); `npm run build` — **PASS** on the same source tree before the base-only rebase.
+  - Pre-commit checks: gitleaks, Ruff, Ruff format, Black, JSON, whitespace and conflict checks **PASS**. The frontend ESLint hook cannot resolve its own staged `frontend/...` filenames after it changes directory to `frontend`; the configured hook was skipped only after direct scoped ESLint completed successfully. The EOF fixer was skipped for `backend/openapi.json` because it adds a newline that disagrees with app-generated OpenAPI. Fresh app generation to `.scratch/openapi-generated-check.json` matched the checked-in artifact byte-for-byte after removing that final newline. `git diff --check` **PASS**.
+  - The WSL-selected `npm run generate:api-types` (Node 18) failed inside Redocly with `RangeError: Invalid string length`. The same pinned `openapi-typescript` generator ran with local Windows Node 24 and produced the generated types. The canonical `generate:api-types:check` wrapper remains NOT_RUN; hosted freshness check is pending.
+- Result: **local focused validation PASS** for the source tree. No hosted CI result exists yet because the branch has not been pushed/opened as a PR.
+- Scope check: 17 tracked paths changed, all within the listed runtime, focused test, locale, generated contract and plan boundary. No model, migration, owner default, nurse-station, unrelated writer, middleware, routing, ops, shared staging or production path changed. `.scratch/` is worktree-local and not staged.
+- Remaining limitation: PostgreSQL integration proof, browser/viewport review, staging, T18 synthetic workflow and full `STAGING_VALIDATION.md` are **NOT_RUN**. No T09.3 Tier-2 deferral is accepted. No review, merge or deployment is claimed.
+- Next exact action: push branch `codex/aqs-t093-cabinet-ui`, open its single-purpose PR against `main`, then inspect required checks on the exact PR head.
+- PR: none yet.
+- Merge commit: none.
+
+
+## T09.3 local validation follow-up — 2026-10-06T21:45+05:00
+
+- Commit under test: 1fe580665bf96770d58ab62125d255bca57c9e09, based on 427b1b6e58efce42e574a72ea1f5673f4c32f126. At this checkpoint origin/main is c38533b352e792e723495744cb1f17f6a583fb4c; dependency-only PRs #3603/#3604 advanced main and rebase is pending.
+- Environment: Windows managed worktree, Python 3.11.9 and Node 24.15.0. Synthetic local UI harness only. No staging, production, live application, credentials, or patient data.
+- Execution mode and scope: continue the approved T09.3 mandatory-gate override recorded above. No third gate. Runtime scope remains the cabinet endpoint/service, Admin cabinet screen, focused tests, five locale files, generated OpenAPI/API types, and plan journals. Staging/production, schema/migrations, owner defaults, unrelated queue services, routing and global middleware remain denied.
+- Additional validation on this source tree:
+  - npm run test — 314 test files, 2,897 tests passed.
+  - npm run type-check — PASS.
+  - npm run lint:check — PASS, 0 errors, 3,511 existing warnings.
+  - npm run check-theme — PASS.
+  - npm run audit:icon-controls — PASS, 406 files, 0 findings.
+  - npm run build — PASS; existing zod/case CSS warnings only.
+  - Five self-contained Chromium specs (registrar-time, registrar-ux-audit, cashier-ux-audit, frontend-10-route-smoke, frontend-10-visual-a11y) — 46/46 passed using the worktree-local, two-origin Vite harness. Ports were checked free before use; no backend/QA accounts were used.
+- Playwright limitation: the first official Windows run could not launch its second Vite server because the config uses Unix-style environment assignment. A local .scratch harness resolved that tooling issue. The full six-spec run then completed 45/86, with 40 visual-regression cases unable to find Windows *-chromium-win32.png baselines and one split-origin mismatch caused by the harness host; after using the expected localhost host, the five non-visual specs passed. No snapshot baselines were intended or committed; only the 40 untracked files generated by the failed Windows run were removed after verifying their paths/timestamps. The visual-regression spec remains INCOMPLETE locally; Linux required Frontend E2E CI must pass before Tier 1 is green.
+- Backend rechecks on the current code commit: scripts/run_backend_pytest.ps1 tests/unit/test_queue_cabinet_management_api_service.py — 23 passed, 1 warning; scripts/run_backend_pytest.ps1 tests/integration/test_queue_resource_runtime_switch.py -k test_cabinet_sync_rejects_existing_day_snapshots — 1 passed, 170 deselected, 1 warning. The latter uses a SQLite/temp fixture and is not PostgreSQL proof.
+- Other checks from the preceding entry remain as recorded: OpenAPI generation matched the checked-in artifact after preserving canonical no-final-newline serialization; direct Windows Node 24 API type generation succeeded. The WSL-selected Node 18 Redocly wrapper failed with RangeError: Invalid string length; canonical generate:api-types:check remains NOT_RUN. Local Windows ESLint pre-commit path handling and OpenAPI EOF-fixer incompatibilities were bypassed only after their direct equivalent checks passed.
+- Result: local source/unit/build/Tier-1 static validation passes; local self-contained Playwright is partial. No hosted checks are available before publication. Do not claim Tier 1 complete until the required hosted E2E run passes.
+- Scope check: no new runtime paths beyond the T09.3 allowlist; .scratch/ and frontend/.scratch/ remain local-only. No patient data or secret is recorded here.
+- Remaining: rebase on current origin/main, verify conflicts/scope and rerun validations for any affected source; commit/push/open the PR; inspect exact-head required CI. PostgreSQL proof, task-owned staging, backend-dependent E2E, manual viewport/accessibility review, T18, and full staging validation remain NOT_RUN. No T09.3 Tier-2 deferral is accepted.
+- PR: none yet. Merge commit: none.
+
+
+## T09.3 post-rebase validation — 2026-10-06T21:51+05:00
+
+- Commit under test: code commit 8d77dfa3b06b0e9167faee7216c14b2601d11080, based on fresh origin/main c38533b352e792e723495744cb1f17f6a583fb4c. The branch rebased from 427b1b6e onto c38533b3 with no conflicts. The intervening #3603/#3604 commits update dependency requirements only.
+- Environment: Windows managed worktree, Python 3.11.9. Tests use repository fixtures; the selected integration case uses SQLite/temp storage. No staging, production, live application, credentials or patient data.
+- Post-rebase validation: scripts/run_backend_pytest.ps1 tests/unit/test_queue_cabinet_management_api_service.py -q --tb=short — 23 passed, 1 warning; scripts/run_backend_pytest.ps1 tests/integration/test_queue_resource_runtime_switch.py -k test_cabinet_sync_rejects_existing_day_snapshots -q --tb=short — 1 passed, 170 deselected, 1 warning. The second result is not PostgreSQL proof.
+- Scope: no source conflict/change was introduced by the rebase. The 17 code/test/contract/UI/locale paths are unchanged from code commit 8d77dfa3b06b0e9167faee7216c14b2601d11080; the four plan journals are updated separately. No denied path was touched. Worktree-local .scratch directories remain untracked.
+- Result: focused backend checks pass on the rebased code commit. Existing full Vitest/build/static and five-spec browser results are recorded in the preceding T09.3 follow-up. Local Windows visual Playwright remains partial; hosted Frontend E2E is pending PR publication.
+- Remaining NOT_RUN: hosted exact-head checks, PostgreSQL proof, task-owned staging/backend-dependent E2E, manual viewport/accessibility review, T18 and full STAGING_VALIDATION.md. No T09.3 Tier-2 deferral is accepted.
+- Next: commit this refreshed documentation checkpoint, push/open the PR, and inspect its exact-head required checks. Do not start T10 before this PR merges and main is synchronized.
+- PR: none. Merge: none.
+
 ## PR #3614 exact-head checks and PR-body refresh — 2026-10-06T16:26+05:00
 
 - Commit under test: `3cd2bf1103cd5759c49d9ca73ad8fed4ac686a1f`, PR #3614, base `1d146d857e1570ff2259975f081f80dc0b31ae82`.
