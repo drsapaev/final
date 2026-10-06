@@ -1,18 +1,19 @@
-## Current checkpoint — PR #3620 exact-head CI passed; docs checkpoint pending (2026-10-07T00:01+05:00)
+## Current checkpoint — PR #3620 CI clock-fixture correction prepared (2026-10-07T02:11+05:00)
 
-Plan version: 3.48
+Plan version: 3.50
 Current task: T09.3
-Current status: IN_PROGRESS (PR_OPEN; exact code-head CI passed; refreshing journals and body before final docs-only push)
+Current status: IN_PROGRESS (PR_OPEN; local fix committed, not pushed; exact-head CI pending; merge HOLD)
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
 Rebased base: d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc
 Fresh origin/main: d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc
 Rebased runtime code commit: c13c317c8d7be2cfe96ca51113f6bb35595d49cc
 Rebased focused regression correction commit: 043573f03aa1656b78db865c6ba32070291b30af
-Local checkpoint parent before this update: eb70338765d38751aeb757aac842f536ba7dd7d8
-Remote PR HEAD before docs-only checkpoint push: eb70338765d38751aeb757aac842f536ba7dd7d8
+Code/evidence checkpoint: eb70338765d38751aeb757aac842f536ba7dd7d8
+Current remote PR HEAD: 58f423c12688b03449da52479f097c444bdaa9cc
+Local source and journal commit: current branch HEAD (one commit ahead; not pushed).
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-07T00:01+05:00
+Last updated: 2026-10-07T02:11+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -21,11 +22,11 @@ Last updated: 2026-10-07T00:01+05:00
 | T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-ci-contract-test-follow-up |
 
 ## Current checkpoint
-- Completed: latest-main code/evidence HEAD eb70338765d38751aeb757aac842f536ba7dd7d8 passed exact-head run 37513876028: 28 success, 13 skipped, 0 failed, 0 pending. Backend tests: 5,357 passed, 65 skipped, 25 deselected, 3 xfailed, 126 warnings; Frontend E2E passed in 12m21s. Frontend unit/build/lint, Code Quality, generated API freshness/OpenAPI, parity, Context Boundary, PR Required Gate, Review Quality, lifecycle, security/secret scans and applicable workflow checks passed. Local rebase checks also passed: focused backend 30/30, OpenAPI byte match, API type freshness, git diff --check.
-- Changed but not verified: only the final journal/body refresh remains local; current remote HEAD eb70338765d38751aeb757aac842f536ba7dd7d8 is validated. The docs-only checkpoint commit will need its own exact-head checks after push.
-- Remaining: publish the updated evidence body and final plan checkpoint, then inspect the exact-head checks on the resulting documentation HEAD. Fix only in-scope issues; Tier-2 staging/live checks remain NOT_RUN and no deferral is accepted.
-- Blocker: PostgreSQL proof beyond hosted backend CI, task-owned staging, backend-dependent E2E, manual viewport review, T18 and full STAGING_VALIDATION.md are NOT_RUN. No T09.3 Tier-2 deferral is accepted.
-- Next exact action: validate the final PR body, commit the updated journals, recheck main d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc and remote PR head eb70338765d38751aeb757aac842f536ba7dd7d8, force-with-lease push, then inspect new exact-head CI. Do not merge or start T10; no Tier-2 deferral is accepted.
+- Completed: previous code/evidence HEAD passed; the latest docs-only HEAD failed twice on four QR token expiry tests. The confirmed test-fixture correction is now in the worktree. Mandatory gate returned `narrow_override/execute` with `gate_misroute=false` and exact first-touch ownership. `py_compile`, the 00:30-versus-noon regression, Ruff, Ruff format, and diff check pass.
+- Changed but not verified: test fix and plan journals are committed together at current local branch HEAD but not pushed. The four PostgreSQL transaction/replay tests were safely skipped locally because no disposable database was provided. Current remote remains `58f423c12688b03449da52479f097c444bdaa9cc` and still carries its old CI failure.
+- Remaining: commit and push the focused correction with journals, then inspect exact-head Backend CI. Read-only workflow inspection shows parity deliberately waits for all core dependencies to succeed; the prior skip was caused by Backend failure. If Backend and all other dependencies pass, parity is expected to run without a workflow edit. Tier-2 staging/live checks remain NOT_RUN and no deferral is accepted.
+- Blocker: PostgreSQL execution of the four regression scenarios and exact-head hosted CI are pending. Also pending: task-owned staging, backend-dependent live E2E, manual viewport/accessibility, T18 and full STAGING_VALIDATION.md.
+- Next exact action: push current local branch HEAD to PR #3620, then inspect every check on the exact new HEAD. Do not merge, start T10, claim Tier-2 deferral, edit the workflow without the stated parity condition, or use staging.
 
 ## Current checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
 
