@@ -1,17 +1,18 @@
-## Current checkpoint — PR #3620 behind new main; rebase required (2026-10-06T22:26+05:00)
+## Current checkpoint — PR #3620 rebased; exact-head push and CI pending (2026-10-06T22:36+05:00)
 
-Plan version: 3.43
+Plan version: 3.44
 Current task: T09.3
-Current status: IN_PROGRESS (PR_OPEN; pushed head checks partly pending; branch behind current main)
+Current status: IN_PROGRESS (PR_OPEN; branch rebased locally; force-with-lease push and new exact-head checks pending)
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
-PR base at last inspection: c38533b352e792e723495744cb1f17f6a583fb4c
+Rebased base: b95bb2d20357741dabacaaee09bc28323eeaae33
 Fresh origin/main: b95bb2d20357741dabacaaee09bc28323eeaae33
-Runtime code commit: 8d77dfa3b06b0e9167faee7216c14b2601d11080
-Focused regression correction commit: 0556ab0626dc975ef46eac7ac3eb0bab832d5a22
-Current pushed PR HEAD: 49b5490db94966f98f5be9356e9fb2aecd67f8dd
+Rebased runtime code commit: b96f18f46b004f742adb56ec1c8ee792a2ad1fca
+Rebased focused regression correction commit: 0a18293115b57176a911556e33aac387424c8b10
+Current local HEAD: bb2c470096fca274edcb142842f8eabf48991815
+Remote PR HEAD before force-with-lease: 49b5490db94966f98f5be9356e9fb2aecd67f8dd
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-06T22:26+05:00
+Last updated: 2026-10-06T22:36+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -20,11 +21,11 @@ Last updated: 2026-10-06T22:26+05:00
 | T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-ci-contract-test-follow-up |
 
 ## Current checkpoint
-- Completed: PR #3620's pushed head 49b5490db94966f98f5be9356e9fb2aecd67f8dd has passing build, lint, unit tests, docs generation, security/secret scans, locale, role, context-boundary and audit checks. Backend tests, Frontend E2E and Code Quality were still pending at 22:26+05. Previous head 0e02ff20db8459e1f5728273fc058e7ab86ffd08 had one stale HTTP 400 assertion among 5,347 Backend passes; focused correction 0556ab0626dc975ef46eac7ac3eb0bab832d5a22 now asserts 409/no mutation.
-- Changed but not verified: `origin/main` advanced to b95bb2d20357741dabacaaee09bc28323eeaae33c7 while PR #3620 remains based on c38533b352e792e723495744cb1f17f6a583fb4c. Rebase is required before closure; no runtime conflict review or post-rebase tests have run yet.
-- Remaining: commit the corrected journal, rebase this own branch onto fresh origin/main, inspect/resolve only in-scope conflicts, rerun focused backend checks and verify the regenerated OpenAPI artifact, then inspect all new exact-head required checks. Fix only in-scope causes in PR #3620. Tier 1 requires successful Frontend E2E.
+- Completed: rebased the T09.3 branch onto b95bb2d20357741dabacaaee09bc28323eeaae33 with no conflicts. Full OpenAPI generated from current app source byte-matches `backend/openapi.json`; frontend API type generation/freshness passed with Git Bash/Windows Node 24; focused backend unit+integration tests passed 30/30 with 1 warning; `git diff --check` passed. The main authorization changes and FastAPI dependency update are preserved.
+- Changed but not verified: rebased commits are local only; remote PR still points at old HEAD 49b5490db94966f98f5be9356e9fb2aecd67f8dd. The rebased branch requires `--force-with-lease` push; no exact-head CI has run on the new commit IDs.
+- Remaining: confirm remote branch has not moved, push rebased branch with `--force-with-lease`, refresh PR body, and inspect every new exact-head required check. Fix only in-scope causes in PR #3620. Tier 1 requires successful Frontend E2E.
 - Blocker: PostgreSQL proof beyond hosted backend CI, task-owned staging, backend-dependent E2E, manual viewport review, T18 and full STAGING_VALIDATION.md are NOT_RUN. No T09.3 Tier-2 deferral is accepted.
-- Next exact action: rebase the own worktree branch onto b95bb2d20357741dabacaaee09bc28323eeaae33c7, verify the merged OpenAPI document against the current API generator, rerun focused checks, push and inspect new exact-head CI. Do not merge or start T10 before the user closes this PR cycle and main is synchronized.
+- Next exact action: push this rebased branch with `--force-with-lease` only if the remote is still at 49b5490db94966f98f5be9356e9fb2aecd67f8dd, update the PR body, and inspect new exact-head CI. Do not merge or start T10 before the user closes this PR cycle and main is synchronized.
 
 ## Current checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
 

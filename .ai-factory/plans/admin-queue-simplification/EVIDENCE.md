@@ -2111,10 +2111,20 @@ Recorded: 2026-10-01T16:41:51+05:00
 
 ## T09.3 base advancement and exact-head check snapshot — 2026-10-06T22:26+05:00
 
-- PR #3620 pushed HEAD at inspection: `49b5490db94966f98f5be9356e9fb2aecd67f8dd`; PR base was `c38533b352e792e723495744cb1f17f6a583fb4c`. `origin/main` advanced to `b95bb2d20357741dabac7ac7ac7ac7ac7ac7ac7` through #3616 (admin services/audit endpoint authorization) and #3602 (FastAPI dependency bound). The branch is behind and rebase is required before closure.
+- PR #3620 pushed HEAD at inspection: `49b5490db94966f98f5be9356e9fb2aecd67f8dd`; PR base was `c38533b352e792e723495744cb1f17f6a583fb4c`. `origin/main` advanced to `b95bb2d20357741dabacaaee09bc28323eeaae33` through #3616 (admin services/audit endpoint authorization) and #3602 (FastAPI dependency bound). The branch was behind and needed a rebase before closure.
 - At the 22:26+05 check snapshot, applicable passing jobs included frontend build/lint/unit, docs generation, Code Quality-related report jobs, CI Scope, Context Boundary, CodeQL, security/secret scans, locale, role integrity, Regression Audit and PR Review Quality. Backend tests, Frontend E2E and unified Code Quality were still pending. Path-aware skips are not passes. The base advance makes these old-head runs informational only; new exact-head checks must pass after rebase/push.
 - Scope impact to review during rebase: `backend/openapi.json` overlaps the #3616 generated OpenAPI update. Preserve the auth contract added on main and T09.3's cabinet 409 response schemas, then verify the complete artifact against the current generator. No changes to `backend/pyproject.toml`, `backend/requirements.txt` or the #3616 authorization endpoint are allowed for T09.3.
-- Next action: rebase this own worktree onto `b95bb2d20357741dabac7ac7ac7ac7ac7ac7ac7`, resolve only the OpenAPI artifact if needed, run focused API/unit tests and generated OpenAPI freshness, push, then verify all exact-head checks. Tier 2 staging/backend-dependent E2E remains NOT_RUN; no deferral accepted; no merge or review decision has been submitted.
+- Next action: completed by the T09.3 rebase checkpoint below. Tier 2 staging/backend-dependent E2E remains NOT_RUN; no deferral accepted; no merge or review decision has been submitted.
+
+## T09.3 rebase and post-rebase local validation — 2026-10-06T22:36+05:00
+
+- Environment: Windows managed worktree, Python 3.11.9, Windows Node 24.15.0. No staging, production, live application, external credentials or patient data.
+- Rebase: replayed T09.3 commits onto `b95bb2d20357741dabacaaee09bc28323eeaae33`; no conflicts. New runtime commit `b96f18f46b004f742adb56ec1c8ee792a2ad1fca`; focused test correction `0a18293115b57176a911556e33aac387424c8b10`; local journal HEAD before this checkpoint `bb2c470096fca274edcb142842f8eabf48991815`. Remote branch was still at `49b5490db94966f98f5be9356e9fb2aecd67f8dd` before push.
+- Scope: preserved #3616 admin authorization changes and #3602 FastAPI dependency update; no conflict or edits to their runtime files. Compared T09.3 `backend/openapi.json` delta against new main: only its cabinet 409 response contract remained. Full `app.openapi()` output generated with fail-closed synthetic `DATABASE_URL` was byte-identical to committed `backend/openapi.json`.
+- Validation: focused cabinet service unit and admin-linkage API integration modules — **30 passed, 1 warning**. `npm run generate:api-types:check` — **PASS** after prepending `C:\Program Files\Git\bin` to this process PATH, causing the script to use Windows Git Bash and Node 24. The first attempt resolved PowerShell's `bash` to WSL and returned 1 before producing types; the pinned rerun generated identical TS content and passed.
+- `git diff --check` — PASS. No tracked TS delta remains after type generation. `.scratch/` and `frontend/.scratch/` remain untracked and are not staged.
+- Status: rebased commits not yet pushed; new exact-head CI is NOT_RUN. Previous PR-head checks are informational only. Tier 2 staging/backend-dependent E2E, manual viewport/accessibility review, T18 and full STAGING_VALIDATION remain NOT_RUN. No deferral, review or merge decision is accepted.
+- Next exact action: verify remote branch remains at `49b5490db94966f98f5be9356e9fb2aecd67f8dd`, push via `--force-with-lease`, refresh and validate PR body, then inspect all exact-head jobs. Do not merge or begin T10.
 
 ## PR #3614 exact-head checks and PR-body refresh — 2026-10-06T16:26+05:00
 
