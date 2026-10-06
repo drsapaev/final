@@ -53,10 +53,24 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Original failure: exact-head GitHub job `Frontend lint` failed at `npm run generate:api-types:check`; lint and `tsc --noEmit` had passed. CI's canonical `frontend/scripts/generate-api-types.sh` prepends three header lines that were missing because the artifact had been emitted by invoking `openapi-typescript` directly.
 - Correction/validation: ran the repository generator with Git Bash, Node `v24.15.0`, and pinned `openapi-typescript 7.13.0`; staged artifact adds exactly those three canonical comments. `npm run generate:api-types:check` then passed locally. `git diff --cached --check` passed.
 - Actual changed paths for the correction: `frontend/src/types/generated/api.ts` (three generated comment lines); this evidence, progress, resume, and plan checkpoint. No other generated or runtime files changed.
-- Result: local generator parity **PASS**. The former exact-head `adcbe1ca` `Frontend lint` result is **FAIL** and will be superseded only by a passing run on the pushed corrective head. At correction time, backend tests and frontend E2E were still pending on `adcbe1ca`; do not count them as evidence for the next head.
+- Result: local generator parity **PASS**. The former exact-head `adcbe1ca` `Frontend lint` result was **FAIL** and is superseded by the passing `390e14b4` run below. At correction time, backend tests and frontend E2E were still pending on `adcbe1ca`; they are not counted as evidence for the corrective head.
 - Scope check: only the generated artifact and plan/evidence files; no staging, PostgreSQL, production, model, migration, runtime, or frontend UI changes.
-- Remaining limitation: push the correction and inspect all applicable CI on its exact new head. PostgreSQL/staging/browser remain **NOT_RUN**.
+- Remaining limitation at this checkpoint: push the correction and inspect all applicable CI on its exact new head. PostgreSQL/staging/browser remain **NOT_RUN**. See the final exact-head validation below.
 - PR: https://github.com/drsapaev/final/pull/3612 (open draft).
+- Merge commit: none.
+
+## T09.1 final review and exact-head validation — 2026-10-06T07:42:29+05:00
+
+- Commit under review: exact PR HEAD `390e14b40d6eafb462e05d07f777c1e063a36c14`; branch `codex/aqs-T09.1-cabinet-preview`; base and merge-base `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`. PR #3612 is open as draft and mergeable.
+- Source review: the two P2 OpenAPI contract omissions were fixed in `688023b8`; canonical generated API parity was fixed in `390e14b4`. No remaining P0/P1/P2 found. No formal GitHub review submission, merge, or staging deferral acceptance is claimed; GitHub review submissions and inline threads were empty at inspection.
+- Original failures and handling: `Frontend lint` initially failed only at generated API parity because the file lacked the repository script's header; exact repo generation restored it and the corrective head passed. The first frontend E2E run had 60 passing tests and one unrelated `lab-dirty-guard.spec.ts` timeout while Vite logged WebSocket `ECONNREFUSED`; rerunning the failed E2E job on the same exact head passed.
+- Local validation: cabinet service + OpenAPI modules **49 passed, 1 warning**; Ruff/check/format, Black, Python compile, `git diff --check`, standalone TypeScript, repository `npm run generate:api-types:check`, and local PR body validator **PASS**.
+- Exact-head GitHub check rollup from `gh pr checks 3612`: **29 passed, 13 skipped, 0 failed**. Backend tests, frontend lint/type-check/API parity, unit tests, build, E2E rerun, OpenAPI freshness, CodeQL/security, regression, role, lifecycle and review-quality gates passed. The latest PR Review Quality Gate passed after the body was corrected to match the required field labels.
+- Skipped: Docker build; k6; production and staging readiness; integration tests; DAST; one security-scan job; Telegram release; metadata; two failure notifications; Supabase Preview; classify-and-route. Skips are not passes.
+- PR body: updated to reflect exact HEAD `390e14b4`, the generator-parity correction, E2E retry and check inventory. `gh pr view 3612 --json body --jq .body | py -3.11 scripts/check_pr_review_template.py` passed; hosted PR Review Quality Gate passed. An intermediate body edit had omitted literal required labels; it was corrected before the latest green gate.
+- Scope check: code correction changes only three canonical generated comments in `frontend/src/types/generated/api.ts`; no runtime/API schema change. Journal changes are limited to the approved plan/evidence files. Main checkout and unrelated `.gate_artifacts/` remain untouched.
+- Remaining limitations: PostgreSQL-specific validation, runtime Admin auth integration, synthetic staging/browser acceptance, production checks and deployment remain **NOT_RUN**. CI E2E is not the full T18 staging acceptance matrix.
+- Next exact action: commit/push this final journal checkpoint, confirm checks on the resulting docs-only HEAD, then await the user's review/merge direction. Do not merge or begin T09.2 before that direction and a completed PR cycle.
 - Merge commit: none.
 
 ## T08.3.3 PR #3609 merged — 2026-10-05T22:10+05:00
