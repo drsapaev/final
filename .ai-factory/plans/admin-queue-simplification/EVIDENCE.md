@@ -2181,3 +2181,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Tier 2 staging/live backend E2E, manual viewport/accessibility, T18 and full STAGING_VALIDATION.md remain **NOT_RUN**. No Tier-2 deferral, review or merge decision is accepted.
 - Scope check: PR source/test/API changes remain in the T09.3 allowlist; upstream mobile API/testing changes are preserved from main. No staging, production, live app, credentials or patient data were used.
 - Next exact action: refresh and validate PR body for new base/head, recheck remote refs, push using --force-with-lease expecting old head 2ba3f7d28ec2c2b2db33fc92c3d7b2f15368ec6c, then inspect all checks on the new exact HEAD.
+
+## T09.3 — latest rebased exact-head CI passed — 2026-10-07T00:01+05:00
+
+- Commit under test: eb70338765d38751aeb757aac842f536ba7dd7d8, PR #3620, base d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc.
+- GitHub run 37513876028 completed **28 success, 13 skipped, 0 failed, 0 pending**. Backend test step passed **5,357 passed, 65 skipped, 25 deselected, 3 xfailed, 126 warnings in 551.82s**; Reminder + QR-join probe and Critical E2E Smoke steps also passed. Frontend E2E passed in **12m21s**. Frontend unit/build/lint, Code Quality, documentation generation, API type/OpenAPI freshness, frontend-backend parity, Context Boundary, PR Required Gate, PR Review Quality Gate, lifecycle recommendation, role/i18n, regression audit, CodeQL, secret/security scans passed.
+- Skipped checks: 13 path-aware/nightly/unrelated jobs, including staging/readiness reports, Docker, integration/load paths and release/metadata jobs. Skipped checks are NOT_RUN, not passes.
+- Local validation on the same source: focused cabinet service unit and admin-linkage integration modules **30 passed, 1 warning**; full app.openapi() byte-matches backend/openapi.json; npm run generate:api-types:check passed with Git Bash/Windows Node 24; git diff --check passed. First local attempt lacked a required test bootstrap setting and failed before collection; fail-closed loopback-placeholder rerun passed without connecting to a database.
+- GitHub PR view confirms state OPEN, base d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc, head eb70338765d38751aeb757aac842f536ba7dd7d8, mergeStateStatus CLEAN, no human reviews. No merge performed.
+- Tier 2 staging/live backend E2E, manual viewport/accessibility, T18 and full STAGING_VALIDATION remain NOT_RUN. No Tier-2 deferral, review, or merge decision is accepted.
+- Next: push the refreshed journals/body as a docs-only checkpoint with a lease for old PR head eb70338765d38751aeb757aac842f536ba7dd7d8; inspect all checks on the resulting exact HEAD. Do not begin T10 until PR #3620 closes and main is synchronized.

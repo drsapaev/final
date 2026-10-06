@@ -1,18 +1,18 @@
-## Current checkpoint — PR #3620 rebased on d75108c1 after previous exact-head CI; next push pending (2026-10-06T23:42+05:00)
+## Current checkpoint — PR #3620 exact-head CI passed; docs checkpoint pending (2026-10-07T00:01+05:00)
 
-Plan version: 3.47
+Plan version: 3.48
 Current task: T09.3
-Current status: IN_PROGRESS (PR_OPEN; re-rebased locally onto latest main; next guarded push and exact-head CI pending)
+Current status: IN_PROGRESS (PR_OPEN; exact code-head CI passed; refreshing journals and body before final docs-only push)
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
 Rebased base: d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc
 Fresh origin/main: d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc
 Rebased runtime code commit: c13c317c8d7be2cfe96ca51113f6bb35595d49cc
 Rebased focused regression correction commit: 043573f03aa1656b78db865c6ba32070291b30af
-Local checkpoint parent before this update: f832f6262530fe7fa67a858198acf303efb7670b
-Remote PR HEAD before force-with-lease: 2ba3f7d28ec2c2b2db33fc92c3d7b2f15368ec6c
+Local checkpoint parent before this update: eb70338765d38751aeb757aac842f536ba7dd7d8
+Remote PR HEAD before docs-only checkpoint push: eb70338765d38751aeb757aac842f536ba7dd7d8
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-06T23:42+05:00
+Last updated: 2026-10-07T00:01+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -21,11 +21,11 @@ Last updated: 2026-10-06T23:42+05:00
 | T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-ci-contract-test-follow-up |
 
 ## Current checkpoint
-- Completed: re-rebased T09.3 onto origin/main d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc after previous exact-head run 37510851862 passed 28 checks with 13 skipped and no failures on 2ba3f7d28ec2c2b2db33fc92c3d7b2f15368ec6c. The upstream #3621 mobile API and integration test changes do not overlap T09.3 paths. Latest rebased focused backend suite passed 30/30 with 1 warning; full app OpenAPI byte-matches backend/openapi.json; API type freshness passed with Windows Git Bash/Node 24; git diff --check passed.
-- Changed but not verified: latest rebased source and journals are local; remote PR remains at 2ba3f7d28ec2c2b2db33fc92c3d7b2f15368ec6c. New exact-head CI has not run on this main base.
-- Remaining: refresh/validate the PR body for origin/main d75108c1 and the new post-checkpoint HEAD, confirm the remote refs, force-with-lease push from expected PR HEAD 2ba3f7d2, and inspect every exact-head check.
+- Completed: latest-main code/evidence HEAD eb70338765d38751aeb757aac842f536ba7dd7d8 passed exact-head run 37513876028: 28 success, 13 skipped, 0 failed, 0 pending. Backend tests: 5,357 passed, 65 skipped, 25 deselected, 3 xfailed, 126 warnings; Frontend E2E passed in 12m21s. Frontend unit/build/lint, Code Quality, generated API freshness/OpenAPI, parity, Context Boundary, PR Required Gate, Review Quality, lifecycle, security/secret scans and applicable workflow checks passed. Local rebase checks also passed: focused backend 30/30, OpenAPI byte match, API type freshness, git diff --check.
+- Changed but not verified: only the final journal/body refresh remains local; current remote HEAD eb70338765d38751aeb757aac842f536ba7dd7d8 is validated. The docs-only checkpoint commit will need its own exact-head checks after push.
+- Remaining: publish the updated evidence body and final plan checkpoint, then inspect the exact-head checks on the resulting documentation HEAD. Fix only in-scope issues; Tier-2 staging/live checks remain NOT_RUN and no deferral is accepted.
 - Blocker: PostgreSQL proof beyond hosted backend CI, task-owned staging, backend-dependent E2E, manual viewport review, T18 and full STAGING_VALIDATION.md are NOT_RUN. No T09.3 Tier-2 deferral is accepted.
-- Next exact action: update and validate the PR body, recheck main d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc and remote PR head 2ba3f7d28ec2c2b2db33fc92c3d7b2f15368ec6c, force-with-lease push, then inspect the new exact-head CI. Tier 2 staging/backend E2E, manual viewport/accessibility, T18 and full staging validation remain NOT_RUN; no deferral is accepted. Do not merge or start T10 before this PR closes and main is synchronized.
+- Next exact action: validate the final PR body, commit the updated journals, recheck main d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc and remote PR head eb70338765d38751aeb757aac842f536ba7dd7d8, force-with-lease push, then inspect new exact-head CI. Do not merge or start T10; no Tier-2 deferral is accepted.
 
 ## Current checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
 
