@@ -2096,6 +2096,19 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Next: commit this refreshed documentation checkpoint, push/open the PR, and inspect its exact-head required checks. Do not start T10 before this PR merges and main is synchronized.
 - PR: none. Merge: none.
 
+
+## T09.3 CI contract-test follow-up — 2026-10-06T22:17+05:00
+
+- PR: #3620, previous exact HEAD 0e02ff20db8459e1f5728273fc058e7ab86ffd08, base c38533b352e792e723495744cb1f17f6a583fb4c. Code commit 8d77dfa3b06b0e9167faee7216c14b2601d11080. PR is OPEN and mergeable; no review or merge action was submitted.
+- Failing check: Backend tests, run https://github.com/drsapaev/final/actions/runs/37499492491. Summary: 5,347 passed, 1 failed, 65 skipped, 25 deselected, 3 xfailed, 126 warnings. The sole failure was tests/integration/test_admin_linkage_cleanup.py::test_queue_cabinet_info_defaults_to_clinic_day_and_separates_snapshot_from_default, which expected HTTP 400 from the old legacy cabinet update contract; T09.3 returns the documented 409. Frontend E2E and all other completed applicable checks passed on that prior HEAD. Skipped checks are not passes.
+- Root cause: stale integration assertions, not a runtime defect. The same test also expected legacy sync to mutate the snapshot after omitting day, which is now intentionally prohibited. The screen GET assertions still verify clinic-local default day and distinct saved/default cabinet values.
+- Correction: update only this focused API integration test. It now expects 409 for the legacy single writer and omitted-day sync, and verifies the existing current-day snapshot remains 399 and historical snapshot remains 301. Removed the obsolete host-date monkeypatch that tested behavior for a now-disabled sync command.
+- Local validation: full backend/tests/integration/test_admin_linkage_cleanup.py — 7 passed, 1 warning; focused case after formatting — 1 passed, 6 deselected, 1 warning; Ruff check PASS; Ruff format --check PASS; py_compile PASS; git diff --check PASS.
+- Scope: the one additional file is an existing focused API integration test permitted by T09.3's focused-test allowlist. No runtime, model, migration, queue default, unrelated writer, frontend, route, ops, staging or production file changed in this follow-up. Focused test correction is committed locally in 0556ab0626dc975ef46eac7ac3eb0bab832d5a22; four journal files are modified but uncommitted. Neither commit has been pushed yet.
+- Result: local regression correction passes. The correction has not yet been pushed; all hosted results belong to old HEAD 0e02ff20db8459e1f5728273fc058e7ab86ffd08. New-head Backend tests and Frontend E2E are NOT_RUN until push.
+- Remaining NOT_RUN: new exact-head CI; PostgreSQL proof beyond hosted suite; task-owned staging, backend-dependent E2E, manual viewport/accessibility review, T18 and full STAGING_VALIDATION.md. No T09.3 Tier-2 deferral is accepted.
+- Next exact action: commit the four journal updates, push the test correction and checkpoint to the existing PR, update its body, then inspect exact-head required checks. Do not merge or start T10 before the PR cycle closes.
+
 ## PR #3614 exact-head checks and PR-body refresh — 2026-10-06T16:26+05:00
 
 - Commit under test: `3cd2bf1103cd5759c49d9ca73ad8fed4ac686a1f`, PR #3614, base `1d146d857e1570ff2259975f081f80dc0b31ae82`.

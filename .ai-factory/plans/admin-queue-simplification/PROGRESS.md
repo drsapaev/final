@@ -1,28 +1,29 @@
-## Current checkpoint — T09.3 locally validated; PR publication and hosted checks pending (2026-10-06T21:51+05:00)
+## Current checkpoint — PR #3620 regression correction committed locally; push and exact-head CI pending (2026-10-06T22:19+05:00)
 
-Plan version: 3.39
+Plan version: 3.41
 Current task: T09.3
-Current status: IN_PROGRESS (local implementation and static checks pass; Windows visual Playwright is partial; PR and hosted checks pending)
+Current status: IN_PROGRESS (PR #3620 is open; stale test corrected in local commit; evidence checkpoint needs commit/push and hosted rerun)
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
-Implementation base: e5b2e6dfdd8393ffdada6a91b4ad4e186af362ae (includes merged PR #3614 at c2ccde2e46bbc115e816d4c383df93b1c8665ab1)
-Current base: origin/main c38533b352e792e723495744cb1f17f6a583fb4c (#3615 and dependency-only #3601/#3603/#3604 included; rebase completed without conflicts)
-Current code commit: 8d77dfa3b06b0e9167faee7216c14b2601d11080
-Last updated: 2026-10-06T21:51+05:00
+Base: origin/main c38533b352e792e723495744cb1f17f6a583fb4c
+Runtime code commit: 8d77dfa3b06b0e9167faee7216c14b2601d11080
+Focused regression correction commit: 0556ab0626dc975ef46eac7ac3eb0bab832d5a22
+Current remote PR HEAD: 0e02ff20db8459e1f5728273fc058e7ab86ffd08 (push pending)
+Last updated: 2026-10-06T22:19+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
-| T09.3 | IN_PROGRESS | codex/aqs-t093-cabinet-ui | | EVIDENCE.md#t093-post-rebase-validation |
+| T09.3 | IN_PROGRESS | PR #3620 | | EVIDENCE.md#t093-ci-contract-test-follow-up |
 
 ## Current checkpoint
-- Completed: T09.3 implementation and focused regressions are present in the isolated worktree. After rebasing on current main, backend cabinet unit module passed 23/23 and selected SQLite/temp integration 1/1 (170 deselected). Focused UI tests passed 7/7; full Vitest 2,897/2,897; type-check, lint:check, theme audit, icon-control audit and build passed on the same source tree. Five non-visual self-contained Chromium specs passed 46/46.
-- Changed but not verified: code is rebased onto c38533b352e792e723495744cb1f17f6a583fb4c; no source conflicts or source changes occurred. Full six-spec Playwright was not locally green: Windows visual-regression screenshots are absent. Hosted exact-head checks have not run.
-- Remaining: commit the refreshed evidence checkpoint, push/open a single-purpose PR, then inspect exact-head required checks. Tier 1 remains incomplete until required E2E CI is green.
-- Blocker: PostgreSQL proof, manual viewport review, task-owned staging, T18 workflow and full STAGING_VALIDATION.md are NOT_RUN. No T09.3 Tier-2 deferral is accepted.
-- Next exact action: commit the refreshed journal, push branch codex/aqs-t093-cabinet-ui, open the PR and inspect applicable exact-head CI. If any hosted check fails, fix only the in-scope cause in this PR.
-- Checks to rerun after source changes: backend cabinet service unit module, selected sync integration test, frontend cabinet tests, type-check, scoped ESLint, build if UI files change, OpenAPI/generated-type parity if contract files change. Hosted Frontend E2E must pass before Tier 1 is considered complete.
+- Completed: T09.3 code is based on c38533b352e792e723495744cb1f17f6a583fb4c. PR #3620 previous HEAD 0e02ff20db8459e1f5728273fc058e7ab86ffd08: Frontend E2E passed; Backend tests had 5,347 passed and one failed old HTTP 400 assertion. The failure is fixed in test-only commit 0556ab0626dc975ef46eac7ac3eb0bab832d5a22. Full integration module 7/7, targeted post-format 1/1, Ruff check/format, py_compile and diff check passed locally.
+- Changed but not verified: focused test correction is committed locally; four journal files are updated and unstaged. The correction has not been pushed, so hosted results still belong to 0e02ff20db8459e1f5728273fc058e7ab86ffd08.
+- Remaining: commit the evidence/body checkpoint, push branch to PR #3620, publish the refreshed PR body, then inspect required checks on the resulting exact HEAD.
+- Blocker: PostgreSQL proof beyond hosted backend CI, task-owned staging, backend-dependent E2E, manual viewport review, T18 and full STAGING_VALIDATION.md are NOT_RUN. No T09.3 Tier-2 deferral is accepted.
+- Next exact action: commit the refreshed journals, push commits 0556ab062 and the evidence checkpoint, update/validate the PR body, then monitor the exact-head backend/E2E and required checks. Fix any in-scope failure in the same PR.
+- Do not start T10 before PR #3620 merges and local main is synchronized.
 
 ## Current checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
 
