@@ -1076,7 +1076,7 @@ def test_alembic_chain_single_head_0069() -> None:
     assert graph["0075_derma_history_read_model"] == ("0074_join_payload_binding",)
     assert graph["0076_derma_history_read_order"] == ("0075_derma_history_read_model",)
     assert graph["0077_daily_queue_policy"] == ("0076_derma_history_read_order",)
-    assert heads == ["0077_daily_queue_policy"]
+    assert heads == ["0078_clinic_settings_keys"]
 
 
 # ===================== C. PostgreSQL FK introspection =====================
@@ -1576,10 +1576,11 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
                 # NURSE-V2 0071/0072, main's 0073 routing snapshot, the
                 # round-8 0074 payload binding, the #3506 0075 derma
                 # history read model and its 0076 read-order index swap,
-                # followed by 0077 daily queue policy persistence);
+                # 0077 daily queue policy persistence and the 0078
+                # clinic settings key canonicalization);
                 # the retirement end-state (no synthetic usernames/doctors)
                 # is a head-agnostic invariant.
-                assert version == "0077_daily_queue_policy"
+                assert version == "0078_clinic_settings_keys"
 
                 usernames = {
                     row[0]
