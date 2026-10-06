@@ -3390,6 +3390,46 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/queues/cabinet-info/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Cabinet Reassignment
+         * @description Preview an explicit same-day cabinet reassignment without writing state.
+         */
+        post: operations["preview_cabinet_reassignment_api_v1_admin_queues_cabinet_info_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/queues/cabinet-info/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Cabinet Reassignment
+         * @description Apply an explicit same-day reassignment; middleware provides keyed replay.
+         */
+        post: operations["apply_cabinet_reassignment_api_v1_admin_queues_cabinet_info_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/queues/cabinet-info/bulk": {
         parameters: {
             query?: never;
@@ -25305,6 +25345,121 @@ export type components = {
             cabinet_floor?: number | null;
             /** Cabinet Building */
             cabinet_building?: string | null;
+        };
+        /** CabinetReassignmentApplyError */
+        CabinetReassignmentApplyError: {
+            /** Detail */
+            detail: string;
+            /** Code */
+            code?: ("idempotency_in_flight" | "idempotency_payload_mismatch" | "idempotency_uncertain_outcome") | null;
+        };
+        /** CabinetReassignmentApplyRequest */
+        CabinetReassignmentApplyRequest: {
+            /** Targets */
+            targets: components["schemas"]["CabinetReassignmentApplyTarget"][];
+            /** New Cabinet Number */
+            new_cabinet_number: string | null;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "room_unavailable" | "equipment_issue" | "schedule_change" | "administrative_correction";
+        };
+        /** CabinetReassignmentApplyResponse */
+        CabinetReassignmentApplyResponse: {
+            /**
+             * Clinic Day
+             * Format: date
+             */
+            clinic_day: string;
+            /** Changed Queue Ids */
+            changed_queue_ids: number[];
+            /** Unchanged Queue Ids */
+            unchanged_queue_ids: number[];
+            /**
+             * Applied At
+             * Format: date-time
+             */
+            applied_at: string;
+        };
+        /** CabinetReassignmentApplyTarget */
+        CabinetReassignmentApplyTarget: {
+            /** Queue Id */
+            queue_id: number;
+            /**
+             * Expected Owner Type
+             * @enum {string}
+             */
+            expected_owner_type: "doctor" | "resource";
+            /** Expected Owner Id */
+            expected_owner_id: number;
+            /** Expected Cabinet Number */
+            expected_cabinet_number: string | null;
+        };
+        /** CabinetReassignmentIdempotencyError */
+        CabinetReassignmentIdempotencyError: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "idempotency_key_invalid" | "idempotency_unavailable";
+            /** Detail */
+            detail: string;
+        };
+        /** CabinetReassignmentPreviewError */
+        CabinetReassignmentPreviewError: {
+            /** Detail */
+            detail: string;
+        };
+        /** CabinetReassignmentPreviewItem */
+        CabinetReassignmentPreviewItem: {
+            /** Queue Id */
+            queue_id: number;
+            /**
+             * Queue Day
+             * Format: date
+             */
+            queue_day: string;
+            /**
+             * Owner Type
+             * @enum {string}
+             */
+            owner_type: "doctor" | "resource";
+            /** Owner Id */
+            owner_id: number;
+            /** Owner Name */
+            owner_name: string;
+            /** Owner Default Cabinet */
+            owner_default_cabinet: string | null;
+            /** Old Cabinet Number */
+            old_cabinet_number: string | null;
+            /** New Cabinet Number */
+            new_cabinet_number: string | null;
+            /** Waiting Count */
+            waiting_count: number;
+            /** Blocking Reasons */
+            blocking_reasons: ("patient_called" | "clinical_work_in_progress" | "active_service_execution")[];
+            /** Can Apply */
+            can_apply: boolean;
+        };
+        /** CabinetReassignmentPreviewRequest */
+        CabinetReassignmentPreviewRequest: {
+            /** Queue Ids */
+            queue_ids: number[];
+            /** New Cabinet Number */
+            new_cabinet_number: string | null;
+        };
+        /** CabinetReassignmentPreviewResponse */
+        CabinetReassignmentPreviewResponse: {
+            /**
+             * Clinic Day
+             * Format: date
+             */
+            clinic_day: string;
+            /** Items */
+            items: components["schemas"]["CabinetReassignmentPreviewItem"][];
+            /** Can Apply */
+            can_apply: boolean;
         };
         /**
          * CallNextPatientResponse
@@ -48237,6 +48392,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_cabinet_reassignment_api_v1_admin_queues_cabinet_info_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CabinetReassignmentPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentPreviewResponse"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentPreviewError"];
+                };
+            };
+            /** @description The caller must have the Admin role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentPreviewError"];
+                };
+            };
+            /** @description One or more requested queues were not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentPreviewError"];
+                };
+            };
+            /** @description A target is not for clinic-local today or its owner is unavailable. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentPreviewError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_cabinet_reassignment_api_v1_admin_queues_cabinet_info_apply_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CabinetReassignmentApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentApplyResponse"];
+                };
+            };
+            /** @description The idempotency key exceeds the middleware limit. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentIdempotencyError"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentApplyError"];
+                };
+            };
+            /** @description The caller must have the Admin role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentApplyError"];
+                };
+            };
+            /** @description One or more requested queues were not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentApplyError"];
+                };
+            };
+            /** @description Queue state changed or an active patient/clinical operation blocks reassignment. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentApplyError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The reassignment or its mandatory audit could not be committed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentApplyError"];
+                };
+            };
+            /** @description Required idempotency coordination is unavailable; no command is executed. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabinetReassignmentIdempotencyError"];
                 };
             };
         };
