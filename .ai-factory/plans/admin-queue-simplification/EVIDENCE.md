@@ -2,6 +2,21 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
+## T09.2 generated API freshness correction — 2026-10-06T13:20+05:00
+
+- Commits under test: original code commit `3260efcae2cae69aa47b89d09e9a52885bd8586f`; local generated-artifact correction `80e5ad8` (not yet pushed). Base is merged PR #3613 commit `1d146d857e1570ff2259975f081f80dc0b31ae82`; current remote PR HEAD before the correction is `c177ad21aeaaa6a81f87dc5a71ba629d35f0d2f2`.
+- Environment: GitHub Actions run `37433626477`; Windows host with Node `v24.15.0`, npm `11.12.1`, and pinned `openapi-typescript@7.13.0`. No staging or production environment used.
+- Execution mode: narrow `direct_execute` for a generated artifact formatting correction already within the T09.2 generated-types allowlist. No OpenAPI schema, DTO semantics or runtime changed.
+- Allowed/actual tracked path: `frontend/src/types/generated/api.ts` only. Plan journal updates are in scope. `.scratch/api-types-regen.ts` was task-owned and removed after comparison; `.scratch/` remains untracked and is excluded from the PR.
+- Original failure: `gh run view 37433626477 --log-failed` shows CI regenerated 2,589,170 bytes with `openapi-typescript 7.13.0`, then `git diff` reported one added blank line between the repository warning header and the generated `/**` body. The committed artifact lacked that separator. Backend tests, frontend unit tests/build and OpenAPI freshness passed on that superseded run; generated API freshness failed; UX E2E, code quality and parity were cancelled when a newer workflow took priority. The run is cancelled overall and is not an exact-head pass.
+- Correction: added the generator-required separator only. Commit `80e5ad8` contains one insertion in the generated TypeScript file.
+- Validation: `npm exec --yes --package=openapi-typescript@7.13.0 -- openapi-typescript backend/openapi.json --output .scratch/api-types-regen.ts --export-type` — **PASS**. A Node comparison prepended the exact header from `frontend/scripts/generate-api-types.sh`, normalized Windows CRLF, and compared the complete result to the tracked generated file — **`PINNED_GENERATION_EXACT_MATCH`**. `git diff --cached --check` — **PASS**. Commit hooks passed except ESLint, which was explicitly skipped because the local hook could not fetch missing `eslint@10.12.0`; hosted lint on the corrected exact PR head remains required.
+- Validation attempts not counted as passes: nested `npm exec --package=openapi-typescript@7.13.0 -- npm run generate:api-types:check` failed because the child `npx` could not see npm exec's temporary binary. This is an invocation/PATH limitation; direct pinned generation and full artifact comparison passed. The previous broad WSL install issue was not repeated.
+- Scope check: one generated file plus plan progress/resume/evidence only; no runtime, API schema, frontend behavior, migration, middleware, ops, staging or production change. `git diff --check` on the final journal diff remains to be run before push.
+- Result/status: generated artifact correction is committed locally; not pushed yet. New exact-head CI for the corrected PR commit is **NOT_RUN**. Independent review is pending; T09.2 backend/staging Tier 2 remains **NOT_RUN**, deferral is not accepted, and merge is not authorized by this checkpoint.
+- Next exact action: push the correction and this journal checkpoint together, then inspect all applicable checks on the resulting exact PR HEAD. Do not merge or claim CI green before that.
+- PR: https://github.com/drsapaev/final/pull/3614. Merge commit: none.
+
 ## T09.2 pre-edit gate and scope — 2026-10-06T09:58+05:00
 
 - Commit/base under test: `89b4888a013978182e45f34ac2e07a9679c497c9`, confirmed merge commit for PR #3612 / T09.1. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`; branch `codex/aqs-T09.2-cabinet-apply`.

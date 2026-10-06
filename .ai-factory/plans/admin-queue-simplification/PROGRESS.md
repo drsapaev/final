@@ -1,25 +1,25 @@
-## Current authoritative checkpoint — T09.2 PR #3614 opened (2026-10-06T13:04+05:00)
+## Current authoritative checkpoint — T09.2 generated API freshness fix (2026-10-06T13:20+05:00)
 
-Plan version: 3.28
-Current task/status: T09.2 / PR_OPEN — [PR #3614](https://github.com/drsapaev/final/pull/3614). Code commit: `3260efcae2cae69aa47b89d09e9a52885bd8586f`.
+Plan version: 3.29
+Current task/status: T09.2 / PR_OPEN — [PR #3614](https://github.com/drsapaev/final/pull/3614). Generated API freshness correction commit: `80e5ad8`; not yet pushed.
 Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`
 Branch: `codex/aqs-T09.2-cabinet-apply`
 Base commit: `1d146d857e1570ff2259975f081f80dc0b31ae82` (merged PR #3613; synchronized with `origin/main`)
-Current PR code commit: `3260efcae2cae69aa47b89d09e9a52885bd8586f`; this PR-open checkpoint is the next commit and will update the PR HEAD.
-Last updated: 2026-10-06T13:04+05:00
+Current PR code commit: `80e5ad8`; current remote HEAD before this fix is `c177ad21aeaaa6a81f87dc5a71ba629d35f0d2f2`.
+Last updated: 2026-10-06T13:20+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | [PR #3612](https://github.com/drsapaev/final/pull/3612) | `89b4888a013978182e45f34ac2e07a9679c497c9` | `EVIDENCE.md#t091-pr-3612-merged` |
-| T09.2 | PR_OPEN | [PR #3614](https://github.com/drsapaev/final/pull/3614) | | `EVIDENCE.md#t092-pr-3614-opened` |
+| T09.2 | PR_OPEN | [PR #3614](https://github.com/drsapaev/final/pull/3614) | | `EVIDENCE.md#t092-generated-api-freshness-correction` |
 
 ## Current checkpoint
-- Completed: PR #3613 merged and `origin/main` synchronized; its key-log redaction resolves the previous T09.2 scope hold. T09.2 implements explicit Admin apply, deterministic queue/entry locks, stale and active-state guards, strict same-transaction audit and replay. Post-sync focused checks: 97 passed, 9 skipped, 2 xfailed; disposable PostgreSQL integration: 8 passed, 0 skipped. OpenAPI and pinned TypeScript generation completed; Python static checks and `git diff --check` passed. Owned Redis/PostgreSQL were removed and WSL distro stopped after its npm installer became unresponsive.
-- Changed but not verified: PR #3614 is open and code commit `3260efcae2cae69aa47b89d09e9a52885bd8586f` is pushed. Initial hosted checks are in progress; no formal review has been submitted. Browser/staging/full system-health remain NOT_RUN. Standard npm generator wrapper could not run in the WSL-backed shell because its npx cache lacks TypeScript; pinned direct generation passed. The PR body passed the local review-quality gate (19 unit checks, both samples, and this body).
-- Remaining: push this PR-state checkpoint, inspect all checks on the resulting exact HEAD, and obtain independent review. Tier 2 staging/browser validation is NOT RUN and reviewer deferral acknowledgement remains pending; no deferral has been accepted.
-- Blocker: merge remains on hold until applicable exact-head CI and independent review pass; Tier 2 is NOT RUN and needs an explicit reviewer decision if a deferral is requested. The old global key-log hold is resolved by merged PR #3613. No staging or production validation is claimed.
-- Next exact action: push the PR-open journal update, then check the exact new PR HEAD and wait for CI/review. Do not merge from this checkpoint.
-- Checks to rerun after any runtime/generated change: focused cabinet unit/API/OpenAPI and service-boundary tests; disposable PostgreSQL apply integration; Ruff, Black, format, compile, OpenAPI generation, pinned TypeScript generation and `git diff --check`.
+- Completed: PR #3613 merged and `origin/main` synchronized; T09.2 apply behavior and its post-sync validation remain recorded in EVIDENCE. On superseded code HEAD `3260efc`, GitHub run `37433626477` found the generated-type freshness failure: generator output differed by the missing blank separator after the header. The pinned `openapi-typescript@7.13.0` output now matches the complete committed artifact after Windows CRLF normalization. Correction commit `80e5ad8` changes only `frontend/src/types/generated/api.ts`.
+- Changed but not verified: correction is committed locally but not pushed; PR remote HEAD is still `c177ad21`. Exact pinned generation comparison and `git diff --cached --check` passed before commit. All commit hooks passed except ESLint, explicitly skipped because the local hook could not fetch its missing package; hosted lint on the corrected PR HEAD is still required. A nested `npm exec … npm run` attempt failed to expose its temporary binary to `npx` and is not a generator pass.
+- Remaining: update and push this evidence checkpoint with the one-line correction, inspect applicable checks on that exact new HEAD, then obtain independent review. Staging/browser/full system-health remain NOT_RUN; deferral acknowledgement is unchecked and no deferral has been accepted.
+- Blocker: merge remains on hold until exact-head CI and independent review pass and a separate Tier 2 staging/deferral decision is made. No staging or production validation is claimed.
+- Next exact action: push the generated-type fix and checkpoint together, then inspect and wait for checks on the resulting exact PR HEAD. Do not merge from this checkpoint.
+- Checks to rerun after any runtime/generated change: exact CI generated-types freshness, frontend lint/type-check, and `git diff --check`; prior focused cabinet + disposable PostgreSQL evidence remains valid because this fix changes no API schema or runtime code.
 
 ## Prior checkpoint — T09.1 continuation decision (superseded)
 
