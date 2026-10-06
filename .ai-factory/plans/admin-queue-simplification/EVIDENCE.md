@@ -2,6 +2,99 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
+## T09.1 PR #3612 continuation decision — 2026-10-06T09:26+05:00
+
+- Reviewed PR HEAD: `a8f7980b1d160726e169050a8bc8f8043294a36b`; code HEAD remains `390e14b40d6eafb462e05d07f777c1e063a36c14`. GitHub reports OPEN, draft, MERGEABLE. Current checks: **26 success, 13 skipped, 0 failure, 0 pending**. Earlier 29-check observations are historical snapshots and are not the current count.
+- Decision authority: the user requested an agent decision for continuation. This is the agent's technical disposition, not a fabricated human/GitHub approval and not a merge/deployment action. Source review has no outstanding P0/P1/P2.
+- Pre-edit boundary: continuation of the recorded T09.1 narrow override; no third gate run. Only this evidence log, PROGRESS, RESUME, the canonical plan and existing PR description may change. Runtime, generated API artifacts, tests, schema, auth policy, ops, staging, production and other agents' files remain unchanged. First stop: new code/diff or a required out-of-scope change.
+- **Disposition:** accept the following PR-specific backend/staging validation deferral for the unused read-only preview. UI Tier 1/Tier 2 are **not applicable**, because no frontend runtime changed. This disposition does not apply to T09.2, T09.3, other PRs, v1 activation or deployment.
+- **Original requirement:** real-PostgreSQL preview query verification; authenticated Admin success and non-Admin denial; synthetic staging/browser acceptance for the completed cabinet workflow. These checks remain **NOT_RUN**, not PASS.
+- **Reason:** scope decision to validate the additive preview together with its first command/consumer. T09.1 performs no writes, changes no schema/auth semantics, uses the existing Admin guard and has no runtime UI consumer. Infrastructure unavailability was not established in this session and is not claimed as the reason.
+- **Evidence:** focused service/ORM-repository/OpenAPI tests **49 passed, 1 warning** on unit SQLite fixtures; static/generator parity checks passed; current-head CI **26 success, 13 skipped, 0 failure**. The real-PG/auth/staging targets above were not run. CI frontend E2E is not their substitute.
+- **Owner / workstream:** admin-queue-simplification T09 executing agent; T09.2 owns real-PG command/preview and API auth proof, T09.3 owns the connected UI/browser workflow, T18 owns the full synthetic matrix.
+- **Resume condition:** before T09.2 merge, run real-PG preview plus atomic apply, stale conflict, mandatory-audit rollback, identical replay, called/active-execution blockers and Admin/non-Admin API checks. Before completing T09.3, validate its browser consumer. T18 and the full pre-deploy staging runbook remain mandatory before production deployment.
+- **Impact on headline completion:** deferred coverage receives **zero completion credit**. T09.1 remains PR_OPEN until confirmed merge; the overall T09 workflow and T18 acceptance remain incomplete. No headline completion percentage is increased by this decision.
+- Continuation: record this decision in the PR description, validate the documentation diff/body, push the journal-only checkpoint and inspect its checks. Recommend ending the #3612 PR cycle next; no merge is performed in this decision-only turn. Begin T09.2 only after confirmed merge, cleanup and main synchronization.
+- Validation of this new journal/body update: `git diff --check` **PASS**; `scripts/run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py','--body-file','.scratch/PR3612-continuation-decision.md','--author','codex')` **PASS** (19 unit checks, both samples and the actual PR body). The initial launcher invocation accidentally bound the script path to RequireModule; retrying with named PythonArgs passed. No runtime tests were repeated for this documentation-only change. Merge commit: none.
+
+## T09.1 gate and scope — 2026-10-05T22:10+05:00
+
+- Base/commit under test: fresh `origin/main`, merge commit `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92` for PR #3609. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`; branch `codex/aqs-T09.1-cabinet-preview`.
+- Execution mode: mandatory `gate` for queue mutation/audit domain. Initial invocation and one required retry with `--known-root-cause backend/app/services/queue_cabinet_management_api_service.py` both routed to `Mode: migration`, first-touch `backend/alembic/versions/0078_*.py`; both generated prompts were read. The scope is a read-only preview/DTO with no storage. Observed agent classification: `gate_misroute=true`, `override_used=true` after the retry, grounded in the approved full plan. No third run, gate-router edit, migration, or model change.
+- Pre-edit boundary: allowed paths are cabinet service/repository/endpoint, focused service/API tests, generated `backend/openapi.json` and `frontend/src/types/generated/api.ts`, and this plan plus `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: frontend runtime; models/migrations; audit writers; defaults, bulk and sync writers; unrelated files; ops, other generated output, staging and production/live data.
+- Source anchors: `queue_cabinet_management_api_service.py`; `queue_cabinet_management_api_repository.py`; `queue_cabinet_management.py`; `queue_domain_service.py::_build_cabinet_payload`; `queue_status.py`; `models/service_execution.py`; existing focused service tests.
+- Source facts: queue-day cabinet is `DailyQueue.cabinet_number`; typed resource owner is identified through `queue_resource_id`; waiting count must be distinct from called/active rows. Called/in-service/diagnostics queue entries and `ServiceExecution.status == in_progress` block reassignment. The preview returns no patient fields and performs no writes.
+- Validation: read-only source inspection; plan checkpoint `git diff --check` **PASS**. See the T09.1 local validation entry below for implementation evidence. Staging: `NOT_RUN`.
+- Stop conditions: unclear owner or queue identity; patient/clinical data needed; preview requires writes; implementation needs apply/audit/persistence; any required path outside the allowlist.
+
+## T09.1 read-only preview implementation — 2026-10-05T22:44+05:00
+
+- Base under test: merge commit `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`; branch `codex/aqs-T09.1-cabinet-preview`.
+- Changed paths: cabinet preview service/repository/endpoint; focused service tests; generated `backend/openapi.json` and `frontend/src/types/generated/api.ts`; this plan plus `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. No model, migration, default writer, existing update/bulk/sync writer, audit writer, or frontend runtime changed.
+- Behavior: preview requires a non-empty list of unique positive queue IDs and an explicit new-cabinet field; OpenAPI publishes the list/item constraints. It queries only those IDs, rejects missing and non-clinic-today queues, and reports clinic day, typed owner/default, day cabinet old/new and waiting count. Called, in-service, diagnostics, legacy status alias `in_progress`, and linked active `ServiceExecution` block apply. Queries select no patient fields and the preview writes nothing.
+- Validation command: `scripts/run_backend_pytest.ps1 tests/unit/test_queue_cabinet_management_api_service.py tests/test_openapi_contract.py -q` with import-only `DATABASE_URL=sqlite:///:memory:` — **49 passed, 1 warning**. The repository regression ran against the existing temporary SQLite unit fixture, not PostgreSQL.
+- Static/generated checks: scoped Ruff check, Ruff format check, Black check, Python compile, and `git diff --check` — **PASS**. OpenAPI was generated from `app.openapi()` with test-only SQLite configuration. Pinned `openapi-typescript 7.13.0` generated the TypeScript artifact; standalone `tsc --ignoreConfig --noEmit --strict --target ES2020 src/types/generated/api.ts` — **PASS**.
+- Limitation: `npm run generate:api-types` **FAILED** in the worktree because its WSL-side `npx` cache could not resolve `typescript` and the worktree has no `node_modules`. The allowed generated file was produced with the same pinned executable already installed in `C:\final\frontend`. Full frontend type-check/build, CI, disposable PostgreSQL, staging and production were **NOT_RUN**.
+- Result: locally `VALIDATED`; no commit or PR yet. Do not report staging/system acceptance. Next exact action: final scope review, checkpoint capture, commit/push and open PR; then await exact-head CI and human merge direction.
+- PR / merge commit: pending.
+
+## T09.1 PR #3612 opened — 2026-10-06T06:33+05:00
+
+- Code commit under review: `4457244a4a3967a0de95fbb1f7c007377415f6e9`; base `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`; branch `codex/aqs-T09.1-cabinet-preview`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`. Draft PR #3612: https://github.com/drsapaev/final/pull/3612.
+- Scope is the read-only preview/DTO/service/repository/API endpoint, focused tests, generated OpenAPI/TypeScript artifacts, and plan journals. Ten paths only. No UI, apply, audit write, model/migration, default/bulk/sync mutation, staging or production changes.
+- Focused tests rerun after the final code-only test cleanup: cabinet service + OpenAPI contract modules **49 passed, 1 warning** with import-only `DATABASE_URL=sqlite:///:memory:`. Existing repository query coverage uses its temporary unit SQLite fixture; this is not PostgreSQL evidence.
+- Ruff, Ruff format, Black, Python compile, `git diff --check`, and standalone generated TypeScript check passed on the code commit. `npm run generate:api-types` could not resolve worktree dependencies through WSL npx; the pinned installed `openapi-typescript 7.13.0` generated the artifact from `C:\final\frontend`.
+- Commit hooks: large-file/conflict/private-key/JSON/EOF/whitespace/gitleaks/Ruff/Ruff-format/Black and repository hygiene hooks passed. The frontend ESLint wrapper is misconfigured: it changes to `frontend/` but passes the staged path with its `frontend/` prefix, so ESLint cannot find the file. Its comment claims this prefix is stripped, but the command does not do so. Direct ESLint invocation finds the generated API types are intentionally ignored by `frontend/eslint.config.js`; standalone TypeScript validation passed. Only this wrapper was skipped on commit; no code lint failure is claimed.
+- Exact-head review and hosted CI are pending. Full frontend type-check/build, PostgreSQL, staging, and production remain **NOT_RUN**. No human GitHub review or merge was submitted.
+- Next exact action: run `aif-review` against PR #3612, inspect checks on the exact current head, fix any in-scope findings, then refresh this evidence. Do not begin T09.2 before this PR cycle closes and main is synchronized.
+- Merge commit: none.
+
+## T09.1 contract review fixes and exact-head check — 2026-10-06T06:51+05:00
+
+- Latest code commit under review: `688023b80aa317db0fa2f08f8c0d16b26b4b330d`; base `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`; branch `codex/aqs-T09.1-cabinet-preview`; draft PR #3612: https://github.com/drsapaev/final/pull/3612.
+- Source review identified two P2 contract omissions: duplicate `queue_ids` were rejected at runtime but `uniqueItems` was absent from OpenAPI; actual 401/403/404/409 responses were not listed in OpenAPI. Commit `688023b8` adds `uniqueItems`, a typed `{detail: string}` error schema for those statuses, regenerated OpenAPI/TypeScript, and regression assertions. No other P0/P1/P2 remained after this fix.
+- Targeted validation on the corrected source: cabinet service + OpenAPI contract modules **49 passed, 1 warning** with import-only `DATABASE_URL=sqlite:///:memory:`. Existing repository query coverage is a temporary unit SQLite fixture, not PostgreSQL evidence. Ruff check/format, Black, Python compile, standalone generated TypeScript check and `git diff --check` passed.
+- Generation: `backend/openapi.json` regenerated via the repository generator with test-only SQLite import settings. WSL Node 18 through `npm run generate:api-types` failed with `RangeError: Invalid string length`; pinned `openapi-typescript 7.13.0` through Windows Node 24 regenerated `frontend/src/types/generated/api.ts`.
+- Commit hooks on `688023b8`: JSON, whitespace, conflict, secret, Gitleaks, Ruff, Ruff-format and Black passed. ESLint was skipped because its wrapper changes into `frontend/` but passes the original `frontend/...` staged path; generated API types are intentionally ignored by ESLint. The EOF fixer was skipped for canonical OpenAPI output, whose generator writes no trailing newline. These skips do not claim the respective hooks passed; standalone TS and OpenAPI contract checks passed.
+- Exact code-head GitHub/Code Review check inventory for `688023b80aa317db0fa2f08f8c0d16b26b4b330d`: **18 success, 4 skipped, 0 failed, 0 pending**. Skipped: two failure-notification jobs, `classify-and-route`, and `Supabase Preview`; skips are not passes. `PR Review Quality Gate` passed. The repository PR-body validator passed after the body was completed; its first draft failure was corrected.
+- Full frontend build/type-check, runtime Admin auth integration, PostgreSQL, staging/browser and production remain **NOT_RUN**. No staging deferral acceptance, GitHub APPROVE review, or merge is claimed. PR #3612 remains open as draft.
+- This entry is superseded for the next action by the generator-parity correction record below; its exact code-head findings remain valid.
+- Merge commit: none.
+
+## T09.1 generator parity CI correction — 2026-10-06T07:06:39+05:00
+
+- Commit under test: PR #3612 docs checkpoint HEAD `adcbe1caf37cf1f9a5235e589c7fe584aabf8851`; code under review remains `688023b80aa317db0fa2f08f8c0d16b26b4b330d`; base `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`.
+- Execution mode: scoped correction within the approved T09.1 generated-contract allowlist. Allowed paths: `frontend/src/types/generated/api.ts` and plan checkpoints. No runtime/API schema change.
+- Original failure: exact-head GitHub job `Frontend lint` failed at `npm run generate:api-types:check`; lint and `tsc --noEmit` had passed. CI's canonical `frontend/scripts/generate-api-types.sh` prepends three header lines that were missing because the artifact had been emitted by invoking `openapi-typescript` directly.
+- Correction/validation: ran the repository generator with Git Bash, Node `v24.15.0`, and pinned `openapi-typescript 7.13.0`; staged artifact adds exactly those three canonical comments. `npm run generate:api-types:check` then passed locally. `git diff --cached --check` passed.
+- Actual changed paths for the correction: `frontend/src/types/generated/api.ts` (three generated comment lines); this evidence, progress, resume, and plan checkpoint. No other generated or runtime files changed.
+- Result: local generator parity **PASS**. The former exact-head `adcbe1ca` `Frontend lint` result was **FAIL** and is superseded by the passing `390e14b4` run below. At correction time, backend tests and frontend E2E were still pending on `adcbe1ca`; they are not counted as evidence for the corrective head.
+- Scope check: only the generated artifact and plan/evidence files; no staging, PostgreSQL, production, model, migration, runtime, or frontend UI changes.
+- Remaining limitation at this checkpoint: push the correction and inspect all applicable CI on its exact new head. PostgreSQL/staging/browser remain **NOT_RUN**. See the final exact-head validation below.
+- PR: https://github.com/drsapaev/final/pull/3612 (open draft).
+- Merge commit: none.
+
+## T09.1 final review and exact-head validation — 2026-10-06T07:42:29+05:00
+
+- Commit under review: exact PR HEAD `390e14b40d6eafb462e05d07f777c1e063a36c14`; branch `codex/aqs-T09.1-cabinet-preview`; base and merge-base `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`. PR #3612 is open as draft and mergeable.
+- Source review: the two P2 OpenAPI contract omissions were fixed in `688023b8`; canonical generated API parity was fixed in `390e14b4`. No remaining P0/P1/P2 found. No formal GitHub review submission, merge, or staging deferral acceptance is claimed; GitHub review submissions and inline threads were empty at inspection.
+- Original failures and handling: `Frontend lint` initially failed only at generated API parity because the file lacked the repository script's header; exact repo generation restored it and the corrective head passed. The first frontend E2E run had 60 passing tests and one unrelated `lab-dirty-guard.spec.ts` timeout while Vite logged WebSocket `ECONNREFUSED`; rerunning the failed E2E job on the same exact head passed.
+- Local validation: cabinet service + OpenAPI modules **49 passed, 1 warning**; Ruff/check/format, Black, Python compile, `git diff --check`, standalone TypeScript, repository `npm run generate:api-types:check`, and local PR body validator **PASS**.
+- Exact-head GitHub check rollup from `gh pr checks 3612`: **29 passed, 13 skipped, 0 failed**. Backend tests, frontend lint/type-check/API parity, unit tests, build, E2E rerun, OpenAPI freshness, CodeQL/security, regression, role, lifecycle and review-quality gates passed. The latest PR Review Quality Gate passed after the body was corrected to match the required field labels.
+- Skipped: Docker build; k6; production and staging readiness; integration tests; DAST; one security-scan job; Telegram release; metadata; two failure notifications; Supabase Preview; classify-and-route. Skips are not passes.
+- PR body: updated to reflect exact HEAD `390e14b4`, the generator-parity correction, E2E retry and check inventory. `gh pr view 3612 --json body --jq .body | py -3.11 scripts/check_pr_review_template.py` passed; hosted PR Review Quality Gate passed. An intermediate body edit had omitted literal required labels; it was corrected before the latest green gate.
+- Scope check: code correction changes only three canonical generated comments in `frontend/src/types/generated/api.ts`; no runtime/API schema change. Journal changes are limited to the approved plan/evidence files. Main checkout and unrelated `.gate_artifacts/` remain untouched.
+- Remaining limitations: PostgreSQL-specific validation, runtime Admin auth integration, synthetic staging/browser acceptance, production checks and deployment remain **NOT_RUN**. CI E2E is not the full T18 staging acceptance matrix.
+- Next exact action: commit/push this final journal checkpoint, confirm checks on the resulting docs-only HEAD, then await the user's review/merge direction. Do not merge or begin T09.2 before that direction and a completed PR cycle.
+- Merge commit: none.
+
+## T08.3.3 PR #3609 merged — 2026-10-05T22:10+05:00
+
+- Exact reviewed PR HEAD: `4e6c15402eb14a69a0daf9ae6d3503d5759b2c67`; merge commit: `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`.
+- GitHub checks at exact reviewed HEAD: 17 success, 18 skipped, 0 failures. Skipped jobs are not counted as passes.
+- Local `main` fast-forwarded to the merge commit. Managed T08.3.3 worktree was archived with the PR attachment. Unrelated `.gate_artifacts/` in `C:\final` was preserved.
+- Result: `MERGED`; no T09 runtime validation is implied by this record.
+
 ## T08.3.2-P2 post-merge clock correction — PR #3607 merged (2026-10-05T20:09+05:00)
 
 - Commit under test: PR #3607 exact HEAD `37eb0d4b5d8628bdd8598990ad93a0f4093a7c96`; base `c1781c46a1b03c3404604542bcc9c4c9951f4c89`. Merge commit: `589520ae132313ca9488f3994be8d28f6041975a`, confirmed by GitHub at `2026-10-05T15:09:16Z`.

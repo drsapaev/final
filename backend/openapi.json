@@ -9716,6 +9716,93 @@
         }
       }
     },
+    "/api/v1/admin/queues/cabinet-info/preview": {
+      "post": {
+        "tags": [
+          "queue-cabinet-management"
+        ],
+        "summary": "Preview Cabinet Reassignment",
+        "description": "Preview an explicit same-day cabinet reassignment without writing state.",
+        "operationId": "preview_cabinet_reassignment_api_v1_admin_queues_cabinet_info_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CabinetReassignmentPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetReassignmentPreviewResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetReassignmentPreviewError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller must have the Admin role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetReassignmentPreviewError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "One or more requested queues were not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetReassignmentPreviewError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A target is not for clinic-local today or its owner is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetReassignmentPreviewError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/queues/cabinet-info/bulk": {
       "put": {
         "tags": [
@@ -73956,6 +74043,175 @@
         },
         "type": "object",
         "title": "CabinetInfo"
+      },
+      "CabinetReassignmentPreviewError": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "CabinetReassignmentPreviewError"
+      },
+      "CabinetReassignmentPreviewItem": {
+        "properties": {
+          "queue_id": {
+            "type": "integer",
+            "title": "Queue Id"
+          },
+          "queue_day": {
+            "type": "string",
+            "format": "date",
+            "title": "Queue Day"
+          },
+          "owner_type": {
+            "type": "string",
+            "enum": [
+              "doctor",
+              "resource"
+            ],
+            "title": "Owner Type"
+          },
+          "owner_id": {
+            "type": "integer",
+            "title": "Owner Id"
+          },
+          "owner_name": {
+            "type": "string",
+            "title": "Owner Name"
+          },
+          "owner_default_cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Default Cabinet"
+          },
+          "old_cabinet_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Cabinet Number"
+          },
+          "new_cabinet_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Cabinet Number"
+          },
+          "waiting_count": {
+            "type": "integer",
+            "title": "Waiting Count"
+          },
+          "blocking_reasons": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "patient_called",
+                "clinical_work_in_progress",
+                "active_service_execution"
+              ]
+            },
+            "type": "array",
+            "title": "Blocking Reasons"
+          },
+          "can_apply": {
+            "type": "boolean",
+            "title": "Can Apply"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queue_id",
+          "queue_day",
+          "owner_type",
+          "owner_id",
+          "owner_name",
+          "owner_default_cabinet",
+          "old_cabinet_number",
+          "new_cabinet_number",
+          "waiting_count",
+          "blocking_reasons",
+          "can_apply"
+        ],
+        "title": "CabinetReassignmentPreviewItem"
+      },
+      "CabinetReassignmentPreviewRequest": {
+        "properties": {
+          "queue_ids": {
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0.0
+            },
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "title": "Queue Ids"
+          },
+          "new_cabinet_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Cabinet Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queue_ids",
+          "new_cabinet_number"
+        ],
+        "title": "CabinetReassignmentPreviewRequest"
+      },
+      "CabinetReassignmentPreviewResponse": {
+        "properties": {
+          "clinic_day": {
+            "type": "string",
+            "format": "date",
+            "title": "Clinic Day"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CabinetReassignmentPreviewItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "can_apply": {
+            "type": "boolean",
+            "title": "Can Apply"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clinic_day",
+          "items",
+          "can_apply"
+        ],
+        "title": "CabinetReassignmentPreviewResponse"
       },
       "CallNextPatientResponse": {
         "properties": {

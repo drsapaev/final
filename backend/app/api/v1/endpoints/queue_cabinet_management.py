@@ -4,10 +4,10 @@ API endpoints для управления информацией о кабине
 
 import logging
 from datetime import date, datetime
-from typing import Any, Literal, NoReturn
+from typing import Annotated, Any, Literal, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -92,6 +92,65 @@ class BulkCabinetUpdateRequest(BaseModel):
     updates: list[QueueCabinetUpdateRequest]
 
 
+class CabinetReassignmentPreviewRequest(BaseModel):
+    queue_ids: list[Annotated[int, Field(gt=0, strict=True)]] = Field(
+        min_length=1,
+        json_schema_extra={"uniqueItems": True},
+    )
+    new_cabinet_number: str | None = Field(max_length=20)
+
+    @field_validator("queue_ids")
+    @classmethod
+    def validate_queue_ids(cls, value: list[int]) -> list[int]:
+        if (
+            not value
+            or any(queue_id <= 0 for queue_id in value)
+            or len(set(value)) != len(value)
+        ):
+            raise ValueError("queue_ids must contain unique positive IDs")
+        return value
+
+    @field_validator("new_cabinet_number")
+    @classmethod
+    def validate_new_cabinet_number(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("new_cabinet_number cannot be blank")
+        return normalized
+
+
+class CabinetReassignmentPreviewError(BaseModel):
+    detail: str
+
+
+class CabinetReassignmentPreviewItem(BaseModel):
+    queue_id: int
+    queue_day: date
+    owner_type: Literal["doctor", "resource"]
+    owner_id: int
+    owner_name: str
+    owner_default_cabinet: str | None
+    old_cabinet_number: str | None
+    new_cabinet_number: str | None
+    waiting_count: int
+    blocking_reasons: list[
+        Literal[
+            "patient_called",
+            "clinical_work_in_progress",
+            "active_service_execution",
+        ]
+    ]
+    can_apply: bool
+
+
+class CabinetReassignmentPreviewResponse(BaseModel):
+    clinic_day: date
+    items: list[CabinetReassignmentPreviewItem]
+    can_apply: bool
+
+
 # ===================== ПОЛУЧЕНИЕ ИНФОРМАЦИИ О КАБИНЕТАХ =====================
 
 
@@ -146,6 +205,48 @@ def get_queue_cabinet_info(
 
 
 # ===================== ОБНОВЛЕНИЕ ИНФОРМАЦИИ О КАБИНЕТАХ =====================
+
+
+@router.post(
+    "/queues/cabinet-info/preview",
+    response_model=CabinetReassignmentPreviewResponse,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": CabinetReassignmentPreviewError,
+            "description": "Authentication is required.",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": CabinetReassignmentPreviewError,
+            "description": "The caller must have the Admin role.",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": CabinetReassignmentPreviewError,
+            "description": "One or more requested queues were not found.",
+        },
+        status.HTTP_409_CONFLICT: {
+            "model": CabinetReassignmentPreviewError,
+            "description": "A target is not for clinic-local today or its owner is unavailable.",
+        },
+    },
+)
+def preview_cabinet_reassignment(
+    request: CabinetReassignmentPreviewRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Preview an explicit same-day cabinet reassignment without writing state."""
+    try:
+        payload = QueueCabinetManagementApiService(db).preview_cabinet_reassignment(
+            queue_ids=request.queue_ids,
+            new_cabinet_number=request.new_cabinet_number,
+        )
+        return CabinetReassignmentPreviewResponse(**payload)
+    except QueueCabinetManagementDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _raise_queue_cabinet_internal_error("preview_cabinet_reassignment", exc)
 
 
 @router.put("/queues/{queue_id}/cabinet-info", response_model=dict[str, Any])
