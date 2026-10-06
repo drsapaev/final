@@ -1,24 +1,24 @@
-## Current authoritative checkpoint — T09.2 ready for PR (2026-10-06T12:59+05:00)
+## Current authoritative checkpoint — T09.2 PR #3614 opened (2026-10-06T13:04+05:00)
 
 Plan version: 3.28
-Current task/status: T09.2 / VALIDATED. Implementation and focused local validation are complete; PR preparation is next.
+Current task/status: T09.2 / PR_OPEN — [PR #3614](https://github.com/drsapaev/final/pull/3614). Code commit: `3260efcae2cae69aa47b89d09e9a52885bd8586f`.
 Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`
 Branch: `codex/aqs-T09.2-cabinet-apply`
 Base commit: `1d146d857e1570ff2259975f081f80dc0b31ae82` (merged PR #3613; synchronized with `origin/main`)
-Current commit under test: `1d146d857e1570ff2259975f081f80dc0b31ae82` plus uncommitted T09.2 changes.
-Last updated: 2026-10-06T12:59+05:00
+Current PR code commit: `3260efcae2cae69aa47b89d09e9a52885bd8586f`; this PR-open checkpoint is the next commit and will update the PR HEAD.
+Last updated: 2026-10-06T13:04+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | [PR #3612](https://github.com/drsapaev/final/pull/3612) | `89b4888a013978182e45f34ac2e07a9679c497c9` | `EVIDENCE.md#t091-pr-3612-merged` |
-| T09.2 | VALIDATED | `codex/aqs-T09.2-cabinet-apply` | | `EVIDENCE.md#t092-resumed-after-pr-3613` |
+| T09.2 | PR_OPEN | [PR #3614](https://github.com/drsapaev/final/pull/3614) | | `EVIDENCE.md#t092-pr-3614-opened` |
 
 ## Current checkpoint
 - Completed: PR #3613 merged and `origin/main` synchronized; its key-log redaction resolves the previous T09.2 scope hold. T09.2 implements explicit Admin apply, deterministic queue/entry locks, stale and active-state guards, strict same-transaction audit and replay. Post-sync focused checks: 97 passed, 9 skipped, 2 xfailed; disposable PostgreSQL integration: 8 passed, 0 skipped. OpenAPI and pinned TypeScript generation completed; Python static checks and `git diff --check` passed. Owned Redis/PostgreSQL were removed and WSL distro stopped after its npm installer became unresponsive.
-- Changed but not verified: T09.2 has not been committed or published; exact-head hosted checks and independent review are NOT_RUN. Browser/staging/full system-health remain NOT_RUN. Standard `npm run generate:api-types:check` could not run in the WSL-backed shell because its npx cache lacks TypeScript; the pinned direct generator command passed. The PR body passed the local review-quality gate (19 unit checks, both samples, and this body).
-- Remaining: final scope/diff review and last `git diff --check`; commit, push and open the T09.2 PR; inspect checks on its exact HEAD.
-- Blocker: none within T09.2 scope. The old global key-log hold is resolved by merged PR #3613. No staging or production validation is claimed.
-- Next exact action: review all tracked changes and the required PR template, then commit and open one T09.2 PR. Do not merge before independent review and applicable PR checks.
+- Changed but not verified: PR #3614 is open and code commit `3260efcae2cae69aa47b89d09e9a52885bd8586f` is pushed. Initial hosted checks are in progress; no formal review has been submitted. Browser/staging/full system-health remain NOT_RUN. Standard npm generator wrapper could not run in the WSL-backed shell because its npx cache lacks TypeScript; pinned direct generation passed. The PR body passed the local review-quality gate (19 unit checks, both samples, and this body).
+- Remaining: push this PR-state checkpoint, inspect all checks on the resulting exact HEAD, and obtain independent review. Tier 2 staging/browser validation is NOT RUN and reviewer deferral acknowledgement remains pending; no deferral has been accepted.
+- Blocker: merge remains on hold until applicable exact-head CI and independent review pass; Tier 2 is NOT RUN and needs an explicit reviewer decision if a deferral is requested. The old global key-log hold is resolved by merged PR #3613. No staging or production validation is claimed.
+- Next exact action: push the PR-open journal update, then check the exact new PR HEAD and wait for CI/review. Do not merge from this checkpoint.
 - Checks to rerun after any runtime/generated change: focused cabinet unit/API/OpenAPI and service-boundary tests; disposable PostgreSQL apply integration; Ruff, Black, format, compile, OpenAPI generation, pinned TypeScript generation and `git diff --check`.
 
 ## Prior checkpoint — T09.1 continuation decision (superseded)

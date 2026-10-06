@@ -60,6 +60,15 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 
 - PR body quality check: `scripts/run_pr_review_gate_checks.py --body-file .scratch/PR-T09.2.md --author codex` — **PASS**, 19 unit tests, both sample bodies, candidate T09.2 body. Tier 2 remains NOT RUN and reviewer deferral acknowledgement is intentionally unchecked; no deferral has been accepted.
 
+## T09.2 PR #3614 opened — 2026-10-06T13:04+05:00
+
+- PR: https://github.com/drsapaev/final/pull/3614, title `fix(queue): apply same-day cabinet reassignment`, base `main` at `1d146d857e1570ff2259975f081f80dc0b31ae82`, branch `codex/aqs-T09.2-cabinet-apply`.
+- Pushed code commit / initial exact PR HEAD: `3260efcae2cae69aa47b89d09e9a52885bd8586f`. It contains the allowed T09.2 runtime, tests, generated contracts and current plan/evidence checkpoint. No formal review or merge is recorded.
+- Initial GitHub state: OPEN, not draft, mergeable, no review decision. Locale Key Parity passed. Python formatting, CodeQL (actions/JS/TS/Python), PR Lifecycle Recommendation, PR Review Quality Gate, Regression Audit Gate, Role System Integrity, CI Scope, Gitleaks, security scan and GitGuardian were in progress. classify-and-route, nightly DAST and Supabase Preview were skipped; skips are not passes. This snapshot predates the PR-open journal checkpoint commit and must not be treated as exact status for a later head.
+- PR body gate passed locally: `scripts/run_pr_review_gate_checks.py --body-file .scratch/PR-T09.2.md --author codex` — 19 unit tests, both documented samples, candidate body.
+- Tier 2 backend-dependent staging/browser checks are NOT_RUN. The body leaves reviewer deferral acknowledgement unchecked. No deferral has been accepted; do not merge on a deferral without a separate explicit reviewer decision.
+- Current exact action: push the PR-open evidence checkpoint and query all checks again for the resulting exact HEAD. Then wait for applicable CI and independent review. Merge commit: none.
+
 ## T09.1 PR #3612 continuation decision — 2026-10-06T09:26+05:00
 
 - Reviewed PR HEAD: `a8f7980b1d160726e169050a8bc8f8043294a36b`; code HEAD remains `390e14b40d6eafb462e05d07f777c1e063a36c14`. GitHub reports OPEN, draft, MERGEABLE. Current checks: **26 success, 13 skipped, 0 failure, 0 pending**. Earlier 29-check observations are historical snapshots and are not the current count.
