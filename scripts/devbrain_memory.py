@@ -315,7 +315,7 @@ def main():
                     task=str(uuid.uuid4()); created=True
                     append_event(base,new_event(root,task,1,cp,[],begin_idem,digest=begin_digest))
                     current={"revision":1,"checkpoint":cp}
-            out={"result":"OK" if created else "NOOP","task_id":task,"revision":current["revision"],"checkpoint":current["checkpoint"],"recall":recall(root,base,{"query":query,"topics":topics})}
+            out={"result":"OK" if created else "NOOP","task_id":task,"revision":current["revision"],"checkpoint":current["checkpoint"],"recall":recall(root,base,{"query":query,"topics":topics},include_active_tasks=False)}
         elif args.action=="capture": out=capture(root,base,x)
         elif args.action=="recall": out=recall(root,base,{"task_id":args.task_id,"query":args.query,"topics":args.topics})
         else: out=export(root,base)
@@ -360,9 +360,9 @@ def capture(root,base,x):
                 if previous[0].get("key")!=item.get("key"): raise MemError("supersedes key mismatch")
         cp=checkpoint_data(x.get("checkpoint",{}),current.get("checkpoint") if current else None)
         ev=new_event(root,task,rev+1,cp,clean,idem,current.get("event_id") if current else None,digest); append_event(base,ev); return {"result":"OK","revision":rev+1,"event_id":ev["event_id"]}
-def recall(root,base,q):
+def recall(root,base,q,include_active_tasks=True):
     rows,errs=records(base); curated,curated_err=curated_records(root); errs.extend(curated_err); task=q.get("task_id"); terms=norm(str(q.get("query",""))+" "+str(q.get("topics","")))
-    if task: ident(task,"task_id")
+    if task is not None: ident(task,"task_id")
     invalid=bool(task and not task_chain(rows,task)[1])
     selected=[e for e in rows if not task or e.get("task_id")==task]
     candidates=[]; latest_by_key={}
@@ -391,16 +391,18 @@ def recall(root,base,q):
         candidates=[k for k in candidates if ranking({**k,"summary":k.get("_rank_words","")},terms)>0]
     for k in candidates: k.pop("_rank_words",None)
     candidates.sort(key=lambda k:(ranking(k,terms),k.get("id","")),reverse=True)
-    active_candidates=[]
-    for t in dict.fromkeys(e.get("task_id") for e in reversed(rows) if isinstance(e.get("task_id"),str)):
-        e=latest_task(rows,t)
-        if e and e.get("checkpoint",{}).get("status")=="in_progress":
-            cp=e["checkpoint"]; text=" ".join((cp.get("goal",""),cp.get("next_step","")))
-            score=len(norm(text)&terms)
-            if terms and score==0: continue
-            active_candidates.append((score,e.get("created_at",""),{"task_id":t,"goal":cp.get("goal","")[:120]}))
-    active_candidates.sort(key=lambda item:(item[0],item[1]),reverse=True)
-    active=[item[2] for item in active_candidates[:2]]
+    active=[]
+    if not task and include_active_tasks:
+        active_candidates=[]
+        for t in dict.fromkeys(e.get("task_id") for e in reversed(rows) if isinstance(e.get("task_id"),str)):
+            e=latest_task(rows,t)
+            if e and e.get("checkpoint",{}).get("status")=="in_progress":
+                cp=e["checkpoint"]; text=" ".join((cp.get("goal",""),cp.get("next_step","")))
+                score=len(norm(text)&terms)
+                if terms and score==0: continue
+                active_candidates.append((score,e.get("created_at",""),{"task_id":t,"goal":cp.get("goal","")[:120]}))
+        active_candidates.sort(key=lambda item:(item[0],item[1]),reverse=True)
+        active=[item[2] for item in active_candidates[:2]]
     e=latest_task(rows,task) if task else None
     result={"status":"DEGRADED" if errs or invalid else "OK","errors":errs[:10],"task_error":"revision_chain_invalid" if invalid else None,"knowledge":candidates[:5],"active_tasks":active,"conflicts":conflicts,"task_id":task,"checkpoint":e.get("checkpoint") if e else None,"revision":e.get("revision",0) if e else 0}
     if len(candidates)>5: result["omitted_count"]=len(candidates)-5

@@ -324,6 +324,45 @@ def test_retry_on_other_worker_replays_response_executes_once(two_workers):
     assert counters["w2"]["calls"] == 0
 
 
+def test_idempotency_replay_logs_only_key_fingerprint(two_workers, caplog):
+    """Caller-owned key material is never copied into replay log messages."""
+    import logging as _logging
+
+    client1, client2, _counters, _redis = two_workers
+    raw_key = "CANARY-private-idempotency-key-7e104"
+    headers = {**auth_headers("1"), "Idempotency-Key": raw_key}
+
+    with caplog.at_level(_logging.INFO, logger=idem_module.logger.name):
+        first = client1.post("/echo", headers=headers)
+        replay = client2.post("/echo", headers=headers)
+
+    assert first.status_code == 200
+    assert replay.status_code == 200
+    fingerprint = idem_module._idempotency_key_log_fingerprint(raw_key)
+    assert raw_key not in caplog.text
+    assert f"key_fingerprint={fingerprint}" in caplog.text
+
+
+def test_idempotency_inflight_conflict_logs_only_key_fingerprint(two_workers, caplog):
+    """Conflict diagnostics correlate retries without logging the raw key."""
+    import logging as _logging
+
+    _client1, client2, _counters, fake_redis = two_workers
+    raw_key = "CANARY-inflight-idempotency-key-a183c"
+    fake_redis.store[nkey("1", raw_key, "claim")] = uuid.uuid4().hex
+
+    with caplog.at_level(_logging.WARNING, logger=idem_module.logger.name):
+        response = client2.post(
+            "/echo",
+            headers={**auth_headers("1"), "Idempotency-Key": raw_key},
+        )
+
+    assert response.status_code == 409
+    fingerprint = idem_module._idempotency_key_log_fingerprint(raw_key)
+    assert raw_key not in caplog.text
+    assert f"key_fingerprint={fingerprint}" in caplog.text
+
+
 def test_in_flight_overlap_returns_409_not_second_execution(two_workers):
     """Overlapping retry while worker 1 is still in flight → 409 Conflict,
     handler never re-executes (previously: duplicate cart)."""
