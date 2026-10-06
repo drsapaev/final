@@ -2039,3 +2039,18 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Next exact action: commit and push this runtime compatibility correction and its canonical journal checkpoint on the existing PR branch; rerun exact-head checks, then update the PR evidence/body with that result.
 - PR: https://github.com/drsapaev/final/pull/3614
 - Merge commit: none.
+
+## PR #3614 exact-head checks and PR-body refresh — 2026-10-06T16:26+05:00
+
+- Commit under test: `3cd2bf1103cd5759c49d9ca73ad8fed4ac686a1f`, PR #3614, base `1d146d857e1570ff2259975f081f80dc0b31ae82`.
+- Environment: GitHub Actions; local Windows managed worktree. No staging, live application or production data.
+- Execution mode: verification and evidence checkpoint within the existing T09.2 scope. No runtime/test change at this checkpoint.
+- Result: exact-head checks completed **30 success, 13 skipped, 0 failure, 0 pending**. Backend tests, Frontend E2E/build/unit/lint, Code Quality, documentation generation, Frontend–Backend Parity, Context Boundary Integrity, PR Required Gate, PR Review Quality Gate, lifecycle recommendation, security/secret scans, locale, role-system, regression audit, and source analysis passed. The exact E2E failure on attempt 1 was rerun as failed job attempt 2 and passed. Attempt 1 timed out waiting for the second patient button in an unrelated mocked lab dirty-guard spec while the Vite websocket proxy returned `ECONNREFUSED`.
+- Skipped jobs are not passes: 13 path-aware/unrelated jobs include staging and production readiness, integration tests, Docker, k6 load, metadata, Telegram release, nightly DAST, classify-and-route, Supabase Preview and failure notifications. Staging/browser/full-system-health remain NOT_RUN.
+- PR body: response to the P1/P2 and compatibility regression was added and published to the existing PR. `scripts/run_pr_review_gate_checks.py --body-file .scratch/PR-T09.2-review-followup.md --author codex` passed 19 unit tests, both documented sample bodies, and the candidate; current GitHub body also has successful PR Review Quality Gate and lifecycle checks.
+- Local code evidence carried forward: display and cabinet focused modules passed **27 tests, 1 existing provider warning**; Ruff check/format, `py_compile`, `git diff --check`, and commit hooks passed. The original hosted backend fail on `6803195e` is resolved by the guarded optional cabinet read in `3cd2bf11`.
+- Scope check: no changes to ownership, defaults, nurse-station assignments, lifecycle, schema/migrations, other writers, frontend, ops, staging or production. The PR branch remains open; no review approval, merge, or deferral was submitted or accepted.
+- Remaining limitation: staging/browser/full-system validation is NOT_RUN; no Tier-2 deferral accepted. Merge remains HOLD pending independent review and a separate staging/deferral decision.
+- Next exact action: push this documentation checkpoint and inspect the resulting docs-only exact-head checks; then await independent review and the staging/deferral decision.
+- PR: https://github.com/drsapaev/final/pull/3614
+- Merge commit: none.
