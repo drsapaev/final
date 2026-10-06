@@ -106,3 +106,9 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - The guard is centralized in the shared queue creation policy and reused by active runtime constructors. Legacy-policy queue creation stays compatible. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off.
 - Source audit found no ordinary runtime write of `policy_version`/`online_issued_count`. The existing Admin retention command deletes only past-date queues beyond a cutoff of at least one day; T07 rejects past-date admission, so it cannot reopen today's/future v1 quota identity. Backup restore is a recovery path that preserves source policy/count, not an admission command. Any future reset/delete command that can target an eligible used v1 queue must be guarded.
 - PostgreSQL race behavior is not claimed by the SQLite tests; T08.3 remains the required PG concurrency/replay/partial-result proof before v1 rollout.
+
+## PR #3614 review fixes — technical interpretation, 2026-10-06
+
+- Under the existing D2 same-day assignment rule, `DailyQueue.cabinet_number` is the saved service location for that day's queue. An explicitly assigned non-empty value therefore takes precedence over `Doctor.cabinet` when announcing a called patient; the doctor default remains unchanged. Existing fallback applies when the daily snapshot is absent. This does not change nurse station assignments or other writers.
+- `expected_cabinet_number` is an optimistic-concurrency snapshot copied from preview, so preserve its exact value including whitespace. Normalize only the proposed `new_cabinet_number`.
+- Source: user request to fix the two confirmed PR #3614 review findings, supported by T09/D2 and current queue/display contracts. This decision is limited to the doctor display call and the T09.2 request validation.
