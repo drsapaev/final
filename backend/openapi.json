@@ -2805,6 +2805,11 @@
         "summary": "Список врачей (временный)",
         "description": "Delegate temporary doctor listing to the service layer.",
         "operationId": "list_doctors_temp_api_v1_services_admin_doctors_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "limit",
@@ -2870,6 +2875,11 @@
         "summary": "История изменений услуги",
         "description": "Получить историю изменений услуги.\n\nВозвращает все изменения услуги с информацией о том, кто и когда их сделал.",
         "operationId": "get_service_history_api_v1_services__service_id__history_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "service_id",
@@ -2940,6 +2950,11 @@
         "summary": "Последние изменения услуг",
         "description": "Получить последние изменения всех услуг.\n\nПолезно для мониторинга активности и аудита.",
         "operationId": "get_recent_service_changes_api_v1_services_admin_audit_recent_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "limit",
