@@ -1,5 +1,5 @@
-"""Split from services.py.
-"""
+"""Split from services.py."""
+
 from __future__ import annotations
 
 from app.api.v1.endpoints.services_ep._helpers import *  # noqa: F401, F403
@@ -46,6 +46,7 @@ async def list_services(
 
 class QueueGroupInfo(BaseModel):
     """Schema for a single queue group"""
+
     display_name: str
     display_name_uz: str | None = None
     service_codes: list[str] = []
@@ -57,6 +58,7 @@ class QueueGroupInfo(BaseModel):
 
 class QueueGroupsResponse(BaseModel):
     """Response schema for queue-groups endpoint"""
+
     groups: dict[str, QueueGroupInfo] = {}
     code_to_group: dict[str, str] = {}
     tab_to_group: dict[str, str] = {}
@@ -84,10 +86,7 @@ async def get_queue_groups(
         - tab_to_group: Маппинг tab_key -> group_key (cardio -> cardiology)
     """
     payload = QueueDomainService(db).get_queue_groups_payload()
-    groups = {
-        key: QueueGroupInfo(**value)
-        for key, value in payload["groups"].items()
-    }
+    groups = {key: QueueGroupInfo(**value) for key, value in payload["groups"].items()}
     return QueueGroupsResponse(
         groups=groups,
         code_to_group=payload["code_to_group"],
@@ -96,6 +95,7 @@ async def get_queue_groups(
 
 
 # ==================== SERVICE CODE MAPPINGS (SSOT) - MUST BE BEFORE /{service_id} ====================
+
 
 class ServiceCodeRepairItem(BaseModel):
     id: int
@@ -175,7 +175,9 @@ async def repair_service_code_drift(
             if service.service_code
             else None
         )
-        changed = current_code != canonical_code or current_service_code != canonical_code
+        changed = (
+            current_code != canonical_code or current_service_code != canonical_code
+        )
 
         if changed:
             affected_services.append(
@@ -315,12 +317,13 @@ class DoctorOut(BaseModel):
 )
 async def list_doctors_temp(
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
     limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
     offset: int = Query(default=0, ge=0, description="Смещение"),
 ):
     """Delegate temporary doctor listing to the service layer."""
     # P1 FIX: cap results to prevent unbounded response
-    return ServicesApiService(db).list_doctors_temp()[offset:offset + limit]
+    return ServicesApiService(db).list_doctors_temp()[offset : offset + limit]
 
 
 # ==================== ИСТОРИЯ ИЗМЕНЕНИЙ УСЛУГ (AUDIT LOG) ====================
@@ -354,6 +357,7 @@ class ServiceAuditLogOut(BaseModel):
 async def get_service_history(
     service_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ):
@@ -402,6 +406,7 @@ async def get_service_history(
 )
 async def get_recent_service_changes(
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ):
@@ -462,7 +467,9 @@ async def resolve_service_endpoint(
     service_id: int | None = Query(None, description="ID услуги"),
     code: str | None = Query(None, description="Код услуги"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")),
+    current_user: User = Depends(
+        require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")
+    ),
 ):
     """
     Универсальный endpoint для разрешения услуги.
@@ -590,12 +597,12 @@ async def get_service_code_mappings(
 async def get_service(
     service_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")),
+    current_user: User = Depends(
+        require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")
+    ),
 ):
     """Delegate service lookup to the service layer."""
     service = ServicesApiService(db).get_service(service_id=service_id)
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
     return _row_to_out(service)
-
-
