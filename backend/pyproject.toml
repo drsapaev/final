@@ -75,7 +75,7 @@ dependencies = [
   # Validation & settings
   "pydantic>=2.7,<2.14",
   "pydantic[email]>=2.7,<2.14",
-  "pydantic-settings>=2.14.1,<2.15",
+  "pydantic-settings>=2.14.1,<2.16",
   "email-validator>=2.0,<3.0",
 
   # Database
