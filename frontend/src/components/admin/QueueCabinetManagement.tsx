@@ -175,6 +175,7 @@ const QueueCabinetManagement = () => {
   const [applyOutcomeUnknown, setApplyOutcomeUnknown] = useState(false);
   const [reassignmentError, setReassignmentError] = useState<string | null>(null);
   const applyKeyRef = useRef<string | null>(null);
+  const previewGenerationRef = useRef(0);
   const loadRequestSequence = useRef(0);
 
   const loadData = useCallback(async (filterSnapshot = INITIAL_FILTERS) => {
@@ -228,34 +229,41 @@ const QueueCabinetManagement = () => {
   };
 
   const openReassignment = (queue: QueueRow) => {
+    previewGenerationRef.current += 1;
     setReassignmentQueue(queue);
     setNewCabinetNumber(String(queue.cabinet_number ?? ''));
     setReasonCode('administrative_correction');
     setReassignmentPreview(null);
     setReassignmentError(null);
+    setPreviewing(false);
     setApplyOutcomeUnknown(false);
     applyKeyRef.current = null;
   };
 
-  const closeReassignment = () => {
+  const closeReassignment = useCallback(() => {
     if (applying || applyOutcomeUnknown) return;
+    previewGenerationRef.current += 1;
     setReassignmentQueue(null);
     setReassignmentPreview(null);
     setReassignmentError(null);
     applyKeyRef.current = null;
-  };
+  }, [applying, applyOutcomeUnknown]);
 
   const updateReassignmentDraft = (nextCabinet: string, nextReason: ReassignmentReasonCode) => {
+    previewGenerationRef.current += 1;
     setNewCabinetNumber(nextCabinet);
     setReasonCode(nextReason);
     setReassignmentPreview(null);
     setReassignmentError(null);
+    setPreviewing(false);
     setApplyOutcomeUnknown(false);
     applyKeyRef.current = null;
   };
 
   const previewReassignment = async () => {
     if (!reassignmentQueue) return;
+    const requestGeneration = ++previewGenerationRef.current;
+    const queueId = reassignmentQueue.id;
     const normalizedCabinet = newCabinetNumber.trim();
     const targetCabinet = normalizedCabinet || null;
     setPreviewing(true);
@@ -266,18 +274,22 @@ const QueueCabinetManagement = () => {
         '/admin/queues/cabinet-info/preview',
         {
           data: {
-            queue_ids: [reassignmentQueue.id],
+            queue_ids: [queueId],
             new_cabinet_number: targetCabinet,
           },
         },
       );
-      setReassignmentPreview(result);
-      applyKeyRef.current = createIdempotencyKey();
+      if (requestGeneration === previewGenerationRef.current) {
+        setReassignmentPreview(result);
+        applyKeyRef.current = createIdempotencyKey();
+      }
     } catch (error: unknown) {
-      const detail = readSafeErrorDetail(error);
-      setReassignmentError(detail || t('admin2.qcm_preview_error'));
+      if (requestGeneration === previewGenerationRef.current) {
+        const detail = readSafeErrorDetail(error);
+        setReassignmentError(detail || t('admin2.qcm_preview_error'));
+      }
     } finally {
-      setPreviewing(false);
+      if (requestGeneration === previewGenerationRef.current) setPreviewing(false);
     }
   };
 

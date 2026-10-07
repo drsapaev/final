@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, apiRequest } from '../../../api/client';
 import QueueCabinetManagement from '../QueueCabinetManagement';
 
+const modalTestMode = vi.hoisted(() => ({ useRealModal: false }));
+
 vi.mock('../../../api/client', () => ({
   apiRequest: vi.fn(),
   api: { request: vi.fn() },
@@ -23,7 +25,14 @@ vi.mock('../../../utils/logger', () => ({
   },
 }));
 
-vi.mock('../../ui/macos', () => ({
+vi.mock('@/contexts/ThemeContext', () => ({ useTheme: () => ({}) }));
+
+vi.mock('../../ui/macos', async () => {
+  const RealModal = (await vi.importActual<typeof import('../../ui/macos/Modal')>(
+    '../../ui/macos/Modal',
+  )).default;
+
+  return ({
   AppEmpty: ({ title, description, action }: React.PropsWithChildren<Record<string, any>>) => (
     <section data-testid="empty-state">
       <h2>{title}</h2>
@@ -46,14 +55,17 @@ vi.mock('../../ui/macos', () => ({
   ),
   Card: ({ children }: React.PropsWithChildren) => <section>{children}</section>,
   Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
-  Modal: ({ isOpen, title, children, actions }: React.PropsWithChildren<Record<string, any>>) =>
-    isOpen ? (
+  Modal: (props: React.PropsWithChildren<Record<string, any>>) => {
+    if (modalTestMode.useRealModal) return React.createElement(RealModal, props);
+    const { isOpen, title, children, actions } = props;
+    return isOpen ? (
       <section role="dialog" aria-modal="true">
         <h2>{title}</h2>
         {children}
         {actions}
       </section>
-    ) : null,
+    ) : null;
+  },
   Select: ({ id, label, value, options, onValueChange, disabled }: Record<string, any>) => (
     <label htmlFor={id}>
       {label}
@@ -75,7 +87,8 @@ vi.mock('../../ui/macos', () => ({
       <output>{value}</output>
     </div>
   ),
-}));
+  });
+});
 
 vi.mock('../../ui/DataTable', () => ({
   DataTable: ({ data }: { data: Array<Record<string, React.ReactNode>> }) => (
@@ -99,6 +112,7 @@ const apiClientRequestMock = vi.mocked(api.request);
 describe('QueueCabinetManagement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    modalTestMode.useRealModal = false;
   });
 
   it('loads one typed owner read and derives the summary from the displayed rows', async () => {
@@ -227,6 +241,93 @@ describe('QueueCabinetManagement', () => {
       headers: { 'Idempotency-Key': expect.any(String) },
     });
     expect(apiClientRequestMock.mock.calls[1][0]).toEqual(applyConfig);
+  });
+
+  it('ignores a preview response after its cabinet draft changes', async () => {
+    let resolvePreview: ((value: unknown) => void) | undefined;
+    apiRequestMock
+      .mockResolvedValueOnce([
+        {
+          id: 4,
+          day: '2026-10-06',
+          owner_type: 'resource',
+          owner_id: 31,
+          owner_name: 'Laboratory',
+          cabinet_number: '8',
+          entries_count: 0,
+          active: true,
+        },
+      ])
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolvePreview = resolve;
+          }),
+      );
+
+    render(<QueueCabinetManagement />);
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_reassign' }));
+    const cabinetInput = screen.getByLabelText('admin2.qcm_new_cabinet');
+    fireEvent.change(cabinetInput, { target: { value: '9' } });
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_preview_reassign' }));
+    fireEvent.change(cabinetInput, { target: { value: '10' } });
+
+    await act(async () => {
+      resolvePreview?.({
+        clinic_day: '2026-10-06',
+        can_apply: true,
+        items: [
+          {
+            queue_id: 4,
+            owner_type: 'resource',
+            owner_id: 31,
+            owner_name: 'Laboratory',
+            old_cabinet_number: '8',
+            new_cabinet_number: '9',
+            waiting_count: 0,
+            blocking_reasons: [],
+            can_apply: true,
+          },
+        ],
+      });
+    });
+
+    expect(cabinetInput).toHaveValue('10');
+    expect(screen.queryByRole('button', { name: 'admin2.qcm_confirm_reassign' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'admin2.qcm_preview_reassign' })).toBeEnabled();
+    expect(apiClientRequestMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps keyboard focus in the cabinet input while editing with the real modal', async () => {
+    modalTestMode.useRealModal = true;
+    apiRequestMock.mockResolvedValueOnce([
+      {
+        id: 4,
+        day: '2026-10-06',
+        owner_type: 'resource',
+        owner_id: 31,
+        owner_name: 'Laboratory',
+        cabinet_number: '8',
+        entries_count: 0,
+        active: true,
+      },
+    ]);
+
+    render(<QueueCabinetManagement />);
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_reassign' }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    });
+    const cabinetInput = screen.getByLabelText('admin2.qcm_new_cabinet');
+    cabinetInput.focus();
+    expect(cabinetInput).toHaveFocus();
+
+    fireEvent.change(cabinetInput, { target: { value: '9' } });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    });
+
+    expect(cabinetInput).toHaveFocus();
   });
 
   it('shows the server clinic-day refusal from preview without enabling apply', async () => {
