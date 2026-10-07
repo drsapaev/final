@@ -36,7 +36,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.11.10'
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
   DATABASE_URL: 'postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb'
   CORS_DISABLE: '1'
   WS_DEV_ALLOW: '1'
@@ -415,23 +415,23 @@ jobs:
           needs.ci-scope.outputs.workflow_changed == 'true'
         )
       )
-    
+
     steps:
     - uses: actions/checkout@v7
-    
+
     - name: 🐍 Установка Python
       uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
-    
+
     - name: 📦 Установка зависимостей
       run: |
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
         pip install black isort flake8 ruff vulture bandit mypy radon pydocstyle pylint
-    
+
     - name: 🔍 Проверка конфигурации
       run: |
         cd backend
@@ -443,15 +443,15 @@ jobs:
         echo "✅ pyproject.toml найден"
         echo "📁 Структура проекта:"
         ls -la app/ | head -10 || echo "⚠️ Директория app не найдена"
-    
+
     - name: 🎨 Проверка форматирования кода
       run: |
         cd backend
         set +e  # Не выходить при ошибках, обрабатываем их вручную
-        
+
         echo "🎨 Проверяем black форматирование (только app/ и tests/)..."
         BLACK_ERRORS=0
-        
+
         # Форматируем только основные директории
         for dir in app tests; do
           if [ -d "$dir" ]; then
@@ -462,7 +462,7 @@ jobs:
             fi
           fi
         done
-        
+
         if [ $BLACK_ERRORS -gt 0 ]; then
           echo "⚠️ Найдено $BLACK_ERRORS директорий, требующих форматирования"
           echo "ℹ️ Не блокируем pipeline на этапе миграции legacy-форматирования"
@@ -470,10 +470,10 @@ jobs:
         else
           echo "✅ Black форматирование OK"
         fi
-        
+
         echo "📦 Проверяем isort сортировку импортов..."
         ISORT_ERRORS=0
-        
+
         for dir in app tests; do
           if [ -d "$dir" ]; then
             echo "  Проверяем $dir/..."
@@ -483,7 +483,7 @@ jobs:
             fi
           fi
         done
-        
+
         if [ $ISORT_ERRORS -gt 0 ]; then
           echo "⚠️ Найдено $ISORT_ERRORS директорий, требующих сортировки импортов"
           echo "ℹ️ Не блокируем pipeline на этапе миграции legacy-импортов"
@@ -491,7 +491,7 @@ jobs:
         else
           echo "✅ Isort сортировка OK"
         fi
-    
+
     - name: 🔍 Линтинг и статический анализ
       run: bash scripts/ci/backend_lint_static_analysis.sh
 
@@ -513,7 +513,7 @@ jobs:
         else
           echo "✅ Ошибок не найдено - документ не создан"
         fi
-    
+
     - name: 🔍 Проверка сложности кода
       run: |
         cd backend
@@ -521,13 +521,13 @@ jobs:
         echo "📊 Анализ сложности кода (Radon)..."
         radon cc app --min B --show-complexity > quality-reports/complexity.txt 2>&1 || true
         radon mi app --min B > quality-reports/maintainability.txt 2>&1 || true
-        
+
         echo "📊 Статистика сложности:"
         head -30 quality-reports/complexity.txt || true
         echo ""
         echo "📊 Индекс поддерживаемости:"
         head -20 quality-reports/maintainability.txt || true
-    
+
     - name: 📝 Проверка документации
       run: |
         cd backend
@@ -537,37 +537,37 @@ jobs:
           echo "⚠️ Некоторые функции не имеют docstrings (не блокируем):"
           cat quality-reports/docstyle.txt | head -30
         }
-    
+
     - name: 🔍 Поиск проблемных паттернов
       run: |
         cd backend
         mkdir -p quality-reports
         set -e
-        
+
         echo "🔍 Поиск TODO/FIXME/HACK комментариев..."
         grep -r "TODO\|FIXME\|HACK\|XXX" app/ --include="*.py" > quality-reports/todos.txt 2>&1 || echo "✅ Нет TODO/FIXME комментариев"
         if [ -s quality-reports/todos.txt ]; then
           echo "⚠️ Найдены TODO/FIXME комментарии:"
           head -20 quality-reports/todos.txt
         fi
-        
+
         echo "🔍 Поиск мертвого кода (Vulture)..."
         vulture app --min-confidence 80 --exclude app/api/v1/endpoints/ > quality-reports/vulture.txt 2>&1 || {
           echo "⚠️ Vulture нашел потенциально мертвый код (не блокируем):"
           head -30 quality-reports/vulture.txt
         }
-        
+
         echo "🔍 Проверка размера файлов..."
         find app -name "*.py" -type f -exec wc -l {} + | sort -rn | head -20 > quality-reports/large-files.txt || true
         echo "📊 Самые большие файлы:"
         head -10 quality-reports/large-files.txt
-        
+
         # Проверяем файлы больше 1000 строк
         if find app -name "*.py" -type f -exec wc -l {} + | awk '$1 > 1000 {print $2}' | grep -q .; then
           echo "⚠️ Найдены файлы больше 1000 строк:"
           find app -name "*.py" -type f -exec wc -l {} + | awk '$1 > 1000 {print $1, $2}'
         fi
-    
+
     - name: 🔒 Проверка безопасности
       run: |
         cd backend
@@ -583,7 +583,7 @@ jobs:
           fi
         }
         echo "✅ Bandit проверка OK"
-    
+
     - name: 📤 Сохранение отчетов
       if: always()
       uses: actions/upload-artifact@v7
@@ -592,7 +592,7 @@ jobs:
         path: backend/quality-reports/
         retention-days: 7
         if-no-files-found: warn
-    
+
     - name: 📊 Итоговый отчет
       if: always()
       run: |
@@ -632,22 +632,22 @@ jobs:
           needs.ci-scope.outputs.workflow_changed == 'true'
         )
       )
-    
+
     steps:
     - uses: actions/checkout@v7
-    
+
     - name: 📦 Установка Node.js
       uses: actions/setup-node@v7
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
-    
+
     - name: 📦 Установка зависимостей
       run: |
         cd frontend
         npm ci --legacy-peer-deps
-    
+
     - name: 🔍 Линтинг frontend
       run: |
         cd frontend
@@ -754,7 +754,7 @@ jobs:
       run: |
         cd frontend
         npm ci --legacy-peer-deps
-    
+
     - name: 🏗️ Сборка frontend
       run: |
         cd frontend
@@ -1106,23 +1106,23 @@ jobs:
       WS_DEV_ALLOW: '1'
       PYTHONIOENCODING: 'utf-8'
       PYTHONUTF8: '1'
-    
+
     steps:
     - uses: actions/checkout@v7
-    
+
     - name: 🐍 Установка Python
       uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
-    
+
     - name: 📦 Установка зависимостей
       run: |
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest pytest-cov pytest-asyncio pytest-deadfixtures httpx
-    
+
     - name: 🗄️ Подготовка базы данных
       run: |
         cd backend
@@ -1198,7 +1198,7 @@ jobs:
           tests/integration/test_rbac_matrix.py \
           tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_fill_emr \
           tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_generate_prescription_pdf
-    
+
     - name: 📊 Загрузка отчета покрытия
       uses: actions/upload-artifact@v7
       if: always()
@@ -1369,16 +1369,16 @@ jobs:
     # Security scanning stays GitHub-native, but is not part of the lightweight
     # PR blocker set for every pull request. Run it on branch pushes and manual dispatch.
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-    
+
     steps:
     - uses: actions/checkout@v7
-    
+
     - name: 🐍 Установка Python
       uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
-    
+
     - name: 📦 Установка зависимостей
       run: |
         cd backend
@@ -1459,13 +1459,13 @@ jobs:
     # Image build verification is useful before branch/main pushes, but it is not
     # required on every PR once the GitHub-native test/parity guardrails are green.
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-    
+
     steps:
     - uses: actions/checkout@v7
-    
+
     - name: 🐳 Настройка Docker Buildx
       uses: docker/setup-buildx-action@v3
-    
+
     - name: 🔍 Проверка Dockerfile'ов
       run: |
         echo "🔍 Проверяем наличие Dockerfile'ов..."
@@ -1479,7 +1479,7 @@ jobs:
           exit 1
         fi
         echo "✅ Все Dockerfile'ы найдены"
-    
+
     - name: 🏗️ Сборка Backend Docker
       uses: docker/build-push-action@v7
       with:
@@ -1491,7 +1491,7 @@ jobs:
         cache-to: type=gha,mode=min,scope=clinic-backend,ignore-error=true
         build-args: |
           BUILDKIT_INLINE_CACHE=1
-    
+
     - name: 🏗️ Сборка Frontend Docker
       uses: docker/build-push-action@v7
       with:
@@ -1532,16 +1532,16 @@ jobs:
       WS_DEV_ALLOW: '1'
       PYTHONIOENCODING: 'utf-8'
       PYTHONUTF8: '1'
-    
+
     steps:
     - uses: actions/checkout@v7
-    
+
     - name: 🐍 Установка Python
       uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
-    
+
     - name: 📦 Установка зависимостей
       run: |
         cd backend
@@ -1552,7 +1552,7 @@ jobs:
         echo "✅ Все зависимости установлены"
         echo "🔍 Проверяем установленные пакеты:"
         pip list | grep -E "(fastapi|uvicorn|requests|httpx)" || true
-    
+
     - name: 🗄️ Подготовка тестовой базы
       run: |
         cd backend
@@ -1578,7 +1578,7 @@ jobs:
         PY
         alembic upgrade head
         alembic current
-    
+
     - name: 🚀 Запуск сервера
       run: |
         set -e
@@ -1587,7 +1587,7 @@ jobs:
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         export PYTHONPATH="$GITHUB_WORKSPACE/backend:$PYTHONPATH"
-        
+
         echo "🔍 Проверяем что приложение может импортироваться..."
         echo "Step 1: Testing critical imports before app.main..."
         echo "  - Testing app.core.exception_handlers..."
@@ -1607,7 +1607,7 @@ jobs:
             import traceback
             traceback.print_exc()
         " 2>&1 || echo "⚠️ exception_handlers import failed"
-        
+
         echo "  - Testing app.ws.queue_ws..."
         python -c "
         import os
@@ -1617,7 +1617,7 @@ jobs:
         from app.ws.queue_ws import router, ws_queue
         print('✅ queue_ws OK')
         " 2>&1 || echo "⚠️ queue_ws import failed"
-        
+
         echo "  - Testing app.api.deps..."
         python -c "
         import os
@@ -1627,7 +1627,7 @@ jobs:
         from app.api.deps import create_access_token
         print('✅ deps OK')
         " 2>&1 || echo "⚠️ deps import failed (will use fallback)"
-        
+
         echo "  - Testing app.api.v1.api..."
         if ! python -c "
         import os
@@ -1676,7 +1676,7 @@ jobs:
               sys.exit(1)
           " 2>&1 || exit 1
         fi
-        
+
         echo "Step 2: Importing app.main module..."
         if ! python -c "
         import os
@@ -1720,7 +1720,7 @@ jobs:
           echo "❌ Не удалось импортировать app из app.main"
           exit 1
         fi
-        
+
         echo "✅ Все импорты успешны"
         echo "🚀 Запускаем сервер..."
         nohup uvicorn app.main:app --host 127.0.0.1 --port 18000 > server.log 2>&1 &
@@ -1728,7 +1728,7 @@ jobs:
         echo $SERVER_PID > server.pid
         echo "⏳ Ожидаем запуска сервера (PID: $SERVER_PID)..."
         sleep 15
-        
+
         # Проверяем, что процесс еще работает
         if ! kill -0 $SERVER_PID 2>/dev/null; then
           echo "❌ Сервер не запустился (процесс завершился)"
@@ -1736,7 +1736,7 @@ jobs:
           cat server.log || echo "Логи не доступны"
           exit 1
         fi
-        
+
         echo "📋 Логи сервера после запуска:"
         head -50 server.log || echo "Логи не доступны"
         echo "🔍 Проверяем статус процесса:"
@@ -1746,7 +1746,7 @@ jobs:
         else
           echo "⚠️ PID файл не найден"
         fi
-        
+
         # Проверяем доступность сервера
         echo "🔍 Проверяем доступность сервера..."
         for i in {1..5}; do
@@ -1764,7 +1764,7 @@ jobs:
             sleep 3
           fi
         done
-    
+
     - name: 🧪 Интеграционные тесты
       run: |
         cd backend
@@ -1791,12 +1791,12 @@ jobs:
           fi
           sleep 2
         done
-        
+
         if [ "$SERVER_READY" = false ]; then
           echo "❌ Сервер не готов к тестированию"
           exit 1
         fi
-        
+
         # Запускаем интеграционные тесты для запущенного сервера
         echo "🧪 Запускаем интеграционные тесты..."
         pytest -q tests/integration/test_server_integration.py -rA || {
@@ -1805,7 +1805,7 @@ jobs:
           tail -100 server.log || true
           exit 1
         }
-    
+
     - name: 🛑 Остановка сервера
       if: always()
       run: |
@@ -2169,23 +2169,23 @@ jobs:
       DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb
       CORS_DISABLE: '1'
       WS_DEV_ALLOW: '1'
-    
+
     steps:
     - uses: actions/checkout@v7
-    
+
     - name: 🐍 Установка Python
       uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
-    
+
     - name: 📦 Установка зависимостей
       run: |
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
         pip install sphinx sphinx-rtd-theme
-    
+
     - name: 📚 Генерация API документации
       env:
         DOCS_REQUIRED: ${{ needs.ci-scope.outputs.docs_required }}
@@ -2219,43 +2219,43 @@ jobs:
           echo "❌ Файл app/main.py не найден"
           exit 1
         fi
-        
+
         # Генерируем OpenAPI схему с улучшенной обработкой ошибок
         python -c "
         import sys
         import os
         import traceback
-        
+
         try:
             # Добавляем текущую директорию в путь
             sys.path.insert(0, '.')
-            
+
             # Устанавливаем переменные окружения ПЕРЕД импортом
             os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb'
             os.environ['CORS_DISABLE'] = '1'
             os.environ['WS_DEV_ALLOW'] = '1'
-            
+
             print('🔧 Настройка окружения завершена')
             print(f'📋 DATABASE_URL: {os.environ.get(\"DATABASE_URL\")}')
-            
+
             # Импортируем приложение
             print('📦 Импортируем app.main...')
             from app.main import app
             import json
-            
+
             print('✅ Импорт app.main успешен')
-            
+
             # Генерируем схему
             print('📝 Генерируем OpenAPI схему...')
             openapi_schema = app.openapi()
-            
+
             # Сохраняем схему
             with open('openapi.json', 'w', encoding='utf-8') as f:
                 json.dump(openapi_schema, f, indent=2, ensure_ascii=False)
-            
+
             print('✅ OpenAPI схема создана успешно')
             print(f'📊 Размер файла: {os.path.getsize(\"openapi.json\")} байт')
-            
+
         except Exception as e:
             print(f'❌ Ошибка генерации документации: {e}')
             print('📋 Детали ошибки:')
@@ -2264,13 +2264,13 @@ jobs:
             if os.environ.get('DOCS_REQUIRED', 'false').lower() == 'true':
                 print('❌ OpenAPI generation is required for this run; failing instead of using fallback schema.')
                 sys.exit(1)
-            
+
             # Создаем минимальную схему в случае ошибки
             print('⚠️ Создаем минимальную схему...')
             minimal_schema = {
                 'openapi': '3.0.0',
                 'info': {
-                    'title': 'Clinic API', 
+                    'title': 'Clinic API',
                     'version': '1.0.0',
                     'description': 'API documentation - generation failed'
                 },
@@ -2282,7 +2282,7 @@ jobs:
                 json.dump(minimal_schema, f, indent=2, ensure_ascii=False)
             print('✅ Минимальная OpenAPI схема создана')
         "
-        
+
         # Проверяем, что файл создался
         if [ -f "openapi.json" ]; then
           echo "✅ Файл openapi.json создан успешно"
@@ -2512,10 +2512,10 @@ jobs:
     timeout-minutes: 20
     needs: [docker, security, docs, integration]
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    
+
     steps:
     - uses: actions/checkout@v7
-    
+
     - name: Staging readiness summary
       run: |
         echo "🚀 Staging readiness report (no live deployment)"
@@ -2533,10 +2533,10 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
       name: production
-    
+
     steps:
     - uses: actions/checkout@v7
-    
+
     - name: Production readiness summary
       run: |
         echo "🌟 Production readiness report (no live deployment)"
@@ -2580,4 +2580,3 @@ jobs:
     permissions:
       issues: write
       contents: read
-

@@ -7,8 +7,7 @@ afterEach(() => {
   cleanup();
   // Safety net: ensure real timers are restored after each test.
   // Some test files call vi.useFakeTimers() but forget vi.useRealTimers()
-  // in their afterEach. In singleFork mode, fake timers leak across files
-  // and can cause vitest's internal shutdown to hang indefinitely.
+  // in their afterEach. Restore them before worker cleanup to avoid hangs.
   vi.useRealTimers();
 });
 
@@ -81,16 +80,20 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Mock IntersectionObserver
-global.IntersectionObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+// Observer implementations must be constructible for Vitest 5.
+global.IntersectionObserver = vi.fn().mockImplementation(function () {
+  return {
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  };
+});
 
 // Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+global.ResizeObserver = vi.fn().mockImplementation(function () {
+  return {
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  };
+});
