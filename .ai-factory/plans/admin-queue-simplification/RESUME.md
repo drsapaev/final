@@ -1,4 +1,14 @@
-## Current resume — T09.3 PR #3620 retry cooldown correction (2026-10-07T13:45+05:00)
+## Current resume — T09.3 PR #3620 CSRF retry correction (2026-10-07T15:14+05:00)
+
+PR #3620 has a follow-up P2 fix in the working tree: when the first cabinet apply response is lost and a retry receives a CSRF `403`, the screen preserves the uncertain outcome, preview, original idempotency key and draft lock. The retry remains available. CSRF rejection is recognized from the standard `X-CSRF-Status: rejected` header or the known `missing_cookie`, `missing_header`, and `mismatch` reasons. A focused regression covers lost response → CSRF `403` → successful retry with the identical body and key.
+
+Validation on the changed files: focused component suite **11/11**, scoped ESLint **PASS**, TypeScript **PASS**, `git diff --check` **PASS**. The first check attempt was run from repository root, where frontend scripts/dependencies are absent; reruns from `frontend/` passed. An independent read-only probe before the fix reproduced the reset of `applyOutcomeUnknown`, preview and key on a CSRF 403.
+
+Last confirmed remote PR HEAD is `1b84be10da1c0e31fb6979e507374980cd3168ec`; its hosted checks were 26 success / 13 skipped / 0 failures, but they predate this change. Commit/push this patch and journals as a fast-forward, then read the new exact-head checks. Do not attribute prior CI to the fix.
+
+Tier 2 for this retry case was NOT_RUN. The separately accepted PR-specific bounded Tier-2 deferral remains only for the four named live specs and runtime base-image equivalence; it earns no coverage credit. T18/full pre-deploy staging remains required. Merge stays on hold pending review of the final code and passing required checks.
+
+## Superseded resume — T09.3 PR #3620 retry cooldown correction (2026-10-07T13:45+05:00)
 
 PR #3620's code P2 is fixed in 03fbe4f51ae7c91df5c8d53486fa97a4f1ca6777. The component captures whether the apply call is retrying an unknown outcome. If that retry receives HTTP 429, it retains the original preview/key, locks draft/cancel, and leaves the same-key retry available. The regression covers lost first response → cooldown 429 → successful replay with an identical request and key.
 

@@ -1,29 +1,29 @@
-## Current checkpoint — PR #3620 cabinet retry 429 fix (2026-10-07T13:45+05:00)
+## Current checkpoint — PR #3620 preserve uncertain apply after CSRF 403 (2026-10-07T15:14+05:00)
 
-Plan version: 3.52
+Plan version: 3.53
 Current task: T09.3
-Current status: PR_OPEN; code fix committed at 03fbe4f; plan checkpoint records the fix; exact-head CI must be checked on the commit containing this checkpoint.
+Current status: PR_OPEN; CSRF retry fix and focused regression are locally validated; code, plan checkpoint, push and exact-head CI remain.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
 Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
-Last confirmed remote PR HEAD before this checkpoint: a046143e628e725d9642a54976d8718b4fc5490c
-Code fix commit: 03fbe4f51ae7c91df5c8d53486fa97a4f1ca6777
+Last confirmed remote PR HEAD before this checkpoint: 1b84be10da1c0e31fb6979e507374980cd3168ec
+Code fix commit: pending; this worktree has the two scoped source/test changes.
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-07T13:45+05:00
+Last updated: 2026-10-07T15:14+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
-| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-p2-review-fix |
+| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-csrf-retry-p2-fix |
 
 ## Current checkpoint
-- Completed: the P2 retry-cooldown fix preserves the pending apply preview/key and locks draft/cancel after a retry 429 following a lost response. Regression verifies a same-key replay succeeds. Focused frontend suite 10/10, targeted ESLint, TypeScript, pre-commit hooks and diff whitespace checks passed.
-- Changed but not verified: fix commit 03fbe4f and its journal checkpoint are on the existing PR branch. Previous remote code head a046143e was pushed; the commit containing this checkpoint is the descendant to verify. The earlier 96580bae run (12 success, 9 skipped, 0 failure) predates the fix and does not validate it.
-- Remaining: confirm the latest branch push, inspect all required checks on the PR HEAD containing this checkpoint, and obtain review. Keep merge on hold until the P2 is reviewed and exact-head required CI passes. The existing bounded Tier-2 deferral remains PR-specific and credits none of its four live specs or runtime base-image equivalence.
-- Blocker: exact-head CI for the commit containing this checkpoint has not been recorded here. New staging validation for the retry edge was NOT_RUN. Full T18 and pre-deployment STAGING_VALIDATION.md remain required.
-- Next exact action: push this checkpoint if it is still local, read the resulting PR HEAD, then inspect all applicable CI. Do not merge, deploy, activate v1, or start T10 from this checkpoint.
-- Checks to rerun after the next PR change: all applicable exact-head checks; before production rollout run the full STAGING_VALIDATION.md checklist.
+- Completed: the new retry fix keeps the unknown apply outcome, original preview/key and draft lock when a retry gets CSRF 403 before idempotency replay. Focused screen suite is 11/11; scoped ESLint, TypeScript and `git diff --check` pass. The test proves the next retry uses the identical request/key and succeeds.
+- Changed but not verified: source/test changes and this evidence checkpoint are not yet committed or pushed. Existing exact-head CI on 1b84be10 is green (26 success, 13 skipped), but predates this fix and does not validate it.
+- Remaining: inspect the final diff, commit only the two allowed source/test files plus T09.3 journals, push as a fast-forward from remote 1b84be10, then inspect all checks on the resulting PR HEAD.
+- Blocker: none for the scoped fix. Tier 2 staging for this retry edge was NOT_RUN; the existing bounded PR-specific deferral remains limited to the four live specs and runtime base-image equivalence. T18 and pre-deployment STAGING_VALIDATION.md remain required.
+- Next exact action: run final `git diff --check`, review staged paths, commit, push without rewriting the branch, then inspect exact-head CI. Do not merge, deploy, activate v1, or start T10 from this checkpoint.
+- Checks to rerun after the push: all applicable exact-head checks; before production rollout run the full STAGING_VALIDATION.md checklist.
 
 ## Superseded checkpoint — PR #3620 bounded Tier-2 deferral decision (2026-10-07T13:04+05:00)
 

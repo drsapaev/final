@@ -482,6 +482,72 @@ describe('QueueCabinetManagement', () => {
     );
   });
 
+  it('keeps the same-key retry available when CSRF rejects a retry after a lost response', async () => {
+    apiRequestMock
+      .mockResolvedValueOnce([
+        {
+          id: 9,
+          day: '2026-10-06',
+          owner_type: 'doctor',
+          owner_id: 15,
+          owner_name: 'Doctor',
+          cabinet_number: '5',
+          entries_count: 0,
+          active: true,
+        },
+      ])
+      .mockResolvedValueOnce({
+        clinic_day: '2026-10-06',
+        can_apply: true,
+        items: [
+          {
+            queue_id: 9,
+            owner_type: 'doctor',
+            owner_id: 15,
+            owner_name: 'Doctor',
+            old_cabinet_number: '5',
+            new_cabinet_number: '9',
+            waiting_count: 0,
+            blocking_reasons: [],
+            can_apply: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce([]);
+    apiClientRequestMock
+      .mockRejectedValueOnce(new Error('synthetic response loss'))
+      .mockRejectedValueOnce({
+        response: {
+          status: 403,
+          headers: { 'x-csrf-status': 'rejected' },
+          data: { detail: 'CSRF validation failed', reason: 'missing_cookie' },
+        },
+      })
+      .mockResolvedValueOnce({ data: { changed_queue_ids: [9] } });
+
+    render(<QueueCabinetManagement />);
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_reassign' }));
+    fireEvent.change(screen.getByLabelText('admin2.qcm_new_cabinet'), {
+      target: { value: '9' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_preview_reassign' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_confirm_reassign' }));
+
+    expect(await screen.findByText('admin2.qcm_uncertain_outcome')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_retry_apply' }));
+    expect(await screen.findByText('CSRF validation failed')).toBeInTheDocument();
+
+    expect(screen.getByLabelText('admin2.qcm_new_cabinet')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'admin2.qcm_cancel' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'admin2.qcm_retry_apply' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_retry_apply' }));
+
+    await waitFor(() => expect(apiClientRequestMock).toHaveBeenCalledTimes(3));
+    expect(apiClientRequestMock.mock.calls[2][0]).toEqual(
+      apiClientRequestMock.mock.calls[0][0],
+    );
+  });
+
   it('translates preview blockers and keeps the confirmation disabled', async () => {
     apiRequestMock
       .mockResolvedValueOnce([
