@@ -1,31 +1,27 @@
-## Current checkpoint — PR #3620 CSRF retry fix pushed and validated (2026-10-07T15:32+05:00)
+## Current checkpoint — PR #3620 preserve uncertain retries after any refusal (2026-10-07T16:08+05:00)
 
-Plan version: 3.55
+Plan version: 3.56
 Current task: T09.3
-Current status: PR_OPEN; code commit `ea51b067e33891c31d6706415bb3d96678a7698d` passed exact-head CI with 26 success, 13 skipped, 0 failed, 0 pending. Evidence-only checkpoint `ed965feabff94e123fc4a4dbb204ae41bf770bb2` is pushed; GitHub triggered no PR workflows for that docs-only commit.
+Current status: IN_PROGRESS; local fix and regression are validated but not yet committed/pushed. Current remote PR HEAD before this fix: f85d7a0f8fc482b2401a8c040a18313077ef2156.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
 Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
-Previous remote PR HEAD before code fix: 1b84be10da1c0e31fb6979e507374980cd3168ec
-Code commit under test: ea51b067e33891c31d6706415bb3d96678a7698d
-Latest confirmed PR HEAD: ed965feabff94e123fc4a4dbb204ae41bf770bb2 (evidence-only descendant; no code changes after tested commit).
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-07T15:32+05:00
+Last updated: 2026-10-07T16:08+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
-| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-csrf-retry-p2-fix |
+| T09.3 | IN_PROGRESS | PR #3620 | | EVIDENCE.md#t093-pr-3620-principal-refusal-retry-fix |
 
 ## Current checkpoint
-- Completed: commit `ea51b067` preserves the pending cabinet apply after a lost response and a CSRF 403; the same request/key remains retryable. Focused component suite 11/11, scoped ESLint, TypeScript, commit hooks and `git diff --check` passed. Exact-head run 37606291652 passed with 26 success, 13 skipped, 0 failed and 0 pending; Backend, Frontend E2E, unit/build/lint, Parity, PR Required Gate and applicable security/quality jobs passed.
-- Changed but not verified: no source or test changes remain unverified. The new code has not received an independent GitHub review. Path-aware skips are not passes.
-- Remaining: obtain an independent review of the final code diff at PR HEAD `ed965feabff94e123fc4a4dbb204ae41bf770bb2` (last code-bearing commit remains `ea51b067`). PR #3620 is OPEN and unmerged. Keep merge on hold pending that review. The previously accepted PR-specific bounded Tier-2 deferral remains limited to four live specs and runtime base-image equivalence; none receives coverage credit.
-- Blocker: independent review remains outstanding. Tier 2 for this retry edge was NOT_RUN; T18 and the full pre-deployment STAGING_VALIDATION.md remain required.
-- Next exact action: inspect/review PR #3620 at its latest HEAD, verify the code-bearing commit is still `ea51b067`, and do not merge or start T10 from this checkpoint.
-- Checks to rerun after the push: all applicable exact-head checks; before production rollout run the full STAGING_VALIDATION.md checklist.
-
+- Completed: source now retains the preview, locked draft and original idempotency key for every error on a retry after an unknown outcome. Added regression cases for CSRF 403, ordinary principal-refusal 403 and stale-state 409; a separate test verifies that a definitive first-apply 409 still allows correcting the draft. Focused tests 14/14, scoped ESLint, TypeScript and `git diff --check` passed.
+- Changed but not verified: the source/test fix is local and uncommitted; no CI run has covered it yet. The prior tested code commit ea51b067 does not validate this new change.
+- Remaining: commit and fast-forward push to the existing PR branch, then inspect all checks on the exact pushed HEAD. Obtain fresh independent review after checks.
+- Blocker: exact-head CI and fresh review are pending. Tier 2 for this retry path remains NOT_RUN; the bounded PR deferral still covers only its four named live specs and runtime base-image equivalence.
+- Next exact action: verify remote branch still points at f85d7a0f, commit only the two frontend files and four T09.3 plan journals, fast-forward push, and inspect exact-head CI. Do not merge or start T10.
+- Checks to rerun after push: all applicable exact-head PR checks; staging remains NOT_RUN, and full STAGING_VALIDATION.md remains required before deployment.
 ## Superseded checkpoint — PR #3620 bounded Tier-2 deferral decision (2026-10-07T13:04+05:00)
 
 Plan version: 3.50

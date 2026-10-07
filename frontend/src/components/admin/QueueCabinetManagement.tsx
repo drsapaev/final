@@ -107,29 +107,6 @@ const readSafeErrorCode = (error: unknown): string | null => {
   return typeof code === 'string' ? code : null;
 };
 
-const isCsrfRejection = (error: unknown): boolean => {
-  const response = (
-    error as {
-      response?: {
-        status?: number;
-        headers?: Record<string, unknown>;
-        data?: unknown;
-      };
-    } | null
-  )?.response;
-  if (response?.status !== 403) return false;
-
-  const csrfStatus = response.headers?.['x-csrf-status'] || response.headers?.['X-CSRF-Status'];
-  if (csrfStatus === 'rejected') return true;
-
-  const data = response.data;
-  const reason = data && typeof data === 'object'
-    ? (data as { reason?: unknown }).reason
-    : null;
-  return typeof reason === 'string'
-    && ['missing_cookie', 'missing_header', 'mismatch'].includes(reason);
-};
-
 // Summary values are derived from the same queue rows shown in the table.
 interface StatsSummary {
   totalQueues: number;
@@ -364,12 +341,9 @@ const QueueCabinetManagement = () => {
         // Keep the request body and key unchanged so a retry joins or replays it.
         setApplyOutcomeUnknown(true);
         setReassignmentError(t('admin2.qcm_apply_in_flight'));
-      } else if (
-        retryingUncertainOutcome
-        && (statusCode === 429 || isCsrfRejection(error))
-      ) {
-        // A local cooldown or CSRF refusal can reject a retry before the
-        // idempotency middleware replays the first attempt's stored result.
+      } else if (retryingUncertainOutcome) {
+        // Any retry refusal can occur before replay confirms the first
+        // attempt's outcome. Preserve the exact command until replay succeeds.
         setApplyOutcomeUnknown(true);
         setReassignmentError(detail || t('admin2.qcm_apply_error'));
       } else if (statusCode && statusCode >= 400 && statusCode < 500) {

@@ -108,6 +108,39 @@ vi.mock('../../ui/DataTable', () => ({
 
 const apiRequestMock = vi.mocked(apiRequest);
 const apiClientRequestMock = vi.mocked(api.request);
+const uncertainRetryRefusals = [
+  {
+    label: 'CSRF 403',
+    detail: 'CSRF validation failed',
+    rejection: {
+      response: {
+        status: 403,
+        headers: { 'x-csrf-status': 'rejected' },
+        data: { detail: 'CSRF validation failed', reason: 'missing_cookie' },
+      },
+    },
+  },
+  {
+    label: 'principal lookup 403',
+    detail: 'Пользователь деактивирован или сессия недействительна',
+    rejection: {
+      response: {
+        status: 403,
+        data: { detail: 'Пользователь деактивирован или сессия недействительна' },
+      },
+    },
+  },
+  {
+    label: 'stale state 409',
+    detail: 'Synthetic stale queue state',
+    rejection: {
+      response: {
+        status: 409,
+        data: { detail: 'Synthetic stale queue state' },
+      },
+    },
+  },
+] as const;
 
 describe('QueueCabinetManagement', () => {
   beforeEach(() => {
@@ -482,7 +515,9 @@ describe('QueueCabinetManagement', () => {
     );
   });
 
-  it('keeps the same-key retry available when CSRF rejects a retry after a lost response', async () => {
+  it.each(uncertainRetryRefusals)(
+    'keeps the same-key retry available when $label follows a lost response',
+    async ({ rejection, detail }) => {
     apiRequestMock
       .mockResolvedValueOnce([
         {
@@ -516,13 +551,7 @@ describe('QueueCabinetManagement', () => {
       .mockResolvedValueOnce([]);
     apiClientRequestMock
       .mockRejectedValueOnce(new Error('synthetic response loss'))
-      .mockRejectedValueOnce({
-        response: {
-          status: 403,
-          headers: { 'x-csrf-status': 'rejected' },
-          data: { detail: 'CSRF validation failed', reason: 'missing_cookie' },
-        },
-      })
+      .mockRejectedValueOnce(rejection)
       .mockResolvedValueOnce({ data: { changed_queue_ids: [9] } });
 
     render(<QueueCabinetManagement />);
@@ -535,7 +564,7 @@ describe('QueueCabinetManagement', () => {
 
     expect(await screen.findByText('admin2.qcm_uncertain_outcome')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_retry_apply' }));
-    expect(await screen.findByText('CSRF validation failed')).toBeInTheDocument();
+    expect(await screen.findByText(detail)).toBeInTheDocument();
 
     expect(screen.getByLabelText('admin2.qcm_new_cabinet')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'admin2.qcm_cancel' })).toBeDisabled();
@@ -545,6 +574,84 @@ describe('QueueCabinetManagement', () => {
     await waitFor(() => expect(apiClientRequestMock).toHaveBeenCalledTimes(3));
     expect(apiClientRequestMock.mock.calls[2][0]).toEqual(
       apiClientRequestMock.mock.calls[0][0],
+    );
+    },
+  );
+
+  it('allows correcting the draft after a definitive first-apply refusal', async () => {
+    apiRequestMock
+      .mockResolvedValueOnce([
+        {
+          id: 10,
+          day: '2026-10-06',
+          owner_type: 'doctor',
+          owner_id: 16,
+          owner_name: 'Doctor',
+          cabinet_number: '5',
+          entries_count: 0,
+          active: true,
+        },
+      ])
+      .mockResolvedValueOnce({
+        clinic_day: '2026-10-06',
+        can_apply: true,
+        items: [
+          {
+            queue_id: 10,
+            owner_type: 'doctor',
+            owner_id: 16,
+            owner_name: 'Doctor',
+            old_cabinet_number: '5',
+            new_cabinet_number: '9',
+            waiting_count: 0,
+            blocking_reasons: [],
+            can_apply: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        clinic_day: '2026-10-06',
+        can_apply: true,
+        items: [
+          {
+            queue_id: 10,
+            owner_type: 'doctor',
+            owner_id: 16,
+            owner_name: 'Doctor',
+            old_cabinet_number: '5',
+            new_cabinet_number: '10',
+            waiting_count: 0,
+            blocking_reasons: [],
+            can_apply: true,
+          },
+        ],
+      });
+    apiClientRequestMock.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: { detail: 'Synthetic stale queue state' },
+      },
+    });
+
+    render(<QueueCabinetManagement />);
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_reassign' }));
+    const cabinetInput = screen.getByLabelText('admin2.qcm_new_cabinet');
+    fireEvent.change(cabinetInput, { target: { value: '9' } });
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_preview_reassign' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_confirm_reassign' }));
+
+    expect(await screen.findByText('Synthetic stale queue state')).toBeInTheDocument();
+    expect(cabinetInput).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'admin2.qcm_cancel' })).toBeEnabled();
+    fireEvent.change(cabinetInput, { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_preview_reassign' }));
+
+    expect(await screen.findByText('admin2.qcm_preview_result')).toBeInTheDocument();
+    expect(apiRequestMock).toHaveBeenNthCalledWith(
+      3,
+      'POST',
+      '/admin/queues/cabinet-info/preview',
+      expect.objectContaining({ data: { queue_ids: [10], new_cabinet_number: '10' } }),
     );
   });
 

@@ -133,3 +133,10 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - **Resume condition:** before production rollout, v1 activation, or declaring T18 complete, provide an isolated harness with normal Admin TOTP, verified synthetic Registrar credentials, configurable origin/storage state, and controlled synthetic data creation/cleanup; run each deferred spec and record its result. Record runtime image/base provenance. Reopen this disposition if changed runtime or new evidence invalidates the feature-scope staging result.
 - **Headline impact:** 0 percentage points of validated Tier-2 coverage are credited by this deferral; 0/4 named specs are complete and runtime base-image equivalence is unproven. The overall plan has no numeric completion formula, so no global completion percentage is inferred. T18 and the full pre-deploy `STAGING_VALIDATION.md` remain incomplete and mandatory.
 - **Not waived:** exact-head required CI for any new commit, independent code review, the remaining T18 acceptance matrix, and full pre-deploy staging validation. No review submission, merge, deployment, or flag activation is authorized by this decision.
+
+## T09.3 / PR #3620 — uncertain result survives every retry refusal — 2026-10-07
+
+- Type: technical implementation choice within approved T09.3 idempotency behavior; no new product rule or authorization change.
+- Once a command's outcome is unknown, a later non-success response from its same-key retry does not settle the earlier outcome. Preserve the original preview, body/key and draft lock until a successful idempotency replay confirms the stored result. In contrast, a definitive refusal on the first apply may keep the current correction/re-preview flow.
+- This behavior covers refusals that occur before replay, including ordinary principal-resolution 403, CSRF 403, cooldown 429 and stale-state 409. It does not change the middleware, RBAC, response contract or queue ownership.
+- Source: PR #3620 review probe, `backend/app/middleware/idempotency_middleware.py` fail-closed principal resolution, and focused cabinet UI regressions.

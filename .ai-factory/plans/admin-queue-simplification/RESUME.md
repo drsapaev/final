@@ -1,4 +1,13 @@
-## Current resume — T09.3 PR #3620 CSRF retry correction (2026-10-07T15:32+05:00)
+## Current resume — T09.3 PR #3620 generic uncertain-retry refusal fix (2026-10-07T16:08+05:00)
+
+The latest local fix keeps the cabinet apply preview, draft lock and original idempotency key after any error on a retry whose first response was lost. A CSRF 403, an ordinary principal-resolution 403, or a stale-state 409 cannot establish the earlier command's result. A definitive 4xx on the first request with no earlier uncertain outcome still clears the preview so the operator can correct the draft.
+
+Regression coverage now exercises the three refusal cases and same-key successful replay, plus the fresh first-request 409 correction path. Local validation passed: 14/14 focused component tests, scoped ESLint, TypeScript and `git diff --check`.
+
+The change is on branch `codex/aqs-t093-cabinet-ui` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`; remote PR HEAD before these edits is `f85d7a0f8fc482b2401a8c040a18313077ef2156`, base `300dd7e9b112dde5143e78d5149634c739ad9b3a`. Source and test changes are local and uncommitted. Do not change backend middleware/auth, queue ownership/lifecycle, staging or production. Reuse the approved T09.3 narrow override; do not rerun the gate because `.scratch/T09.3-SCOPE.md` forbids a third gate.
+
+Next: check the remote branch still points at `f85d7a0f`, commit the two frontend files and plan journals, fast-forward push, then inspect exact-head CI and request a fresh independent review. Tier 2 for this retry edge is NOT_RUN; the previously accepted bounded deferral remains limited to four named live specs and runtime base-image equivalence. Keep merge on hold until code review and required checks pass.
+## Superseded resume — T09.3 PR #3620 CSRF retry correction (2026-10-07T15:32+05:00)
 
 PR #3620 code commit `ea51b067e33891c31d6706415bb3d96678a7698d` fixes the follow-up P2: when the first cabinet apply response is lost and a retry receives a CSRF `403`, the screen preserves the uncertain outcome, preview, original idempotency key and draft lock. The retry remains available. CSRF rejection is recognized from the standard `X-CSRF-Status: rejected` header or the known `missing_cookie`, `missing_header`, and `mismatch` reasons. A focused regression covers lost response → CSRF `403` → successful retry with the identical body and key.
 
