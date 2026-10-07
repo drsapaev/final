@@ -1,4 +1,18 @@
-## Current resume — T09.3 PR #3620 generic uncertain-retry refusal fix (2026-10-07T16:08+05:00)
+## Current resume — T09.3 PR #3620 retry refusal fix (2026-10-07T16:28+05:00)
+
+PR #3620 code HEAD a4cc2a9c493ff09302afe18b91a3eff0662f8047 fixes the reviewed P2. After a lost first response, any error returned by a retry preserves the same preview, payload, idempotency key and draft lock; a successful same-key replay settles the command. A definitive first-request refusal still allows draft correction.
+
+Local validation: focused component suite 14/14; scoped ESLint; TypeScript; git diff --check; commit hooks. The fix was pushed as a fast-forward from f85d7a0f8fc482b2401a8c040a18313077ef2156.
+
+Exact-head GitHub run 37612124999 completed on code HEAD a4cc2a9c with 26 success, 13 skipped, 0 failed, 0 pending. Backend, Frontend E2E/unit/lint/build, Code Quality, PR Required Gate, parity, docs, security/secrets, CodeQL, regression, role, locale and lifecycle checks passed. The 13 skipped jobs are not passes.
+
+PR #3620 remains OPEN, unmerged and mergeable at base 300dd7e9b112dde5143e78d5149634c739ad9b3a; independent GitHub review submissions are empty. Keep merge on hold until independent review. Do not submit a self-review or merge.
+
+Tier 2 for this retry edge is NOT_RUN. The prior bounded deferral remains limited to admin-navigation, rq17-setup-directions-live, queue-system, panel-qa-admin-live and runtime base-image equivalence. It provides no new coverage credit. T18 and full pre-deploy STAGING_VALIDATION.md remain outstanding.
+
+Next exact action: obtain an independent review of a4cc2a9c, address any in-scope findings, then continue the PR cycle. Do not start T10 before #3620 closes and the base is synchronized.
+
+## Superseded resume — T09.3 PR #3620 generic retry fix before push/CI (2026-10-07T16:08+05:00)
 
 The latest local fix keeps the cabinet apply preview, draft lock and original idempotency key after any error on a retry whose first response was lost. A CSRF 403, an ordinary principal-resolution 403, or a stale-state 409 cannot establish the earlier command's result. A definitive 4xx on the first request with no earlier uncertain outcome still clears the preview so the operator can correct the draft.
 

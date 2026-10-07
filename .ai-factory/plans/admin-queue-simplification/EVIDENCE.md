@@ -2264,7 +2264,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Decision state: prior P2 is corrected and code/required CI are green. Independent review of the final HEAD remains outstanding; PR is not merged. Next action is review the final diff and only then decide merge. No T10 work starts before PR #3620 closes and main synchronizes.
 - Follow-up evidence checkpoint: docs-only commit `ed965feabff94e123fc4a4dbb204ae41bf770bb2` was pushed after the code-bearing commit. The GitHub workflow-runs API returned no PR-triggered runs for this docs-only commit. All code paths remain identical to tested commit `ea51b067`; the exact-head CI cited above applies to that code commit. Latest confirmed PR base/head are `300dd7e9b112dde5143e78d5149634c739ad9b3a` / `ed965feabff94e123fc4a4dbb204ae41bf770bb2`.
 
-## T09.3 PR #3620 — preserve unknown apply outcome after any retry refusal — 2026-10-07T16:08+05:00
+## Superseded T09.3 PR #3620 checkpoint — preserve unknown apply outcome after retry refusal, before push — 2026-10-07T16:08+05:00
 
 - Authorization and mode: user directed us to resolve the P2 found in review. Reuse the approved T09.3 narrow override; no third gate. Worktree is `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-t093-cabinet-ui`, base `300dd7e9b112dde5143e78d5149634c739ad9b3a`. Remote PR #3620 HEAD before this fix: `f85d7a0f8fc482b2401a8c040a18313077ef2156`.
 - Root cause: after a lost first apply response, middleware principal resolution can fail on a transient DB read and return an ordinary 403 before looking up/replaying the idempotency result. The UI handled that and similar 4xx retry responses as definitive, clearing the original key and preview. The previous isolated synthetic probe reproduced the reset.
@@ -2276,3 +2276,17 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: no production/shared staging access; no auth bypass; other pre-existing `.scratch/` files were preserved. The owned review probe remains only as untracked scratch and is not staged.
 - Result: fix validated locally, awaiting commit/push, exact-head checks and fresh independent review. Merge remains HOLD.
 - Next exact action: confirm remote ref still equals `f85d7a0f`, commit only allowed source/test/plan paths, push fast-forward and inspect every exact-head check.
+
+
+## T09.3 PR #3620 — final retry-refusal validation — 2026-10-07T16:28+05:00
+
+- Commit under test: a4cc2a9c493ff09302afe18b91a3eff0662f8047; direct parent f85d7a0f8fc482b2401a8c040a18313077ef2156; PR #3620 base 300dd7e9b112dde5143e78d5149634c739ad9b3a. GitHub reports this exact PR code HEAD, OPEN, mergeable and unmerged.
+- Change: after a lost first apply response, every failure from a retry retains the original preview, payload, idempotency key and locked draft. A definitive refusal on the first apply still allows correction and re-preview.
+- Regression: lost response → CSRF 403 / ordinary principal-resolution 403 / stale-state 409 → successful same-key replay; separately verifies that an initial definitive 409 permits draft correction.
+- Local validation on the code commit: focused component test suite 14 passed; scoped ESLint PASS; npm run type-check -- --pretty false PASS; git diff --check PASS; commit hooks PASS.
+- Exact-head hosted validation: GitHub Actions run https://github.com/drsapaev/final/actions/runs/37612124999 on code HEAD a4cc2a9c completed 26 success / 13 skipped / 0 failed / 0 pending. Backend, Frontend E2E, Frontend unit, lint, build, Code Quality, Frontend-Backend Parity, PR Required Gate, documentation, security/secrets, CodeQL, regression, role, locale and lifecycle checks passed.
+- The 13 skipped jobs are not passes; path-aware or non-applicable examples include staging/production readiness, integration, Docker, k6, metadata, Telegram, nightly DAST, Supabase Preview, classify-and-route and notifications.
+- Tier 2 for this retry refusal scenario: NOT_RUN. The previously accepted bounded PR-specific deferral remains restricted to the four named live specs and runtime base-image equivalence; it does not add coverage for this new P2. T18 and full pre-deploy STAGING_VALIDATION.md remain required.
+- Scope: code commit changes only the approved cabinet screen/test and T09.3 journal paths. No middleware/auth/API/schema/migration, staging, production or shared-environment change. Existing untracked .scratch/ content was preserved and not staged.
+- Review/merge state: GitHub review submissions are []; PR is OPEN, mergeable and unmerged. The P2 is fixed and required CI is green, but independent review remains outstanding. Merge stays HOLD.
+- Next exact action: obtain an independent review of code HEAD a4cc2a9c; handle any scoped finding in this PR. Do not self-approve, merge, start T10 or claim Tier-2 completion.

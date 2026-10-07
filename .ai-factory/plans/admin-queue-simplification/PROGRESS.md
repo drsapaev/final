@@ -1,4 +1,32 @@
-## Current checkpoint — PR #3620 preserve uncertain retries after any refusal (2026-10-07T16:08+05:00)
+## Current checkpoint — T09.3 PR #3620 retry refusal fix and exact-head CI (2026-10-07T16:28+05:00)
+
+Plan version: 3.57
+Current task: T09.3
+Current status: PR_OPEN; P2 fixed, committed and pushed; exact-head applicable CI passed. Independent review pending.
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
+Branch: codex/aqs-t093-cabinet-ui
+Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
+PR code HEAD: a4cc2a9c493ff09302afe18b91a3eff0662f8047
+Parent: f85d7a0f8fc482b2401a8c040a18313077ef2156
+PR: https://github.com/drsapaev/final/pull/3620
+Last updated: 2026-10-07T16:28+05:00
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
+| T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
+| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-pr-3620-final-retry-refusal-validation |
+
+## Current checkpoint
+- Completed: after an apply response is lost, any refusal from retrying the same command retains the original preview, request body/idempotency key and locked draft until a successful replay. The first definitive refusal still permits correction. Focused tests 14/14, scoped ESLint, TypeScript, git diff --check and commit hooks passed. Commit a4cc2a9c is a direct child of expected f85d7a0f and was pushed fast-forward.
+- Exact-head CI: run 37612124999 on code HEAD a4cc2a9c finished with 26 success, 13 skipped, 0 failed, 0 pending. Backend, Frontend E2E/unit/lint/build, Code Quality, PR Required Gate, parity, docs, security/secrets, CodeQL, regression, role, locale and lifecycle checks passed.
+- Changed but not verified: Tier-2 staging for this retry refusal scenario is NOT_RUN. The earlier bounded PR deferral remains limited to four named live specs and runtime base-image equivalence; no Tier-2 credit is added.
+- Remaining: obtain an independent review of code HEAD a4cc2a9c; GitHub currently reports reviews=[]. Keep PR open and do not publish a self-review or merge.
+- Blocker: independent review is pending. The residual T18 live-spec/base-image checks and full STAGING_VALIDATION.md remain required before their stated rollout/deployment gates.
+- Next exact action: request/perform an independent code review of PR #3620 at a4cc2a9c; address any findings in the same T09.3 scope. Do not start T10 until #3620 closes and the base is synchronized.
+- Checks to rerun after another code change: focused component tests, scoped ESLint, TypeScript, git diff --check, then all applicable exact-head PR CI. Tier-2 for this retry edge stays NOT_RUN.
+
+## Superseded checkpoint — PR #3620 generic uncertain-retry local state (2026-10-07T16:08+05:00)
 
 Plan version: 3.56
 Current task: T09.3
