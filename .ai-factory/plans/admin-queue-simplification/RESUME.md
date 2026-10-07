@@ -1,12 +1,12 @@
-## Current resume — T09.3 PR #3620 retry cooldown correction (2026-10-07T13:43+05:00)
+## Current resume — T09.3 PR #3620 retry cooldown correction (2026-10-07T13:45+05:00)
 
-The reviewed code at remote PR HEAD 96580bae had one P2: after an apply response was lost, a retry could be refused by the local 429 cooldown. The catch cleared the original key and allowed edits even though the first command's result remained unresolved.
+PR #3620's code P2 is fixed in 03fbe4f51ae7c91df5c8d53486fa97a4f1ca6777. The component captures whether the apply call is retrying an unknown outcome. If that retry receives HTTP 429, it retains the original preview/key, locks draft/cancel, and leaves the same-key retry available. The regression covers lost first response → cooldown 429 → successful replay with an identical request and key.
 
-Code fix commit 03fbe4f51ae7c91df5c8d53486fa97a4f1ca6777 captures whether the request retries an unknown outcome. If that retry receives 429, it keeps the same preview/key and locks draft/cancel while leaving same-key retry available. Regression covers lost response → 429 → success with an identical request/key.
+Local checks: focused frontend suite 10/10; targeted ESLint; npm run type-check -- --pretty false; commit hooks; and git diff --check all passed. Commit hooks included ESLint and gitleaks. Earlier remote head 96580bae had 12 success, 9 skipped and 0 failures, but that run predates this fix.
 
-Local validation: focused frontend tests 10/10, targeted ESLint, npm run type-check -- --pretty false, pre-commit hooks and git diff --check passed. The old remote head CI run 37591139241 finished with 12 successes, 9 skips, 0 failures; it does not apply to this fix. New code has no hosted CI or staging evidence yet.
+The code fix and plan checkpoint are on the existing PR branch. Last confirmed remote HEAD before this checkpoint was a046143e628e725d9642a54976d8718b4fc5490c. Inspect the PR HEAD after pushing this checkpoint and read its exact-head checks; the older check result is not transferable. Staging for this retry edge is NOT_RUN. The bounded Tier-2 deferral remains limited to the four live specs and runtime base-image equivalence.
 
-The accepted bounded Tier-2 deferral remains limited to the four live specs and runtime base-image equivalence. It does not waive this code P2. The current local branch includes the code fix and this journal checkpoint; push the existing branch and inspect all required checks at its resulting HEAD. Merge remains HOLD until exact-head CI and review. No T10, rollout, production deployment, or v1 activation.
+Merge remains HOLD until the P2 is reviewed and required CI passes on the PR HEAD containing this checkpoint. No T10, rollout, production deployment or v1 activation.
 
 ## Superseded resume — T09.3 PR #3620 local clock regression fixed (2026-10-07T02:11+05:00)
 
