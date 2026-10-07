@@ -31,12 +31,14 @@ function Test-Text {
 function Invoke-GateScenario {
     param(
         [Parameter(Mandatory = $true)]
-        [string] $Task
+        [string] $Task,
+        [string[]] $GateArgs = @()
     )
 
     Push-Location $repoRoot
     try {
-        $outputLines = & $gateLauncher $Task 6>$null
+        $invokeArgs = @($Task) + @($GateArgs)
+        $outputLines = & $gateLauncher @invokeArgs 6>$null
         $exitCode = $LASTEXITCODE
     }
     finally {
@@ -77,26 +79,44 @@ $scenarios = @(
         Id = "migration"
         Name = "Alembic / SQLAlchemy migration"
         Task = "add Alembic revision for existing TelegramStaffLinkToken model table telegram_staff_link_tokens"
+        GateArgs = @()
     },
     [pscustomobject]@{
         Id = "registrar-payment"
         Name = "Registrar payment/status"
         Task = "fix registrar payment status persistence ownership"
+        GateArgs = @()
     },
     [pscustomobject]@{
         Id = "queue-identity"
         Name = "Queue identity"
         Task = "fix queue specialist id Doctor.id canonical ownership"
+        GateArgs = @()
     },
     [pscustomobject]@{
         Id = "telegram-mixed"
         Name = "Telegram mixed contract"
         Task = "align Telegram frontend manager with backend contract"
+        GateArgs = @()
     },
     [pscustomobject]@{
         Id = "notification-catalog"
         Name = "Notification catalog / anti-noise"
         Task = "implement notification preferences mute snooze DND runtime policy"
+        GateArgs = @()
+    },
+    [pscustomobject]@{
+        Id = "exact-reviewed-scope"
+        Name = "Exact reviewed scope and workflow validation"
+        Task = "Update the DevBrain gate using frontend/tsconfig.json and .github/workflows/pr-review-quality-gate.yml"
+        GateArgs = @(
+            "--known-root-cause", "ai/langgraph/scripts/agent_gate.py",
+            "--scope", "ai/langgraph/scripts/agent_gate.py",
+            "--scope", "ai/langgraph/tests/test_agent_gate.py",
+            "--scope", "scripts/devbrain_acceptance.ps1",
+            "--scope", ".github/workflows/pr-review-quality-gate.yml",
+            "--scope", "frontend/tsconfig.json"
+        )
     }
 )
 
@@ -183,6 +203,25 @@ function Test-ScenarioExpectations {
                 $fail.Add("appears routed to unrelated queue/status ownership only") | Out-Null
             }
         }
+        "exact-reviewed-scope" {
+            $expected = @(
+                "ai/langgraph/scripts/agent_gate.py",
+                "ai/langgraph/tests/test_agent_gate.py",
+                "scripts/devbrain_acceptance.ps1",
+                ".github/workflows/pr-review-quality-gate.yml",
+                "frontend/tsconfig.json"
+            )
+            $actual = @($Run.Payload.first_touch_files)
+            if (($actual -join "`n") -ne ($expected -join "`n")) {
+                $fail.Add("first-touch does not exactly preserve the reviewed scope") | Out-Null
+            }
+            if (-not (Test-Text $Run.Output "GitHub Actions workflow YAML parse and actionlint")) {
+                $fail.Add("missing GitHub Actions workflow validation target") | Out-Null
+            }
+            if (Test-Text $Run.Output "docker compose") {
+                $fail.Add("workflow YAML was incorrectly routed to Docker Compose validation") | Out-Null
+            }
+        }
         default {
             $fail.Add("unknown scenario id: $($Scenario.Id)") | Out-Null
         }
@@ -202,7 +241,7 @@ $warnCount = 0
 $failCount = 0
 
 foreach ($scenario in $scenarios) {
-    $run = Invoke-GateScenario -Task $scenario.Task
+    $run = Invoke-GateScenario -Task $scenario.Task -GateArgs @($scenario.GateArgs)
     $check = Test-ScenarioExpectations -Scenario $scenario -Run $run
 
     if ($check.Fail.Count -gt 0) {
