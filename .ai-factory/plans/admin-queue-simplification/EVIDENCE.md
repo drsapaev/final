@@ -2,6 +2,22 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
+## T09.3 P2 retry-cooldown fix — 2026-10-07T13:43+05:00
+
+- Commit under test: 03fbe4f51ae7c91df5c8d53486fa97a4f1ca6777; base 300dd7e9b112dde5143e78d5149634c739ad9b3a; prior remote PR HEAD 96580bae84930efb18a24d5c61429ba0441fcf4b.
+- Environment: local attached Windows PR worktree, Node 24.15.0/npm 11.12.1, Python 3.11.9 tooling not needed for this UI-only fix. No staging, PostgreSQL, production, live app or patient data used.
+- Execution mode: narrow_override, reusing the approved T09.3 gate and its known-root-cause retry. .scratch/T09.3-SCOPE.md forbids a third gate; this patch remains within its already-approved cabinet screen and test files.
+- Allowed/actual code paths: frontend/src/components/admin/QueueCabinetManagement.tsx and frontend/src/components/admin/__tests__/QueueCabinetManagement.test.tsx. The T09.3 plan progress/resume/evidence and main plan were also refreshed. No backend/API/middleware, schema, ownership, lifecycle, route, ops or staging paths changed.
+- Original failure: a lost apply response sets outcome unknown; a subsequent 429 (including the existing client-side cooldown rejection before dispatch) entered generic 4xx handling, which cleared the key/preview and unlocked editing despite not resolving the first attempt.
+- Correction: the component remembers when the submitted command retries an uncertain outcome; a retry 429 preserves that outcome, preview and same idempotency key, locks the draft/cancel action, and keeps the same-key retry available.
+- Validation: npm run test:run -- src/components/admin/__tests__/QueueCabinetManagement.test.tsx — PASS, 10 tests; npx --no-install eslint src/components/admin/QueueCabinetManagement.tsx src/components/admin/__tests__/QueueCabinetManagement.test.tsx — PASS; npm run type-check -- --pretty false — PASS; git diff --cached --check and commit hooks (including ESLint, gitleaks and hygiene hooks) — PASS.
+- Regression: lost first response → retry gets synthetic 429 → UI retains locked pending state → successful replay uses the exact original request and key. Prior owned reproduction at frontend/.scratch/review-3620-96580ba/pending-outcome.test.tsx failed against the old implementation; this test is now in the canonical component suite.
+- CI: before the fix, run 37591139241 on remote HEAD 96580bae finished with 12 success, 9 skipped, 0 failure. It is not evidence for this commit. New exact-head CI is NOT_RUN until push.
+- Result: local code validation PASS. Staging/browser/system and PostgreSQL checks for this patch NOT_RUN. Existing Tier-2 deferral remains partial and bounded; no deferred coverage is credited.
+- PR: #3620, existing branch codex/aqs-t093-cabinet-ui; local fix commit is not yet pushed. Merge: none.
+- Next exact action: push the code and journal checkpoint, inspect exact-head required CI and review. Keep merge HOLD until then.
+
+
 ## T09.2 generated API freshness correction and exact-head CI — 2026-10-06T13:39+05:00
 
 - Commits under test: original code commit `3260efcae2cae69aa47b89d09e9a52885bd8586f`; generated-artifact correction `80e5ad80e`; exact code/evidence HEAD `ca6a1ba8e34ab02cb8773ca38256c33b22516895`. Base is merged PR #3613 commit `1d146d857e1570ff2259975f081f80dc0b31ae82`.

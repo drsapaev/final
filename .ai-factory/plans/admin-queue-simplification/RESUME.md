@@ -1,4 +1,14 @@
-## Current resume — T09.3 PR #3620 local clock regression fixed (2026-10-07T02:11+05:00)
+## Current resume — T09.3 PR #3620 retry cooldown correction (2026-10-07T13:43+05:00)
+
+The reviewed code at remote PR HEAD 96580bae had one P2: after an apply response was lost, a retry could be refused by the local 429 cooldown. The catch cleared the original key and allowed edits even though the first command's result remained unresolved.
+
+Code fix commit 03fbe4f51ae7c91df5c8d53486fa97a4f1ca6777 captures whether the request retries an unknown outcome. If that retry receives 429, it keeps the same preview/key and locks draft/cancel while leaving same-key retry available. Regression covers lost response → 429 → success with an identical request/key.
+
+Local validation: focused frontend tests 10/10, targeted ESLint, npm run type-check -- --pretty false, pre-commit hooks and git diff --check passed. The old remote head CI run 37591139241 finished with 12 successes, 9 skips, 0 failures; it does not apply to this fix. New code has no hosted CI or staging evidence yet.
+
+The accepted bounded Tier-2 deferral remains limited to the four live specs and runtime base-image equivalence. It does not waive this code P2. The current local branch includes the code fix and this journal checkpoint; push the existing branch and inspect all required checks at its resulting HEAD. Merge remains HOLD until exact-head CI and review. No T10, rollout, production deployment, or v1 activation.
+
+## Superseded resume — T09.3 PR #3620 local clock regression fixed (2026-10-07T02:11+05:00)
 
 PR #3620 remains OPEN at base d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc and remote HEAD 58f423c12688b03449da52479f097c444bdaa9cc. Its earlier exact-head run 37516137885 failed twice on four QR token expiry tests. The test-only correction and plan checkpoint are committed together at current local branch HEAD, one commit ahead and not pushed; the preceding code/evidence HEAD eb70338765d38751aeb757aac842f536ba7dd7d8 passed run 37513876028 with 28 success and 13 skipped.
 

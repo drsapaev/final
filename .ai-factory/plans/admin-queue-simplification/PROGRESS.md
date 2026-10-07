@@ -1,4 +1,31 @@
-## Current checkpoint — PR #3620 bounded Tier-2 deferral decision (2026-10-07T13:04+05:00)
+## Current checkpoint — PR #3620 cabinet retry 429 fix (2026-10-07T13:43+05:00)
+
+Plan version: 3.51
+Current task: T09.3
+Current status: PR_OPEN; P2 fix committed locally; journal checkpoint and push pending; new exact-head CI not run.
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
+Branch: codex/aqs-t093-cabinet-ui
+Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
+Remote PR HEAD before this fix: 96580bae84930efb18a24d5c61429ba0441fcf4b
+Local code commit: 03fbe4f51ae7c91df5c8d53486fa97a4f1ca6777
+PR: https://github.com/drsapaev/final/pull/3620
+Last updated: 2026-10-07T13:43+05:00
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
+| T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
+| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-p2-review-fix |
+
+## Current checkpoint
+- Completed: fixed pending apply handling when a retry after lost response receives 429. Focused frontend suite: 10 passed; targeted ESLint and TypeScript checks passed; pre-commit hooks passed; staged diff whitespace check passed. Only the cabinet screen and its focused test changed in the code commit.
+- Changed but not verified: code commit 03fbe4f is local on the existing PR branch and not yet pushed. The previous remote HEAD 96580bae CI finished with 12 success, 9 skipped, 0 failed; those results do not validate this fix. The plan journal checkpoint is being committed next.
+- Remaining: push the code and journal commits to PR #3620, inspect every applicable check on the resulting HEAD, and request/obtain review separately. Keep merge on hold until the P2 fix is reviewed and exact-head required CI passes. The previously accepted bounded Tier-2 deferral remains PR-specific and gives no completion credit for its four live specs or runtime base-image equivalence.
+- Blocker: no CI has run on 03fbe4f; this patch has no new staging run. Full T18 and the pre-deployment STAGING_VALIDATION.md remain required.
+- Next exact action: commit the T09.3 evidence checkpoint, push the existing branch, then inspect exact-head CI. Do not merge, deploy, activate v1, or start T10 from this checkpoint.
+- Checks to rerun after the next PR change: all applicable exact-head checks; before production rollout run the full STAGING_VALIDATION.md checklist.
+
+## Superseded checkpoint — PR #3620 bounded Tier-2 deferral decision (2026-10-07T13:04+05:00)
 
 Plan version: 3.50
 Current task: T09.3
