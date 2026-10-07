@@ -1,12 +1,12 @@
-## Current resume — T09.3 PR #3620 CSRF retry correction (2026-10-07T15:14+05:00)
+## Current resume — T09.3 PR #3620 CSRF retry correction (2026-10-07T15:29+05:00)
 
-PR #3620 has a follow-up P2 fix in the working tree: when the first cabinet apply response is lost and a retry receives a CSRF `403`, the screen preserves the uncertain outcome, preview, original idempotency key and draft lock. The retry remains available. CSRF rejection is recognized from the standard `X-CSRF-Status: rejected` header or the known `missing_cookie`, `missing_header`, and `mismatch` reasons. A focused regression covers lost response → CSRF `403` → successful retry with the identical body and key.
+PR #3620 code commit `ea51b067e33891c31d6706415bb3d96678a7698d` fixes the follow-up P2: when the first cabinet apply response is lost and a retry receives a CSRF `403`, the screen preserves the uncertain outcome, preview, original idempotency key and draft lock. The retry remains available. CSRF rejection is recognized from the standard `X-CSRF-Status: rejected` header or the known `missing_cookie`, `missing_header`, and `mismatch` reasons. A focused regression covers lost response → CSRF `403` → successful retry with the identical body and key.
 
 Validation on the changed files: focused component suite **11/11**, scoped ESLint **PASS**, TypeScript **PASS**, `git diff --check` **PASS**. The first check attempt was run from repository root, where frontend scripts/dependencies are absent; reruns from `frontend/` passed. An independent read-only probe before the fix reproduced the reset of `applyOutcomeUnknown`, preview and key on a CSRF 403.
 
-Last confirmed remote PR HEAD is `1b84be10da1c0e31fb6979e507374980cd3168ec`; its hosted checks were 26 success / 13 skipped / 0 failures, but they predate this change. Commit/push this patch and journals as a fast-forward, then read the new exact-head checks. Do not attribute prior CI to the fix.
+The fix was pushed as a fast-forward from `1b84be10` to `ea51b067`. Exact-head run 37606291652 completed **26 success / 13 skipped / 0 failed / 0 pending**. Backend, Frontend E2E, unit/build/lint, Parity, PR Required Gate, CodeQL and applicable quality/security checks passed. The 13 path-aware/nightly/non-applicable skips (including staging/readiness, Docker, integration/load, metadata and nightly DAST) are not passes.
 
-Tier 2 for this retry case was NOT_RUN. The separately accepted PR-specific bounded Tier-2 deferral remains only for the four named live specs and runtime base-image equivalence; it earns no coverage credit. T18/full pre-deploy staging remains required. Merge stays on hold pending review of the final code and passing required checks.
+Tier 2 for this retry case was NOT_RUN. The separately accepted PR-specific bounded Tier-2 deferral remains only for the four named live specs and runtime base-image equivalence; it earns no coverage credit. T18/full pre-deploy staging remains required. PR #3620 remains OPEN; independent review is outstanding, so merge stays on hold.
 
 ## Superseded resume — T09.3 PR #3620 retry cooldown correction (2026-10-07T13:45+05:00)
 

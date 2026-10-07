@@ -1,15 +1,15 @@
-## Current checkpoint — PR #3620 preserve uncertain apply after CSRF 403 (2026-10-07T15:14+05:00)
+## Current checkpoint — PR #3620 CSRF retry fix pushed and validated (2026-10-07T15:29+05:00)
 
-Plan version: 3.53
+Plan version: 3.54
 Current task: T09.3
-Current status: PR_OPEN; CSRF retry fix and focused regression are locally validated; code, plan checkpoint, push and exact-head CI remain.
+Current status: PR_OPEN; code fix `ea51b067e33891c31d6706415bb3d96678a7698d` is pushed; exact-head CI passed with 26 success, 13 skipped, 0 failed, 0 pending.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
 Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
-Last confirmed remote PR HEAD before this checkpoint: 1b84be10da1c0e31fb6979e507374980cd3168ec
-Code fix commit: pending; this worktree has the two scoped source/test changes.
+Previous remote PR HEAD: 1b84be10da1c0e31fb6979e507374980cd3168ec
+Code fix commit / current remote PR HEAD: ea51b067e33891c31d6706415bb3d96678a7698d
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-07T15:14+05:00
+Last updated: 2026-10-07T15:29+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -18,11 +18,11 @@ Last updated: 2026-10-07T15:14+05:00
 | T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-csrf-retry-p2-fix |
 
 ## Current checkpoint
-- Completed: the new retry fix keeps the unknown apply outcome, original preview/key and draft lock when a retry gets CSRF 403 before idempotency replay. Focused screen suite is 11/11; scoped ESLint, TypeScript and `git diff --check` pass. The test proves the next retry uses the identical request/key and succeeds.
-- Changed but not verified: source/test changes and this evidence checkpoint are not yet committed or pushed. Existing exact-head CI on 1b84be10 is green (26 success, 13 skipped), but predates this fix and does not validate it.
-- Remaining: inspect the final diff, commit only the two allowed source/test files plus T09.3 journals, push as a fast-forward from remote 1b84be10, then inspect all checks on the resulting PR HEAD.
-- Blocker: none for the scoped fix. Tier 2 staging for this retry edge was NOT_RUN; the existing bounded PR-specific deferral remains limited to the four live specs and runtime base-image equivalence. T18 and pre-deployment STAGING_VALIDATION.md remain required.
-- Next exact action: run final `git diff --check`, review staged paths, commit, push without rewriting the branch, then inspect exact-head CI. Do not merge, deploy, activate v1, or start T10 from this checkpoint.
+- Completed: commit `ea51b067` preserves the pending cabinet apply after a lost response and a CSRF 403; the same request/key remains retryable. Focused component suite 11/11, scoped ESLint, TypeScript, commit hooks and `git diff --check` passed. Exact-head run 37606291652 passed with 26 success, 13 skipped, 0 failed and 0 pending; Backend, Frontend E2E, unit/build/lint, Parity, PR Required Gate and applicable security/quality jobs passed.
+- Changed but not verified: no source or test changes remain unverified. The new code has not received an independent GitHub review. Path-aware skips are not passes.
+- Remaining: obtain an independent review of the final PR diff. PR #3620 is OPEN and unmerged. Keep merge on hold pending that review. The previously accepted PR-specific bounded Tier-2 deferral remains limited to four live specs and runtime base-image equivalence; none receives coverage credit.
+- Blocker: independent review remains outstanding. Tier 2 for this retry edge was NOT_RUN; T18 and the full pre-deployment STAGING_VALIDATION.md remain required.
+- Next exact action: inspect/review PR #3620 at HEAD `ea51b067e33891c31d6706415bb3d96678a7698d`; do not merge or start T10 from this checkpoint.
 - Checks to rerun after the push: all applicable exact-head checks; before production rollout run the full STAGING_VALIDATION.md checklist.
 
 ## Superseded checkpoint — PR #3620 bounded Tier-2 deferral decision (2026-10-07T13:04+05:00)
