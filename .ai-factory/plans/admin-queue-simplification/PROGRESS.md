@@ -1,15 +1,16 @@
-## Current checkpoint — PR #3620 CSRF retry fix pushed and validated (2026-10-07T15:29+05:00)
+## Current checkpoint — PR #3620 CSRF retry fix pushed and validated (2026-10-07T15:32+05:00)
 
-Plan version: 3.54
+Plan version: 3.55
 Current task: T09.3
-Current status: PR_OPEN; code fix `ea51b067e33891c31d6706415bb3d96678a7698d` is pushed; exact-head CI passed with 26 success, 13 skipped, 0 failed, 0 pending.
+Current status: PR_OPEN; code commit `ea51b067e33891c31d6706415bb3d96678a7698d` passed exact-head CI with 26 success, 13 skipped, 0 failed, 0 pending. Evidence-only checkpoint `ed965feabff94e123fc4a4dbb204ae41bf770bb2` is pushed; GitHub triggered no PR workflows for that docs-only commit.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
 Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
-Previous remote PR HEAD: 1b84be10da1c0e31fb6979e507374980cd3168ec
-Code fix commit / current remote PR HEAD: ea51b067e33891c31d6706415bb3d96678a7698d
+Previous remote PR HEAD before code fix: 1b84be10da1c0e31fb6979e507374980cd3168ec
+Code commit under test: ea51b067e33891c31d6706415bb3d96678a7698d
+Latest confirmed PR HEAD: ed965feabff94e123fc4a4dbb204ae41bf770bb2 (evidence-only descendant; no code changes after tested commit).
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-07T15:29+05:00
+Last updated: 2026-10-07T15:32+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -20,9 +21,9 @@ Last updated: 2026-10-07T15:29+05:00
 ## Current checkpoint
 - Completed: commit `ea51b067` preserves the pending cabinet apply after a lost response and a CSRF 403; the same request/key remains retryable. Focused component suite 11/11, scoped ESLint, TypeScript, commit hooks and `git diff --check` passed. Exact-head run 37606291652 passed with 26 success, 13 skipped, 0 failed and 0 pending; Backend, Frontend E2E, unit/build/lint, Parity, PR Required Gate and applicable security/quality jobs passed.
 - Changed but not verified: no source or test changes remain unverified. The new code has not received an independent GitHub review. Path-aware skips are not passes.
-- Remaining: obtain an independent review of the final PR diff. PR #3620 is OPEN and unmerged. Keep merge on hold pending that review. The previously accepted PR-specific bounded Tier-2 deferral remains limited to four live specs and runtime base-image equivalence; none receives coverage credit.
+- Remaining: obtain an independent review of the final code diff at PR HEAD `ed965feabff94e123fc4a4dbb204ae41bf770bb2` (last code-bearing commit remains `ea51b067`). PR #3620 is OPEN and unmerged. Keep merge on hold pending that review. The previously accepted PR-specific bounded Tier-2 deferral remains limited to four live specs and runtime base-image equivalence; none receives coverage credit.
 - Blocker: independent review remains outstanding. Tier 2 for this retry edge was NOT_RUN; T18 and the full pre-deployment STAGING_VALIDATION.md remain required.
-- Next exact action: inspect/review PR #3620 at HEAD `ea51b067e33891c31d6706415bb3d96678a7698d`; do not merge or start T10 from this checkpoint.
+- Next exact action: inspect/review PR #3620 at its latest HEAD, verify the code-bearing commit is still `ea51b067`, and do not merge or start T10 from this checkpoint.
 - Checks to rerun after the push: all applicable exact-head checks; before production rollout run the full STAGING_VALIDATION.md checklist.
 
 ## Superseded checkpoint — PR #3620 bounded Tier-2 deferral decision (2026-10-07T13:04+05:00)
