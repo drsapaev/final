@@ -230,6 +230,37 @@ class MemoryTests(unittest.TestCase):
   path.write_text(json.dumps(data),encoding="utf-8")
   item=self.runmem("recall",extra=("--query","API origin"))["knowledge"][0]
   self.assertEqual(item["provenance_state"],"worktree_only"); self.assertEqual(item["scope"],"worktree"); self.assertFalse(item["current_assertion"])
+ def test_exact_task_recall_uses_checkpoint_goal_and_keeps_task_local_knowledge(self):
+  api_item=self.curated()
+  source_hash=hashlib.sha256((self.root/"source.py").read_bytes()).hexdigest()
+  queue_item=dict(KN,id="curated-queue",key="queue-owner",topic="queue",summary="Queue identity and ordering are backend-owned",tags=["queue","identity"],anchors=[{"path":"source.py","sha256":source_hash}])
+  curated_path=self.root/"docs"/"devbrain"/"memory"/"curated.json"
+  curated_data=json.loads(curated_path.read_text(encoding="utf-8")); curated_data["knowledge"].append(queue_item)
+  curated_path.write_text(json.dumps(curated_data),encoding="utf-8")
+  subprocess.run(["git","-C",str(self.root),"add",str(curated_path.relative_to(self.root))],check=True)
+  subprocess.run(["git","-C",str(self.root),"commit","-qm","add unrelated curated fixture"],check=True)
+
+  goal="Inspect frontend API and WebSocket origin resolution"
+  task=self.runmem("begin",{"goal":goal,"query":goal})
+  exact=self.runmem("recall",extra=("--task-id",task["task_id"]))
+  self.assertEqual([item["id"] for item in exact["knowledge"]],[api_item["id"]])
+  self.assertEqual(exact["checkpoint"]["goal"],goal)
+  self.assertEqual(exact["active_tasks"],[])
+
+  local=dict(KN,id="task-local",key="task-local",scope="task",topic="registrar",summary="Task-local registrar note")
+  shared=dict(KN,id="shared-gate-lesson",key="gate-path-parsing",kind="lesson",topic="agent-gate",summary="Gate path parsing preserves explicit companion scope",tags=["gate","path","scope"],anchors=[{"path":"source.py","sha256":source_hash}])
+  private=dict(KN,id="other-task-private",key="private-gate-note",scope="task",topic="agent-gate",summary="Private gate path parsing note",tags=["gate","path"])
+  self.capture("previous-task",knowledge=[shared,private],checkpoint=dict(CP,goal="Review gate"))
+  self.capture("gate-task",knowledge=[local],checkpoint=dict(CP,goal="Fix gate path parsing"))
+  local_recall=self.runmem("recall",extra=("--task-id","gate-task"))
+  self.assertEqual({item["id"] for item in local_recall["knowledge"]},{"task-local","shared-gate-lesson"})
+  self.assertNotIn("other-task-private",[item["id"] for item in local_recall["knowledge"]])
+  self.assertEqual(local_recall["checkpoint"]["goal"],"Fix gate path parsing")
+  self.assertEqual(local_recall["active_tasks"],[])
+
+  unknown=self.runmem("recall",extra=("--task-id","unknown-task"))
+  self.assertEqual(unknown["knowledge"],[])
+  self.assertEqual(unknown["active_tasks"],[])
  def test_concurrent_writes_and_many_records_bounded(self):
   ps=[]
   for i in range(3):
