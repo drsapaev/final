@@ -8,6 +8,8 @@ import json
 import posixpath
 import shutil
 import subprocess
+import sys
+from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -67,7 +69,9 @@ def container(service="backend", *, project=PROJECT, status="running", **changes
 
 
 @pytest.fixture
-def staging(tmp_path):
+def staging(tmp_path, monkeypatch):
+    # Existing pure tooling tests must never query the host's real registry.
+    monkeypatch.setattr(guard, "IS_WINDOWS", False)
     env = tmp_path / "ops" / "staging.env"
     env.parent.mkdir()
     env.write_text(
@@ -109,6 +113,8 @@ def session(staging, monkeypatch):
         return []
 
     monkeypatch.setattr(staging, "preflight", preflight)
+    monkeypatch.setattr(staging, "host_storage", lambda **kwargs: None)
+    monkeypatch.setattr(staging, "linux_storage", lambda **kwargs: None)
     monkeypatch.setattr(staging, "boot_id", lambda: "boot-1")
     monkeypatch.setattr(staging, "ready", lambda: None)
     return staging, keeper
@@ -125,6 +131,290 @@ def args(action="session", **changes):
     }
     result.update(changes)
     return argparse.Namespace(**result)
+
+
+@pytest.fixture
+def registry(monkeypatch):
+    """Model only read-only winreg operations; never read actual registrations."""
+    def install(rows):
+        @contextmanager
+        def open_key(parent, name):
+            if parent == "HKCU":
+                assert name == r"Software\Microsoft\Windows\CurrentVersion\Lxss"
+                yield "registrations"
+            else:
+                assert parent == "registrations"
+                yield int(name)
+
+        def value(key, name):
+            if name not in rows[key]:
+                raise OSError("unavailable registration value")
+            return rows[key][name], 1
+
+        module = SimpleNamespace(
+            HKEY_CURRENT_USER="HKCU", OpenKey=open_key,
+            QueryInfoKey=lambda key: (len(rows), 0, 0),
+            EnumKey=lambda key, index: str(index), QueryValueEx=value,
+        )
+        monkeypatch.setitem(sys.modules, "winreg", module)
+        return module
+
+    return install
+
+
+@pytest.mark.parametrize("base", [r"D:\WSL\Ubuntu-24.04", r"\\?\D:\WSL\Ubuntu-24.04"])
+def test_registered_distro_storage_resolves_other_volume_and_extended_path(registry, base):
+    registry([
+        {"DistributionName": "Ubuntu-other", "BasePath": r"C:\WSL\other"},
+        {"DistributionName": "Ubuntu-24.04", "BasePath": base},
+    ])
+    assert guard.windows_distro_base_path("ubuntu-24.04") == r"D:\WSL\Ubuntu-24.04"
+
+
+@pytest.mark.parametrize("rows", [
+    [],
+    [{"DistributionName": "Ubuntu-other", "BasePath": r"D:\WSL\other"}],
+    [{"DistributionName": "Ubuntu-24.04"}],
+    [{"DistributionName": 123, "BasePath": r"D:\WSL\distro"}],
+    [
+        {"DistributionName": "Ubuntu-24.04", "BasePath": r"D:\WSL\one"},
+        {"DistributionName": "ubuntu-24.04", "BasePath": r"E:\WSL\two"},
+    ],
+])
+def test_unknown_or_ambiguous_distro_registration_fails_before_boot(
+    staging, registry, monkeypatch, rows
+):
+    registry(rows)
+    monkeypatch.setattr(guard, "IS_WINDOWS", True)
+    monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot"))
+    monkeypatch.setattr(guard, "native", lambda *a, **k: pytest.fail("no native command"))
+    with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN"):
+        staging.execute(args())
+
+
+@pytest.mark.parametrize("base", [
+    None, "", "D:relative", r"\relative", r"\\server\share\distro",
+    r"\\?\UNC\server\share\distro", r"%USERPROFILE%\distro", "D:\\private\npath",
+])
+def test_invalid_backing_paths_fail_without_echoing_registry_values(registry, base):
+    registry([{"DistributionName": "Ubuntu-24.04", "BasePath": base}])
+    with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN") as error:
+        guard.windows_distro_base_path("Ubuntu-24.04")
+    assert "private" not in str(error.value) and "USERPROFILE" not in str(error.value)
+
+
+def test_registry_failure_is_safe_and_does_not_invoke_wsl(staging, registry, monkeypatch):
+    module = registry([])
+
+    def unavailable(*args):
+        raise OSError("private registry error")
+
+    monkeypatch.setattr(module, "OpenKey", unavailable)
+    monkeypatch.setattr(guard, "IS_WINDOWS", True)
+    monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot"))
+    monkeypatch.setattr(guard, "native", lambda *a, **k: pytest.fail("no native command"))
+    with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN") as error:
+        staging.execute(args("start", no_build=False))
+    assert "private" not in str(error.value)
+
+
+@pytest.mark.parametrize("action", ["preflight", "check", "start", "session"])
+def test_full_vhd_volume_blocks_before_keeper_even_when_worktree_has_space(
+    staging, registry, monkeypatch, action
+):
+    registry([{"DistributionName": "Ubuntu-24.04", "BasePath": r"\\?\D:\WSL\Ubuntu-24.04"}])
+    monkeypatch.setattr(guard, "IS_WINDOWS", True)
+    measured = []
+
+    def usage(path):
+        measured.append(path)
+        return SimpleNamespace(free=0 if str(path).startswith("D:") else 6 * guard.GIB)
+
+    monkeypatch.setattr(guard.shutil, "disk_usage", usage)
+    monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no WSL keeper"))
+    monkeypatch.setattr(guard, "native", lambda *a, **k: pytest.fail("no WSL/native command"))
+    with pytest.raises(guard.GuardError, match="WSL_BACKING_DISK_LOW"):
+        staging.execute(args(action))
+    assert measured == [r"D:\WSL\Ubuntu-24.04"]
+
+
+def test_build_with_healthy_backing_but_low_worktree_drive_stops_before_keeper(
+    staging, registry, monkeypatch
+):
+    registry([{"DistributionName": "Ubuntu-24.04", "BasePath": r"D:\WSL\Ubuntu-24.04"}])
+    monkeypatch.setattr(guard, "IS_WINDOWS", True)
+    monkeypatch.setattr(guard.shutil, "disk_usage", lambda path: SimpleNamespace(
+        free=20 * guard.GIB if str(path).startswith("D:") else guard.GIB
+    ))
+    monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot"))
+    monkeypatch.setattr(guard, "native", lambda *a, **k: pytest.fail("no Compose/native command"))
+    with pytest.raises(guard.GuardError, match="^DISK_LOW"):
+        staging.execute(args("start", no_build=False))
+    assert staging.summary["wsl_backing_disk_free_gib"] == 20
+    assert staging.summary["host_disk_free_gib"] == 1
+
+
+@pytest.mark.parametrize("build_possible,reserve", [(False, 2), (True, 10)])
+@pytest.mark.parametrize("difference", [-1, 0])
+def test_host_storage_reserve_uses_exact_byte_boundary(
+    staging, monkeypatch, build_possible, reserve, difference
+):
+    monkeypatch.setattr(guard.shutil, "disk_usage", lambda path: SimpleNamespace(
+        free=reserve * guard.GIB + difference
+    ))
+    if difference < 0:
+        with pytest.raises(guard.GuardError, match="WSL_BACKING_DISK_LOW"):
+            staging.host_storage(build_possible=build_possible)
+    else:
+        staging.host_storage(build_possible=build_possible)
+        assert staging.summary["wsl_backing_disk_free_gib"] == reserve
+
+
+@pytest.mark.parametrize("no_build", [False, True])
+def test_opaque_session_requires_build_reserve_unless_caller_promises_no_build(
+    session, monkeypatch, no_build
+):
+    staging, keeper = session
+    monkeypatch.setattr(staging, "host_storage", guard.WslStaging.host_storage.__get__(staging))
+    monkeypatch.setattr(guard.shutil, "disk_usage", lambda path: SimpleNamespace(free=6 * guard.GIB))
+    child_calls = []
+    monkeypatch.setattr(guard.subprocess, "run", lambda command, **kwargs:
+        child_calls.append(command) or SimpleNamespace(returncode=0))
+    invocation = args(no_build=no_build, command=["opaque.exe", "build-like literal"])
+    if no_build:
+        assert staging.execute(invocation)["result"] == "PASS"
+        assert child_calls == [invocation.command]
+        assert keeper.stdin.closed
+    else:
+        with pytest.raises(guard.GuardError, match="WSL_BACKING_DISK_LOW"):
+            staging.execute(invocation)
+        assert not child_calls and not keeper.stdin.closed
+
+
+def test_unmeasurable_backing_volume_does_not_boot_or_echo_path(staging, monkeypatch):
+    def unavailable(path):
+        raise OSError("private backing path")
+
+    monkeypatch.setattr(guard.shutil, "disk_usage", unavailable)
+    monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: pytest.fail("no boot"))
+    with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN") as error:
+        staging.execute(args())
+    assert "private" not in str(error.value)
+
+
+@pytest.fixture
+def linux_storage_stub(staging, monkeypatch):
+    options = {"/": "rw,relatime,errors=remount-ro", "/custom Docker data": "rw"}
+    space = {path: 20 * guard.GIB for path in options}
+    calls = []
+
+    def docker(*command, **kwargs):
+        assert command == ("info", "--format", "{{json .DockerRootDir}}")
+        return json.dumps("/custom Docker data")
+
+    def wsl(*command, **kwargs):
+        calls.append(command)
+        assert command[:2] == ("env", "-i") and "LC_ALL=C" in command
+        if "findmnt" in command:
+            path = command[command.index("--target") + 1]
+            return json.dumps({"filesystems": [{"target": path, "options": options[path]}]})
+        assert "df" in command and command[-2] == "--"
+        return f"Avail\n {space[command[-1]]}"
+
+    monkeypatch.setattr(staging, "docker", docker)
+    monkeypatch.setattr(staging, "wsl", wsl)
+    return options, space, calls
+
+
+def test_linux_storage_checks_real_docker_root_and_exact_read_only_token(staging, linux_storage_stub):
+    _, _, calls = linux_storage_stub
+    staging.linux_storage(build_possible=True)
+    assert set(staging.summary["wsl_storage"]) == {"/", "/custom Docker data"}
+    assert staging.summary["wsl_storage"]["/custom Docker data"]["free_gib"] == 20
+    assert [command[-1] for command in calls if "df" in command] == ["/", "/custom Docker data"]
+
+
+@pytest.mark.parametrize("response", ["private", "null", '"relative"', '""', '"/private\\npath"'])
+def test_unverifiable_docker_storage_path_fails_safely(staging, monkeypatch, response):
+    monkeypatch.setattr(staging, "docker", lambda *a, **k: response)
+    monkeypatch.setattr(staging, "wsl", lambda *a, **k: pytest.fail("invalid Docker root"))
+    with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN") as error:
+        staging.linux_storage(build_possible=False)
+    assert "private" not in str(error.value)
+
+
+@pytest.mark.parametrize("path", ["/", "/custom Docker data"])
+def test_read_only_root_or_docker_storage_fails(staging, linux_storage_stub, path):
+    options, _, _ = linux_storage_stub
+    options[path] = "ro,relatime"
+    with pytest.raises(guard.GuardError, match="WSL_STORAGE_READ_ONLY"):
+        staging.linux_storage(build_possible=False)
+
+
+@pytest.mark.parametrize("build_possible,reserve", [(False, 2), (True, 10)])
+@pytest.mark.parametrize("difference", [-1, 0])
+def test_linux_storage_reserve_uses_exact_byte_boundary(
+    staging, linux_storage_stub, build_possible, reserve, difference
+):
+    _, space, _ = linux_storage_stub
+    space["/custom Docker data"] = reserve * guard.GIB + difference
+    if difference < 0:
+        with pytest.raises(guard.GuardError, match="WSL_DISK_LOW"):
+            staging.linux_storage(build_possible=build_possible)
+    else:
+        staging.linux_storage(build_possible=build_possible)
+
+
+@pytest.mark.parametrize("response", [
+    "not json", "{}", '{"filesystems":[]}',
+    '{"filesystems":[{"target":"/","options":"unknown"}]}',
+    '{"filesystems":[{"target":"/","options":null}]}',
+])
+def test_unverifiable_linux_mount_fails_safely(staging, linux_storage_stub, monkeypatch, response):
+    monkeypatch.setattr(staging, "wsl", lambda *a, **k: response)
+    with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN"):
+        staging.linux_storage(build_possible=False)
+
+
+@pytest.mark.parametrize("available", [
+    "", "Avail", "Avail\n-1", "Avail\nprivate", "Avail\n1\n2", "Unknown\n99999999999",
+])
+def test_unverifiable_linux_space_fails_safely(staging, linux_storage_stub, monkeypatch, available):
+    original = staging.wsl
+    monkeypatch.setattr(staging, "wsl", lambda *a, **k:
+        available if "df" in a else original(*a, **k))
+    with pytest.raises(guard.GuardError, match="WSL_STORAGE_UNKNOWN") as error:
+        staging.linux_storage(build_possible=False)
+    assert "private" not in str(error.value)
+
+
+@pytest.mark.parametrize("action", ["start", "session"])
+def test_linux_storage_failure_closes_keeper_before_compose_or_child(session, monkeypatch, action):
+    staging, keeper = session
+
+    def read_only(**kwargs):
+        raise guard.GuardError("WSL_STORAGE_READ_ONLY")
+
+    monkeypatch.setattr(staging, "linux_storage", read_only)
+    monkeypatch.setattr(staging, "compose_command", lambda *a, **k: pytest.fail("no Compose mutation"))
+    monkeypatch.setattr(guard.subprocess, "run", lambda *a, **k: pytest.fail("no child"))
+    with pytest.raises(guard.GuardError, match="WSL_STORAGE_READ_ONLY"):
+        staging.execute(args(action))
+    assert keeper.stdin.closed and keeper.waited
+
+
+def test_stop_bypasses_storage_blockers_but_only_runs_owned_down(session, registry, monkeypatch):
+    staging, keeper = session
+    registry([{"DistributionName": "Ubuntu-24.04", "BasePath": r"D:\WSL\Ubuntu-24.04"}])
+    monkeypatch.setattr(guard, "IS_WINDOWS", True)
+    monkeypatch.setattr(staging, "host_storage", guard.WslStaging.host_storage.__get__(staging))
+    monkeypatch.setattr(guard.shutil, "disk_usage", lambda *a: pytest.fail("Stop must not demand space"))
+    monkeypatch.setattr(staging, "linux_storage", lambda **k: pytest.fail("Stop must not demand writable storage"))
+    commands = []
+    monkeypatch.setattr(staging, "compose_command", lambda *a, **k: commands.append((a, k)))
+    assert staging.execute(args("stop"))["storage_checks"] == "BYPASSED_FOR_OWNED_STOP"
+    assert commands == [(('down',), {"timeout": 180})]
+    assert keeper.stdin.closed and keeper.waited
 
 
 def test_native_failure_keeps_secret_stderr_and_arguments_private(monkeypatch):
@@ -420,7 +710,15 @@ def test_check_action_cannot_pass_unhealthy_runtime(session, monkeypatch):
 
 def test_start_rejects_build_before_mutation_when_disk_is_low(session, monkeypatch):
     staging, keeper = session
-    staging.summary["host_disk_free_gib"] = 1
+    monkeypatch.setattr(
+        staging, "host_storage", guard.WslStaging.host_storage.__get__(staging)
+    )
+    monkeypatch.setattr(
+        guard.shutil, "disk_usage", lambda path: SimpleNamespace(free=guard.GIB)
+    )
+    monkeypatch.setattr(
+        guard.subprocess, "Popen", lambda *a, **k: pytest.fail("do not boot low storage")
+    )
     monkeypatch.setattr(
         staging,
         "compose_command",
@@ -428,7 +726,7 @@ def test_start_rejects_build_before_mutation_when_disk_is_low(session, monkeypat
     )
     with pytest.raises(guard.GuardError, match="DISK_LOW"):
         staging.execute(args("start", no_build=False))
-    assert keeper.stdin.closed
+    assert not keeper.stdin.closed and not keeper.waited
 
 
 def test_session_keeps_wsl_alive_for_exact_child_lifetime(session, monkeypatch):
@@ -851,10 +1149,12 @@ def test_preflight_blocks_production_checkout_before_docker(staging, monkeypatch
         staging.preflight()
 
 
-def test_preflight_is_read_only_and_resolves_commit_and_exact_context(
-    staging, monkeypatch
+@pytest.mark.parametrize("action", ["preflight", "stop"])
+def test_real_preflight_checks_context_and_stop_bypasses_capacity_probes(
+    staging, monkeypatch, action
 ):
     calls = []
+    mutations = []
 
     def native(argv, **kwargs):
         calls.append(argv)
@@ -889,19 +1189,33 @@ def test_preflight_is_read_only_and_resolves_commit_and_exact_context(
             return "2.40.3"
         raise AssertionError(argv)
 
+    def compose(*command, **kwargs):
+        if command == ("config", "--format", "json"):
+            return json.dumps(compose_config())
+        assert action == "stop" and command == ("down",)
+        mutations.append((command, kwargs))
+
     monkeypatch.setattr(guard, "native", native)
     monkeypatch.setattr(staging, "wsl", wsl)
     monkeypatch.setattr(staging, "docker", docker)
-    monkeypatch.setattr(
-        staging, "compose_command", lambda *a, **k: json.dumps(compose_config())
-    )
+    monkeypatch.setattr(staging, "compose_command", compose)
     monkeypatch.setattr(staging, "containers", list)
     monkeypatch.setattr(guard, "validate_windows_listeners", lambda ports: None)
     monkeypatch.setattr(guard, "tcp_ready", lambda port: False)
-    monkeypatch.setattr(
-        guard.shutil, "disk_usage", lambda root: SimpleNamespace(free=20 * 1024**3)
-    )
-    assert staging.preflight() == []
+    if action == "stop":
+        keeper = KeeperProcess()
+        monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: keeper)
+        monkeypatch.setattr(guard.shutil, "disk_usage", lambda *a: pytest.fail("Stop capacity probe"))
+        monkeypatch.setattr(staging, "linux_storage", lambda **k: pytest.fail("Stop Linux probe"))
+        assert staging.execute(args("stop"))["result"] == "PASS"
+        assert mutations == [(('down',), {"timeout": 180})]
+        assert keeper.stdin.closed and keeper.waited
+    else:
+        monkeypatch.setattr(
+            guard.shutil, "disk_usage", lambda root: SimpleNamespace(free=20 * guard.GIB)
+        )
+        assert staging.preflight() == []
+        assert not mutations
     assert staging.summary["commit"] == "a" * 40
     assert staging.summary["ports"] == PORTS
     assert staging.summary["wsl_available_mib"] == 2048
