@@ -186,6 +186,28 @@ def _clinic_now() -> datetime:
     return datetime.now(ZoneInfo("Asia/Tashkent"))
 
 
+def _qr_token_seed_now(now: datetime | None) -> datetime:
+    """Keep synthetic QR tokens valid against the resolver's real wall clock.
+
+    The admission-clock fixtures may deliberately freeze a different clinic
+    time (for example noon while simulating 00:30). QR-token validation still
+    compares ``expires_at`` with the real current time, so never seed expiry
+    from a frozen clock that is already behind the test runner.
+    """
+    timezone = ZoneInfo("Asia/Tashkent")
+    fixture_now = (now or _clinic_now()).replace(tzinfo=None)
+    wall_now = datetime.now(timezone).replace(tzinfo=None)
+    return max(fixture_now, wall_now)
+
+
+def test_stale_admission_clock_does_not_backdate_qr_token_seed():
+    timezone = ZoneInfo("Asia/Tashkent")
+    wall_now = datetime.now(timezone).replace(tzinfo=None)
+    stale_fixture_now = wall_now - timedelta(days=1)
+
+    assert _qr_token_seed_now(stale_fixture_now) >= wall_now
+
+
 def _seed_join_world(
     session,
     suffix: str,
@@ -236,7 +258,7 @@ def _seed_join_world(
     session.commit()
     session.refresh(daily_queue)
 
-    local_now = (now or _clinic_now()).replace(tzinfo=None)
+    local_now = _qr_token_seed_now(now)
     token = QueueToken(
         token=f"rq25a1-token-{suffix}",
         day=day,
@@ -763,7 +785,7 @@ def _seed_multi_v1_world(
         session.flush()
         owners[label] = {"doctor_id": doctor.id, "queue_id": queue.id}
 
-    local_now = (now or _clinic_now()).replace(tzinfo=None)
+    local_now = _qr_token_seed_now(now)
     token = QueueToken(
         token=f"t0832-clinic-{suffix}-{uuid.uuid4().hex[:10]}",
         day=day,
