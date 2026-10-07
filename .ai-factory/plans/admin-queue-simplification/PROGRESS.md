@@ -1,32 +1,31 @@
-## Current checkpoint — PR #3620 CI clock-fixture correction prepared (2026-10-07T02:11+05:00)
+## Current checkpoint — PR #3620 bounded Tier-2 deferral decision (2026-10-07T13:04+05:00)
 
 Plan version: 3.50
 Current task: T09.3
-Current status: IN_PROGRESS (PR_OPEN; local fix committed, not pushed; exact-head CI pending; merge HOLD)
+Current status: PR_OPEN; Tier 2 PARTIAL with a PR-specific bounded deferral accepted; independent code review and exact-head CI for the latest docs-only commit are pending.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
-Rebased base: d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc
-Fresh origin/main: d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc
-Rebased runtime code commit: c13c317c8d7be2cfe96ca51113f6bb35595d49cc
-Rebased focused regression correction commit: 043573f03aa1656b78db865c6ba32070291b30af
-Code/evidence checkpoint: eb70338765d38751aeb757aac842f536ba7dd7d8
-Current remote PR HEAD: 58f423c12688b03449da52479f097c444bdaa9cc
-Local source and journal commit: current branch HEAD (one commit ahead; not pushed).
+Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
+T09.3 code-evidence HEAD: 853b6c048cc19bc6a4bbfcc7582287c551baa2ca
+Current PR HEAD: 501435405b27327710c8b6934f7905bf11527ed0
+Decision commit: 501435405b27327710c8b6934f7905bf11527ed0
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-07T02:11+05:00
+Last updated: 2026-10-07T13:04+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
-| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-ci-contract-test-follow-up |
+| T09.3 | PR_OPEN | PR #3620 | | DECISIONS.md — accepted bounded Tier-2 deferral |
 
 ## Current checkpoint
-- Completed: previous code/evidence HEAD passed; the latest docs-only HEAD failed twice on four QR token expiry tests. The confirmed test-fixture correction is now in the worktree. Mandatory gate returned `narrow_override/execute` with `gate_misroute=false` and exact first-touch ownership. `py_compile`, the 00:30-versus-noon regression, Ruff, Ruff format, and diff check pass.
-- Changed but not verified: test fix and plan journals are committed together at current local branch HEAD but not pushed. The four PostgreSQL transaction/replay tests were safely skipped locally because no disposable database was provided. Current remote remains `58f423c12688b03449da52479f097c444bdaa9cc` and still carries its old CI failure.
-- Remaining: commit and push the focused correction with journals, then inspect exact-head Backend CI. Read-only workflow inspection shows parity deliberately waits for all core dependencies to succeed; the prior skip was caused by Backend failure. If Backend and all other dependencies pass, parity is expected to run without a workflow edit. Tier-2 staging/live checks remain NOT_RUN and no deferral is accepted.
-- Blocker: PostgreSQL execution of the four regression scenarios and exact-head hosted CI are pending. Also pending: task-owned staging, backend-dependent live E2E, manual viewport/accessibility, T18 and full STAGING_VALIDATION.md.
-- Next exact action: push current local branch HEAD to PR #3620, then inspect every check on the exact new HEAD. Do not merge, start T10, claim Tier-2 deferral, edit the workflow without the stated parity condition, or use staging.
+- Completed: the target T09.3 flow passed on task-owned synthetic staging (Admin password+TOTP, cabinet read, stale-preview rejection, focus handling, same-day apply); 253/253 served static files matched an independent Linux Node 20 rebuild and `50x.html` matched the nginx upstream artifact. Code-evidence HEAD `853b6c0` had 26 success, 13 skipped, 0 failed and 0 pending. The user-delegated bounded deferral for four residual live specs and runtime base-image equivalence is recorded in PR #3620 and `DECISIONS.md`; no Tier-2 coverage is credited for those items.
+- Changed but not verified: docs-only decision commit `5014354` is pushed. On its exact HEAD, PR Review Quality Gate, regression/lifecycle, docs generation, frontend build, security/secrets, CodeQL, role, locale and context checks passed; Backend tests, Frontend E2E and Code Quality were IN_PROGRESS on exact HEAD `5014354` at 13:03+05. Other applicable checks shown by `gh pr checks` had passed or were skipped. This progress-only commit will create a new exact HEAD; inspect its checks after push.
+- Remaining: finish exact-head checks on `501435405b27327710c8b6934f7905bf11527ed0`; obtain independent code review. Keep PR open until both are resolved. T18 must later run the deferred specs and base-image provenance through a safe synthetic harness; full `STAGING_VALIDATION.md` remains mandatory before rollout.
+- Blocker: no safe harness yet for the four named specs; runtime base-image equivalence is NOT_PROVEN; no independent code review is recorded. Tier 2 remains PARTIAL, not PASS.
+- Next exact action: inspect `gh pr checks 3620` on the current exact HEAD and address any failures; do not merge, deploy, activate v1, or start T10 from this checkpoint.
+- Checks to rerun after the next PR change: all required exact-head checks. For resumed Tier-2 work, rerun each deferred live spec plus image/base provenance and retain per-spec evidence; before deployment run the full `STAGING_VALIDATION.md` checklist.
+
 
 ## Current checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
 
