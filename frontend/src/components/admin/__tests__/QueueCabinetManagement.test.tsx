@@ -417,6 +417,71 @@ describe('QueueCabinetManagement', () => {
     );
   });
 
+  it('keeps the same-key retry available when a cooldown 429 follows a lost response', async () => {
+    apiRequestMock
+      .mockResolvedValueOnce([
+        {
+          id: 8,
+          day: '2026-10-06',
+          owner_type: 'doctor',
+          owner_id: 14,
+          owner_name: 'Doctor',
+          cabinet_number: '5',
+          entries_count: 0,
+          active: true,
+        },
+      ])
+      .mockResolvedValueOnce({
+        clinic_day: '2026-10-06',
+        can_apply: true,
+        items: [
+          {
+            queue_id: 8,
+            owner_type: 'doctor',
+            owner_id: 14,
+            owner_name: 'Doctor',
+            old_cabinet_number: '5',
+            new_cabinet_number: '9',
+            waiting_count: 0,
+            blocking_reasons: [],
+            can_apply: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce([]);
+    apiClientRequestMock
+      .mockRejectedValueOnce(new Error('synthetic response loss'))
+      .mockRejectedValueOnce({
+        response: {
+          status: 429,
+          data: { detail: 'Synthetic client cooldown; retry was not sent' },
+        },
+      })
+      .mockResolvedValueOnce({ data: { changed_queue_ids: [8] } });
+
+    render(<QueueCabinetManagement />);
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_reassign' }));
+    fireEvent.change(screen.getByLabelText('admin2.qcm_new_cabinet'), {
+      target: { value: '9' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_preview_reassign' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_confirm_reassign' }));
+
+    expect(await screen.findByText('admin2.qcm_uncertain_outcome')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_retry_apply' }));
+    expect(await screen.findByText('Synthetic client cooldown; retry was not sent')).toBeInTheDocument();
+
+    expect(screen.getByLabelText('admin2.qcm_new_cabinet')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'admin2.qcm_cancel' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'admin2.qcm_retry_apply' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_retry_apply' }));
+
+    await waitFor(() => expect(apiClientRequestMock).toHaveBeenCalledTimes(3));
+    expect(apiClientRequestMock.mock.calls[2][0]).toEqual(
+      apiClientRequestMock.mock.calls[0][0],
+    );
+  });
+
   it('translates preview blockers and keeps the confirmation disabled', async () => {
     apiRequestMock
       .mockResolvedValueOnce([

@@ -295,6 +295,7 @@ const QueueCabinetManagement = () => {
 
   const applyReassignment = async () => {
     if (!reassignmentQueue || !reassignmentPreview?.can_apply) return;
+    const retryingUncertainOutcome = applyOutcomeUnknown;
     const previewItem = reassignmentPreview.items.find(
       (item) => item.queue_id === reassignmentQueue.id,
     );
@@ -340,6 +341,11 @@ const QueueCabinetManagement = () => {
         // Keep the request body and key unchanged so a retry joins or replays it.
         setApplyOutcomeUnknown(true);
         setReassignmentError(t('admin2.qcm_apply_in_flight'));
+      } else if (retryingUncertainOutcome && statusCode === 429) {
+        // A cooldown/rate-limit refusal on the retry does not resolve the first
+        // attempt: the retry may have been refused before it reached the server.
+        setApplyOutcomeUnknown(true);
+        setReassignmentError(detail || t('admin2.qcm_apply_error'));
       } else if (statusCode && statusCode >= 400 && statusCode < 500) {
         applyKeyRef.current = null;
         setReassignmentPreview(null);
