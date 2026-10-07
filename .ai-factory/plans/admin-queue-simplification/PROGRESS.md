@@ -1,15 +1,15 @@
-## Current checkpoint — T09.3 PR #3620 retry refusal fix and exact-head CI (2026-10-07T16:28+05:00)
+## Current checkpoint — T09.3 PR #3620 exact-head test correction and staging replay (2026-10-07T22:07+05:00)
 
-Plan version: 3.57
+Plan version: 3.58
 Current task: T09.3
-Current status: PR_OPEN; P2 fixed, committed and pushed; exact-head applicable CI passed. Independent review pending.
+Current status: PR_OPEN; retry-specific synthetic staging passed; QR fixture correction is pushed; Backend and Frontend E2E passed on exact HEAD. Three CodeQL jobs failed without a surfaced finding; independent review remains pending.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
 Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
-PR code HEAD: a4cc2a9c493ff09302afe18b91a3eff0662f8047
-Parent: f85d7a0f8fc482b2401a8c040a18313077ef2156
+PR HEAD: c147ec97bf30fa31fc79a118c7cc41b6d06a6403
+Code-bearing runtime HEAD: eb1522ac8203da70ea1ff04bae3a52c0e0a62ed8
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-07T16:28+05:00
+Last updated: 2026-10-07T22:07+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -18,13 +18,15 @@ Last updated: 2026-10-07T16:28+05:00
 | T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-pr-3620-final-retry-refusal-validation |
 
 ## Current checkpoint
-- Completed: after an apply response is lost, any refusal from retrying the same command retains the original preview, request body/idempotency key and locked draft until a successful replay. The first definitive refusal still permits correction. Focused tests 14/14, scoped ESLint, TypeScript, git diff --check and commit hooks passed. Commit a4cc2a9c is a direct child of expected f85d7a0f and was pushed fast-forward.
-- Exact-head CI: run 37612124999 on code HEAD a4cc2a9c finished with 26 success, 13 skipped, 0 failed, 0 pending. Backend, Frontend E2E/unit/lint/build, Code Quality, PR Required Gate, parity, docs, security/secrets, CodeQL, regression, role, locale and lifecycle checks passed.
-- Changed but not verified: Tier-2 staging for this retry refusal scenario is NOT_RUN. The earlier bounded PR deferral remains limited to four named live specs and runtime base-image equivalence; no Tier-2 credit is added.
-- Remaining: obtain an independent review of code HEAD a4cc2a9c; GitHub currently reports reviews=[]. Keep PR open and do not publish a self-review or merge.
-- Blocker: independent review is pending. The residual T18 live-spec/base-image checks and full STAGING_VALIDATION.md remain required before their stated rollout/deployment gates.
-- Next exact action: request/perform an independent code review of PR #3620 at a4cc2a9c; address any findings in the same T09.3 scope. Do not start T10 until #3620 closes and the base is synchronized.
-- Checks to rerun after another code change: focused component tests, scoped ESLint, TypeScript, git diff --check, then all applicable exact-head PR CI. Tier-2 for this retry edge stays NOT_RUN.
+- Completed: the T09.3 retry-refusal fix remains in `a4cc2a9c`; the isolated synthetic staging retry path passed on code-bearing HEAD `eb1522ac` after normal Admin password-to-TOTP enrollment, same-day cabinet apply, intentionally lost response, injected retry refusal, and byte-identical replay. Task-owned staging resources were torn down. This is limited scenario evidence, not full Tier 2.
+- Exact-head test correction: `c147ec97b` changes only `backend/tests/integration/test_qr_family_phone_identity.py` and this evidence journal. It fixes synthetic QR token expiry seeding when an admission-clock fixture is stale relative to the resolver's real clinic-local wall clock.
+- Exact-head CI: unified run [37655411234](https://github.com/drsapaev/final/actions/runs/37655411234) on `c147ec97b`: Backend **5,358 passed, 65 skipped, 25 deselected, 3 xfailed, 126 warnings**; PostgreSQL QR concurrency probe **4 passed**; critical smoke **35 passed**; Frontend E2E **PASS** (10m52s), unit, lint, build, documentation, security, parity, context-boundary, role, locale, Regression Audit, PR Required Gate and PR Review Quality Gate passed. Path-aware skipped checks remain NOT_RUN.
+- CodeQL status: `Analyze (actions)`, `Analyze (javascript-typescript)` and `Analyze (python)` failed in the `Perform CodeQL Analysis` step. Their annotations contain only Ubuntu runner notices, no security finding. The CodeQL analyses API has no analysis recorded for `c147ec97b` (latest PR analysis records still refer to `49aadb822`). GitHub refused retry for that workflow run. Treat exact-HEAD CodeQL as FAILED/NOT_VERIFIED, not PASS.
+- Changed but not verified: independent human review; served frontend revision provenance for the retry-specific staging run; four deferred live specs; runtime base-image equivalence; full T18 and `STAGING_VALIDATION.md`. Tier 2 remains PARTIAL: the named retry path passed but the four deferred specs remain NOT_RUN and base-image equivalence remains NOT_PROVEN.
+- PR write limitation: attempts to refresh the PR description via GitHub GraphQL, GitHub REST and the GitHub connector returned internal/HTTP 500 errors. The remote PR body therefore still contains stale `49aadb822`/pending-check text; update it once GitHub writes recover. PR #3620 is OPEN and mergeable, with no independent review decision. No review or merge was submitted.
+- Blocker: exact-HEAD CodeQL jobs are failed/unverified and independent review is pending. The existing bounded deferral remains limited to four live specs and base-image equivalence; it does not waive exact-head required checks, remaining T18 acceptance, or pre-deploy staging.
+- Next exact action: refresh PR #3620 body when GitHub write APIs recover; determine an authorized exact-HEAD CodeQL rerun path or leave it explicitly unresolved; obtain independent code review. Do not start T10 until #3620 is reviewed/closed, the branch is cleaned and local main is synchronized.
+- Checks to rerun after another code change: relevant focused tests, `git diff --check`, then all applicable exact-head PR CI. Do not rerun staging unless runtime source changes; full T18 remains outstanding regardless.
 
 ## Superseded checkpoint — PR #3620 generic uncertain-retry local state (2026-10-07T16:08+05:00)
 
