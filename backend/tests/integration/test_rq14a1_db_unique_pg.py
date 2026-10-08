@@ -18,7 +18,7 @@ PROGRESS E-037 before the edits):
   RQ14A1U_PG_ADMIN_URL env override — is verified to be
   localhost/loopback BEFORE connecting; remote/unverified candidates
   are rejected (never used, never printed).
-- REAL MIGRATION PROOFS: populated upgrade = 0064 -> ORM seed ->
+- REAL MIGRATION PROOFS: populated upgrade = 0064 -> compatible seed ->
   session.commit() -> alembic upgrade head, comparing meaningful ROW
   VALUES before/after (not only counts). Duplicate refusals are three
   separate scenarios on separate databases (entry number, active
@@ -158,8 +158,8 @@ def _assert_pg_head(engine) -> None:
     # RQ-18 follow-up round-8 re-parents the payload binding as 0074;
     # #3506 derma history read model moves the head to 0075; its
     # read-order index swap moves it to 0076; T06.1 adds 0077; the
-    # site-plan settings canonicalization adds 0078.
-    assert version == "0078_clinic_settings_keys", version
+    # site-plan settings canonicalization adds 0078; public-site schema adds 0079.
+    assert version == "0079_kosmed_website_content", version
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:
@@ -221,8 +221,12 @@ def _no_time_gate(monkeypatch):
 
 
 def _make_doctor(session, suffix: str):
+    """Seed a doctor across both head and pre-0079 scratch schemas.
+
+    The current Doctor ORM includes website columns that are absent from
+    the 0064 schemas used by the populated-upgrade and duplicate proofs.
+    """
     from app.core.security import get_password_hash
-    from app.models.clinic import Doctor
     from app.models.user import User
 
     user = User(
@@ -235,11 +239,18 @@ def _make_doctor(session, suffix: str):
     )
     session.add(user)
     session.commit()
-    doctor = Doctor(user_id=user.id, specialty="cardiology", cabinet="601", active=True)
-    session.add(doctor)
+    doctor_id = session.execute(
+        text(
+            "INSERT INTO doctors "
+            "(user_id, specialty, cabinet, start_number_online, "
+            "max_online_per_day, active) "
+            "VALUES (:user_id, 'cardiology', '601', 1, 15, true) "
+            "RETURNING id"
+        ),
+        {"user_id": user.id},
+    ).scalar_one()
     session.commit()
-    session.refresh(doctor)
-    return doctor
+    return SimpleNamespace(id=doctor_id)
 
 
 def _seed_queue(session, doctor_id: int, day: date, tag, active=True):
@@ -291,6 +302,83 @@ def test_upgrade_creates_both_objects_on_clean_schema(pg_engine):
         "entry_constraint": True,
         "doctor_index": True,
     }
+
+
+def _insert_website_slug(engine, entity: str, slug: str | None, suffix: str) -> None:
+    if entity == "service":
+        statement = text(
+            "INSERT INTO services "
+            "(name, active, created_at, requires_doctor, is_consultation, "
+            "allow_doctor_price_override, slug) "
+            "VALUES (:name, true, CURRENT_TIMESTAMP, false, false, false, :slug)"
+        )
+        parameters = {"name": f"Website slug test {suffix}", "slug": slug}
+    elif entity == "doctor":
+        statement = text(
+            "INSERT INTO doctors "
+            "(specialty, start_number_online, max_online_per_day, active, slug) "
+            "VALUES ('cardiology', 1, 15, true, :slug)"
+        )
+        parameters = {"slug": slug}
+    else:
+        raise AssertionError(f"Unsupported website slug entity: {entity}")
+
+    with engine.begin() as connection:
+        connection.execute(statement, parameters)
+
+
+@pytest.mark.parametrize("entity", ("service", "doctor"))
+@pytest.mark.parametrize("slug", (None, "a", "cardiology-visit-42"))
+def test_website_slug_check_accepts_null_and_valid_values(pg_engine, entity, slug):
+    _assert_pg_head(pg_engine)
+    _insert_website_slug(pg_engine, entity, slug, f"valid-{_RUN}-{entity}-{slug}")
+
+
+@pytest.mark.parametrize("entity", ("service", "doctor"))
+@pytest.mark.parametrize(
+    "slug",
+    (
+        "",
+        "Bad-Slug",
+        "has space",
+        "nested/path",
+        "two--parts",
+        "-leading",
+        "trailing-",
+        "under_score",
+        "ўзбекча",
+    ),
+)
+def test_website_slug_check_rejects_invalid_values(pg_engine, entity, slug):
+    _assert_pg_head(pg_engine)
+    with pytest.raises(IntegrityError):
+        _insert_website_slug(pg_engine, entity, slug, f"invalid-{_RUN}-{entity}")
+
+
+def test_website_slugs_are_unique_per_entity_and_separate_between_entities(pg_engine):
+    _assert_pg_head(pg_engine)
+    slug = f"shared-{_RUN}"
+    _insert_website_slug(pg_engine, "service", slug, f"service-{_RUN}")
+    _insert_website_slug(pg_engine, "doctor", slug, f"doctor-{_RUN}")
+
+    for entity in ("service", "doctor"):
+        with pytest.raises(IntegrityError):
+            _insert_website_slug(pg_engine, entity, slug, f"duplicate-{entity}-{_RUN}")
+
+
+def test_website_slug_model_constraints_match_postgres_storage_contract(test_db):
+    from app.models.clinic import Doctor
+    from app.models.service import Service
+
+    expected = "slug IS NULL OR slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+    for model, constraint_name in (
+        (Service, "ck_services_website_slug_format"),
+        (Doctor, "ck_doctors_website_slug_format"),
+    ):
+        constraints = {
+            constraint.name: constraint for constraint in model.__table__.constraints
+        }
+        assert str(constraints[constraint_name].sqltext) == expected
 
 
 def test_populated_upgrade_preserves_row_values():
