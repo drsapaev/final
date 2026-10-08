@@ -832,7 +832,7 @@ def test_alembic_chain_single_head_0063() -> None:
     # T06.1 adds persisted policy version and online issuance count.
     assert graph["0077_daily_queue_policy"] == ("0076_derma_history_read_order",)
     assert len("0077_daily_queue_policy") <= 32
-    assert heads == ["0077_daily_queue_policy"]
+    assert heads == ["0078_clinic_settings_keys"]
 
 
 # ===================== D. parity + ADR =====================

@@ -33,7 +33,7 @@ import {
   Checkbox,
 } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
 
 const ClinicSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT;
@@ -49,11 +49,11 @@ const ClinicSettings = () => {
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
     clinic_name: 'Programma Clinic',
-    address: '',
-    phone: '',
-    email: '',
-    timezone: 'Asia/Tashkent',
-    logo_url: '/static/logo.png'
+    clinic_address: '',
+    clinic_phone: '',
+    clinic_email: '',
+    clinic_timezone: 'Asia/Tashkent',
+    clinic_logo_url: '/static/logo.png'
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -75,6 +75,8 @@ const ClinicSettings = () => {
   useEffect(() => {
     loadSettings();
     loadTicketPrintSettings();
+    // Load-on-mount only: the loaders read stable API bindings, not reactive values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadSettings = async () => {
@@ -147,7 +149,7 @@ const ClinicSettings = () => {
   };
 
   const uploadLogo = async (): Promise<string> => {
-    if (!logoFile) return settings.logo_url;
+    if (!logoFile) return settings.clinic_logo_url;
     try {
       return await uploadLogoApi(logoFile);
     } catch (error) {
@@ -162,7 +164,7 @@ const ClinicSettings = () => {
       setMessage({ type: '', text: '' });
 
       // Сначала загружаем логотип если выбран новый
-      let logoUrl = settings.logo_url;
+      let logoUrl = settings.clinic_logo_url;
       if (logoFile) {
         logoUrl = await uploadLogo();
       }
@@ -170,7 +172,7 @@ const ClinicSettings = () => {
       // Подготавливаем настройки для отправки
       const settingsToSave = {
         ...settings,
-        logo_url: logoUrl
+        clinic_logo_url: logoUrl
       };
 
       await saveClinicSettingsApi({
@@ -182,8 +184,8 @@ const ClinicSettings = () => {
       setLogoPreview(null);
 
       // Обновляем логотип в настройках
-      if (logoUrl !== settings.logo_url) {
-        setSettings(prev => ({ ...prev, logo_url: logoUrl }));
+      if (logoUrl !== settings.clinic_logo_url) {
+        setSettings(prev => ({ ...prev, clinic_logo_url: logoUrl }));
       }
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
@@ -312,8 +314,8 @@ const ClinicSettings = () => {
                   {t('admin2.cset_label_address')}
                 </label>
                 <Textarea
-                  value={settings.address || ''}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
+                  value={settings.clinic_address || ''}
+                  onChange={(e) => handleInputChange('clinic_address', e.target.value)}
                   rows={2}
                   placeholder={t('admin2.cset_ph_address')}
                   className="w-full"
@@ -327,8 +329,8 @@ const ClinicSettings = () => {
                 </label>
                 <Input
                   type="tel"
-                  value={settings.phone || ''}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  value={settings.clinic_phone || ''}
+                  onChange={(e) => handleInputChange('clinic_phone', e.target.value)}
                   placeholder="+998 (90) 123-45-67"
                   className="w-full"
                 />
@@ -341,8 +343,8 @@ const ClinicSettings = () => {
                 </label>
                 <Input
                   type="email"
-                  value={settings.email || ''}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  value={settings.clinic_email || ''}
+                  onChange={(e) => handleInputChange('clinic_email', e.target.value)}
                   placeholder="info@clinic.com"
                   className="w-full"
                 />
@@ -365,8 +367,8 @@ const ClinicSettings = () => {
                 </label>
                 <Select
                   aria-label={t('admin2.cset_aria_timezone')}
-                  value={settings.timezone || 'Asia/Tashkent'}
-                  onChange={(value) => handleInputChange('timezone', value.target.value)}
+                  value={settings.clinic_timezone || 'Asia/Tashkent'}
+                  onChange={(value) => handleInputChange('clinic_timezone', value.target.value)}
                   options={timezones}
                   size="large"
                   className="w-full"
@@ -384,11 +386,11 @@ const ClinicSettings = () => {
                 </label>
 
                 {/* Текущий логотип */}
-                {(settings.logo_url || logoPreview) && (
+                {(settings.clinic_logo_url || logoPreview) && (
                   <div className="mb-3">
                     <div className="admin-w-128-h-80-bd-2dashedvar-mac-border-radius-var--mac-radius-md-flex-ai-cent-5f1cf18b">
                       <img
-                        src={logoPreview || settings.logo_url}
+                        src={logoPreview || settings.clinic_logo_url}
                         alt={t('admin2.cset_alt_logo')}
                         className="admin-maxw-100pct-maxh-100pct-of-contain"
                       />

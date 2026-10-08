@@ -177,7 +177,7 @@ def test_single_alembic_head(fresh_head_url):
     # 0075, its read-order index swap — to 0076; T06.1 adds daily queue
     # policy persistence at 0077. This file still proves 0070's own links
     # via the graph pins below.
-    assert "0077_daily_queue_policy" in head_lines[0]
+    assert "0078_clinic_settings_keys" in head_lines[0]
 
 
 @pytest.mark.integration

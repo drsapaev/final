@@ -7,6 +7,7 @@ Primary operational rules for repo-aware agents. ZCode reads this root file dire
 - Clinic EMR and operations platform. Backend: Python 3.11, FastAPI, SQLAlchemy, Pydantic v2, PostgreSQL/Alembic, Redis/WebSocket. Frontend: React 19, Vite, React Router, strict TypeScript. Queue/specialty ownership: [ADR-001](docs/adr/ADR-001-queue-ownership-and-specialty-architecture.md).
 - Local backend/frontend defaults are `18000`/`5173`. This Windows host also has separate WSL staging; staging may be stopped and uses synthetic data only. Treat each Compose run as ephemeral and tear it down after validation; preserve a failing stack only with `KEEP_STAGING=1` recorded in the task checkpoint. Production is served from the main tree. Follow [session worktrees and deploy](docs/runbooks/AGENT_SESSION_WORKTREES.md).
 - Repo context: `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, this file, and task-specific canonical source/tests. DevBrain operations are outside runtime in `ai/langgraph`. Verify legacy directories and artifacts before use.
+- For Doktor KosMed public-site work, read the [current handoff](docs/plans/2026-10-06-kosmed-public-site-handoff.md), [detailed publication and stage 2a–4 requirements](docs/plans/2026-09-28-kosmed-public-site-plan.md#11-подробные-требования-к-публикации-адресам-и-этапам-2a4), and [data audit](docs/plans/2026-09-28-kosmed-site-data-audit.md) before each implementation slice or PR. Recheck dated findings and PR status against current source; unresolved decisions are not implementation approval.
 
 ## Task execution
 
