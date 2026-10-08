@@ -1,13 +1,13 @@
-## Current resume — PR #3633 cross-writer serialization P2 (2026-10-08T20:06+05:00)
+## Current resume — PR #3633 cross-writer serialization P2 and Tier-2 execution (2026-10-08T20:18+05:00)
 
-- Continue in `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-T10-profile-guards`, local runtime commit `e68f93bf7`; PR remote was OPEN/MERGEABLE at old HEAD `56f5a6fc37cec600c2da69724a6b7c10faf70135`, base `885782648fd7b83b0687b33cf930ae608d94a026`. Code and current journal checkpoint are committed locally; push is next.
+- Continue in `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-T10-profile-guards`, local HEAD `02db899d893f1992cd956f0e6504e5e93b22b363`. This merges remote PR head `98b71d527` with current `origin/main` `7bb02680e778ac56369503c4fd337ac9329da4b2`; the merge is not yet pushed. PR #3633 was OPEN/BEHIND at its old remote head; push after committing this checkpoint.
 - User explicitly authorized fixing the remaining P2 and accepted HTTP 409/no-write when a tagged writer waits and detects a changed binding.
 - Current changes serialize profile binding checks against tagged DailyQueue, Service, QueueResource, Doctor activation, department default Service and public-address writers. Stale binding returns the existing structured 409/no-write contract. CSV bulk department import has row savepoints to avoid committing partial setup on that conflict.
-- Local evidence: `test_queue_profile_lifecycle.py` 34/34 and `test_admin_department_create_atomicity.py` 8/8 on disposable PostgreSQL 16; focused QR/visit/GraphQL/legacy suite 39/39 and adapter unit suite 26/26; scoped Ruff, compileall and diff checks pass. One warning per pytest run. The complete details and hook caveat are in `PROGRESS.md` and `EVIDENCE.md#t10-pr-3633-cross-writer-p2-local-validation`.
+- Fresh combined PostgreSQL rerun on local HEAD: 42 passed, 0 skipped, 1 warning. The exact task-owned no-volume PG16 container was removed. Earlier focused QR/visit/GraphQL/legacy suite 39/39 and adapter unit suite 26/26; scoped Ruff, compileall and diff checks remain in `EVIDENCE.md#t10-pr-3633-cross-writer-p2-local-validation`.
 - A first PG attempt was `NOT_RUN` after WSL stopped its temporary container. The successful retry kept WSL alive, passed both PostgreSQL suites, and removed the exact task-owned no-volume container. No other project was touched.
 - Tier-2 staging is separately authorized by the user's selection. Limit it to one isolated synthetic project with its own ignored env/ports and normal Admin 2FA, testing profile rebind against permanent-address creation through the API. Do not run the full ten-check suite or touch shared/production services. Preflight, readiness or 2FA failure means stop and report `NOT_RUN`; tear down only the owned Compose project.
 - Preserve untracked `.scratch/` and `frontend/.scratch/`. Gate was already run and generated handoff read; do not rerun. No merge or formal review submission; user performs merge.
-- Next: push the code plus journal checkpoint, inspect exact-head CI, then run a new isolated synthetic Tier-2 staging session for the P2, with normal Admin 2FA. Full STAGING_VALIDATION.md/T18/browser coverage remain NOT_RUN.
+- Next: commit this checkpoint and push local HEAD `02db899d`, verify PR base sync, run the isolated staging scenario, then inspect exact-head CI. Full STAGING_VALIDATION.md/T18/browser coverage remain NOT_RUN.
 
 ## Superseded resume — T10 serialization implementation start (2026-10-08T18:34:35+05:00)
 
