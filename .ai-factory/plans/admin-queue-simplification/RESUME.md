@@ -1,4 +1,4 @@
-## Current resume — T10 exact-head CI complete (2026-10-08T10:18+05:00)
+## Current resume — T10 exact-head CI complete (2026-10-08T10:35+05:00)
 
 - PR #3620 / T09.3 merged at `2026-10-08T03:57:48Z`, merge commit `19c35ec62481dde45c9ea49146ecc4999aaf599f`. T10 branch `codex/aqs-T10-profile-guards` is based on that `origin/main`; GitHub confirms PR #3633 OPEN / MERGEABLE at exact HEAD `79a61c79837b7ffa1db40a031a7cca1b3f0d5505`. No merge is confirmed.
 - T10 implementation: `_queue_profiles.py` counts active permanent addresses, provides a typed read-only proposed-binding preview, and rejects used-profile `queue_tags` (including order) and `department_key` changes before assigning any request field. Presentation fields/archive remain allowed. Active public addresses also block hard delete. Lifecycle regressions and OpenAPI contract coverage were added.
@@ -13,8 +13,8 @@
 - Fix is pushed in `79a61c79`: add that LF and remove stale schema/path counts from the generator source comment. Direct Node 24.15.0 + `openapi-typescript` 7.13.0 generation exactly matches the full tracked output (2,594,056 bytes); `npm run type-check` and `git diff --check` pass. Normal `npm run generate:api-types:check` selected WSL Node 18.19.1 and failed with `ResolveError: Invalid string length`; it did not modify tracked files and is NOT a pass.
 - First-touch remains limited to `frontend/src/types/generated/api.ts`, `frontend/scripts/generate-api-types.sh`, and T10 plan/evidence documents; these are within the user's approved generated-type scope. Denied: backend runtime, migrations, frontend runtime UI, shared staging and production. Hosted Node24 generated-freshness check is the required validation after push. Stop if the completed job log identifies a different cause or the API body changes unexpectedly.
 - No T10 staging run or deferral is recorded. Earlier bounded Tier-2 staging gaps and full T18/`STAGING_VALIDATION.md` remain outstanding.
-- Full workflow `37730206034` passed on exact HEAD `79a61c79837b7ffa1db40a031a7cca1b3f0d5505`, including hosted generated-type freshness, Frontend E2E, Backend tests, unit/build/lint, parity, PR Required Gate and applicable quality/security checks. Path-aware skips are not passes; Tier-2 staging was NOT_RUN and no deferral was accepted.
-- Next: commit/push the docs-only final checkpoint, then inspect applicable checks on the resulting exact PR head. PR #3633 remains OPEN / MERGEABLE and is ready for the user's merge after that checkpoint. Start T11 only after GitHub confirms merge, worktree cleanup, and main sync. Do not merge or publish a self-review.
+- Full workflow `37730206034` passed on `79a61c79`; follow-up full workflow `37731779639` passed on exact source HEAD `7b8677d0`, including hosted generated-type freshness, Frontend E2E, Backend tests, unit/build/lint, parity, PR Required Gate and applicable quality/security checks. Path-aware skips are not passes; Tier-2 staging was NOT_RUN and no deferral was accepted.
+- PR #3633 remains OPEN / MERGEABLE on `7b8677d0` and is ready for the user's merge. Start T11 only after GitHub confirms merge, worktree cleanup, and main sync. Do not merge or publish a self-review.
 
 ## Superseded resume — T09.3 PR #3620 documentation handoff repair (2026-10-08T08:23+05:00)
 

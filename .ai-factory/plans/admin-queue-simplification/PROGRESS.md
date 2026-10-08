@@ -1,13 +1,13 @@
 # Progress
 
-Plan version: 3.72
+Plan version: 3.73
 Current task: T10 — protect used queue profile bindings.
-Current status: PR_OPEN / MERGEABLE; generated freshness failure on `eeaa512f` was confirmed as a single missing LF and fixed in pushed commit `79a61c79`. All applicable checks, including Frontend E2E and generated freshness, pass on exact HEAD `79a61c79`; docs-only checkpoint is being prepared.
+Current status: PR_OPEN / MERGEABLE; generated freshness failure on `eeaa512f` was confirmed as a single missing LF and fixed in `79a61c79`. All applicable checks, including Frontend E2E and generated freshness, passed on exact source HEAD `7b8677d0`; this checkpoint only records evidence.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-T10-profile-guards
 Base commit: 19c35ec62481dde45c9ea49146ecc4999aaf599f (fresh origin/main)
-Current commit: `79a61c79837b7ffa1db40a031a7cca1b3f0d5505` plus this docs-only checkpoint; base `19c35ec62481dde45c9ea49146ecc4999aaf599f`.
-Last updated: 2026-10-08T10:18:00+05:00
+Current commit: `7b8677d0b3b31091f3f9f5c1256e37135a0ff457` plus this docs-only evidence checkpoint; base `19c35ec62481dde45c9ea49146ecc4999aaf599f`.
+Last updated: 2026-10-08T10:35:00+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -25,9 +25,9 @@ Last updated: 2026-10-08T10:18:00+05:00
 - Completed: PR body was updated and passed `scripts/check_pr_review_template.py`; the RBAC regression and evidence checkpoint were pushed in commit `16050140802c14a76051ca5379613d64eb8106a9`.
 - Previous exact PR HEAD `21f6be15` had all listed applicable checks pass. Full logs from `eeaa512f` confirmed `Frontend lint` failed only because generated API output lacked one LF before the generated comment; no other generated-content drift. Commit `79a61c79` adds the LF and removes stale counts from the generator source comment.
 - Local fix validation: exact Node24 / openapi-typescript 7.13.0 output now matches byte-for-byte (2,594,056 bytes); `npm run type-check` and `git diff --check` pass. The normal npm script via WSL Node18.19.1 fails with Redocly `Invalid string length`; only hosted Node24 freshness can close that gate.
-- Full workflow `37730206034` on exact HEAD `79a61c79837b7ffa1db40a031a7cca1b3f0d5505` completed successfully, including Frontend E2E (13m13s), Backend tests (11m39s), frontend unit/build/lint with generated freshness, parity, PR Required Gate, quality, docs, and applicable security/release gates. Path-aware skips are listed in EVIDENCE.md and are not passes. The superseded `eeaa512f` run's canceled jobs are not counted.
+- Full workflow `37730206034` passed on exact HEAD `79a61c79`; then full workflow `37731779639` passed on exact source HEAD `7b8677d0`, including Frontend E2E, Backend tests, frontend unit/build/lint with generated freshness, parity, PR Required Gate, quality, docs, and applicable security/release gates. Path-aware skips are listed in EVIDENCE.md and are not passes. Superseded-run canceled jobs are not counted.
 - No staging was run and no T10 Tier-2 deferral is accepted. Earlier bounded staging gaps and full T18 validation remain outstanding.
-- Next exact action: commit/push this docs-only checkpoint and inspect the resulting exact-head applicable checks; then leave #3633 for the user's merge. Do not start T11 before GitHub confirms merge, worktree cleanup, and main synchronization.
+- Current source-bearing exact HEAD `7b8677d0` has all applicable checks green. This checkpoint is documentation-only and records the final result; leave #3633 for the user's merge. Do not start T11 before GitHub confirms merge, worktree cleanup, and main synchronization.
 - Checks to rerun after the next code change: Ruff, Python compile, OpenAPI contract, TypeScript check, generated artifact freshness, PostgreSQL profile lifecycle suite, and `git diff --check`.
 ## Superseded checkpoint — PR #3620 generic uncertain-retry local state (2026-10-07T16:08+05:00)
 

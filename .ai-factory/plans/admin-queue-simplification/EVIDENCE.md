@@ -2474,3 +2474,10 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Path-aware/inapplicable checks were skipped and are not counted as passes: Supabase Preview, Docker build, separate security scan, integration tests, k6 load tests, production/staging readiness reports, nightly DAST, metadata and classify-and-route. The superseded run's canceled jobs are also not counted.
 - No staging was run for T10; Tier-2 staging is `NOT_RUN`, no deferral is accepted, and this CI result does not satisfy staging. T18/full `STAGING_VALIDATION.md` remains outstanding.
 - Next: commit/push this docs-only checkpoint, verify checks on its exact resulting PR head, then hand #3633 to the user for merge. Do not start T11 before GitHub confirms the merge, the worktree is cleaned, and `main` is synchronized.
+
+## T10 docs-checkpoint exact-head validation — 2026-10-08T10:35+05:00
+
+- Confirmed PR #3633 is OPEN / MERGEABLE at exact HEAD `7b8677d0b3b31091f3f9f5c1256e37135a0ff457`, base `19c35ec62481dde45c9ea49146ecc4999aaf599f`.
+- Workflow `37731779639` completed successfully on that exact HEAD. Backend tests, Frontend E2E, Frontend unit tests, build, lint/generated API freshness, Frontend–Backend Parity, PR Required Gate, Code Quality, Telegram release, docs generation, Context Boundary Integrity, language analysis, regression and applicable security checks passed.
+- Path-aware skips: Docker build, separate security scan, integration tests, production/staging readiness reports, k6, DAST, metadata and classify-and-route. Skips are not counted as passes. No staging was run; Tier-2 remains `NOT_RUN`, no deferral is accepted.
+- This evidence is for the code-bearing exact HEAD `7b8677d0`; the next checkpoint, if any, is documentation-only and must not alter runtime files. User performs merge. Do not start T11 until GitHub confirms merge, worktree cleanup and main synchronization.
