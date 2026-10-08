@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
@@ -24,6 +25,18 @@ from app.services.service_mapping import (
     get_allowed_service_code_prefixes,
     normalize_service_code,
     resolve_queue_group_key,
+)
+
+logger = logging.getLogger(__name__)
+_WEBSITE_PUBLICATION_BATCH_FIELDS = frozenset(
+    {
+        "name_uz",
+        "description_ru",
+        "description_uz",
+        "slug",
+        "show_on_website",
+        "website_first_published_at",
+    }
 )
 
 
@@ -577,6 +590,24 @@ class ServicesApiService:
         """
         from sqlalchemy.exc import SQLAlchemyError
 
+        website_fields = sorted(_WEBSITE_PUBLICATION_BATCH_FIELDS.intersection(updates))
+        if website_fields:
+            logger.warning(
+                "[FIX] Rejected website-owned fields in service batch update: %s",
+                website_fields,
+            )
+            raise ValueError(
+                "Website publication fields must be changed through the website content endpoint"
+            )
+
+        if "name" in updates:
+            name = updates["name"]
+            normalized_name = str(name).strip() if name is not None else ""
+            if not normalized_name:
+                logger.warning("[FIX] Rejected blank service name in batch update")
+                raise ValueError("Service name cannot be empty")
+            updates = {**updates, "name": normalized_name}
+
         # repository-boundary: ORM-запрос batch-локов живёт в
         # ServicesApiRepository (гейт прямых ORM-вызовов сервис-слоя)
         rows = self.repository.get_services_for_update(service_ids)
@@ -587,17 +618,13 @@ class ServicesApiService:
             if service_id not in by_id
         ]
         services = [
-            by_id[service_id]
-            for service_id in service_ids
-            if service_id in by_id
+            by_id[service_id] for service_id in service_ids if service_id in by_id
         ]
         if not services:
             return [], failed_services
 
         retag_requested = "queue_tag" in updates
-        owner_sensitive_flip = ("active" in updates) or (
-            "requires_doctor" in updates
-        )
+        owner_sensitive_flip = ("active" in updates) or ("requires_doctor" in updates)
         affected: set[str] = set()
         for service in services:
             old_tag = service.queue_tag

@@ -268,6 +268,69 @@ def test_doctor_publication_and_admin_deactivation_hide_without_resetting_slug(
     )
 
 
+def test_service_batch_update_cannot_bypass_website_publication_contract(
+    client, db_session, auth_headers
+):
+    published = _service(db_session, "batch-publication-guard")
+    published.name_uz = "SYNTHETIC xizmat"
+    published.description_ru = "SYNTHETIC description."
+    published.description_uz = "SYNTHETIC tavsif."
+    published.slug = "synthetic-batch-publication-guard"
+    published.show_on_website = True
+    published.website_first_published_at = datetime.now(UTC)
+    db_session.commit()
+    published_id = published.id
+    original_published_at = published.website_first_published_at
+    original_name = published.name
+
+    for updates in (
+        {"slug": "synthetic-replacement-slug"},
+        {"show_on_website": False},
+        {"website_first_published_at": None},
+        {"name_uz": "SYNTHETIC invalid batch edit"},
+        {"description_ru": "SYNTHETIC invalid batch edit"},
+        {"description_uz": "SYNTHETIC invalid batch edit"},
+        {"name": "   "},
+    ):
+        response = client.post(
+            "/api/v1/services/admin/batch-update",
+            headers=auth_headers,
+            json={"service_ids": [published_id], "updates": updates},
+        )
+        assert response.status_code == 400, response.text
+
+    draft = _service(db_session, "batch-incomplete-publication-guard")
+    draft_id = draft.id
+    response = client.post(
+        "/api/v1/services/admin/batch-update",
+        headers=auth_headers,
+        json={"service_ids": [draft_id], "updates": {"show_on_website": True}},
+    )
+    assert response.status_code == 400, response.text
+
+    db_session.expire_all()
+    published_row = db_session.query(Service).filter(Service.id == published_id).one()
+    assert published_row.name == original_name
+    assert published_row.slug == "synthetic-batch-publication-guard"
+    assert published_row.show_on_website is True
+    assert published_row.website_first_published_at == original_published_at
+    draft_row = db_session.query(Service).filter(Service.id == draft_id).one()
+    assert draft_row.show_on_website is False
+    assert draft_row.website_first_published_at is None
+
+    valid_rename = client.post(
+        "/api/v1/services/admin/batch-update",
+        headers=auth_headers,
+        json={
+            "service_ids": [published_id],
+            "updates": {"name": "  SYNTHETIC renamed service  "},
+        },
+    )
+    assert valid_rename.status_code == 200, valid_rename.text
+    db_session.expire_all()
+    assert db_session.get(Service, published_id).name == "SYNTHETIC renamed service"
+
+
 def test_service_batch_deactivation_unpublishes_and_reactivation_does_not_republish(
     client, db_session, auth_headers
 ):

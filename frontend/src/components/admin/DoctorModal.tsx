@@ -14,8 +14,9 @@ import {
 } from '../ui/macos';
 import type { SelectChangeEvent } from '../ui/macos/Select';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
 import { api } from '../../api/client';
+import logger from '../../utils/logger';
 import type { WebsiteDoctorContent } from '../../types/domain/clinic';
 
 interface DoctorUser {
@@ -106,6 +107,7 @@ const DoctorModal = ({
   const [websiteError, setWebsiteError] = useState('');
   const [websiteNotice, setWebsiteNotice] = useState('');
   const websiteLoadErrorTranslation = useRef(t);
+  const websiteRequestGeneration = useRef(0);
 
   useEffect(() => {
     websiteLoadErrorTranslation.current = t;
@@ -165,22 +167,26 @@ const DoctorModal = ({
   }, [isOpen, language]);
 
   useEffect(() => {
+    const requestGeneration = ++websiteRequestGeneration.current;
     if (!isOpen || !doctor?.id) {
       setWebsiteContent(null);
       setWebsiteForm({ bio_ru: '', bio_uz: '', slug: '' });
       setWebsiteError('');
       setWebsiteNotice('');
+      setWebsiteLoading(false);
+      setWebsiteSaving(false);
       return;
     }
 
     let cancelled = false;
     setWebsiteLoading(true);
+    setWebsiteSaving(false);
     setWebsiteError('');
     setWebsiteContent(null);
     setWebsiteForm({ bio_ru: '', bio_uz: '', slug: '' });
     api.get(`/admin/doctors/${doctor.id}/website-content`)
       .then((response) => {
-        if (cancelled) return;
+        if (cancelled || requestGeneration !== websiteRequestGeneration.current) return;
         const content = response.data as WebsiteDoctorContent;
         setWebsiteContent(content);
         setWebsiteForm({
@@ -190,7 +196,7 @@ const DoctorModal = ({
         });
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (cancelled || requestGeneration !== websiteRequestGeneration.current) return;
         const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
         const detailMessage = typeof detail === 'object' && detail !== null
           ? (detail as { message?: string }).message
@@ -200,11 +206,16 @@ const DoctorModal = ({
         );
       })
       .finally(() => {
-        if (!cancelled) setWebsiteLoading(false);
+        if (!cancelled && requestGeneration === websiteRequestGeneration.current) {
+          setWebsiteLoading(false);
+        }
       });
 
     return () => {
       cancelled = true;
+      if (requestGeneration === websiteRequestGeneration.current) {
+        websiteRequestGeneration.current += 1;
+      }
     };
   }, [doctor?.id, isOpen]);
 
@@ -328,12 +339,21 @@ const DoctorModal = ({
     setWebsiteSaving(true);
     setWebsiteError('');
     setWebsiteNotice('');
+    const requestGeneration = websiteRequestGeneration.current;
+    const requestedDoctorId = doctor.id;
     try {
       const response = await api.put(
-        `/admin/doctors/${doctor.id}/website-content`,
+        `/admin/doctors/${requestedDoctorId}/website-content`,
         { ...websiteForm, operation },
       );
       const content = response.data as WebsiteDoctorContent;
+      if (
+        requestGeneration !== websiteRequestGeneration.current ||
+        String(content.id) !== String(requestedDoctorId)
+      ) {
+        logger.debug('[FIX] Ignored stale website doctor save response');
+        return;
+      }
       setWebsiteContent(content);
       setWebsiteForm({
         bio_ru: content.bio_ru || '',
@@ -342,13 +362,19 @@ const DoctorModal = ({
       });
       setWebsiteNotice(t('admin2.dmdl_site_save_success'));
     } catch (error: unknown) {
+      if (requestGeneration !== websiteRequestGeneration.current) {
+        logger.debug('[FIX] Ignored stale website doctor save error');
+        return;
+      }
       const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
       const detailMessage = typeof detail === 'object' && detail !== null
         ? (detail as { message?: string }).message
         : typeof detail === 'string' ? detail : undefined;
       setWebsiteError(detailMessage || t('admin2.dmdl_site_save_error'));
     } finally {
-      setWebsiteSaving(false);
+      if (requestGeneration === websiteRequestGeneration.current) {
+        setWebsiteSaving(false);
+      }
     }
   };
 
