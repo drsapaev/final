@@ -1,36 +1,30 @@
-## Current checkpoint — T09.3 PR #3620 analytics fixture correction validated (2026-10-08T07:46+05:00)
+# Progress
 
-Plan version: 3.60
+Plan version: 3.61
 Current task: T09.3
-Current status: PR_OPEN; the test-only fixture correction and evidence journals are committed and pushed as `9b914d548b2fe2e120c4ed6076ed015e5ce1a610`. Applicable exact-head CI passed. No independent human review or merge was submitted. Tier 2 remains PARTIAL under the existing bounded deferral.
+Current status: PR_OPEN; preparing the docs-only follow-up for the review P2. Do not merge from the agent.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
-Original PR base: 300dd7e9b112dde5143e78d5149634c739ad9b3a
-Synchronized origin/main: 2c825dd439fd28eb5edf10f5ade7a83534f67c5a
-UI P2 fix commit: 6024bb76a533c3a7f2f875270ec0e255385174c5
-Main-sync commit: bbbde4303e3c0fdbee08d27578b5de8679ead690
-Remote PR HEAD before this correction: 6479d5dad3f05f0572ec5b4045cecf139fe243c4
-Current PR HEAD: 9b914d548b2fe2e120c4ed6076ed015e5ce1a610
-PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-08T07:46+05:00
+Base commit: 2c825dd439fd28eb5edf10f5ade7a83534f67c5a (verified equal to fresh origin/main before this docs repair)
+Latest code-bearing commit: 9b914d548b2fe2e120c4ed6076ed015e5ce1a610
+PR checkpoint before this docs repair: 8915ca7c97729fe516376d296cd4f16b711eb40b
+Last updated: 2026-10-08T08:23+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
-| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md — analytics fixture correction |
+| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md — docs handoff correction |
 
 ## Current checkpoint
-- Completed: both earlier UI P2 fixes remain validated. The cabinet reason is now a labeled native select reachable inside the real modal focus trap. A terminal `idempotency_uncertain_outcome` triggers an authenticated current-state read; a fresh preview is required before a new command key if the requested cabinet is not already set.
-- Root cause of the red backend test: its synthetic statistics date is fixed at 2026-09-07 while the analytics endpoint defaults to a rolling 30-day period. On the current test date the fixture row falls outside that period, so the test incorrectly returned zero before checking the owner filter.
-- Test-only correction: both analytics calls in the helper pass explicit `start_date` and `end_date` equal to the synthetic fixture day. The failing test now passes locally; production/runtime code is unchanged.
-- Local backend validation: targeted `test_queue_analytics_includes_resource_rows` **1 passed** using the repository launcher and isolated temporary SQLite test fixture; `py_compile` **PASS**; `git diff --check` **PASS**. The first local invocation lacked a process-local `DATABASE_URL` and stopped during import before running tests; the explicit test-only SQLite environment resolved that setup issue. No shared or production database was used.
-- Previous exact-head checks on `6479d5dad` had 5,359 backend tests passed and one failed, with 65 skipped, 25 deselected and 3 xfailed; PR Required Gate consequently failed. On corrected HEAD `9b914d548`, Backend passed (5,360 passed, 65 skipped, 25 deselected, 3 xfailed, 125 warnings); critical smoke passed 35/35; frontend unit tests, E2E (11m10s), build and lint passed; parity, all three CodeQL analyses, PR Required Gate and PR Review Quality Gate passed. Other applicable checks also passed. Path-aware/non-applicable skips remain NOT_RUN, not passes.
-- Tier 2: the current UI fixes have no staging run. Earlier retry/idempotency staging on `eb1522ac` does not validate them. Overall Tier 2 remains PARTIAL under the accepted bounded PR-specific deferral: four named live specs remain NOT_RUN, runtime base-image equivalence remains NOT_PROVEN, and T18/full `STAGING_VALIDATION.md` remain incomplete.
-- PR #3620 remains OPEN and mergeable at `9b914d548`; the PR body was refreshed with the corrected fixture, exact-head CI result, and unchanged Tier-2 status. No independent human review or merge was performed.
-- Next exact action: obtain independent human review for PR #3620. Keep merge on hold until review/merge authorization is provided. Tier 2 staging gaps remain separate and outstanding under the existing bounded deferral.
-- Checks to rerun after another source edit: the targeted analytics test, `py_compile`, and `git diff --check`; then the exact-head required CI after push.
-
+- Completed: T09.3 runtime/test change is unchanged since source commit `9b914d548`; its analytics fixture fix and prior queue UI fixes remain in PR #3620. Source HEAD `9b914d548` and PR documentation HEAD `8915ca7c9` both have recorded passing applicable exact-head CI; see EVIDENCE.md.
+- Review finding being addressed: mandatory `RESUME.md` named old source SHA `a4cc2a9c` and old base; the main plan incorrectly said the code was uncommitted and CI pending. This checkpoint aligns the main plan, resume entry and progress record, preserving older entries as superseded history.
+- Latest hosted evidence before this docs repair: unified run `37719601177` on PR HEAD `8915ca7c`; Backend 5,360 passed, 65 skipped, 25 deselected, 3 xfailed; Frontend E2E, unit/build/lint, parity, PR Required Gate and applicable quality/security checks passed. The two PR-body metadata checks also passed. Path-aware skips are NOT_RUN.
+- Focused read-only review validation on `8915ca7c`: cabinet screen Vitest **17 passed**; backend cabinet service/admin-linkage/analytics targets **31 passed, 1 warning**. Backend used its temporary SQLite test fixture and does not prove PostgreSQL locking. No runtime edit was made during review.
+- This follow-up changes only the four plan/checkpoint files named in EVIDENCE.md. On resume, inspect actual local status, remote PR HEAD/base, review state and checks; results for earlier SHAs do not prove a later docs checkpoint.
+- Tier 2 remains PARTIAL: no staging evidence was added for the current UI follow-up; four named live specs remain NOT_RUN; runtime base-image equivalence remains NOT_PROVEN; T18 and full pre-deploy `STAGING_VALIDATION.md` remain outstanding. No coverage is credited by the bounded deferral beyond its explicit scope.
+- Next exact action on continuation: check whether this docs checkpoint is present on the PR branch; if it is, inspect all applicable checks for the actual current HEAD. If all pass, report the PR ready for the user's merge. Do not merge or publish a review.
+- Stop if origin/main or the PR branch moved, any tracked path outside the four-document allowlist changed, or the repair requires runtime/staging/production work.
 ## Superseded checkpoint — PR #3620 generic uncertain-retry local state (2026-10-07T16:08+05:00)
 
 Plan version: 3.56
