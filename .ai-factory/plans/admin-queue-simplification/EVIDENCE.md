@@ -2393,7 +2393,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Tier 2: no staging evidence was added. Tier 2 remains PARTIAL; four named live specs remain NOT_RUN; runtime base-image equivalence remains NOT_PROVEN; the current UI follow-up has no additional live-staging proof; T18 and full `STAGING_VALIDATION.md` remain outstanding. The prior bounded deferral stays within its recorded scope.
 - Result/next action: current handoff no longer asks for review of `a4cc2a9c`. After pushing this checkpoint, fetch GitHub's current PR HEAD/base, verify all applicable checks on that HEAD, and report readiness for the user's merge. Do not merge or publish a review.
 
-## T10 — used queue profile binding guard — 2026-10-08T09:37+05:00
+## T10 — used queue profile binding guard — 2026-10-08T09:39+05:00
 
 - Commit under test: `eb4a9d5ef423ffb5249831a252d0912471ddc220`; based on `19c35ec62481dde45c9ea49146ecc4999aaf599f`; branch `codex/aqs-T10-profile-guards`.
 - Environment: Windows worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`; fresh `origin/main` equals the base. Disposable PostgreSQL 16.15 ran in an isolated Docker container published only on `127.0.0.1:55439`; no shared staging or production service was used.
@@ -2407,6 +2407,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - WSL diagnosis: an initial disposable PostgreSQL attempt skipped all 20 cases because the distro idled and Docker stopped that container cleanly after about 19 seconds. Holding Ubuntu active for the test process stabilized the container and Windows-to-WSL loopback. A focused regression passed, then the full lifecycle module passed 20/20. The container was stopped and removed; test-owned scratch databases were managed by the fixture's cleanup path.
 - Commit-hook interaction: the first commit attempt stopped after `end-of-file-fixer` added a byte that broke exact OpenAPI parity and Black reformatted existing lines in two test modules; Ruff format and Black produce different output for those legacy lines. The successful commit skipped only `end-of-file-fixer` and `ruff-format`; all other configured hooks passed, and Ruff lint/Black check passed separately. The GitHub format workflow is report-only for import-order drift.
 - Remaining validation: exact-head hosted CI and PR review. T10 staging was not run and no T10 Tier-2 deferral is accepted; earlier bounded Tier-2 staging gaps and full T18/`STAGING_VALIDATION.md` remain separate.
-- Result: T10 is **VALIDATED locally** at commit `eb4a9d5ef`, not merged and not yet hosted-CI validated. No PR is open yet; no review or merge was published.
+- PR: [#3633](https://github.com/drsapaev/final/pull/3633), OPEN/MERGEABLE at initial observed head `794f5e6fff450873495f04c8b2487865dec9b7f0`, base `19c35ec62481dde45c9ea49146ecc4999aaf599f`. This PR-state checkpoint advances the branch; re-query GitHub after push before reporting checks.
+- Result: T10 is locally validated at code commit `eb4a9d5ef`, PR #3633 is open, and exact-head hosted CI is pending. No review or merge was published.
 - Scope check: no model/schema/migration, frontend runtime UI, T11/T12 lifecycle, ownership/fairness, RBAC, shared staging, production, or unrelated scratch changes. Existing scratch directories were preserved.
-- PR: none. Merge commit: none.
+- Merge commit: none. User performs merge.
