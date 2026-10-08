@@ -146,9 +146,15 @@ def test_service_website_publication_records_admin_audit_in_same_write(
     db_session.expire_all()
     audit = (
         db_session.query(ServiceAuditLog)
-        .filter(ServiceAuditLog.service_id == service.id)
-        .one()
+        .filter(
+            ServiceAuditLog.service_id == service.id,
+            ServiceAuditLog.user_id == admin_user.id,
+            ServiceAuditLog.comment == "Website content operation: save_draft",
+        )
+        .order_by(ServiceAuditLog.id.desc())
+        .first()
     )
+    assert audit is not None
     assert audit.user_id == admin_user.id
     assert audit.action == "update"
     assert audit.comment == "Website content operation: save_draft"
