@@ -1,30 +1,30 @@
 # Progress
 
-Plan version: 3.61
-Current task: T09.3
-Current status: PR_OPEN; preparing the docs-only follow-up for the review P2. Do not merge from the agent.
+Plan version: 3.63
+Current task: T10 — protect used queue profile bindings.
+Current status: VALIDATED; local PostgreSQL lifecycle, OpenAPI contract, generated-type freshness and TypeScript checks pass; PR not opened yet.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
-Branch: codex/aqs-t093-cabinet-ui
-Base commit: 2c825dd439fd28eb5edf10f5ade7a83534f67c5a (verified equal to fresh origin/main before this docs repair)
-Latest code-bearing commit: 9b914d548b2fe2e120c4ed6076ed015e5ce1a610
-PR checkpoint before this docs repair: 8915ca7c97729fe516376d296cd4f16b711eb40b
-Last updated: 2026-10-08T08:23+05:00
+Branch: codex/aqs-T10-profile-guards
+Base commit: 19c35ec62481dde45c9ea49146ecc4999aaf599f (fresh origin/main)
+Current commit: 19c35ec62481dde45c9ea49146ecc4999aaf599f (uncommitted T10 diff)
+Last updated: 2026-10-08T09:32:00+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
-| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md — docs handoff correction |
+| T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
+| T10 | VALIDATED | codex/aqs-T10-profile-guards; PR not opened | | EVIDENCE.md#t10-profile-binding-guard |
 
 ## Current checkpoint
-- Completed: T09.3 runtime/test change is unchanged since source commit `9b914d548`; its analytics fixture fix and prior queue UI fixes remain in PR #3620. Source HEAD `9b914d548` and PR documentation HEAD `8915ca7c9` both have recorded passing applicable exact-head CI; see EVIDENCE.md.
-- Review finding being addressed: mandatory `RESUME.md` named old source SHA `a4cc2a9c` and old base; the main plan incorrectly said the code was uncommitted and CI pending. This checkpoint aligns the main plan, resume entry and progress record, preserving older entries as superseded history.
-- Latest hosted evidence before this docs repair: unified run `37719601177` on PR HEAD `8915ca7c`; Backend 5,360 passed, 65 skipped, 25 deselected, 3 xfailed; Frontend E2E, unit/build/lint, parity, PR Required Gate and applicable quality/security checks passed. The two PR-body metadata checks also passed. Path-aware skips are NOT_RUN.
-- Focused read-only review validation on `8915ca7c`: cabinet screen Vitest **17 passed**; backend cabinet service/admin-linkage/analytics targets **31 passed, 1 warning**. Backend used its temporary SQLite test fixture and does not prove PostgreSQL locking. No runtime edit was made during review.
-- This follow-up changes only the four plan/checkpoint files named in EVIDENCE.md. On resume, inspect actual local status, remote PR HEAD/base, review state and checks; results for earlier SHAs do not prove a later docs checkpoint.
-- Tier 2 remains PARTIAL: no staging evidence was added for the current UI follow-up; four named live specs remain NOT_RUN; runtime base-image equivalence remains NOT_PROVEN; T18 and full pre-deploy `STAGING_VALIDATION.md` remain outstanding. No coverage is credited by the bounded deferral beyond its explicit scope.
-- Next exact action on continuation: check whether this docs checkpoint is present on the PR branch; if it is, inspect all applicable checks for the actual current HEAD. If all pass, report the PR ready for the user's merge. Do not merge or publish a review.
-- Stop if origin/main or the PR branch moved, any tracked path outside the four-document allowlist changed, or the repair requires runtime/staging/production work.
+- Completed: PR #3620 / T09.3 merged at 2026-10-08T03:57:48Z. Fresh origin/main and T10 base are both 19c35ec62481dde45c9ea49146ecc4999aaf599f.
+- Changed: endpoint counts active permanent addresses, previews proposed binding values, blocks used-profile `queue_tags`/order/`department_key` mutations before assignment, and returns typed 409. Added PostgreSQL regressions and OpenAPI contract coverage, regenerated the spec/client types, and removed the stale schema-count claim from the generator header.
+- Validation PASS: Ruff check; Python `py_compile`; `backend/tests/test_openapi_contract.py` — 39 passed, 1 warning; `backend/tests/integration/test_queue_profile_lifecycle.py` — 20 passed, 1 warning; frontend `tsc --noEmit` exit 0; generated type body exact match with installed `openapi-typescript` 7.13.0; runtime OpenAPI serialization parity; `git diff --check` to rerun after final journal update.
+- WSL diagnosis: the first disposable PG container exited cleanly when Ubuntu became idle, causing a test attempt to skip all 20 cases. Keeping Ubuntu active for the duration of the run stabilized the same loopback-only PostgreSQL 16.15 container. The successful suite provisioned its own unique scratch DB and passed; the test container was stopped and removed.
+- Generation note: the repository npm generator previously failed under WSL Node 18.19 in Redocly with `Invalid string length`; direct invocation of the installed CLI under bundled Node 24 produced the exact current type body. `frontend/scripts/generate-api-types.sh` now uses a non-counting source header, preventing stale schema-count metadata. The ordinary npm generator is not recorded as run/pass.
+- Blocker: none for local T10 validation. Exact-head hosted CI and PR review remain pending. T10 has no staging run; do not treat it as Tier-2 evidence or accept a T10 deferral.
+- Next exact action: commit and open a single-purpose PR, inspect exact-head CI, then report readiness to the user. User performs merge.
+- Checks to rerun after the next code change: Ruff, Python compile, OpenAPI contract, TypeScript check, generated artifact freshness, PostgreSQL profile lifecycle suite, and `git diff --check`.
 ## Superseded checkpoint — PR #3620 generic uncertain-retry local state (2026-10-07T16:08+05:00)
 
 Plan version: 3.56

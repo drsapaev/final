@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_integration._helpers import (
@@ -177,9 +177,11 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
       is owned by this profile: their entries are the profile's real
       usage history and possibly still-waiting patients;
     - waiting entries under those queues (must remain serviceable by
-      staff regardless of the profile's active state).
+      staff regardless of the profile's active state);
+    - active permanent public addresses linked to this profile.
     """
     from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
     from app.models.service import Service
 
     tags = [t for t in (profile.queue_tags or []) if t]
@@ -187,6 +189,14 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
     daily_queues = 0
     entries_waiting = 0
     entries_total = 0
+    active_public_addresses = (
+        db.query(QueueDirectionPublicAddress)
+        .filter(
+            QueueDirectionPublicAddress.queue_profile_id == profile.id,
+            QueueDirectionPublicAddress.retired_at.is_(None),
+        )
+        .count()
+    )
     if tags:
         services = db.query(Service).filter(Service.queue_tag.in_(tags)).count()
         daily_queues = (
@@ -211,6 +221,7 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
         "daily_queues": daily_queues,
         "entries_waiting": entries_waiting,
         "entries_total": entries_total,
+        "active_public_addresses": active_public_addresses,
     }
 
 
@@ -312,6 +323,108 @@ class QueueProfileUpdate(BaseModel):
     color: str | None = Field(None, max_length=20)
 
 
+class QueueProfileBindingSnapshot(BaseModel):
+    queue_tags: list[str]
+    department_key: str | None
+
+
+class QueueProfileLinkCounts(BaseModel):
+    services: int
+    daily_queues: int
+    entries_waiting: int
+    entries_total: int
+    active_public_addresses: int
+
+
+class QueueProfileImpactIdentity(BaseModel):
+    key: str
+
+
+class QueueProfileUpdateImpactPreview(BaseModel):
+    success: bool
+    profile: QueueProfileImpactIdentity
+    current: QueueProfileBindingSnapshot
+    proposed: QueueProfileBindingSnapshot
+    links: QueueProfileLinkCounts
+    changed_binding_fields: list[Literal["queue_tags", "department_key"]]
+    blocked_fields: list[Literal["queue_tags", "department_key"]]
+    can_update: bool
+
+
+class QueueProfileBindingConflictDetail(BaseModel):
+    reason: Literal["profile_binding_change_blocked"]
+    blocked_fields: list[Literal["queue_tags", "department_key"]]
+    links: QueueProfileLinkCounts
+    message: str
+
+
+class QueueProfileBindingConflictResponse(BaseModel):
+    detail: QueueProfileBindingConflictDetail
+
+
+@router.post(
+    "/queues/profiles/{profile_key}/impact-preview",
+    response_model=QueueProfileUpdateImpactPreview,
+)
+def preview_queue_profile_update(
+    profile_key: str,
+    profile_data: QueueProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Read-only impact preview for a proposed profile update.
+
+    A preview is informational. The PUT handler re-reads usage immediately
+    before applying any fields and never accepts a preview as authorization.
+    """
+    try:
+        from app.models.queue_profile import QueueProfile
+
+        profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
+        if not profile:
+            raise HTTPException(
+                status_code=404, detail=f"Profile '{profile_key}' not found"
+            )
+
+        proposed_update = profile_data.dict(exclude_unset=True)
+        current = {
+            "queue_tags": list(profile.queue_tags or []),
+            "department_key": profile.department_key,
+        }
+        proposed = dict(current)
+        if "queue_tags" in proposed_update:
+            proposed["queue_tags"] = _canonical_profile_tags(
+                proposed_update["queue_tags"], profile.key
+            )
+        if "department_key" in proposed_update:
+            proposed["department_key"] = proposed_update["department_key"]
+
+        changed_binding_fields = [
+            field
+            for field in ("queue_tags", "department_key")
+            if proposed[field] != current[field]
+        ]
+        links = _profile_link_counts(db, profile)
+        blocked_fields = changed_binding_fields if any(links.values()) else []
+
+        return {
+            "success": True,
+            "profile": QueueProfileImpactIdentity(key=profile.key),
+            "current": current,
+            "proposed": proposed,
+            "links": links,
+            "changed_binding_fields": changed_binding_fields,
+            "blocked_fields": blocked_fields,
+            "can_update": not blocked_fields,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error previewing queue profile update for {profile_key}: {e}")
+        db.rollback()
+        _raise_registrar_internal_error("queue profile update preview", e)
+
+
 @router.post("/queues/profiles", response_model=dict[str, Any])
 def create_queue_profile(
     profile_data: QueueProfileCreate,
@@ -386,7 +499,16 @@ def create_queue_profile(
         _raise_registrar_internal_error("create queue profile", e)
 
 
-@router.put("/queues/profiles/{profile_key}", response_model=dict[str, Any])
+@router.put(
+    "/queues/profiles/{profile_key}",
+    response_model=dict[str, Any],
+    responses={
+        409: {
+            "model": QueueProfileBindingConflictResponse,
+            "description": "Binding changes are blocked while the profile is in use.",
+        }
+    },
+)
 def update_queue_profile(
     profile_key: str,
     profile_data: QueueProfileUpdate,
@@ -410,11 +532,43 @@ def update_queue_profile(
 
         # Update fields (only those provided)
         update_data = profile_data.dict(exclude_unset=True)
+        if "queue_tags" in update_data:
+            update_data["queue_tags"] = _canonical_profile_tags(
+                update_data["queue_tags"], profile.key
+            )
+
+        current_bindings = {
+            "queue_tags": list(profile.queue_tags or []),
+            "department_key": profile.department_key,
+        }
+        changed_binding_fields = [
+            field
+            for field in ("queue_tags", "department_key")
+            if field in update_data and update_data[field] != current_bindings[field]
+        ]
+        if changed_binding_fields:
+            # Recompute usage at command time. A preview is never authority
+            # to change a binding after the profile has become used.
+            links = _profile_link_counts(db, profile)
+            if any(links.values()):
+                logger.warning(
+                    "QueueProfile binding update blocked: "
+                    f"key={profile.key} fields={changed_binding_fields} links={links}"
+                )
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "reason": "profile_binding_change_blocked",
+                        "blocked_fields": changed_binding_fields,
+                        "links": links,
+                        "message": (
+                            "Связи используемого профиля менять нельзя. "
+                            "Разрешены только отображаемые поля и архивирование."
+                        ),
+                    },
+                )
+
         for field, value in update_data.items():
-            if field == "queue_tags":
-                # D-1 (Codex round-6 P1): same contract as creation (see
-                # _canonical_profile_tags).
-                value = _canonical_profile_tags(value, profile.key)
             if hasattr(profile, field):
                 setattr(profile, field, value)
 

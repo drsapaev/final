@@ -34,7 +34,7 @@ npx openapi-typescript "$OPENAPI_PATH" \
 
 # Prepend warning header so nobody edits the file by hand.
 HEADER='// ⚠️ АВТОГЕНЕРИРОВАННЫЙ ФАЙЛ — НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ!
-// Источник: backend/openapi.json (731 schemas, 997 paths)
+// Источник: backend/openapi.json
 // Регенерация: npm run generate:api-types
 // CI guard: npm run generate:api-types:check (fails if generated is stale)
 //

@@ -1,4 +1,15 @@
-## Current resume — T09.3 PR #3620 documentation handoff repair (2026-10-08T08:23+05:00)
+## Current resume — T10 protect used queue profile bindings (2026-10-08T09:32+05:00)
+
+- PR #3620 / T09.3 merged at `2026-10-08T03:57:48Z`, merge commit `19c35ec62481dde45c9ea49146ecc4999aaf599f`. The T10 worktree is based on the freshly fetched `origin/main` at the same SHA; branch `codex/aqs-T10-profile-guards`.
+- T10 implementation: `_queue_profiles.py` counts active permanent addresses, provides a typed read-only proposed-binding preview, and rejects used-profile `queue_tags` (including order) and `department_key` changes before assigning any request field. Presentation fields/archive remain allowed. Active public addresses also block hard delete. Lifecycle regressions and OpenAPI contract coverage were added.
+- User explicitly approved the T10 scope extension for OpenAPI and generated API types; the generator header template was also adjusted narrowly because it hard-coded an inaccurate schema count. No frontend runtime/adapters are in scope.
+- Local PASS: Ruff check; Python compile; OpenAPI contract suite 39/39; PostgreSQL profile lifecycle suite 20/20 on an isolated disposable PostgreSQL 16.15; TypeScript `tsc --noEmit`; generated type body exact match with `openapi-typescript` 7.13.0 under bundled Node 24; runtime OpenAPI serialization parity.
+- WSL stability: Ubuntu auto-stopped the first idle Docker run after ~19 seconds, so the initial suite skipped. Keeping the distro active for the test process fixed Windows-to-WSL loopback access. The test-owned scratch DB and the disposable container were cleaned up. This is a local PG test result, not a staging run.
+- No Tier-2 staging run or deferral applies to T10. The historical Tier-2 gaps for the earlier UI staging work and full T18/`STAGING_VALIDATION.md` remain separate and outstanding.
+- Current allowed paths: `_queue_profiles.py`, `backend/tests/integration/test_queue_profile_lifecycle.py`, `backend/tests/test_openapi_contract.py`, `backend/openapi.json`, `frontend/scripts/generate-api-types.sh`, `frontend/src/types/generated/api.ts`, and T10 plan/checkpoint/decision files. Denied: models/schema/migrations, frontend runtime UI, T11/T12, queue ownership/fairness, auth/RBAC, shared staging/production, unrelated scratch.
+- Next: final diff/scope check, commit, open the single-purpose PR, and inspect exact-head hosted CI. User performs merge; do not merge or publish a self-review.
+
+## Superseded resume — T09.3 PR #3620 documentation handoff repair (2026-10-08T08:23+05:00)
 
 - At the start of this checkpoint, PR #3620 was OPEN and MERGEABLE. Its base and freshly fetched `origin/main` were both `2c825dd439fd28eb5edf10f5ade7a83534f67c5a`. Latest code-bearing commit was `9b914d548b2fe2e120c4ed6076ed015e5ce1a610`; the PR documentation checkpoint before this repair was `8915ca7c97729fe516376d296cd4f16b711eb40b`. These identify the pre-repair state only. After publication, query GitHub for the actual HEAD/base/state and inspect that exact HEAD's checks.
 - Review P2: this file's prior “current resume” directed review to superseded code HEAD `a4cc2a9c` and base `300dd7e9`; the main plan still claimed uncommitted changes and pending CI. This entry and the main current checkpoint have been corrected. Earlier entries remain below as superseded history.

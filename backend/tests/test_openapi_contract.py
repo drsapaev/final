@@ -117,14 +117,12 @@ def test_openapi_documents_online_booking_policy_and_cutoff_contract(
     schema = _get_openapi_schema(client)
     components = schema["components"]["schemas"]
 
-    status_schema = schema["paths"]["/api/v1/online-queue/status"]["get"][
-        "responses"
-    ]["200"]["content"]["application/json"]["schema"]
+    status_schema = schema["paths"]["/api/v1/online-queue/status"]["get"]["responses"][
+        "200"
+    ]["content"]["application/json"]["schema"]
     assert status_schema["$ref"].endswith("/QueueStatusCheck")
     status_contract = components["QueueStatusCheck"]
-    assert {"queue_end_time", "policy_version"}.issubset(
-        status_contract["required"]
-    )
+    assert {"queue_end_time", "policy_version"}.issubset(status_contract["required"])
     assert status_contract["properties"]["policy_version"]["enum"] == [
         "legacy",
         "daily_online_issuances_v1",
@@ -134,9 +132,9 @@ def test_openapi_documents_online_booking_policy_and_cutoff_contract(
         for branch in status_contract["properties"]["queue_end_time"]["anyOf"]
     )
 
-    qr_schema = schema["paths"]["/api/v1/online-queue/qrcode"]["post"][
-        "responses"
-    ]["200"]["content"]["application/json"]["schema"]
+    qr_schema = schema["paths"]["/api/v1/online-queue/qrcode"]["post"]["responses"][
+        "200"
+    ]["content"]["application/json"]["schema"]
     qr_contract = components[qr_schema["$ref"].rsplit("/", 1)[-1]]
     assert {"end_time", "policy_version"}.issubset(qr_contract["required"])
 
@@ -155,9 +153,9 @@ def test_openapi_documents_separate_queue_length_and_online_quota_facts(
     schema = _get_openapi_schema(client)
     components = schema["components"]["schemas"]
 
-    status_ref = schema["paths"]["/api/v1/online-queue/status"]["get"][
-        "responses"
-    ]["200"]["content"]["application/json"]["schema"]["$ref"]
+    status_ref = schema["paths"]["/api/v1/online-queue/status"]["get"]["responses"][
+        "200"
+    ]["content"]["application/json"]["schema"]["$ref"]
     status_contract = components[status_ref.rsplit("/", 1)[-1]]
     assert {
         "queue_length",
@@ -183,9 +181,9 @@ def test_openapi_documents_separate_queue_length_and_online_quota_facts(
         "online_bookings_remaining",
     }.issubset(qr_contract["properties"])
 
-    admin_ref = schema["paths"]["/api/v1/admin/queue-status"]["get"][
-        "responses"
-    ]["200"]["content"]["application/json"]["schema"]["items"]["$ref"]
+    admin_ref = schema["paths"]["/api/v1/admin/queue-status"]["get"]["responses"][
+        "200"
+    ]["content"]["application/json"]["schema"]["items"]["$ref"]
     admin_contract = components[admin_ref.rsplit("/", 1)[-1]]
     assert {
         "queue_id",
@@ -195,9 +193,9 @@ def test_openapi_documents_separate_queue_length_and_online_quota_facts(
         "online_bookings_remaining",
     }.issubset(admin_contract["required"])
 
-    limits_ref = schema["paths"]["/api/v1/admin/queue-limits"]["get"][
-        "responses"
-    ]["200"]["content"]["application/json"]["schema"]["items"]["$ref"]
+    limits_ref = schema["paths"]["/api/v1/admin/queue-limits"]["get"]["responses"][
+        "200"
+    ]["content"]["application/json"]["schema"]["items"]["$ref"]
     limits_contract = components[limits_ref.rsplit("/", 1)[-1]]
     assert {
         "queue_length",
@@ -242,6 +240,46 @@ def test_openapi_queue_cabinet_response_exposes_typed_owner_fields(
         "application/json"
     ]["schema"]
     assert single_response["$ref"] == f"#/components/schemas/{response_name}"
+
+
+def test_openapi_queue_profile_binding_preview_and_conflict_are_typed(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    paths = schema["paths"]
+    components = schema["components"]["schemas"]
+
+    preview = paths["/api/v1/queues/profiles/{profile_key}/impact-preview"]["post"]
+    request_schema = preview["requestBody"]["content"]["application/json"]["schema"]
+    assert request_schema["$ref"] == "#/components/schemas/QueueProfileUpdate"
+    preview_schema = preview["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
+    assert preview_schema["$ref"] == (
+        "#/components/schemas/QueueProfileUpdateImpactPreview"
+    )
+    preview_contract = components["QueueProfileUpdateImpactPreview"]
+    assert {
+        "current",
+        "proposed",
+        "links",
+        "changed_binding_fields",
+        "blocked_fields",
+        "can_update",
+    }.issubset(preview_contract["required"])
+    links_ref = preview_contract["properties"]["links"]["$ref"]
+    links_contract = components[links_ref.rsplit("/", 1)[-1]]
+    assert "active_public_addresses" in links_contract["required"]
+
+    update = paths["/api/v1/queues/profiles/{profile_key}"]["put"]
+    conflict_schema = update["responses"]["409"]["content"]["application/json"][
+        "schema"
+    ]
+    assert conflict_schema["$ref"] == (
+        "#/components/schemas/QueueProfileBindingConflictResponse"
+    )
+    conflict_contract = components["QueueProfileBindingConflictResponse"]
+    assert "detail" in conflict_contract["required"]
 
 
 def test_openapi_doctor_queue_workflow_exposes_canonical_ids(

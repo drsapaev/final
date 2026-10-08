@@ -1,15 +1,15 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.61 — T09.3 PR #3620: analytics fixture correction validated; current documentation checkpoint synchronizes the mandatory resume target after review.
-**Создан:** 30 сентября 2026. **Обновлён:** 8 октября 2026, 2026-10-08T08:23+05:00 Asia/Tashkent.
-**Current task:** T09.3 — explicit same-day cabinet preview/apply and protection of existing queue snapshots from legacy writers; PR #3620 remains open for the user to merge.
-**Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`; branch `codex/aqs-t093-cabinet-ui`.
-**Verified base:** PR base and freshly fetched `origin/main` were both `2c825dd439fd28eb5edf10f5ade7a83534f67c5a`.
-**Latest code-bearing commit:** `9b914d548b2fe2e120c4ed6076ed015e5ce1a610` (analytics test fixture only). **PR documentation checkpoint before this repair:** `8915ca7c97729fe516376d296cd4f16b711eb40b`.
-**Current-state rule:** the SHAs above identify the source and the PR state observed before this documentation repair. On every resume, query GitHub and the worktree for the real PR HEAD/base/status; do not treat the checkpoint SHA as the current remote head after pushing this repair.
-**Scope:** T09.3 Admin queue-cabinet preview/apply, legacy cabinet writer containment, focused tests, generated contract artifacts and plan checkpoints. This repair changes only plan/checkpoint documentation. No model/migration, queue owner/default, queue identity/number/status/time, middleware, routing, runtime, staging or production behavior changes.
-> **Checkpoint:** review found one documentation P2: `RESUME.md` pointed the next reviewer at superseded code HEAD `a4cc2a9c` and an old base, while the main plan said changes were uncommitted and CI pending. The current checkpoint corrects those handoff claims, preserves older entries as history, and requires fresh remote-state verification on resume. The pre-repair PR HEAD `8915ca7c` had all applicable hosted checks passing; the documentation repair itself must be checked on the resulting actual PR HEAD before merge preparation is declared complete.
-> **Tier 2:** remains PARTIAL. The bounded PR-specific deferral covers only the four named live specs and runtime base-image equivalence; current T09.3 UI follow-up flows add no staging evidence. T18 and full pre-deploy `STAGING_VALIDATION.md` remain outstanding. Skipped CI jobs remain NOT_RUN.
+**Версия:** 3.63 — T10 protect used profile bindings; local validation complete, PR not yet opened.
+**Создан:** 30 сентября 2026. **Обновлён:** 8 октября 2026, 2026-10-08T09:32+05:00 Asia/Tashkent.
+**Current task:** T10 — protect queue profile tags/order/department bindings when used; local PostgreSQL lifecycle, OpenAPI, generated-type and TypeScript checks pass.
+**Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`; branch `codex/aqs-T10-profile-guards`.
+**Verified base:** freshly fetched `origin/main` and current `HEAD` are `19c35ec62481dde45c9ea49146ecc4999aaf599f`.
+**T09.3 closure:** PR #3620 merged at `2026-10-08T03:57:48Z`, merge commit `19c35ec62481dde45c9ea49146ecc4999aaf599f`.
+**Current-state rule:** the base SHA identifies the clean starting point; T10 changes are currently uncommitted. On every resume, inspect actual worktree, branch and remote state before relying on this checkpoint.
+**Scope:** T10 QueueProfile endpoint, PostgreSQL lifecycle tests, OpenAPI contract test/spec, generated TypeScript API types and the generator’s stale-count header, plus plan/checkpoint/decision documents. User explicitly approved the OpenAPI/generated-type scope extension. No migration/schema, frontend runtime UI, T11/T12 lifecycle/publication, queue ownership/fairness, auth/RBAC, shared staging or production changes.
+> **T10:** protect used QueueProfile bindings. The local diff counts active permanent addresses, prevents used-profile tag/order/department changes at PUT time, and adds a read-only proposed-binding preview with typed conflict response. PostgreSQL lifecycle and OpenAPI contract tests cover this contract; generated OpenAPI/client artifacts and the non-counting generator header are in scope.
+> **Tier 2:** no staging run was performed for T10; no staging deferral is accepted. T18 and full pre-deploy `STAGING_VALIDATION.md` remain outstanding. Skipped checks remain NOT_RUN.
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Последний подтверждённый merge с runtime-изменением:** PR #3613, `1d146d857e1570ff2259975f081f80dc0b31ae82` (безопасная замена ключей в idempotency-логах). Предыдущие quota-policy изменения T08.2c были в PR #3596 (`7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`); последующий T08.3.1 PR #3599 добавил PostgreSQL tests и был merged as `a452c54e5851611476c1b2ac3e3298aeff467eca`.
@@ -17,7 +17,7 @@
 > Следующие две строки — исторический снимок метаданных T08.2c, оставленный для прослеживаемости; текущие ветка и статус указаны выше.
 **Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; PR [#3596](https://github.com/drsapaev/final/pull/3596). Report implementation `718d4d65c5717528e8a93fb819fdf328c63bf772`; future-date compatibility fix `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`; OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`. Focused local checks pass (85 unit/OpenAPI, 4 selected integration). The docs-freshness CI failure on `fd9b1c793` was due to a final CRLF in the generated snapshot; it is removed to match exact app serialization. New exact-head checks pending.
 
-> **T00–T09.2, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1, T08.3.2, T08.3.2-P2 and T08.3.3 — MERGED; T09.3 — PR_OPEN / exact-head CI pending; T10–T18 — PLANNED.** The user explicitly authorized the confirmed test-fixture correction. The local code/evidence commit is current branch HEAD and ready to push; exact-head CI remains pending. Do not edit the workflow unless Backend and all parity dependencies pass yet required parity remains skipped. Do not merge or start T10 before PR #3620 closes and main is synchronized.
+> **T00–T09.3, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1, T08.3.2, T08.3.2-P2 and T08.3.3 — MERGED; T10 — VALIDATED locally / PR not opened; T11–T18 — PLANNED.** PR #3620 merged at `19c35ec6`; the current T10 diff is validated on that base. Exact-head hosted CI remains pending; user performs merge.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
@@ -414,7 +414,9 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 **Stop:** called/active transfer, audit cannot atomic, unknown write ownership.
 **Evidence/logs:** actor/typed target/old-new/reason/request ID; INFO change/WARN refusal/ERROR failure; operator procedure default vs today.
 
-#### T09.3 execution checkpoint — Admin UI and legacy writer containment
+#### T09.3 execution checkpoint — historical snapshot before PR #3620 merge
+
+> Historical checkpoint only. The state and next action below were current before PR #3620 merged; current progress is in the header and `admin-queue-simplification/PROGRESS.md`.
 
 - **Status:** PR #3620 is OPEN at base d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc, code/evidence HEAD eb70338765d38751aeb757aac842f536ba7dd7d8. Exact-head run 37513876028 passed **28 success, 13 skipped, 0 failed, 0 pending**. Backend tests: 5,357 passed, 65 skipped, 25 deselected, 3 xfailed, 126 warnings; Frontend E2E passed in 12m21s. Runtime commit c13c317c8d7be2cfe96ca51113f6bb35595d49cc; test correction 043573f03aa1656b78db865c6ba32070291b30af.
 - **Mode and gate:** mandatory queue gate and one known-root retry, both misrouted. Retry returned narrow_override, gate_misroute=true, override_used=true, handoff_required=true; generated prompt was read. User-approved plan authorizes the recorded narrow override for cabinet endpoint/service, screen, focused tests and generated API contract. Do not run a third gate or touch unrelated generic queue/model paths.
@@ -432,12 +434,12 @@ T08.3 spans several independent admission transaction owners. To keep each PR bo
 **Зависимости:** T00. **Режим:** mandatory gate.
 **Anchors:** `registrar_integration/_queue_profiles.py`: canonical tags/link counts/preview/update/delete; `models/queue_direction_public_address.py`.
 
-1. Зафиксировать PUT bypass delete guard. Usage=services/queues/entries/active public address; helper адрес пока не учитывает.
+1. Зафиксированный дефект: PUT обходил delete guard, а общий usage helper не считал активные permanent public addresses. Общий helper теперь охватывает services/queues/entries/active addresses.
 2. Used profile: запрещены queue_tags/significant order/department_key change. Presentation/archive разрешены; порядок не потерять через сортировку.
 3. Preview old/proposed config без mutations; PUT revalidate dependencies до первого setattr, stale preview не разрешение.
 4. Mixed PUT с forbidden binding reject целиком; safe structured impact errors.
 
-**Validation:** `backend/tests/integration/test_queue_profile_lifecycle.py`: tags/order/department, unused edit, presentation/archive, address-only usage, stale preview, atomic mixed reject, history/address preserved.
+**Validation:** `backend/tests/integration/test_queue_profile_lifecycle.py`: tags/order/department, unused edit, presentation/archive, address-only usage, stale preview, atomic mixed reject, history/address preserved. `backend/tests/test_openapi_contract.py`, exact OpenAPI serialization parity, generated TypeScript body parity, `tsc --noEmit`; generator header must not claim stale schema/path totals.
 **Stop:** owner transfer/address rebind/unknown canonical alias equality.
 **Evidence/logs:** field/usage impact, safe WARN refusal/INFO change/audit по existing command contract; lifecycle T11/T12 не менять здесь.
 
