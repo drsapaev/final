@@ -1,31 +1,32 @@
 # Progress
 
-Plan version: 3.75
+Plan version: 3.76
 Current task: T10 — protect used queue profile bindings; fix two review P2s.
-Current status: PR_OPEN — both review P2s fixed, pushed and exact-head applicable CI passed. PR #3633 remains OPEN / MERGEABLE on HEAD `015fe6a0857f323829f0ed92b230e599ac856624`; user performs merge.
+Current status: IN_PROGRESS — two additional review P2s are fixed, validated on disposable PostgreSQL and committed locally. Journal checkpoint, push and new-head CI are pending. PR #3633 remains OPEN; user performs merge.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-T10-profile-guards
-Base commit: 19c35ec62481dde45c9ea49146ecc4999aaf599f (fresh origin/main)
-Current commit: `015fe6a0857f323829f0ed92b230e599ac856624` (pushed journal checkpoint); includes P2 runtime/test commit `736da5606`; PR base `19c35ec62481dde45c9ea49146ecc4999aaf599f`.
-Last updated: 2026-10-08T12:34:19+05:00
+PR base: `19c35ec62481dde45c9ea49146ecc4999aaf599f` (base when this branch started; origin/main is one unrelated migration ahead).
+Latest source/test commit: `37c6e4c7ebe1727dc1d0e96fc289618fda6a8a1a`.
+The T10 journal checkpoint is the current local HEAD; push is pending. Remote PR HEAD before push: `5b45b9bdaffe341ae2ee67d9136bc0f04b9c1e60`.
+Fresh `origin/main`: `7598692842241f54125ca9b7735964b7d5ee1b50` (one unrelated clinic-settings migration ahead of this continuing PR branch).
+Last updated: 2026-10-08T13:39:31+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
-| T10 | PR_OPEN | PR #3633; HEAD `015fe6a0`; applicable CI green | | EVIDENCE.md#t10-review-p2-follow-up-exact-head-ci |
+| T10 | IN_PROGRESS | PR #3633; local fixes validated; push/CI pending | | EVIDENCE.md#t10-additional-review-p2-fixes |
 
-## Current checkpoint — T10 review P2 follow-up, exact-head CI passed (2026-10-08T12:34+05:00)
+## Current checkpoint — T10 additional review P2 fixes (2026-10-08T13:39+05:00)
 
-- Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-T10-profile-guards`. P2 code/test commit `736da5606` and journal commit `015fe6a0857f323829f0ed92b230e599ac856624` are pushed. GitHub confirms #3633 OPEN / MERGEABLE at exact HEAD `015fe6a0857f323829f0ed92b230e599ac856624`; PR base is `19c35ec62481dde45c9ea49146ecc4999aaf599f`. User merges; do not infer merge from chat.
-- Fixes in progress: (1) compare current/proposed `queue_tags` under the same canonical expansion, preserve raw legacy tags when equivalent, and count dependencies under the effective expanded tag set; (2) serialize profile PUT and permanent public-address provision on a `QueueProfile` row lock, keeping the lock through collision retry.
-- Gate: mandatory queue gate with confirmed root `_queue_profiles.py` returned `narrow_override` / `execute`, no handoff, `gate_misroute=false`, `override_used=true`, first-touch only the root endpoint. The explicit user request to fix both review P2s on T10 is the bounded basis for adding the called-out public-address service, focused PG tests, and these journals. No third gate run.
-- Actual changed code paths: `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, `backend/app/services/queue_svc/_operations.py`, `backend/tests/integration/test_queue_profile_lifecycle.py`. Documentation changes are limited to the main plan, this file, `RESUME.md`, and `EVIDENCE.md`.
-- Validation: final combined PostgreSQL run on a disposable PostgreSQL 16 container — full T10 lifecycle module plus public-address collision-retry regression, **24 passed, 1 warning**. This includes the legacy dental edit, deterministic two-session address lock race, and collision retry after the lock-preserving change. Scoped Ruff, Black, Python compile, `git diff --check`, hooks and exact-head applicable hosted CI pass. A first pytest invocation used a root-relative path and collected zero tests; early PG attempts were skipped while WSL idled. Final tests used a live WSL keepalive and the one-off container was stopped and removed. Do not count skipped attempts as passes.
-- No OpenAPI/API shape change, schema/migration, frontend runtime, staging, production, rollout, Tier-2 deferral, review publication, or merge. Tier-2 staging remains `NOT_RUN`; no deferral is accepted.
-- Exact-head hosted checks: workflow `37742699132` completed successfully at `015fe6a0`; Backend, Frontend unit/E2E/build/lint, Frontend–Backend Parity, Code Quality, Telegram release gate, docs generation, Context Boundary, PR Required Gate and applicable static/security/secret/locale/CodeQL checks passed. Docker build, Supabase Preview, classify-and-route, k6, staging/production readiness reports, integration tests, separate security scan, nightly DAST, metadata and notification jobs were path-aware/inapplicable skips, not passes.
-- Next exact action: user may merge #3633 after reviewing the PR; do not publish a review or merge on the user's behalf. T10 Tier-2 staging remains `NOT_RUN`, no deferral accepted. Do not start T11 before confirmed merge, branch cleanup and main sync. Preserve pre-existing untracked `.scratch/` and `frontend/.scratch/`.
+- Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-T10-profile-guards`. PR #3633 was OPEN at HEAD `5b45b9bdaffe341ae2ee67d9136bc0f04b9c1e60`, base `19c35ec62481dde45c9ea49146ecc4999aaf599f`; user merges. Current main has one later, unrelated clinic-settings migration. Preserve PR history; do not infer merge from chat.
+- New fixes: (1) `_profile_link_counts` counts the canonical `profile.key` as queue usage as well as effective expanded tags, because doctor QR join writes `DailyQueue.queue_tag=profile.key`; persisted routing tags remain unchanged. (2) DELETE locks/refreshes the `QueueProfile` row before checking dependencies, serializing it with address provision and binding PUT.
+- Gate: corrected mandatory gate invocation with confirmed root `_queue_profiles.py` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; I read the generated execution prompt. The explicit user request to fix these two exact findings authorizes the narrow endpoint/test change despite router first-touch omissions. The first malformed invocation did not run the gate and made no code change. No third gate run.
+- Actual source/test paths: `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, `backend/tests/integration/test_queue_profile_lifecycle.py`; source/test commit `37c6e4c7ebe1727dc1d0e96fc289618fda6a8a1a`. The current local HEAD contains the T10 journal checkpoint. No schema/OpenAPI/frontend/API-shape change.
+- Validation PASS on disposable PostgreSQL 16: `tests/integration/test_queue_profile_lifecycle.py` plus `test_rq16d_public_direction_runtime.py::test_collision_retry_generates_fresh_code` — **26 passed, 1 warning, 0 skipped**. Includes both new PostgreSQL regressions and the previous dental/edit/address-lock/collision cases. Scoped Ruff, Black, py_compile, `git diff --check`, and all applicable source commit hooks pass. The first attempt skipped because WSL idled; the successful run used an active WSL process and the owned disposable container. The combined successful run had no skipped tests.
+- Previous exact-head CI on the old PR HEAD passed applicable checks; CI for this new source revision is pending until push. Tier-2 staging remains `NOT_RUN`; no deferral accepted. No production or shared staging used.
+- Next exact action: commit the T10 journal checkpoint, push the source/test and docs commits to the existing PR branch, then inspect checks on the resulting exact HEAD. Do not merge or publish a review. Do not start T11 before user confirms merge, branch cleanup and main sync. Preserve unrelated scratch.
 
 ## Superseded checkpoint — T10 generated-API validation before review P2 follow-up (2026-10-08T10:35+05:00)
 - Completed: PR #3620 / T09.3 merged at 2026-10-08T03:57:48Z. Fresh origin/main and T10 base are both 19c35ec62481dde45c9ea49146ecc4999aaf599f. GitHub confirms PR #3633 OPEN / MERGEABLE at `79a61c79837b7ffa1db40a031a7cca1b3f0d5505`; no merge is confirmed.
