@@ -1,13 +1,13 @@
 # Progress
 
-Plan version: 3.65
+Plan version: 3.66
 Current task: T10 — protect used queue profile bindings.
-Current status: PR_OPEN; PR #3633; local PostgreSQL lifecycle, OpenAPI contract, generated-type freshness and TypeScript checks pass; exact-head hosted CI is pending.
+Current status: PR_OPEN; PR #3633. Added a PostgreSQL negative-RBAC regression; lifecycle suite now passes 21/21. PR Review Quality Gate had failed because required PR-body fields were missing; body correction is next.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-T10-profile-guards
 Base commit: 19c35ec62481dde45c9ea49146ecc4999aaf599f (fresh origin/main)
-Current commit: current branch HEAD (resolve from Git/GitHub on resume); code commit `eb4a9d5ef423ffb5249831a252d0912471ddc220`
-Last updated: 2026-10-08T09:39:00+05:00
+Current commit: `657948f18a290105a3a5c80d002c47e058481386` plus uncommitted test-only regression before the next checkpoint commit; code commit `eb4a9d5ef423ffb5249831a252d0912471ddc220`
+Last updated: 2026-10-08T09:44:23+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -17,13 +17,13 @@ Last updated: 2026-10-08T09:39:00+05:00
 | T10 | PR_OPEN | PR #3633 | | EVIDENCE.md#t10-profile-binding-guard |
 
 ## Current checkpoint
-- Completed: PR #3620 / T09.3 merged at 2026-10-08T03:57:48Z. Fresh origin/main and T10 base are both 19c35ec62481dde45c9ea49146ecc4999aaf599f. T10 PR #3633 is OPEN; initial observed head was `794f5e6fff450873495f04c8b2487865dec9b7f0` before this journal-only checkpoint advances the branch.
+- Completed: PR #3620 / T09.3 merged at 2026-10-08T03:57:48Z. Fresh origin/main and T10 base are both 19c35ec62481dde45c9ea49146ecc4999aaf599f. GitHub currently reports PR #3633 OPEN at `657948f18a290105a3a5c80d002c47e058481386`; no merge is confirmed.
 - Changed: endpoint counts active permanent addresses, previews proposed binding values, blocks used-profile `queue_tags`/order/`department_key` mutations before assignment, and returns typed 409. Added PostgreSQL regressions and OpenAPI contract coverage, regenerated the spec/client types, and removed the stale schema-count claim from the generator header.
-- Validation PASS: Ruff check; Python `py_compile`; `backend/tests/test_openapi_contract.py` — 39 passed, 1 warning; `backend/tests/integration/test_queue_profile_lifecycle.py` — 20 passed, 1 warning; frontend `tsc --noEmit` exit 0; generated type body exact match with installed `openapi-typescript` 7.13.0; runtime OpenAPI serialization parity; `git diff --check` to rerun after final journal update.
+- Validation PASS: Ruff check; Python `py_compile`; Black check; `backend/tests/test_openapi_contract.py` — previously 39 passed, 1 warning; `backend/tests/integration/test_queue_profile_lifecycle.py` — 21 passed, 1 warning on disposable PostgreSQL 16.15; frontend `tsc --noEmit` exit 0; generated type body exact match with installed `openapi-typescript` 7.13.0; runtime OpenAPI serialization parity. `git diff --check` must be rerun after this checkpoint.
 - WSL diagnosis: the first disposable PG container exited cleanly when Ubuntu became idle, causing a test attempt to skip all 20 cases. Keeping Ubuntu active for the duration of the run stabilized the same loopback-only PostgreSQL 16.15 container. The successful suite provisioned its own unique scratch DB and passed; the test container was stopped and removed.
 - Generation note: the repository npm generator previously failed under WSL Node 18.19 in Redocly with `Invalid string length`; direct invocation of the installed CLI under bundled Node 24 produced the exact current type body. `frontend/scripts/generate-api-types.sh` now uses a non-counting source header, preventing stale schema-count metadata. The ordinary npm generator is not recorded as run/pass.
-- Blocker: exact-head hosted CI and PR review remain pending. T10 staging was not run; do not treat it as Tier-2 evidence or accept a T10 deferral.
-- Next exact action: after pushing this checkpoint, query PR #3633's actual HEAD/base and inspect all applicable checks on that exact HEAD; user performs merge.
+- Blocker: PR Review Quality Gate failed on exact head `657948f1` because the PR body omitted required sections/fields; other listed applicable checks passed, while path-aware jobs were skipped. Correct and locally validate the body, commit/push the new RBAC regression and checkpoint, then inspect exact-head hosted checks. T10 staging was not run; do not treat it as Tier-2 evidence or accept a T10 deferral.
+- Next exact action: complete the PR body template correction, commit only the T10 regression/checkpoint files, push, inspect all applicable checks on the new exact head, and leave merge to the user.
 - Checks to rerun after the next code change: Ruff, Python compile, OpenAPI contract, TypeScript check, generated artifact freshness, PostgreSQL profile lifecycle suite, and `git diff --check`.
 ## Superseded checkpoint — PR #3620 generic uncertain-retry local state (2026-10-07T16:08+05:00)
 

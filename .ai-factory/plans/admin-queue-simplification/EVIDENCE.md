@@ -2411,3 +2411,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: T10 is locally validated at code commit `eb4a9d5ef`, PR #3633 is open, and exact-head hosted CI is pending. No review or merge was published.
 - Scope check: no model/schema/migration, frontend runtime UI, T11/T12 lifecycle, ownership/fairness, RBAC, shared staging, production, or unrelated scratch changes. Existing scratch directories were preserved.
 - Merge commit: none. User performs merge.
+
+## T10 continuation — negative RBAC proof and PR quality-gate repair — 2026-10-08T09:44+05:00
+
+- Commit under test: remote PR head `657948f18a290105a3a5c80d002c47e058481386` plus an uncommitted test-only change; base `19c35ec62481dde45c9ea49146ecc4999aaf599f`; branch `codex/aqs-T10-profile-guards`.
+- Execution mode/scope: continuation of T10's documented mandatory queue-domain gate and narrow override; no runtime or schema change. Added only a negative RBAC regression to `backend/tests/integration/test_queue_profile_lifecycle.py`. Allowed path remains that test and the T10 plan/checkpoint docs; denied paths remain endpoint/runtime changes, migrations, frontend runtime, shared staging, production and unrelated scratch.
+- Original failure: exact-head `PR Review Quality Gate` failed because #3633's body lacked required sections and field answers. Other listed applicable checks passed; path-aware checks were skipped and remain NOT_RUN. GitHub reports #3633 OPEN, so the user's “merged” update is not confirmed for this PR at this checkpoint.
+- Validation: `backend/tests/integration/test_queue_profile_lifecycle.py` — **21 passed, 1 warning** on isolated disposable PostgreSQL 16.15, including a Registrar token receiving 403 from the Admin-only preview endpoint; Ruff check — PASS; Black check — PASS; Python compile — PASS. The disposable database container was stopped and removed; only system/test-created databases existed inside the ephemeral container. No shared staging was used.
+- Not rerun because this change is test-only: OpenAPI contract suite (previously 39 passed, 1 warning), frontend TypeScript, generated API parity and runtime OpenAPI serialization checks. No T10 staging, browser, production or Tier-2 evidence was produced.
+- Next: complete and locally validate all required PR-body fields; commit/push the scoped test and checkpoint; inspect the new exact-head hosted checks and report readiness. Do not merge; the user performs merge.
+- Merge commit: none.

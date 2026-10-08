@@ -1,12 +1,12 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.65 — T10 protect used profile bindings; PR #3633 is open, exact-head CI pending.
-**Создан:** 30 сентября 2026. **Обновлён:** 8 октября 2026, 2026-10-08T09:39+05:00 Asia/Tashkent.
-**Current task:** T10 — protect queue profile tags/order/department bindings when used; local PostgreSQL lifecycle, OpenAPI, generated-type and TypeScript checks pass; [PR #3633](https://github.com/drsapaev/final/pull/3633) is open.
+**Версия:** 3.66 — T10 negative RBAC regression and PR quality-gate repair.
+**Создан:** 30 сентября 2026. **Обновлён:** 8 октября 2026, 2026-10-08T09:44+05:00 Asia/Tashkent.
+**Current task:** T10 — protect queue profile tags/order/department bindings when used. PostgreSQL lifecycle suite passes 21/21 with Admin/Registrar proof; [PR #3633](https://github.com/drsapaev/final/pull/3633) remains open, and its PR-body quality gate requires correction.
 **Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`; branch `codex/aqs-T10-profile-guards`.
 **Verified base:** freshly fetched `origin/main` and current `HEAD` are `19c35ec62481dde45c9ea49146ecc4999aaf599f`.
 **T09.3 closure:** PR #3620 merged at `2026-10-08T03:57:48Z`, merge commit `19c35ec62481dde45c9ea49146ecc4999aaf599f`.
-**Current-state rule:** T10 code commit is `eb4a9d5ef423ffb5249831a252d0912471ddc220` on the clean base above. PR #3633 was opened at head `794f5e6fff450873495f04c8b2487865dec9b7f0`; this PR-state journal commit advances the head. On every resume, inspect actual worktree, branch and remote state before relying on this checkpoint.
+**Current-state rule:** T10 code commit is `eb4a9d5ef423ffb5249831a252d0912471ddc220` on the base above. GitHub currently reports PR #3633 OPEN at `657948f18a290105a3a5c80d002c47e058481386`; a negative-RBAC regression and plan checkpoint are being finalized. On every resume, inspect actual worktree, branch and remote state before relying on this checkpoint. Do not treat the user's “merged” update as confirmation until GitHub reports a merge commit.
 **Scope:** T10 QueueProfile endpoint, PostgreSQL lifecycle tests, OpenAPI contract test/spec, generated TypeScript API types and the generator’s stale-count header, plus plan/checkpoint/decision documents. User explicitly approved the OpenAPI/generated-type scope extension. No migration/schema, frontend runtime UI, T11/T12 lifecycle/publication, queue ownership/fairness, auth/RBAC, shared staging or production changes.
 > **T10:** protect used QueueProfile bindings. The local diff counts active permanent addresses, prevents used-profile tag/order/department changes at PUT time, and adds a read-only proposed-binding preview with typed conflict response. PostgreSQL lifecycle and OpenAPI contract tests cover this contract; generated OpenAPI/client artifacts and the non-counting generator header are in scope.
 > **Tier 2:** no staging run was performed for T10; no staging deferral is accepted. T18 and full pre-deploy `STAGING_VALIDATION.md` remain outstanding. Skipped checks remain NOT_RUN.
@@ -17,7 +17,7 @@
 > Следующие две строки — исторический снимок метаданных T08.2c, оставленный для прослеживаемости; текущие ветка и статус указаны выше.
 **Текущий worktree:** `C:\final\_wt_aqs_t082c_availability`; ветка `codex/aqs-T08.2c-availability`; база `9b8296f8e090a2d6f6e0c70eb78e4f00f4e6d80e`; PR [#3596](https://github.com/drsapaev/final/pull/3596). Report implementation `718d4d65c5717528e8a93fb819fdf328c63bf772`; future-date compatibility fix `b6c3973d11a450169c1e5ad04c4dbf5d47ac33d8`; OpenAPI EOF parity fix `f8012a1cd8bea673f218f2c873b197c1940b24eb`. Focused local checks pass (85 unit/OpenAPI, 4 selected integration). The docs-freshness CI failure on `fd9b1c793` was due to a final CRLF in the generated snapshot; it is removed to match exact app serialization. New exact-head checks pending.
 
-> **T00–T09.3, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1, T08.3.2, T08.3.2-P2 and T08.3.3 — MERGED; T10 — PR_OPEN (#3633); T11–T18 — PLANNED.** PR #3620 merged at `19c35ec6`; T10 local validation passes. Exact-head hosted CI remains pending; user performs merge.
+> **T00–T09.3, T08.1a, T08.1b, T08.2a, T08.2b, T08.2c, T08.3.1, T08.3.2, T08.3.2-P2 and T08.3.3 — MERGED; T10 — PR_OPEN (#3633); T11–T18 — PLANNED.** PR #3620 merged at `19c35ec6`; T10 local lifecycle checks pass 21/21. The current PR quality gate failed on missing body fields; repair and exact-head CI are pending. User performs merge.
 > Принятый deferral staging для #3543 не является PASS и не распространяется на следующие PR. Feature flag создания v1 остаётся выключенным; production activation и deploy не разрешены.
 
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).

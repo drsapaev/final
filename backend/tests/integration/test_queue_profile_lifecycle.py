@@ -468,6 +468,33 @@ def _preview_profile_update(pg_client, pg_admin_user, key: str, payload: dict):
     )
 
 
+def test_binding_update_preview_rejects_non_admin(pg_client, pg_session):
+    from app.core.security import get_password_hash
+    from app.models.user import User
+    from tests.conftest import mint_access_token
+
+    registrar = User(
+        username="rq12b_t10_registrar",
+        email="rq12b-t10-registrar@example.com",
+        full_name="RQ12B T10 Registrar",
+        hashed_password=get_password_hash("rq12b-t10-synthetic-password"),
+        role="Registrar",
+        is_active=True,
+        is_superuser=False,
+    )
+    pg_session.add(registrar)
+    pg_session.commit()
+
+    headers = {"Authorization": f"Bearer {mint_access_token(registrar)}"}
+    response = pg_client.post(
+        "/api/v1/queues/profiles/rq12b-t10-auth/impact-preview",
+        json={"queue_tags": ["rq12b-t10-new-tag"]},
+        headers=headers,
+    )
+
+    assert response.status_code == 403, response.text
+
+
 def test_used_profile_binding_changes_are_blocked_atomically(
     pg_client, pg_session, pg_admin_user
 ):
