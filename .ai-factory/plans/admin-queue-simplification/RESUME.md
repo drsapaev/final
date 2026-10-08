@@ -1,4 +1,16 @@
-## Current resume — T10 exact-head CI, staging and P2 hold (2026-10-08T17:19:46+05:00)
+## Current resume — PR #3633 cross-writer serialization P2 (2026-10-08T20:03+05:00)
+
+- Continue in `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-T10-profile-guards`, local runtime commit `e68f93bf7`; PR remote was OPEN/MERGEABLE at old HEAD `56f5a6fc37cec600c2da69724a6b7c10faf70135`, base `885782648fd7b83b0687b33cf930ae608d94a026`. Code and current journal checkpoint are committed locally; push is next.
+- User explicitly authorized fixing the remaining P2 and accepted HTTP 409/no-write when a tagged writer waits and detects a changed binding.
+- Current changes serialize profile binding checks against tagged DailyQueue, Service, QueueResource, Doctor activation, department default Service and public-address writers. Stale binding returns the existing structured 409/no-write contract. CSV bulk department import has row savepoints to avoid committing partial setup on that conflict.
+- Local evidence: `test_queue_profile_lifecycle.py` 34/34 and `test_admin_department_create_atomicity.py` 8/8 on disposable PostgreSQL 16; focused QR/visit/GraphQL/legacy suite 39/39 and adapter unit suite 26/26; scoped Ruff, compileall and diff checks pass. One warning per pytest run. The complete details and hook caveat are in `PROGRESS.md` and `EVIDENCE.md#t10-pr-3633-cross-writer-p2-local-validation`.
+- A first PG attempt was `NOT_RUN` after WSL stopped its temporary container. The successful retry kept WSL alive, passed both PostgreSQL suites, and removed the exact task-owned no-volume container. No other project was touched.
+- Preserve untracked `.scratch/` and `frontend/.scratch/`. Gate was already run and generated handoff read; do not rerun. No merge or formal review submission; user performs merge.
+- Next: push the code plus journal checkpoint, inspect exact-head CI, then run a new isolated synthetic Tier-2 staging session for the P2, with normal Admin 2FA. Full STAGING_VALIDATION.md/T18/browser coverage remain NOT_RUN.
+
+## Superseded resume — T10 serialization implementation start (2026-10-08T18:34:35+05:00)
+
+## Superseded resume — T10 exact-head CI, staging and P2 hold (2026-10-08T17:19:46+05:00)
 
 - Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`; branch `codex/aqs-T10-profile-guards`. PR #3633 was OPEN/MERGEABLE at code/checkpoint HEAD `005477d4`, base `88578264`. All applicable hosted CI checks passed on that HEAD (pipeline `37774519034`); a documentation-only follow-up is being pushed and needs scoped exact-head CI inspection.
 - Test false-positive fix `979f6e81` and conflict-free merge of current main are in the branch. Tier-2 runtime validation passed on commit `29a8ef16`; report [T10-PR3633-tier2-staging-report.md](T10-PR3633-tier2-staging-report.md), 34 PASS/0 FAIL; project resources and task ports were removed/verified.

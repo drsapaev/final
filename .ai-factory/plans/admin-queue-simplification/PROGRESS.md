@@ -1,23 +1,36 @@
 # Progress
 
-Plan version: 3.82
+Plan version: 3.83
 Current task: T10 — protect used QueueProfile bindings and address PR #3633 review.
-Current status: BLOCKED — Tier-2 API staging passed on runtime commit `29a8ef16`; test false-positive fix and main sync are pushed. All applicable hosted checks passed on code/checkpoint HEAD `005477d4`; a follow-up docs-only checkpoint is being pushed and its scoped checks must be inspected. One cross-writer serialization P2 remains open and keeps merge on hold; no deferral accepted.
+Current status: IN_PROGRESS — sole unresolved cross-writer serialization P2 is implemented and locally validated on PR #3633. Tier-2 staging for this runtime commit is pending. Do not merge or submit a review; user merges.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-T10-profile-guards
 Base at last GitHub query: 885782648fd7b83b0687b33cf930ae608d94a026
-Code/checkpoint HEAD with completed hosted CI: 005477d4d59ee5cb1fe6f1983d39b2366a5fdcef
-Runtime commit validated in Tier-2: 29a8ef169bb25fb1dfaa77ee3c726b515e1598e1
-Last updated: 2026-10-08T17:19:46+05:00
+Current local runtime commit: e68f93bf7 (not yet pushed at this checkpoint)
+PR remote HEAD at last GitHub query: 56f5a6fc37cec600c2da69724a6b7c10faf70135
+Last updated: 2026-10-08T20:03+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
-| T10 | BLOCKED | PR #3633; test correction + latest main synced; Tier-2 PASS; applicable CI passed on `005477d4`; one cross-writer P2 open; no merge | | EVIDENCE.md#t10-pr-3633-exact-head-ci |
+| T10 | IN_PROGRESS | PR #3633; runtime fix `e68f93bf7` local; user merges | | EVIDENCE.md#t10-pr-3633-cross-writer-p2-local-validation |
 
-## Current checkpoint — T10 exact-head CI and review state (2026-10-08T17:19:46+05:00)
+## Current checkpoint — T10 cross-writer P2 local validation (2026-10-08T20:03+05:00)
+
+- PR #3633 was OPEN/MERGEABLE at remote HEAD `56f5a6fc37cec600c2da69724a6b7c10faf70135`, base `885782648fd7b83b0687b33cf930ae608d94a026`. Local runtime/test commit `e68f93bf7` is committed but not pushed; this journal checkpoint is being committed separately. Preserve `.scratch/` and `frontend/.scratch/`.
+- User authorized fixing the remaining review finding and accepted the proposed stale-binding result: a writer that waits and then observes a changed binding returns HTTP 409 without writing.
+- Pre-edit gate/scope record remains in `EVIDENCE.md#t10-pr-3633-cross-writer-p2-prework`; gate result was `narrow_override`, `gate_misroute=yes`, `override_used=yes`, `handoff_required=yes`. User authorization covered the complete writer scope and HTTP 409/no-write stale-binding rule. Do not rerun the gate.
+- Implementation uses shared owner-config tag/department locks and checks the binding snapshot after lock wait. Profile PUT/delete lock old/proposed scopes, refresh the profile row and recheck links. Tagged queue, resource, service, doctor, role activation, and public-address writers now use the same boundary; adapters preserve conflict/no-write behavior. The default-service department path also participates.
+- Call-graph follow-up: bulk department import stages settings before `_ensure_department_integrations` takes its shared scope. Each CSV row now has a savepoint so a stale-binding conflict rolls back that whole row while preserving earlier/later successful rows. This is bounded to the same P2 and has a PostgreSQL regression.
+- Local validation PASS: QueueProfile PostgreSQL lifecycle 34/34; department-create atomicity PostgreSQL 8/8; focused QR/visit/GraphQL/legacy adapter suite 39/39; focused unit suite 26/26; scoped Ruff, compileall and diff checks. Warnings: one per pytest run. Admin department helper retains baseline Ruff diagnostics (`I001`/three `B023`) outside the new code. Exact commands/results are in `EVIDENCE.md#t10-pr-3633-cross-writer-p2-local-validation`.
+- Commit `e68f93bf7` passed non-rewriting pre-commit hooks including gitleaks. The first hook attempt exposed auto-formatters rewriting unrelated legacy code and existing Ruff findings; only those generated worktree changes were reversed. End-of-file fixer/Ruff auto-fix/Ruff format/Black were skipped on the successful commit; do not describe those hooks as passed.
+- First PG test attempt was `NOT_RUN` because WSL stopped the test container. The retry kept the WSL session alive; all 8 + 34 PostgreSQL tests passed against the task-owned loopback-only PG16 container, then the exact no-volume container was removed. No shared staging/production target was used.
+- Scope includes backend QueueProfile/link writers, department default-service/bulk-row writer, focused backend tests and T10 journals only. No schema/migration, frontend, generated OpenAPI/client, changed queue ownership, or clinical lifecycle behavior.
+- Next exact action: push the code and journal commits, inspect current exact-head CI, then create a unique ignored synthetic staging env and run documented WSL `Preflight → Start → Session` for Admin 2FA and stale-binding API scenarios. Do not merge or submit a review; user merges. Full STAGING_VALIDATION.md/browser/T18 remain separate.
+
+## Superseded checkpoint — T10 exact-head CI and review state (2026-10-08T17:19:46+05:00)
 
 - PR #3633 is OPEN/MERGEABLE at code/checkpoint HEAD `005477d4d59ee5cb1fe6f1983d39b2366a5fdcef`, base `885782648fd7b83b0687b33cf930ae608d94a026`, as last queried before this documentation-only checkpoint. Exact-hosted CI run `37774519034` and associated quality/security runs passed all applicable checks on that HEAD.
 - Code/runtime commits in that head include the test false-positive correction `979f6e81` and conflict-free merge commit `29a8ef16` incorporating latest `origin/main`. Tier-2 synthetic API staging passed on runtime commit `29a8ef16`; sanitized report is [T10-PR3633-tier2-staging-report.md](T10-PR3633-tier2-staging-report.md). The follow-up in this checkpoint changes plan/evidence documents only.
