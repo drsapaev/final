@@ -926,7 +926,7 @@ def test_binding_update_rechecks_after_stale_preview(
 def test_public_address_provision_serializes_with_binding_update(
     pg_engine, pg_session, pg_admin_user, monkeypatch
 ):
-    """A binding PUT waits for address creation, then rechecks and blocks."""
+    """A binding PUT waits on the shared scope, then rechecks and blocks."""
     import threading
     import time
     from concurrent.futures import ThreadPoolExecutor
@@ -1032,7 +1032,7 @@ def test_public_address_provision_serializes_with_binding_update(
                 if update_future.done():
                     break
                 time.sleep(0.02)
-            assert blocked_by_provision, "update must wait on the profile row lock"
+            assert blocked_by_provision, "update must wait on the shared binding scope"
         finally:
             finish_provision.set()
 
@@ -1181,6 +1181,408 @@ def test_delete_serializes_with_public_address_provision(
     )
     assert address.queue_profile_id == profile.id
     assert address.retired_at is None
+
+
+def test_tagged_daily_queue_writer_serializes_profile_binding_update(
+    pg_engine, pg_session, pg_admin_user
+):
+    """A tagged queue commit wins the shared scope and blocks a rebind."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import date
+
+    from fastapi import HTTPException
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        QueueProfileUpdate,
+        update_queue_profile,
+    )
+    from app.crud.queue_resource_routing import lock_daily_queue_creation
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+
+    suffix = uuid.uuid4().hex[:8]
+    key = f"rq12b-t10-writer-first-{suffix}"
+    tag = f"rq12b-wf-{suffix}"
+    profile = QueueProfile(
+        key=key,
+        title="T10 writer first",
+        queue_tags=[tag],
+        department_key=None,
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    doctor = Doctor(specialty=f"unrelated-{suffix}", active=False)
+    pg_session.add_all([profile, doctor])
+    pg_session.commit()
+    pg_session.refresh(doctor)
+
+    session_factory = sessionmaker(bind=pg_engine, future=True)
+    writer_holds_scope = threading.Event()
+    allow_writer_commit = threading.Event()
+    update_started = threading.Event()
+    pids: dict[str, int] = {}
+
+    def tagged_writer() -> None:
+        with session_factory() as db:
+            pids["writer"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            lock_daily_queue_creation(db, date.today(), doctor.id, queue_tag=tag)
+            writer_holds_scope.set()
+            if not allow_writer_commit.wait(timeout=10):
+                raise TimeoutError("profile update did not reach the lock")
+            db.add(
+                DailyQueue(
+                    day=date.today(),
+                    specialist_id=doctor.id,
+                    queue_tag=tag,
+                    active=True,
+                )
+            )
+            db.commit()
+
+    def update_binding() -> int:
+        with session_factory() as db:
+            pids["update"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            user = db.get(User, pg_admin_user.id)
+            update_started.set()
+            try:
+                update_queue_profile(
+                    profile_key=key,
+                    profile_data=QueueProfileUpdate(queue_tags=[f"rq12b-new-{suffix}"]),
+                    db=db,
+                    current_user=user,
+                )
+                return 200
+            except HTTPException as exc:
+                return exc.status_code
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        writer_future = executor.submit(tagged_writer)
+        update_future = None
+        try:
+            assert writer_holds_scope.wait(timeout=5)
+            update_future = executor.submit(update_binding)
+            assert update_started.wait(timeout=5)
+
+            deadline = time.monotonic() + 5
+            update_waited_for_writer = False
+            while time.monotonic() < deadline:
+                with pg_engine.connect() as connection:
+                    blockers = connection.execute(
+                        text("SELECT pg_blocking_pids(:pid)"),
+                        {"pid": pids["update"]},
+                    ).scalar_one()
+                if pids["writer"] in blockers:
+                    update_waited_for_writer = True
+                    break
+                if update_future.done():
+                    break
+                time.sleep(0.02)
+            assert update_waited_for_writer, (
+                "binding update must wait for tagged writer"
+            )
+        finally:
+            allow_writer_commit.set()
+
+        writer_future.result(timeout=10)
+        assert update_future is not None
+        assert update_future.result(timeout=10) == 409
+
+    pg_session.expire_all()
+    pg_session.refresh(profile)
+    assert profile.queue_tags == [tag]
+    assert (
+        pg_session.query(DailyQueue)
+        .filter(DailyQueue.queue_tag == tag, DailyQueue.specialist_id == doctor.id)
+        .count()
+        == 1
+    )
+
+
+def test_tagged_daily_queue_writer_rejects_binding_changed_while_waiting(
+    pg_engine, pg_session, pg_admin_user, monkeypatch
+):
+    """A stale tagged writer returns 409 and inserts nothing after a rebind."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import date
+
+    from fastapi import HTTPException
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.api.v1.endpoints.registrar_integration import _queue_profiles
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        QueueProfileUpdate,
+        update_queue_profile,
+    )
+    from app.crud.queue_owner_invariant import QueueProfileBindingChanged
+    from app.crud.queue_resource_routing import lock_daily_queue_creation
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+
+    suffix = uuid.uuid4().hex[:8]
+    key = f"rq12b-t10-update-first-{suffix}"
+    tag = f"rq12b-uf-{suffix}"
+    stale_tag_variant = tag.upper()
+    new_tag = f"rq12b-new-{suffix}"
+    profile = QueueProfile(
+        key=key,
+        title="T10 update first",
+        queue_tags=[tag],
+        department_key=None,
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    doctor = Doctor(specialty=f"unrelated-{suffix}", active=False)
+    pg_session.add_all([profile, doctor])
+    pg_session.commit()
+    pg_session.refresh(doctor)
+
+    session_factory = sessionmaker(bind=pg_engine, future=True)
+    usage_checked = threading.Event()
+    allow_update_commit = threading.Event()
+    writer_started = threading.Event()
+    pids: dict[str, int] = {}
+    original_link_counts = _queue_profiles._profile_link_counts
+
+    def pause_after_usage_check(db, current_profile):
+        counts = original_link_counts(db, current_profile)
+        if threading.current_thread().name.startswith("t10-update-first"):
+            usage_checked.set()
+            if not allow_update_commit.wait(timeout=10):
+                raise TimeoutError("tagged writer did not reach the profile lock")
+        return counts
+
+    monkeypatch.setattr(
+        _queue_profiles, "_profile_link_counts", pause_after_usage_check
+    )
+
+    def update_binding() -> int:
+        with session_factory() as db:
+            user = db.get(User, pg_admin_user.id)
+            try:
+                update_queue_profile(
+                    profile_key=key,
+                    profile_data=QueueProfileUpdate(queue_tags=[new_tag]),
+                    db=db,
+                    current_user=user,
+                )
+                return 200
+            except HTTPException as exc:
+                return exc.status_code
+
+    def tagged_writer() -> int:
+        with session_factory() as db:
+            pids["writer"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            writer_started.set()
+            try:
+                lock_daily_queue_creation(
+                    db,
+                    date.today(),
+                    doctor.id,
+                    queue_tag=stale_tag_variant,
+                )
+            except QueueProfileBindingChanged as exc:
+                return exc.status_code
+            db.add(
+                DailyQueue(
+                    day=date.today(),
+                    specialist_id=doctor.id,
+                    queue_tag=stale_tag_variant,
+                    active=True,
+                )
+            )
+            db.commit()
+            return 201
+
+    with ThreadPoolExecutor(
+        max_workers=2, thread_name_prefix="t10-update-first"
+    ) as executor:
+        update_future = executor.submit(update_binding)
+        writer_future = None
+        try:
+            assert usage_checked.wait(timeout=5)
+            writer_future = executor.submit(tagged_writer)
+            assert writer_started.wait(timeout=5)
+
+            deadline = time.monotonic() + 5
+            writer_waited_for_update = False
+            while time.monotonic() < deadline:
+                if "writer" not in pids:
+                    time.sleep(0.02)
+                    continue
+                with pg_engine.connect() as connection:
+                    blockers = connection.execute(
+                        text("SELECT pg_blocking_pids(:pid)"),
+                        {"pid": pids["writer"]},
+                    ).scalar_one()
+                if blockers:
+                    writer_waited_for_update = True
+                    break
+                if writer_future.done():
+                    break
+                time.sleep(0.02)
+            assert writer_waited_for_update, (
+                "tagged writer must wait for profile update"
+            )
+        finally:
+            allow_update_commit.set()
+
+        assert update_future.result(timeout=10) == 200
+        assert writer_future is not None
+        assert writer_future.result(timeout=10) == 409
+
+    pg_session.expire_all()
+    pg_session.refresh(profile)
+    assert profile.queue_tags == [new_tag]
+    assert (
+        pg_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == date.today(),
+            DailyQueue.specialist_id == doctor.id,
+        )
+        .count()
+        == 0
+    )
+
+
+def test_tagged_service_writer_rejects_binding_changed_while_waiting(
+    pg_engine, pg_session, pg_admin_user, monkeypatch
+):
+    """A Service insert waiting behind a rebind returns 409 without writing."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    from fastapi import HTTPException
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.api.v1.endpoints.registrar_integration import _queue_profiles
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        QueueProfileUpdate,
+        update_queue_profile,
+    )
+    from app.models.queue_profile import QueueProfile
+    from app.models.service import Service
+    from app.models.user import User
+    from app.services.services_api_service import ServicesApiService
+
+    suffix = uuid.uuid4().hex[:8]
+    key = f"rq12b-t10-service-{suffix}"
+    tag = f"rq12b-svc-{suffix}"
+    new_tag = f"rq12b-new-svc-{suffix}"
+    service_name = f"T10 concurrent service {suffix}"
+    profile = QueueProfile(
+        key=key,
+        title="T10 service writer",
+        queue_tags=[tag],
+        department_key=None,
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    pg_session.add(profile)
+    pg_session.commit()
+
+    session_factory = sessionmaker(bind=pg_engine, future=True)
+    usage_checked = threading.Event()
+    allow_update_commit = threading.Event()
+    writer_started = threading.Event()
+    pids: dict[str, int] = {}
+    original_link_counts = _queue_profiles._profile_link_counts
+
+    def pause_after_usage_check(db, current_profile):
+        counts = original_link_counts(db, current_profile)
+        if threading.current_thread().name.startswith("t10-service-update"):
+            usage_checked.set()
+            if not allow_update_commit.wait(timeout=10):
+                raise TimeoutError("service writer did not reach the profile lock")
+        return counts
+
+    monkeypatch.setattr(
+        _queue_profiles, "_profile_link_counts", pause_after_usage_check
+    )
+
+    def update_binding() -> int:
+        with session_factory() as db:
+            user = db.get(User, pg_admin_user.id)
+            try:
+                update_queue_profile(
+                    profile_key=key,
+                    profile_data=QueueProfileUpdate(queue_tags=[new_tag]),
+                    db=db,
+                    current_user=user,
+                )
+                return 200
+            except HTTPException as exc:
+                return exc.status_code
+
+    def create_service() -> int:
+        with session_factory() as db:
+            pids["writer"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            writer_started.set()
+            try:
+                ServicesApiService(db).create_service(
+                    service_data={
+                        "name": service_name,
+                        "queue_tag": tag,
+                        "requires_doctor": False,
+                    }
+                )
+                return 201
+            except HTTPException as exc:
+                return exc.status_code
+
+    with ThreadPoolExecutor(
+        max_workers=2, thread_name_prefix="t10-service-update"
+    ) as executor:
+        update_future = executor.submit(update_binding)
+        writer_future = None
+        try:
+            assert usage_checked.wait(timeout=5)
+            writer_future = executor.submit(create_service)
+            assert writer_started.wait(timeout=5)
+
+            deadline = time.monotonic() + 5
+            writer_waited_for_update = False
+            while time.monotonic() < deadline:
+                if "writer" not in pids:
+                    time.sleep(0.02)
+                    continue
+                with pg_engine.connect() as connection:
+                    blockers = connection.execute(
+                        text("SELECT pg_blocking_pids(:pid)"),
+                        {"pid": pids["writer"]},
+                    ).scalar_one()
+                if blockers:
+                    writer_waited_for_update = True
+                    break
+                if writer_future.done():
+                    break
+                time.sleep(0.02)
+            assert writer_waited_for_update, "service writer must wait for profile update"
+        finally:
+            allow_update_commit.set()
+
+        assert update_future.result(timeout=10) == 200
+        assert writer_future is not None
+        assert writer_future.result(timeout=10) == 409
+
+    pg_session.expire_all()
+    pg_session.refresh(profile)
+    assert profile.queue_tags == [new_tag]
+    assert (
+        pg_session.query(Service).filter(Service.name == service_name).count() == 0
+    )
 
 
 def _public_profile_keys(pg_client) -> set[str]:

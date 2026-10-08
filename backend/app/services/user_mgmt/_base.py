@@ -18,6 +18,7 @@ from app.core.specialties import (
     INCOMPLETE_DOCTOR_SPECIALTY,  # noqa: F401 — SSOT: core/specialties (D-1)
     canonical_specialty,
 )
+from app.crud.queue_owner_invariant import lock_profile_link_scopes
 from app.models.clinic import Doctor  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.user_profile import (  # noqa: F401
@@ -242,6 +243,18 @@ class UserManagementServiceMixinBase:
                     reason,
                 )
                 return 0
+            inactive_doctors = (
+                db.query(Doctor)
+                .filter(Doctor.user_id == user_id, Doctor.active.is_(False))
+                .with_for_update()
+                .populate_existing()
+                .all()
+            )
+            pending_doctor_tags = [
+                row.specialty for row in inactive_doctors if row.specialty
+            ]
+            if pending_doctor_tags:
+                lock_profile_link_scopes(db, queue_tags=pending_doctor_tags)
             # Codex #3031 round-3 P1: the shared mirror is ALSO the
             # activation-only path (update_user {"is_active": true} and bulk
             # activate) — enforce the same catalog contract the promotion
@@ -334,7 +347,11 @@ class UserManagementServiceMixinBase:
 
         if new_is_doctor:
             existing = (
-                db.query(Doctor).filter(Doctor.user_id == user.id).first()
+                db.query(Doctor)
+                .filter(Doctor.user_id == user.id)
+                .with_for_update()
+                .populate_existing()
+                .first()
             )
             if existing is None:
                 # Codex round-8 P2: a concurrent promotion of the same user
@@ -368,6 +385,8 @@ class UserManagementServiceMixinBase:
                         specialty,
                     )
                     specialty = INCOMPLETE_DOCTOR_SPECIALTY
+                if user.is_active and specialty:
+                    lock_profile_link_scopes(db, queue_tags=[specialty])
                 values = {
                     "user_id": user.id,
                     "specialty": specialty,
@@ -443,6 +462,10 @@ class UserManagementServiceMixinBase:
                 ):
                     raise DoctorSpecialtyNotSelectableError(stored_specialty)
                 if not existing.active and user.is_active:
+                    if existing.specialty:
+                        lock_profile_link_scopes(
+                            db, queue_tags=[existing.specialty]
+                        )
                     existing.active = True
                     db.flush()
                     logger.info(

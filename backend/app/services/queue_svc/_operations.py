@@ -631,7 +631,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         # moved to queue_resource_routing (one SSOT shared with the four
         # legacy creation paths) — byte-identical identity, see
         # daily_queue_creation_lock_key.
-        lock_daily_queue_creation(db, day, actual_specialist_id)
+        lock_daily_queue_creation(
+            db, day, actual_specialist_id, queue_tag=queue_tag
+        )
 
         # PR-26: ARCHITECTURE FIX — queue is owned by DOCTOR, not by queue_tag.
         #
@@ -1196,10 +1198,22 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
         Returns ``(row, created)``.
         """
+        from app.crud.queue_owner_invariant import lock_profile_link_scopes
         from app.models.queue_direction_public_address import (
             QueueDirectionPublicAddress,
         )
         from app.models.queue_profile import QueueProfile
+
+        # Rebinding takes these same transaction-scoped owner-config locks
+        # before locking the profile row. This gives address creation the
+        # same serialization boundary as other profile links; if a rebind
+        # wins while this writer waits, reject the stale provisioning
+        # attempt before inserting the address.
+        lock_profile_link_scopes(
+            db,
+            queue_tags=[profile.key, *(profile.queue_tags or [])],
+            department_keys=[profile.department_key],
+        )
 
         # Binding updates take the same row lock before checking usage. This
         # makes address creation and binding mutation linearizable: whichever

@@ -13,7 +13,6 @@ from app.crud.queue_owner_invariant import (
     OwnerInvariantViolation,
     affected_service_tags,
     lock_owner_config_scope,
-    lock_owner_config_scopes,
     validate_service_gate_for_requires_doctor,
     validate_tag_owner_invariant,
 )
@@ -355,20 +354,30 @@ class ServicesApiService:
         )
 
         service = Service(**payload)
-        self.repository.add(service)
         # RQ-17 §3.1: gate мутации service-set тега (пин 3: create
         # requires_doctor=true на resource-backed теге -> reject;
         # пост-валидация — defense-in-depth для любого create с тегом).
         db = self.db
         create_tag = payload.get("queue_tag")
+        create_department = payload.get("department_key")
+        if create_tag or create_department:
+            from app.crud.queue_owner_invariant import lock_profile_link_scopes
+
+            lock_profile_link_scopes(
+                db,
+                queue_tags=[create_tag] if create_tag else [],
+                department_keys=[create_department] if create_department else [],
+            )
         if create_tag:
             if payload.get("requires_doctor"):
                 validate_service_gate_for_requires_doctor(
                     db, create_tag, clinic_today(db)
                 )
-            lock_owner_config_scope(db, create_tag)
+        self.repository.add(service)
+        if create_tag or create_department:
             db.flush()
-            validate_tag_owner_invariant(db, create_tag, clinic_today(db))
+            if create_tag:
+                validate_tag_owner_invariant(db, create_tag, clinic_today(db))
         self.repository.commit()
         self.repository.refresh(service)
         self._log_service_creation(service, user_id=user_id)
@@ -458,9 +467,21 @@ class ServicesApiService:
         old_tag = service.queue_tag
         new_tag = update_data["queue_tag"] if "queue_tag" in update_data else old_tag
         affected_tags = affected_service_tags(old_tag, new_tag)
+        old_department = service.department_key
+        new_department = (
+            update_data["department_key"]
+            if "department_key" in update_data
+            else old_department
+        )
         db = self.db
         today = clinic_today(db)
-        lock_owner_config_scopes(db, affected_tags)
+        from app.crud.queue_owner_invariant import lock_profile_link_scopes
+
+        lock_profile_link_scopes(
+            db,
+            queue_tags=affected_tags,
+            department_keys=[old_department, new_department],
+        )
 
         for field, value in update_data.items():
             setattr(service, field, value)
@@ -587,17 +608,33 @@ class ServicesApiService:
             "requires_doctor" in updates
         )
         affected: set[str] = set()
+        affected_departments: set[str] = set()
         for service in services:
             old_tag = service.queue_tag
             new_tag = updates["queue_tag"] if retag_requested else old_tag
             affected.update(affected_service_tags(old_tag, new_tag))
+            old_department = service.department_key
+            new_department = (
+                updates["department_key"]
+                if "department_key" in updates
+                else old_department
+            )
+            affected_departments.update(
+                value for value in (old_department, new_department) if value
+            )
             if owner_sensitive_flip and old_tag:
                 affected.add(old_tag)
         affected_tags = sorted(affected)
 
         db = self.db
         today = clinic_today(db)
-        lock_owner_config_scopes(db, affected_tags)
+        from app.crud.queue_owner_invariant import lock_profile_link_scopes
+
+        lock_profile_link_scopes(
+            db,
+            queue_tags=affected_tags,
+            department_keys=affected_departments,
+        )
 
         old_snapshots = {
             service.id: self._service_snapshot(service) for service in services

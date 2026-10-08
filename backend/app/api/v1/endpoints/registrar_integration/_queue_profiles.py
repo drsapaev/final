@@ -618,9 +618,83 @@ def update_queue_profile(
     try:
         from app.models.queue_profile import QueueProfile
 
-        # Find profile
-        # Serialize binding edits with public-address provisioning. Both
-        # operations lock this canonical row before checking dependencies.
+        # Read the binding without a row lock first. Link writers take the
+        # same owner-config scopes, so acquiring those scopes before this
+        # profile row keeps one lock order and closes check-then-create races.
+        candidate = (
+            db.query(QueueProfile)
+            .filter(QueueProfile.key == profile_key)
+            .populate_existing()
+            .first()
+        )
+        if not candidate:
+            raise HTTPException(
+                status_code=404, detail=f"Profile '{profile_key}' not found"
+            )
+
+        update_data = profile_data.dict(exclude_unset=True)
+        if "department_key" in update_data:
+            update_data["department_key"] = _normalize_department_key(
+                update_data["department_key"]
+            )
+        if "queue_tags" in update_data:
+            candidate_tags = _canonical_profile_tags(
+                update_data["queue_tags"], candidate.key
+            )
+            if _profile_binding_values_equal(
+                "queue_tags", candidate.queue_tags, candidate_tags, candidate.key
+            ):
+                update_data.pop("queue_tags")
+            else:
+                update_data["queue_tags"] = candidate_tags
+
+        candidate_bindings = {
+            "queue_tags": list(candidate.queue_tags or []),
+            "department_key": candidate.department_key,
+        }
+        changed_binding_fields = [
+            field
+            for field in ("queue_tags", "department_key")
+            if field in update_data
+            and not _profile_binding_values_equal(
+                field, candidate_bindings[field], update_data[field], candidate.key
+            )
+        ]
+        # Full-form clients send unchanged values. Drop them so a presentation
+        # edit can never overwrite a binding another admin changed while this
+        # request waited for the profile row.
+        for field in ("queue_tags", "department_key"):
+            if (
+                field in update_data
+                and field not in changed_binding_fields
+                and _profile_binding_values_equal(
+                    field,
+                    candidate_bindings[field],
+                    update_data[field],
+                    candidate.key,
+                )
+            ):
+                update_data.pop(field)
+
+        if changed_binding_fields:
+            from app.crud.queue_owner_invariant import lock_profile_binding_scopes
+
+            proposed_tags = update_data.get("queue_tags", candidate.queue_tags or [])
+            proposed_department = update_data.get(
+                "department_key", candidate.department_key
+            )
+            lock_profile_binding_scopes(
+                db,
+                queue_tags=(
+                    _canonical_profile_tags(candidate.queue_tags, candidate.key)
+                    + _canonical_profile_tags(proposed_tags, candidate.key)
+                    + [candidate.key]
+                ),
+                department_keys=[candidate.department_key, proposed_department],
+            )
+
+        # Serialize binding edits and public-address provisioning on this
+        # canonical row after the shared tag/department scopes are held.
         profile = (
             db.query(QueueProfile)
             .filter(QueueProfile.key == profile_key)
@@ -633,30 +707,34 @@ def update_queue_profile(
                 status_code=404, detail=f"Profile '{profile_key}' not found"
             )
 
-        # Update fields (only those provided)
-        update_data = profile_data.dict(exclude_unset=True)
-        if "department_key" in update_data:
-            update_data["department_key"] = _normalize_department_key(
-                update_data["department_key"]
-            )
-        if "queue_tags" in update_data:
-            candidate_tags = _canonical_profile_tags(
-                update_data["queue_tags"], profile.key
-            )
-            if _profile_binding_values_equal(
-                "queue_tags", profile.queue_tags, candidate_tags, profile.key
-            ):
-                # The UI submits the full form, including unchanged tags.
-                # Preserve older persisted spellings/order instead of
-                # treating canonical expansion as a binding mutation.
-                update_data.pop("queue_tags")
-            else:
-                update_data["queue_tags"] = candidate_tags
-
         current_bindings = {
             "queue_tags": list(profile.queue_tags or []),
             "department_key": profile.department_key,
         }
+        stale_fields = [
+            field
+            for field in ("queue_tags", "department_key")
+            if not _profile_binding_values_equal(
+                field,
+                candidate_bindings[field],
+                current_bindings[field],
+                profile.key,
+            )
+        ]
+        if stale_fields:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "reason": "profile_binding_changed",
+                    "stale_fields": stale_fields,
+                    "message": (
+                        "Привязка направления изменилась во время сохранения. "
+                        "Обновите страницу и повторите действие."
+                    ),
+                },
+            )
+
         changed_binding_fields = [
             field
             for field in ("queue_tags", "department_key")
@@ -735,10 +813,31 @@ def delete_queue_profile(
         from app.models.queue_profile import QueueProfile
         from app.models.service import Service
 
-        # Serialize deletion with address provisioning and binding updates.
-        # Recheck dependencies only after obtaining the same canonical row
-        # lock so an address created while this command waits cannot be
-        # tombstoned by the subsequent DELETE.
+        candidate = (
+            db.query(QueueProfile)
+            .filter(QueueProfile.key == profile_key)
+            .populate_existing()
+            .first()
+        )
+        if not candidate:
+            raise HTTPException(
+                status_code=404, detail=f"Profile '{profile_key}' not found"
+            )
+
+        from app.crud.queue_owner_invariant import lock_profile_binding_scopes
+
+        lock_profile_binding_scopes(
+            db,
+            queue_tags=(
+                _canonical_profile_tags(candidate.queue_tags, candidate.key)
+                + [candidate.key]
+            ),
+            department_keys=[candidate.department_key],
+        )
+
+        # Re-read and lock after taking the same tag/dept scopes as link
+        # writers. Address provisioning is additionally serialized by this
+        # canonical row lock.
         profile = (
             db.query(QueueProfile)
             .filter(QueueProfile.key == profile_key)
@@ -749,6 +848,30 @@ def delete_queue_profile(
         if not profile:
             raise HTTPException(
                 status_code=404, detail=f"Profile '{profile_key}' not found"
+            )
+
+        stale_fields = [
+            field
+            for field, old_value, new_value in (
+                ("queue_tags", candidate.queue_tags, profile.queue_tags),
+                ("department_key", candidate.department_key, profile.department_key),
+            )
+            if not _profile_binding_values_equal(
+                field, old_value, new_value, profile.key
+            )
+        ]
+        if stale_fields:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "reason": "profile_binding_changed",
+                    "stale_fields": stale_fields,
+                    "message": (
+                        "Привязка направления изменилась во время удаления. "
+                        "Обновите страницу и повторите действие."
+                    ),
+                },
             )
 
         # RQ-12.b (D-02 owner decision 2026-09-15): hard delete is allowed

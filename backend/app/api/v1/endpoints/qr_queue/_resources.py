@@ -34,7 +34,7 @@ from app.api.v1.endpoints.qr_queue._helpers import router
 from app.crud.clinic import clinic_today
 from app.crud.queue_owner_invariant import (
     OwnerInvariantViolation,
-    lock_owner_config_scope,
+    lock_profile_link_scopes,
     validate_queue_resource_activation,
     validate_tag_owner_invariant,
 )
@@ -172,7 +172,7 @@ def create_queue_resource(
     today = clinic_today(db)
     try:
         # serialization-scope §3.1(б) — наравне с Service-мутациями тега
-        lock_owner_config_scope(db, payload.queue_tag)
+        lock_profile_link_scopes(db, queue_tags=[payload.queue_tag])
         # Round-3 P2: RE-CHECK ПОД ЛОКОМ. Дубликат-проверка ДО advisory
         # lock не сериализована: два конкурентных POST одного тега оба
         # видят «дубликата нет», затем второй упирается в UNIQUE
@@ -239,7 +239,7 @@ def update_queue_resource(
     changes = payload.model_dump(exclude_unset=True)
     today = clinic_today(db)
     try:
-        lock_owner_config_scope(db, tag_scope)
+        lock_profile_link_scopes(db, queue_tags=[tag_scope])
         # Round-3 P2: re-read ПОД row-lock внутри serialization-scope —
         # тот же протокол, что у Service writer-а (get_service_for_update).
         # db.get ДО лока мог вернуть stale identity-map строку: advisory-лок

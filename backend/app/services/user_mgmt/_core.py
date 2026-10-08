@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from sqlalchemy.orm import joinedload
 
+from app.crud.queue_owner_invariant import (
+    QueueProfileBindingChanged,
+    lock_profile_link_scopes,
+)
 from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
 )
@@ -278,6 +282,10 @@ class CoreMixin(UserManagementServiceMixinBase):
                             ),
                             active=user_data.is_active,
                         )
+                        if new_doctor.active and new_doctor.specialty:
+                            lock_profile_link_scopes(
+                                db, queue_tags=[new_doctor.specialty]
+                            )
                         db.add(new_doctor)
                         doctor_created = True
                         logger.info(
@@ -330,6 +338,10 @@ class CoreMixin(UserManagementServiceMixinBase):
                             specialty=mapped_specialty,
                             active=user_data.is_active,
                         )
+                        if new_doctor.active and new_doctor.specialty:
+                            lock_profile_link_scopes(
+                                db, queue_tags=[new_doctor.specialty]
+                            )
                         db.add(new_doctor)
                         doctor_created = True
                         logger.info(
@@ -345,6 +357,9 @@ class CoreMixin(UserManagementServiceMixinBase):
 
             return True, "Пользователь успешно создан", user
 
+        except QueueProfileBindingChanged:
+            db.rollback()
+            raise
         except Exception as e:
             db.rollback()
             logger.error(f"Error creating user: {e}")
@@ -576,6 +591,9 @@ class CoreMixin(UserManagementServiceMixinBase):
             # create a SECOND active verified Patient-user on a live portal
             # phone. Roll back (releases the advisory lock) and re-raise —
             # the API boundary maps this to a controlled HTTP 409.
+            db.rollback()
+            raise
+        except QueueProfileBindingChanged:
             db.rollback()
             raise
         except MedicalSpecialtyCatalogError as e:

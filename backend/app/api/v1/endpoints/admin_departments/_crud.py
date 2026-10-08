@@ -167,6 +167,7 @@ def bulk_create_departments(
     ``key`` pattern, name lengths, etc.) before any DB write.
     """
     departments_data = [d.model_dump(exclude_unset=True) for d in payload.departments]
+    from app.crud.queue_owner_invariant import QueueProfileBindingChanged
 
     created = 0
     skipped = 0
@@ -195,11 +196,21 @@ def bulk_create_departments(
                 active=dept_data.get("active", True),
                 description=dept_data.get("description", ""),
             )
-            db.add(department)
-            db.flush()
-
-            _ensure_department_integrations(db, department)
+            # Keep each CSV row atomic inside the endpoint's outer batch
+            # transaction. Integration setup can wait on the same owner-config
+            # lock as a profile rebind and reject stale bindings after several
+            # related rows have already been staged. A savepoint lets that one
+            # row roll back while preserving earlier successful rows.
+            with db.begin_nested():
+                db.add(department)
+                db.flush()
+                _ensure_department_integrations(db, department)
             created += 1
+        except QueueProfileBindingChanged:
+            errors.append(
+                f"Row {idx + 1}: direction binding changed during setup; retry this row"
+            )
+            skipped += 1
         except Exception as exc:
             errors.append(f"Row {idx + 1}: {str(exc)}")
             skipped += 1
