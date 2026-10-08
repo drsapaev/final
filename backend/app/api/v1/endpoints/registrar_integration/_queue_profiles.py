@@ -535,9 +535,26 @@ def create_queue_profile(
     try:
         from app.models.queue_profile import QueueProfile
 
+        canonical_tags = _canonical_profile_tags(
+            profile_data.queue_tags, profile_data.key
+        )
+        from app.crud.queue_owner_invariant import lock_profile_link_scopes
+
+        # Serialize profile creation with department cascades and link
+        # writers. The duplicate check must happen after the shared scopes so
+        # a profile cannot appear after a department's cascade snapshot.
+        lock_profile_link_scopes(
+            db,
+            queue_tags=canonical_tags + [profile_data.key],
+            department_keys=[profile_data.department_key],
+        )
+
         # Check if key already exists
         existing = (
-            db.query(QueueProfile).filter(QueueProfile.key == profile_data.key).first()
+            db.query(QueueProfile)
+            .filter(QueueProfile.key == profile_data.key)
+            .populate_existing()
+            .first()
         )
         if existing:
             raise HTTPException(
@@ -553,9 +570,7 @@ def create_queue_profile(
             # D-1 (Codex round-6 P1): a dental-family profile must never be
             # persisted with tags blind to the canonical spelling (see
             # _canonical_profile_tags for the exact contract).
-            queue_tags=_canonical_profile_tags(
-                profile_data.queue_tags, profile_data.key
-            ),
+            queue_tags=canonical_tags,
             department_key=profile_data.department_key,
             display_order=profile_data.display_order,
             is_active=profile_data.is_active,
@@ -829,15 +844,23 @@ def delete_queue_profile(
                 status_code=404, detail=f"Profile '{profile_key}' not found"
             )
 
+        # Keep immutable scalar snapshots before waiting on advisory scopes.
+        # SQLAlchemy's identity map refreshes `candidate` when the locked
+        # query below uses populate_existing(); comparing ORM attributes
+        # afterward would compare the refreshed row to itself.
+        candidate_key = str(candidate.key)
+        candidate_queue_tags = list(candidate.queue_tags or [])
+        candidate_department_key = candidate.department_key
+
         from app.crud.queue_owner_invariant import lock_profile_binding_scopes
 
         lock_profile_binding_scopes(
             db,
             queue_tags=(
-                _canonical_profile_tags(candidate.queue_tags, candidate.key)
-                + [candidate.key]
+                _canonical_profile_tags(candidate_queue_tags, candidate_key)
+                + [candidate_key]
             ),
-            department_keys=[candidate.department_key],
+            department_keys=[candidate_department_key],
         )
 
         # Re-read and lock after taking the same tag/dept scopes as link
@@ -858,11 +881,15 @@ def delete_queue_profile(
         stale_fields = [
             field
             for field, old_value, new_value in (
-                ("queue_tags", candidate.queue_tags, profile.queue_tags),
-                ("department_key", candidate.department_key, profile.department_key),
+                ("queue_tags", candidate_queue_tags, profile.queue_tags),
+                (
+                    "department_key",
+                    candidate_department_key,
+                    profile.department_key,
+                ),
             )
             if not _profile_binding_values_equal(
-                field, old_value, new_value, profile.key
+                field, old_value, new_value, candidate_key
             )
         ]
         if stale_fields:

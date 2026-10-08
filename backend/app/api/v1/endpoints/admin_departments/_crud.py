@@ -6,7 +6,6 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.endpoints.admin_departments._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.admin_departments._helpers import (
-    _department_linked_profiles,
     _ensure_department_integrations,
     _sync_department_active_to_profiles,
     _sync_department_rename_to_own_profile,
@@ -253,7 +252,12 @@ def bulk_delete_departments(
     departments = []
     not_found = 0
     for dept_id in ids:
-        department = db.query(Department).filter(Department.id == dept_id).first()
+        department = (
+            db.query(Department)
+            .filter(Department.id == dept_id)
+            .populate_existing()
+            .first()
+        )
         if not department:
             not_found += 1
             continue
@@ -261,8 +265,13 @@ def bulk_delete_departments(
     departments.sort(key=lambda item: item.id)
 
     blocked_report: list[dict] = []
+    departments, profiles_by_department = _lock_department_delete_targets(
+        db, departments
+    )
     for department in departments:
-        dept_links = _department_delete_block_report(db, department)
+        dept_links = _department_delete_block_report(
+            db, department, profiles_by_department[department.id]
+        )
         if dept_links:
             blocked_report.append(
                 {
@@ -276,6 +285,7 @@ def bulk_delete_departments(
             )
     if blocked_report:
         total_waiting = sum(r["waiting_patients"] for r in blocked_report)
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -444,33 +454,152 @@ def initialize_department(
     }
 
 
-def _department_delete_block_report(db: Session, department) -> list[dict]:
+def _department_delete_profiles_query(db: Session, department_keys: set[str]):
+    return db.query(QueueProfile).filter(
+        or_(
+            QueueProfile.department_key.in_(department_keys),
+            QueueProfile.key.in_(department_keys),
+        )
+    )
+
+
+def _department_profile_membership_snapshot(
+    profiles: list[QueueProfile], department_keys: set[str]
+) -> dict[str, tuple[tuple[int, str, tuple[str, ...], str | None], ...]]:
+    return {
+        department_key: tuple(
+            sorted(
+                (
+                    profile.id,
+                    profile.key,
+                    tuple(profile.queue_tags or []),
+                    profile.department_key,
+                )
+                for profile in profiles
+                if profile.key == department_key
+                or profile.department_key == department_key
+            )
+        )
+        for department_key in department_keys
+    }
+
+
+def _raise_stale_department_delete(db: Session) -> None:
+    from app.crud.queue_owner_invariant import QueueProfileBindingChanged
+
+    db.rollback()
+    raise QueueProfileBindingChanged()
+
+
+def _lock_department_delete_targets(
+    db: Session, candidate_departments: list[Department]
+) -> tuple[list[Department], dict[int, list[QueueProfile]]]:
+    """Take one canonical owner-config lock set before cascade row locks.
+
+    Single and bulk deletion share this preflight. Bulk deletion must collect
+    every department/profile scope before locking any row, otherwise two
+    batches can acquire overlapping department scopes in opposite orders.
+    """
+    if not candidate_departments:
+        return [], {}
+
+    from app.crud.queue_owner_invariant import lock_profile_binding_scopes
+
+    department_snapshots = {
+        department.id: department.key for department in candidate_departments
+    }
+    department_ids = set(department_snapshots)
+    department_keys = set(department_snapshots.values())
+    candidate_profiles = (
+        _department_delete_profiles_query(db, department_keys)
+        .order_by(QueueProfile.id)
+        .populate_existing()
+        .all()
+    )
+    candidate_membership = _department_profile_membership_snapshot(
+        candidate_profiles, department_keys
+    )
+
+    queue_tags: set[str] = set()
+    profile_department_keys: set[str] = set(department_keys)
+    for department_key in department_keys:
+        queue_tags.update(expand_queue_tags([department_key]))
+    for profile in candidate_profiles:
+        # Include the profile key as the 1:1 convention may be the only
+        # link, and expand its persisted tags using the same specialty alias
+        # rules as link writers.
+        queue_tags.update(expand_queue_tags([profile.key]))
+        queue_tags.update(
+            expand_queue_tags(profile.queue_tags or [profile.key])
+        )
+        if profile.department_key:
+            profile_department_keys.add(profile.department_key)
+
+    try:
+        lock_profile_binding_scopes(
+            db,
+            queue_tags=queue_tags,
+            department_keys=profile_department_keys,
+        )
+    except Exception:
+        db.rollback()
+        raise
+
+    departments = (
+        db.query(Department)
+        .filter(Department.id.in_(department_ids))
+        .order_by(Department.id)
+        .with_for_update()
+        .populate_existing()
+        .all()
+    )
+    if (
+        {department.id: department.key for department in departments}
+        != department_snapshots
+    ):
+        _raise_stale_department_delete(db)
+
+    linked_profiles = (
+        _department_delete_profiles_query(db, department_keys)
+        .order_by(QueueProfile.id)
+        .with_for_update()
+        .populate_existing()
+        .all()
+    )
+    if (
+        _department_profile_membership_snapshot(linked_profiles, department_keys)
+        != candidate_membership
+    ):
+        _raise_stale_department_delete(db)
+
+    profiles_by_department = {
+        department.id: [
+            profile
+            for profile in linked_profiles
+            if profile.key == department.key
+            or profile.department_key == department.key
+        ]
+        for department in departments
+    }
+    return departments, profiles_by_department
+
+
+def _department_delete_block_report(
+    db: Session, department, linked_profiles: list[QueueProfile]
+) -> list[dict]:
     """RQ-13.a (D-06/S-11/D-02): per-profile impact rows for a department
     whose linked profiles still own queue history (any day), waiting
     patients, active routing mappings, or active permanent public addresses.
-    Lock each profile
-    before recomputing shared usage facts so address provisioning cannot
-    race the department cascade. Shared by single and bulk delete."""
+    The caller has already acquired the union of owner-config scopes and
+    locked/revalidated every linked profile before recomputing usage facts.
+    Shared by single and bulk delete."""
     from app.api.v1.endpoints.registrar_integration._queue_profiles import (
         _profile_link_counts,
     )
-    from app.models.queue_profile import QueueProfile
-
     blocked_links: list[dict] = []
-    linked_profiles = sorted(
-        _department_linked_profiles(db, department), key=lambda item: item.key
-    )
+    linked_profiles = sorted(linked_profiles, key=lambda item: item.key)
     for linked_profile in linked_profiles:
-        profile = (
-            db.query(QueueProfile)
-            .filter(QueueProfile.id == linked_profile.id)
-            .with_for_update()
-            .populate_existing()
-            .first()
-        )
-        if profile is None:
-            continue
-        counts = _profile_link_counts(db, profile)
+        counts = _profile_link_counts(db, linked_profile)
         if any(
             counts[field] > 0
             for field in (
@@ -482,7 +611,7 @@ def _department_delete_block_report(db: Session, department) -> list[dict]:
         ):
             blocked_links.append(
                 {
-                    "profile_key": profile.key,
+                    "profile_key": linked_profile.key,
                     "daily_queues": counts["daily_queues"],
                     "entries_waiting": counts["entries_waiting"],
                     "entries_total": counts["entries_total"],
@@ -561,7 +690,12 @@ def delete_department(
     DepartmentService/DepartmentQueueSettings/DepartmentRegistrationSettings,
     and deletes associated QueueProfile.
     """
-    department = db.query(Department).filter(Department.id == department_id).first()
+    department = (
+        db.query(Department)
+        .filter(Department.id == department_id)
+        .populate_existing()
+        .first()
+    )
 
     if not department:
         raise HTTPException(
@@ -569,15 +703,23 @@ def delete_department(
             detail=f"Department with id {department_id} not found",
         )
 
+    departments, profiles_by_department = _lock_department_delete_targets(
+        db, [department]
+    )
+    department = departments[0]
+
     # RQ-13.a (D-06/S-11/D-02): a department whose linked profiles still
     # own queue history, waiting patients, active routing mappings, or
     # active permanent public addresses cannot be hard-deleted — the
     # profile cascade would remove a live booking target. Same significant-link bar as
     # the profile hard-delete guard (RQ-12.b), computed live from the
     # same SSOT at execution time (stale-data protection by construction).
-    blocked_links = _department_delete_block_report(db, department)
+    blocked_links = _department_delete_block_report(
+        db, department, profiles_by_department[department.id]
+    )
     if blocked_links:
         total_waiting = sum(b["entries_waiting"] for b in blocked_links)
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={

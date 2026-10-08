@@ -2497,6 +2497,382 @@ def test_department_bulk_delete_without_queue_history_cascades(
             is None
         ), f"1:1 profile for {dept['key']} must be cascade-deleted, not orphaned"
 
+
+@pytest.mark.parametrize("mutation_path", ["single", "bulk"])
+def test_user_reactivation_takes_owner_scope_before_doctor_row_lock(
+    pg_engine, pg_admin_user, mutation_path
+):
+    """User reactivation waits on owner-config before locking Doctor rows.
+
+    A tagged admission can hold the owner scope and then take Doctor FOR
+    SHARE. Both the single-user and bulk lifecycle commands must wait on the
+    advisory scope first; taking Doctor FOR UPDATE first deadlocks this order.
+    """
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    import sqlalchemy as sa
+    from sqlalchemy.exc import OperationalError
+    from sqlalchemy.orm import sessionmaker
+
+    from app.crud.queue_owner_invariant import lock_profile_link_scopes
+    from app.models.clinic import Doctor
+    from app.models.user import User
+
+    suffix = uuid.uuid4().hex[:8]
+    application_name = f"aqs_reactivate_{suffix}"
+    specialty = "cardiology"
+    session_factory = sessionmaker(bind=pg_engine, future=True)
+
+    with session_factory() as seed:
+        user = User(
+            username=f"aqs-reactivate-{suffix}",
+            email=f"aqs-reactivate-{suffix}@example.test",
+            full_name="Synthetic Queue Lifecycle",
+            hashed_password="not-used-in-this-test",
+            role="Doctor",
+            is_active=False,
+        )
+        seed.add(user)
+        seed.flush()
+        doctor = Doctor(user_id=user.id, specialty=specialty, active=False)
+        seed.add(doctor)
+        seed.commit()
+        user_id = user.id
+        doctor_id = doctor.id
+
+    join_session = session_factory()
+    lock_profile_link_scopes(join_session, queue_tags=[specialty])
+    activation_started = threading.Event()
+
+    def activate_owner():
+        from app.schemas.user_management import (
+            UserBulkActionRequest,
+            UserUpdateRequest,
+        )
+        from app.services.user_mgmt import UserManagementService
+
+        with session_factory() as worker:
+            worker.execute(
+                sa.text("SELECT set_config('application_name', :name, false)"),
+                {"name": application_name},
+            )
+            activation_started.set()
+            service = UserManagementService()
+            if mutation_path == "single":
+                return service.update_user(
+                    worker,
+                    user_id,
+                    UserUpdateRequest(is_active=True),
+                    pg_admin_user.id,
+                )
+            return service.bulk_action_users(
+                worker,
+                UserBulkActionRequest(user_ids=[user_id], action="activate"),
+                pg_admin_user.id,
+            )
+
+    blocked_by_doctor_row = False
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(activate_owner)
+        try:
+            assert activation_started.wait(timeout=5)
+            deadline = time.monotonic() + 10
+            waiting_on_owner_scope = False
+            with session_factory() as observer:
+                while time.monotonic() < deadline:
+                    wait = observer.execute(
+                        sa.text(
+                            "SELECT wait_event_type, wait_event "
+                            "FROM pg_stat_activity "
+                            "WHERE application_name = :name AND state = 'active' "
+                            "ORDER BY pid DESC LIMIT 1"
+                        ),
+                        {"name": application_name},
+                    ).first()
+                    if wait and wait[0] == "Lock" and wait[1] == "advisory":
+                        waiting_on_owner_scope = True
+                        break
+                    if future.done():
+                        break
+                    time.sleep(0.02)
+            assert waiting_on_owner_scope, (
+                "reactivation should wait for owner-config before Doctor row locks"
+            )
+
+            join_session.execute(sa.text("SET LOCAL lock_timeout = '500ms'"))
+            try:
+                joined_doctor = (
+                    join_session.query(Doctor)
+                    .filter(Doctor.id == doctor_id)
+                    .with_for_update(read=True)
+                    .populate_existing()
+                    .first()
+                )
+                assert joined_doctor is not None
+            except OperationalError:
+                blocked_by_doctor_row = True
+        finally:
+            join_session.rollback()
+            join_session.close()
+        result = future.result(timeout=15)
+
+    assert blocked_by_doctor_row is False, (
+        f"{mutation_path} activation locked Doctor before waiting for owner scope"
+    )
+    if mutation_path == "single":
+        assert result[0] is True, result
+    else:
+        assert result[0] is True, result
+        assert result[2]["processed_count"] == 1, result
+
+    with session_factory() as verify:
+        assert verify.get(User, user_id).is_active is True
+        assert verify.get(Doctor, doctor_id).active is True
+
+
+def test_profile_delete_rejects_binding_rebound_while_waiting(pg_engine, pg_admin_user):
+    """DELETE compares an immutable candidate snapshot after scope wait."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    import sqlalchemy as sa
+    from fastapi import HTTPException
+    from sqlalchemy.orm import sessionmaker
+
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        delete_queue_profile,
+    )
+    from app.crud.queue_owner_invariant import lock_profile_binding_scopes
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+
+    suffix = uuid.uuid4().hex[:8]
+    key = f"aqs-delete-race-{suffix}"
+    old_tag = f"aqs-old-{suffix}"
+    new_tag = f"aqs-new-{suffix}"
+    session_factory = sessionmaker(bind=pg_engine, future=True)
+    with session_factory() as seed:
+        seed.add(
+            QueueProfile(
+                key=key,
+                title="Synthetic profile delete race",
+                queue_tags=[old_tag],
+                department_key=None,
+                is_active=True,
+                show_on_qr_page=False,
+            )
+        )
+        seed.commit()
+
+    writer_holds_scopes = threading.Event()
+    allow_rebind_commit = threading.Event()
+    delete_started = threading.Event()
+    pids: dict[str, int] = {}
+
+    def rebind_profile():
+        with session_factory() as writer:
+            pids["writer"] = writer.execute(
+                sa.text("SELECT pg_backend_pid()")
+            ).scalar_one()
+            lock_profile_binding_scopes(
+                writer, queue_tags=[old_tag, new_tag]
+            )
+            profile = (
+                writer.query(QueueProfile)
+                .filter(QueueProfile.key == key)
+                .with_for_update()
+                .populate_existing()
+                .one()
+            )
+            profile.queue_tags = [new_tag]
+            writer.flush()
+            writer_holds_scopes.set()
+            if not allow_rebind_commit.wait(timeout=10):
+                raise TimeoutError("profile delete did not wait for rebind scope")
+            writer.commit()
+
+    def delete_profile() -> tuple[int, dict | None]:
+        with session_factory() as deleter:
+            pids["delete"] = deleter.execute(
+                sa.text("SELECT pg_backend_pid()")
+            ).scalar_one()
+            admin = deleter.get(User, pg_admin_user.id)
+            delete_started.set()
+            try:
+                delete_queue_profile(key, deleter, admin)
+                return (200, None)
+            except HTTPException as exc:
+                return (exc.status_code, exc.detail)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        writer_future = executor.submit(rebind_profile)
+        delete_future = None
+        try:
+            assert writer_holds_scopes.wait(timeout=5)
+            delete_future = executor.submit(delete_profile)
+            assert delete_started.wait(timeout=5)
+            deadline = time.monotonic() + 5
+            delete_waited = False
+            while time.monotonic() < deadline:
+                if "delete" not in pids:
+                    time.sleep(0.02)
+                    continue
+                with pg_engine.connect() as connection:
+                    blockers = connection.execute(
+                        sa.text("SELECT pg_blocking_pids(:pid)"),
+                        {"pid": pids["delete"]},
+                    ).scalar_one()
+                if pids["writer"] in blockers:
+                    delete_waited = True
+                    break
+                if delete_future.done():
+                    break
+                time.sleep(0.02)
+            assert delete_waited, "profile delete must wait on the old binding scope"
+        finally:
+            allow_rebind_commit.set()
+        writer_future.result(timeout=10)
+        assert delete_future is not None
+        status_code, detail = delete_future.result(timeout=10)
+        assert status_code == 409, detail
+        assert detail["stale_fields"] == ["queue_tags"]
+
+    with session_factory() as verify:
+        profile = verify.query(QueueProfile).filter_by(key=key).one()
+        assert profile.queue_tags == [new_tag]
+
+
+@pytest.mark.parametrize("delete_path", ["single", "bulk"])
+def test_department_delete_serializes_with_active_doctor_link_writer(
+    pg_engine, pg_client, pg_admin_user, delete_path
+):
+    """A live doctor link committed during delete preflight is not orphaned."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    from types import SimpleNamespace
+
+    import sqlalchemy as sa
+    from fastapi import HTTPException
+    from sqlalchemy.orm import sessionmaker
+
+    from app.api.v1.endpoints.admin_departments._crud import (
+        bulk_delete_departments,
+        delete_department,
+    )
+    from app.crud import clinic as clinic_crud
+    from app.crud.queue_owner_invariant import lock_profile_link_scopes
+    from app.models.clinic import Doctor
+    from app.models.department import Department
+    from app.models.user import User
+    from app.schemas.clinic import DoctorCreate
+
+    suffix = uuid.uuid4().hex[:8]
+    headers = _dep_headers(pg_admin_user)
+    department = _create_department(pg_client, headers, f"race_{suffix}")
+    clean_department = None
+    if delete_path == "bulk":
+        clean_department = _create_department(pg_client, headers, f"clean_{suffix}")
+    session_factory = sessionmaker(bind=pg_engine, future=True)
+    scope_held = threading.Event()
+    allow_link_commit = threading.Event()
+    delete_started = threading.Event()
+    pids: dict[str, int] = {}
+
+    def create_linked_doctor():
+        with session_factory() as writer:
+            pids["writer"] = writer.execute(
+                sa.text("SELECT pg_backend_pid()")
+            ).scalar_one()
+            lock_profile_link_scopes(
+                writer,
+                queue_tags=[department["key"]],
+                department_keys=[department["key"]],
+            )
+            scope_held.set()
+            if not allow_link_commit.wait(timeout=10):
+                raise TimeoutError("department delete did not wait for link scope")
+            doctor = clinic_crud.create_doctor(
+                writer,
+                DoctorCreate(specialty=department["key"], active=True),
+            )
+            return doctor.id
+
+    def delete_department_command():
+        with session_factory() as deleter:
+            pids["delete"] = deleter.execute(
+                sa.text("SELECT pg_backend_pid()")
+            ).scalar_one()
+            admin = deleter.get(User, pg_admin_user.id)
+            delete_started.set()
+            try:
+                if delete_path == "single":
+                    delete_department(department["id"], deleter, admin)
+                else:
+                    ids = [department["id"], clean_department["id"]]
+                    bulk_delete_departments(SimpleNamespace(ids=ids), deleter, admin)
+                return (200, None)
+            except HTTPException as exc:
+                return (exc.status_code, exc.detail)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        writer_future = executor.submit(create_linked_doctor)
+        delete_future = None
+        try:
+            assert scope_held.wait(timeout=5)
+            delete_future = executor.submit(delete_department_command)
+            assert delete_started.wait(timeout=5)
+            deadline = time.monotonic() + 5
+            delete_waited = False
+            while time.monotonic() < deadline:
+                if "delete" not in pids:
+                    time.sleep(0.02)
+                    continue
+                with pg_engine.connect() as connection:
+                    blockers = connection.execute(
+                        sa.text("SELECT pg_blocking_pids(:pid)"),
+                        {"pid": pids["delete"]},
+                    ).scalar_one()
+                if pids["writer"] in blockers:
+                    delete_waited = True
+                    break
+                if delete_future.done():
+                    break
+                time.sleep(0.02)
+            assert delete_waited, (
+                "department deletion must acquire owner-config scopes before counts"
+            )
+        finally:
+            allow_link_commit.set()
+        doctor_id = writer_future.result(timeout=10)
+        assert delete_future is not None
+        status_code, detail = delete_future.result(timeout=10)
+        assert status_code == 409, detail
+        if delete_path == "bulk":
+            blocked_profiles = [
+                profile
+                for blocked in detail["blocked"]
+                for profile in blocked["profiles"]
+            ]
+        else:
+            blocked_profiles = detail["profiles"]
+        linked = next(
+            profile
+            for profile in blocked_profiles
+            if profile["profile_key"] == department["key"]
+        )
+        assert linked["active_doctors"] == 1
+
+    with session_factory() as verify:
+        assert verify.get(Department, department["id"]) is not None
+        assert verify.get(Doctor, doctor_id).active is True
+        if clean_department:
+            assert verify.get(Department, clean_department["id"]) is not None
+
+
 def test_doctor_update_and_tagged_graphql_join_follow_owner_config_lock_order(pg_engine):
     """A tagged GraphQL admission holds owner-config before Doctor FOR SHARE.
 
