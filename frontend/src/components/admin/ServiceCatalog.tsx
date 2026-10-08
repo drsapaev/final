@@ -1,6 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState, useEffect } from 'react';
-import type { CSSProperties } from "react";
+import { useState, useEffect, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import ServiceAuditHistory from './ServiceAuditHistory';
@@ -253,6 +253,8 @@ const ServiceCatalog = () => {
   const [websiteLoading, setWebsiteLoading] = useState(false);
   const [websiteLoaded, setWebsiteLoaded] = useState(false);
   const [websiteOpen, setWebsiteOpen] = useState(false);
+  const websiteLoadingRef = useRef(false);
+  const websiteRefreshQueuedRef = useRef(false);
   const [websiteError, setWebsiteError] = useState('');
   const [websiteNotice, setWebsiteNotice] = useState('');
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -369,12 +371,20 @@ const ServiceCatalog = () => {
     }
   };
 
-  const loadWebsiteContent = async (force = false) => {
-    if (websiteLoading || (websiteLoaded && !force)) return;
+  async function loadWebsiteContent(force = false) {
+    if (websiteLoadingRef.current) {
+      if (force) websiteRefreshQueuedRef.current = true;
+      return;
+    }
+    if (websiteLoaded && !force) return;
+
+    websiteLoadingRef.current = true;
     setWebsiteLoading(true);
     setWebsiteError('');
     try {
       const response = await api.get('/services/admin/website-content');
+      if (websiteRefreshQueuedRef.current) return;
+
       const rows = response.data as WebsiteServiceContent[];
       setWebsiteServices(rows);
       setWebsiteServiceId((current) =>
@@ -384,12 +394,20 @@ const ServiceCatalog = () => {
       );
       setWebsiteLoaded(true);
     } catch (error) {
-      logger.error('Ошибка загрузки website-контента услуг:', error);
-      setWebsiteError(t('admin2.sc_site_content_load_error'));
+      if (!websiteRefreshQueuedRef.current) {
+        logger.error('Ошибка загрузки website-контента услуг:', error);
+        setWebsiteError(t('admin2.sc_site_content_load_error'));
+        setWebsiteLoaded(false);
+      }
     } finally {
+      websiteLoadingRef.current = false;
       setWebsiteLoading(false);
+      if (websiteRefreshQueuedRef.current) {
+        websiteRefreshQueuedRef.current = false;
+        void loadWebsiteContent(true);
+      }
     }
-  };
+  }
 
   const toggleWebsiteEditor = () => {
     const nextOpen = !websiteOpen;
@@ -398,7 +416,8 @@ const ServiceCatalog = () => {
   };
 
   const refreshWebsiteContent = () => {
-    if (websiteOpen) void loadWebsiteContent(true);
+    setWebsiteLoaded(false);
+    if (websiteOpen || websiteLoadingRef.current) void loadWebsiteContent(true);
   };
 
   const refreshCatalog = () => {
@@ -417,7 +436,19 @@ const ServiceCatalog = () => {
         { ...websiteForm, operation }
       );
       const saved = response.data as WebsiteServiceContent;
-      setWebsiteServices((items) => items.map((item) => item.id === saved.id ? saved : item));
+      setWebsiteServices((items) => {
+        const exists = items.some((item) => item.id === saved.id);
+        return exists
+          ? items.map((item) => item.id === saved.id ? saved : item)
+          : [...items, saved];
+      });
+      setServices((items) => items.map((item) =>
+        String(item.id) === String(saved.id)
+          ? { ...item, name: saved.name_ru, active: saved.active }
+          : item
+      ));
+      setWebsiteLoaded(true);
+      refreshWebsiteContent();
       setWebsiteNotice(t('admin2.sc_site_content_save_success'));
     } catch (error) {
       const responseData = (error as { response?: { data?: { detail?: unknown } } })?.response?.data;
@@ -505,6 +536,7 @@ const ServiceCatalog = () => {
       });
       setEditingService(null);
       setShowAddForm(false);
+      refreshWebsiteContent();
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
 
@@ -573,6 +605,7 @@ const ServiceCatalog = () => {
       }
 
       setMessage({ type: 'success', text: String(responseData.message || t('admin2.sc_service_deleted')) });
+      refreshWebsiteContent();
     } catch (error) {
       // ❌ ОТКАТ: Возвращаем старое состояние при ошибке
       setServices(oldServices);
@@ -621,7 +654,7 @@ const ServiceCatalog = () => {
   const handleBatchEditComplete = () => {
     setShowBatchEdit(false);
     setSelectedServiceIds(new Set());
-    loadData();
+    refreshCatalog();
   };
 
   if (loading) {

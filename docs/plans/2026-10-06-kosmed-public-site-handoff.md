@@ -4,6 +4,7 @@
 
 > **Дата:** 2026-10-08. **База проверки:** `origin/main` — `7bb02680e` (включает PR #3625, документационный PR #3624 и PR #3636).
 > **Текущий статус:** storage-этап 2a смёржен в PR [#3636](https://github.com/drsapaev/final/pull/3636); реализация админского этапа 2b подготовлена в ветке `codex/kosmed-site-stage2b-publication` от `7bb02680e`. Focused backend tests — 22 passed; frontend publication/i18n tests — 35 passed; type-check, production build, backend syntax и whitespace check прошли. Этап 2b ожидает PR review и merge. Это статус Git, не подтверждение развёртывания.
+> **Review follow-up:** Code Review выявил три замечания по сохранению валидности публикации врача, аудиту изменения контента услуги и синхронизации двух представлений каталога. Все три исправления подготовлены для PR #3637; локально прошли focused backend tests (25), frontend publication tests (2), type-check, production build, Ruff и Python syntax check. Сгенерированная через `app.openapi()` схема совпала с `backend/openapi.json` байт-в-байт, включая EOF. CI после отправки коммита ещё должен подтвердить эти результаты. PR остаётся открытым и не развёрнут.
 > **Назначение:** передача актуального плана, границ и прогресса любому агенту, продолжающему сайт. После merge этап 2b подтверждать по коду, проверкам и merge его PR.
 > **Порядок чтения:** этот документ → план → аудит → текущие канонические исходники и focused tests. Перед каждым PR перепроверять изменяемые факты. `AGENTS.md` и канонические контракты сохраняют приоритет.
 

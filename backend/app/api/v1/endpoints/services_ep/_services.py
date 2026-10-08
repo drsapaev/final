@@ -61,7 +61,9 @@ async def update_admin_service_website_content(
     current_user: User = Depends(require_roles("Admin")),
 ):
     try:
-        return PublicSiteAdminService(db).update_service_content(service_id, payload)
+        return PublicSiteAdminService(db).update_service_content(
+            service_id, payload, actor_user_id=current_user.id
+        )
     except WebsiteContentServiceError as exc:
         raise HTTPException(
             status_code=exc.status_code, detail=exc.as_detail()

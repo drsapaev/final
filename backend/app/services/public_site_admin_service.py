@@ -21,6 +21,7 @@ from app.schemas.public_site_admin import (
     WebsiteServiceContentOut,
     WebsiteServiceContentUpdate,
 )
+from app.services.service_audit_service import ServiceAuditService
 
 _UNSET = object()
 
@@ -111,6 +112,22 @@ def _doctor_missing_fields(
     return missing
 
 
+def _service_website_audit_values(service: Service) -> dict[str, Any]:
+    """Return the website-owned service fields in JSON-safe audit form."""
+    published_at = service.website_first_published_at
+    return {
+        "name": service.name,
+        "name_uz": service.name_uz,
+        "description_ru": service.description_ru,
+        "description_uz": service.description_uz,
+        "slug": service.slug,
+        "show_on_website": bool(service.show_on_website),
+        "website_first_published_at": (
+            published_at.isoformat() if published_at is not None else None
+        ),
+    }
+
+
 def _slug_conflict(exc: IntegrityError, *, entity: str) -> bool:
     original = getattr(exc, "orig", None)
     constraint_name = getattr(getattr(original, "diag", None), "constraint_name", None)
@@ -171,9 +188,9 @@ class PublicSiteAdminService:
             id=doctor.id,
             active=bool(doctor.active),
             owner_active=bool(user.is_active) if user else None,
-            display_name=(user.full_name.strip() or None)
-            if user and user.full_name
-            else None,
+            display_name=(
+                (user.full_name.strip() or None) if user and user.full_name else None
+            ),
             bio_ru=doctor.bio_ru,
             bio_uz=doctor.bio_uz,
             slug=doctor.slug,
@@ -214,6 +231,8 @@ class PublicSiteAdminService:
         self,
         service_id: int,
         payload: WebsiteServiceContentUpdate,
+        *,
+        actor_user_id: int,
     ) -> WebsiteServiceContentOut:
         service = self.services.get_service_for_update(service_id)
         if not service:
@@ -223,6 +242,7 @@ class PublicSiteAdminService:
                 message="Услуга не найдена.",
             )
 
+        old_audit_values = _service_website_audit_values(service)
         changes = payload.model_dump(exclude_unset=True, exclude={"operation"})
         candidate = {
             "name_ru": service.name,
@@ -265,7 +285,21 @@ class PublicSiteAdminService:
         service.description_uz = candidate["description_uz"]
         service.slug = candidate["slug"]
         self._apply_operation(service, payload.operation)
-        return self._commit_service(service, action_result=result)
+        new_audit_values = _service_website_audit_values(service)
+        audit_changes = {
+            field: {"old": old_value, "new": new_audit_values[field]}
+            for field, old_value in old_audit_values.items()
+            if old_value != new_audit_values[field]
+        }
+        return self._commit_service(
+            service,
+            action_result=result,
+            actor_user_id=actor_user_id,
+            operation=payload.operation,
+            audit_changes=audit_changes,
+            old_audit_values=old_audit_values,
+            new_audit_values=new_audit_values,
+        )
 
     def update_doctor_content(
         self,
@@ -446,10 +480,28 @@ class PublicSiteAdminService:
             entity.show_on_website = False
 
     def _commit_service(
-        self, service: Service, *, action_result: str
+        self,
+        service: Service,
+        *,
+        action_result: str,
+        actor_user_id: int,
+        operation: WebsiteContentOperation,
+        audit_changes: dict[str, dict[str, Any]],
+        old_audit_values: dict[str, Any],
+        new_audit_values: dict[str, Any],
     ) -> WebsiteServiceContentOut:
         try:
             self.services.add(service)
+            ServiceAuditService(self.db).log_service_change(
+                service_id=service.id,
+                action="update",
+                user_id=actor_user_id,
+                changes=audit_changes,
+                old_values=old_audit_values,
+                new_values=new_audit_values,
+                comment=f"Website content operation: {operation.value}",
+                commit=False,
+            )
             self.services.commit()
             self.services.refresh(service)
         except IntegrityError as exc:

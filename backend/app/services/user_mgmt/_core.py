@@ -1,4 +1,5 @@
 """Core mixin for UserManagementService. Split from user_management_service.py."""
+
 from __future__ import annotations
 
 from sqlalchemy.orm import joinedload
@@ -66,7 +67,6 @@ class CoreMixin(UserManagementServiceMixinBase):
             ],
         }
 
-
     def _count_other_active_admins(self, db: Session, exclude_user_id: int) -> int:
         return (
             db.query(User)
@@ -79,7 +79,6 @@ class CoreMixin(UserManagementServiceMixinBase):
             )
             .count()
         )
-
 
     def _count_other_active_superadmins(self, db: Session, exclude_user_id: int) -> int:
         return (
@@ -94,7 +93,6 @@ class CoreMixin(UserManagementServiceMixinBase):
             )
             .count()
         )
-
 
     def ensure_user_support_records(
         self, db: Session, user_or_id: User | int
@@ -173,7 +171,6 @@ class CoreMixin(UserManagementServiceMixinBase):
 
         return profile, preferences, notification_settings
 
-
     def create_user(
         self, db: Session, user_data: UserCreateRequest, created_by: int
     ) -> tuple[bool, str, User | None]:
@@ -206,7 +203,7 @@ class CoreMixin(UserManagementServiceMixinBase):
                 role=user_data.role,
                 is_active=user_data.is_active,
                 is_superuser=user_data.is_superuser,
-                must_change_password=getattr(user_data, 'must_change_password', False),
+                must_change_password=getattr(user_data, "must_change_password", False),
             )
             db.add(user)
             db.flush()  # Получаем ID пользователя
@@ -247,9 +244,7 @@ class CoreMixin(UserManagementServiceMixinBase):
             doctor_created = False
             if user_data.role in DOCTOR_PROFILE_ROLES:
                 existing_doctor = (
-                    db.query(Doctor)
-                    .filter(Doctor.user_id == user.id)
-                    .first()
+                    db.query(Doctor).filter(Doctor.user_id == user.id).first()
                 )
                 if not existing_doctor:
                     if user_data.role == "Doctor" and user_data.doctor_profile:
@@ -350,7 +345,6 @@ class CoreMixin(UserManagementServiceMixinBase):
             logger.error(f"Error creating user: {e}")
             return False, "Внутренняя ошибка", None
 
-
     def update_user(
         self, db: Session, user_id: int, user_data: UserUpdateRequest, updated_by: int
     ) -> tuple[bool, str]:
@@ -399,14 +393,22 @@ class CoreMixin(UserManagementServiceMixinBase):
                     "Войдите под другим администратором и выполните это действие оттуда.",
                 )
 
-            if updated_by == user_id and user.role == "Admin" and target_role != "Admin":
+            if (
+                updated_by == user_id
+                and user.role == "Admin"
+                and target_role != "Admin"
+            ):
                 return (
                     False,
                     "Нельзя снять у текущей учётной записи роль администратора из активной сессии. "
                     "Сначала войдите под другим администратором.",
                 )
 
-            if updated_by == user_id and user.is_superuser and target_is_superuser is False:
+            if (
+                updated_by == user_id
+                and user.is_superuser
+                and target_is_superuser is False
+            ):
                 return (
                     False,
                     "Нельзя снять права суперпользователя у текущей учётной записи из активной сессии. "
@@ -429,7 +431,7 @@ class CoreMixin(UserManagementServiceMixinBase):
             ):
                 return (
                     False,
-                    "Нельзя деактивировать или понизить последнего активного суперпользователя"
+                    "Нельзя деактивировать или понизить последнего активного суперпользователя",
                 )
 
             admin_privileges_removed = (
@@ -437,8 +439,14 @@ class CoreMixin(UserManagementServiceMixinBase):
                 and user.is_active
                 and (target_is_active is False or target_role != "Admin")
             )
-            if admin_privileges_removed and self._count_other_active_admins(db, user_id) == 0:
-                return False, "Нельзя деактивировать или понизить последнего активного администратора"
+            if (
+                admin_privileges_removed
+                and self._count_other_active_admins(db, user_id) == 0
+            ):
+                return (
+                    False,
+                    "Нельзя деактивировать или понизить последнего активного администратора",
+                )
 
             # Phase 0 (PR #3320 round 2, review P1): SYSTEMIC phone-scope
             # invariant. The activation flow guards its own path; any OTHER
@@ -478,8 +486,7 @@ class CoreMixin(UserManagementServiceMixinBase):
                     # resolver predicate (generic login 401).
                     update_data["phone"] = new_normalized
                 phone_changed = (
-                    "phone" in update_data
-                    and new_normalized != old_normalized
+                    "phone" in update_data and new_normalized != old_normalized
                 )
                 if phone_changed:
                     if target_role == Roles.PATIENT:
@@ -505,9 +512,7 @@ class CoreMixin(UserManagementServiceMixinBase):
                     # Patient on an already-verified phone: the record joins
                     # the login-resolver predicate — the phone scope must
                     # still be free of ANOTHER active candidate.
-                    ensure_phone_scope_free(
-                        db, profile.phone, exclude_user_id=user.id
-                    )
+                    ensure_phone_scope_free(db, profile.phone, exclude_user_id=user.id)
 
             for field, value in update_data.items():
                 if hasattr(user, field):
@@ -518,12 +523,28 @@ class CoreMixin(UserManagementServiceMixinBase):
                 profile_data = {
                     k: v
                     for k, v in update_data.items()
-                    if k in ['full_name', 'first_name', 'last_name', 'phone']
+                    if k in ["full_name", "first_name", "last_name", "phone"]
                 }
                 if profile_data:
                     for field, value in profile_data.items():
                         if hasattr(user.profile, field):
                             setattr(user.profile, field, value)
+
+            # Website publication requires an owner display name. Keep the
+            # public card valid when an Admin clears that name through the
+            # user-management path; this update shares the same transaction.
+            if "full_name" in update_data and not (user.full_name or "").strip():
+                published_doctor = (
+                    db.query(Doctor)
+                    .filter(
+                        Doctor.user_id == user_id,
+                        Doctor.show_on_website.is_(True),
+                    )
+                    .with_for_update()
+                    .first()
+                )
+                if published_doctor is not None:
+                    published_doctor.show_on_website = False
 
             # Ghost-doctor prevention: mirror is_active onto Doctor profile
             if "is_active" in update_data and user.is_active != old_is_active:
@@ -550,9 +571,7 @@ class CoreMixin(UserManagementServiceMixinBase):
             # demotion deactivates it (history preserved). Legacy roles are
             # handled by the same contract (see _apply_role_change_doctor_lifecycle).
             if "role" in update_data and user.role != old_role:
-                self._apply_role_change_doctor_lifecycle(
-                    db, user, old_role, user.role
-                )
+                self._apply_role_change_doctor_lifecycle(db, user, old_role, user.role)
 
             # Логируем обновление
             self._log_user_action(
@@ -591,7 +610,6 @@ class CoreMixin(UserManagementServiceMixinBase):
             db.rollback()
             logger.error(f"Error updating user: {e}")
             return False, "Внутренняя ошибка"
-
 
     def delete_user(
         self,
@@ -671,13 +689,15 @@ class CoreMixin(UserManagementServiceMixinBase):
 
         except IntegrityError:
             db.rollback()
-            return False, "Невозможно удалить пользователя, так как существуют связанные данные (история действий, записи, платежи). Рекомендуется деактивировать пользователя вместо удаления."
+            return (
+                False,
+                "Невозможно удалить пользователя, так как существуют связанные данные (история действий, записи, платежи). Рекомендуется деактивировать пользователя вместо удаления.",
+            )
 
         except Exception as e:
             db.rollback()
             logger.error(f"Error deleting user: {e}")
             return False, "Внутренняя ошибка"
-
 
     def get_user_profile(self, db: Session, user_id: int) -> dict[str, Any] | None:
         """Получает полный профиль пользователя"""
@@ -693,8 +713,8 @@ class CoreMixin(UserManagementServiceMixinBase):
                 "role": user.role,
                 "is_active": user.is_active,
                 "is_superuser": user.is_superuser,
-                "created_at": user.created_at if hasattr(user, 'created_at') else None,
-                "updated_at": user.updated_at if hasattr(user, 'updated_at') else None,
+                "created_at": user.created_at if hasattr(user, "created_at") else None,
+                "updated_at": user.updated_at if hasattr(user, "updated_at") else None,
             }
 
             # Добавляем данные профиля
@@ -751,8 +771,8 @@ class CoreMixin(UserManagementServiceMixinBase):
                     "session_timeout": user.preferences.session_timeout,
                     "require_2fa": user.preferences.require_2fa,
                     "auto_logout": user.preferences.auto_logout,
-                    "created_at": getattr(user.preferences, 'created_at', None),
-                    "updated_at": getattr(user.preferences, 'updated_at', None),
+                    "created_at": getattr(user.preferences, "created_at", None),
+                    "updated_at": getattr(user.preferences, "updated_at", None),
                 }
 
             # Добавляем настройки уведомлений
@@ -785,10 +805,10 @@ class CoreMixin(UserManagementServiceMixinBase):
                     "quiet_hours_end": user.notification_settings.quiet_hours_end,
                     "weekend_notifications": user.notification_settings.weekend_notifications,
                     "created_at": getattr(
-                        user.notification_settings, 'created_at', None
+                        user.notification_settings, "created_at", None
                     ),
                     "updated_at": getattr(
-                        user.notification_settings, 'updated_at', None
+                        user.notification_settings, "updated_at", None
                     ),
                 }
 
@@ -796,9 +816,7 @@ class CoreMixin(UserManagementServiceMixinBase):
             # "Profile incomplete / Specialty required"). None = no linked
             # Doctor row; True = linked profile still has the auto-create
             # placeholder specialty ("general") and must be completed.
-            doctor_row = (
-                db.query(Doctor).filter(Doctor.user_id == user.id).first()
-            )
+            doctor_row = db.query(Doctor).filter(Doctor.user_id == user.id).first()
             profile_data["doctor_profile_incomplete"] = (
                 is_doctor_profile_incomplete(doctor_row.specialty)
                 if doctor_row is not None
@@ -810,7 +828,6 @@ class CoreMixin(UserManagementServiceMixinBase):
         except Exception as e:
             logger.error(f"Error getting user profile: {e}")
             return None
-
 
     def search_users(
         self, db: Session, search_params: UserSearchRequest
@@ -898,9 +915,7 @@ class CoreMixin(UserManagementServiceMixinBase):
             doctor_by_user_id: dict[int, Doctor] = {}
             if page_user_ids:
                 doctor_rows = (
-                    db.query(Doctor)
-                    .filter(Doctor.user_id.in_(page_user_ids))
-                    .all()
+                    db.query(Doctor).filter(Doctor.user_id.in_(page_user_ids)).all()
                 )
                 doctor_by_user_id = {d.user_id: d for d in doctor_rows}
             for user in users:
@@ -912,10 +927,10 @@ class CoreMixin(UserManagementServiceMixinBase):
                     "is_active": user.is_active,
                     "is_superuser": user.is_superuser,
                     "created_at": (
-                        user.created_at if hasattr(user, 'created_at') else None
+                        user.created_at if hasattr(user, "created_at") else None
                     ),
                     "updated_at": (
-                        user.updated_at if hasattr(user, 'updated_at') else None
+                        user.updated_at if hasattr(user, "updated_at") else None
                     ),
                 }
 

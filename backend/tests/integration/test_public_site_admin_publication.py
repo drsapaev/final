@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from app.models.clinic import Doctor
 from app.models.service import Service
+from app.models.service_audit import ServiceAuditLog
 from app.models.user import User
 
 
@@ -120,6 +121,43 @@ def test_service_publication_lifecycle_locks_slug_and_preserves_first_timestamp(
     assert republished.status_code == 200, republished.text
     assert republished.json()["show_on_website"] is True
     assert republished.json()["website_first_published_at"] == first_published_at
+
+
+def test_service_website_publication_records_admin_audit_in_same_write(
+    client, db_session, auth_headers, admin_user
+):
+    service = _service(db_session, "audit")
+    old_name = service.name
+
+    response = client.put(
+        f"/api/v1/services/admin/website-content/{service.id}",
+        headers=auth_headers,
+        json={
+            "operation": "save_draft",
+            "name_ru": "SYNTHETIC обновлённое название",
+            "name_uz": "SYNTHETIC yangi nom",
+            "description_ru": "SYNTHETIC описание.",
+            "description_uz": "SYNTHETIC tavsif.",
+            "slug": "synthetic-audit-service",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    audit = (
+        db_session.query(ServiceAuditLog)
+        .filter(ServiceAuditLog.service_id == service.id)
+        .one()
+    )
+    assert audit.user_id == admin_user.id
+    assert audit.action == "update"
+    assert audit.comment == "Website content operation: save_draft"
+    assert audit.changes["name"] == {
+        "old": old_name,
+        "new": "SYNTHETIC обновлённое название",
+    }
+    assert audit.old_values["show_on_website"] is False
+    assert audit.new_values["name_uz"] == "SYNTHETIC yangi nom"
 
 
 def test_service_publication_requires_both_locales_and_unique_slug(
