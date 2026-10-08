@@ -199,6 +199,13 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
     # same effective tag set so a legacy alias is not mistaken for an
     # unused binding.
     tags = _canonical_profile_tags(profile.queue_tags, profile.key)
+    # Doctor-backed QR admission stores the profile key as its DailyQueue
+    # queue_tag (see join_queue_with_token), while the profile's queue_tags
+    # select eligible doctors. Include that canonical queue identity in the
+    # usage guard without rewriting the profile's persisted routing tags.
+    usage_tags = list(tags)
+    if profile.key and profile.key not in usage_tags:
+        usage_tags.append(profile.key)
     services = 0
     daily_queues = 0
     entries_waiting = 0
@@ -211,16 +218,16 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
         )
         .count()
     )
-    if tags:
-        services = db.query(Service).filter(Service.queue_tag.in_(tags)).count()
+    if usage_tags:
+        services = db.query(Service).filter(Service.queue_tag.in_(usage_tags)).count()
         daily_queues = (
-            db.query(DailyQueue).filter(DailyQueue.queue_tag.in_(tags)).count()
+            db.query(DailyQueue).filter(DailyQueue.queue_tag.in_(usage_tags)).count()
         )
         if daily_queues:
             queue_ids = [
                 row.id
                 for row in db.query(DailyQueue.id)
-                .filter(DailyQueue.queue_tag.in_(tags))
+                .filter(DailyQueue.queue_tag.in_(usage_tags))
                 .all()
             ]
             entries_q = db.query(OnlineQueueEntry).filter(
@@ -661,8 +668,17 @@ def delete_queue_profile(
         from app.models.queue_profile import QueueProfile
         from app.models.service import Service
 
-        # Find profile
-        profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
+        # Serialize deletion with address provisioning and binding updates.
+        # Recheck dependencies only after obtaining the same canonical row
+        # lock so an address created while this command waits cannot be
+        # tombstoned by the subsequent DELETE.
+        profile = (
+            db.query(QueueProfile)
+            .filter(QueueProfile.key == profile_key)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
         if not profile:
             raise HTTPException(
                 status_code=404, detail=f"Profile '{profile_key}' not found"

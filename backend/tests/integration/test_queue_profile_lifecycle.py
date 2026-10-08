@@ -644,6 +644,42 @@ def test_legacy_dental_tags_allow_unchanged_binding_on_used_profile(
     assert profile.queue_tags == legacy_tags
 
 
+def test_doctor_qr_profile_key_queue_blocks_binding_update(
+    pg_client, pg_session, pg_admin_user
+):
+    """Doctor QR queues use profile.key even when it is absent from tags."""
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue
+    from app.models.queue_profile import QueueProfile
+
+    world = _seed_profile_with_queue(pg_session, "t10key")
+    profile = pg_session.query(QueueProfile).filter_by(key=world["key"]).one()
+    doctor = pg_session.query(Doctor).filter_by(id=world["doctor_id"]).one()
+    queue = pg_session.query(DailyQueue).filter_by(id=world["queue_id"]).one()
+    assert profile.key not in profile.queue_tags
+
+    # join_queue_with_token matches doctors from profile.queue_tags but
+    # persists their DailyQueue under profile.key.
+    doctor.specialty = world["tag"]
+    queue.queue_tag = profile.key
+    pg_session.commit()
+
+    payload = {"queue_tags": ["rq12b-t10key-rebound"]}
+    preview = _preview_profile_update(pg_client, pg_admin_user, world["key"], payload)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["links"]["daily_queues"] == 1
+    assert preview.json()["links"]["entries_waiting"] == 1
+    assert preview.json()["can_update"] is False
+
+    update = _put_profile(pg_client, pg_admin_user, world["key"], payload)
+    assert update.status_code == 409, update.text
+    assert update.json()["detail"]["reason"] == "profile_binding_change_blocked"
+    pg_session.refresh(profile)
+    pg_session.refresh(queue)
+    assert profile.queue_tags == [world["tag"]]
+    assert queue.queue_tag == profile.key
+
+
 def test_active_public_address_counts_as_profile_usage(
     pg_client, pg_session, pg_admin_user
 ):
@@ -866,6 +902,134 @@ def test_public_address_provision_serializes_with_binding_update(
         .one()
     )
     assert created is True
+    assert address.queue_profile_id == profile.id
+    assert address.retired_at is None
+
+
+def test_delete_serializes_with_public_address_provision(
+    pg_engine, pg_session, pg_admin_user, monkeypatch
+):
+    """DELETE waits for provisioning, then observes and preserves its address."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    from fastapi import HTTPException
+    from sqlalchemy import text
+    from sqlalchemy.orm import Query, sessionmaker
+
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        delete_queue_profile,
+    )
+    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import queue_service
+    from app.services.queue_svc import _operations as queue_operations
+
+    key = "rq12b-t10-delete-address-race"
+    profile = QueueProfile(
+        key=key,
+        title="RQ-12.b delete/address race",
+        queue_tags=["rq12b-t10-delete-address-tag"],
+        department_key=None,
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    pg_session.add(profile)
+    pg_session.commit()
+    profile_id = profile.id
+
+    session_factory = sessionmaker(bind=pg_engine, future=True)
+    provision_locked = threading.Event()
+    finish_provision = threading.Event()
+    delete_started = threading.Event()
+    delete_counted_address = threading.Event()
+    pids: dict[str, int] = {}
+    original_generator = queue_operations.generate_public_code
+    original_count = Query.count
+
+    def paused_generator():
+        provision_locked.set()
+        if not finish_provision.wait(timeout=10):
+            raise TimeoutError("test did not release address provisioning")
+        return original_generator()
+
+    def observe_address_usage_count(query):
+        result = original_count(query)
+        if (
+            threading.current_thread().name == "t10-delete-worker"
+            and query.column_descriptions[0].get("entity")
+            is QueueDirectionPublicAddress
+        ):
+            delete_counted_address.set()
+        return result
+
+    monkeypatch.setattr(queue_operations, "generate_public_code", paused_generator)
+    monkeypatch.setattr(Query, "count", observe_address_usage_count)
+
+    def provision_address():
+        with session_factory() as db:
+            pids["provision"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            profile_row = db.get(QueueProfile, profile_id)
+            assert profile_row is not None
+            row, created = queue_service.provision_public_address(
+                db, profile=profile_row
+            )
+            assert created is True
+            return row.public_code
+
+    def delete_profile():
+        threading.current_thread().name = "t10-delete-worker"
+        with session_factory() as db:
+            pids["delete"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            delete_started.set()
+            try:
+                delete_queue_profile(key, db, pg_admin_user)
+                return 200
+            except HTTPException as exc:
+                return exc.status_code
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        provision_future = executor.submit(provision_address)
+        delete_future = None
+        try:
+            assert provision_locked.wait(timeout=5), "provision did not lock profile"
+            delete_future = executor.submit(delete_profile)
+            assert delete_started.wait(timeout=5), "profile deletion did not start"
+
+            deadline = time.monotonic() + 5
+            blocked_by_provision = False
+            while time.monotonic() < deadline:
+                with pg_engine.connect() as connection:
+                    blockers = connection.execute(
+                        text("SELECT pg_blocking_pids(:pid)"),
+                        {"pid": pids["delete"]},
+                    ).scalar_one()
+                if pids["provision"] in blockers:
+                    blocked_by_provision = True
+                    break
+                if delete_future.done():
+                    break
+                time.sleep(0.02)
+
+            assert blocked_by_provision, "DELETE must wait for the profile row lock"
+            assert (
+                not delete_counted_address.is_set()
+            ), "DELETE must acquire the profile lock before reading dependencies"
+        finally:
+            finish_provision.set()
+
+        public_code = provision_future.result(timeout=10)
+        assert delete_future is not None
+        assert delete_future.result(timeout=10) == 409
+
+    pg_session.expire_all()
+    profile = pg_session.query(QueueProfile).filter_by(key=key).one()
+    address = (
+        pg_session.query(QueueDirectionPublicAddress)
+        .filter_by(public_code=public_code)
+        .one()
+    )
     assert address.queue_profile_id == profile.id
     assert address.retired_at is None
 
