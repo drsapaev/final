@@ -2680,7 +2680,13 @@ def _test_queue_analytics_body(
     synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
     admin = _make_user(db_session, username="admin_anl29", role="Admin")
 
-    payload = get_queue_analytics(synthetic.id, db=db_session, current_user=admin)
+    payload = get_queue_analytics(
+        synthetic.id,
+        start_date=_DAY.isoformat(),
+        end_date=_DAY.isoformat(),
+        db=db_session,
+        current_user=admin,
+    )
     assert payload["totals"]["online_joins"] == 3
     assert payload["totals"]["total_served"] == 4
 
@@ -2703,7 +2709,13 @@ def _test_queue_analytics_body(
         )
     )
     db_session.commit()
-    other_payload = get_queue_analytics(other.id, db=db_session, current_user=admin)
+    other_payload = get_queue_analytics(
+        other.id,
+        start_date=_DAY.isoformat(),
+        end_date=_DAY.isoformat(),
+        db=db_session,
+        current_user=admin,
+    )
     assert other_payload["totals"]["online_joins"] == 9
 
 
