@@ -84,7 +84,6 @@
 | Doctor | bio_ru/bio_uz (или привязка к UserProfile.bio) | профиль врача | Alembic + админка |
 | Doctor | фото (связка с UserProfile.avatar_url или своё) | профиль врача | существующее поле + upload/раздача |
 | Doctor | slug | URL /doctors/:slug | Alembic |
-| ClinicSettings | reconcile ключей `clinic_*` vs `address/phone/…` | единый SSOT контактов | фиксы wizard/UI |
 | ClinicSettings | рабочие часы уровня клиники, координаты/ссылка на карту, соцсети/telegram, переводы имени и адреса | страница контактов | KV-ключи (+ возможно Branch) |
 | Настройки канала записи (владелец уточняется) | режим instant/request, доступность записи, допущенные услуги/врачи | раздел 8 плана | типизированный контракт в существующем backend; текущий `/admin/queue/settings` новые ключи не сохраняет |
 | Инфраструктура | раздача медиа: `/static` не смонтирован ни в backend, ни в nginx | логотип, фото врачей | отдельное решение |
