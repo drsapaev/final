@@ -1,24 +1,36 @@
 # Progress
 
-Plan version: 3.77
-Current task: T10 — protect used queue profile bindings; complete T10-specific synthetic Tier-2 staging.
-Current status: IN_PROGRESS — source fixes are committed; T10-specific authenticated API staging passed on exact PR HEAD. The staging stack and secret env were removed. Four plan journals now record evidence; commit/push and exact-head CI for the documentation checkpoint remain. PR #3633 is OPEN/MERGEABLE; user performs merge. No T10 deferral was accepted.
+Plan version: 3.79
+Current task: T10 — protect used QueueProfile bindings and address PR #3633 review.
+Current status: BLOCKED — review-fix code commit `00833c760c0f5d9d438c05526163bf6fc2db4140` is pushed. Nine inline review threads are resolved; the cross-writer serialization P2 remains open and blocks merge. Local validation passed. Hosted CI on `00833c76` was partially complete at last check: Backend tests and Frontend E2E were still running; other applicable jobs listed below had passed. The latest mandatory gate returned `narrow_override` with a required handoff and exact first-touch/stop conditions that do not cover all writers found in the read-only inventory, so no partial code patch was made. Bounded staging PASS applies to earlier runtime HEAD `c37179b6` only and was not rerun for these review fixes. No deferral was accepted.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-T10-profile-guards
 PR base: 19c35ec62481dde45c9ea49146ecc4999aaf599f (base when this branch started).
-Latest source/test commit: 37c6e4c7ebe1727dc1d0e96fc289618fda6a8a1a.
-Current local HEAD / remote PR HEAD before docs checkpoint: c37179b6dfcb456c4e632a1a6f6eac1c2e9e322b.
+Latest source/test commit: 00833c760c0f5d9d438c05526163bf6fc2db4140.
+Current local HEAD / remote PR code HEAD before documentation checkpoint: 00833c760c0f5d9d438c05526163bf6fc2db4140.
 Fetched origin/main: c790a35982359c1ab5c47e7873079569144ed371; this is one unrelated commit ahead of the PR merge-base 19c35ec62481dde45c9ea49146ecc4999aaf599f. GitHub still reports #3633 OPEN/MERGEABLE.
-Last updated: 2026-10-08T14:39:49+05:00
+Last updated: 2026-10-08T16:31+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
-| T10 | IN_PROGRESS | PR #3633; T10 API staging PASS; docs checkpoint/CI pending | | EVIDENCE.md#t10-pr-3633-bounded-synthetic-tier-2-staging |
+| T10 | BLOCKED | PR #3633; 9 threads resolved, one serialization P2 and two CI jobs open | | EVIDENCE.md#t10-pr-3633-serialization-gate |
 
-## Current checkpoint — T10 bounded synthetic Tier-2 staging (2026-10-08T14:39:49+05:00)
+## Current checkpoint — PR #3633 serialization review blocker (2026-10-08T16:31+05:00)
+
+- Confirmed PR #3633 OPEN/MERGEABLE at exact code HEAD `00833c760c0f5d9d438c05526163bf6fc2db4140`, base `19c35ec62481dde45c9ea49146ecc4999aaf599f`. Code was committed and pushed fast-forward; no merge or formal review was submitted. The PR body now records scope, results and the unresolved blocker.
+- Fixed/revalidated review findings: active public addresses now block single/bulk department deletion; empty department key is a no-op; structured 409 is rendered; active Doctor, QueueResource, and department-linked Service mappings are counted; typed preview 401/403/404 are in OpenAPI and generated client types. Legacy unchanged tags and direct profile DELETE/address-provision locking were already fixed in earlier T10 commits and remain covered.
+- Review-thread state: 9 threads were replied to and resolved; only the P2 for serialization across all tagged `DailyQueue`/service/resource creation paths remains open. A bounded inventory found independent constructors in CRUD, GraphQL, services and repositories. No incomplete shared-lock patch was made. Merge remains on hold.
+- New task gate: the mandatory wrapper was run from `ai/langgraph` for the full serialization P2, with confirmed root `_queue_profiles.py` and `--handoff`. Result: `narrow_override`; `gate_misroute=yes`; `override_used=yes`; `handoff_required=yes`. Canonical anchors `AGENTS.md`, `docs/devbrain/PROJECT_MEMORY.md`, and `docs/devbrain/DEVBRAIN_STATUS.md` were read. First-touch list: `_queue_profiles.py`, backend entrypoint/staging Dockerfiles and compose files, `services/queue_service.py`, `models/online_queue.py`, and `tests/unit/test_queue_time_window.py`. The gate stops edits outside that exact list. Read-only inventory found relevant direct constructors also in `graphql/mutations.py`, `crud/online_queue.py`, `repositories/queue_api_repository.py`, `queue_limits_repository.py`, `visit_confirmation_repository.py`, `services/queue_svc/_operations.py`, and `services/force_majeure_service.py`; migration and dev-seed constructors also exist. The profile endpoint row lock, owner-config tag advisory locks, and per-day doctor/resource locks are distinct and do not establish complete coverage. No code edit was made after the gate.
+- Validation: PostgreSQL lifecycle plus OpenAPI tests — 70 passed, 1 warning; frontend focused Vitest — 6 passed; TypeScript check and production build passed; scoped ESLint — 0 errors, 4 warnings; Ruff, Black, py_compile, generated-type byte parity, and `git diff --check` passed. Standard npm generation failed in WSL Node 18 (`Invalid string length`); direct installed Node 24 CLI output matched byte-for-byte. Commit hooks passed except pinned `end-of-file-fixer`, `ruff-format`, and Black, skipped after they were shown to rewrite the OpenAPI EOF or unrelated legacy formatting; equivalent local checks passed.
+- Tier-2 staging: the bounded synthetic Admin API slice passed on prior runtime HEAD `c37179b6`, including TOTP and address provisioning/DELETE concurrency. It was not rerun for `00833c76`; do not treat the prior PASS as validating this follow-up. No deferral was accepted. Full STAGING_VALIDATION.md, T18, browser/UI E2E and served-frontend provenance remain NOT_RUN.
+- Hosted checks on `00833c76` at 2026-10-08T16:26+05:00: PR Review Quality Gate, PR Lifecycle Recommendation, Regression Audit, Gitleaks, i18n, security, frontend lint/build/unit, code quality, context boundary, API docs, and Telegram release gate passed. Backend tests and Frontend E2E were still in progress. DAST nightly and metadata checks were skipped; skipped jobs are not counted as passes. Combined commit status returned no separate commit statuses.
+- Gate decision required before code: serialize the usage check and every relevant link writer, then re-read current QueueProfile binding after waiting. Recommended behavior for a request using a tag removed during the wait is HTTP 409 with no write; this avoids creating an orphaned queue/service link. That stale-request behavior and the needed extra first-touch paths are not in the exact gate handoff. Keep the P2 open and merge held until a complete scope is authorized and validated, or the reviewer explicitly accepts a bounded deferral.
+- Next exact action: after human authorization of the wider writer scope and stale-tag outcome, prepare a concrete T10.1 first-touch list and execute the required gate/handoff; otherwise keep the current PR on hold. Preserve unrelated `.scratch/` and `frontend/.scratch/`.
+
+## Historical checkpoint — T10 bounded synthetic Tier-2 staging (2026-10-08T14:39:49+05:00)
 
 - PR #3633 was confirmed OPEN/MERGEABLE at exact HEAD c37179b6dfcb456c4e632a1a6f6eac1c2e9e322b, base 19c35ec62481dde45c9ea49146ecc4999aaf599f. The reviewed code/test commit and exact-head CI are already on this HEAD; the documentation-only update below requires new exact-head CI after push. User performs merge; no merge or review was submitted.
 - Exact environment: worktree HEAD c37179b6dfcb456c4e632a1a6f6eac1c2e9e322b, tracked worktree clean, WSL Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3, owned project codex-t10-pr3633-tier2-20261008, backend/frontend/PostgreSQL ports 18011/18090/55442. Backend/worker source mount and project ownership passed launcher checks. Frontend served-revision attestation remains false; no frontend revision claim is made.
@@ -29,7 +41,7 @@ Last updated: 2026-10-08T14:39:49+05:00
 - Sanitized local report: .scratch/T10-PR3633-tier2-staging-report.md. No patient or production data was used. No runtime code changed.
 - Teardown PASS: scripts/staging_down.ps1 -ProjectName codex-t10-pr3633-tier2-20261008 -EnvFile .scratch/t10-pr3633-staging.env; immediate verification found zero project containers, volumes, networks and images. The task-owned env file containing synthetic credentials was removed.
 - Scope: this is the T10 authenticated API acceptance slice only. Full STAGING_VALIDATION.md, T18, browser/UI E2E, served-frontend provenance, rollout and production remain NOT_RUN. No deferral was accepted.
-- Next exact action: run git diff --check, commit only the four plan files, refresh origin/main/remote PR state, push the existing branch fast-forward, then inspect exact-head CI. Do not update the PR body, merge, start T11, or touch preserved unrelated .scratch/ and frontend/.scratch/.
+- Superseded next action: the plan checkpoint was committed/pushed, followed by the review-fix commit `00833c76`; see the current checkpoint above. The old instruction not to update the PR body no longer applies.
 
 ## Superseded checkpoint — T10 additional review P2 fixes (2026-10-08T13:39+05:00)
 
