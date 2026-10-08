@@ -1,8 +1,8 @@
-## Current checkpoint — T09.3 PR #3620 analytics fixture correction (2026-10-08T07:31+05:00)
+## Current checkpoint — T09.3 PR #3620 analytics fixture correction validated (2026-10-08T07:46+05:00)
 
 Plan version: 3.60
 Current task: T09.3
-Current status: IN_PROGRESS; the expired analytics test now passes locally. The focused test and journal changes are not yet committed or pushed; hosted CI for them is NOT_RUN.
+Current status: PR_OPEN; the test-only fixture correction and evidence journals are committed and pushed as `9b914d548b2fe2e120c4ed6076ed015e5ce1a610`. Applicable exact-head CI passed. No independent human review or merge was submitted. Tier 2 remains PARTIAL under the existing bounded deferral.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
 Original PR base: 300dd7e9b112dde5143e78d5149634c739ad9b3a
@@ -10,8 +10,9 @@ Synchronized origin/main: 2c825dd439fd28eb5edf10f5ade7a83534f67c5a
 UI P2 fix commit: 6024bb76a533c3a7f2f875270ec0e255385174c5
 Main-sync commit: bbbde4303e3c0fdbee08d27578b5de8679ead690
 Remote PR HEAD before this correction: 6479d5dad3f05f0572ec5b4045cecf139fe243c4
+Current PR HEAD: 9b914d548b2fe2e120c4ed6076ed015e5ce1a610
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-08T07:31+05:00
+Last updated: 2026-10-08T07:46+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -24,10 +25,10 @@ Last updated: 2026-10-08T07:31+05:00
 - Root cause of the red backend test: its synthetic statistics date is fixed at 2026-09-07 while the analytics endpoint defaults to a rolling 30-day period. On the current test date the fixture row falls outside that period, so the test incorrectly returned zero before checking the owner filter.
 - Test-only correction: both analytics calls in the helper pass explicit `start_date` and `end_date` equal to the synthetic fixture day. The failing test now passes locally; production/runtime code is unchanged.
 - Local backend validation: targeted `test_queue_analytics_includes_resource_rows` **1 passed** using the repository launcher and isolated temporary SQLite test fixture; `py_compile` **PASS**; `git diff --check` **PASS**. The first local invocation lacked a process-local `DATABASE_URL` and stopped during import before running tests; the explicit test-only SQLite environment resolved that setup issue. No shared or production database was used.
-- Previous exact-head checks on `6479d5dad` had 5,359 backend tests passed and one failed, with 65 skipped, 25 deselected and 3 xfailed; PR Required Gate consequently failed. Those results precede this correction. Hosted CI for the current working diff is **NOT_RUN** until it is pushed.
+- Previous exact-head checks on `6479d5dad` had 5,359 backend tests passed and one failed, with 65 skipped, 25 deselected and 3 xfailed; PR Required Gate consequently failed. On corrected HEAD `9b914d548`, Backend passed (5,360 passed, 65 skipped, 25 deselected, 3 xfailed, 125 warnings); critical smoke passed 35/35; frontend unit tests, E2E (11m10s), build and lint passed; parity, all three CodeQL analyses, PR Required Gate and PR Review Quality Gate passed. Other applicable checks also passed. Path-aware/non-applicable skips remain NOT_RUN, not passes.
 - Tier 2: the current UI fixes have no staging run. Earlier retry/idempotency staging on `eb1522ac` does not validate them. Overall Tier 2 remains PARTIAL under the accepted bounded PR-specific deferral: four named live specs remain NOT_RUN, runtime base-image equivalence remains NOT_PROVEN, and T18/full `STAGING_VALIDATION.md` remain incomplete.
-- PR #3620 remains OPEN; no GitHub review or merge was performed.
-- Next exact action: verify the remote ref still equals `6479d5dad`, commit only the test plus these two journals, push fast-forward, refresh the PR description with accurate local results and pending hosted CI, and inspect every applicable check on the new HEAD. Keep merge on hold until required checks pass and final review is complete.
+- PR #3620 remains OPEN and mergeable at `9b914d548`; the PR body was refreshed with the corrected fixture, exact-head CI result, and unchanged Tier-2 status. No independent human review or merge was performed.
+- Next exact action: obtain independent human review for PR #3620. Keep merge on hold until review/merge authorization is provided. Tier 2 staging gaps remain separate and outstanding under the existing bounded deferral.
 - Checks to rerun after another source edit: the targeted analytics test, `py_compile`, and `git diff --check`; then the exact-head required CI after push.
 
 ## Superseded checkpoint — PR #3620 generic uncertain-retry local state (2026-10-07T16:08+05:00)
