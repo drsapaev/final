@@ -1199,6 +1199,22 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         from app.models.queue_direction_public_address import (
             QueueDirectionPublicAddress,
         )
+        from app.models.queue_profile import QueueProfile
+
+        # Binding updates take the same row lock before checking usage. This
+        # makes address creation and binding mutation linearizable: whichever
+        # operation obtains the profile lock first commits before the other
+        # checks its dependencies.
+        locked_profile = (
+            db.query(QueueProfile)
+            .filter(QueueProfile.id == profile.id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        if locked_profile is None:
+            raise QueueValidationError("Направление больше не существует")
+        profile = locked_profile
 
         existing = (
             db.query(QueueDirectionPublicAddress)
@@ -1223,11 +1239,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     db.add(row)
                     db.flush()
             except IntegrityError as exc:
-                # Either a burned code collision (retry with a fresh code)
-                # or a concurrent provision of the SAME profile won the
-                # one-active-per-profile race — re-check idempotency before
-                # the next attempt.
-                db.rollback()
+                # The nested transaction has rolled back the failed insert.
+                # Keep the outer transaction and profile lock alive while
+                # checking idempotency and retrying a burned global code.
                 winner = (
                     db.query(QueueDirectionPublicAddress)
                     .filter(

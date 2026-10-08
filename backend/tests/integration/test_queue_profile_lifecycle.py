@@ -607,6 +607,43 @@ def test_unused_profile_can_change_bindings_and_preview_is_read_only(
     assert profile.department_key == payload["department_key"]
 
 
+def test_legacy_dental_tags_allow_unchanged_binding_on_used_profile(
+    pg_client, pg_session, pg_admin_user
+):
+    """Canonical expansion must not turn an unchanged legacy list into a rebind."""
+    from app.models.queue_profile import QueueProfile
+
+    key = "rq12b-t10-dental-legacy"
+    legacy_tags = ["dental", "dentistry", "stomatology"]
+    profile = QueueProfile(
+        key=key,
+        title="RQ-12.b legacy dental",
+        queue_tags=legacy_tags,
+        department_key="stomatology",
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    pg_session.add(profile)
+    pg_session.commit()
+    _add_service(pg_session, "t10dent", "T10DENT", "dentist")
+
+    payload = {"title": "RQ-12.b renamed dental", "queue_tags": legacy_tags}
+    preview = _preview_profile_update(pg_client, pg_admin_user, key, payload)
+    assert preview.status_code == 200, preview.text
+    preview_data = preview.json()
+    assert preview_data["links"]["services"] == 1
+    assert preview_data["changed_binding_fields"] == []
+    assert preview_data["blocked_fields"] == []
+    assert preview_data["current"]["queue_tags"] == legacy_tags
+    assert preview_data["proposed"]["queue_tags"] == legacy_tags
+
+    updated = _put_profile(pg_client, pg_admin_user, key, payload)
+    assert updated.status_code == 200, updated.text
+    pg_session.refresh(profile)
+    assert profile.title == payload["title"]
+    assert profile.queue_tags == legacy_tags
+
+
 def test_active_public_address_counts_as_profile_usage(
     pg_client, pg_session, pg_admin_user
 ):
@@ -699,6 +736,138 @@ def test_binding_update_rechecks_after_stale_preview(
 
     pg_session.refresh(profile)
     assert profile.queue_tags == [tag]
+
+
+def test_public_address_provision_serializes_with_binding_update(
+    pg_engine, pg_session, pg_admin_user, monkeypatch
+):
+    """A binding PUT waits for address creation, then rechecks and blocks."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    from fastapi import HTTPException
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        QueueProfileUpdate,
+        update_queue_profile,
+    )
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import queue_service
+    from app.services.queue_svc import _operations as queue_operations
+
+    key = "rq12b-t10-address-race"
+    original_tags = ["rq12b-t10-address-race-tag"]
+    profile = QueueProfile(
+        key=key,
+        title="RQ-12.b address race",
+        queue_tags=original_tags,
+        department_key=None,
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    pg_session.add(profile)
+    pg_session.commit()
+    profile_id = profile.id
+
+    session_factory = sessionmaker(bind=pg_engine, future=True)
+    provision_locked = threading.Event()
+    finish_provision = threading.Event()
+    update_started = threading.Event()
+    pids: dict[str, int] = {}
+    original_generator = queue_operations.generate_public_code
+
+    def paused_generator():
+        provision_locked.set()
+        if not finish_provision.wait(timeout=10):
+            raise TimeoutError("test did not release address provisioning")
+        return original_generator()
+
+    monkeypatch.setattr(queue_operations, "generate_public_code", paused_generator)
+
+    def provision():
+        db = session_factory()
+        try:
+            pids["provision"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            profile_row = (
+                db.query(QueueProfile).filter(QueueProfile.id == profile_id).first()
+            )
+            assert profile_row is not None
+            row, created = queue_service.provision_public_address(
+                db, profile=profile_row
+            )
+            return row.public_code, created
+        finally:
+            db.rollback()
+            db.close()
+
+    def update_binding():
+        db = session_factory()
+        try:
+            pids["update"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            update_started.set()
+            try:
+                update_queue_profile(
+                    profile_key=key,
+                    profile_data=QueueProfileUpdate(
+                        queue_tags=["rq12b-t10-address-race-new"]
+                    ),
+                    db=db,
+                    current_user=pg_admin_user,
+                )
+                return 200
+            except HTTPException as exc:
+                return exc.status_code
+        finally:
+            db.rollback()
+            db.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        provision_future = executor.submit(provision)
+        update_future = None
+        try:
+            provision_lock_observed = provision_locked.wait(timeout=5)
+            assert provision_lock_observed, "provision did not lock the profile"
+            update_future = executor.submit(update_binding)
+            assert update_started.wait(timeout=5), "binding update did not start"
+
+            deadline = time.monotonic() + 5
+            blocked_by_provision = False
+            while time.monotonic() < deadline:
+                with pg_engine.connect() as connection:
+                    blockers = connection.execute(
+                        text("SELECT pg_blocking_pids(:pid)"),
+                        {"pid": pids["update"]},
+                    ).scalar_one()
+                if pids["provision"] in blockers:
+                    blocked_by_provision = True
+                    break
+                if update_future.done():
+                    break
+                time.sleep(0.02)
+            assert blocked_by_provision, "update must wait on the profile row lock"
+        finally:
+            finish_provision.set()
+
+        address_code, created = provision_future.result(timeout=10)
+        assert update_future is not None
+        assert update_future.result(timeout=10) == 409
+
+    pg_session.expire_all()
+    pg_session.refresh(profile)
+    assert profile.queue_tags == original_tags
+    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
+
+    address = (
+        pg_session.query(QueueDirectionPublicAddress)
+        .filter(QueueDirectionPublicAddress.public_code == address_code)
+        .one()
+    )
+    assert created is True
+    assert address.queue_profile_id == profile.id
+    assert address.retired_at is None
 
 
 def _public_profile_keys(pg_client) -> set[str]:

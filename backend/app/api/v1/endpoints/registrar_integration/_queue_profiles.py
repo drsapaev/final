@@ -37,6 +37,16 @@ def _canonical_profile_tags(tags: list[str] | None, profile_key: str) -> list[st
     return expand_queue_tags(tag_list)
 
 
+def _profile_binding_values_equal(
+    field: str, left: Any, right: Any, profile_key: str
+) -> bool:
+    if field == "queue_tags":
+        return _canonical_profile_tags(left, profile_key) == _canonical_profile_tags(
+            right, profile_key
+        )
+    return left == right
+
+
 @router.get("/queues/profiles", response_model=dict[str, Any])
 def get_queue_profiles(
     active_only: bool = Query(True, description="Только активные профили"),
@@ -184,7 +194,11 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
     from app.models.queue_direction_public_address import QueueDirectionPublicAddress
     from app.models.service import Service
 
-    tags = [t for t in (profile.queue_tags or []) if t]
+    # Runtime routing expands dental-family aliases even for legacy rows
+    # seeded before the canonical profile writer. Count links against that
+    # same effective tag set so a legacy alias is not mistaken for an
+    # unused binding.
+    tags = _canonical_profile_tags(profile.queue_tags, profile.key)
     services = 0
     daily_queues = 0
     entries_waiting = 0
@@ -393,8 +407,17 @@ def preview_queue_profile_update(
         }
         proposed = dict(current)
         if "queue_tags" in proposed_update:
-            proposed["queue_tags"] = _canonical_profile_tags(
+            candidate_tags = _canonical_profile_tags(
                 proposed_update["queue_tags"], profile.key
+            )
+            # Keep the legacy stored list visible for a semantically
+            # unchanged proposal; preview should describe the actual no-op.
+            proposed["queue_tags"] = (
+                current["queue_tags"]
+                if _profile_binding_values_equal(
+                    "queue_tags", current["queue_tags"], candidate_tags, profile.key
+                )
+                else candidate_tags
             )
         if "department_key" in proposed_update:
             proposed["department_key"] = proposed_update["department_key"]
@@ -402,7 +425,9 @@ def preview_queue_profile_update(
         changed_binding_fields = [
             field
             for field in ("queue_tags", "department_key")
-            if proposed[field] != current[field]
+            if not _profile_binding_values_equal(
+                field, current[field], proposed[field], profile.key
+            )
         ]
         links = _profile_link_counts(db, profile)
         blocked_fields = changed_binding_fields if any(links.values()) else []
@@ -524,7 +549,15 @@ def update_queue_profile(
         from app.models.queue_profile import QueueProfile
 
         # Find profile
-        profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
+        # Serialize binding edits with public-address provisioning. Both
+        # operations lock this canonical row before checking dependencies.
+        profile = (
+            db.query(QueueProfile)
+            .filter(QueueProfile.key == profile_key)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
         if not profile:
             raise HTTPException(
                 status_code=404, detail=f"Profile '{profile_key}' not found"
@@ -533,9 +566,18 @@ def update_queue_profile(
         # Update fields (only those provided)
         update_data = profile_data.dict(exclude_unset=True)
         if "queue_tags" in update_data:
-            update_data["queue_tags"] = _canonical_profile_tags(
+            candidate_tags = _canonical_profile_tags(
                 update_data["queue_tags"], profile.key
             )
+            if _profile_binding_values_equal(
+                "queue_tags", profile.queue_tags, candidate_tags, profile.key
+            ):
+                # The UI submits the full form, including unchanged tags.
+                # Preserve older persisted spellings/order instead of
+                # treating canonical expansion as a binding mutation.
+                update_data.pop("queue_tags")
+            else:
+                update_data["queue_tags"] = candidate_tags
 
         current_bindings = {
             "queue_tags": list(profile.queue_tags or []),
@@ -544,7 +586,10 @@ def update_queue_profile(
         changed_binding_fields = [
             field
             for field in ("queue_tags", "department_key")
-            if field in update_data and update_data[field] != current_bindings[field]
+            if field in update_data
+            and not _profile_binding_values_equal(
+                field, current_bindings[field], update_data[field], profile.key
+            )
         ]
         if changed_binding_fields:
             # Recompute usage at command time. A preview is never authority
