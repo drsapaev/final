@@ -14,6 +14,7 @@ from app.core.specialties import (
     expand_queue_tags,
 )
 from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
+from app.schemas.queue_profile_conflicts import QueueProfileBindingChangedResponse
 
 
 def _canonical_profile_tags(tags: list[str] | None, profile_key: str) -> list[str]:
@@ -599,8 +600,12 @@ def create_queue_profile(
     response_model=dict[str, Any],
     responses={
         409: {
-            "model": QueueProfileBindingConflictResponse,
-            "description": "Binding changes are blocked while the profile is in use.",
+            "model": QueueProfileBindingConflictResponse
+            | QueueProfileBindingChangedResponse,
+            "description": (
+                "Binding changes are blocked while the profile is in use, or "
+                "the submitted binding snapshot became stale."
+            ),
         }
     },
 )

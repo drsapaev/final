@@ -7929,6 +7929,16 @@
           "404": {
             "description": "Направление не найдено"
           },
+          "409": {
+            "description": "Direction binding changed while address provisioning was waiting.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileBindingChangedResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -17884,11 +17894,19 @@
             }
           },
           "409": {
-            "description": "Binding changes are blocked while the profile is in use.",
+            "description": "Binding changes are blocked while the profile is in use, or the submitted binding snapshot became stale.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QueueProfileBindingConflictResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/QueueProfileBindingConflictResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QueueProfileBindingChangedResponse"
+                    }
+                  ],
+                  "title": "Response 409 Update Queue Profile Api V1 Queues Profiles  Profile Key  Put"
                 }
               }
             }
@@ -32226,6 +32244,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/app__schemas__clinic__DoctorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Doctor specialty changed while the update was waiting.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileBindingChangedResponse"
                 }
               }
             }
@@ -103319,6 +103347,52 @@
         ],
         "title": "QueuePositionResponse",
         "description": "Ответ с информацией о позиции в очереди"
+      },
+      "QueueProfileBindingChangedDetail": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "const": "profile_binding_changed",
+            "title": "Reason"
+          },
+          "stale_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale Fields"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "message"
+        ],
+        "title": "QueueProfileBindingChangedDetail",
+        "description": "A stale binding snapshot that must be reloaded before retrying."
+      },
+      "QueueProfileBindingChangedResponse": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/QueueProfileBindingChangedDetail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "QueueProfileBindingChangedResponse"
       },
       "QueueProfileBindingConflictDetail": {
         "properties": {

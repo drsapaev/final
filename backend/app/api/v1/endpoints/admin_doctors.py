@@ -26,6 +26,7 @@ from app.schemas.clinic import (
     SpecialtyVocabularyItem,
     WeeklyScheduleUpdate,
 )
+from app.schemas.queue_profile_conflicts import QueueProfileBindingChangedResponse
 from app.services.admin_doctors_stats_service import AdminDoctorsStatsService
 from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
@@ -331,6 +332,8 @@ def admin_create_medical_specialty(
     from app.services.specialty_catalog_admin import (
         SpecialtyCatalogConflictError,
         SpecialtyCatalogValidationError,
+    )
+    from app.services.specialty_catalog_admin import (
         create as catalog_create,
     )
 
@@ -610,6 +613,10 @@ def create_doctor(
     "/doctors/{doctor_id}",
     response_model=DoctorOut,
     responses={
+        409: {
+            "model": QueueProfileBindingChangedResponse,
+            "description": "Doctor specialty changed while the update was waiting.",
+        },
         503: {
             "model": ServiceUnavailableDetail,
             "description": (

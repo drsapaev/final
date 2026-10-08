@@ -37,6 +37,21 @@ class _FakeAssignmentService:
         return self.prepared_assignments.get(key)
 
 
+class _EmptyQuery:
+    def all(self):
+        return []
+
+
+class _FakeDb:
+    # The tag lock reads QueueProfile bindings before taking the
+    # PostgreSQL-only advisory lock. This unit fake supplies an empty
+    # catalog snapshot and no PostgreSQL bind.
+    bind = None
+
+    def query(self, *_entities):
+        return _EmptyQuery()
+
+
 @pytest.mark.unit
 def test_assign_same_day_queue_numbers_uses_extracted_wizard_seam():
     today = date.today()
@@ -55,7 +70,7 @@ def test_assign_same_day_queue_numbers_uses_extracted_wizard_seam():
     )
 
     service = RegistrarWizardQueueAssignmentService(
-        db=object(),
+        db=_FakeDb(),
         assignment_service_factory=lambda _: fake_assignment_service,
         lifecycle_service_factory=lambda db: SimpleNamespace(
             activate_confirmed_visit=lambda visit_id, current_user=None, commit=False: None
@@ -90,7 +105,7 @@ def test_assign_same_day_queue_numbers_preserves_safe_behavior_for_empty_and_fai
     )
 
     service = RegistrarWizardQueueAssignmentService(
-        db=object(),
+        db=_FakeDb(),
         assignment_service_factory=lambda _: fake_assignment_service,
         lifecycle_service_factory=lambda db: SimpleNamespace(
             activate_confirmed_visit=lambda visit_id, current_user=None, commit=False: None
@@ -170,7 +185,7 @@ def test_cart_locks_all_tag_scopes_sorted_before_any_prepare(monkeypatch):
     monkeypatch.setattr(wizard_module, "lock_queue_tag_claim_scope", _recording_lock)
 
     service = RegistrarWizardQueueAssignmentService(
-        db=object(),
+        db=_FakeDb(),
         assignment_service_factory=lambda _: fake_assignment_service,
         lifecycle_service_factory=lambda db: SimpleNamespace(
             activate_confirmed_visit=lambda visit_id, current_user=None, commit=False: None

@@ -152,7 +152,11 @@ def test_canonical_service_uses_the_shared_helper() -> None:
     source = (
         BACKEND_ROOT / "app" / "services" / "queue_svc" / "_operations.py"
     ).read_text(encoding="utf-8")
-    assert "lock_daily_queue_creation(db, day, actual_specialist_id)" in source
+    assert re.search(
+        r"lock_daily_queue_creation\(\s*db,\s*day,\s*actual_specialist_id,"
+        r"\s*queue_tag=queue_tag\s*\)",
+        source,
+    )
     # the historical inline spelling is gone
     assert 'f"daily_queue:{day}:{actual_specialist_id}"' not in source
 
@@ -183,7 +187,7 @@ def test_legacy_creation_paths_call_the_helper_before_their_lookup() -> None:
             "query_filters = [",
         ),
         "app/repositories/visit_confirmation_repository.py": (
-            "lock_daily_queue_creation(self.db, day, actual_specialist_id)",
+            "lock_daily_queue_creation(",
             "query = self.db.query(DailyQueue).filter(",
         ),
         "app/repositories/queue_limits_repository.py": (

@@ -36228,6 +36228,25 @@ export type components = {
                 [key: string]: unknown;
             };
         };
+        /**
+         * QueueProfileBindingChangedDetail
+         * @description A stale binding snapshot that must be reloaded before retrying.
+         */
+        QueueProfileBindingChangedDetail: {
+            /**
+             * Reason
+             * @constant
+             */
+            reason: "profile_binding_changed";
+            /** Stale Fields */
+            stale_fields?: string[] | null;
+            /** Message */
+            message: string;
+        };
+        /** QueueProfileBindingChangedResponse */
+        QueueProfileBindingChangedResponse: {
+            detail: components["schemas"]["QueueProfileBindingChangedDetail"];
+        };
         /** QueueProfileBindingConflictDetail */
         QueueProfileBindingConflictDetail: {
             /**
@@ -47283,6 +47302,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Direction binding changed while address provisioning was waiting. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileBindingChangedResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53160,13 +53188,13 @@ export interface operations {
                     };
                 };
             };
-            /** @description Binding changes are blocked while the profile is in use. */
+            /** @description Binding changes are blocked while the profile is in use, or the submitted binding snapshot became stale. */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QueueProfileBindingConflictResponse"];
+                    "application/json": components["schemas"]["QueueProfileBindingConflictResponse"] | components["schemas"]["QueueProfileBindingChangedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61837,6 +61865,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__clinic__DoctorOut"];
+                };
+            };
+            /** @description Doctor specialty changed while the update was waiting. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileBindingChangedResponse"];
                 };
             };
             /** @description Validation Error */

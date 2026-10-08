@@ -2496,3 +2496,234 @@ def test_department_bulk_delete_without_queue_history_cascades(
             .first()
             is None
         ), f"1:1 profile for {dept['key']} must be cascade-deleted, not orphaned"
+
+def test_doctor_update_and_tagged_graphql_join_follow_owner_config_lock_order(pg_engine):
+    """A tagged GraphQL admission holds owner-config before Doctor FOR SHARE.
+
+    A concurrent specialty edit must wait for that config lock before it
+    acquires Doctor FOR UPDATE, allowing the join to finish without a
+    PostgreSQL deadlock.
+    """
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import date
+
+    from sqlalchemy import text
+
+    from app.crud import clinic as clinic_crud
+    from app.crud.queue_resource_routing import lock_queue_tag_claim_scope
+    from app.models.clinic import Doctor
+    from app.schemas.clinic import DoctorUpdate
+
+    session_factory = sessionmaker(bind=pg_engine, future=True)
+    suffix = uuid.uuid4().hex[:8]
+    old_tag = f"rq12b-doctor-lock-{suffix}"
+    new_tag = f"rq12b-doctor-next-{suffix}"
+    doctor_id = None
+
+    with session_factory() as seed:
+        doctor = Doctor(specialty=old_tag, active=True)
+        seed.add(doctor)
+        seed.commit()
+        doctor_id = doctor.id
+
+    join_session = session_factory()
+    lock_queue_tag_claim_scope(join_session, old_tag, date.today())
+
+    application_name = f"t10_doc_lock_{suffix}"
+    started = threading.Event()
+
+    def update_specialty():
+        with session_factory() as worker:
+            worker.execute(
+                text("SELECT set_config('application_name', :name, false)"),
+                {"name": application_name},
+            )
+            started.set()
+            updated = clinic_crud.update_doctor(
+                worker, doctor_id, DoctorUpdate(specialty=new_tag)
+            )
+            return updated.specialty
+
+    blocked_by_row_lock = False
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(update_specialty)
+        try:
+            assert started.wait(timeout=5), "doctor update worker did not start"
+            deadline = time.monotonic() + 10
+            observed_advisory_wait = False
+            with session_factory() as observer:
+                while time.monotonic() < deadline:
+                    wait = observer.execute(
+                        text(
+                            "SELECT wait_event_type, wait_event "
+                            "FROM pg_stat_activity "
+                            "WHERE application_name = :name AND state = 'active' "
+                            "ORDER BY pid DESC LIMIT 1"
+                        ),
+                        {"name": application_name},
+                    ).first()
+                    if wait and wait[0] == "Lock" and wait[1] == "advisory":
+                        observed_advisory_wait = True
+                        break
+                    if future.done():
+                        break
+                    time.sleep(0.02)
+            assert observed_advisory_wait, (
+                "doctor update should wait on the tagged join's owner-config "
+                "advisory lock before taking the Doctor row lock"
+            )
+
+            join_session.execute(text("SET LOCAL lock_timeout = '1s'"))
+            try:
+                selected = (
+                    join_session.query(Doctor)
+                    .filter(Doctor.id == doctor_id)
+                    .with_for_update(read=True)
+                    .populate_existing()
+                    .first()
+                )
+                assert selected is not None
+            except Exception as exc:
+                from sqlalchemy.exc import OperationalError
+
+                if isinstance(exc, OperationalError):
+                    blocked_by_row_lock = True
+                else:
+                    raise
+        finally:
+            join_session.rollback()
+        updated_specialty = future.result(timeout=10)
+
+    assert not blocked_by_row_lock, (
+        "tagged GraphQL join could not take Doctor FOR SHARE while the "
+        "specialty update waited on the owner-config lock"
+    )
+    assert updated_specialty == new_tag
+
+
+def test_doctor_update_rejects_stale_specialty_snapshot_without_writing(
+    pg_engine, monkeypatch
+):
+    """A specialty changed after the unlocked candidate read returns 409."""
+    from fastapi import HTTPException
+
+    from app.crud import clinic as clinic_crud
+    from app.models.clinic import Doctor
+    from app.schemas.clinic import DoctorUpdate
+
+    session_factory = sessionmaker(bind=pg_engine, future=True)
+    suffix = uuid.uuid4().hex[:8]
+    old_tag = f"rq12b-doctor-stale-{suffix}"
+    competing_tag = f"rq12b-doctor-winner-{suffix}"
+    requested_tag = f"rq12b-doctor-loser-{suffix}"
+
+    with session_factory() as seed:
+        doctor = Doctor(specialty=old_tag, active=True)
+        seed.add(doctor)
+        seed.commit()
+        doctor_id = doctor.id
+
+    def concurrent_rebind(_db, *, queue_tags, department_keys=()):
+        with session_factory() as competing:
+            row = competing.query(Doctor).filter(Doctor.id == doctor_id).one()
+            row.specialty = competing_tag
+            competing.commit()
+
+    monkeypatch.setattr(clinic_crud, "lock_profile_link_scopes", concurrent_rebind)
+    with session_factory() as request:
+        with pytest.raises(HTTPException) as conflict:
+            clinic_crud.update_doctor(
+                request, doctor_id, DoctorUpdate(specialty=requested_tag)
+            )
+
+    assert conflict.value.status_code == 409
+    assert conflict.value.detail["reason"] == "profile_binding_changed"
+    assert conflict.value.detail["stale_fields"] == ["specialty"]
+    with session_factory() as check:
+        stored = check.query(Doctor).filter(Doctor.id == doctor_id).one()
+        assert stored.specialty == competing_tag
+
+
+def test_department_delete_blocked_when_active_doctor_mapping_exists(
+    pg_client, pg_session, pg_admin_user
+):
+    """A live Doctor tag mapping keeps a department profile from cascading."""
+    from app.models.clinic import Doctor
+    from app.models.department import Department
+    from app.models.queue_profile import QueueProfile
+
+    headers = _dep_headers(pg_admin_user)
+    dept = _create_department(pg_client, headers, "active_doc_map")
+    profile = pg_session.query(QueueProfile).filter_by(key=dept["key"]).one()
+    doctor = Doctor(specialty=dept["key"], active=True)
+    pg_session.add(doctor)
+    pg_session.commit()
+    doctor_id = doctor.id
+
+    response = pg_client.delete(
+        f"/api/v1/admin/departments/{dept['id']}", headers=headers
+    )
+    assert response.status_code == 409, response.text
+    blocked = next(
+        row
+        for row in response.json()["detail"]["profiles"]
+        if row["profile_key"] == dept["key"]
+    )
+    assert blocked["active_doctors"] == 1
+    assert blocked["active_queue_resources"] == 0
+
+    pg_session.expire_all()
+    assert pg_session.query(Department).filter_by(id=dept["id"]).one()
+    assert pg_session.query(QueueProfile).filter_by(id=profile.id).one()
+    assert pg_session.query(Doctor).filter_by(id=doctor_id).one().active is True
+
+
+def test_department_bulk_delete_blocked_when_active_resource_mapping_exists(
+    pg_client, pg_session, pg_admin_user
+):
+    """Bulk deletion preserves a live QueueResource and all unselected rows."""
+    from app.models.department import Department
+    from app.models.online_queue import QueueResource
+    from app.models.queue_profile import QueueProfile
+
+    headers = _dep_headers(pg_admin_user)
+    blocked = _create_department(pg_client, headers, "active_res_map")
+    clean = _create_department(pg_client, headers, "active_res_clean")
+    profile = pg_session.query(QueueProfile).filter_by(key=blocked["key"]).one()
+    resource = QueueResource(
+        code=f"{blocked['key']}-res",
+        queue_tag=blocked["key"],
+        display_name="Synthetic active resource mapping",
+        active=True,
+    )
+    pg_session.add(resource)
+    pg_session.commit()
+    resource_id = resource.id
+
+    response = pg_client.request(
+        "DELETE",
+        "/api/v1/admin/departments/bulk-delete",
+        headers=headers,
+        json={"ids": [blocked["id"], clean["id"]]},
+    )
+    assert response.status_code == 409, response.text
+    blocked_department = next(
+        row
+        for row in response.json()["detail"]["blocked"]
+        if row["department_id"] == blocked["id"]
+    )
+    impact = next(
+        row
+        for row in blocked_department["profiles"]
+        if row["profile_key"] == blocked["key"]
+    )
+    assert impact["active_queue_resources"] == 1
+    assert impact["active_doctors"] == 0
+
+    pg_session.expire_all()
+    assert pg_session.query(Department).filter_by(id=blocked["id"]).one()
+    assert pg_session.query(Department).filter_by(id=clean["id"]).one()
+    assert pg_session.query(QueueProfile).filter_by(id=profile.id).one()
+    assert pg_session.query(QueueResource).filter_by(id=resource_id).one().active is True

@@ -282,8 +282,8 @@ def bulk_delete_departments(
                 "error": "department_has_queue_history",
                 "message": (
                     "Массовое удаление отменено: связанные вкладки очередей "
-                    "содержат записи, ожидающих пациентов или активные "
-                    "постоянные ссылки. "
+                    "содержат записи, активные назначения врачей/ресурсов "
+                    "или постоянные ссылки. "
                     "Деактивируйте отделения вместо удаления."
                 ),
                 "waiting_patients": total_waiting,
@@ -447,7 +447,8 @@ def initialize_department(
 def _department_delete_block_report(db: Session, department) -> list[dict]:
     """RQ-13.a (D-06/S-11/D-02): per-profile impact rows for a department
     whose linked profiles still own queue history (any day), waiting
-    patients, or active permanent public addresses. Lock each profile
+    patients, active routing mappings, or active permanent public addresses.
+    Lock each profile
     before recomputing shared usage facts so address provisioning cannot
     race the department cascade. Shared by single and bulk delete."""
     from app.api.v1.endpoints.registrar_integration._queue_profiles import (
@@ -470,7 +471,15 @@ def _department_delete_block_report(db: Session, department) -> list[dict]:
         if profile is None:
             continue
         counts = _profile_link_counts(db, profile)
-        if counts["entries_total"] > 0 or counts["active_public_addresses"] > 0:
+        if any(
+            counts[field] > 0
+            for field in (
+                "entries_total",
+                "active_public_addresses",
+                "active_doctors",
+                "active_queue_resources",
+            )
+        ):
             blocked_links.append(
                 {
                     "profile_key": profile.key,
@@ -478,6 +487,8 @@ def _department_delete_block_report(db: Session, department) -> list[dict]:
                     "entries_waiting": counts["entries_waiting"],
                     "entries_total": counts["entries_total"],
                     "active_public_addresses": counts["active_public_addresses"],
+                    "active_doctors": counts["active_doctors"],
+                    "active_queue_resources": counts["active_queue_resources"],
                 }
             )
     return blocked_links
@@ -559,9 +570,9 @@ def delete_department(
         )
 
     # RQ-13.a (D-06/S-11/D-02): a department whose linked profiles still
-    # own queue history, waiting patients, or active permanent public
-    # addresses cannot be hard-deleted — the profile cascade would remove
-    # the public link target. Same significant-link bar as
+    # own queue history, waiting patients, active routing mappings, or
+    # active permanent public addresses cannot be hard-deleted — the
+    # profile cascade would remove a live booking target. Same significant-link bar as
     # the profile hard-delete guard (RQ-12.b), computed live from the
     # same SSOT at execution time (stale-data protection by construction).
     blocked_links = _department_delete_block_report(db, department)
@@ -573,8 +584,8 @@ def delete_department(
                 "error": "department_has_queue_history",
                 "message": (
                     "Нельзя удалить отделение: связанные вкладки очередей "
-                    "содержат записи, ожидающих пациентов или активные "
-                    "постоянные ссылки. "
+                    "содержат записи, активные назначения врачей/ресурсов "
+                    "или постоянные ссылки. "
                     "Деактивируйте отделение вместо удаления."
                 ),
                 "waiting_patients": total_waiting,
