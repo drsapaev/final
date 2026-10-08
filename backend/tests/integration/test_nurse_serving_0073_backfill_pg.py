@@ -33,7 +33,9 @@ columns added after 0072), then 0073 runs and the backfill outcome is pinned:
 SQLite is never a substitute here: the alembic chain and the partial
 unique index live only on PostgreSQL.
 
-Scratch-database isolation: the scratch name is run-unique (prefix + a
+The pre-0073 Doctor and Service rows are inserted with raw SQL as well:
+their current ORM models include public-site columns that do not exist at
+0072. Scratch-database isolation: the scratch name is run-unique (prefix + a
 uuid suffix), created WITHOUT a pre-drop and dropped only in teardown,
 only if this run actually created it. Two concurrent pytest processes
 (or two agents) against one PostgreSQL server therefore never see each
@@ -56,10 +58,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from app.models.clinic import Doctor
 from app.models.online_queue import OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
-from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
 
@@ -186,9 +186,12 @@ def backfill_world():
 
 
 def _seed_pre_0073_world(engine) -> dict:
-    """The supporting world via ORM (its columns all exist at 0072); the
-    execution rows via RAW SQL — the HEAD ORM model carries the 0073
-    snapshot columns the 0072 schema does not have."""
+    """Seed 0072-compatible supporting rows and execution rows.
+
+    Doctor and Service use raw SQL because their HEAD ORM models include
+    public-site fields added after 0072. DailyQueue and execution rows also
+    use raw SQL because their HEAD models include later migration columns.
+    """
     Session = sessionmaker(bind=engine, future=True)
     session = Session()
     nurse = User(
@@ -205,9 +208,21 @@ def _seed_pre_0073_world(engine) -> dict:
     # ownerless queue since 0063) that still carries the station's tag —
     # the exact shape whose chain resolves through the runtime's tag
     # axis fallback (``_execution_station_resource``).
-    doctor = Doctor(
-        specialty="tag_n23_bf", start_number_online=1, max_online_per_day=15
-    )
+    # The current Doctor model includes website fields introduced in 0079;
+    # seed only columns present in this fixture's 0072 schema.
+    doctor_id = session.execute(
+        text(
+            "INSERT INTO doctors "
+            "(specialty, start_number_online, max_online_per_day, active) "
+            "VALUES (:specialty, :start_number_online, :max_online_per_day, true) "
+            "RETURNING id"
+        ),
+        {
+            "specialty": "tag_n23_bf",
+            "start_number_online": 1,
+            "max_online_per_day": 15,
+        },
+    ).scalar_one()
     resource = QueueResource(
         code="n23_bf_procedures",
         queue_tag="tag_n23_bf",
@@ -217,9 +232,9 @@ def _seed_pre_0073_world(engine) -> dict:
         max_online_per_day=15,
         default_cabinet="c1",
     )
-    session.add_all([nurse, patient, resource, doctor])
+    session.add_all([nurse, patient, resource])
     session.commit()
-    for row in (nurse, patient, resource, doctor):
+    for row in (nurse, patient, resource):
         session.refresh(row)
 
     # This fixture intentionally remains at migration 0072. The current
@@ -247,7 +262,7 @@ def _seed_pre_0073_world(engine) -> dict:
         text(queue_columns),
         {
             "day": today,
-            "specialist_id": doctor.id,
+            "specialist_id": doctor_id,
             "resource_id": None,
             "queue_tag": resource.queue_tag,
         },
@@ -261,53 +276,63 @@ def _seed_pre_0073_world(engine) -> dict:
         department=resource.queue_tag,
         status="in_progress",
     )
-    routed = Service(
-        code="N23BF_ROUTED",
-        name="Service N23BF_ROUTED",
-        queue_tag=resource.queue_tag,
-        requires_doctor=False,
-        active=True,
+    session.add(visit)
+    # The current Service model includes website fields introduced in 0079;
+    # keep this pre-0073 fixture compatible with its 0072 table shape.
+    service_insert = text(
+        "INSERT INTO services "
+        "(code, name, active, created_at, requires_doctor, queue_tag, "
+        "is_consultation, allow_doctor_price_override) "
+        "VALUES (:code, :name, true, CURRENT_TIMESTAMP, false, :queue_tag, "
+        "false, false) RETURNING id"
     )
-    retagged = Service(
-        code="N23BF_RETAGGED",
-        name="Service N23BF_RETAGGED",
-        queue_tag="tag_n23_bf_elsewhere",  # contradicts the station NOW
-        requires_doctor=False,
-        active=True,
-    )
-    session.add_all([visit, routed, retagged])
+    routed_service_id = session.execute(
+        service_insert,
+        {
+            "code": "N23BF_ROUTED",
+            "name": "Service N23BF_ROUTED",
+            "queue_tag": resource.queue_tag,
+        },
+    ).scalar_one()
+    retagged_service_id = session.execute(
+        service_insert,
+        {
+            "code": "N23BF_RETAGGED",
+            "name": "Service N23BF_RETAGGED",
+            "queue_tag": "tag_n23_bf_elsewhere",  # contradicts the station NOW
+        },
+    ).scalar_one()
     session.commit()
-    for row in (visit, routed, retagged):
-        session.refresh(row)
+    session.refresh(visit)
 
     vs_routed = VisitService(
         visit_id=visit.id,
-        service_id=routed.id,
-        code=routed.code,
-        name=routed.name,
+        service_id=routed_service_id,
+        code="N23BF_ROUTED",
+        name="Service N23BF_ROUTED",
         qty=1,
     )
     vs_retagged = VisitService(
         visit_id=visit.id,
-        service_id=retagged.id,
-        code=retagged.code,
-        name=retagged.name,
+        service_id=retagged_service_id,
+        code="N23BF_RETAGGED",
+        name="Service N23BF_RETAGGED",
         qty=1,
     )
     vs_orphan = VisitService(
         visit_id=visit.id,
-        service_id=routed.id,
-        code=routed.code,
-        name=routed.name,
+        service_id=routed_service_id,
+        code="N23BF_ROUTED",
+        name="Service N23BF_ROUTED",
         qty=1,
     )
     # A separate LINE of the same routed service for the tag-axis row —
     # one in_progress attempt per VisitService (the 0072 partial index).
     vs_tag_axis = VisitService(
         visit_id=visit.id,
-        service_id=routed.id,
-        code=routed.code,
-        name=routed.name,
+        service_id=routed_service_id,
+        code="N23BF_ROUTED",
+        name="Service N23BF_ROUTED",
         qty=1,
     )
     session.add_all([vs_routed, vs_retagged, vs_orphan, vs_tag_axis])
@@ -361,7 +386,7 @@ def _seed_pre_0073_world(engine) -> dict:
         "entry_retagged_id": entry_retagged.id,
         "resource_id": resource.id,
         "resource_queue_tag": resource.queue_tag,
-        "routed_service_id": routed.id,
+        "routed_service_id": routed_service_id,
     }
     session.close()
 
