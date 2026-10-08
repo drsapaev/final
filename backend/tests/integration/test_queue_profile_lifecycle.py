@@ -2544,6 +2544,7 @@ def test_user_reactivation_takes_owner_scope_before_doctor_row_lock(
 
     join_session = session_factory()
     lock_profile_link_scopes(join_session, queue_tags=[specialty])
+    holder_pid = join_session.execute(sa.text("SELECT pg_backend_pid()")).scalar_one()
     activation_started = threading.Event()
 
     def activate_owner():
@@ -2580,25 +2581,28 @@ def test_user_reactivation_takes_owner_scope_before_doctor_row_lock(
             assert activation_started.wait(timeout=5)
             deadline = time.monotonic() + 10
             waiting_on_owner_scope = False
+            observed_blockers: list[int] = []
             with session_factory() as observer:
                 while time.monotonic() < deadline:
                     wait = observer.execute(
                         sa.text(
-                            "SELECT wait_event_type, wait_event "
+                            "SELECT pg_blocking_pids(pid) "
                             "FROM pg_stat_activity "
-                            "WHERE application_name = :name AND state = 'active' "
+                            "WHERE application_name = :name "
                             "ORDER BY pid DESC LIMIT 1"
                         ),
                         {"name": application_name},
-                    ).first()
-                    if wait and wait[0] == "Lock" and wait[1] == "advisory":
+                    ).scalar()
+                    observed_blockers = list(wait or [])
+                    if holder_pid in observed_blockers:
                         waiting_on_owner_scope = True
                         break
                     if future.done():
                         break
                     time.sleep(0.02)
             assert waiting_on_owner_scope, (
-                "reactivation should wait for owner-config before Doctor row locks"
+                "reactivation should wait for owner-config before Doctor row locks; "
+                f"blocking_pids={observed_blockers}, holder_pid={holder_pid}"
             )
 
             join_session.execute(sa.text("SET LOCAL lock_timeout = '500ms'"))
@@ -2906,6 +2910,7 @@ def test_doctor_update_and_tagged_graphql_join_follow_owner_config_lock_order(pg
 
     join_session = session_factory()
     lock_queue_tag_claim_scope(join_session, old_tag, date.today())
+    holder_pid = join_session.execute(text("SELECT pg_backend_pid()")).scalar_one()
 
     application_name = f"t10_doc_lock_{suffix}"
     started = threading.Event()
@@ -2929,18 +2934,20 @@ def test_doctor_update_and_tagged_graphql_join_follow_owner_config_lock_order(pg
             assert started.wait(timeout=5), "doctor update worker did not start"
             deadline = time.monotonic() + 10
             observed_advisory_wait = False
+            observed_blockers: list[int] = []
             with session_factory() as observer:
                 while time.monotonic() < deadline:
                     wait = observer.execute(
                         text(
-                            "SELECT wait_event_type, wait_event "
+                            "SELECT pg_blocking_pids(pid) "
                             "FROM pg_stat_activity "
-                            "WHERE application_name = :name AND state = 'active' "
+                            "WHERE application_name = :name "
                             "ORDER BY pid DESC LIMIT 1"
                         ),
                         {"name": application_name},
-                    ).first()
-                    if wait and wait[0] == "Lock" and wait[1] == "advisory":
+                    ).scalar()
+                    observed_blockers = list(wait or [])
+                    if holder_pid in observed_blockers:
                         observed_advisory_wait = True
                         break
                     if future.done():
@@ -2948,7 +2955,8 @@ def test_doctor_update_and_tagged_graphql_join_follow_owner_config_lock_order(pg
                     time.sleep(0.02)
             assert observed_advisory_wait, (
                 "doctor update should wait on the tagged join's owner-config "
-                "advisory lock before taking the Doctor row lock"
+                "advisory lock before taking the Doctor row lock; "
+                f"blocking_pids={observed_blockers}, holder_pid={holder_pid}"
             )
 
             join_session.execute(text("SET LOCAL lock_timeout = '1s'"))
