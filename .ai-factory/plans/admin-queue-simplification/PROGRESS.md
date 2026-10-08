@@ -1,33 +1,34 @@
 # Progress
 
-Plan version: 3.80
+Plan version: 3.81
 Current task: T10 — protect used QueueProfile bindings and address PR #3633 review.
-Current status: BLOCKED — PR #3633 has one unresolved cross-writer serialization P2 and is BEHIND `main`. T10-specific synthetic API Tier-2 staging passed on exact PR HEAD `61355f96`. Hosted CI on that HEAD failed one unrelated backend test because timestamp digits collided with synthetic ID `7701`; PR Required Gate failed and the dependent Parity job was skipped. A test-only false-positive correction is local and focused validation passes, but it is not committed/pushed yet. No P2 partial patch or deferral was accepted.
+Current status: BLOCKED — bounded T10 API Tier-2 staging now passes on local runtime commit `29a8ef16`; the false-positive test fix is committed locally and latest `origin/main` is merged. Push and exact-head CI remain pending. One cross-writer serialization P2 remains open and keeps merge on hold; no deferral accepted.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-T10-profile-guards
-PR base: 19c35ec62481dde45c9ea49146ecc4999aaf599f.
-Latest runtime commit: 00833c760c0f5d9d438c05526163bf6fc2db4140.
-Current local HEAD / remote PR HEAD: 61355f96f253539e4c59d88abfd082b4437e8a88; one local test-only diff is not committed.
-Fetched origin/main: 885782648fd7b83b0687b33cf930ae608d94a026, three commits beyond the PR base. GitHub reports #3633 OPEN/BEHIND.
-Last updated: 2026-10-08T16:50+05:00
+PR base at last remote query: 19c35ec62481dde45c9ea49146ecc4999aaf599f
+Remote PR HEAD at last query: 61355f96f253539e4c59d88abfd082b4437e8a88
+Runtime commit validated: 29a8ef169bb25fb1dfaa77ee3c726b515e1598e1
+Fetched and merged origin/main: 885782648fd7b83b0687b33cf930ae608d94a026
+Last updated: 2026-10-08T17:05:10+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
-| T10 | BLOCKED | PR #3633; 9 threads resolved, one serialization P2 open; Tier-2 API staging PASS on `61355f96`; backend CI red pending test-only fix; PR BEHIND | | EVIDENCE.md#t10-pr-3633-tier2-and-ci-follow-up |
+| T10 | BLOCKED | PR #3633 remote still at `61355f96`; local main sync + test fix at `29a8ef16`; Tier-2 API staging PASS; new hosted CI pending; one serialization P2 open | | EVIDENCE.md#t10-pr-3633-main-sync-tier2 |
 
-## Current checkpoint — T10 Tier-2 staging and CI follow-up (2026-10-08T16:50+05:00)
+## Current checkpoint — T10 main sync and Tier-2 staging (2026-10-08T17:05:10+05:00)
 
-- PR #3633 is OPEN/BEHIND at exact remote HEAD `61355f96f253539e4c59d88abfd082b4437e8a88`; base `19c35ec62481dde45c9ea49146ecc4999aaf599f`; latest `origin/main` is `885782648fd7b83b0687b33cf930ae608d94a026`. The runtime review fixes are in `00833c76`; `61355f96` adds documentation only. No merge or formal review was submitted.
-- Review state: 9 inline threads are resolved; one P2 (`Serialize the usage check with link creation`) remains unresolved. It requires a shared serialization boundary across all relevant DailyQueue/service/resource writers and a stale-binding policy. The required gate handoff omits several discovered writers, so no partial code patch was made. Await explicit scope authorization or a reviewer-approved bounded deferral; merge remains on hold.
-- Tier-2 staging PASS on exact PR/worktree HEAD `61355f96`: WSL Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3; owned project `codex-t10-pr3633-tier2-rerun-20261008`, ports 18011/18090/55442. Normal synthetic Admin TOTP passed; used-profile binding and address guards passed; deterministic PostgreSQL public-address provision/Profile DELETE race passed; single and bulk department-delete requests returned 409 with active-address counts and preserved the linked profiles/addresses and both departments on bulk refusal. Preflight and runtime readiness passed; backend source mount was verified for this worktree. `served_revision_verified=false`; no frontend provenance claim.
-- Teardown PASS: only the owned project was removed; follow-up found 0 project containers, volumes, networks and local images. The task-owned synthetic env file was removed. Sanitized report: `.scratch/T10-PR3633-tier2-rerun-report.md`. Full `STAGING_VALIDATION.md`, T18, browser/UI E2E, served-frontend provenance and production remain NOT_RUN; no deferral was accepted.
-- Exact-head CI run `37770734528` on `61355f96` failed backend tests: **5,379 passed, 65 skipped, 25 deselected, 3 xfailed, 1 failed**. The only failure was `test_staff_cancel_visit_adapter_mutates_visit_and_queue_with_audit`, whose search for synthetic ID `7701` scanned the nondeterministic audit timestamp (`...827701...`). This is a test false positive; runtime audit payload still stores the Telegram ID as a hash. `PR Required Gate` failed; Parity was skipped because Backend failed and is a required dependency. Other applicable frontend, quality, security, docs and Telegram checks passed; skipped jobs are not passes.
-- A local test-only correction in `backend/tests/unit/test_telegram_staff_action_adapter_service.py` excludes only `timestamp` from the stable-field PII assertion. The gate was run with that exact file as known root and returned `narrow_override`, `gate_misroute=yes`, `override_used=yes`, `handoff_required=yes`; the generated prompt and canonical anchors were read. Only the test path is changed. Focused module: **9 passed, 1 warning** using explicit test-only SQLite fixture configuration; `py_compile` and `git diff --check` passed. The first local invocation lacked `DATABASE_URL` and failed before test collection; it is not counted as a test failure.
-- Changed but not verified remotely: the test correction is still uncommitted. No fresh hosted CI exists for it. Existing untracked scratch paths were preserved.
-- Next exact action: commit the focused test correction and T10 journals; merge fetched `origin/main` (`8857826`) into this feature branch without rewriting existing history; if conflict-free, push and inspect fresh exact-head CI. Stop if conflicts require out-of-scope edits. Separately keep the P2 open until its broader writer scope and stale-binding behavior are authorized and fully tested.
+- PR #3633 was OPEN/BEHIND at remote HEAD `61355f96f253539e4c59d88abfd082b4437e8a88`, base `19c35ec62481dde45c9ea49146ecc4999aaf599f`. The local branch now contains the false-positive test fix commit `979f6e81d` and a conflict-free merge of `origin/main` `88578264`, resulting in runtime-tested commit `29a8ef169bb25fb1dfaa77ee3c726b515e1598e1`. No push, review submission, merge, or PR-body edit has occurred yet.
+- Test failure on old remote HEAD `61355f96`: `test_staff_cancel_visit_adapter_mutates_visit_and_queue_with_audit` searched the full payload for `7701`, which coincidentally appeared in the generated timestamp. The focused test-only fix excludes `timestamp` from the stable-field check; no Telegram runtime code changed. Local focused test after main sync: **9 passed, 1 warning**, with `DATABASE_URL=sqlite:///:memory:` and `TESTING=1`. The first invocation used a backend-prefixed path from the backend working directory and collected zero tests; the corrected invocation passed.
+- Local commit hooks for `979f6e81` passed, including gitleaks, Ruff, Ruff-format and Black. `git diff --check origin/main...HEAD` passed before this journal update. The latest main sync completed without conflicts; three upstream commits are now in the feature branch.
+- Tier-2 staging PASS on exact runtime commit `29a8ef169bb25fb1dfaa77ee3c726b515e1598e1`: owned WSL Ubuntu-24.04 project `codex-t10-pr3633-current-20261008`, Docker 29.1.3, Compose 2.40.3, ports 18012/18091/55443. Normal synthetic Admin password and TOTP passed; profile binding and permanent-address guards passed; PostgreSQL public-address provisioning/Profile DELETE race passed; single and bulk department deletion refused active-address cases and preserved data. Sanitized report: `T10-PR3633-tier2-staging-report.md` (34 PASS, 0 FAIL; explicit out-of-scope NOT_RUN row).
+- Staging preflight/readiness/session passed with stable WSL boot ID. `served_revision_verified=false`; no frontend revision claim. Teardown removed only the owned project; verification found zero project containers, volumes, networks, images, and listeners on task ports. The synthetic env file was removed. No production or shared staging data was used.
+- Tier-2 scope is API-only. Full `docs/runbooks/STAGING_VALIDATION.md`, T18, browser/UI/keyboard/viewport checks, frontend artifact provenance, rollout, and production remain NOT_RUN; staging deferral has not been accepted.
+- Review state: nine inline threads are resolved; P2 `Serialize the usage check with link creation` remains unresolved. Complete remediation spans more tagged DailyQueue/Service/QueueResource writers than the mandatory gate handoff allows and needs a stale-binding policy. No partial fix was made; keep merge on hold pending explicit scope authorization or reviewer-approved bounded deferral.
+- Old exact-head CI `37770734528` remains a historical failure on `61355f96` (5,379 passed, 65 skipped, 25 deselected, 3 xfailed, 1 failed; PR Required Gate failed; dependent Parity skipped). No exact-head CI exists yet for the local updated branch.
+- Next exact action: commit this checkpoint, verify the remote PR branch is still at `61355f96`, push the existing branch fast-forward, then inspect all applicable checks on the resulting exact head. Do not submit review or merge; preserve the P2 hold.
 
 ## Superseded checkpoint — PR #3633 serialization review blocker (2026-10-08T16:31+05:00)
 
