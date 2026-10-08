@@ -1,11 +1,11 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.81 — синтетическая API Tier-2 проверка T10 прошла на runtime commit `29a8ef169bb25fb1dfaa77ee3c726b515e1598e1`; исправлен flaky assertion из hosted CI; один cross-writer serialization P2 остаётся открытым.
-**Создан:** 30 сентября 2026. **Обновлён:** 8 октября 2026, 2026-10-08T17:05:10+05:00 Asia/Tashkent.
-**Current task:** T10 — завершение review-follow-up PR #3633. Локальная ветка `codex/aqs-T10-profile-guards` содержит тестовый fix `979f6e81` и conflict-free merge `origin/main` `88578264`; runtime-сценарий Tier-2 выполнен на `29a8ef16`. Remote PR всё ещё на HEAD `61355f96` до push; exact-head CI для обновлённой ветки пока не запущен.
+**Версия:** 3.82 — Tier-2 API staging PASS на `29a8ef16`; CI false-positive исправлен; applicable hosted checks прошли на `005477d4`; один cross-writer serialization P2 остаётся открытым.
+**Создан:** 30 сентября 2026. **Обновлён:** 8 октября 2026, 2026-10-08T17:19:46+05:00 Asia/Tashkent.
+**Current task:** T10 — review-follow-up PR #3633. Test correction `979f6e81` и merge latest `main` входят в code/checkpoint HEAD `005477d4`; GitHub сообщил PR OPEN/MERGEABLE на базе `88578264`. Все применимые hosted checks для этого SHA прошли. Документационный checkpoint создаёт новый PR HEAD, его scoped checks надо перепроверить.
 **Текущий worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`.
-**Tier-2:** PASS для ограниченного authenticated API с synthetic Admin/TOTP и disposable PostgreSQL; отчёт `admin-queue-simplification/T10-PR3633-tier2-staging-report.md` (34 PASS, 0 FAIL). WSL проект полностью удалён после проверки ресурсов.
-**Не завершено:** полный `STAGING_VALIDATION.md`, T18, browser/UI/keyboard/viewport, served frontend provenance, production/rollout — NOT_RUN. Один review P2 о сериализации binding-use с tagged queue/service/resource writers остаётся открытым и блокирует merge. Дефerral не принят; пользователь мержит PR.
+**Tier-2:** ограниченная synthetic Admin/TOTP + disposable PostgreSQL API-проверка прошла на runtime commit `29a8ef16`; sanitized report: [admin-queue-simplification/T10-PR3633-tier2-staging-report.md](admin-queue-simplification/T10-PR3633-tier2-staging-report.md). Все ресурсы staging-проекта удалены и проверены.
+**Ограничения:** полный `STAGING_VALIDATION.md`, T18, browser/UI/keyboard/viewport, frontend provenance, rollout и production — NOT_RUN. Один open P2 требует общей сериализации всех подходящих queue/service/resource writers и блокирует merge. Deferral не принят; пользователь мержит PR.
 **Обязательный вход для агента:** [RESUME.md](admin-queue-simplification/RESUME.md).
 **Текущая точка:** [PROGRESS.md](admin-queue-simplification/PROGRESS.md).
 

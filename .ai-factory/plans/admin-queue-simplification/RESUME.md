@@ -1,12 +1,11 @@
-## Current resume — T10 main sync, CI correction and Tier-2 staging (2026-10-08T17:05:10+05:00)
+## Current resume — T10 exact-head CI, staging and P2 hold (2026-10-08T17:19:46+05:00)
 
-- Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-T10-profile-guards`. PR #3633 was OPEN/BEHIND at remote HEAD `61355f96`; latest base `origin/main` `88578264` is merged locally. Runtime-tested local commit: `29a8ef169bb25fb1dfaa77ee3c726b515e1598e1`. The local branch has not been pushed yet.
-- The test-only CI fix is commit `979f6e81`: the PII assertion now omits generated `timestamp` while checking the stable audit fields for synthetic chat ID `7701`. Backend focused module after main sync: **9 passed, 1 warning**. No runtime code changed for this failure.
-- Bounded T10 Tier-2 staging passed on `29a8ef16`: normal Admin TOTP; used-profile binding and permanent-address guards; PostgreSQL provision/Profile DELETE concurrency; single/bulk department deletion refusal with address preservation. Report `T10-PR3633-tier2-staging-report.md`, 34 PASS, 0 FAIL. The project was torn down and verified at zero containers, volumes, networks, images and task-port listeners; generated env removed. No frontend provenance claim (`served_revision_verified=false`).
-- This does not complete full `STAGING_VALIDATION.md`, T18, browser/UI/keyboard/viewport tests, frontend provenance, rollout or production checks; those remain NOT_RUN. No Tier-2 deferral has been accepted.
-- Review: nine of ten inline threads resolved. The cross-writer serialization P2 remains open; the mandatory gate handoff omits several discovered writers and requires a defined stale-binding result. No partial change, formal review, merge, or deferral was made. Merge remains HOLD.
-- Historical CI on old remote HEAD `61355f96` failed the flaky timestamp assertion; a new exact-head run is pending push. Keep skipped jobs distinct from passes.
-- Next: commit the updated journals, confirm remote branch still equals `61355f96`, push fast-forward, inspect exact-head CI. Stop before formal approval/merge while the P2 remains open.
+- Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`; branch `codex/aqs-T10-profile-guards`. PR #3633 was OPEN/MERGEABLE at code/checkpoint HEAD `005477d4`, base `88578264`. All applicable hosted CI checks passed on that HEAD (pipeline `37774519034`); a documentation-only follow-up is being pushed and needs scoped exact-head CI inspection.
+- Test false-positive fix `979f6e81` and conflict-free merge of current main are in the branch. Tier-2 runtime validation passed on commit `29a8ef16`; report [T10-PR3633-tier2-staging-report.md](T10-PR3633-tier2-staging-report.md), 34 PASS/0 FAIL; project resources and task ports were removed/verified.
+- Exact-head CI PASS includes backend, Frontend unit/E2E/build/lint, parity, PR Required Gate, quality, docs, Telegram release, CodeQL, security, gitleaks and GitGuardian. DAST Nightly, Supabase Preview, metadata, Docker build, integration/load, staging/production readiness and path-aware jobs were skipped, not passes.
+- Nine inline comments are resolved; P2 `Serialize the usage check with link creation` remains unresolved. The complete writer scope exceeds the latest gate handoff, and stale-binding policy is unapproved. Do not patch partially, resolve, approve, defer or merge it without valid scope/decision.
+- The Tier-2 staging run is API-only. Full `STAGING_VALIDATION.md`, T18, browser/UI/keyboard/viewport and frontend provenance remain NOT_RUN. No deferral has been accepted.
+- Next: verify exact remote HEAD after the docs-only push, inspect that head's applicable CI, then keep merge on hold pending full P2 remediation or a reviewer-approved bounded deferral. User performs merge.
 
 ## Superseded resume — PR #3633 serialization review blocker (2026-10-08T16:31+05:00)
 
