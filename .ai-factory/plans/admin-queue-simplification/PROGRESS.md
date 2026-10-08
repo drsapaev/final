@@ -1,16 +1,17 @@
-## Current checkpoint — T09.3 PR #3620 review fixes in progress (2026-10-08T06:42+05:00)
+## Current checkpoint — T09.3 PR #3620 review fixes committed locally (2026-10-08T06:49+05:00)
 
-Plan version: 3.59
+Plan version: 3.60
 Current task: T09.3
-Current status: PR_OPEN; two reviewed P2 fixes are locally implemented and focused frontend verification passes. Exact-head CI for the new changes is pending.
+Current status: PR_OPEN; two reviewed P2 fixes are committed locally and focused frontend verification passes against the current main dependency lock. Push and exact-head CI are pending.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
-PR base at start of this checkpoint: 300dd7e9b112dde5143e78d5149634c739ad9b3a
-origin/main at start of this checkpoint: 2c825dd439fd28eb5edf10f5ade7a83534f67c5a
-PR HEAD before this follow-up: 655217f586f47a997f286a3e47c68957c0cf0432
-Local code HEAD: 655217f586f47a997f286a3e47c68957c0cf0432 plus uncommitted changes
+Original PR base: 300dd7e9b112dde5143e78d5149634c739ad9b3a
+Synchronized origin/main: 2c825dd439fd28eb5edf10f5ade7a83534f67c5a
+P2 fix commit: 6024bb76a533c3a7f2f875270ec0e255385174c5
+Local main-sync commit: bbbde4303e3c0fdbee08d27578b5de8679ead690
+Remote PR HEAD before push: 655217f586f47a997f286a3e47c68957c0cf0432
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-08T06:42+05:00
+Last updated: 2026-10-08T06:49+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -19,14 +20,14 @@ Last updated: 2026-10-08T06:42+05:00
 | T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md#t093-pr-3620-final-retry-refusal-validation |
 
 ## Current checkpoint
-- Completed locally: P2-1 replaces the portaled reason picker in this modal with a native select inside the real Modal focus trap; regression test tabs to and selects the reason. P2-2 recognizes terminal `idempotency_uncertain_outcome`, reads canonical queue state, closes only when owner and requested cabinet match, and otherwise requires a fresh preview and separate apply confirmation before issuing a new key. Other uncertain transport/retry paths retain same-key replay.
-- Changed paths: `frontend/src/components/admin/QueueCabinetManagement.tsx`, its focused test, five locale files, and this progress/evidence checkpoint. No backend/API/middleware/schema/auth/runtime policy, production, or shared staging files changed.
-- Local verification on the changed tree: focused Vitest **17/17**; frontend TypeScript check **PASS**; scoped ESLint for the component/test **PASS**; strict locale key parity **PASS**; frontend production build **PASS**; `git diff --check` **PASS**. A scoped pass over all seven changed TypeScript/locale files reported no errors and existing locale quote-style warnings. Build completed with dependency/CSS minifier warnings.
-- Exact-head PR checks on the old code head `655217f58` are not evidence for this follow-up. Fresh `origin/main` is `2c825dd43` (#3631) while PR base is `300dd7e9`; synchronize this worktree before publishing, without changing the PR's feature scope, then verify new checks on the pushed HEAD.
-- Tier 2: existing retry/idempotency staging evidence is limited to code-bearing HEAD `eb1522ac` and does not validate these new UI fixes. This follow-up's staging scenario remains **NOT_RUN**. Overall Tier 2 remains PARTIAL under the already accepted bounded PR-specific deferral: four named live specs remain NOT_RUN, runtime base-image equivalence remains NOT_PROVEN, and T18/full `STAGING_VALIDATION.md` remain incomplete. No additional staging evidence is claimed.
-- PR #3620 remains OPEN and mergeable; no independent human review, review submission, or merge occurred in this task.
-- Next exact action: finish the final diff/scope check, commit this narrow fix and journal, merge current `origin/main` into this PR worktree, update the PR body, push, and inspect exact-head CI. If any main-sync conflict expands beyond T09.3's source/test/locale/journal scope, stop and record the conflict. The user asked to fix review findings, not to merge; do not merge or start T10.
-- Checks to rerun after the main sync/push: focused Vitest, `npm run type-check`, scoped ESLint, frontend build and `git diff --check`; then all applicable exact-head PR CI. Tier-2 staging for the new UI changes remains NOT_RUN and must not be called PASS from earlier staging runs.
+- Completed: P2-1 replaces the portaled reason picker with a labeled native select inside the real Modal focus trap; regression coverage tabs to it and selects a reason. P2-2 handles terminal `idempotency_uncertain_outcome` by reading current queue state; it closes only when typed owner and desired cabinet match, otherwise requires an explicit fresh preview and separate apply confirmation before a new key. Other uncertain transport/retry paths retain same-key replay.
+- Fix is committed locally as `6024bb76a`; current main `2c825dd43` was merged into this PR worktree as `bbbde4303`, without conflict. The PR-specific change set remains the T09.3 paths after comparison to `origin/main`.
+- Local verification after installing the synchronized frontend lock (Vitest 5): focused tests **17/17**, TypeScript **PASS**, scoped ESLint **PASS**, strict five-locale parity **PASS** (10,324 keys each), production build **PASS**, `git diff --check` **PASS**. Build completed with known dependency-comment/CSS-minifier warnings. `npm ci` reported five high-severity audit advisories; no audit triage or dependency change was added to this UI fix.
+- Exact-head CI for the new branch HEAD is pending. Previous checks on `655217f58` do not verify this follow-up. The PR remote still points to `655217f58`; local branch includes the fix and main-sync commits, and this progress update is being prepared before push.
+- Tier 2: earlier retry/idempotency staging evidence is limited to code-bearing HEAD `eb1522ac` and does not validate these UI changes. The current fix has no staging run. Overall Tier 2 remains PARTIAL under the already accepted bounded PR-specific deferral: four named live specs are NOT_RUN, runtime base-image equivalence is NOT_PROVEN, and T18/full `STAGING_VALIDATION.md` remain incomplete. No new staging coverage is claimed.
+- PR #3620 is OPEN and mergeable; no independent human review, review submission, or GitHub merge occurred.
+- Next exact action: commit this progress/evidence checkpoint, push the branch fast-forward, update the PR body with the two fixes and local checks, then inspect all applicable exact-head CI. Do not publish a review, merge, or start T10 in this task. Stop if the remote branch moved or the PR changed unexpectedly.
+- Checks to rerun if another source change occurs: focused Vitest, TypeScript, scoped ESLint, locale parity, build and `git diff --check`, then applicable exact-head CI. Tier-2 staging for these changes remains NOT_RUN.
 
 ## Superseded checkpoint — PR #3620 generic uncertain-retry local state (2026-10-07T16:08+05:00)
 
