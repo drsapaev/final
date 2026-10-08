@@ -175,7 +175,9 @@ def anchor_meta(root,items):
         h=digest.hexdigest(); dirty=bool(git("status","--porcelain","--untracked-files=all","--ignored=matching","--",rel,cwd=root))
         result.append({"path":rel,"sha256":h,"state":"worktree_only" if dirty else "sources_match","worktree":str(root) if dirty else None})
     return result
+SEARCH_STOPWORDS={"a","an","and","are","as","at","be","by","do","does","for","from","how","in","is","it","of","on","or","the","this","to","was","what","when","where","which","with","и","или","в","на","для","по","из","с","к","что","как","это"}
 def norm(s): return set(re.findall(r"[^\W_]+",s.casefold(),flags=re.UNICODE))
+def search_terms(s): return norm(s)-SEARCH_STOPWORDS
 def knowledge_item(x,root):
     required={"schema_version","id","key","kind","topic","summary","tags","scope","source_type","evidence_summary","anchors","supersedes"}
     if not isinstance(x,dict) or set(x)!=required: raise MemError("invalid knowledge schema")
@@ -361,13 +363,21 @@ def capture(root,base,x):
         cp=checkpoint_data(x.get("checkpoint",{}),current.get("checkpoint") if current else None)
         ev=new_event(root,task,rev+1,cp,clean,idem,current.get("event_id") if current else None,digest); append_event(base,ev); return {"result":"OK","revision":rev+1,"event_id":ev["event_id"]}
 def recall(root,base,q,include_active_tasks=True):
-    rows,errs=records(base); curated,curated_err=curated_records(root); errs.extend(curated_err); task=q.get("task_id"); terms=norm(str(q.get("query",""))+" "+str(q.get("topics","")))
+    rows,errs=records(base); curated,curated_err=curated_records(root); errs.extend(curated_err); task=q.get("task_id")
     if task is not None: ident(task,"task_id")
-    invalid=bool(task and not task_chain(rows,task)[1])
-    selected=[e for e in rows if not task or e.get("task_id")==task]
+    task_event,task_valid=task_chain(rows,task) if task is not None else (None,True)
+    invalid=bool(task is not None and not task_valid)
+    query_text=str(q.get("query",""))+" "+str(q.get("topics",""))
+    if task_event:
+        checkpoint=task_event.get("checkpoint",{})
+        goal=checkpoint.get("goal","") if isinstance(checkpoint,dict) else ""
+        query_text+=" "+str(goal)
+    terms=search_terms(query_text)
+    selected=[e for e in rows if task is None or e.get("task_id")==task or any(k.get("scope")=="repo" for k in e.get("knowledge",[]))]
     candidates=[]; latest_by_key={}
     sources=[(e,k,"local") for e in selected for k in e.get("knowledge",[])] + [(None,k,"curated") for k in curated]
     for e,k,origin in sources:
+        if task is not None and e and e.get("task_id")!=task and k.get("scope")!="repo": continue
         if not task and k.get("scope")=="task": continue
         state=[source_state(root,a) for a in k.get("anchors",[])]
         if k.get("scope")=="worktree" and e and e.get("worktree"):
@@ -375,7 +385,7 @@ def recall(root,base,q,include_active_tasks=True):
                 if Path(e["worktree"]).resolve()!=root: state.append("worktree_only")
             except OSError: state.append("worktree_only")
         k=dict(k); k["provenance_state"]="source_changed" if "source_changed" in state else ("source_missing" if "source_missing" in state else ("worktree_only" if "worktree_only" in state else "sources_match"))
-        k["origin"]=origin
+        k["origin"]=origin; k["_task_id"]=e.get("task_id") if e else None
         k["current_assertion"]=k["provenance_state"]=="sources_match" and k.get("scope")=="repo" and k.get("kind") in {"fact","lesson"} and bool(k.get("anchors"))
         if k["provenance_state"] in ("source_changed","source_missing"):
             k.pop("summary",None); k["summary_omitted"]=True
@@ -384,12 +394,14 @@ def recall(root,base,q,include_active_tasks=True):
         latest_by_key.setdefault(k.get("key"),[]).append(k); candidates.append(k)
     superseded={ref for item in candidates for ref in item.get("supersedes",[])}
     candidates=[item for item in candidates if item.get("id") not in superseded]
+    if task is not None:
+        candidates=[k for k in candidates if k.get("_task_id")==task or (terms and ranking({**k,"summary":k.get("_rank_words","")},terms)>0)]
     remaining={}
     for item in candidates: remaining.setdefault(item.get("key"),[]).append(item)
     conflicts=[key for key,items in remaining.items() if len({i.get("summary") for i in items})>1]
-    if terms:
+    if terms and task is None:
         candidates=[k for k in candidates if ranking({**k,"summary":k.get("_rank_words","")},terms)>0]
-    for k in candidates: k.pop("_rank_words",None)
+    for k in candidates: k.pop("_rank_words",None); k.pop("_task_id",None)
     candidates.sort(key=lambda k:(ranking(k,terms),k.get("id","")),reverse=True)
     active=[]
     if not task and include_active_tasks:

@@ -575,6 +575,33 @@ class TestQueueCabinetManagementApiService:
             == 1
         )
 
+    def test_legacy_single_and_sync_endpoints_reject_snapshot_writes(
+        self, client, db_session, admin_auth_headers, monkeypatch
+    ):
+        clinic_day = date(2026, 10, 6)
+        monkeypatch.setattr(
+            "app.services.queue_cabinet_management_api_service.clinic_today",
+            lambda _db: clinic_day,
+        )
+        _doctor, _resource, doctor_queue, _resource_queue, _yesterday = (
+            self._seed_reassignment_targets(db_session, clinic_day)
+        )
+
+        single = client.put(
+            f"/api/v1/admin/queues/{doctor_queue.id}/cabinet-info",
+            json={"cabinet_number": "306"},
+            headers=admin_auth_headers,
+        )
+        sync = client.post(
+            "/api/v1/admin/queues/sync-cabinet-info",
+            headers=admin_auth_headers,
+        )
+
+        assert single.status_code == 409
+        assert sync.status_code == 409
+        db_session.refresh(doctor_queue)
+        assert doctor_queue.cabinet_number == "101"
+
     def test_preview_repository_batches_owner_waiting_and_active_status_reads(
         self, db_session
     ):
@@ -695,7 +722,7 @@ class TestQueueCabinetManagementApiService:
             )
         assert exc_info.value.status_code == 400
 
-    def test_update_queue_cabinet_info_updates_fields_and_commits(self):
+    def test_update_queue_cabinet_info_updates_metadata_and_commits(self):
         queue = SimpleNamespace(
             cabinet_number=None,
             cabinet_floor=None,
@@ -716,17 +743,17 @@ class TestQueueCabinetManagementApiService:
         service = QueueCabinetManagementApiService(db=None, repository=Repository())
         result = service.update_queue_cabinet_info(
             queue_id=10,
-            cabinet_info={"cabinet_number": "201", "cabinet_floor": 2},
+            cabinet_info={"cabinet_floor": 2},
             updated_by="admin",
         )
 
         assert result["success"] is True
-        assert queue.cabinet_number == "201"
+        assert queue.cabinet_number is None
         assert queue.cabinet_floor == 2
         assert state["committed"] is True
         assert state["refreshed"] is True
 
-    def test_update_queue_cabinet_info_can_clear_fields_with_explicit_nulls(self):
+    def test_legacy_single_writer_rejects_cabinet_change_atomically(self):
         queue = SimpleNamespace(
             cabinet_number="101",
             cabinet_floor=3,
@@ -745,22 +772,92 @@ class TestQueueCabinetManagementApiService:
                 state["refreshed"] = True
 
         service = QueueCabinetManagementApiService(db=None, repository=Repository())
-        result = service.update_queue_cabinet_info(
-            queue_id=10,
-            cabinet_info={
-                "cabinet_number": None,
-                "cabinet_floor": None,
-                "cabinet_building": None,
-            },
+        with pytest.raises(QueueCabinetManagementDomainError) as exc_info:
+            service.update_queue_cabinet_info(
+                queue_id=10,
+                cabinet_info={
+                    "cabinet_number": None,
+                    "cabinet_floor": None,
+                    "cabinet_building": None,
+                },
+                updated_by="admin",
+            )
+
+        assert exc_info.value.status_code == 409
+        assert queue.cabinet_number == "101"
+        assert queue.cabinet_floor == 3
+        assert queue.cabinet_building == "A"
+        assert state == {"committed": False, "refreshed": False}
+
+    def test_legacy_bulk_writer_reports_snapshot_rejection_without_partial_row(self):
+        queue = SimpleNamespace(
+            id=8,
+            cabinet_number="101",
+            cabinet_floor=3,
+            cabinet_building="A",
+        )
+        state = {"committed": False}
+
+        class Repository:
+            def get_daily_queue(self, queue_id):
+                return queue if queue_id == queue.id else None
+
+            def commit(self):
+                state["committed"] = True
+
+        result = QueueCabinetManagementApiService(
+            db=None, repository=Repository()
+        ).bulk_update_cabinet_info(
+            updates=[
+                {
+                    "queue_id": 8,
+                    "cabinet_info": {
+                        "cabinet_number": "202",
+                        "cabinet_floor": 4,
+                    },
+                }
+            ],
             updated_by="admin",
         )
 
         assert result["success"] is True
-        assert queue.cabinet_number is None
-        assert queue.cabinet_floor is None
-        assert queue.cabinet_building is None
-        assert state["committed"] is True
-        assert state["refreshed"] is True
+        assert result["updated_queues"] == []
+        assert result["errors"][0]["queue_id"] == 8
+        assert queue.cabinet_number == "101"
+        assert queue.cabinet_floor == 3
+        assert state["committed"] is False
+
+    def test_legacy_sync_is_rejected_without_reading_or_mutating_queues(self):
+        class Repository:
+            def list_queues_for_day(self, **_kwargs):
+                raise AssertionError("disabled sync must not read daily queues")
+
+        service = QueueCabinetManagementApiService(db=None, repository=Repository())
+        with pytest.raises(QueueCabinetManagementDomainError) as exc_info:
+            service.sync_cabinet_info_from_doctors(
+                day=None, specialist_id=None, synced_by="admin"
+            )
+
+        assert exc_info.value.status_code == 409
+
+    def test_cabinet_mutation_openapi_documents_legacy_conflicts(self):
+        from app.main import app
+
+        paths = app.openapi()["paths"]
+        single = paths["/api/v1/admin/queues/{queue_id}/cabinet-info"]["put"]
+        sync = paths["/api/v1/admin/queues/sync-cabinet-info"]["post"]
+        for operation in (single, sync):
+            conflict = operation["responses"]["409"]["content"]["application/json"][
+                "schema"
+            ]
+            assert conflict["$ref"] == (
+                "#/components/schemas/QueueCabinetMutationError"
+            )
+        error_contract = app.openapi()["components"]["schemas"][
+            "QueueCabinetMutationError"
+        ]
+        assert error_contract["required"] == ["detail"]
+        assert error_contract["properties"]["detail"]["type"] == "string"
 
     def test_get_cabinet_statistics_counts_queues_and_entries(self):
         queue = SimpleNamespace(

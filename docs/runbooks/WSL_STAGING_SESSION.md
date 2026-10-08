@@ -32,6 +32,31 @@ and the distribution without starting Compose services; runtime readiness is
 `NOT_RUN`. Use `Check` after startup when the complete healthy stack is
 required.
 
+### Check the disk that actually contains WSL
+
+The worktree and the distribution can be on different Windows drives. For
+example, free space on `C:` does not protect a VHD stored on `D:`. Before
+starting its WSL keeper, the helper resolves the selected distribution's
+registered `BasePath` and checks that backing volume. An unknown or ambiguous
+registration stops the operation; the helper does not guess a drive.
+
+The summary distinguishes `host_disk_free_gib` (the worktree) from
+`wsl_backing_path` and `wsl_backing_disk_free_gib` (the distribution).
+`storage_reserve_gib` is an operational safety reserve: 10 GiB for image
+builds or an unrestricted `Session`, and 2 GiB for non-build operations.
+The worktree also retains its 2 GiB floor for possible image builds. These
+reserves are not a diagnosis of an earlier crash. The helper also
+checks the Linux root filesystem and the daemon's actual `DockerRootDir`
+for read-only mounts and insufficient free space before Compose mutations or
+the validation child. Separately mounted containerd image storage requires
+its own operator check; these probes do not certify every daemon layout.
+
+Resolve a storage refusal before retrying a build. Do not repeatedly launch
+WSL at zero backing-volume capacity, force a read-only mount writable, prune
+the shared daemon, or delete another task's images, volumes or user files.
+`Stop` bypasses capacity and read-only storage refusals so that cleanup can
+still be attempted; project ownership checks remain mandatory.
+
 Start your own stack:
 
 ```powershell
@@ -59,7 +84,7 @@ started, wrap the entire long test or browser validation in `Session`:
 
 ```powershell
 $validationScript = Join-Path (Get-Location) 'output/staging/validate-own-session.ps1'
-.\ops\scripts\wsl_staging.ps1 -Action Session -EnvFile ops/staging.env `
+.\ops\scripts\wsl_staging.ps1 -Action Session -EnvFile ops/staging.env -NoBuild `
   -CommandArgs @('powershell.exe', '-NoProfile', '-File', $validationScript)
 ```
 
@@ -70,16 +95,37 @@ the invocation and is released when the validation ends; it does not rely on
 a `sleep 1800` timer. Do not launch a short-lived keeper in one command and
 assume a later independent command is protected.
 
+For `Session`, `-NoBuild` is the caller's explicit promise that the child
+does not build container images. The helper does not inspect arbitrary child
+commands. Test/browser-only sessions may use this flag and the smaller
+storage reserve; an image rebuild or frontend provenance build must omit it
+and satisfy the build reserve. `-NoBuild` does not skip the session's
+readiness, isolation or storage checks.
+
 Run browser work during this session. Normal synthetic Admin login may
 require 2FA enrollment before an Admin screen can be tested. Prepare that
 account through the normal flow; do not bypass authentication. Missing login
 or enrollment makes the dependent browser checks `NOT_RUN`.
 
-To stop only your configured project:
+To temporarily stop only your configured project while keeping its data
+and built images:
 
 ```powershell
 .\ops\scripts\wsl_staging.ps1 -Action Stop -EnvFile ops/staging.env
 ```
+
+`Stop` is not final teardown. Every completed staging run must remove its
+own containers, networks, named volumes and locally built images:
+
+```powershell
+.\scripts\staging_down.ps1 -ProjectName clinic-your-task -EnvFile ops/staging.env
+```
+
+Use the exact project configured for this task. Final teardown runs
+`down -v --remove-orphans --rmi local`; verify that the project's resources
+are absent before removing its ignored env file. Preserve a failing stack
+only with the documented `KEEP_STAGING=1` checkpoint exception. Forgotten
+images and volumes consume the same backing volume used by the next build.
 
 Do not use `wsl --shutdown`, change global `.wslconfig`, stop another project,
 or invoke the legacy `start_staging_host.ps1`/`stop_staging_host.ps1` as a
@@ -106,7 +152,7 @@ Run the supported suite with a fresh, unique absolute JUnit report:
 ```powershell
 $junit = Join-Path (Get-Location) ('output/staging/pg-' + [guid]::NewGuid().ToString('N') + '.xml')
 # Set RQ23A_PG_ADMIN_URL privately before this command.
-.\ops\scripts\wsl_staging.ps1 -Action Session -EnvFile ops/staging.env `
+.\ops\scripts\wsl_staging.ps1 -Action Session -EnvFile ops/staging.env -NoBuild `
   -PgAdminEnv RQ23A_PG_ADMIN_URL -Junit $junit
 ```
 
@@ -149,6 +195,7 @@ bind to `RequireModule` instead.
 | Linux health is good but Windows cannot connect | Helper Windows TCP checks | Treat forwarding as a failed prerequisite; do not turn failed PostgreSQL tests into skips and keep running. |
 | Scratch PostgreSQL disappears before logs can be inspected | Container lifetime and ownership | Preserve the task-owned container until diagnosis is recorded; avoid disposable `--rm` processes during failure investigation. |
 | Build stops on a small Windows host | Host disk/RAM and recorded native error | Free task-owned artifacts safely or reduce simultaneous task-owned builds. Diagnose the failure before another build; do not delete foreign images/volumes. |
+| `EROFS` during a build, or subsequent WSL `UtilInitGroups` I/O failure | Actual registered VHD backing volume, Linux mount state and bounded kernel evidence | Stop dependent builds. Restore host capacity without deleting user data, verify the distribution is writable, and complete only the task-owned teardown. Do not infer OOM or force a filesystem repair from the error alone. |
 | Browser reaches login instead of the Admin screen | Synthetic account's normal 2FA state | Finish normal enrollment or record browser checks `NOT_RUN`. |
 
 The user's October 2026 staging report described expired temporary keepalive,

@@ -18,10 +18,14 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from urllib.parse import parse_qsl, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
+IS_WINDOWS = os.name == "nt"
+GIB = 1024**3
+BUILD_RESERVE_GIB = 10
+RUN_RESERVE_GIB = 2
 PORT_KEYS = {
     "backend": ("STAGING_BACKEND_PORT", 18001, 18000),
     "frontend": ("STAGING_FRONTEND_PORT", 18080, 80),
@@ -41,6 +45,44 @@ INSPECT = (
 
 class GuardError(RuntimeError):
     """Only safe, fixed diagnostic messages belong here."""
+
+
+def windows_distro_base_path(distribution: str) -> str:
+    """Read registration without invoking WSL (which could boot a full VHD)."""
+    try:
+        import winreg
+
+        matches = []
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Lxss",
+        ) as registrations:
+            for index in range(winreg.QueryInfoKey(registrations)[0]):
+                with winreg.OpenKey(
+                    registrations, winreg.EnumKey(registrations, index)
+                ) as registered:
+                    name = winreg.QueryValueEx(registered, "DistributionName")[0]
+                    if not isinstance(name, str):
+                        raise ValueError
+                    if name.casefold() == distribution.casefold():
+                        matches.append(winreg.QueryValueEx(registered, "BasePath")[0])
+        if len(matches) != 1 or not isinstance(matches[0], str):
+            raise ValueError
+        base_path = matches[0]
+        if base_path.startswith("\\\\?\\"):
+            base_path = base_path[4:]
+        path = PureWindowsPath(base_path)
+        if (
+            not path.is_absolute()
+            or not re.fullmatch(r"[A-Za-z]:", path.drive)
+            or any(char in base_path for char in ("\0", "\r", "\n", "%"))
+        ):
+            raise ValueError
+        return str(path)
+    except (ImportError, OSError, ValueError, TypeError):
+        raise GuardError(
+            "WSL_STORAGE_UNKNOWN: selected distro needs one local absolute registered BasePath; verify its VHD location"
+        ) from None
 
 
 def native(argv: list[str], *, timeout: int = 30, operation: str = "native") -> str:
@@ -402,6 +444,110 @@ class WslStaging:
             for line in self.docker("inspect", "--format", INSPECT, *ids).splitlines()
         ]
 
+    def host_storage(self, *, build_possible: bool, recovery: bool = False) -> None:
+        # The checkout and the sparse distro VHD can live on different volumes.
+        # Non-Windows direct calls exist only for the mocked tooling tests.
+        backing = (
+            windows_distro_base_path(self.distribution) if IS_WINDOWS else str(self.root)
+        )
+        self.summary["wsl_backing_path"] = backing
+        self.storage_recovery = recovery
+        reserve = BUILD_RESERVE_GIB if build_possible else RUN_RESERVE_GIB
+        self.summary["storage_reserve_gib"] = reserve
+        if recovery:
+            self.summary["storage_checks"] = "BYPASSED_FOR_OWNED_STOP"
+            self.summary.pop("host_disk_free_gib", None)
+            self.summary.pop("wsl_backing_disk_free_gib", None)
+            return
+        try:
+            free = shutil.disk_usage(backing).free
+        except OSError:
+            raise GuardError(
+                "WSL_STORAGE_UNKNOWN: selected distro backing storage cannot be measured; no WSL boot attempted"
+            ) from None
+        self.summary["wsl_backing_disk_free_gib"] = free // GIB
+        if free < reserve * GIB:
+            raise GuardError(
+                f"WSL_BACKING_DISK_LOW: selected distro backing storage needs {reserve} GiB free; recover space before WSL boot"
+            )
+        try:
+            worktree_free = shutil.disk_usage(self.root).free
+        except OSError:
+            raise GuardError(
+                "HOST_STORAGE_UNKNOWN: worktree storage cannot be measured; no WSL boot attempted"
+            ) from None
+        self.summary["host_disk_free_gib"] = worktree_free // GIB
+        if build_possible and worktree_free < RUN_RESERVE_GIB * GIB:
+            raise GuardError(
+                "DISK_LOW: fewer than 2 GiB available on the worktree drive; resolve before build"
+            )
+
+    def linux_storage(self, *, build_possible: bool) -> None:
+        """Reject read-only/full virtual storage before Compose or the child."""
+        reserve = BUILD_RESERVE_GIB if build_possible else RUN_RESERVE_GIB
+        try:
+            root = json.loads(self.docker("info", "--format", "{{json .DockerRootDir}}"))
+        except (ValueError, TypeError):
+            raise GuardError(
+                "WSL_STORAGE_UNKNOWN: local Docker storage path cannot be verified"
+            ) from None
+        if (
+            not isinstance(root, str)
+            or not root.startswith("/")
+            or any(char in root for char in ("\0", "\r", "\n"))
+        ):
+            raise GuardError("WSL_STORAGE_UNKNOWN: local Docker storage path is invalid")
+        self.summary["wsl_storage"] = {}
+        prefix = (
+            "env",
+            "-i",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "LC_ALL=C",
+        )
+        for path in dict.fromkeys(("/", root)):
+            try:
+                mounts = json.loads(
+                    self.wsl(
+                        *prefix, "findmnt", "--json", "--target", path,
+                        "--output", "TARGET,OPTIONS", operation="wsl-storage-mount",
+                    )
+                )["filesystems"]
+                if len(mounts) != 1:
+                    raise ValueError
+                target = mounts[0]["target"]
+                options = mounts[0]["options"].split(",")
+                if not isinstance(target, str) or not target.startswith("/"):
+                    raise ValueError
+                if "ro" in options:
+                    raise GuardError(
+                        "WSL_STORAGE_READ_ONLY: root or Docker storage is read-only; recover it before staging"
+                    )
+                if "rw" not in options:
+                    raise ValueError
+                available = self.wsl(
+                    *prefix, "df", "--block-size=1", "--output=avail", "--", path,
+                    operation="wsl-storage-space",
+                ).splitlines()
+                if (
+                    len(available) != 2
+                    or available[0].strip() != "Avail"
+                    or not re.fullmatch(r"\s*\d+\s*", available[1])
+                ):
+                    raise ValueError
+                free = int(available[1])
+            except (ValueError, KeyError, TypeError, AttributeError):
+                raise GuardError(
+                    "WSL_STORAGE_UNKNOWN: root or Docker mount/space cannot be verified"
+                ) from None
+            self.summary["wsl_storage"][path] = {
+                "mount_target": target,
+                "free_gib": free // GIB,
+            }
+            if free < reserve * GIB:
+                raise GuardError(
+                    f"WSL_DISK_LOW: root or Docker storage needs {reserve} GiB free; recover space before staging"
+                )
+
     def preflight(self) -> list[dict]:
         main = Path(
             native(
@@ -474,14 +620,18 @@ class WslStaging:
                 raise GuardError(
                     "HOST_PORT: selected Windows port is already in use outside this project"
                 )
-        free = shutil.disk_usage(self.root).free // (1024**3)
-        self.summary["host_disk_free_gib"] = free
+        free = None
+        if not getattr(self, "storage_recovery", False):
+            free = self.summary.get("host_disk_free_gib")
+            if free is None:
+                free = shutil.disk_usage(self.root).free // GIB
+                self.summary["host_disk_free_gib"] = free
         mem = self.wsl("cat", "/proc/meminfo")
         self.summary["wsl_available_mib"] = (
             int(re.search(r"MemAvailable:\s+(\d+)", mem)[1]) // 1024
         )
         self.summary["warnings"] = []
-        if free < 10:
+        if free is not None and free < 10:
             self.summary["warnings"].append(
                 "Low host disk space; no automatic prune performed"
             )
@@ -521,15 +671,17 @@ class WslStaging:
         }
 
     def execute(self, args) -> dict:
+        # Session commands are opaque and may build. NoBuild is the caller's
+        # explicit promise to run without image builds, not an argv heuristic.
+        build_possible = args.action in {"start", "session"} and not args.no_build
+        self.host_storage(build_possible=build_possible, recovery=args.action == "stop")
         with self.keeper() as keeper:
             self.preflight()
+            if args.action != "stop":
+                self.linux_storage(build_possible=build_possible)
             boot = self.summary["boot_id"]
             self.assert_session(keeper, boot)
             if args.action == "start":
-                if not args.no_build and self.summary["host_disk_free_gib"] < 2:
-                    raise GuardError(
-                        "DISK_LOW: fewer than 2 GiB available on the worktree drive; resolve before build"
-                    )
                 command = ["up", "-d", "--wait", "--wait-timeout", str(args.timeout)]
                 if not args.no_build:
                     command.append("--build")

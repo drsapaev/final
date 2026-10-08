@@ -32,7 +32,21 @@ MODEL_ALIASES = {
 
 EXPLICIT_PATH_RE = re.compile(
     r"(?P<path>(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\."
-    r"(?:jsx|tsx|js|ts|py|json|yaml|yml|toml|ps1|bat|sh|md|txt))"
+    r"(?:tsx|jsx|json|yaml|yml|toml|ps1|bat|sh|md|txt|ts|js|py)"
+    r"(?![A-Za-z0-9_-])(?!\.[A-Za-z0-9]))"
+)
+
+CREATE_FILE_INTENT_RE = re.compile(
+    r"\b(?:add|create|generate|write|introduce|создать|создай|создайте|"
+    r"добавить|добавь|добавьте|записать)\b",
+    re.IGNORECASE,
+)
+NEGATED_CREATE_INTENT_RE = re.compile(
+    r"\b(?:do\s+not(?:\s+to)?|don't|dont|never|without|not\s+to|"
+    r"не(?:\s+(?:надо|нужно))?|нельзя)\s+"
+    r"(?:add|create|generate|write|introduce|создавать|создать|создай|"
+    r"добавлять|добавить|добавь|записывать|записать)\b",
+    re.IGNORECASE,
 )
 
 MIGRATION_INTENT_RE = re.compile(
@@ -221,6 +235,31 @@ def path_exists(repo_root: Path, rel_path: str, tracked: set[str]) -> bool:
     return rel in tracked or (repo_root / rel).exists()
 
 
+def is_safe_repo_relative_path(repo_root: Path, rel_path: str) -> bool:
+    rel = normalize_rel_path(rel_path)
+    parts = rel.split("/")
+    if (
+        not rel
+        or rel.startswith("/")
+        or ":" in rel
+        or "\x00" in rel
+        or any(part in {"", ".", ".."} for part in parts)
+    ):
+        return False
+
+    candidate = repo_root / rel
+    if candidate.is_symlink():
+        return False
+    probe = candidate if candidate.exists() else candidate.parent
+    if not probe.exists():
+        return False
+    try:
+        probe.resolve().relative_to(repo_root.resolve())
+    except ValueError:
+        return False
+    return True
+
+
 def unique_existing(repo_root: Path, tracked: set[str], paths: list[str]) -> list[str]:
     seen: set[str] = set()
     result: list[str] = []
@@ -246,19 +285,47 @@ def unique_paths(paths: list[str]) -> list[str]:
 
 
 def explicit_paths(task: str, repo_root: Path, tracked: set[str]) -> list[str]:
-    candidates = [match.group("path") for match in EXPLICIT_PATH_RE.finditer(task)]
+    candidates = list(EXPLICIT_PATH_RE.finditer(task))
     seen: set[str] = set()
     result: list[str] = []
-    for path in candidates:
+    for match in candidates:
+        path = match.group("path").rstrip(".,;:!?)\\]}\"")
         rel = normalize_rel_path(path)
         if rel in seen:
             continue
-        # Explicit first-touch paths may name a new file for extraction work.
-        # Allow that only when the parent directory already exists in checkout.
-        if path_exists(repo_root, rel, tracked) or (repo_root / rel).parent.exists():
+        if not is_safe_repo_relative_path(repo_root, rel):
+            continue
+        if path_exists(repo_root, rel, tracked):
+            seen.add(rel)
+            result.append(rel)
+            continue
+
+        prefix = task[max(0, match.start() - 100) : match.start()]
+        if CREATE_FILE_INTENT_RE.search(prefix) and not NEGATED_CREATE_INTENT_RE.search(prefix):
             seen.add(rel)
             result.append(rel)
     return result
+
+
+def reviewed_scope(
+    repo_root: Path,
+    tracked: set[str],
+    paths: list[str],
+) -> tuple[list[str] | None, str | None]:
+    result: list[str] = []
+    for raw_path in paths:
+        rel = normalize_rel_path(raw_path)
+        if not is_safe_repo_relative_path(repo_root, rel):
+            return None, "reviewed scope contains an unsafe or out-of-repository path"
+        candidate = repo_root / rel
+        if candidate.is_dir():
+            return None, "reviewed scope entries must name files"
+        if not path_exists(repo_root, rel, tracked) and not candidate.parent.exists():
+            return None, "new reviewed-scope files require an existing parent directory"
+        result.append(rel)
+    if not result:
+        return None, "reviewed scope cannot be empty"
+    return unique_paths(result), None
 
 
 def rule_matches(task: str, repo_root: Path, tracked: set[str]) -> tuple[list[str], list[str]]:
@@ -379,16 +446,17 @@ def repo_location_command(repo_root: Path) -> str:
     return f"Set-Location -LiteralPath {powershell_quote(repo_root)}"
 
 
-def python_launcher_command(repo_root: Path) -> str:
+def python_launcher_command(repo_root: Path, python_args: list[str]) -> str:
     launcher = repo_root / "scripts" / "run_python.ps1"
-    return f"& {powershell_quote(launcher)}"
+    args = ", ".join(powershell_quote(arg) for arg in python_args)
+    return f"& {powershell_quote(launcher)} -PythonArgs @({args})"
 
 
 def migration_validation_targets(repo_root: Path, new_revision_pattern: str) -> list[str]:
     placeholder = new_revision_pattern.replace("*", "<slug>")
-    python_launcher = python_launcher_command(repo_root)
     return [
-        f"{repo_location_command(repo_root)}; {python_launcher} -m py_compile {placeholder}",
+        f"{repo_location_command(repo_root)}; "
+        f"{python_launcher_command(repo_root, ['-m', 'py_compile', placeholder])}",
         f"Set-Location -LiteralPath {powershell_quote(repo_root / 'backend')}; alembic heads",
         f"Set-Location -LiteralPath {powershell_quote(repo_root / 'backend')}; alembic history --verbose",
         f"Set-Location -LiteralPath {powershell_quote(repo_root / 'backend')}; alembic upgrade head  # against a disposable/test Postgres database",
@@ -399,10 +467,9 @@ def validation_targets(repo_root: Path, files: list[str]) -> list[str]:
     targets: list[str] = []
     py_files = [path for path in files if path.endswith(".py")]
     if py_files:
-        joined = " ".join(py_files)
         targets.append(
             f"{repo_location_command(repo_root)}; "
-            f"{python_launcher_command(repo_root)} -m py_compile {joined}"
+            f"{python_launcher_command(repo_root, ['-m', 'py_compile', *py_files])}"
         )
 
     frontend_tests = [
@@ -419,8 +486,26 @@ def validation_targets(repo_root: Path, files: list[str]) -> list[str]:
     if any(path in {"frontend/package.json", "frontend/package-lock.json"} for path in files):
         targets.append("cd frontend; npm.cmd audit --audit-level=moderate")
 
-    if any(path.endswith((".yml", ".yaml")) for path in files):
-        targets.append("docker compose config for touched compose file, if Docker is available")
+    workflow_files = [
+        path
+        for path in files
+        if path.startswith(".github/workflows/") and path.endswith((".yml", ".yaml"))
+    ]
+    for path in workflow_files:
+        targets.append(
+            f"GitHub Actions workflow YAML parse and actionlint for {path} "
+            "(use the repository CI workflow validation)"
+        )
+
+    compose_files = [
+        path
+        for path in files
+        if path in {"ops/docker-compose.yml", "ops/compose.staging.yml"}
+    ]
+    for path in compose_files:
+        targets.append(
+            f"docker compose -f {path} config (if Docker is available)"
+        )
 
     if not targets:
         targets.append("manual review of generated first-touch file list")
@@ -541,6 +626,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Confirmed relative source file that must be included in the patch slice",
     )
     parser.add_argument(
+        "--scope",
+        action="append",
+        default=[],
+        metavar="REPO_PATH",
+        help="Exact reviewed first-touch path; repeat for each allowed file",
+    )
+    parser.add_argument(
         "--model",
         default=None,
         help=(
@@ -589,21 +681,41 @@ def main(argv: list[str] | None = None) -> int:
 
     initial_first_touch = unique_paths(files)
     known = normalize_rel_path(args.known_root_cause) if args.known_root_cause else None
+    scope: list[str] | None = None
     gate_misroute = False
     override_used = False
 
     if known:
-        if not path_exists(repo_root, known, tracked):
-            emit_stop(f"known root cause does not exist: {known}", args.format)
+        safe_known = is_safe_repo_relative_path(repo_root, known)
+        if not safe_known or not path_exists(repo_root, known, tracked):
+            emit_stop(
+                "known root cause must be an existing repository-relative file",
+                args.format,
+            )
+            return 2
+
+    if args.scope:
+        if not known:
+            emit_stop("reviewed scope requires a known root cause", args.format)
+            return 2
+        scope, scope_error = reviewed_scope(repo_root, tracked, args.scope)
+        if scope_error:
+            emit_stop(scope_error, args.format)
+            return 2
+        if known and known not in scope:
+            emit_stop("reviewed scope must include the known root cause", args.format)
             return 2
 
     # A confirmed gate/dev-brain owner takes precedence over incidental mentions
     # of the strict domains that the tooling itself is expected to protect.
     if is_self_tooling_task(task, known):
-        initial_first_touch = [known]
+        initial_first_touch = unique_paths([known, *explicit])
         reasons = ["dev-brain gate/tooling ownership"]
 
     if is_migration_task(task, known):
+        if scope is not None:
+            emit_stop("reviewed file scope cannot replace migration ownership routing", args.format)
+            return 2
         new_revision = next_migration_pattern(tracked)
         first_touch = unique_paths([new_revision])
         read_only_references = migration_read_only_references(
@@ -650,8 +762,11 @@ def main(argv: list[str] | None = None) -> int:
             initial_first_touch.insert(0, known)
 
     strict_task = bool(STRICT_TASK_RE.search(task)) and not is_self_tooling_task(task, known)
-    if known and not strict_task:
-        first_touch = [known]
+    if scope is not None:
+        first_touch = scope
+        reasons.append("exact human-reviewed scope")
+    elif known and not strict_task:
+        first_touch = unique_paths([known, *explicit])
     else:
         first_touch = unique_paths(initial_first_touch)
     read_only_references: list[str] = []

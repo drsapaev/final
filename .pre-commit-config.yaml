@@ -51,10 +51,11 @@ repos:
     hooks:
       - id: eslint
         name: 🧹 ESLint (frontend)
-        # Strip the 'frontend/' prefix that pre-commit adds, then run eslint
-        # from inside frontend/ with the relative path. npx --no-install
-        # fails fast if node_modules is missing (better than silent skip).
-        entry: bash -c 'cd frontend && npx --no-install eslint --fix "$@"' --
+        # Run from frontend/ so its flat config and tsconfig resolve consistently.
+        # Node changes directory before loading ESLint; filenames from pre-commit
+        # are repo-relative, so remove their frontend/ prefix.
+        entry: >-
+          node -e 'process.chdir("frontend"); const files = process.argv.slice(1).map((path) => path.startsWith("frontend/") ? path.slice("frontend/".length) : path); process.argv = [process.argv[0], "eslint", "--fix", ...files]; require(process.cwd() + "/node_modules/eslint/bin/eslint.js");' --
         language: system
         files: ^frontend/.*\.(js|jsx|ts|tsx)$
         pass_filenames: true

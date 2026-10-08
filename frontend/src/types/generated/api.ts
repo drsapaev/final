@@ -3461,8 +3461,8 @@ export type paths = {
         put?: never;
         /**
          * Sync Cabinet Info From Doctors
-         * @description Синхронизировать информацию о кабинетах из таблицы doctors
-         *     Доступно только администраторам
+         * @description Keep the route for compatibility; callers receive 409 because queue-day
+         *     cabinet snapshots are no longer synchronized from owner defaults.
          */
         post: operations["sync_cabinet_info_from_doctors_api_v1_admin_queues_sync_cabinet_info_post"];
         delete?: never;
@@ -35933,6 +35933,11 @@ export type components = {
         } & {
             [key: string]: unknown;
         };
+        /** QueueCabinetMutationError */
+        QueueCabinetMutationError: {
+            /** Detail */
+            detail: string;
+        };
         /** QueueCabinetResponse */
         QueueCabinetResponse: {
             /** Id */
@@ -48385,6 +48390,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description Existing daily queue cabinet snapshots can only be changed with the explicit reassignment command. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueCabinetMutationError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48601,7 +48615,7 @@ export interface operations {
     sync_cabinet_info_from_doctors_api_v1_admin_queues_sync_cabinet_info_post: {
         parameters: {
             query?: {
-                /** @description Дата для синхронизации (по умолчанию сегодня) */
+                /** @description Deprecated: existing daily queue snapshots are read-only */
                 day?: string | null;
                 /** @description ID конкретного специалиста */
                 specialist_id?: number | null;
@@ -48621,6 +48635,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Legacy synchronization into existing daily queues is disabled. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueCabinetMutationError"];
                 };
             };
             /** @description Validation Error */

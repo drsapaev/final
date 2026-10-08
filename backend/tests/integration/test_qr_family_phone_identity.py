@@ -181,7 +181,40 @@ def _clinic_day():
     return datetime.now(ZoneInfo("Asia/Tashkent")).date()
 
 
-def _seed_join_world(session, suffix: str, *, day: date | None = None) -> dict:
+def _clinic_now() -> datetime:
+    """Current clinic-local time used only when a seed caller has no frozen clock."""
+    return datetime.now(ZoneInfo("Asia/Tashkent"))
+
+
+def _qr_token_seed_now(now: datetime | None) -> datetime:
+    """Keep synthetic QR tokens valid against the resolver's real wall clock.
+
+    The admission-clock fixtures may deliberately freeze a different clinic
+    time (for example noon while simulating 00:30). QR-token validation still
+    compares ``expires_at`` with the real current time, so never seed expiry
+    from a frozen clock that is already behind the test runner.
+    """
+    timezone = ZoneInfo("Asia/Tashkent")
+    fixture_now = (now or _clinic_now()).replace(tzinfo=None)
+    wall_now = datetime.now(timezone).replace(tzinfo=None)
+    return max(fixture_now, wall_now)
+
+
+def test_stale_admission_clock_does_not_backdate_qr_token_seed():
+    timezone = ZoneInfo("Asia/Tashkent")
+    wall_now = datetime.now(timezone).replace(tzinfo=None)
+    stale_fixture_now = wall_now - timedelta(days=1)
+
+    assert _qr_token_seed_now(stale_fixture_now) >= wall_now
+
+
+def _seed_join_world(
+    session,
+    suffix: str,
+    *,
+    day: date | None = None,
+    now: datetime | None = None,
+) -> dict:
     """Doctor + DailyQueue + a doctor-scoped QueueToken (SYNTHETIC)."""
     from app.core.security import get_password_hash
     from app.models.clinic import Doctor
@@ -225,7 +258,7 @@ def _seed_join_world(session, suffix: str, *, day: date | None = None) -> dict:
     session.commit()
     session.refresh(daily_queue)
 
-    local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
+    local_now = _qr_token_seed_now(now)
     token = QueueToken(
         token=f"rq25a1-token-{suffix}",
         day=day,
@@ -295,12 +328,13 @@ def _no_time_gate(monkeypatch):
 
 
 @pytest.fixture
-def _fixed_v1_admission_day(monkeypatch) -> date:
-    """Freeze queue and QR admission clocks inside v1's test window."""
+def _fixed_v1_admission_now(monkeypatch) -> datetime:
+    """Model CI at clinic 00:30 while admission uses its frozen noon clock."""
     from app.services import qr_queue_service, queue_service
 
     timezone = ZoneInfo("Asia/Tashkent")
     clinic_day = datetime.now(timezone).date()
+    wall_now = datetime.combine(clinic_day, time(0, 30), tzinfo=timezone)
     frozen_now = datetime.combine(clinic_day, time(12, 0), tzinfo=timezone)
 
     class FrozenDateTime(datetime):
@@ -313,13 +347,20 @@ def _fixed_v1_admission_day(monkeypatch) -> date:
     # Both admission paths use these public clock facades: the queue service
     # allocator and QR session start. Keep their real window checks active,
     # while making the test independent of wall time.
+    monkeypatch.setattr(sys.modules[__name__], "_clinic_now", lambda: wall_now)
     monkeypatch.setattr(queue_service, "datetime", FrozenDateTime)
     monkeypatch.setattr(qr_queue_service, "datetime", FrozenDateTime)
-    return clinic_day
+    return frozen_now
+
+
+@pytest.fixture
+def _fixed_v1_admission_day(_fixed_v1_admission_now) -> date:
+    return _fixed_v1_admission_now.date()
 
 
 def test_fixed_v1_admission_day_freezes_both_clock_facades(
     _fixed_v1_admission_day,
+    _fixed_v1_admission_now,
 ):
     from app.services import qr_queue_service, queue_service
 
@@ -332,6 +373,12 @@ def test_fixed_v1_admission_day_freezes_both_clock_facades(
 
     assert queue_service.datetime.now(clinic_timezone) == expected_now
     assert qr_queue_service.datetime.now(clinic_timezone) == expected_now
+    assert _clinic_now() == datetime.combine(
+        _fixed_v1_admission_day,
+        time(0, 30),
+        tzinfo=clinic_timezone,
+    )
+    assert _fixed_v1_admission_now == expected_now
 
 
 def test_family_member_gets_own_card_and_own_ticket(pg_session, pg_engine):
@@ -672,7 +719,13 @@ def _set_v1_queue_cap(session, queue_id: int, cap: int) -> None:
     session.commit()
 
 
-def _seed_multi_v1_world(session, suffix: str, *, day: date | None = None) -> dict:
+def _seed_multi_v1_world(
+    session,
+    suffix: str,
+    *,
+    day: date | None = None,
+    now: datetime | None = None,
+) -> dict:
     """Seed two directly selectable, synthetic v1 queues and a clinic QR token."""
     from app.core.security import get_password_hash
     from app.models.clinic import Doctor
@@ -732,7 +785,7 @@ def _seed_multi_v1_world(session, suffix: str, *, day: date | None = None) -> di
         session.flush()
         owners[label] = {"doctor_id": doctor.id, "queue_id": queue.id}
 
-    local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
+    local_now = _qr_token_seed_now(now)
     token = QueueToken(
         token=f"t0832-clinic-{suffix}-{uuid.uuid4().hex[:10]}",
         day=day,
@@ -747,7 +800,7 @@ def _seed_multi_v1_world(session, suffix: str, *, day: date | None = None) -> di
 
 
 def test_qr_session_lost_response_replays_snapshot_without_second_issuance(
-    pg_engine, monkeypatch, _fixed_v1_admission_day
+    pg_engine, monkeypatch, _fixed_v1_admission_day, _fixed_v1_admission_now
 ):
     """A fresh PostgreSQL session replays the committed response byte-for-value."""
     from app.models.online_queue import (
@@ -759,7 +812,12 @@ def test_qr_session_lost_response_replays_snapshot_without_second_issuance(
 
     Session = sessionmaker(bind=pg_engine, future=True)
     setup = Session()
-    world = _seed_join_world(setup, "t0832replay", day=_fixed_v1_admission_day)
+    world = _seed_join_world(
+        setup,
+        "t0832replay",
+        day=_fixed_v1_admission_day,
+        now=_fixed_v1_admission_now,
+    )
     _set_v1_queue_cap(setup, world["queue_id"], cap=4)
     setup.close()
 
@@ -808,7 +866,7 @@ def test_qr_session_lost_response_replays_snapshot_without_second_issuance(
 
 
 def test_qr_single_join_rolls_back_entry_counter_patient_and_session_together(
-    pg_engine, monkeypatch, _fixed_v1_admission_day
+    pg_engine, monkeypatch, _fixed_v1_admission_day, _fixed_v1_admission_now
 ):
     """A failure after allocation but before outer commit exposes no partial write."""
     from app.models.online_queue import (
@@ -821,7 +879,12 @@ def test_qr_single_join_rolls_back_entry_counter_patient_and_session_together(
 
     Session = sessionmaker(bind=pg_engine, future=True)
     setup = Session()
-    world = _seed_join_world(setup, "t0832rollback", day=_fixed_v1_admission_day)
+    world = _seed_join_world(
+        setup,
+        "t0832rollback",
+        day=_fixed_v1_admission_day,
+        now=_fixed_v1_admission_now,
+    )
     _set_v1_queue_cap(setup, world["queue_id"], cap=4)
     setup.close()
 
@@ -878,7 +941,7 @@ def test_qr_single_join_rolls_back_entry_counter_patient_and_session_together(
 
 
 def test_qr_multi_join_commits_successful_partial_result_and_replays_snapshot(
-    pg_engine, monkeypatch, _fixed_v1_admission_day
+    pg_engine, monkeypatch, _fixed_v1_admission_day, _fixed_v1_admission_now
 ):
     """A mixed eligible/full batch commits only its success and exact response."""
     from app.models.online_queue import (
@@ -890,7 +953,12 @@ def test_qr_multi_join_commits_successful_partial_result_and_replays_snapshot(
 
     Session = sessionmaker(bind=pg_engine, future=True)
     setup = Session()
-    world = _seed_multi_v1_world(setup, "partial", day=_fixed_v1_admission_day)
+    world = _seed_multi_v1_world(
+        setup,
+        "partial",
+        day=_fixed_v1_admission_day,
+        now=_fixed_v1_admission_now,
+    )
     setup.close()
 
     payload = {
@@ -957,7 +1025,7 @@ def test_qr_multi_join_commits_successful_partial_result_and_replays_snapshot(
 
 
 def test_qr_multi_join_rolls_back_partial_writes_and_snapshot_together(
-    pg_engine, monkeypatch, _fixed_v1_admission_day
+    pg_engine, monkeypatch, _fixed_v1_admission_day, _fixed_v1_admission_now
 ):
     """A pre-commit failure rolls back even the successful element of a partial batch."""
     from app.models.online_queue import (
@@ -970,7 +1038,12 @@ def test_qr_multi_join_rolls_back_partial_writes_and_snapshot_together(
 
     Session = sessionmaker(bind=pg_engine, future=True)
     setup = Session()
-    world = _seed_multi_v1_world(setup, "multirollback", day=_fixed_v1_admission_day)
+    world = _seed_multi_v1_world(
+        setup,
+        "multirollback",
+        day=_fixed_v1_admission_day,
+        now=_fixed_v1_admission_now,
+    )
     setup.close()
 
     payload = {
