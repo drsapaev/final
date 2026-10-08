@@ -216,8 +216,9 @@ def test_single_alembic_head(head_url):
     # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
     # as 0074 on top of it; #3506 derma history read model moves it to
     # 0075, its read-order index swap — to 0076; T06.1 adds daily queue
-    # policy persistence at 0077.
-    assert "0077_daily_queue_policy" in head_lines[0]
+    # policy persistence at 0077; the site-plan settings canonicalization
+    # adds 0078.
+    assert "0078_clinic_settings_keys" in head_lines[0]
 
 
 @pytest.mark.integration
