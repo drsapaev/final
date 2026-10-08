@@ -147,6 +147,17 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Next exact action: run `aif-review` against PR #3612, inspect checks on the exact current head, fix any in-scope findings, then refresh this evidence. Do not begin T09.2 before this PR cycle closes and main is synchronized.
 - Merge commit: none.
 
+## T10 continuation — PR body repair and exact-head checks started — 2026-10-08T09:46+05:00
+
+- Current code/checkpoint commit: `16050140802c14a76051ca5379613d64eb8106a9`; base `19c35ec62481dde45c9ea49146ecc4999aaf599f`; branch `codex/aqs-T10-profile-guards`.
+- PR state: GitHub confirms #3633 OPEN / MERGEABLE at exact HEAD `16050140802c14a76051ca5379613d64eb8106a9`, base `19c35ec62481dde45c9ea49146ecc4999aaf599f`. User merge is not confirmed.
+- PR body: updated to include every required section and field; local `scripts/check_pr_review_template.py --body-file ...` passed. The prior body-only `PR Review Quality Gate` failure was superseded by this corrected body and a new run.
+- Exact-head check status immediately after push: applicable Analyze, lint/format report, locale, quality, lifecycle, regression and security checks were `pending`; Supabase Preview and classify-and-route were skipped. No pending check is recorded as PASS.
+- Local validation carried forward: PostgreSQL lifecycle module **21 passed, 1 warning**, Ruff, Black, Python compile, OpenAPI contract (previously 39 passed, 1 warning), TypeScript, generated type parity, runtime OpenAPI serialization parity, and `git diff --check` passed. No frontend runtime or API/schema changes were made in this continuation.
+- Scope check: only the T10 regression and plan/evidence documents were committed. Pre-existing `.scratch/` and `frontend/.scratch/` were left untouched. The disposable PostgreSQL container was stopped/removed; no shared staging or production was contacted.
+- Next: push this documentation checkpoint, then query exact PR HEAD/base/state and wait for all applicable checks on that exact head. Leave merge to the user.
+- Merge commit: none.
+
 ## T09.1 contract review fixes and exact-head check — 2026-10-06T06:51+05:00
 
 - Latest code commit under review: `688023b80aa317db0fa2f08f8c0d16b26b4b330d`; base `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`; branch `codex/aqs-T09.1-cabinet-preview`; draft PR #3612: https://github.com/drsapaev/final/pull/3612.

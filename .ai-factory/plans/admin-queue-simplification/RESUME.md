@@ -1,6 +1,6 @@
-## Current resume — T10 protect used queue profile bindings (2026-10-08T09:44+05:00)
+## Current resume — T10 protect used queue profile bindings (2026-10-08T09:46+05:00)
 
-- PR #3620 / T09.3 merged at `2026-10-08T03:57:48Z`, merge commit `19c35ec62481dde45c9ea49146ecc4999aaf599f`. T10 code commit `eb4a9d5ef423ffb5249831a252d0912471ddc220` is based on that fresh `origin/main`; branch `codex/aqs-T10-profile-guards`. GitHub currently reports PR #3633 OPEN at `657948f18a290105a3a5c80d002c47e058481386`; merge is not confirmed.
+- PR #3620 / T09.3 merged at `2026-10-08T03:57:48Z`, merge commit `19c35ec62481dde45c9ea49146ecc4999aaf599f`. T10 branch `codex/aqs-T10-profile-guards` is based on that fresh `origin/main`; GitHub confirms PR #3633 OPEN / MERGEABLE at `16050140802c14a76051ca5379613d64eb8106a9`. No merge is confirmed.
 - T10 implementation: `_queue_profiles.py` counts active permanent addresses, provides a typed read-only proposed-binding preview, and rejects used-profile `queue_tags` (including order) and `department_key` changes before assigning any request field. Presentation fields/archive remain allowed. Active public addresses also block hard delete. Lifecycle regressions and OpenAPI contract coverage were added.
 - User explicitly approved the T10 scope extension for OpenAPI and generated API types; the generator header template was also adjusted narrowly because it hard-coded an inaccurate schema count. No frontend runtime/adapters are in scope.
 - Local PASS on committed source plus the pending RBAC regression: Ruff check; Python compile; Black check; OpenAPI contract suite previously 39/39; PostgreSQL profile lifecycle suite now 21/21 on an isolated disposable PostgreSQL 16.15, including Registrar-token `403`; TypeScript `tsc --noEmit`; generated type body exact match with `openapi-typescript` 7.13.0 under bundled Node 24; runtime OpenAPI serialization parity. Rerun `git diff --check` after the pending checkpoint.
@@ -8,8 +8,9 @@
 - No Tier-2 staging run or deferral applies to T10. The historical Tier-2 gaps for the earlier UI staging work and full T18/`STAGING_VALIDATION.md` remain separate and outstanding.
 - Current allowed paths: `_queue_profiles.py`, `backend/tests/integration/test_queue_profile_lifecycle.py`, `backend/tests/test_openapi_contract.py`, `backend/openapi.json`, `frontend/scripts/generate-api-types.sh`, `frontend/src/types/generated/api.ts`, and T10 plan/checkpoint/decision files. Denied: models/schema/migrations, frontend runtime UI, T11/T12, queue ownership/fairness, auth/RBAC, shared staging/production, unrelated scratch.
 - Commit hooks: the exact OpenAPI snapshot intentionally has no trailing newline; the generic EOF fixer changes its bytes and breaks runtime parity. Ruff format and Black also disagree on unchanged legacy formatting in two touched test files. The successful commit ran all other hooks and skipped only `end-of-file-fixer` and `ruff-format`; Ruff lint and Black check passed.
-- Blocker: `PR Review Quality Gate` failed on exact head `657948f1` because the PR body omitted required template fields. Correct the body and run its local validator; commit and push the scoped RBAC regression plus checkpoint; then inspect all applicable checks on the new exact PR head.
-- Next: complete/validate the PR body, commit only the T10 regression and checkpoint documents, push, and verify hosted checks on the exact updated head. User performs merge; do not merge or publish a self-review.
+- The T10 negative-RBAC regression is committed in `1605014080`; local PostgreSQL lifecycle result is 21 passed, 1 warning. PR body was updated and `scripts/check_pr_review_template.py` passed. The body-only quality-gate failure on the prior head is being rerun.
+- Blocker: exact-head hosted checks on `1605014080` are pending; path-aware skips remain NOT_RUN. No T10 staging or deferral is recorded.
+- Next: push this documentation checkpoint, re-query the exact PR HEAD/base/state and inspect all applicable checks on that exact head. User performs merge; do not merge or publish a self-review.
 
 ## Superseded resume — T09.3 PR #3620 documentation handoff repair (2026-10-08T08:23+05:00)
 
