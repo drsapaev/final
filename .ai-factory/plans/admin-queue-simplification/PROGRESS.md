@@ -1,3 +1,83 @@
+# Progress
+
+Plan version: 3.61
+Current task: T09.3
+Current status: PR_OPEN; preparing the docs-only follow-up for the review P2. Do not merge from the agent.
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
+Branch: codex/aqs-t093-cabinet-ui
+Base commit: 2c825dd439fd28eb5edf10f5ade7a83534f67c5a (verified equal to fresh origin/main before this docs repair)
+Latest code-bearing commit: 9b914d548b2fe2e120c4ed6076ed015e5ce1a610
+PR checkpoint before this docs repair: 8915ca7c97729fe516376d296cd4f16b711eb40b
+Last updated: 2026-10-08T08:23+05:00
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
+| T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
+| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md — docs handoff correction |
+
+## Current checkpoint
+- Completed: T09.3 runtime/test change is unchanged since source commit `9b914d548`; its analytics fixture fix and prior queue UI fixes remain in PR #3620. Source HEAD `9b914d548` and PR documentation HEAD `8915ca7c9` both have recorded passing applicable exact-head CI; see EVIDENCE.md.
+- Review finding being addressed: mandatory `RESUME.md` named old source SHA `a4cc2a9c` and old base; the main plan incorrectly said the code was uncommitted and CI pending. This checkpoint aligns the main plan, resume entry and progress record, preserving older entries as superseded history.
+- Latest hosted evidence before this docs repair: unified run `37719601177` on PR HEAD `8915ca7c`; Backend 5,360 passed, 65 skipped, 25 deselected, 3 xfailed; Frontend E2E, unit/build/lint, parity, PR Required Gate and applicable quality/security checks passed. The two PR-body metadata checks also passed. Path-aware skips are NOT_RUN.
+- Focused read-only review validation on `8915ca7c`: cabinet screen Vitest **17 passed**; backend cabinet service/admin-linkage/analytics targets **31 passed, 1 warning**. Backend used its temporary SQLite test fixture and does not prove PostgreSQL locking. No runtime edit was made during review.
+- This follow-up changes only the four plan/checkpoint files named in EVIDENCE.md. On resume, inspect actual local status, remote PR HEAD/base, review state and checks; results for earlier SHAs do not prove a later docs checkpoint.
+- Tier 2 remains PARTIAL: no staging evidence was added for the current UI follow-up; four named live specs remain NOT_RUN; runtime base-image equivalence remains NOT_PROVEN; T18 and full pre-deploy `STAGING_VALIDATION.md` remain outstanding. No coverage is credited by the bounded deferral beyond its explicit scope.
+- Next exact action on continuation: check whether this docs checkpoint is present on the PR branch; if it is, inspect all applicable checks for the actual current HEAD. If all pass, report the PR ready for the user's merge. Do not merge or publish a review.
+- Stop if origin/main or the PR branch moved, any tracked path outside the four-document allowlist changed, or the repair requires runtime/staging/production work.
+## Superseded checkpoint — PR #3620 generic uncertain-retry local state (2026-10-07T16:08+05:00)
+
+Plan version: 3.56
+Current task: T09.3
+Current status: IN_PROGRESS; local fix and regression are validated but not yet committed/pushed. Current remote PR HEAD before this fix: f85d7a0f8fc482b2401a8c040a18313077ef2156.
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
+Branch: codex/aqs-t093-cabinet-ui
+Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
+PR: https://github.com/drsapaev/final/pull/3620
+Last updated: 2026-10-07T16:08+05:00
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
+| T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
+| T09.3 | IN_PROGRESS | PR #3620 | | EVIDENCE.md#t093-pr-3620-principal-refusal-retry-fix |
+
+## Current checkpoint
+- Completed: source now retains the preview, locked draft and original idempotency key for every error on a retry after an unknown outcome. Added regression cases for CSRF 403, ordinary principal-refusal 403 and stale-state 409; a separate test verifies that a definitive first-apply 409 still allows correcting the draft. Focused tests 14/14, scoped ESLint, TypeScript and `git diff --check` passed.
+- Changed but not verified: the source/test fix is local and uncommitted; no CI run has covered it yet. The prior tested code commit ea51b067 does not validate this new change.
+- Remaining: commit and fast-forward push to the existing PR branch, then inspect all checks on the exact pushed HEAD. Obtain fresh independent review after checks.
+- Blocker: exact-head CI and fresh review are pending. Tier 2 for this retry path remains NOT_RUN; the bounded PR deferral still covers only its four named live specs and runtime base-image equivalence.
+- Next exact action: verify remote branch still points at f85d7a0f, commit only the two frontend files and four T09.3 plan journals, fast-forward push, and inspect exact-head CI. Do not merge or start T10.
+- Checks to rerun after push: all applicable exact-head PR checks; staging remains NOT_RUN, and full STAGING_VALIDATION.md remains required before deployment.
+## Superseded checkpoint — PR #3620 bounded Tier-2 deferral decision (2026-10-07T13:04+05:00)
+
+Plan version: 3.50
+Current task: T09.3
+Current status: PR_OPEN; Tier 2 PARTIAL with a PR-specific bounded deferral accepted; independent code review and exact-head CI for the latest docs-only commit are pending.
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
+Branch: codex/aqs-t093-cabinet-ui
+Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
+T09.3 code-evidence HEAD: 853b6c048cc19bc6a4bbfcc7582287c551baa2ca
+Current PR HEAD: 501435405b27327710c8b6934f7905bf11527ed0
+Decision commit: 501435405b27327710c8b6934f7905bf11527ed0
+PR: https://github.com/drsapaev/final/pull/3620
+Last updated: 2026-10-07T13:04+05:00
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
+| T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
+| T09.3 | PR_OPEN | PR #3620 | | DECISIONS.md — accepted bounded Tier-2 deferral |
+
+## Current checkpoint
+- Completed: the target T09.3 flow passed on task-owned synthetic staging (Admin password+TOTP, cabinet read, stale-preview rejection, focus handling, same-day apply); 253/253 served static files matched an independent Linux Node 20 rebuild and `50x.html` matched the nginx upstream artifact. Code-evidence HEAD `853b6c0` had 26 success, 13 skipped, 0 failed and 0 pending. The user-delegated bounded deferral for four residual live specs and runtime base-image equivalence is recorded in PR #3620 and `DECISIONS.md`; no Tier-2 coverage is credited for those items.
+- Changed but not verified: docs-only decision commit `5014354` is pushed. On its exact HEAD, PR Review Quality Gate, regression/lifecycle, docs generation, frontend build, security/secrets, CodeQL, role, locale and context checks passed; Backend tests, Frontend E2E and Code Quality were IN_PROGRESS on exact HEAD `5014354` at 13:03+05. Other applicable checks shown by `gh pr checks` had passed or were skipped. This progress-only commit will create a new exact HEAD; inspect its checks after push.
+- Remaining: finish exact-head checks on `501435405b27327710c8b6934f7905bf11527ed0`; obtain independent code review. Keep PR open until both are resolved. T18 must later run the deferred specs and base-image provenance through a safe synthetic harness; full `STAGING_VALIDATION.md` remains mandatory before rollout.
+- Blocker: no safe harness yet for the four named specs; runtime base-image equivalence is NOT_PROVEN; no independent code review is recorded. Tier 2 remains PARTIAL, not PASS.
+- Next exact action: inspect `gh pr checks 3620` on the current exact HEAD and address any failures; do not merge, deploy, activate v1, or start T10 from this checkpoint.
+- Checks to rerun after the next PR change: all required exact-head checks. For resumed Tier-2 work, rerun each deferred live spec plus image/base provenance and retain per-spec evidence; before deployment run the full `STAGING_VALIDATION.md` checklist.
+
+
 ## Current checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
 
 Plan version: 3.34

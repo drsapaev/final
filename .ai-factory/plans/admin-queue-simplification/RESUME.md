@@ -1,4 +1,68 @@
-## Resume — PR #3614 review fixes
+## Current resume — T09.3 PR #3620 documentation handoff repair (2026-10-08T08:23+05:00)
+
+- At the start of this checkpoint, PR #3620 was OPEN and MERGEABLE. Its base and freshly fetched `origin/main` were both `2c825dd439fd28eb5edf10f5ade7a83534f67c5a`. Latest code-bearing commit was `9b914d548b2fe2e120c4ed6076ed015e5ce1a610`; the PR documentation checkpoint before this repair was `8915ca7c97729fe516376d296cd4f16b711eb40b`. These identify the pre-repair state only. After publication, query GitHub for the actual HEAD/base/state and inspect that exact HEAD's checks.
+- Review P2: this file's prior “current resume” directed review to superseded code HEAD `a4cc2a9c` and base `300dd7e9`; the main plan still claimed uncommitted changes and pending CI. This entry and the main current checkpoint have been corrected. Earlier entries remain below as superseded history.
+- The source fix under review sets both analytics calls to the synthetic fixture's date interval. No runtime, schema, owner, middleware, auth, routing, staging or production changes are part of this docs repair.
+- Before this repair, run `37719601177` on PR checkpoint `8915ca7c` passed all applicable CI, including Backend (5,360 passed, 65 skipped, 25 deselected, 3 xfailed), Frontend E2E/unit/build/lint, parity and PR Required Gate; two later metadata checks passed too. Path-aware skipped jobs remain NOT_RUN.
+- Focused local review checks on `8915ca7c`: Frontend cabinet screen suite 17/17; focused backend targets 31 passed with one warning. Backend tests used a temporary SQLite fixture and are not PostgreSQL concurrency evidence. `git diff --check` passed before the current doc-only edit.
+- Scope/mode: reuse the existing T09.3 `gate_known_root_cause` authorization. `.scratch/T09.3-SCOPE.md` explicitly says not to run a third gate; the four documentation files are already within its checkpoint allowlist. Do not rerun a gate for this continuation. First touch is this resume, `PROGRESS.md`, `EVIDENCE.md`, and the main plan only.
+- Tier 2 remains PARTIAL. The existing bounded deferral is limited to `admin-navigation`, `rq17-setup-directions-live`, `queue-system`, `panel-qa-admin-live` and runtime base-image equivalence. Current UI follow-up flows have no additional staging evidence; T18 and full `STAGING_VALIDATION.md` remain required.
+- Next: confirm the documentation sync is on the PR branch, then fetch the current GitHub state and inspect every applicable check on the resulting actual HEAD. If clean and green, report merge readiness to the user, who owns the merge. No review publication or merge is part of this handoff.
+## Superseded resume — T09.3 PR #3620 retry refusal fix (reviewed source state a4cc2a9c; superseded by analytics and documentation checkpoints)
+
+PR #3620 code HEAD a4cc2a9c493ff09302afe18b91a3eff0662f8047 fixes the reviewed P2. After a lost first response, any error returned by a retry preserves the same preview, payload, idempotency key and draft lock; a successful same-key replay settles the command. A definitive first-request refusal still allows draft correction.
+
+Local validation: focused component suite 14/14; scoped ESLint; TypeScript; git diff --check; commit hooks. The fix was pushed as a fast-forward from f85d7a0f8fc482b2401a8c040a18313077ef2156.
+
+Exact-head GitHub run 37612124999 completed on code HEAD a4cc2a9c with 26 success, 13 skipped, 0 failed, 0 pending. Backend, Frontend E2E/unit/lint/build, Code Quality, PR Required Gate, parity, docs, security/secrets, CodeQL, regression, role, locale and lifecycle checks passed. The 13 skipped jobs are not passes.
+
+PR #3620 remains OPEN, unmerged and mergeable at base 300dd7e9b112dde5143e78d5149634c739ad9b3a; independent GitHub review submissions are empty. Keep merge on hold until independent review. Do not submit a self-review or merge.
+
+Tier 2 for this retry edge is NOT_RUN. The prior bounded deferral remains limited to admin-navigation, rq17-setup-directions-live, queue-system, panel-qa-admin-live and runtime base-image equivalence. It provides no new coverage credit. T18 and full pre-deploy STAGING_VALIDATION.md remain outstanding.
+
+Next exact action: obtain an independent review of a4cc2a9c, address any in-scope findings, then continue the PR cycle. Do not start T10 before #3620 closes and the base is synchronized.
+
+## Superseded resume — T09.3 PR #3620 generic retry fix before push/CI (2026-10-07T16:08+05:00)
+
+The latest local fix keeps the cabinet apply preview, draft lock and original idempotency key after any error on a retry whose first response was lost. A CSRF 403, an ordinary principal-resolution 403, or a stale-state 409 cannot establish the earlier command's result. A definitive 4xx on the first request with no earlier uncertain outcome still clears the preview so the operator can correct the draft.
+
+Regression coverage now exercises the three refusal cases and same-key successful replay, plus the fresh first-request 409 correction path. Local validation passed: 14/14 focused component tests, scoped ESLint, TypeScript and `git diff --check`.
+
+The change is on branch `codex/aqs-t093-cabinet-ui` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`; remote PR HEAD before these edits is `f85d7a0f8fc482b2401a8c040a18313077ef2156`, base `300dd7e9b112dde5143e78d5149634c739ad9b3a`. Source and test changes are local and uncommitted. Do not change backend middleware/auth, queue ownership/lifecycle, staging or production. Reuse the approved T09.3 narrow override; do not rerun the gate because `.scratch/T09.3-SCOPE.md` forbids a third gate.
+
+Next: check the remote branch still points at `f85d7a0f`, commit the two frontend files and plan journals, fast-forward push, then inspect exact-head CI and request a fresh independent review. Tier 2 for this retry edge is NOT_RUN; the previously accepted bounded deferral remains limited to four named live specs and runtime base-image equivalence. Keep merge on hold until code review and required checks pass.
+## Superseded resume — T09.3 PR #3620 CSRF retry correction (2026-10-07T15:32+05:00)
+
+PR #3620 code commit `ea51b067e33891c31d6706415bb3d96678a7698d` fixes the follow-up P2: when the first cabinet apply response is lost and a retry receives a CSRF `403`, the screen preserves the uncertain outcome, preview, original idempotency key and draft lock. The retry remains available. CSRF rejection is recognized from the standard `X-CSRF-Status: rejected` header or the known `missing_cookie`, `missing_header`, and `mismatch` reasons. A focused regression covers lost response → CSRF `403` → successful retry with the identical body and key.
+
+Validation on the changed files: focused component suite **11/11**, scoped ESLint **PASS**, TypeScript **PASS**, `git diff --check` **PASS**. The first check attempt was run from repository root, where frontend scripts/dependencies are absent; reruns from `frontend/` passed. An independent read-only probe before the fix reproduced the reset of `applyOutcomeUnknown`, preview and key on a CSRF 403.
+
+The fix was pushed as a fast-forward from `1b84be10` to `ea51b067`. Exact-head run 37606291652 completed **26 success / 13 skipped / 0 failed / 0 pending**. Backend, Frontend E2E, unit/build/lint, Parity, PR Required Gate, CodeQL and applicable quality/security checks passed. The 13 path-aware/nightly/non-applicable skips (including staging/readiness, Docker, integration/load, metadata and nightly DAST) are not passes. Evidence checkpoint `ed965feabff94e123fc4a4dbb204ae41bf770bb2` was then pushed; GitHub triggered no PR workflow on that docs-only commit, so `ea51b067` remains the tested code-bearing commit.
+
+Tier 2 for this retry case was NOT_RUN. The separately accepted PR-specific bounded Tier-2 deferral remains only for the four named live specs and runtime base-image equivalence; it earns no coverage credit. T18/full pre-deploy staging remains required. PR #3620 remains OPEN; independent review is outstanding, so merge stays on hold.
+
+## Superseded resume — T09.3 PR #3620 retry cooldown correction (2026-10-07T13:45+05:00)
+
+PR #3620's code P2 is fixed in 03fbe4f51ae7c91df5c8d53486fa97a4f1ca6777. The component captures whether the apply call is retrying an unknown outcome. If that retry receives HTTP 429, it retains the original preview/key, locks draft/cancel, and leaves the same-key retry available. The regression covers lost first response → cooldown 429 → successful replay with an identical request and key.
+
+Local checks: focused frontend suite 10/10; targeted ESLint; npm run type-check -- --pretty false; commit hooks; and git diff --check all passed. Commit hooks included ESLint and gitleaks. Earlier remote head 96580bae had 12 success, 9 skipped and 0 failures, but that run predates this fix.
+
+The code fix and plan checkpoint are on the existing PR branch. Last confirmed remote HEAD before this checkpoint was a046143e628e725d9642a54976d8718b4fc5490c. Inspect the PR HEAD after pushing this checkpoint and read its exact-head checks; the older check result is not transferable. Staging for this retry edge is NOT_RUN. The bounded Tier-2 deferral remains limited to the four live specs and runtime base-image equivalence.
+
+Merge remains HOLD until the P2 is reviewed and required CI passes on the PR HEAD containing this checkpoint. No T10, rollout, production deployment or v1 activation.
+
+## Superseded resume — T09.3 PR #3620 local clock regression fixed (2026-10-07T02:11+05:00)
+
+PR #3620 remains OPEN at base d75108c11ed1515f8f8c4d08e18b3dbbeb98a1bc and remote HEAD 58f423c12688b03449da52479f097c444bdaa9cc. Its earlier exact-head run 37516137885 failed twice on four QR token expiry tests. The test-only correction and plan checkpoint are committed together at current local branch HEAD, one commit ahead and not pushed; the preceding code/evidence HEAD eb70338765d38751aeb757aac842f536ba7dd7d8 passed run 37513876028 with 28 success and 13 skipped.
+
+Cause and correction: seed helpers previously derived expiry from wall time plus two hours while admission was frozen to noon. They now accept an optional explicit clinic-local time; other callers retain the old default. The regression fixture deterministically sets seed wall time to 00:30 and admission time to noon, and the four affected PostgreSQL scenarios use the same frozen time for token expiry and admission. This changes tests only.
+
+Local checks: the clock regression passed, `py_compile`, Ruff, formatting and `git diff --check` passed. Four PostgreSQL scenarios were skipped with a deliberately unavailable loopback endpoint so the test runner could not use an existing database; hosted Backend CI must prove them on the pushed exact HEAD.
+
+The parity job depends on CI scope, frontend lint/unit/build, Backend and architecture checks, and intentionally runs only when no dependency failed or was cancelled. The previous parity skip was expected because Backend failed; do not modify workflow unless parity still skips after all dependencies pass.
+
+Next exact action: push current local branch HEAD to the existing PR branch without rewriting it, then inspect every exact-head check. Keep merge HOLD; Tier-2 staging/live E2E, manual viewport/accessibility review, T18 and full STAGING_VALIDATION remain NOT_RUN with no deferral. Do not start T10.
+## Historical resume — PR #3614 review fixes
 
 Current branch remains `codex/aqs-T09.2-cabinet-apply` in the existing review worktree at `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`. Latest code/evidence HEAD is `3cd2bf1103cd5759c49d9ca73ad8fed4ac686a1f`; base is `1d146d857e1570ff2259975f081f80dc0b31ae82`. PR #3614 is open.
 

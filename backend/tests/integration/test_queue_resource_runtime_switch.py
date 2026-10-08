@@ -2680,7 +2680,13 @@ def _test_queue_analytics_body(
     synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
     admin = _make_user(db_session, username="admin_anl29", role="Admin")
 
-    payload = get_queue_analytics(synthetic.id, db=db_session, current_user=admin)
+    payload = get_queue_analytics(
+        synthetic.id,
+        start_date=_DAY.isoformat(),
+        end_date=_DAY.isoformat(),
+        db=db_session,
+        current_user=admin,
+    )
     assert payload["totals"]["online_joins"] == 3
     assert payload["totals"]["total_served"] == 4
 
@@ -2703,7 +2709,13 @@ def _test_queue_analytics_body(
         )
     )
     db_session.commit()
-    other_payload = get_queue_analytics(other.id, db=db_session, current_user=admin)
+    other_payload = get_queue_analytics(
+        other.id,
+        start_date=_DAY.isoformat(),
+        end_date=_DAY.isoformat(),
+        db=db_session,
+        current_user=admin,
+    )
     assert other_payload["totals"]["online_joins"] == 9
 
 
@@ -3684,17 +3696,12 @@ def test_full_update_independent_entry_uses_resource_floor(
     assert created_doctor.number == 1  # empty doctor queue: MAX+1
 
 
-def test_cabinet_sync_skips_resource_rows(db_session: Session) -> None:
-    """Codex round-16 P2: POST /admin/queues/sync-cabinet-info does not
-    overwrite a resource queue's registry-sourced cabinet with a
-    doctor's stale one; doctor queues still sync. Pre-0063 the pin ran
-    against the 0059 bridge (whose synthetic specialist carried the
-    stale cabinet 42); the QD-2D conversion leaves the same protection
-    on the resource-owned row. The service COMMITs — durable rows
-    cleaned in the finally."""
+def test_cabinet_sync_rejects_existing_day_snapshots(db_session: Session) -> None:
+    """Legacy sync cannot replace saved day snapshots from current defaults."""
     try:
         from app.services.queue_cabinet_management_api_service import (
             QueueCabinetManagementApiService,
+            QueueCabinetManagementDomainError,
         )
 
         resource = _make_resource(db_session, code="lab", queue_tag="lab")
@@ -3717,18 +3724,15 @@ def test_cabinet_sync_skips_resource_rows(db_session: Session) -> None:
         doc_queue.cabinet_number = None
         db_session.commit()
 
-        result = QueueCabinetManagementApiService(
-            db_session
-        ).sync_cabinet_info_from_doctors(
-            day=_DAY.isoformat(), specialist_id=None, synced_by="admin"
-        )
+        with pytest.raises(QueueCabinetManagementDomainError) as exc_info:
+            QueueCabinetManagementApiService(db_session).sync_cabinet_info_from_doctors(
+                day=_DAY.isoformat(), specialist_id=None, synced_by="admin"
+            )
         db_session.refresh(resource_queue)
         db_session.refresh(doc_queue)
-        assert result["success"] is True
-        # the resource destination survives the sync
+        assert exc_info.value.status_code == 409
         assert resource_queue.cabinet_number == "7"
-        # the doctor queue still syncs from its doctor
-        assert doc_queue.cabinet_number == "5"
+        assert doc_queue.cabinet_number is None
     finally:
         _durable_cleanup(db_session, "dr_z3")
 
@@ -8552,14 +8556,12 @@ def test_start_visit_success_persists_whole_unit_existing_visit(monkeypatch) -> 
     annotations (visit_time/notes). Guards the fix from being
     "simplified" into dropping the boundary commit entirely."""
     import os
-
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
     from sqlalchemy.orm import Session, sessionmaker
 
     from app.api.v1.endpoints.doctor_integration import _queue_ops
-
     from app.api.v1.endpoints.doctor_integration._queue_ops import (
         start_patient_visit,
     )
