@@ -8,7 +8,7 @@ Branch: codex/aqs-T10-profile-guards
 Base at last GitHub query: 885782648fd7b83b0687b33cf930ae608d94a026
 Current local runtime commit: e68f93bf7 (not yet pushed at this checkpoint)
 PR remote HEAD at last GitHub query: 56f5a6fc37cec600c2da69724a6b7c10faf70135
-Last updated: 2026-10-08T20:03+05:00
+Last updated: 2026-10-08T20:06+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -17,7 +17,7 @@ Last updated: 2026-10-08T20:03+05:00
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | IN_PROGRESS | PR #3633; runtime fix `e68f93bf7` local; user merges | | EVIDENCE.md#t10-pr-3633-cross-writer-p2-local-validation |
 
-## Current checkpoint — T10 cross-writer P2 local validation (2026-10-08T20:03+05:00)
+## Current checkpoint — T10 cross-writer P2 local validation (2026-10-08T20:06+05:00)
 
 - PR #3633 was OPEN/MERGEABLE at remote HEAD `56f5a6fc37cec600c2da69724a6b7c10faf70135`, base `885782648fd7b83b0687b33cf930ae608d94a026`. Local runtime/test commit `e68f93bf7` is committed but not pushed; this journal checkpoint is being committed separately. Preserve `.scratch/` and `frontend/.scratch/`.
 - User authorized fixing the remaining review finding and accepted the proposed stale-binding result: a writer that waits and then observes a changed binding returns HTTP 409 without writing.
@@ -27,6 +27,7 @@ Last updated: 2026-10-08T20:03+05:00
 - Local validation PASS: QueueProfile PostgreSQL lifecycle 34/34; department-create atomicity PostgreSQL 8/8; focused QR/visit/GraphQL/legacy adapter suite 39/39; focused unit suite 26/26; scoped Ruff, compileall and diff checks. Warnings: one per pytest run. Admin department helper retains baseline Ruff diagnostics (`I001`/three `B023`) outside the new code. Exact commands/results are in `EVIDENCE.md#t10-pr-3633-cross-writer-p2-local-validation`.
 - Commit `e68f93bf7` passed non-rewriting pre-commit hooks including gitleaks. The first hook attempt exposed auto-formatters rewriting unrelated legacy code and existing Ruff findings; only those generated worktree changes were reversed. End-of-file fixer/Ruff auto-fix/Ruff format/Black were skipped on the successful commit; do not describe those hooks as passed.
 - First PG test attempt was `NOT_RUN` because WSL stopped the test container. The retry kept the WSL session alive; all 8 + 34 PostgreSQL tests passed against the task-owned loopback-only PG16 container, then the exact no-volume container was removed. No shared staging/production target was used.
+- The user separately selected Tier-2 staging for this follow-up. Authorized scope: one unique synthetic-only Compose project, free task-owned ports, an ignored env file, a task-owned validation script/report, normal synthetic Admin password→TOTP flow, and API-only checks of profile rebind versus public-address creation. Denied: shared/production staging, copied credentials/data, full ten-check certification, unrelated browser/UI work, deployment or flag changes. Stop if preflight cannot prove isolation, a selected port/project conflicts, or normal Admin 2FA cannot complete; tear down only the owned project.
 - Scope includes backend QueueProfile/link writers, department default-service/bulk-row writer, focused backend tests and T10 journals only. No schema/migration, frontend, generated OpenAPI/client, changed queue ownership, or clinical lifecycle behavior.
 - Next exact action: push the code and journal commits, inspect current exact-head CI, then create a unique ignored synthetic staging env and run documented WSL `Preflight → Start → Session` for Admin 2FA and stale-binding API scenarios. Do not merge or submit a review; user merges. Full STAGING_VALIDATION.md/browser/T18 remain separate.
 
