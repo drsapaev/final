@@ -2432,3 +2432,12 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Not rerun because this change is test-only: OpenAPI contract suite (previously 39 passed, 1 warning), frontend TypeScript, generated API parity and runtime OpenAPI serialization checks. No T10 staging, browser, production or Tier-2 evidence was produced.
 - Next: complete and locally validate all required PR-body fields; commit/push the scoped test and checkpoint; inspect the new exact-head hosted checks and report readiness. Do not merge; the user performs merge.
 - Merge commit: none.
+
+## T10 continuation — final applicable checks on PR HEAD — 2026-10-08T09:48+05:00
+
+- Exact commit under review: `21f6be154a8e2071198c726e77f2d5ac0f7af140`; code/test checkpoint `16050140802c14a76051ca5379613d64eb8106a9`; base `19c35ec62481dde45c9ea49146ecc4999aaf599f`.
+- GitHub state: PR #3633 is OPEN and MERGEABLE; `gh pr view` reports exact HEAD/base above. User merge has not happened.
+- Hosted PASS on exact HEAD: Analyze (actions, javascript-typescript, python), CodeQL, GitGuardian Security Checks, Locale Key Parity, Hardcoded Russian Text Detector, PR Review Quality Gate, Recommend PR lifecycle state, Regression Audit Gate, gitleaks, leaked-secret scan, and security scan.
+- Skipped: Supabase Preview, classify-and-route, and failure notification jobs. They are path-aware/non-applicable and are NOT_RUN, not PASS. No full staging/browser or production verification was performed.
+- Local code validation remains: PostgreSQL lifecycle **21 passed, 1 warning**; OpenAPI contract **39 passed, 1 warning** from the prior unchanged suite; Ruff, Black, Python compile, TypeScript, generated type parity and runtime OpenAPI serialization parity passed. The PR body also passed its local quality-template validator.
+- Next: push this docs-only final evidence checkpoint, verify the resulting PR head and its applicable checks, then wait for the user's merge. T11 may start only after confirmed merge, branch cleanup and main sync.
