@@ -22,7 +22,6 @@ import {
   AppError,
   Input,
   Modal,
-  Select,
   StatCard,
 } from '../ui/macos';
 import { DataTable } from '../ui/DataTable';
@@ -85,6 +84,13 @@ interface ReassignmentPreview {
   clinic_day: string;
   items: ReassignmentPreviewItem[];
   can_apply: boolean;
+}
+
+interface ReassignmentObservation {
+  owner_type: 'doctor' | 'resource';
+  owner_id: number;
+  owner_name: string;
+  cabinet_number: string | null;
 }
 
 const createIdempotencyKey = (): string => {
@@ -172,7 +178,10 @@ const QueueCabinetManagement = () => {
   const [reassignmentPreview, setReassignmentPreview] = useState<ReassignmentPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const [applyOutcomeUnknown, setApplyOutcomeUnknown] = useState(false);
+  const [uncertainOutcomeNeedsReconciliation, setUncertainOutcomeNeedsReconciliation] = useState(false);
+  const [reconciliationObservation, setReconciliationObservation] = useState<ReassignmentObservation | null>(null);
   const [reassignmentError, setReassignmentError] = useState<string | null>(null);
   const applyKeyRef = useRef<string | null>(null);
   const previewGenerationRef = useRef(0);
@@ -237,6 +246,8 @@ const QueueCabinetManagement = () => {
     setReassignmentError(null);
     setPreviewing(false);
     setApplyOutcomeUnknown(false);
+    setUncertainOutcomeNeedsReconciliation(false);
+    setReconciliationObservation(null);
     applyKeyRef.current = null;
   };
 
@@ -246,6 +257,8 @@ const QueueCabinetManagement = () => {
     setReassignmentQueue(null);
     setReassignmentPreview(null);
     setReassignmentError(null);
+    setUncertainOutcomeNeedsReconciliation(false);
+    setReconciliationObservation(null);
     applyKeyRef.current = null;
   }, [applying, applyOutcomeUnknown]);
 
@@ -257,6 +270,8 @@ const QueueCabinetManagement = () => {
     setReassignmentError(null);
     setPreviewing(false);
     setApplyOutcomeUnknown(false);
+    setUncertainOutcomeNeedsReconciliation(false);
+    setReconciliationObservation(null);
     applyKeyRef.current = null;
   };
 
@@ -330,6 +345,9 @@ const QueueCabinetManagement = () => {
       applyKeyRef.current = null;
       setReassignmentQueue(null);
       setReassignmentPreview(null);
+      setApplyOutcomeUnknown(false);
+      setUncertainOutcomeNeedsReconciliation(false);
+      setReconciliationObservation(null);
       toast.success(t('admin2.qcm_apply_success'));
       await loadData(appliedFilters);
     } catch (error: unknown) {
@@ -337,7 +355,14 @@ const QueueCabinetManagement = () => {
       const detail = readSafeErrorDetail(response?.data) || readSafeErrorDetail(error);
       const errorCode = readSafeErrorCode(response?.data);
       const statusCode = response?.status;
-      if (errorCode === 'idempotency_in_flight') {
+      if (errorCode === 'idempotency_uncertain_outcome') {
+        // The server has no replay snapshot. Read the canonical queue state
+        // before allowing a fresh preview/key; never infer a no-write result.
+        setApplyOutcomeUnknown(true);
+        setUncertainOutcomeNeedsReconciliation(true);
+        setReconciliationObservation(null);
+        setReassignmentError(detail || t('admin2.qcm_uncertain_outcome'));
+      } else if (errorCode === 'idempotency_in_flight') {
         // Keep the request body and key unchanged so a retry joins or replays it.
         setApplyOutcomeUnknown(true);
         setReassignmentError(t('admin2.qcm_apply_in_flight'));
@@ -350,6 +375,8 @@ const QueueCabinetManagement = () => {
         applyKeyRef.current = null;
         setReassignmentPreview(null);
         setApplyOutcomeUnknown(false);
+        setUncertainOutcomeNeedsReconciliation(false);
+        setReconciliationObservation(null);
         setReassignmentError(detail || t('admin2.qcm_apply_error'));
       } else {
         // Keep the same payload and key available for a safe retry when the
@@ -360,6 +387,73 @@ const QueueCabinetManagement = () => {
     } finally {
       setApplying(false);
     }
+  };
+
+  const reconcileUncertainApply = async () => {
+    if (!reassignmentQueue || !reassignmentPreview) return;
+    const previewItem = reassignmentPreview.items.find(
+      (item) => item.queue_id === reassignmentQueue.id,
+    );
+    if (!previewItem) return;
+
+    setReconciling(true);
+    setReassignmentError(null);
+    try {
+      const current = await apiRequest<QueueRow>(
+        'GET',
+        `/admin/queues/${reassignmentQueue.id}/cabinet-info`,
+      );
+      if (current.id !== reassignmentQueue.id) {
+        setReassignmentError(t('admin2.qcm_reconcile_invalid_read'));
+        return;
+      }
+
+      const currentCabinet = toOptionalString(current.cabinet_number);
+      const observation: ReassignmentObservation = {
+        owner_type: current.owner_type,
+        owner_id: current.owner_id,
+        owner_name: current.owner_name,
+        cabinet_number: currentCabinet,
+      };
+      setReconciliationObservation(observation);
+      setReassignmentQueue(current);
+
+      const ownerMatches =
+        current.owner_type === previewItem.owner_type &&
+        current.owner_id === previewItem.owner_id;
+      if (ownerMatches && currentCabinet === previewItem.new_cabinet_number) {
+        applyKeyRef.current = null;
+        setReassignmentQueue(null);
+        setReassignmentPreview(null);
+        setApplyOutcomeUnknown(false);
+        setUncertainOutcomeNeedsReconciliation(false);
+        setReconciliationObservation(null);
+        toast.success(t('admin2.qcm_reconcile_target_confirmed'));
+        await loadData(appliedFilters);
+        return;
+      }
+
+      // The observed state is rendered as a status below the uncertain-outcome
+      // alert; don't repeat the same text as a second alert.
+    } catch (error: unknown) {
+      const detail = readSafeErrorDetail(error);
+      setReassignmentError(detail || t('admin2.qcm_reconcile_error'));
+    } finally {
+      setReconciling(false);
+    }
+  };
+
+  const startFreshPreviewAfterReconciliation = () => {
+    if (!reconciliationObservation || !reassignmentQueue) return;
+    // The operator has inspected a fresh read. A new apply remains gated by
+    // another preview and confirmation, whose expected cabinet is rechecked
+    // under the existing backend locks.
+    applyKeyRef.current = null;
+    setApplyOutcomeUnknown(false);
+    setUncertainOutcomeNeedsReconciliation(false);
+    setReassignmentPreview(null);
+    setReassignmentError(null);
+    void previewReassignment();
   };
 
   const tableRows = useMemo(
@@ -714,22 +808,45 @@ const QueueCabinetManagement = () => {
         onClose={closeReassignment}
         title={t('admin2.qcm_reassign_title')}
         size="default"
-        closeOnBackdrop={!applying && !applyOutcomeUnknown}
-        closeOnEscape={!applying && !applyOutcomeUnknown}
+        closeOnBackdrop={!applying && !reconciling && !applyOutcomeUnknown}
+        closeOnEscape={!applying && !reconciling && !applyOutcomeUnknown}
         actions={(
           <>
-            <Button variant="outline" onClick={closeReassignment} disabled={applying || applyOutcomeUnknown}>
+            <Button variant="outline" onClick={closeReassignment} disabled={applying || reconciling || applyOutcomeUnknown}>
               {t('admin2.qcm_cancel')}
             </Button>
             {reassignmentPreview ? (
-              <Button
-                variant="primary"
-                onClick={() => void applyReassignment()}
-                disabled={!reassignmentPreview.can_apply || applying || previewing}
-                loading={applying}
-              >
-                {applyOutcomeUnknown ? t('admin2.qcm_retry_apply') : t('admin2.qcm_confirm_reassign')}
-              </Button>
+              uncertainOutcomeNeedsReconciliation ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => void reconcileUncertainApply()}
+                    disabled={reconciling || applying || previewing}
+                    loading={reconciling}
+                  >
+                    {reconciling ? t('admin2.qcm_reconciling') : t('admin2.qcm_check_result')}
+                  </Button>
+                  {reconciliationObservation ? (
+                    <Button
+                      variant="primary"
+                      onClick={startFreshPreviewAfterReconciliation}
+                      disabled={reconciling || applying || previewing}
+                      loading={previewing}
+                    >
+                      {t('admin2.qcm_preview_new_attempt')}
+                    </Button>
+                  ) : null}
+                </>
+              ) : (
+                <Button
+                  variant="primary"
+                  onClick={() => void applyReassignment()}
+                  disabled={!reassignmentPreview.can_apply || applying || previewing}
+                  loading={applying}
+                >
+                  {applyOutcomeUnknown ? t('admin2.qcm_retry_apply') : t('admin2.qcm_confirm_reassign')}
+                </Button>
+              )
             ) : (
               <Button
                 variant="primary"
@@ -763,23 +880,24 @@ const QueueCabinetManagement = () => {
               <small>{t('admin2.qcm_clear_cabinet_hint')}</small>
             </div>
             <div>
-              <Select
+              <label htmlFor="qcm-reason-code">{t('admin2.qcm_reason')}</label>
+              <select
                 id="qcm-reason-code"
-                label={t('admin2.qcm_reason')}
+                className="admin-form-select"
                 value={reasonCode}
-                options={[
-                  { value: 'room_unavailable', label: t('admin2.qcm_reason_room') },
-                  { value: 'equipment_issue', label: t('admin2.qcm_reason_equipment') },
-                  { value: 'schedule_change', label: t('admin2.qcm_reason_schedule') },
-                  { value: 'administrative_correction', label: t('admin2.qcm_reason_admin') },
-                ]}
-                onValueChange={(value) => {
-                  if (typeof value === 'string') {
-                    updateReassignmentDraft(newCabinetNumber, value as ReassignmentReasonCode);
-                  }
-                }}
-                disabled={applying || applyOutcomeUnknown}
-              />
+                onChange={(event) =>
+                  updateReassignmentDraft(
+                    newCabinetNumber,
+                    event.target.value as ReassignmentReasonCode,
+                  )
+                }
+                disabled={applying || reconciling || applyOutcomeUnknown}
+              >
+                <option value="room_unavailable">{t('admin2.qcm_reason_room')}</option>
+                <option value="equipment_issue">{t('admin2.qcm_reason_equipment')}</option>
+                <option value="schedule_change">{t('admin2.qcm_reason_schedule')}</option>
+                <option value="administrative_correction">{t('admin2.qcm_reason_admin')}</option>
+              </select>
             </div>
             {reassignmentPreview ? (
               <div aria-live="polite">
@@ -800,6 +918,15 @@ const QueueCabinetManagement = () => {
               </div>
             ) : null}
             {applyOutcomeUnknown ? <p role="alert">{t('admin2.qcm_uncertain_outcome')}</p> : null}
+            {uncertainOutcomeNeedsReconciliation && reconciliationObservation ? (
+              <p role="status">
+                {t('admin2.qcm_reconcile_observed', {
+                  owner: reconciliationObservation.owner_name,
+                  cabinet:
+                    reconciliationObservation.cabinet_number || t('admin2.qcm_not_specified'),
+                })}
+              </p>
+            ) : null}
             {reassignmentError ? <p role="alert">{reassignmentError}</p> : null}
           </div>
         ) : null}

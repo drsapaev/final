@@ -1,5 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api, apiRequest } from '../../../api/client';
@@ -363,6 +364,55 @@ describe('QueueCabinetManagement', () => {
     expect(cabinetInput).toHaveFocus();
   });
 
+  it('keeps the reassignment reason reachable in the real modal keyboard path', async () => {
+    modalTestMode.useRealModal = true;
+    const originalOffsetParent = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'offsetParent',
+    );
+    Object.defineProperty(HTMLElement.prototype, 'offsetParent', {
+      configurable: true,
+      get() { return this.parentElement; },
+    });
+
+    try {
+      apiRequestMock.mockResolvedValueOnce([
+        {
+          id: 4,
+          day: '2026-10-06',
+          owner_type: 'resource',
+          owner_id: 31,
+          owner_name: 'Synthetic resource',
+          cabinet_number: '8',
+          entries_count: 0,
+          active: true,
+        },
+      ]);
+
+      const user = userEvent.setup();
+      render(<QueueCabinetManagement />);
+      fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_reassign' }));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      });
+
+      const reasonSelect = screen.getByRole('combobox', { name: 'admin2.qcm_reason' });
+      const cabinetInput = screen.getByLabelText('admin2.qcm_new_cabinet');
+      cabinetInput.focus();
+      expect(cabinetInput).toHaveFocus();
+      await user.tab();
+      expect(reasonSelect).toHaveFocus();
+      await user.selectOptions(reasonSelect, 'room_unavailable');
+      expect(reasonSelect).toHaveValue('room_unavailable');
+    } finally {
+      if (originalOffsetParent) {
+        Object.defineProperty(HTMLElement.prototype, 'offsetParent', originalOffsetParent);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'offsetParent');
+      }
+    }
+  });
+
   it('shows the server clinic-day refusal from preview without enabling apply', async () => {
     apiRequestMock
       .mockResolvedValueOnce([
@@ -577,6 +627,182 @@ describe('QueueCabinetManagement', () => {
     );
     },
   );
+
+  it('reads the authoritative queue state and confirms the requested cabinet after an uncertain outcome', async () => {
+    apiRequestMock
+      .mockResolvedValueOnce([
+        {
+          id: 18,
+          day: '2026-10-06',
+          owner_type: 'resource',
+          owner_id: 31,
+          owner_name: 'Synthetic resource',
+          cabinet_number: '8',
+          entries_count: 0,
+          active: true,
+        },
+      ])
+      .mockResolvedValueOnce({
+        clinic_day: '2026-10-06',
+        can_apply: true,
+        items: [
+          {
+            queue_id: 18,
+            owner_type: 'resource',
+            owner_id: 31,
+            owner_name: 'Synthetic resource',
+            old_cabinet_number: '8',
+            new_cabinet_number: '9',
+            waiting_count: 0,
+            blocking_reasons: [],
+            can_apply: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        id: 18,
+        day: '2026-10-06',
+        owner_type: 'resource',
+        owner_id: 31,
+        owner_name: 'Synthetic resource',
+        cabinet_number: '9',
+        entries_count: 0,
+        active: true,
+      })
+      .mockResolvedValueOnce([
+        {
+          id: 18,
+          day: '2026-10-06',
+          owner_type: 'resource',
+          owner_id: 31,
+          owner_name: 'Synthetic resource',
+          cabinet_number: '9',
+          entries_count: 0,
+          active: true,
+        },
+      ]);
+    apiClientRequestMock
+      .mockRejectedValueOnce(new Error('synthetic response loss'))
+      .mockRejectedValueOnce({
+        response: {
+          status: 409,
+          data: {
+            code: 'idempotency_uncertain_outcome',
+            detail: 'Previous outcome is unknown; inspect the current queue state.',
+          },
+        },
+      });
+
+    render(<QueueCabinetManagement />);
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_reassign' }));
+    fireEvent.change(screen.getByLabelText('admin2.qcm_new_cabinet'), {
+      target: { value: '9' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_preview_reassign' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_confirm_reassign' }));
+    expect(await screen.findByText('admin2.qcm_uncertain_outcome')).toBeInTheDocument();
+
+    const originalApply = apiClientRequestMock.mock.calls[0][0];
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_retry_apply' }));
+    expect(await screen.findByText('Previous outcome is unknown; inspect the current queue state.')).toBeInTheDocument();
+    expect(apiClientRequestMock.mock.calls[1][0]).toEqual(originalApply);
+    expect(screen.queryByRole('button', { name: 'admin2.qcm_retry_apply' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_check_result' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(apiRequestMock).toHaveBeenNthCalledWith(
+      3,
+      'GET',
+      '/admin/queues/18/cabinet-info',
+    );
+    expect(await screen.findByText('9')).toBeInTheDocument();
+  });
+
+  it('requires a fresh preview before issuing a new key when reconciliation still shows the old cabinet', async () => {
+    const preview = (cabinet: string) => ({
+      clinic_day: '2026-10-06',
+      can_apply: true,
+      items: [
+        {
+          queue_id: 19,
+          owner_type: 'doctor' as const,
+          owner_id: 12,
+          owner_name: 'Synthetic doctor',
+          old_cabinet_number: cabinet,
+          new_cabinet_number: '9',
+          waiting_count: 0,
+          blocking_reasons: [],
+          can_apply: true,
+        },
+      ],
+    });
+    apiRequestMock
+      .mockResolvedValueOnce([
+        {
+          id: 19,
+          day: '2026-10-06',
+          owner_type: 'doctor',
+          owner_id: 12,
+          owner_name: 'Synthetic doctor',
+          cabinet_number: '8',
+          entries_count: 0,
+          active: true,
+        },
+      ])
+      .mockResolvedValueOnce(preview('8'))
+      .mockResolvedValueOnce({
+        id: 19,
+        day: '2026-10-06',
+        owner_type: 'doctor',
+        owner_id: 12,
+        owner_name: 'Synthetic doctor',
+        cabinet_number: '8',
+        entries_count: 0,
+        active: true,
+      })
+      .mockResolvedValueOnce(preview('8'));
+    apiClientRequestMock
+      .mockRejectedValueOnce(new Error('synthetic response loss'))
+      .mockRejectedValueOnce({
+        response: {
+          status: 409,
+          data: { code: 'idempotency_uncertain_outcome', detail: 'Outcome needs reconciliation.' },
+        },
+      })
+      .mockResolvedValueOnce({ data: { changed_queue_ids: [19] } });
+
+    render(<QueueCabinetManagement />);
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_reassign' }));
+    fireEvent.change(screen.getByLabelText('admin2.qcm_new_cabinet'), {
+      target: { value: '9' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_preview_reassign' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_confirm_reassign' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_retry_apply' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_check_result' }));
+    expect(await screen.findByText('admin2.qcm_reconcile_observed')).toHaveAttribute('role', 'status');
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.qcm_preview_new_attempt' }));
+
+    await waitFor(() => expect(apiRequestMock).toHaveBeenCalledTimes(4));
+    expect(apiRequestMock).toHaveBeenNthCalledWith(
+      4,
+      'POST',
+      '/admin/queues/cabinet-info/preview',
+      expect.objectContaining({ data: { queue_ids: [19], new_cabinet_number: '9' } }),
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'admin2.qcm_confirm_reassign' }));
+
+    await waitFor(() => expect(apiClientRequestMock).toHaveBeenCalledTimes(3));
+    const initialRequest = apiClientRequestMock.mock.calls[0]?.[0];
+    const freshRequest = apiClientRequestMock.mock.calls[2]?.[0];
+    const initialKey = initialRequest?.headers?.['Idempotency-Key'];
+    const freshKey = freshRequest?.headers?.['Idempotency-Key'];
+    expect(initialKey).toBeTruthy();
+    expect(freshKey).toBeTruthy();
+    expect(freshKey).not.toBe(initialKey);
+  });
 
   it('allows correcting the draft after a definitive first-apply refusal', async () => {
     apiRequestMock
