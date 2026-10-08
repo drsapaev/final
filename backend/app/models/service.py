@@ -4,7 +4,17 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
 from app.db.base_class import Base
@@ -16,10 +26,29 @@ if TYPE_CHECKING:
 
 class Service(Base):
     __tablename__ = "services"
+    __table_args__ = (
+        Index(
+            "uq_services_website_slug",
+            "slug",
+            unique=True,
+            postgresql_where=text("slug IS NOT NULL"),
+            sqlite_where=text("slug IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
+    show_on_website: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    name_uz: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    description_ru: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_uz: Mapped[str | None] = mapped_column(Text, nullable=True)
+    slug: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    website_first_published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     department_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("departments.id", ondelete="SET NULL"),
