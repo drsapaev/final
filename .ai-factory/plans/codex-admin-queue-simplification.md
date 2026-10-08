@@ -1,12 +1,12 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.63 — T10 protect used profile bindings; local validation complete, PR not yet opened.
-**Создан:** 30 сентября 2026. **Обновлён:** 8 октября 2026, 2026-10-08T09:32+05:00 Asia/Tashkent.
+**Версия:** 3.64 — T10 protect used profile bindings; local validation complete, PR not yet opened.
+**Создан:** 30 сентября 2026. **Обновлён:** 8 октября 2026, 2026-10-08T09:37+05:00 Asia/Tashkent.
 **Current task:** T10 — protect queue profile tags/order/department bindings when used; local PostgreSQL lifecycle, OpenAPI, generated-type and TypeScript checks pass.
 **Current worktree:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`; branch `codex/aqs-T10-profile-guards`.
 **Verified base:** freshly fetched `origin/main` and current `HEAD` are `19c35ec62481dde45c9ea49146ecc4999aaf599f`.
 **T09.3 closure:** PR #3620 merged at `2026-10-08T03:57:48Z`, merge commit `19c35ec62481dde45c9ea49146ecc4999aaf599f`.
-**Current-state rule:** the base SHA identifies the clean starting point; T10 changes are currently uncommitted. On every resume, inspect actual worktree, branch and remote state before relying on this checkpoint.
+**Current-state rule:** T10 commit is `eb4a9d5ef423ffb5249831a252d0912471ddc220` on the clean base above; PR is not open yet. On every resume, inspect actual worktree, branch and remote state before relying on this checkpoint.
 **Scope:** T10 QueueProfile endpoint, PostgreSQL lifecycle tests, OpenAPI contract test/spec, generated TypeScript API types and the generator’s stale-count header, plus plan/checkpoint/decision documents. User explicitly approved the OpenAPI/generated-type scope extension. No migration/schema, frontend runtime UI, T11/T12 lifecycle/publication, queue ownership/fairness, auth/RBAC, shared staging or production changes.
 > **T10:** protect used QueueProfile bindings. The local diff counts active permanent addresses, prevents used-profile tag/order/department changes at PUT time, and adds a read-only proposed-binding preview with typed conflict response. PostgreSQL lifecycle and OpenAPI contract tests cover this contract; generated OpenAPI/client artifacts and the non-counting generator header are in scope.
 > **Tier 2:** no staging run was performed for T10; no staging deferral is accepted. T18 and full pre-deploy `STAGING_VALIDATION.md` remain outstanding. Skipped checks remain NOT_RUN.

@@ -1,13 +1,13 @@
 # Progress
 
-Plan version: 3.63
+Plan version: 3.64
 Current task: T10 — protect used queue profile bindings.
-Current status: VALIDATED; local PostgreSQL lifecycle, OpenAPI contract, generated-type freshness and TypeScript checks pass; PR not opened yet.
+Current status: VALIDATED; commit `eb4a9d5ef423ffb5249831a252d0912471ddc220`; local PostgreSQL lifecycle, OpenAPI contract, generated-type freshness and TypeScript checks pass; PR not opened yet.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-T10-profile-guards
 Base commit: 19c35ec62481dde45c9ea49146ecc4999aaf599f (fresh origin/main)
-Current commit: 19c35ec62481dde45c9ea49146ecc4999aaf599f (uncommitted T10 diff)
-Last updated: 2026-10-08T09:32:00+05:00
+Current commit: eb4a9d5ef423ffb5249831a252d0912471ddc220
+Last updated: 2026-10-08T09:37:00+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
