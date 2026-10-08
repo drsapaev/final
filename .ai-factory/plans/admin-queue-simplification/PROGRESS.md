@@ -1,24 +1,37 @@
 # Progress
 
-Plan version: 3.76
-Current task: T10 — protect used queue profile bindings; fix two review P2s.
-Current status: IN_PROGRESS — two additional review P2s are fixed, validated on disposable PostgreSQL and committed locally. Journal checkpoint, push and new-head CI are pending. PR #3633 remains OPEN; user performs merge.
+Plan version: 3.77
+Current task: T10 — protect used queue profile bindings; complete T10-specific synthetic Tier-2 staging.
+Current status: IN_PROGRESS — source fixes are committed; T10-specific authenticated API staging passed on exact PR HEAD. The staging stack and secret env were removed. Four plan journals now record evidence; commit/push and exact-head CI for the documentation checkpoint remain. PR #3633 is OPEN/MERGEABLE; user performs merge. No T10 deferral was accepted.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-T10-profile-guards
-PR base: `19c35ec62481dde45c9ea49146ecc4999aaf599f` (base when this branch started; origin/main is one unrelated migration ahead).
-Latest source/test commit: `37c6e4c7ebe1727dc1d0e96fc289618fda6a8a1a`.
-The T10 journal checkpoint is the current local HEAD; push is pending. Remote PR HEAD before push: `5b45b9bdaffe341ae2ee67d9136bc0f04b9c1e60`.
-Fresh `origin/main`: `7598692842241f54125ca9b7735964b7d5ee1b50` (one unrelated clinic-settings migration ahead of this continuing PR branch).
-Last updated: 2026-10-08T13:39:31+05:00
+PR base: 19c35ec62481dde45c9ea49146ecc4999aaf599f (base when this branch started).
+Latest source/test commit: 37c6e4c7ebe1727dc1d0e96fc289618fda6a8a1a.
+Current local HEAD / remote PR HEAD before docs checkpoint: c37179b6dfcb456c4e632a1a6f6eac1c2e9e322b.
+Fetched origin/main: c790a35982359c1ab5c47e7873079569144ed371; this is one unrelated commit ahead of the PR merge-base 19c35ec62481dde45c9ea49146ecc4999aaf599f. GitHub still reports #3633 OPEN/MERGEABLE.
+Last updated: 2026-10-08T14:39:49+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
-| T10 | IN_PROGRESS | PR #3633; local fixes validated; push/CI pending | | EVIDENCE.md#t10-additional-review-p2-fixes |
+| T10 | IN_PROGRESS | PR #3633; T10 API staging PASS; docs checkpoint/CI pending | | EVIDENCE.md#t10-pr-3633-bounded-synthetic-tier-2-staging |
 
-## Current checkpoint — T10 additional review P2 fixes (2026-10-08T13:39+05:00)
+## Current checkpoint — T10 bounded synthetic Tier-2 staging (2026-10-08T14:39:49+05:00)
+
+- PR #3633 was confirmed OPEN/MERGEABLE at exact HEAD c37179b6dfcb456c4e632a1a6f6eac1c2e9e322b, base 19c35ec62481dde45c9ea49146ecc4999aaf599f. The reviewed code/test commit and exact-head CI are already on this HEAD; the documentation-only update below requires new exact-head CI after push. User performs merge; no merge or review was submitted.
+- Exact environment: worktree HEAD c37179b6dfcb456c4e632a1a6f6eac1c2e9e322b, tracked worktree clean, WSL Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3, owned project codex-t10-pr3633-tier2-20261008, backend/frontend/PostgreSQL ports 18011/18090/55442. Backend/worker source mount and project ownership passed launcher checks. Frontend served-revision attestation remains false; no frontend revision claim is made.
+- Initial Check correctly refused the stale stack: all containers in the owned project had exited after the previous idle interval. No dependent test ran. The first Session wrapper returned helper PASS but launched an empty PowerShell child; the report was absent, so that attempt is NOT_RUN. The argument-forwarding mistake was corrected by invoking the documented PowerShell array directly and running Start immediately before Session.
+- Correct Start to Session run passed runtime readiness and executed the validator on this exact worktree. Standard synthetic Admin password login required TOTP enrollment; enrollment and verification completed normally, and the API reported TOTP enabled/verified. No bypass was used.
+- Queue guard PASS: a synthetic doctor-backed DailyQueue used queue_tag=profile.key while profile routing tags were [cardiology]. Impact preview counted the queue and blocked queue_tags; binding PUT returned 409; presentation-only PUT returned 200; re-read preserved the original tags; DELETE returned 409.
+- Permanent-address concurrency PASS: two Admin API requests were observed waiting behind the same PostgreSQL QueueProfile row lock in known order. Provision committed with HTTP 200; the following DELETE revalidated and returned 409. Impact preview reported one active address; subsequent DELETE also returned 409.
+- Sanitized local report: .scratch/T10-PR3633-tier2-staging-report.md. No patient or production data was used. No runtime code changed.
+- Teardown PASS: scripts/staging_down.ps1 -ProjectName codex-t10-pr3633-tier2-20261008 -EnvFile .scratch/t10-pr3633-staging.env; immediate verification found zero project containers, volumes, networks and images. The task-owned env file containing synthetic credentials was removed.
+- Scope: this is the T10 authenticated API acceptance slice only. Full STAGING_VALIDATION.md, T18, browser/UI E2E, served-frontend provenance, rollout and production remain NOT_RUN. No deferral was accepted.
+- Next exact action: run git diff --check, commit only the four plan files, refresh origin/main/remote PR state, push the existing branch fast-forward, then inspect exact-head CI. Do not update the PR body, merge, start T11, or touch preserved unrelated .scratch/ and frontend/.scratch/.
+
+## Superseded checkpoint — T10 additional review P2 fixes (2026-10-08T13:39+05:00)
 
 - Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-T10-profile-guards`. PR #3633 was OPEN at HEAD `5b45b9bdaffe341ae2ee67d9136bc0f04b9c1e60`, base `19c35ec62481dde45c9ea49146ecc4999aaf599f`; user merges. Current main has one later, unrelated clinic-settings migration. Preserve PR history; do not infer merge from chat.
 - New fixes: (1) `_profile_link_counts` counts the canonical `profile.key` as queue usage as well as effective expanded tags, because doctor QR join writes `DailyQueue.queue_tag=profile.key`; persisted routing tags remain unchanged. (2) DELETE locks/refreshes the `QueueProfile` row before checking dependencies, serializing it with address provision and binding PUT.

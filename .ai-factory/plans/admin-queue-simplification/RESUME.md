@@ -1,4 +1,15 @@
-## Current resume — T10 additional review P2 fixes (2026-10-08T13:39+05:00)
+## Current resume — T10 bounded synthetic Tier-2 staging (2026-10-08T14:39:49+05:00)
+
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final, branch codex/aqs-T10-profile-guards. PR #3633 was OPEN/MERGEABLE at exact HEAD c37179b6dfcb456c4e632a1a6f6eac1c2e9e322b, base 19c35ec62481dde45c9ea49146ecc4999aaf599f; user performs merge.
+- T10 code/test source commit: 37c6e4c7ebe1727dc1d0e96fc289618fda6a8a1a. Exact-head CI on c37179b6 was green before this documentation update. No runtime code changed during staging.
+- T10-specific synthetic staging PASS on that exact HEAD: normal Admin password plus TOTP enrollment/verification; queue_tag=profile.key usage is counted and binding PUT is refused; deterministic PostgreSQL public-address provision/DELETE race preserves the active address and returns DELETE 409.
+- Staging was isolated to project codex-t10-pr3633-tier2-20261008 with ports 18011/18090/55442 and the exact worktree backend mount. WSL Docker/Compose readiness passed. served_revision_verified=false; no frontend provenance claim.
+- The first Check found the prior idle stack stopped; the first Session attempt used an outer argument-forwarding wrapper and did not run the validator. Both attempts are NOT_RUN. Corrected direct -CommandArgs @(...) invocation with immediate Start-to-Session produced the sanitized PASS report.
+- Teardown succeeded and was verified: no project containers, volumes, networks or local images remain. The owned synthetic env/credentials file was removed. Report remains at .scratch/T10-PR3633-tier2-staging-report.md; scripts are under ignored output/staging/t10-pr3633/.
+- No deferral was accepted. Full docs/runbooks/STAGING_VALIDATION.md, T18, browser/UI suites and frontend artifact provenance remain NOT_RUN; no production or shared staging was touched.
+- Next exact step: run git diff --check; commit only codex-admin-queue-simplification.md, PROGRESS.md, RESUME.md, EVIDENCE.md; refresh origin/main and PR state; fast-forward push the existing branch; inspect checks on the resulting exact HEAD. Do not merge or start T11 until the user merges and main is synchronized.
+
+## Superseded resume — T10 additional review P2 fixes (2026-10-08T13:39+05:00)
 
 - Continue in `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-T10-profile-guards`. Source/test commit `37c6e4c7ebe1727dc1d0e96fc289618fda6a8a1a` and the T10 journal checkpoint are committed locally; push is pending. PR #3633 remote was OPEN at HEAD `5b45b9bdaffe341ae2ee67d9136bc0f04b9c1e60`, base `19c35ec62481dde45c9ea49146ecc4999aaf599f`; current origin/main is one unrelated clinic-settings migration ahead. Keep the existing PR history; user performs merge.
 - Both new review P2s are fixed locally: usage counts include doctor-QR DailyQueues keyed by `profile.key`; DELETE takes the same refreshed QueueProfile row lock as public-address provision before checking links. Two permanent PostgreSQL regressions cover these cases.
