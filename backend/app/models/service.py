@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -27,6 +28,10 @@ if TYPE_CHECKING:
 class Service(Base):
     __tablename__ = "services"
     __table_args__ = (
+        CheckConstraint(
+            "slug IS NULL OR slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'",
+            name="ck_services_website_slug_format",
+        ).ddl_if(dialect="postgresql"),
         Index(
             "uq_services_website_slug",
             "slug",

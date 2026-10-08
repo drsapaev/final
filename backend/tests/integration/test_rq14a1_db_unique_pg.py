@@ -304,6 +304,83 @@ def test_upgrade_creates_both_objects_on_clean_schema(pg_engine):
     }
 
 
+def _insert_website_slug(engine, entity: str, slug: str | None, suffix: str) -> None:
+    if entity == "service":
+        statement = text(
+            "INSERT INTO services "
+            "(name, active, created_at, requires_doctor, is_consultation, "
+            "allow_doctor_price_override, slug) "
+            "VALUES (:name, true, CURRENT_TIMESTAMP, false, false, false, :slug)"
+        )
+        parameters = {"name": f"Website slug test {suffix}", "slug": slug}
+    elif entity == "doctor":
+        statement = text(
+            "INSERT INTO doctors "
+            "(specialty, start_number_online, max_online_per_day, active, slug) "
+            "VALUES ('cardiology', 1, 15, true, :slug)"
+        )
+        parameters = {"slug": slug}
+    else:
+        raise AssertionError(f"Unsupported website slug entity: {entity}")
+
+    with engine.begin() as connection:
+        connection.execute(statement, parameters)
+
+
+@pytest.mark.parametrize("entity", ("service", "doctor"))
+@pytest.mark.parametrize("slug", (None, "a", "cardiology-visit-42"))
+def test_website_slug_check_accepts_null_and_valid_values(pg_engine, entity, slug):
+    _assert_pg_head(pg_engine)
+    _insert_website_slug(pg_engine, entity, slug, f"valid-{_RUN}-{entity}-{slug}")
+
+
+@pytest.mark.parametrize("entity", ("service", "doctor"))
+@pytest.mark.parametrize(
+    "slug",
+    (
+        "",
+        "Bad-Slug",
+        "has space",
+        "nested/path",
+        "two--parts",
+        "-leading",
+        "trailing-",
+        "under_score",
+        "ўзбекча",
+    ),
+)
+def test_website_slug_check_rejects_invalid_values(pg_engine, entity, slug):
+    _assert_pg_head(pg_engine)
+    with pytest.raises(IntegrityError):
+        _insert_website_slug(pg_engine, entity, slug, f"invalid-{_RUN}-{entity}")
+
+
+def test_website_slugs_are_unique_per_entity_and_separate_between_entities(pg_engine):
+    _assert_pg_head(pg_engine)
+    slug = f"shared-{_RUN}"
+    _insert_website_slug(pg_engine, "service", slug, f"service-{_RUN}")
+    _insert_website_slug(pg_engine, "doctor", slug, f"doctor-{_RUN}")
+
+    for entity in ("service", "doctor"):
+        with pytest.raises(IntegrityError):
+            _insert_website_slug(pg_engine, entity, slug, f"duplicate-{entity}-{_RUN}")
+
+
+def test_website_slug_model_constraints_match_postgres_storage_contract(test_db):
+    from app.models.clinic import Doctor
+    from app.models.service import Service
+
+    expected = "slug IS NULL OR slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+    for model, constraint_name in (
+        (Service, "ck_services_website_slug_format"),
+        (Doctor, "ck_doctors_website_slug_format"),
+    ):
+        constraints = {
+            constraint.name: constraint for constraint in model.__table__.constraints
+        }
+        assert str(constraints[constraint_name].sqltext) == expected
+
+
 def test_populated_upgrade_preserves_row_values():
     """REAL migration proof: 0064 -> synthetic rows -> COMMIT -> upgrade
     to 0065 -> the same rows are compared FIELD BY FIELD (not counts)."""

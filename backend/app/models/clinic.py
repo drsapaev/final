@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Enum,
@@ -70,6 +71,10 @@ class Doctor(Base):
 
     __tablename__ = "doctors"
     __table_args__ = (
+        CheckConstraint(
+            "slug IS NULL OR slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'",
+            name="ck_doctors_website_slug_format",
+        ).ddl_if(dialect="postgresql"),
         Index(
             "uq_doctors_website_slug",
             "slug",
