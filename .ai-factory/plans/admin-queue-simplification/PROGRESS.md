@@ -2,31 +2,32 @@
 
 Plan version: 3.84
 Current task: T10 — protect used QueueProfile bindings and address PR #3633 review.
-Current status: IN_PROGRESS — review fixes are pushed; exact-head CI passed. Tier-2 staging remains partial; extra race tests and full staging runbook are NOT_RUN.
+Current status: IN_PROGRESS — code fixes, exact-head CI, and PR description are updated. Tier-2 staging remains partial; extra race tests and full staging runbook are NOT_RUN.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-T10-profile-guards
 Base (`origin/main`): 7bb02680e778ac56369503c4fd337ac9329da4b2
-Current local HEAD: evidence-only journal checkpoint commit, pending push (tracked tree clean)
-PR remote HEAD at last query: b2f99ab66d4e1ebc3e592a1d34f1ad16d6a8f8e2 (OPEN/CLEAN; applicable CI passed; Tier-2 partial)
-Last updated: 2026-10-08T22:17+05:00
+Current local HEAD: evidence follow-up based on validated code HEAD b2f99ab66 and PR snapshot cb73091c0 (journal-only changes pending commit)
+PR remote HEAD at last query: cb73091c0d4a312153aca938014e94435239f118 (OPEN/CLEAN; applicable CI and PR-body checks passed; Tier-2 partial)
+Last updated: 2026-10-08T22:35+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
-| T10 | IN_PROGRESS | PR #3633; HEAD b2f99ab6; user merges | | EVIDENCE.md#t10-pr-3633-exact-head-ci-and-tier-2-status-2026-10-08 |
+| T10 | IN_PROGRESS | PR #3633; HEAD cb73091c; user merges | | EVIDENCE.md#t10-pr-3633-description-and-ci-checkpoint-2026-10-08 |
 
-## Current checkpoint — PR #3633 review fixes, exact-head CI, and Tier-2 status (2026-10-08T22:17+05:00)
+## Current checkpoint — PR #3633 description, exact-head CI, and Tier-2 status (2026-10-08T22:35+05:00)
 
-- Actual state checked: worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final, branch codex/aqs-T10-profile-guards; at the last GitHub snapshot local and remote code HEAD were both b2f99ab66d4e1ebc3e592a1d34f1ad16d6a8f8e2; base is 7bb02680e778ac56369503c4fd337ac9329da4b2. Since that snapshot, only the three T10 journal files changed in an evidence-only local checkpoint commit, which is pending push. Tracked tree is clean; untracked scratch directories are preserved.
+- Actual state checked: worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final, branch codex/aqs-T10-profile-guards; local and PR remote HEAD are both cb73091c0d4a312153aca938014e94435239f118; base is 7bb02680e778ac56369503c4fd337ac9329da4b2. Tracked tree is clean; untracked scratch directories are preserved.
 - Review code changes pushed in 928642674 fix Doctor owner-config-before-row lock order with stale-specialty 409/no-write; block single/bulk department deletion when active Doctor/QueueResource mappings would be detached; publish typed stale-binding 409s for profile PUT, Doctor update, and public-address provision; and update OpenAPI/generated TypeScript plus focused regression tests. The previously open cross-writer P2 implementation and PostgreSQL concurrency tests are present on the branch. CI source fakes/scanners now match the real binding-snapshot query. Commit b2f99ab66 fixes the sole docs-freshness mismatch by writing the workflow-generated OpenAPI JSON trailing newline.
 - Exact-head hosted run 37813134735 completed successfully on b2f99ab66. Backend: **5,418 passed, 65 skipped, 25 deselected, 3 xfailed, 125 warnings**. Frontend unit tests, E2E, lint/type-check, build, OpenAPI freshness, generated API type freshness, Code Quality, Frontend–Backend Parity, Context Boundary, PR Required Gate, security/secret scans, i18n, regression audit, Telegram release gate, and metadata/workflow validation passed. The exact check snapshot is recorded in EVIDENCE. Path-aware skips include Docker, k6, integration, staging/production readiness, DAST, Supabase Preview, and standalone security; skips are not passes.
+- Exact documentation-only HEAD cb73091c0 passed run 37815639318 with no failed or pending checks: Backend, Frontend E2E, frontend unit/build/lint, OpenAPI/docs freshness, API parity, Context Boundary, Code Quality, PR Required Gate, Telegram, security and metadata passed. The updated PR body separately passed the local template gate (19 tests + samples) and remote validator; GitHub PR Review Quality Gate and PR Lifecycle Recommendation passed again after the body edit. Applicable path-aware skips remain documented and are not passes.
 - Local focused tests: **55 passed, 1 warning**. Scoped Ruff, compileall, frontend type-check, OpenAPI/generated-type parity, PyYAML workflow parse, `git diff --check`, theme check, icon-control audit, and local OpenAPI newline parity passed. The commit hook `check-yaml` could not launch because Windows Application Control returned WinError 4551; equivalent PyYAML parse passed. Do not report that hook as having run.
 - Bounded Tier-2 staging is PARTIAL. On an owned synthetic PostgreSQL staging project mounted to source content matching the review-fix code, normal Admin password→TOTP, four PG regressions (Doctor lock ordering/stale specialty; active Doctor single-delete and active QueueResource bulk-delete guards), authenticated single/bulk API checks, and synthetic cleanup passed. This does not attest the immutable served frontend revision. A separate no-build Compose attempt for the two tagged queue/rebind race tests timed out at `NATIVE_UNAVAILABLE (compose-up)`; those tests are NOT_RUN. The owned project was removed and checked absent. Host C: had 9 GiB free, below the 10-GiB build reserve; do not retry until capacity changes.
 - Remaining NOT_RUN: full `docs/runbooks/STAGING_VALIDATION.md`, T18/browser/UI/keyboard/viewport checks, served frontend artifact provenance, and the two staging race tests. No Tier-2 deferral has been accepted. CI/branch status is not a substitute for these staging checks.
-- Five GitHub review threads remain unresolved; the corresponding code changes are present, but no thread replies/resolutions or formal review submission were made. PR #3633 is OPEN/CLEAN; no merge commit exists. User owns the merge decision.
-- Next exact action: push the evidence-only journal checkpoint, inspect applicable checks on that resulting exact PR HEAD, then update and validate the PR description with the code HEAD, CI result, partial Tier-2 scope, NOT_RUN list, and no accepted deferral. After that, await safe staging capacity or an explicit human deferral decision. Do not merge, submit a formal review, or write review-thread replies/resolutions.
+- Five GitHub review threads remain unresolved pending reviewer verification; the corresponding code fixes are present. No thread replies/resolutions or formal review submission were made. PR #3633 is OPEN/CLEAN; no merge commit exists. The description now records exact code/CI evidence and partial Tier-2 status; user owns the merge decision.
+- Next exact action: commit and push this journal-only follow-up; inspect the resulting exact-head checks. Then, when host capacity is restored above the runbook's 10-GiB build reserve, rerun only the two staging race scenarios in a fresh isolated synthetic project and record exact-head source provenance. If that remains unavailable, wait for the user's explicit bounded Tier-2 deferral decision. Full STAGING_VALIDATION.md/T18 remains a separate NOT_RUN requirement. Do not merge, submit a formal review, or write review-thread replies/resolutions.
 ## Superseded checkpoint — T10 cross-writer P2, main sync and fresh PostgreSQL rerun (2026-10-08T20:18+05:00)
 
 - GitHub PR #3633 was OPEN at remote HEAD `98b71d52767d70f300812f2c3ba5bef195d5dbcd`, while GitHub `main` is `7bb02680e778ac56369503c4fd337ac9329da4b2`; PR was BEHIND. Local `02db899d893f1992cd956f0e6504e5e93b22b363` is a clean merge of that PR head and current `origin/main`. Push is pending. Preserve pre-existing untracked `.scratch/` and `frontend/.scratch/`.
