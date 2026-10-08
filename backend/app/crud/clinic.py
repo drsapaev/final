@@ -270,6 +270,26 @@ def get_doctor_by_id(db: Session, doctor_id: int) -> Doctor | None:
     return db.query(Doctor).filter(Doctor.id == doctor_id).first()
 
 
+def get_doctor_by_id_for_update(db: Session, doctor_id: int) -> Doctor | None:
+    """Lock and refresh a Doctor row before website publication changes."""
+    return (
+        db.query(Doctor)
+        .filter(Doctor.id == doctor_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+
+
+def get_doctor_website_slug_conflict(
+    db: Session, *, slug: str, exclude_doctor_id: int | None = None
+) -> Doctor | None:
+    query = db.query(Doctor).filter(Doctor.slug == slug)
+    if exclude_doctor_id is not None:
+        query = query.filter(Doctor.id != exclude_doctor_id)
+    return query.first()
+
+
 def get_doctor_by_user_id(db: Session, user_id: int) -> Doctor | None:
     """Получить врача по ID пользователя"""
     return db.query(Doctor).filter(Doctor.user_id == user_id).first()
@@ -346,6 +366,10 @@ def update_doctor(db: Session, doctor_id: int, doctor: DoctorUpdate) -> Doctor |
         if field == "specialty":
             # D-1: canonicalize on update too (PUT /admin/doctors path).
             value = canonical_specialty(value)
+        if field == "active" and value is False:
+            # Deactivation hides the public card. A later reactivation must
+            # require an explicit website republish operation.
+            db_doctor.show_on_website = False
         setattr(db_doctor, field, value)
 
     db.commit()
@@ -360,6 +384,7 @@ def delete_doctor(db: Session, doctor_id: int) -> bool:
         return False
 
     db_doctor.active = False
+    db_doctor.show_on_website = False
     db.commit()
     return True
 

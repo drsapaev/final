@@ -41,6 +41,18 @@ class ServicesApiRepository:
     def get_service(self, service_id: int):
         return self.db.query(Service).filter(Service.id == service_id).first()
 
+    def list_services_for_website_admin(self):
+        """Return all service rows for the Admin-only website editor."""
+        return self.db.query(Service).order_by(Service.id.asc()).all()
+
+    def get_service_website_slug_conflict(
+        self, *, slug: str, exclude_service_id: int | None = None
+    ):
+        query = self.db.query(Service).filter(Service.slug == slug)
+        if exclude_service_id is not None:
+            query = query.filter(Service.id != exclude_service_id)
+        return query.first()
+
     def get_service_for_update(self, service_id: int):
         """RQ-17 round-2 (P1-2): row-level serialization writer-а.
 

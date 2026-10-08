@@ -450,6 +450,12 @@ class ServicesApiService:
             if not category:
                 raise ValueError("Selected category not found")
 
+        if "name" in update_data:
+            name = update_data["name"]
+            if name is None or not str(name).strip():
+                raise ValueError("Service name cannot be empty")
+            update_data["name"] = str(name).strip()
+
         # RQ-17 §3.1(б)/(в): serialization-scope мутации Service. Ретег
         # Service.queue_tag (поле writable: ServiceUpdate.queue_tag,
         # PUT /services/{service_id}) меняет ДВА service-set разом —
@@ -464,6 +470,11 @@ class ServicesApiService:
 
         for field, value in update_data.items():
             setattr(service, field, value)
+
+        if update_data.get("active") is False:
+            # Deactivation removes the card from public visibility. A later
+            # activation does not republish it automatically.
+            service.show_on_website = False
 
         if affected_tags:
             if update_data.get("requires_doctor"):
@@ -507,6 +518,7 @@ class ServicesApiService:
             # критической секции (round-4 brief)
             lock_owner_config_scope(db, service.queue_tag)
         service.active = False
+        service.show_on_website = False
         self.repository.add(service)
         if service.queue_tag:
             db.flush()
@@ -607,6 +619,10 @@ class ServicesApiService:
                 for field, value in updates.items():
                     if hasattr(service, field):
                         setattr(service, field, value)
+                if updates.get("active") is False:
+                    # The batch endpoint is another canonical deactivation
+                    # path; reactivation must not restore public visibility.
+                    service.show_on_website = False
 
             if affected_tags:
                 if updates.get("requires_doctor"):

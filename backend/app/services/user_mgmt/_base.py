@@ -275,6 +275,10 @@ class UserManagementServiceMixinBase:
                     raise DoctorSpecialtyNotSelectableError(stored_specialty)
 
         values: dict[str, object] = {"active": active}
+        if not active or detach_owner:
+            # The public card must stay hidden after account deactivation or
+            # unlinking. Reactivation does not restore website visibility.
+            values["show_on_website"] = False
         if detach_owner:
             values["user_id"] = None
         filters = [Doctor.user_id == user_id]

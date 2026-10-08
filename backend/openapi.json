@@ -2401,6 +2401,139 @@
         }
       }
     },
+    "/api/v1/services/admin/website-content": {
+      "get": {
+        "tags": [
+          "services"
+        ],
+        "summary": "Получить website-контент услуг для админки",
+        "description": "Read website fields without expanding the unauthenticated catalog DTO.",
+        "operationId": "get_admin_service_website_content_api_v1_services_admin_website_content_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WebsiteServiceContentOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Admin Service Website Content Api V1 Services Admin Website Content Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/services/admin/website-content/{service_id}": {
+      "get": {
+        "tags": [
+          "services"
+        ],
+        "summary": "Получить website-контент услуги для админки",
+        "operationId": "get_admin_service_website_content_item_api_v1_services_admin_website_content__service_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "service_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Service Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebsiteServiceContentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "services"
+        ],
+        "summary": "Изменить и опубликовать website-контент услуги",
+        "operationId": "update_admin_service_website_content_api_v1_services_admin_website_content__service_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "service_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Service Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebsiteServiceContentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebsiteServiceContentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/services": {
       "get": {
         "tags": [
@@ -32188,6 +32321,110 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Delete Doctor Api V1 Admin Doctors  Doctor Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/doctors/{doctor_id}/website-content": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Doctor Website Content",
+        "description": "Read the Admin-only website fields for one doctor.",
+        "operationId": "get_doctor_website_content_api_v1_admin_doctors__doctor_id__website_content_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doctor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebsiteDoctorContentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Doctor Website Content",
+        "description": "Apply one explicit Admin publication operation to a doctor.",
+        "operationId": "update_doctor_website_content_api_v1_admin_doctors__doctor_id__website_content_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doctor Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebsiteDoctorContentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebsiteDoctorContentOut"
                 }
               }
             }
@@ -117459,6 +117696,357 @@
         ],
         "title": "WebhookWithStats",
         "description": "Webhook со статистикой"
+      },
+      "WebsiteContentOperation": {
+        "type": "string",
+        "enum": [
+          "save_draft",
+          "save_published",
+          "publish",
+          "unpublish",
+          "republish"
+        ],
+        "title": "WebsiteContentOperation"
+      },
+      "WebsiteDoctorContentOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "owner_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Active"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "bio_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio Ru"
+          },
+          "bio_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio Uz"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "show_on_website": {
+            "type": "boolean",
+            "title": "Show On Website"
+          },
+          "website_first_published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website First Published At"
+          },
+          "slug_locked": {
+            "type": "boolean",
+            "title": "Slug Locked"
+          },
+          "missing_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Fields"
+          },
+          "action_result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "active",
+          "show_on_website",
+          "slug_locked"
+        ],
+        "title": "WebsiteDoctorContentOut"
+      },
+      "WebsiteDoctorContentUpdate": {
+        "properties": {
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/WebsiteContentOperation"
+          },
+          "bio_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio Ru"
+          },
+          "bio_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio Uz"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operation"
+        ],
+        "title": "WebsiteDoctorContentUpdate"
+      },
+      "WebsiteServiceContentOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "name_ru": {
+            "type": "string",
+            "title": "Name Ru"
+          },
+          "name_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Uz"
+          },
+          "description_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Ru"
+          },
+          "description_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Uz"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "show_on_website": {
+            "type": "boolean",
+            "title": "Show On Website"
+          },
+          "website_first_published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website First Published At"
+          },
+          "slug_locked": {
+            "type": "boolean",
+            "title": "Slug Locked"
+          },
+          "missing_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Fields"
+          },
+          "action_result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "active",
+          "name_ru",
+          "show_on_website",
+          "slug_locked"
+        ],
+        "title": "WebsiteServiceContentOut"
+      },
+      "WebsiteServiceContentUpdate": {
+        "properties": {
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/WebsiteContentOperation"
+          },
+          "name_ru": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Ru"
+          },
+          "name_uz": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Uz"
+          },
+          "description_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Ru"
+          },
+          "description_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Uz"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operation"
+        ],
+        "title": "WebsiteServiceContentUpdate"
       },
       "WeeklyScheduleUpdate": {
         "properties": {

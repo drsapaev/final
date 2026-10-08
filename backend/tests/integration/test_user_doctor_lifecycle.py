@@ -11,7 +11,7 @@ Ghost-doctor prevention contract (PR: fix/doctor-lifecycle-ghost-doctor):
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 from app.core.security import get_password_hash
 from app.models.clinic import Doctor
@@ -106,6 +106,10 @@ def test_bulk_deactivate_then_activate_mirrors_to_doctor(
     client, db_session, auth_headers
 ):
     user, doctor = _create_doctor_with_profile(db_session, "bulk")
+    doctor.show_on_website = True
+    doctor.slug = "synthetic-bulk-doctor"
+    doctor.website_first_published_at = datetime.now(UTC)
+    db_session.commit()
 
     response = client.post(
         "/api/v1/users/users/bulk-action",
@@ -114,7 +118,11 @@ def test_bulk_deactivate_then_activate_mirrors_to_doctor(
     )
     assert response.status_code == 200, response.text
     db_session.expire_all()
-    assert db_session.query(Doctor).filter(Doctor.id == doctor.id).one().active is False
+    doctor_row = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+    assert doctor_row.active is False
+    assert doctor_row.show_on_website is False
+    assert doctor_row.slug == "synthetic-bulk-doctor"
+    first_published_at = doctor_row.website_first_published_at
 
     response = client.post(
         "/api/v1/users/users/bulk-action",
@@ -123,7 +131,10 @@ def test_bulk_deactivate_then_activate_mirrors_to_doctor(
     )
     assert response.status_code == 200, response.text
     db_session.expire_all()
-    assert db_session.query(Doctor).filter(Doctor.id == doctor.id).one().active is True
+    doctor_row = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+    assert doctor_row.active is True
+    assert doctor_row.show_on_website is False
+    assert doctor_row.website_first_published_at == first_published_at
 
 
 def test_bulk_delete_deactivates_doctor(client, db_session, auth_headers):

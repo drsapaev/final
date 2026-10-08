@@ -26,10 +26,18 @@ from app.schemas.clinic import (
     SpecialtyVocabularyItem,
     WeeklyScheduleUpdate,
 )
+from app.schemas.public_site_admin import (
+    WebsiteDoctorContentOut,
+    WebsiteDoctorContentUpdate,
+)
 from app.services.admin_doctors_stats_service import AdminDoctorsStatsService
 from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
     MedicalSpecialtyCatalogService,
+)
+from app.services.public_site_admin_service import (
+    PublicSiteAdminService,
+    WebsiteContentServiceError,
 )
 from app.services.user_mgmt._base import (
     DOCTOR_PROFILE_ROLES,
@@ -793,6 +801,48 @@ def update_doctor(
         raise _admin_doctors_http_error(exc, "update_doctor") from exc
     except Exception as exc:
         raise _admin_doctors_http_error(exc, "update_doctor") from exc
+
+
+@router.get(
+    "/doctors/{doctor_id}/website-content",
+    response_model=WebsiteDoctorContentOut,
+)
+def get_doctor_website_content(
+    doctor_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Read the Admin-only website fields for one doctor."""
+    try:
+        return PublicSiteAdminService(db).get_doctor_content(doctor_id)
+    except WebsiteContentServiceError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=exc.as_detail()
+        ) from exc
+    except Exception as exc:
+        raise _admin_doctors_http_error(exc, "get_doctor_website_content") from exc
+
+
+@router.put(
+    "/doctors/{doctor_id}/website-content",
+    response_model=WebsiteDoctorContentOut,
+)
+def update_doctor_website_content(
+    doctor_id: int,
+    payload: WebsiteDoctorContentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Apply one explicit Admin publication operation to a doctor."""
+    try:
+        return PublicSiteAdminService(db).update_doctor_content(doctor_id, payload)
+    except WebsiteContentServiceError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=exc.as_detail()
+        ) from exc
+    except Exception as exc:
+        db.rollback()
+        raise _admin_doctors_http_error(exc, "update_doctor_website_content") from exc
 
 
 @router.delete("/doctors/{doctor_id}", response_model=dict[str, Any])
