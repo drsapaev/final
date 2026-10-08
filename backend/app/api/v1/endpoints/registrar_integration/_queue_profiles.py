@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from sqlalchemy import func
+
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_integration._helpers import (
     _raise_registrar_internal_error,
@@ -44,7 +46,17 @@ def _profile_binding_values_equal(
         return _canonical_profile_tags(left, profile_key) == _canonical_profile_tags(
             right, profile_key
         )
+    if field == "department_key":
+        return _normalize_department_key(left) == _normalize_department_key(right)
     return left == right
+
+
+def _normalize_department_key(value: str | None) -> str | None:
+    """Treat empty admin Select values as an unassigned department."""
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 @router.get("/queues/profiles", response_model=dict[str, Any])
@@ -181,8 +193,9 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
     rendered preview can never authorize a destructive action (stale
     preview protection, ACCEPTANCE S-10). Significant links are:
 
-    - services whose queue_tag is owned by this profile (a delete would
-      orphan or silently untag them);
+    - services whose queue_tag is owned by this profile, and services
+      assigned through the profile's department_key;
+    - active doctors and QueueResources selected by the profile's tags;
     - daily queues (ANY day — historical rows included) whose queue_tag
       is owned by this profile: their entries are the profile's real
       usage history and possibly still-waiting patients;
@@ -190,7 +203,8 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
       staff regardless of the profile's active state);
     - active permanent public addresses linked to this profile.
     """
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
     from app.models.queue_direction_public_address import QueueDirectionPublicAddress
     from app.models.service import Service
 
@@ -207,6 +221,9 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
     if profile.key and profile.key not in usage_tags:
         usage_tags.append(profile.key)
     services = 0
+    department_services = 0
+    active_doctors = 0
+    active_queue_resources = 0
     daily_queues = 0
     entries_waiting = 0
     entries_total = 0
@@ -237,8 +254,35 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
             entries_waiting = entries_q.filter(
                 OnlineQueueEntry.status == "waiting"
             ).count()
+    if tags:
+        active_doctors = (
+            db.query(Doctor)
+            .filter(
+                Doctor.active.is_(True),
+                func.lower(func.trim(Doctor.specialty)).in_(
+                    {tag.strip().lower() for tag in tags}
+                ),
+            )
+            .count()
+        )
+        active_queue_resources = (
+            db.query(QueueResource)
+            .filter(
+                QueueResource.active.is_(True),
+                QueueResource.queue_tag.in_(tags),
+            )
+            .count()
+        )
+    department_key = _normalize_department_key(profile.department_key)
+    if department_key:
+        department_services = (
+            db.query(Service).filter(Service.department_key == department_key).count()
+        )
     return {
         "services": services,
+        "department_services": department_services,
+        "active_doctors": active_doctors,
+        "active_queue_resources": active_queue_resources,
         "daily_queues": daily_queues,
         "entries_waiting": entries_waiting,
         "entries_total": entries_total,
@@ -351,6 +395,9 @@ class QueueProfileBindingSnapshot(BaseModel):
 
 class QueueProfileLinkCounts(BaseModel):
     services: int
+    department_services: int
+    active_doctors: int
+    active_queue_resources: int
     daily_queues: int
     entries_waiting: int
     entries_total: int
@@ -383,9 +430,23 @@ class QueueProfileBindingConflictResponse(BaseModel):
     detail: QueueProfileBindingConflictDetail
 
 
+class QueueProfileHttpError(BaseModel):
+    """FastAPI HTTPException envelope used by Admin preview errors."""
+
+    detail: str
+
+
 @router.post(
     "/queues/profiles/{profile_key}/impact-preview",
     response_model=QueueProfileUpdateImpactPreview,
+    responses={
+        401: {
+            "model": QueueProfileHttpError,
+            "description": "Authentication required.",
+        },
+        403: {"model": QueueProfileHttpError, "description": "Admin role required."},
+        404: {"model": QueueProfileHttpError, "description": "Profile not found."},
+    },
 )
 def preview_queue_profile_update(
     profile_key: str,
@@ -427,7 +488,9 @@ def preview_queue_profile_update(
                 else candidate_tags
             )
         if "department_key" in proposed_update:
-            proposed["department_key"] = proposed_update["department_key"]
+            proposed["department_key"] = _normalize_department_key(
+                proposed_update["department_key"]
+            )
 
         changed_binding_fields = [
             field
@@ -572,6 +635,10 @@ def update_queue_profile(
 
         # Update fields (only those provided)
         update_data = profile_data.dict(exclude_unset=True)
+        if "department_key" in update_data:
+            update_data["department_key"] = _normalize_department_key(
+                update_data["department_key"]
+            )
         if "queue_tags" in update_data:
             candidate_tags = _canonical_profile_tags(
                 update_data["queue_tags"], profile.key

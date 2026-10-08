@@ -17793,6 +17793,36 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin role required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profile not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileHttpError"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -103468,6 +103498,20 @@
         "title": "QueueProfileCreate",
         "description": "Schema for creating a new QueueProfile"
       },
+      "QueueProfileHttpError": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "QueueProfileHttpError",
+        "description": "FastAPI HTTPException envelope used by Admin preview errors."
+      },
       "QueueProfileImpactIdentity": {
         "properties": {
           "key": {
@@ -103486,6 +103530,18 @@
           "services": {
             "type": "integer",
             "title": "Services"
+          },
+          "department_services": {
+            "type": "integer",
+            "title": "Department Services"
+          },
+          "active_doctors": {
+            "type": "integer",
+            "title": "Active Doctors"
+          },
+          "active_queue_resources": {
+            "type": "integer",
+            "title": "Active Queue Resources"
           },
           "daily_queues": {
             "type": "integer",
@@ -103507,6 +103563,9 @@
         "type": "object",
         "required": [
           "services",
+          "department_services",
+          "active_doctors",
+          "active_queue_resources",
           "daily_queues",
           "entries_waiting",
           "entries_total",

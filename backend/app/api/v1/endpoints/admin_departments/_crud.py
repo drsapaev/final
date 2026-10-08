@@ -232,8 +232,9 @@ def bulk_delete_departments(
     ids = payload.ids
 
     # RQ-13 UI-slice (S-11/D-06): guard parity with the single delete —
-    # a department whose linked profiles still own queue history cannot be
-    # hard-deleted. All-or-nothing: nothing is deleted when ANY requested
+    # a department whose linked profiles still own queue history or active
+    # permanent public addresses cannot be hard-deleted. All-or-nothing:
+    # nothing is deleted when ANY requested
     # department is blocked (no partial bulk delete), and the 409 report
     # names every offending department with its live impact. Deletable
     # departments go through the SAME cascade as the single endpoint
@@ -246,6 +247,7 @@ def bulk_delete_departments(
             not_found += 1
             continue
         departments.append(department)
+    departments.sort(key=lambda item: item.id)
 
     blocked_report: list[dict] = []
     for department in departments:
@@ -269,7 +271,8 @@ def bulk_delete_departments(
                 "error": "department_has_queue_history",
                 "message": (
                     "Массовое удаление отменено: связанные вкладки очередей "
-                    "все ещё содержат записи/ожидающих пациентов. "
+                    "содержат записи, ожидающих пациентов или активные "
+                    "постоянные ссылки. "
                     "Деактивируйте отделения вместо удаления."
                 ),
                 "waiting_patients": total_waiting,
@@ -432,24 +435,38 @@ def initialize_department(
 
 def _department_delete_block_report(db: Session, department) -> list[dict]:
     """RQ-13.a (D-06/S-11/D-02): per-profile impact rows for a department
-    whose linked profiles still own queue history (any day) or waiting
-    patients. Same significant-link bar as the profile hard-delete guard
-    (RQ-12.b), computed live from the same SSOT at execution time
-    (stale-data protection by construction). Shared by the single delete
-    and the bulk delete (one contract, not two behaviors)."""
+    whose linked profiles still own queue history (any day), waiting
+    patients, or active permanent public addresses. Lock each profile
+    before recomputing shared usage facts so address provisioning cannot
+    race the department cascade. Shared by single and bulk delete."""
     from app.api.v1.endpoints.registrar_integration._queue_profiles import (
         _profile_link_counts,
     )
+    from app.models.queue_profile import QueueProfile
+
     blocked_links: list[dict] = []
-    for profile in _department_linked_profiles(db, department):
+    linked_profiles = sorted(
+        _department_linked_profiles(db, department), key=lambda item: item.key
+    )
+    for linked_profile in linked_profiles:
+        profile = (
+            db.query(QueueProfile)
+            .filter(QueueProfile.id == linked_profile.id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        if profile is None:
+            continue
         counts = _profile_link_counts(db, profile)
-        if counts["entries_total"] > 0:
+        if counts["entries_total"] > 0 or counts["active_public_addresses"] > 0:
             blocked_links.append(
                 {
                     "profile_key": profile.key,
                     "daily_queues": counts["daily_queues"],
                     "entries_waiting": counts["entries_waiting"],
                     "entries_total": counts["entries_total"],
+                    "active_public_addresses": counts["active_public_addresses"],
                 }
             )
     return blocked_links
@@ -531,9 +548,9 @@ def delete_department(
         )
 
     # RQ-13.a (D-06/S-11/D-02): a department whose linked profiles still
-    # own queue history (any day) or waiting patients cannot be hard-
-    # deleted — the profile deletion below would remove the tab surfaces
-    # those patients are reachable through. Same significant-link bar as
+    # own queue history, waiting patients, or active permanent public
+    # addresses cannot be hard-deleted — the profile cascade would remove
+    # the public link target. Same significant-link bar as
     # the profile hard-delete guard (RQ-12.b), computed live from the
     # same SSOT at execution time (stale-data protection by construction).
     blocked_links = _department_delete_block_report(db, department)
@@ -545,7 +562,8 @@ def delete_department(
                 "error": "department_has_queue_history",
                 "message": (
                     "Нельзя удалить отделение: связанные вкладки очередей "
-                    "все ещё содержат записи/ожидающих пациентов. "
+                    "содержат записи, ожидающих пациентов или активные "
+                    "постоянные ссылки. "
                     "Деактивируйте отделение вместо удаления."
                 ),
                 "waiting_patients": total_waiting,
@@ -1024,5 +1042,3 @@ def remove_doctor_from_department(
     db.commit()
 
     return {"success": True, "message": "Doctor removed from department"}
-
-

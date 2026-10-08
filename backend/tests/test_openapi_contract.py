@@ -258,6 +258,11 @@ def test_openapi_queue_profile_binding_preview_and_conflict_are_typed(
     assert preview_schema["$ref"] == (
         "#/components/schemas/QueueProfileUpdateImpactPreview"
     )
+    for status in ("401", "403", "404"):
+        error_schema = preview["responses"][status]["content"]["application/json"][
+            "schema"
+        ]
+        assert error_schema["$ref"] == "#/components/schemas/QueueProfileHttpError"
     preview_contract = components["QueueProfileUpdateImpactPreview"]
     assert {
         "current",
@@ -269,7 +274,12 @@ def test_openapi_queue_profile_binding_preview_and_conflict_are_typed(
     }.issubset(preview_contract["required"])
     links_ref = preview_contract["properties"]["links"]["$ref"]
     links_contract = components[links_ref.rsplit("/", 1)[-1]]
-    assert "active_public_addresses" in links_contract["required"]
+    assert {
+        "active_public_addresses",
+        "active_doctors",
+        "active_queue_resources",
+        "department_services",
+    }.issubset(links_contract["required"])
 
     update = paths["/api/v1/queues/profiles/{profile_key}"]["put"]
     conflict_schema = update["responses"]["409"]["content"]["application/json"][

@@ -742,6 +742,155 @@ def test_active_public_address_counts_as_profile_usage(
     assert address.retired_at is None
 
 
+def test_empty_department_key_is_no_change_for_used_profile(
+    pg_client, pg_session, pg_admin_user
+):
+    """The Select's empty-string value preserves a NULL binding on used profiles."""
+    from app.models.queue_profile import QueueProfile
+
+    world = _seed_profile_with_queue(pg_session, "t10emptydept")
+    profile = pg_session.query(QueueProfile).filter_by(key=world["key"]).one()
+    assert profile.department_key is None
+
+    payload = {"title": "RQ-12.b presentation update", "department_key": ""}
+    preview = _preview_profile_update(pg_client, pg_admin_user, world["key"], payload)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["proposed"]["department_key"] is None
+    assert preview.json()["changed_binding_fields"] == []
+    assert preview.json()["blocked_fields"] == []
+
+    updated = _put_profile(pg_client, pg_admin_user, world["key"], payload)
+    assert updated.status_code == 200, updated.text
+    pg_session.refresh(profile)
+    assert profile.title == payload["title"]
+    assert profile.department_key is None
+
+
+def test_active_doctor_mapping_blocks_profile_rebinding(
+    pg_client, pg_session, pg_admin_user
+):
+    from app.models.clinic import Doctor
+    from app.models.queue_profile import QueueProfile
+
+    key = "rq12b-t10-doctor-only"
+    tag = "rq12b-t10-doctor-only-tag"
+    profile = QueueProfile(
+        key=key,
+        title="RQ-12.b doctor only",
+        queue_tags=[tag],
+        department_key=None,
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    pg_session.add_all(
+        [
+            profile,
+            Doctor(specialty=tag, active=True),
+            # The canonical DailyQueue identity is not automatically a
+            # doctor-routing tag when it is absent from queue_tags.
+            Doctor(specialty=key, active=True),
+        ]
+    )
+    pg_session.commit()
+
+    payload = {"queue_tags": ["rq12b-t10-doctor-only-new"]}
+    preview = _preview_profile_update(pg_client, pg_admin_user, key, payload)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["links"]["active_doctors"] == 1
+    assert preview.json()["can_update"] is False
+
+    updated = _put_profile(pg_client, pg_admin_user, key, payload)
+    assert updated.status_code == 409, updated.text
+    assert updated.json()["detail"]["links"]["active_doctors"] == 1
+
+
+def test_active_queue_resource_mapping_blocks_profile_rebinding(
+    pg_client, pg_session, pg_admin_user
+):
+    from app.models.online_queue import QueueResource
+    from app.models.queue_profile import QueueProfile
+
+    key = "rq12b-t10-resource-only"
+    tag = "rq12b-t10-resource-only-tag"
+    profile = QueueProfile(
+        key=key,
+        title="RQ-12.b resource only",
+        queue_tags=[tag],
+        department_key=None,
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    resource = QueueResource(
+        code="t10-resource-only",
+        queue_tag=tag,
+        display_name="RQ-12.b synthetic resource",
+        active=True,
+    )
+    pg_session.add_all(
+        [
+            profile,
+            resource,
+            # The profile key is a queue identity, not a resource mapping
+            # unless it is also explicitly one of the profile's tags.
+            QueueResource(
+                code="t10-resource-profile-key",
+                queue_tag=key,
+                display_name="RQ-12.b synthetic profile-key resource",
+                active=True,
+            ),
+        ]
+    )
+    pg_session.commit()
+
+    payload = {"queue_tags": ["rq12b-t10-resource-only-new"]}
+    preview = _preview_profile_update(pg_client, pg_admin_user, key, payload)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["links"]["active_queue_resources"] == 1
+    assert preview.json()["can_update"] is False
+
+    updated = _put_profile(pg_client, pg_admin_user, key, payload)
+    assert updated.status_code == 409, updated.text
+    assert updated.json()["detail"]["links"]["active_queue_resources"] == 1
+
+
+def test_department_linked_service_blocks_department_binding_change(
+    pg_client, pg_session, pg_admin_user
+):
+    from app.models.queue_profile import QueueProfile
+    from app.models.service import Service
+
+    key = "rq12b-t10-dept-service"
+    department_key = "rq12b-t10-dept-service-dept"
+    profile = QueueProfile(
+        key=key,
+        title="RQ-12.b department service",
+        queue_tags=["rq12b-t10-dept-service-tag"],
+        department_key=department_key,
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    service = Service(
+        name="RQ-12.b department-only service",
+        code="T10DSVC",
+        service_code="T10DSVC",
+        queue_tag=None,
+        department_key=department_key,
+        active=True,
+    )
+    pg_session.add_all([profile, service])
+    pg_session.commit()
+
+    payload = {"department_key": "rq12b-t10-dept-service-new"}
+    preview = _preview_profile_update(pg_client, pg_admin_user, key, payload)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["links"]["department_services"] == 1
+    assert preview.json()["can_update"] is False
+
+    updated = _put_profile(pg_client, pg_admin_user, key, payload)
+    assert updated.status_code == 409, updated.text
+    assert updated.json()["detail"]["links"]["department_services"] == 1
+
+
 def test_binding_update_rechecks_after_stale_preview(
     pg_client, pg_session, pg_admin_user
 ):
@@ -1502,6 +1651,23 @@ def _seed_waiting_entry_for_department(pg_session, dept_key: str, suffix: str) -
     return {"tag": tag, "queue_id": queue.id, "entry_id": entry.id}
 
 
+def _seed_active_public_address_for_department(
+    pg_session, dept_key: str, suffix: str
+) -> dict[str, int]:
+    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
+    from app.models.queue_profile import QueueProfile
+
+    profile = pg_session.query(QueueProfile).filter_by(key=dept_key).one()
+    address = QueueDirectionPublicAddress(
+        queue_profile_id=profile.id,
+        public_code=f"r13{suffix}".ljust(12, "x")[:12],
+    )
+    pg_session.add(address)
+    pg_session.commit()
+    pg_session.refresh(address)
+    return {"profile_id": profile.id, "address_id": address.id}
+
+
 def test_department_deactivation_hides_linked_profiles_and_qr(
     pg_client, pg_session, pg_admin_user
 ):
@@ -1730,6 +1896,82 @@ def test_department_delete_without_queue_history_keeps_cascade(
         pg_session.query(QueueProfile).filter(QueueProfile.key == dept_key).first()
         is None
     )
+
+
+def test_department_delete_blocked_when_profile_has_active_public_address(
+    pg_client, pg_session, pg_admin_user
+):
+    """The single department delete preserves address-only profile links."""
+    from app.models.department import Department
+    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
+    from app.models.queue_profile import QueueProfile
+
+    headers = _dep_headers(pg_admin_user)
+    dept = _create_department(pg_client, headers, "addr")
+    seeded = _seed_active_public_address_for_department(
+        pg_session, dept["key"], "single"
+    )
+
+    response = pg_client.delete(
+        f"/api/v1/admin/departments/{dept['id']}", headers=headers
+    )
+    assert response.status_code == 409, response.text
+    profiles = response.json()["detail"]["profiles"]
+    blocked = next(row for row in profiles if row["profile_key"] == dept["key"])
+    assert blocked["active_public_addresses"] == 1
+
+    pg_session.expire_all()
+    assert pg_session.query(Department).filter_by(id=dept["id"]).one()
+    assert pg_session.query(QueueProfile).filter_by(key=dept["key"]).one()
+    address = (
+        pg_session.query(QueueDirectionPublicAddress)
+        .filter_by(id=seeded["address_id"])
+        .one()
+    )
+    assert address.queue_profile_id == seeded["profile_id"]
+    assert address.retired_at is None
+
+
+def test_department_bulk_delete_blocked_when_profile_has_active_public_address(
+    pg_client, pg_session, pg_admin_user
+):
+    """Bulk delete applies the same address guard without partial cleanup."""
+    from app.models.department import Department
+    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
+    from app.models.queue_profile import QueueProfile
+
+    headers = _dep_headers(pg_admin_user)
+    blocked = _create_department(pg_client, headers, "addrbulk_a")
+    clean = _create_department(pg_client, headers, "addrbulk_b")
+    seeded = _seed_active_public_address_for_department(
+        pg_session, blocked["key"], "bulk"
+    )
+
+    response = pg_client.request(
+        "DELETE",
+        "/api/v1/admin/departments/bulk-delete",
+        headers=headers,
+        json={"ids": [blocked["id"], clean["id"]]},
+    )
+    assert response.status_code == 409, response.text
+    details = response.json()["detail"]["blocked"]
+    blocked_row = next(row for row in details if row["department_id"] == blocked["id"])
+    profile_impact = next(
+        row for row in blocked_row["profiles"] if row["profile_key"] == blocked["key"]
+    )
+    assert profile_impact["active_public_addresses"] == 1
+
+    pg_session.expire_all()
+    for department in (blocked, clean):
+        assert pg_session.query(Department).filter_by(id=department["id"]).one()
+    assert pg_session.query(QueueProfile).filter_by(key=blocked["key"]).one()
+    address = (
+        pg_session.query(QueueDirectionPublicAddress)
+        .filter_by(id=seeded["address_id"])
+        .one()
+    )
+    assert address.queue_profile_id == seeded["profile_id"]
+    assert address.retired_at is None
 
 
 def test_bulk_deactivation_follows_hide_contract(pg_client, pg_session, pg_admin_user):

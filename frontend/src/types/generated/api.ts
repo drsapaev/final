@@ -36307,6 +36307,14 @@ export type components = {
              */
             color?: string | null;
         };
+        /**
+         * QueueProfileHttpError
+         * @description FastAPI HTTPException envelope used by Admin preview errors.
+         */
+        QueueProfileHttpError: {
+            /** Detail */
+            detail: string;
+        };
         /** QueueProfileImpactIdentity */
         QueueProfileImpactIdentity: {
             /** Key */
@@ -36316,6 +36324,12 @@ export type components = {
         QueueProfileLinkCounts: {
             /** Services */
             services: number;
+            /** Department Services */
+            department_services: number;
+            /** Active Doctors */
+            active_doctors: number;
+            /** Active Queue Resources */
+            active_queue_resources: number;
             /** Daily Queues */
             daily_queues: number;
             /** Entries Waiting */
@@ -53080,6 +53094,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueProfileUpdateImpactPreview"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileHttpError"];
+                };
+            };
+            /** @description Admin role required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileHttpError"];
+                };
+            };
+            /** @description Profile not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileHttpError"];
                 };
             };
             /** @description Validation Error */
