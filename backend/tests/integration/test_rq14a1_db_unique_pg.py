@@ -18,7 +18,7 @@ PROGRESS E-037 before the edits):
   RQ14A1U_PG_ADMIN_URL env override — is verified to be
   localhost/loopback BEFORE connecting; remote/unverified candidates
   are rejected (never used, never printed).
-- REAL MIGRATION PROOFS: populated upgrade = 0064 -> ORM seed ->
+- REAL MIGRATION PROOFS: populated upgrade = 0064 -> compatible seed ->
   session.commit() -> alembic upgrade head, comparing meaningful ROW
   VALUES before/after (not only counts). Duplicate refusals are three
   separate scenarios on separate databases (entry number, active
@@ -221,8 +221,12 @@ def _no_time_gate(monkeypatch):
 
 
 def _make_doctor(session, suffix: str):
+    """Seed a doctor across both head and pre-0079 scratch schemas.
+
+    The current Doctor ORM includes website columns that are absent from
+    the 0064 schemas used by the populated-upgrade and duplicate proofs.
+    """
     from app.core.security import get_password_hash
-    from app.models.clinic import Doctor
     from app.models.user import User
 
     user = User(
@@ -235,11 +239,18 @@ def _make_doctor(session, suffix: str):
     )
     session.add(user)
     session.commit()
-    doctor = Doctor(user_id=user.id, specialty="cardiology", cabinet="601", active=True)
-    session.add(doctor)
+    doctor_id = session.execute(
+        text(
+            "INSERT INTO doctors "
+            "(user_id, specialty, cabinet, start_number_online, "
+            "max_online_per_day, active) "
+            "VALUES (:user_id, 'cardiology', '601', 1, 15, true) "
+            "RETURNING id"
+        ),
+        {"user_id": user.id},
+    ).scalar_one()
     session.commit()
-    session.refresh(doctor)
-    return doctor
+    return SimpleNamespace(id=doctor_id)
 
 
 def _seed_queue(session, doctor_id: int, day: date, tag, active=True):
