@@ -158,8 +158,8 @@ def _assert_pg_head(engine) -> None:
     # RQ-18 follow-up round-8 re-parents the payload binding as 0074;
     # #3506 derma history read model moves the head to 0075; its
     # read-order index swap moves it to 0076; T06.1 adds 0077; the
-    # site-plan settings canonicalization adds 0078.
-    assert version == "0078_clinic_settings_keys", version
+    # site-plan settings canonicalization adds 0078; public-site schema adds 0079.
+    assert version == "0079_kosmed_website_content", version
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:

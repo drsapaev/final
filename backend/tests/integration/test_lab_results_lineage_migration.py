@@ -175,9 +175,10 @@ def test_single_alembic_head(fresh_head_url):
     # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
     # as 0074 on top of it; #3506 derma history read model moves it to
     # 0075, its read-order index swap — to 0076; T06.1 adds daily queue
-    # policy persistence at 0077. This file still proves 0070's own links
+    # policy persistence at 0077; 0078 canonicalizes clinic settings and
+    # 0079 adds public-site content. This file still proves 0070's own links
     # via the graph pins below.
-    assert "0078_clinic_settings_keys" in head_lines[0]
+    assert "0079_kosmed_website_content" in head_lines[0]
 
 
 @pytest.mark.integration

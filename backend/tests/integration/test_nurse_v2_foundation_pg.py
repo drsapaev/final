@@ -217,8 +217,8 @@ def test_single_alembic_head(head_url):
     # as 0074 on top of it; #3506 derma history read model moves it to
     # 0075, its read-order index swap — to 0076; T06.1 adds daily queue
     # policy persistence at 0077; the site-plan settings canonicalization
-    # adds 0078.
-    assert "0078_clinic_settings_keys" in head_lines[0]
+    # adds 0078; 0079 adds public website content.
+    assert "0079_kosmed_website_content" in head_lines[0]
 
 
 @pytest.mark.integration
