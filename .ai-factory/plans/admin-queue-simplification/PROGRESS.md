@@ -2,13 +2,13 @@
 
 Plan version: 3.86
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: MERGE_HOLD — PR #3639 is OPEN/MERGEABLE at exact remote HEAD `f7bd12acf6dabbbaaa35c02ad49d6ad209db1a4e`, based on merged #3633 (`6315c62edb888bb8864928a41dd70a4c00be6e3d`). This journal-only head adds review findings to the three T11 journals; runtime code remains at `44d0de7b`. Exact-head applicable CI on `f7bd12ac` passed; path-aware skips remain SKIPPED, not PASS. Bounded synthetic typed-owner/history staging is 7/7 PASS on unchanged runtime code. Read-only review identified one unresolved P1 and one P2; see `EVIDENCE.md#t11-pr-3639-read-only-code-review`. T11 Tier-2 remains PARTIAL; no deferral is accepted and #3639 is not merged.
+Current status: MERGE_HOLD — P1/P2 review fixes are committed locally (`de15904d`) and validated on merge commit `75d103445500ecb3232784f72c94a4439d1a47e8`, which includes current `origin/main` `7f30b231dfa66ac080ae376267e80889fa264bd8`. The remote PR is still at `532ecffae456b9141b54c8f45d83c1981a8f61e5`; push and exact-head CI are pending. Tier-2 remains PARTIAL, no deferral is accepted, and user owns the merge decision.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
-Base (`origin/main`): 6315c62edb888bb8864928a41dd70a4c00be6e3d
-Remote PR HEAD: f7bd12acf6dabbbaaa35c02ad49d6ad209db1a4e (same as local HEAD); runtime/test review target remains `44d0de7b639367de40cc685679fdab94c6611107`.
-Current changed paths: T11 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` only, plus ignored synthetic staging env/helper/reports. Preserve untracked task-owned `.scratch/`; do not stage generated artifacts.
-Last updated: 2026-10-09T13:25+05:00
+Base (`origin/main`): 7f30b231dfa66ac080ae376267e80889fa264bd8
+Remote PR HEAD: 532ecffae456b9141b54c8f45d83c1981a8f61e5; local tested HEAD: 75d103445500ecb3232784f72c94a4439d1a47e.
+Current changed paths: review fix commit `de15904d` (five source/test paths); this checkpoint updates only T11 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Preserve untracked task-owned `.scratch/`; do not stage generated artifacts.
+Last updated: 2026-10-09T14:34+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,9 +16,17 @@ Last updated: 2026-10-09T13:25+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS | PR #3639; exact HEAD 44d0de7b | | EVIDENCE.md#t11-pr-3639-typed-ownerhistory-tier-2-follow-up |
+| T11 | IN_PROGRESS / MERGE_HOLD | PR #3639; local tested HEAD 75d10344; remote pending push | | EVIDENCE.md#t11-pr-3639-review-fixes-local-validation-on-merged-base |
 
-## Current checkpoint — T11 staging and review checkpoint — 2026-10-09T13:25+05:00
+## Current checkpoint — T11 PR #3639 review fixes — 2026-10-09T14:34+05:00
+
+- Local branch HEAD `75d103445500ecb3232784f72c94a4439d1a47e` merges code-fix commit `de15904de99e97976764ed2f105e42bcd3b7a106` with fresh `origin/main` `7f30b231dfa66ac080ae376267e80889fa264bd8`. The remote PR remains at `532ecffae456b9141b54c8f45d83c1981a8f61e5`; the fix and journal checkpoint have not yet been pushed. No branch history was rewritten.
+- Both review findings are fixed locally: legacy token info/admission now reject published shared-tag targets with unavailable or conflicting parent scope while preserving equivalent visible same-parent profiles; available-specialists applies pagination after eligibility and reports the full eligible total. Regression coverage exercises both failure and positive shared-tag paths.
+- Exact local validation on this HEAD: disposable PostgreSQL token integration module **10 passed, 1 warning**; focused unit/API selector and shared-tag policy selection **4 passed, 19 deselected, 1 warning**; `py_compile`, scoped Ruff, `git diff --check`, and commit hooks (including pinned `ruff-format` and Black) passed. Owned disposable PostgreSQL container on loopback port 55542 was removed; WSL keeper was stopped.
+- The separate T11 synthetic staging result remains 7/7 for its bounded cases, but frontend provenance, browser/Admin routes, keyboard/viewports, full `STAGING_VALIDATION.md`, and T18 remain NOT_RUN. Tier-2 stays PARTIAL; no deferral is accepted. Merge remains HOLD pending push, exact-head CI/review, and an explicit Tier-2 decision.
+- Next exact action: commit the three journal updates, push the existing branch to PR #3639, inspect current GitHub review threads and exact-head checks, then update the PR description through its quality gate. Do not submit a formal approval, accept a deferral, or merge.
+
+## Previous checkpoint — T11 staging and review checkpoint — 2026-10-09T13:25+05:00
 
 - PR #3639 is OPEN/MERGEABLE at `f7bd12acf6dabbbaaa35c02ad49d6ad209db1a4e`; base is `6315c62edb888bb8864928a41dd70a4c00be6e3d`. This is a journal-only commit over code review HEAD `44d0de7b639367de40cc685679fdab94c6611107`; local branch and remote PR head match. User owns merge; no formal review, deferral acceptance, or merge occurred.
 - Exact-head Unified CI run `37903465393` passed applicable Backend, Frontend unit/E2E/build/lint, OpenAPI/docs, parity, Code Quality, Context Boundary, PR Required Gate and CI Scope. Associated Regression Audit `37903465411`, PR Lifecycle `37903465512`, PR Review Quality `37903465442`, i18n `37903465470`, Gitleaks `37903465526`, and Security `37903465473` passed. Skipped path-aware jobs include DAST, metadata, Telegram release, Docker, standalone security, integration, staging/production readiness, and k6; skips are not passes.

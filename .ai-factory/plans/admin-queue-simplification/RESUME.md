@@ -1,4 +1,13 @@
-## Current checkpoint — T11 staging complete; review findings block merge — 2026-10-09T13:08+05:00
+## Current resume — T11 PR #3639 review findings fixed locally; publish and CI pending — 2026-10-09T14:34+05:00
+
+- Task ID `9af17c38-8235-4681-93e8-6a9864cbdb75`. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Local HEAD `75d103445500ecb3232784f72c94a4439d1a47e` merges code-fix `de15904de99e97976764ed2f105e42bcd3b7a106` with current `origin/main` `7f30b231dfa66ac080ae376267e80889fa264bd8`. PR #3639 remote HEAD is still `532ecffae456b9141b54c8f45d83c1981a8f61e5`; updates are not pushed yet.
+- P1 duplicate/shared QR-tag target bypass and P2 pre-eligibility pagination are fixed. Focused PostgreSQL suite passed 10/10; focused unit/API/selector tests passed 4 with 19 deselected; compile, scoped Ruff, whitespace check, and commit hooks passed. Full evidence and limitations are in `EVIDENCE.md#t11-pr-3639-review-fixes-local-validation-on-merged-base`.
+- Exact-head hosted CI, GitHub review-thread status after the fix, and updated PR-body quality gate are pending. Do not carry old CI results forward as validation of the new head. Do not submit a formal approval or merge; the user retains merge ownership.
+- Tier-2 remains PARTIAL, with no deferral accepted. Existing synthetic seven-case evidence is limited to its recorded slice. Served frontend provenance, browser/Admin specs, keyboard/viewports, full `docs/runbooks/STAGING_VALIDATION.md`, and T18 remain NOT_RUN.
+- Current local tracked edits are expected only in T11 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`; preserve the pre-existing untracked `.scratch/` and never stage it.
+- Next exact action: run `git diff --check`, verify only the three allowed journal paths changed, commit the checkpoint with repository hooks, and normal-push `codex/aqs-T11-manual-availability`. Then query GitHub for the actual PR HEAD/base, open review threads and exact-head CI; only after that prepare/update the PR description through `scripts/run_pr_review_gate_checks.py`.
+
+## Previous checkpoint — T11 staging complete; review findings block merge — 2026-10-09T13:08+05:00
 
 - Task ID `a4ab7f88-53a1-4601-b96e-18f45c5e95a9`. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 is OPEN/MERGEABLE at exact HEAD `f7bd12acf6dabbbaaa35c02ad49d6ad209db1a4e`, base `6315c62edb888bb8864928a41dd70a4c00be6e3d`; this is a journal-only commit over code review HEAD `44d0de7b`. User performs merge; no formal review, deferral acceptance, or merge occurred.
 - Current exact-head CI run `37903465393` and associated Regression Audit `37903465411`, PR Lifecycle `37903465512`, PR Review Quality `37903465442`, i18n `37903465470`, Gitleaks `37903465526`, and Security `37903465473` passed applicable checks. Path-aware skipped jobs are recorded in `PROGRESS.md`; they are not passes.
