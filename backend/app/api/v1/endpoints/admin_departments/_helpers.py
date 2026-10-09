@@ -400,7 +400,10 @@ def _ensure_department_integrations(
             queue_tags=expand_queue_tags([department.key]),
             department_key=department.key,
             display_order=department.display_order,
-            is_active=department.active,
+            # Parent activity is resolved separately; a newly provisioned
+            # profile has no manual archive intent, even if its parent starts
+            # inactive.
+            is_active=True,
             show_on_qr_page=True,
             icon=department.icon or "Layers",
             color=department.color or "#3b82f6",

@@ -65,12 +65,9 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
         from app.models.queue_profile import QueueProfile
 
         try:
-            profiles = (
+            published_profiles = (
                 self.db.query(QueueProfile)
-                .filter(
-                    QueueProfile.is_active == True,
-                    QueueProfile.show_on_qr_page == True,
-                )
+                .filter(QueueProfile.show_on_qr_page == True)
                 .order_by(QueueProfile.display_order)
                 .all()
             )
@@ -80,11 +77,11 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             )
 
             availability_by_profile = load_queue_profile_availability(
-                self.db, profiles
+                self.db, published_profiles
             )
             profiles = [
                 profile
-                for profile in profiles
+                for profile in published_profiles
                 if queue_profile_is_qr_selectable(
                     profile, availability_by_profile[profile]
                 )
@@ -94,6 +91,8 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
                 "[QRQueueService] queue_profiles unavailable; offering empty selection",
                 exc_info=True,
             )
+            published_profiles = []
+            availability_by_profile = {}
             profiles = []
 
         profile_by_specialty: dict[str, dict[str, Any]] = {}
@@ -123,6 +122,7 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             return []
 
         from app.core.roles import is_doctor_role_spelling
+        from app.services.queue_service import queue_service
         from app.services.user_mgmt._base import is_doctor_profile_incomplete
 
         doctors = (
@@ -141,6 +141,13 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             specialty = self._normalize_specialty_key(raw_specialty)
             profile = profile_by_specialty.get(specialty)
             if not profile or doctor.id in seen_ids:
+                continue
+            if not queue_service._get_qr_visible_profile_for_doctor(
+                self.db,
+                doctor,
+                profiles=published_profiles,
+                availability_by_profile=availability_by_profile,
+            ):
                 continue
             owner = getattr(doctor, "user", None)
             if (

@@ -601,8 +601,11 @@ def test_admin_shown_ecg_direction_is_selectable_and_joinable(
 def test_parent_off_removes_selection_and_blocks_direct_qr_join(
     pg_client, pg_session, monkeypatch
 ):
-    """A clinic-wide QR token cannot bypass a currently disabled parent."""
+    """Shared tags fail closed when any published target parent is off."""
     from app.models.department import Department
+    from app.models.online_queue import QueueToken
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
     from app.services.queue_service import QueueValidationError, queue_service
 
     monkeypatch.setattr(queue_service, "ONLINE_QUEUE_START_TIME", time(0, 0))
@@ -616,12 +619,36 @@ def test_parent_off_removes_selection_and_blocks_direct_qr_join(
     token = _clinic_wide_token(pg_session, "rq09-token-ecg-parent-off")
     department = pg_session.query(Department).filter_by(key="echokg").one()
     original_active = department.active
+    alternate_parent = Department(
+        key="rq09sharedparent",
+        name_ru="RQ-09 Synthetic Active Parent",
+        active=True,
+    )
+    pg_session.add(alternate_parent)
+    pg_session.flush()
+    sibling_profile = QueueProfile(
+        key="rq09-ecg-active-sibling",
+        title="RQ-09 Synthetic Active ECG sibling",
+        queue_tags=["ecg"],
+        department_key=alternate_parent.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    pg_session.add(sibling_profile)
+    pg_session.flush()
     department.active = False
     pg_session.commit()
 
     try:
         selectable = _selectable(pg_client, token.token)
         assert all(item["id"] != doctor.id for item in selectable)
+
+        available = pg_client.get("/api/v1/queue/available-specialists")
+        assert available.status_code == 200, available.text
+        assert all(
+            item["id"] != doctor.id
+            for item in available.json().get("specialists", [])
+        ), "legacy public selector must match the clinic-wide join eligibility"
 
         with pytest.raises(QueueValidationError):
             queue_service.join_queue_with_token(
@@ -636,6 +663,21 @@ def test_parent_off_removes_selection_and_blocks_direct_qr_join(
         pg_session.rollback()
         department = pg_session.query(Department).filter_by(key="echokg").one()
         department.active = original_active
+        sibling_profile = (
+            pg_session.query(QueueProfile)
+            .filter_by(key="rq09-ecg-active-sibling")
+            .one_or_none()
+        )
+        if sibling_profile is not None:
+            pg_session.delete(sibling_profile)
+        alternate_parent = (
+            pg_session.query(Department).filter_by(key="rq09sharedparent").one_or_none()
+        )
+        if alternate_parent is not None:
+            pg_session.delete(alternate_parent)
+        pg_session.query(QueueToken).filter_by(token=token.token).delete()
+        pg_session.query(type(doctor)).filter_by(id=doctor.id).delete()
+        pg_session.query(User).filter_by(id=_user.id).delete()
         pg_session.commit()
 
 

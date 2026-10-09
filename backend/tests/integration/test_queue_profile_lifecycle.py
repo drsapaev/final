@@ -2125,6 +2125,53 @@ def test_department_deactivation_preserves_manual_state_and_blocks_new_qr(
     }
 
 
+def test_department_created_inactive_keeps_profile_manual_state_active(
+    pg_client, pg_session, pg_admin_user
+):
+    """Parent activity is derived availability, not a manual profile archive."""
+    from app.models.queue_profile import QueueProfile
+
+    headers = _dep_headers(pg_admin_user)
+    dept = _create_department(pg_client, headers, "createdoff", active=False)
+    dept_key = dept["key"]
+    profile = pg_session.query(QueueProfile).filter_by(key=dept_key).one()
+    assert profile.is_active is True
+
+    def profile_facts():
+        response = pg_client.get(
+            "/api/v1/queues/profiles?active_only=false", headers=headers
+        )
+        assert response.status_code == 200, response.text
+        return next(
+            item for item in response.json()["profiles"] if item["key"] == dept_key
+        )
+
+    unavailable = profile_facts()
+    assert unavailable["is_active"] is True
+    assert unavailable["effective_availability"] == {
+        "state": "unavailable",
+        "is_available": False,
+        "reason_codes": ["parent_inactive"],
+        "parent_department_key": dept_key,
+        "parent_active": False,
+    }
+
+    activated = pg_client.post(
+        f"/api/v1/admin/departments/{dept['id']}/toggle", headers=headers
+    )
+    assert activated.status_code == 200, activated.text
+    pg_session.expire_all()
+    profile = pg_session.query(QueueProfile).filter_by(key=dept_key).one()
+    assert profile.is_active is True
+    assert profile_facts()["effective_availability"] == {
+        "state": "available",
+        "is_available": True,
+        "reason_codes": [],
+        "parent_department_key": dept_key,
+        "parent_active": True,
+    }
+
+
 def test_department_reactivation_preserves_manual_archives(
     pg_client, pg_session, pg_admin_user
 ):

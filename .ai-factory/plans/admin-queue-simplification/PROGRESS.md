@@ -2,13 +2,13 @@
 
 Plan version: 3.86
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: PR_OPEN — PR #3639 is OPEN/MERGEABLE at exact HEAD `6be3badb610d69e3c9c3dd26d2d3bbfcac942d49`, based on `7f30b231dfa66ac080ae376267e80889fa264bd8`. The two previously reviewed P1/P2 findings and the RQ29 fixture regression are committed. Exact-head applicable CI is green. Tier-2 remains PARTIAL; no deferral has been accepted. Merge remains user-owned.
+Current status: IN_PROGRESS — both review fixes are implemented and the three focused PostgreSQL integration modules pass locally. Exact baseline/remote PR HEAD is `93c506a87b5dd31c428da8ee1581c4035c739e7e`; local edits are uncommitted. Mandatory gate returned a bounded narrow override; execution prompt read. Tier-2 remains PARTIAL; no deferral has been accepted. Merge remains user-owned.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 Base (`origin/main`): 7f30b231dfa66ac080ae376267e80889fa264bd8
-Remote PR HEAD: 6be3badb610d69e3c9c3dd26d2d3bbfcac942d49.
-Current changed paths: T11 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` journal updates only; preserve untracked task-owned `.scratch/` and do not stage it.
-Last updated: 2026-10-09T15:39+05:00
+Remote PR HEAD: 93c506a87b5dd31c428da8ee1581c4035c739e7e.
+Current changed paths: four backend modules, two focused integration tests, this plan's `PROGRESS.md`/`EVIDENCE.md`/`RESUME.md`, and the required `aif-fix` patch note. Preserve pre-existing untracked `.scratch/` and do not stage it.
+Last updated: 2026-10-09T16:35+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,9 +16,24 @@ Last updated: 2026-10-09T15:39+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | PR_OPEN | PR #3639; exact HEAD 6be3badb; applicable exact-head CI green | | EVIDENCE.md#t11-rq29-fixture-follow-up-exact-head-validation |
+| T11 | IN_PROGRESS | PR #3639; P1/P2 fixes and local checks pass; base sync, push and exact-head CI pending | | EVIDENCE.md#t11-pr-3639-review-fix-implementation |
 
-## Current checkpoint — T11 PR #3639 RQ29 fixture follow-up — 2026-10-09T15:39+05:00
+## Current checkpoint — T11 PR #3639 review fixes — 2026-10-09T16:35+05:00
+
+- Task ID `9af17c38-8235-4681-93e8-6a9864cbdb75`; continue the same T11 assignment. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Baseline local and remote PR HEAD `93c506a87b5dd31c428da8ee1581c4035c739e7e`; base `7f30b231dfa66ac080ae376267e80889fa264bd8`. Preserve existing untracked `.scratch/`.
+- Chosen mode: mandatory `gate` because the fix changes queue admission and department-derived availability. The normal gate stopped because no first-touch files were resolved. The required retry with `--known-root-cause backend/app/services/queue_svc/_core.py` returned `narrow_override`, `gate_misroute=false`, `override_used=true`; its first-touch was only `_core.py`. A subsequent reviewed scoped invocation with the exact paths below returned `narrow_override`, `handoff_required=true`, `gate_misroute=false`, `override_used=true`. The generated execution prompt was read and is followed. Do not change the gate/router.
+- Confirmed root causes: (1) the clinic-wide Doctor path selects the first QR-visible profile for a shared specialty tag without applying the all-candidate ambiguity guard; (2) auto-created profiles copy `Department.active` into manual `QueueProfile.is_active`, so a profile created while its parent is inactive remains archived after the parent is activated under T11 semantics.
+- Allowed paths: `backend/app/services/queue_svc/_core.py`, `backend/app/services/queue_svc/_operations.py`, `backend/app/services/qr_queue/_specialists.py`, `backend/app/api/v1/endpoints/qr_queue/_specialists.py`, `backend/app/api/v1/endpoints/admin_departments/_helpers.py`, `backend/tests/integration/test_qr_token_path_owner_eligibility.py`, `backend/tests/integration/test_qr_selection_join_visibility.py`, `backend/tests/integration/test_queue_profile_lifecycle.py`, this T11 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`, and `.ai-factory/patches/2026-10-09-16.14.md`.
+- Denied: schema/models/migrations, gate/router, production/deployment, unrelated paths, other worktrees and scratch content, Tier-2 staging, formal GitHub review submission, and merge. PR-description changes require an explicit gate scope and remain out of this prework boundary.
+- Validation target: regression coverage for clinic-wide selection and join with one unavailable published parent plus a visible shared-tag sibling; lifecycle coverage for create-inactive → activate yielding a manually active profile with parent-effective availability; targeted PostgreSQL backend tests, `py_compile` if applicable, scoped lint, and `git diff --check`. After push, inspect checks on the exact new PR HEAD.
+- Stop conditions: gate requires changes outside the allowed scope; behavior would change queue ownership or explicit-publication policy; a disposable PostgreSQL target cannot be established; tests reveal existing patient/history mutation; or PR HEAD changes during work.
+- Completed: gate and scoped prompt; fail-first reproduction of both findings; shared-tag fail-closed checks now cover clinic-wide selection, direct join and `/queue/available-specialists`; a new auto-created profile starts manually active and follows parent effective availability. All three approved integration modules passed together on task-owned disposable PostgreSQL: **61 passed, 1 warning**. Final `py_compile`, scoped Ruff with known baseline I001/B023/C416 ignored, and `git diff --check` passed. The `aif-fix` patch note is present.
+- Changed but not verified: final PR commit and base synchronization have not been made; hosted checks have not run on these changes.
+- Remaining: inspect final diff, commit the exact approved paths, merge the three non-overlapping commits from current `origin/main` into the PR branch, rerun focused validation on that synchronized HEAD, push and inspect exact-head checks.
+- Blocker: none for local validation. No staging, review submission, or merge is authorized in this scope.
+- Next exact action: review/stage only the listed T11 source/test/journal/patch files, commit, sync current `origin/main`, rerun focused PostgreSQL and static checks, push PR #3639 and verify checks on the exact new HEAD.
+
+## Previous checkpoint — T11 PR #3639 RQ29 fixture follow-up — 2026-10-09T15:39+05:00
 
 - Exact PR HEAD and local HEAD are `6be3badb610d69e3c9c3dd26d2d3bbfcac942d49`; base is `7f30b231dfa66ac080ae376267e80889fa264bd8`. The code-only commit changes `backend/tests/integration/test_rq29_end_to_end_path_pg.py` to keep the synthetic public lab profile on `LAB_TAG` alone; this avoids colliding with an existing cardiology token fixture under the shared-tag policy. Runtime code and the shared-tag guard are unchanged by this commit.
 - Exact-head Unified CI passed the Backend job, including `test_rq29_combined_path`, and applicable frontend unit/E2E/build/lint, OpenAPI/docs, parity, Code Quality, Context Boundary, PR Required Gate, Regression Audit, PR Review Quality, lifecycle recommendation, i18n, CodeQL, Gitleaks, GitGuardian, and security checks. Path-aware jobs marked skipped remain skipped, not passes. Full check/run details: `EVIDENCE.md#t11-rq29-fixture-follow-up-exact-head-validation`.

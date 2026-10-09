@@ -46,12 +46,10 @@ def get_available_specialists(
         # (was hardcoded — new specialties like 'neurology' got default icon/name)
         from app.models.queue_profile import QueueProfile
 
-        profiles = (
+        published_profiles = (
             db.query(QueueProfile)
-            .filter(
-                QueueProfile.is_active == True,
-                QueueProfile.show_on_qr_page == True,
-            )
+            .filter(QueueProfile.show_on_qr_page == True)
+            .order_by(QueueProfile.display_order)
             .all()
         )
         from app.services.queue_profile_availability import (
@@ -59,10 +57,12 @@ def get_available_specialists(
             queue_profile_is_qr_selectable,
         )
 
-        availability_by_profile = load_queue_profile_availability(db, profiles)
+        availability_by_profile = load_queue_profile_availability(
+            db, published_profiles
+        )
         profiles = [
             profile
-            for profile in profiles
+            for profile in published_profiles
             if queue_profile_is_qr_selectable(profile, availability_by_profile[profile])
         ]
 
@@ -87,10 +87,22 @@ def get_available_specialists(
                         "color": color,
                     }
 
+        from app.services.queue_service import queue_service
+
         specialists_list = []
         for doctor in doctors:
             specialty_key = doctor.specialty.lower() if doctor.specialty else None
             if not specialty_key:
+                continue
+
+            # Match the clinic-wide QR selector and admission: every published
+            # profile sharing this tag must resolve to one available target.
+            if not queue_service._get_qr_visible_profile_for_doctor(
+                db,
+                doctor,
+                profiles=published_profiles,
+                availability_by_profile=availability_by_profile,
+            ):
                 continue
 
             # PR-28: look up in dynamic mapping, fallback to raw specialty

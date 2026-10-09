@@ -1,4 +1,13 @@
-## Current resume — T11 PR #3639 RQ29 fixture follow-up — 2026-10-09T15:39+05:00
+## Current resume — T11 PR #3639 review fixes — 2026-10-09T16:35+05:00
+
+- Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Baseline local/remote PR #3639 HEAD is `93c506a87b5dd31c428da8ee1581c4035c739e7e`; base `7f30b231dfa66ac080ae376267e80889fa264bd8`.
+- User asked to fix both review findings. P1: clinic-wide Doctor selection/join can choose one visible QueueProfile despite another published shared-tag candidate having an inactive/conflicting parent. P2: a department-created QueueProfile inherits `is_active=False` when the Department is created inactive, and activation no longer restores this derived false state.
+- Mandatory gate has run. Normal run stopped on missing first-touch resolution; required known-root retry returned a narrow override; the exact-scoped retry returned `narrow_override` with handoff required. The generated execution prompt was read. Scope and stop conditions are in `PROGRESS.md#current-checkpoint-t11-pr-3639-review-fixes` and `EVIDENCE.md#t11-pr-3639-review-fix-prework`.
+- Keep merge and formal GitHub review submission with the user. Do not run staging in this code-fix continuation. Preserve unrelated `.scratch/` and do not stage it.
+- The two findings are fixed locally. Regression evidence: the new clinic-wide mixed-parent case and inactive-parent creation case failed before code edits; after fixes, the three approved PostgreSQL integration modules passed **61/61** on a disposable `pgserver` instance. `py_compile`, scoped Ruff with the existing I001/B023/C416 baseline findings suppressed, and `git diff --check` pass. No staging was run.
+- PR #3639 is still remote HEAD `93c506a8`; current `origin/main` is `8f3d325d`, and GitHub reports the PR behind. The three intervening main commits touch disjoint paths. After final diff review and commit, merge `origin/main` into this PR worktree, rerun focused PostgreSQL/static checks, then push and inspect exact-head CI. Preserve `.scratch/`; do not submit a review, accept a Tier-2 deferral, or merge.
+
+## Previous resume — T11 PR #3639 RQ29 fixture follow-up — 2026-10-09T15:39+05:00
 
 - Task ID `9af17c38-8235-4681-93e8-6a9864cbdb75`. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Exact local and PR HEAD: `6be3badb610d69e3c9c3dd26d2d3bbfcac942d49`; base: `7f30b231dfa66ac080ae376267e80889fa264bd8`. PR #3639 is OPEN/MERGEABLE.
 - Commit `6be3badb` corrects only the RQ29 synthetic test fixture: the public lab direction uses `LAB_TAG` alone to avoid aliasing the existing cardiology token fixture. Runtime code is unchanged. The earlier P1/P2 fixes remain in the PR.

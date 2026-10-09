@@ -223,7 +223,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 availability=availability,
             ):
                 logger.warning(
-                    "[queue token] rejected unavailable published QueueProfile target: candidates=%d",
+                    "[QR availability] rejected unavailable published QueueProfile target: candidates=%d",
                     len(target_profiles),
                 )
                 return False
@@ -231,7 +231,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
         if len(target_scopes) != 1:
             logger.warning(
-                "[queue token] rejected ambiguous shared QueueProfile tag: candidates=%d",
+                "[QR availability] rejected ambiguous shared QueueProfile tag: candidates=%d",
                 len(target_profiles),
             )
             return False

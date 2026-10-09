@@ -144,6 +144,12 @@ class CoreMixin(QueueBusinessServiceMixinBase):
             resolved_availability = load_queue_profile_availability(
                 db, profile_candidates
             )
+        if not cls._qr_profile_candidates_are_unambiguous(
+            profile_candidates,
+            db,
+            resolved_availability,
+        ):
+            return None
         for profile in profile_candidates:
             if cls._is_qr_visible_profile(
                 profile, db, availability=resolved_availability[profile]
