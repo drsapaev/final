@@ -108,6 +108,18 @@ def _make_resource(
     return resource
 
 
+def _ensure_active_profile_department(db_session: Session, key: str) -> None:
+    """Seed the explicit QueueProfile parent required by T11 eligibility."""
+    from app.models.department import Department
+
+    department = db_session.query(Department).filter(Department.key == key).first()
+    if department is None:
+        db_session.add(Department(key=key, name_ru=f"SYNTHETIC-{key}", active=True))
+    else:
+        department.active = True
+    db_session.flush()
+
+
 def _make_queue(
     db_session: Session,
     *,
@@ -4150,6 +4162,7 @@ def test_clinic_wide_profile_join_routes_registry_tag(db_session: Session) -> No
     from app.models.online_queue import QueueToken as _QueueToken
     from app.models.queue_profile import QueueProfile
 
+    _ensure_active_profile_department(db_session, "laboratory")
     future_day = date.today() + timedelta(days=2)
     profile = QueueProfile(
         key="laboratory_cc1",
@@ -4234,6 +4247,7 @@ def test_clinic_wide_profile_join_prefers_deactivated_resource_surface(
     from app.models.online_queue import QueueToken as _QueueToken
     from app.models.queue_profile import QueueProfile
 
+    _ensure_active_profile_department(db_session, "echokg")
     future_day = date.today() + timedelta(days=2)
     profile = QueueProfile(
         key="echokg_cc2",
@@ -4314,6 +4328,7 @@ def test_clinic_wide_profile_join_doctor_path_without_registry(
     from app.models.online_queue import QueueToken as _QueueToken
     from app.models.queue_profile import QueueProfile
 
+    _ensure_active_profile_department(db_session, "laboratory")
     future_day = date.today() + timedelta(days=2)
     profile = QueueProfile(
         key="laboratory_cc3",

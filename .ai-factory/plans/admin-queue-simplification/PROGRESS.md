@@ -2,13 +2,13 @@
 
 Plan version: 3.84
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: PR_OPEN — PR #3639 is at exact HEAD `bb55443fff0058754af117f3d3da91ffe0b21448`, base `6315c62edb888bb8864928a41dd70a4c00be6e3d`. Exact-head run `37886046478` passes OpenAPI freshness but fails generated TypeScript freshness; Frontend unit tests passed, Backend remains in progress, and PR-quality/security checks passed. The generated API output and T11 journals are locally changed. First commit attempt was blocked by a Gitleaks false positive on a redundant Git object ID and absent worktree ESLint dependencies. No review decision or merge. T11 Tier-2 staging and T18 remain NOT_RUN.
+Current status: PR_OPEN — PR #3639 is OPEN/MERGEABLE at remote HEAD `bb55443f`, based on merged #3633 (`6315c62e`). Local branch HEAD `2b90c34a` contains the generated API artifact; nine test-only corrections and T11 journal updates are pending commit. PR body is refreshed and its quality gate passes (19 tests, two samples, live body). No hosted CI has run on the local corrections yet. #3639 is not merged.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 Base (`origin/main`): 6315c62edb888bb8864928a41dd70a4c00be6e3d
-Current local and remote PR HEAD: bb55443fff0058754af117f3d3da91ffe0b21448
-Current uncommitted tracked paths: generated `frontend/src/types/generated/api.ts` and T11 `PROGRESS.md`/`EVIDENCE.md`; `.scratch/` remains untracked.
-Last updated: 2026-10-09T10:08+05:00
+Remote PR HEAD: bb55443f; local HEAD: 2b90c34a
+Current changed paths: nine allowed backend integration test modules and T11 `PROGRESS.md`/`EVIDENCE.md`/`RESUME.md`; local generated artifact commit is one ahead of remote. Task-owned `.scratch/` remains untracked and must be preserved.
+Last updated: 2026-10-09T10:42+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,7 +16,18 @@ Last updated: 2026-10-09T10:08+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | PR_OPEN | PR #3639; exact HEAD bb55443f; generated API follow-up locally pending | | EVIDENCE.md#t11-generated-api-types-local-output |
+| T11 | IN_PROGRESS | PR #3639; remote bb55443f, local 2b90c34a plus local test fixes | | EVIDENCE.md#t11-backend-ci-repair-validation |
+
+## Current checkpoint — T11 backend CI repair validated locally (2026-10-09T10:42+05:00)
+
+- T10 PR #3633 is confirmed merged at `6315c62e`. PR #3639 remains OPEN/MERGEABLE at remote `bb55443f`; local `2b90c34a` is one unpushed generated-client commit ahead. Do not merge #3639.
+- T11 test corrections are limited to the nine paths recorded in `EVIDENCE.md#t11-backend-ci-repair-validation`: selectable-profile fixtures now have active/unambiguous parents (or are explicitly standalone), and admin-only `effective_availability` is asserted separately from CSV projection. Runtime, schema, OpenAPI and frontend runtime are unchanged.
+- Fail-first local SQLite run reproduced 5 failures and 2 PostgreSQL-only skips. After corrections, targeted SQLite/PG selection for all 24 exact CI failures passed **24/24** on disposable PostgreSQL 16/SQLite (1 warning, 44.49s). T11 focused availability/lifecycle modules produced 75 passed and 5 initial skips because the pre-provisioned `clinic_test` database had no Alembic schema; after applying `alembic upgrade head` only to that disposable DB, the skipped QR selector module passed **5/5**. All 80 distinct T11 focused cases are now covered as passing.
+- Local validation also passed `py_compile` for all nine test modules, scoped Ruff check, and `git diff --check`. `ruff format --check` still reports legacy formatting drift in seven touched modules; no broad formatter rewrite was applied. Exact details and honest `NOT_RUN` items are in the latest EVIDENCE entry.
+- Environment lesson: installed WSL distro is `Ubuntu-24.04`; the old alias `Ubuntu` returns `DISTRO_NOT_FOUND`. A detached PostgreSQL container was stopped after WSL idled (~22 seconds, exit 0, `OOMKilled=false`). Holding the correct distro with a task-owned `sleep` process kept Docker alive; all DB tests then passed. The exact no-volume `clinic-aqs-t11-pg-20261009` container and keeper are removed. This is an environment finding only; ops/WSL helper changes remain outside T11's current allowlist and should be a separate follow-up after this PR cycle.
+- Tier-2 T11 staging, ordinary Admin 2FA, browser checks, and served-build provenance remain **NOT_RUN**; no deferral is accepted. T10's earlier staging record still has two queue/rebind race scenarios NOT_RUN; they are separate from this T11 CI repair and remain open, with no deferral accepted.
+- PR #3639 body now records the fixture/projection corrections and local test results; the body quality gate passed 19 checks, both documented samples, and the live PR body.
+- Next exact action: inspect the final diff, stage only the nine listed tests and T11 journals, commit/push to the existing branch, then inspect all applicable checks on the new exact PR HEAD. Preserve `.scratch/`; keep merge with the user. After this PR cycle, address the WSL launcher/keepalive recurrence and T10 remaining staging race evidence under their own bounded scopes.
 
 ## Current checkpoint — T11 generated API type artifact prework (2026-10-09T10:01+05:00)
 
