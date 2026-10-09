@@ -1,21 +1,38 @@
 # Progress
 
 Plan version: 3.84
-Current task: T10 — protect used QueueProfile bindings and address PR #3633 review.
-Current status: IN_PROGRESS — code fixes, exact-head CI, and PR description are updated. Tier-2 staging remains partial; extra race tests and full staging runbook are NOT_RUN.
-Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
-Branch: codex/aqs-T10-profile-guards
-Base (`origin/main`): 7bb02680e778ac56369503c4fd337ac9329da4b2
-Current local HEAD: evidence follow-up based on validated code HEAD b2f99ab66 and PR snapshot cb73091c0 (journal-only changes pending commit)
-PR remote HEAD at last query: cb73091c0d4a312153aca938014e94435239f118 (OPEN/CLEAN; applicable CI and PR-body checks passed; Tier-2 partial)
-Last updated: 2026-10-08T22:35+05:00
+Current task: T11 — manual QueueProfile activity and parent-resolution policy.
+Current status: VALIDATED — runtime/test commit `a47b327ab427daac75eb9e3778e59eb1b166ef45` is committed; focused PostgreSQL/unit checks pass locally. Journals are pending a docs checkpoint; branch is not pushed and PR is not opened. Hosted staging/browser validation and T18 remain NOT_RUN.
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
+Branch: codex/aqs-T11-manual-availability
+Base (`origin/main`): 6315c62edb888bb8864928a41dd70a4c00be6e3d
+Current local HEAD: a47b327ab427daac75eb9e3778e59eb1b166ef45 (runtime/test commit; journal changes pending)
+PR: none; preparing the T11 PR after final diff and body checks
+Last updated: 2026-10-09T09:32+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
-| T10 | IN_PROGRESS | PR #3633; HEAD cb73091c; user merges | | EVIDENCE.md#t10-pr-3633-description-and-ci-checkpoint-2026-10-08 |
+| T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
+| T11 | VALIDATED | codex/aqs-T11-manual-availability; no PR yet | | EVIDENCE.md#t11-local-validation-2026-10-09 |
+
+## Current checkpoint — T11 local validation (2026-10-09T09:32+05:00)
+
+- PR #3633 is merged at `6315c62edb888bb8864928a41dd70a4c00be6e3d`; local `C:\final` was fast-forwarded to the same `origin/main`. Existing untracked `.gate_artifacts/` in `C:\final` was preserved.
+- T10 latest isolated Tier-2 rerun is partial: PostgreSQL focused regressions 51/51 PASS; normal Admin password→TOTP and owned API checks PASS; exact frontend asset bytes matched the Start image, but immutable served-SHA attestation is NOT_RUN. Live queue/rebind specs, browser/UI/keyboard/viewport, and full `STAGING_VALIDATION.md` are NOT_RUN. The owned synthetic Compose project was torn down and absence verified. See `T10-PR3633-tier2-staging-report.md` and the newest T10 evidence entry; do not transfer these results to other commits.
+- T11 starts at base `6315c62edb888bb8864928a41dd70a4c00be6e3d` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`.
+- Pre-edit mode and gate: mandatory `gate`; initial run stopped with `no first-touch files could be resolved`. Confirmed root cause is `_helpers.py:_sync_department_active_to_profiles`; one retry with `--known-root-cause backend/app/api/v1/endpoints/admin_departments/_helpers.py` returned `narrow_override`, `gate_misroute=false`, `override_used=true`, and no handoff. The user's approved T11 plan explicitly authorizes the bounded lifecycle and consumer scope. No gate/router code changed.
+- Implemented the shared parent/manual availability policy; department off/on no longer writes `QueueProfile.is_active`; admin profile reads include effective state/reasons; public QR selectors, direct joins, already-issued queue tokens, and permanent public-address flows recheck the policy. Batch doctor target resolution reuses preloaded profiles/availability rather than issuing a parent lookup per doctor.
+- Local validation: 73/73 PostgreSQL integration tests, 7/7 availability unit tests, and 6/6 PostgreSQL lock-order tests passed; changed backend files compiled and `git diff --check` passed. Scoped Ruff passed with only pre-existing `I001`, `B023`, and `C416` findings suppressed; the unfiltered run reports those five findings on untouched lines. Exact commands/results are in EVIDENCE.
+- Temporary test infrastructure: local PostgreSQL 17 on loopback was stopped; `clinic_test_t11` was dropped; the failed WSL test container was removed. The task-owned data directory `.scratch/t11-pg-20261009` remains because the execution policy rejected its cleanup commands; keep it unstaged. Port 55437 is no longer serving this cluster.
+- Changed but not verified: exact-head hosted CI and formal human review, because no PR exists yet. No T11 staging/browser pass is claimed. Full staging and T18 remain required later by the plan.
+- PR-body quality gate: passed 19 unit tests, both documented samples and the filled T11 body after correcting missing required field labels. Final diff/scope review found no material blocker; two stale QR availability comments were corrected. Architecture/rules align; ROADMAP has no direct T11 link (non-blocking WARN).
+- Runtime/test commit: `a47b327ab427daac75eb9e3778e59eb1b166ef45`. Its parent remains the fresh `origin/main` base. Commit hooks passed except `ruff`, `ruff-format`, and `black`, which were skipped after their first attempt exposed three existing B023 findings and broad baseline rewrites; a scoped Ruff command passed with pre-existing rules suppressed. Details are in EVIDENCE.
+- Blocker: none for creating the T11 PR. Do not stage `.scratch/` or unrelated paths.
+- Next exact action: commit only the two plan journal files, push this branch, and open the PR. Wait for exact-head checks/review; do not merge.
+- Checks to rerun after any further runtime change: 73-test PostgreSQL integration command, 7-test unit command, lock-order test, changed-file `py_compile`, scoped Ruff, and `git diff --check`. For a docs-only adjustment, rerun the PR body gate and `git diff --check`.
 
 ## Current checkpoint — PR #3633 description, exact-head CI, and Tier-2 status (2026-10-08T22:35+05:00)
 
