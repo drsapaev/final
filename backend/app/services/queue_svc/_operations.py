@@ -1025,6 +1025,45 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     "Очередь ещё не создана для выбранного специалиста"
                 )
 
+            # A staff-issued legacy token may outlive a department/profile
+            # change. Re-check the current profile binding here, at token
+            # validation time. Tags that never had a QueueProfile retain
+            # their legacy resource-token behavior; a configured profile
+            # that is now archived, parent-off, dangling, or conflicting
+            # cannot be bypassed by an already-issued token.
+            specialist = queue_token.specialist or (
+                db.query(Doctor)
+                .filter(Doctor.id == queue_token.specialist_id)
+                .first()
+            )
+            if specialist is not None:
+                profile_candidates = self._get_qr_profile_candidates_for_tag(
+                    db, daily_queue.queue_tag
+                )
+                if not profile_candidates:
+                    profile_candidates = self._get_qr_profile_candidates_for_doctor(
+                        db, specialist
+                    )
+                if profile_candidates:
+                    from app.services.queue_profile_availability import (
+                        load_queue_profile_availability,
+                    )
+
+                    availability_by_profile = load_queue_profile_availability(
+                        db, profile_candidates
+                    )
+                    if not any(
+                        self._is_qr_visible_profile(
+                            profile,
+                            db,
+                            availability=availability_by_profile[profile],
+                        )
+                        for profile in profile_candidates
+                    ):
+                        raise QueueValidationError(
+                            "Специалист недоступен для QR-записи"
+                        )
+
         # QD-2C (Codex round-18 P2): токен резолвится в ресурсную очередь —
         # владелец/кабинет join-метаданных с оси ресурса (реестр): публичный
         # экран QueueJoin и join-ответы показывают registry-назначение, а не
@@ -1311,7 +1350,61 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if day is None:
             return {}
 
+        if not token_obj.is_clinic_wide:
+            daily_queue = token_meta.get("daily_queue")
+            queue_tag = daily_queue.queue_tag if daily_queue is not None else None
+            if not queue_tag:
+                return {}
+            return dict.fromkeys(range(len(specialist_ids)), queue_tag)
+
         targets: dict[int, str] = {}
+        from app.models.queue_profile import QueueProfile
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+        )
+
+        profile_selection_ids: set[int] = set()
+        doctor_selection_ids: set[int] = set()
+        for index, specialist_id in enumerate(specialist_ids):
+            specialist_type = (
+                str(specialist_entity_types[index]).strip().lower()
+                if specialist_entity_types is not None
+                and index < len(specialist_entity_types)
+                else None
+            )
+            if specialist_type == "profile":
+                profile_selection_ids.add(specialist_id)
+            elif specialist_type in (None, "doctor"):
+                doctor_selection_ids.add(specialist_id)
+
+        if doctor_selection_ids:
+            profile_rows = db.query(QueueProfile).all()
+        elif profile_selection_ids:
+            profile_rows = (
+                db.query(QueueProfile)
+                .filter(QueueProfile.id.in_(sorted(profile_selection_ids)))
+                .all()
+            )
+        else:
+            profile_rows = []
+        profiles_by_id = {profile.id: profile for profile in profile_rows}
+        availability_by_profile = load_queue_profile_availability(
+            db, profile_rows
+        )
+        doctors_by_id: dict[int, Doctor] = {}
+        if doctor_selection_ids:
+            eligible_doctors = (
+                db.query(Doctor)
+                .join(User, Doctor.user_id == User.id)
+                .filter(
+                    Doctor.active.is_(True),
+                    Doctor.id.in_(sorted(doctor_selection_ids)),
+                    User.is_active.is_(True),
+                    func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
+                )
+                .all()
+            )
+            doctors_by_id = {doctor.id: doctor for doctor in eligible_doctors}
 
         def _profile_target_tag(profile) -> str | None:
             profile_key = getattr(profile, "key", None)
@@ -1341,23 +1434,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             )
             try:
                 if not token_obj.is_clinic_wide:
-                    daily_queue = token_meta.get("daily_queue")
-                    queue_tag = (
-                        daily_queue.queue_tag if daily_queue is not None else None
-                    )
-                    if queue_tag:
-                        targets[index] = queue_tag
                     continue
                 if specialist_type == "profile":
-                    from app.models.queue_profile import QueueProfile
-
-                    queue_profile = (
-                        db.query(QueueProfile)
-                        .filter(QueueProfile.id == specialist_id)
-                        .first()
-                    )
+                    queue_profile = profiles_by_id.get(specialist_id)
                     if queue_profile is None or not self._is_qr_visible_profile(
-                        queue_profile
+                        queue_profile,
+                        db,
+                        availability=availability_by_profile[queue_profile],
                     ):
                         continue
                     tag = _profile_target_tag(queue_profile)
@@ -1365,20 +1448,15 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                         targets[index] = tag
                     continue
                 if specialist_type in (None, "doctor"):
-                    doctor = (
-                        db.query(Doctor)
-                        .join(User, Doctor.user_id == User.id)
-                        .filter(
-                            Doctor.active.is_(True),
-                            Doctor.id == specialist_id,
-                            User.is_active.is_(True),
-                            func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
-                        )
-                        .first()
-                    )
+                    doctor = doctors_by_id.get(specialist_id)
                     if not doctor or is_doctor_profile_incomplete(doctor.specialty):
                         continue
-                    qr_profile = self._get_qr_visible_profile_for_doctor(db, doctor)
+                    qr_profile = self._get_qr_visible_profile_for_doctor(
+                        db,
+                        doctor,
+                        profiles=profile_rows,
+                        availability_by_profile=availability_by_profile,
+                    )
                     if qr_profile is None:
                         continue
                     targets[index] = qr_profile.key
@@ -1483,7 +1561,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     .first()
                 )
                 if queue_profile is None or not self._is_qr_visible_profile(
-                    queue_profile
+                    queue_profile, db
                 ):
                     raise QueueValidationError("Специалист недоступен для QR-записи")
             elif specialist_type in (None, "doctor"):

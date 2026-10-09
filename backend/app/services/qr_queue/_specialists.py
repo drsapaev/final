@@ -42,9 +42,10 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
     def _get_clinic_wide_selectable_specialists(self) -> list[dict[str, Any]]:
         """RQ-09: the PUBLIC clinic-wide selection mirrors the JOIN contract.
 
-        Visibility — ADMIN-controlled SSOT (PR-28):
-        ``QueueProfile.is_active`` + ``show_on_qr_page`` are the only
-        profile constraints. No hard-coded hidden keys
+        Visibility — ADMIN-controlled SSOT (PR-28/T11):
+        manual ``QueueProfile.is_active``, ``show_on_qr_page``, and the
+        resolved Department parent availability jointly gate each profile.
+        No hard-coded hidden keys
         (``QueueBusinessService.QR_HIDDEN_PROFILE_KEYS == set()``) and no
         ``INITIAL_QUEUE_PROFILES`` fallback: when every direction is
         hidden the public page must offer a correct EMPTY state (the
@@ -73,6 +74,21 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
                 .order_by(QueueProfile.display_order)
                 .all()
             )
+            from app.services.queue_profile_availability import (
+                load_queue_profile_availability,
+                queue_profile_is_qr_selectable,
+            )
+
+            availability_by_profile = load_queue_profile_availability(
+                self.db, profiles
+            )
+            profiles = [
+                profile
+                for profile in profiles
+                if queue_profile_is_qr_selectable(
+                    profile, availability_by_profile[profile]
+                )
+            ]
         except Exception:
             logger.warning(
                 "[QRQueueService] queue_profiles unavailable; offering empty selection",
@@ -161,5 +177,3 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             seen_ids.add(doctor.id)
 
         return selectable
-
-

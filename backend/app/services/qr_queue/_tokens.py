@@ -233,6 +233,44 @@ class TokensMixin(QRQueueServiceMixinBase):
                     self.db, daily_queue, target_date, qr_token.specialist_id
                 )
 
+                if (
+                    specialist is not None
+                    and not qr_token.is_clinic_wide
+                    and daily_queue is not None
+                ):
+                    # Evaluate the queue actually named by this token first.
+                    # A visible sibling profile for the same doctor's
+                    # specialty must not make an unavailable target usable.
+                    # Unprofiled legacy resource tokens retain their old path.
+                    profile_candidates = (
+                        queue_service._get_qr_profile_candidates_for_tag(
+                            self.db, daily_queue.queue_tag
+                        )
+                    )
+                    if not profile_candidates:
+                        profile_candidates = (
+                            queue_service._get_qr_profile_candidates_for_doctor(
+                                self.db, specialist
+                            )
+                        )
+                    if profile_candidates:
+                        from app.services.queue_profile_availability import (
+                            load_queue_profile_availability,
+                        )
+
+                        availability_by_profile = load_queue_profile_availability(
+                            self.db, profile_candidates
+                        )
+                        if not any(
+                            queue_service._is_qr_visible_profile(
+                                profile,
+                                self.db,
+                                availability=availability_by_profile[profile],
+                            )
+                            for profile in profile_candidates
+                        ):
+                            return None
+
             logger.debug(
                 f"[QRQueueService.get_qr_token_info] DailyQueue найдена: {daily_queue is not None}"
             )

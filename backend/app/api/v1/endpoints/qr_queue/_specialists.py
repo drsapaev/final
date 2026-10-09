@@ -46,7 +46,21 @@ def get_available_specialists(
         from app.models.queue_profile import QueueProfile
         profiles = db.query(QueueProfile).filter(
             QueueProfile.is_active == True,
+            QueueProfile.show_on_qr_page == True,
         ).all()
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+            queue_profile_is_qr_selectable,
+        )
+
+        availability_by_profile = load_queue_profile_availability(db, profiles)
+        profiles = [
+            profile
+            for profile in profiles
+            if queue_profile_is_qr_selectable(
+                profile, availability_by_profile[profile]
+            )
+        ]
 
         # Build mapping from profile keys + queue_tags
         specialty_mapping = {}
@@ -83,13 +97,9 @@ def get_available_specialists(
                         break
 
             if not normalized_specialty:
-                # Unknown specialty — use raw key with defaults
-                normalized_specialty = specialty_key
-                specialty_mapping[normalized_specialty] = {
-                    'name': doctor.specialty or 'Специалист',
-                    'icon': '👨‍⚕️',
-                    'color': '#8E8E93',
-                }
+                # A QR selector must not advertise a doctor whose current
+                # profile/parent policy would reject the subsequent join.
+                continue
 
             specialists_list.append({
                 'id': doctor.id,
@@ -140,5 +150,3 @@ def get_available_specialists(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
-
-

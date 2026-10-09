@@ -597,6 +597,99 @@ def test_admin_shown_ecg_direction_is_selectable_and_joinable(
     assert payload["entries"][0]["specialist_id"] == doctor.id
 
 
+@pytest.mark.queue
+def test_parent_off_removes_selection_and_blocks_direct_qr_join(
+    pg_client, pg_session, monkeypatch
+):
+    """A clinic-wide QR token cannot bypass a currently disabled parent."""
+    from app.models.department import Department
+    from app.services.queue_service import QueueValidationError, queue_service
+
+    monkeypatch.setattr(queue_service, "ONLINE_QUEUE_START_TIME", time(0, 0))
+    _user, doctor = _doctor_with_user(
+        pg_session,
+        specialty="ecg",
+        label="ecg_parent_off",
+        role="Doctor",
+        doctor_id=9291,
+    )
+    token = _clinic_wide_token(pg_session, "rq09-token-ecg-parent-off")
+    department = pg_session.query(Department).filter_by(key="echokg").one()
+    original_active = department.active
+    department.active = False
+    pg_session.commit()
+
+    try:
+        selectable = _selectable(pg_client, token.token)
+        assert all(item["id"] != doctor.id for item in selectable)
+
+        with pytest.raises(QueueValidationError):
+            queue_service.join_queue_with_token(
+                pg_session,
+                token_str=token.token,
+                patient_name="RQ09 Synthetic Parent-Off Patient",
+                phone="+998900000929",
+                specialist_id_override=doctor.id,
+                specialist_type="doctor",
+            )
+    finally:
+        pg_session.rollback()
+        department = pg_session.query(Department).filter_by(key="echokg").one()
+        department.active = original_active
+        pg_session.commit()
+
+
+@pytest.mark.queue
+def test_batch_doctor_target_resolution_reads_parent_departments_once(pg_session):
+    """A multi-doctor QR batch resolves profile parents with one read."""
+    from sqlalchemy import event
+
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import queue_service
+
+    _user1, cardiologist = _doctor_with_user(
+        pg_session, specialty="cardiology", label="batch_cardio"
+    )
+    _user2, ecg_doctor = _doctor_with_user(
+        pg_session, specialty="ecg", label="batch_ecg"
+    )
+    ecg_profile = pg_session.query(QueueProfile).filter_by(key="echokg").one()
+    original_show_on_qr = ecg_profile.show_on_qr_page
+    ecg_profile.show_on_qr_page = True
+    token = _clinic_wide_token(pg_session, "rq09-token-batch-parent-policy")
+    pg_session.commit()
+
+    department_selects: list[str] = []
+    engine = pg_session.get_bind()
+
+    def record_department_select(_conn, _cursor, statement, _parameters, _context, _many):
+        normalized = " ".join(statement.lower().replace('"', "").split())
+        table_tokens = {token.rstrip(",;") for token in normalized.split()}
+        if "select" in normalized and any(
+            token == "departments" or token.endswith(".departments")
+            for token in table_tokens
+        ):
+            department_selects.append(statement)
+
+    event.listen(engine, "before_cursor_execute", record_department_select)
+    try:
+        targets = queue_service.resolve_join_batch_tag_targets(
+            pg_session,
+            token_str=token.token,
+            specialist_ids=[cardiologist.id, ecg_doctor.id],
+            specialist_entity_types=["doctor", "doctor"],
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", record_department_select)
+        pg_session.rollback()
+        profile = pg_session.query(QueueProfile).filter_by(key="echokg").one()
+        profile.show_on_qr_page = original_show_on_qr
+        pg_session.commit()
+
+    assert set(targets) == {0, 1}
+    assert len(department_selects) == 1
+
+
 # ---------------------------------------------------------------------------
 # 3. Ghost / incomplete / resource-synthetic owners are NOT advertised
 # ---------------------------------------------------------------------------

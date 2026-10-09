@@ -323,6 +323,51 @@ def test_healthy_doctor_still_joins_via_doctor_token(pg_session):
     assert entries[0].patient_id is not None
 
 
+def test_existing_doctor_token_refuses_after_parent_department_is_disabled(
+    pg_session,
+):
+    """The exact queue tag wins over an available sibling specialty profile."""
+    from app.models.department import Department
+    from app.models.queue_profile import QueueProfile
+
+    session = pg_session
+    user = _make_user(session, "rq09c_parent_off", "Doctor", active=True)
+    doctor = _make_doctor(session, user.id)
+    # A token's doctor specialty can diverge from the queue's actual tag.
+    # An available sibling profile for that specialty must not bypass the
+    # unavailable profile that owns the queue tag.
+    session.add(
+        QueueProfile(
+            key="rq09c-visible-sibling",
+            title="Synthetic visible sibling",
+            queue_tags=["general"],
+            is_active=True,
+            show_on_qr_page=True,
+        )
+    )
+    doctor.specialty = "general"
+    session.commit()
+    world = _seed_doctor_token(session, "parent-off", doctor.id)
+    department = session.query(Department).filter_by(key="cardiology").one()
+    original_active = department.active
+    department.active = False
+    session.commit()
+
+    try:
+        from app.services.qr_queue import QRQueueService
+        from app.services.queue_svc import QueueValidationError
+
+        assert QRQueueService(session).get_qr_token_info(world["token"]) is None
+        with pytest.raises((QueueValidationError, ValueError)):
+            _join(session, world["token"])
+        assert _entries(session, world["queue_id"]) == []
+    finally:
+        session.rollback()
+        department = session.query(Department).filter_by(key="cardiology").one()
+        department.active = original_active
+        session.commit()
+
+
 def test_resource_owned_surface_joins_without_doctor_role_gate(pg_session):
     """(e) QD-2C regression guard: when the registry surface is
     resource-owned, the legacy synthetic token owner (role 'Lab') must

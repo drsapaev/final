@@ -91,6 +91,11 @@ def get_queue_profiles(
             query = query.filter(QueueProfile.is_active == True)
 
         profiles = query.order_by(QueueProfile.display_order).all()
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+        )
+
+        availability_by_profile = load_queue_profile_availability(db, profiles)
 
         return {
             "success": True,
@@ -105,6 +110,10 @@ def get_queue_profiles(
                     "color": p.color,
                     "order": p.display_order,  # API returns as 'order' for frontend compatibility
                     "is_active": p.is_active,
+                    # ``is_active`` is persisted manual intent. The nested
+                    # fact explains whether new QR/admission is currently
+                    # available after resolving the optional Department.
+                    "effective_availability": availability_by_profile[p].as_dict(),
                     "show_on_qr_page": getattr(
                         p, "show_on_qr_page", True
                     ),  # Handle missing column
@@ -132,7 +141,8 @@ def get_queue_profiles_public(
     ⭐ PUBLIC ENDPOINT: Получить список профилей для QR-страницы регистрации.
 
     Не требует авторизации - используется пациентами при самостоятельной регистрации.
-    Возвращает только профили с is_active=True И show_on_qr_page=True.
+    Возвращает только профили с ручным is_active=True, show_on_qr_page=True
+    и доступным однозначно разрешённым Department parent (если он назначен).
 
     Используется на странице /queue/join для выбора специальности.
     """
@@ -148,6 +158,19 @@ def get_queue_profiles_public(
             .order_by(QueueProfile.display_order)
             .all()
         )
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+            queue_profile_is_qr_selectable,
+        )
+
+        availability_by_profile = load_queue_profile_availability(db, profiles)
+        profiles = [
+            profile
+            for profile in profiles
+            if queue_profile_is_qr_selectable(
+                profile, availability_by_profile[profile]
+            )
+        ]
 
         return {
             "success": True,
