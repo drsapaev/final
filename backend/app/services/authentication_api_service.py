@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
+from app.core.roles import is_doctor_role_spelling
 from app.repositories.authentication_api_repository import AuthenticationApiRepository
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -33,6 +37,15 @@ class AuthenticationApiService:
         profile_loader,
         support_records_loader=None,
     ) -> dict:
+        if "full_name" in update_data and is_doctor_role_spelling(current_user.role):
+            full_name = update_data["full_name"]
+            if not isinstance(full_name, str) or not full_name.strip():
+                logger.info("[FIX] Rejected an empty display name for a doctor account")
+                raise AuthenticationApiDomainError(
+                    status_code=422,
+                    detail="Для учетной записи врача имя не может быть пустым.",
+                )
+
         profile = None
         if support_records_loader is not None:
             profile, _, _ = support_records_loader()
@@ -65,15 +78,18 @@ class AuthenticationApiService:
                 if field == "email":
                     email_updated = True
 
-            if profile is not None and field in profile_fields and hasattr(profile, field):
+            if (
+                profile is not None
+                and field in profile_fields
+                and hasattr(profile, field)
+            ):
                 setattr(profile, field, value)
                 if field == "phone":
                     phone_updated = True
 
         if profile is not None:
-            if (
-                "full_name" not in update_data
-                and any(key in update_data for key in ("first_name", "last_name", "middle_name"))
+            if "full_name" not in update_data and any(
+                key in update_data for key in ("first_name", "last_name", "middle_name")
             ):
                 composed_name = " ".join(
                     part

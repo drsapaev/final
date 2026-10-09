@@ -2,6 +2,7 @@
 CRUD операции для управления клиникой в админ панели
 """
 
+import logging
 from datetime import date
 from typing import Any
 
@@ -24,6 +25,8 @@ from app.schemas.clinic import (
     ServiceCategoryUpdate,
 )
 from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
+
+logger = logging.getLogger(__name__)
 
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
@@ -358,7 +361,7 @@ def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:
 
 def update_doctor(db: Session, doctor_id: int, doctor: DoctorUpdate) -> Doctor | None:
     """Обновить врача"""
-    db_doctor = get_doctor_by_id(db, doctor_id)
+    db_doctor = get_doctor_by_id_for_update(db, doctor_id)
     if not db_doctor:
         return None
 
@@ -369,6 +372,8 @@ def update_doctor(db: Session, doctor_id: int, doctor: DoctorUpdate) -> Doctor |
         if field == "active" and value is False:
             # Deactivation hides the public card. A later reactivation must
             # require an explicit website republish operation.
+            if db_doctor.show_on_website:
+                logger.info("[FIX] Hid the doctor website card during deactivation")
             db_doctor.show_on_website = False
         setattr(db_doctor, field, value)
 
@@ -379,10 +384,12 @@ def update_doctor(db: Session, doctor_id: int, doctor: DoctorUpdate) -> Doctor |
 
 def delete_doctor(db: Session, doctor_id: int) -> bool:
     """Удалить врача (мягкое удаление)"""
-    db_doctor = get_doctor_by_id(db, doctor_id)
+    db_doctor = get_doctor_by_id_for_update(db, doctor_id)
     if not db_doctor:
         return False
 
+    if db_doctor.show_on_website:
+        logger.info("[FIX] Hid the doctor website card during deletion")
     db_doctor.active = False
     db_doctor.show_on_website = False
     db.commit()

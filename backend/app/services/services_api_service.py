@@ -590,6 +590,41 @@ class ServicesApiService:
         """
         from sqlalchemy.exc import SQLAlchemyError
 
+        active_fields = [field for field in ("active", "is_active") if field in updates]
+        if active_fields:
+            normalized_values: dict[str, bool] = {}
+            for field in active_fields:
+                value = updates[field]
+                if isinstance(value, bool):
+                    normalized_values[field] = value
+                elif type(value) is int and value in (0, 1):
+                    normalized_values[field] = bool(value)
+                else:
+                    logger.warning(
+                        "[FIX] Rejected a non-boolean service batch activity value"
+                    )
+                    raise ValueError("Service activity updates must use true or false")
+
+            if len(set(normalized_values.values())) > 1:
+                logger.warning(
+                    "[FIX] Rejected conflicting activity fields in service batch update"
+                )
+                raise ValueError("active and is_active must have the same value")
+
+            normalized_active = next(iter(normalized_values.values()))
+            if "is_active" in active_fields:
+                logger.debug(
+                    "[FIX] Normalized the legacy is_active service batch field"
+                )
+            updates = {
+                **{
+                    key: value
+                    for key, value in updates.items()
+                    if key not in active_fields
+                },
+                "active": normalized_active,
+            }
+
         website_fields = sorted(_WEBSITE_PUBLICATION_BATCH_FIELDS.intersection(updates))
         if website_fields:
             logger.warning(

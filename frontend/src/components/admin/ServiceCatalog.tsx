@@ -255,6 +255,8 @@ const ServiceCatalog = () => {
   const [websiteOpen, setWebsiteOpen] = useState(false);
   const websiteLoadingRef = useRef(false);
   const websiteRefreshQueuedRef = useRef(false);
+  const websiteDirtyServiceIdRef = useRef<string | null>(null);
+  const previousWebsiteServiceIdRef = useRef<string | null>(null);
   const [websiteError, setWebsiteError] = useState('');
   const [websiteNotice, setWebsiteNotice] = useState('');
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -303,10 +305,23 @@ const ServiceCatalog = () => {
   );
 
   useEffect(() => {
+    const selectionChanged = previousWebsiteServiceIdRef.current !== websiteServiceId;
+    previousWebsiteServiceIdRef.current = websiteServiceId;
+
     if (!selectedWebsiteService) {
+      websiteDirtyServiceIdRef.current = null;
       setWebsiteForm({ name_ru: '', name_uz: '', description_ru: '', description_uz: '', slug: '' });
+      if (selectionChanged) {
+        setWebsiteError('');
+        setWebsiteNotice('');
+      }
       return;
     }
+    if (websiteDirtyServiceIdRef.current === websiteServiceId) {
+      logger.debug('[FIX] Preserved unsaved website content during catalog refresh');
+      return;
+    }
+    websiteDirtyServiceIdRef.current = null;
     setWebsiteForm({
       name_ru: selectedWebsiteService.name_ru || '',
       name_uz: selectedWebsiteService.name_uz || '',
@@ -314,9 +329,16 @@ const ServiceCatalog = () => {
       description_uz: selectedWebsiteService.description_uz || '',
       slug: selectedWebsiteService.slug || '',
     });
-    setWebsiteError('');
-    setWebsiteNotice('');
-  }, [selectedWebsiteService]);
+    if (selectionChanged) {
+      setWebsiteError('');
+      setWebsiteNotice('');
+    }
+  }, [selectedWebsiteService, websiteServiceId]);
+
+  const updateWebsiteField = (field: keyof WebsiteServiceFormState, value: string) => {
+    websiteDirtyServiceIdRef.current = websiteServiceId;
+    setWebsiteForm((current) => ({ ...current, [field]: value }));
+  };
 
   const loadData = async () => {
     try {
@@ -436,6 +458,9 @@ const ServiceCatalog = () => {
         { ...websiteForm, operation }
       );
       const saved = response.data as WebsiteServiceContent;
+      if (websiteDirtyServiceIdRef.current === String(saved.id)) {
+        websiteDirtyServiceIdRef.current = null;
+      }
       setWebsiteServices((items) => {
         const exists = items.some((item) => item.id === saved.id);
         return exists
@@ -448,7 +473,6 @@ const ServiceCatalog = () => {
           : item
       ));
       setWebsiteLoaded(true);
-      refreshWebsiteContent();
       setWebsiteNotice(t('admin2.sc_site_content_save_success'));
     } catch (error) {
       const responseData = (error as { response?: { data?: { detail?: unknown } } })?.response?.data;
@@ -779,7 +803,7 @@ const ServiceCatalog = () => {
                     <Input
                       id="service-site-name-ru"
                       value={websiteForm.name_ru}
-                      onChange={(event) => setWebsiteForm((current) => ({ ...current, name_ru: event.target.value }))}
+                      onChange={(event) => updateWebsiteField('name_ru', event.target.value)}
                       disabled={websiteSaving}
                       maxLength={256}
                     />
@@ -791,7 +815,7 @@ const ServiceCatalog = () => {
                     <Input
                       id="service-site-name-uz"
                       value={websiteForm.name_uz}
-                      onChange={(event) => setWebsiteForm((current) => ({ ...current, name_uz: event.target.value }))}
+                      onChange={(event) => updateWebsiteField('name_uz', event.target.value)}
                       disabled={websiteSaving}
                       maxLength={256}
                     />
@@ -803,7 +827,7 @@ const ServiceCatalog = () => {
                     <Input
                       id="service-site-slug"
                       value={websiteForm.slug}
-                      onChange={(event) => setWebsiteForm((current) => ({ ...current, slug: event.target.value }))}
+                      onChange={(event) => updateWebsiteField('slug', event.target.value)}
                       disabled={websiteSaving || selectedWebsiteService.slug_locked}
                       maxLength={160}
                     />
@@ -818,7 +842,7 @@ const ServiceCatalog = () => {
                     <Textarea
                       id="service-site-description-ru"
                       value={websiteForm.description_ru}
-                      onChange={(event) => setWebsiteForm((current) => ({ ...current, description_ru: event.target.value }))}
+                      onChange={(event) => updateWebsiteField('description_ru', event.target.value)}
                       disabled={websiteSaving}
                       minRows={3}
                     />
@@ -830,7 +854,7 @@ const ServiceCatalog = () => {
                     <Textarea
                       id="service-site-description-uz"
                       value={websiteForm.description_uz}
-                      onChange={(event) => setWebsiteForm((current) => ({ ...current, description_uz: event.target.value }))}
+                      onChange={(event) => updateWebsiteField('description_uz', event.target.value)}
                       disabled={websiteSaving}
                       minRows={3}
                     />
