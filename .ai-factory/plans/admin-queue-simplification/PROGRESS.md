@@ -2,13 +2,13 @@
 
 Plan version: 3.84
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: PR_OPEN — PR #3639 remains open; the latest remote head observed before this follow-up was `c62d13fdfc48eab2861660a94d135c4d4237535b`, base `6315c62edb888bb8864928a41dd70a4c00be6e3d`. The CI run at the previous code checkpoint reported OpenAPI freshness failure; a workflow-equivalent generated snapshot is now prepared locally. No review decision or merge. T11 Tier-2 staging and T18 remain NOT_RUN.
+Current status: PR_OPEN — local follow-up commit `df42d0ad9` adds the generated OpenAPI description snapshot and T11 journal checkpoint; remote PR #3639 is still at `c62d13fdfc48eab2861660a94d135c4d4237535b`, so push is pending. Base is `6315c62edb888bb8864928a41dd70a4c00be6e3d`. No review decision or merge. T11 Tier-2 staging and T18 remain NOT_RUN.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 Base (`origin/main`): 6315c62edb888bb8864928a41dd70a4c00be6e3d
-Previous local/remote PR HEAD: c62d13fdfc48eab2861660a94d135c4d4237535b
-Current tracked pending paths: `backend/openapi.json`, `PROGRESS.md`, and `EVIDENCE.md`; `.scratch/` remains untracked and excluded.
-Last updated: 2026-10-09T09:50+05:00
+Previous remote PR HEAD: c62d13fdfc48eab2861660a94d135c4d4237535b
+Current local follow-up commit: df42d0ad9 (OpenAPI snapshot + initial checkpoint); uncommitted journal-only checkpoint updates: `PROGRESS.md`, `EVIDENCE.md`; `.scratch/` remains untracked and excluded.
+Last updated: 2026-10-09T09:56+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,9 +16,9 @@ Last updated: 2026-10-09T09:50+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | PR_OPEN | PR #3639; latest observed remote HEAD c62d13fd | | EVIDENCE.md#t11-pr-3639-openapi-freshness-follow-up |
+| T11 | PR_OPEN | PR #3639; local df42d0ad9 plus journal update pending push; remote c62d13fd | | EVIDENCE.md#t11-pr-3639-openapi-freshness-follow-up |
 
-## Current checkpoint — T11 PR #3639 OpenAPI freshness follow-up (2026-10-09T09:50+05:00)
+## Current checkpoint — T11 PR #3639 OpenAPI freshness follow-up (2026-10-09T09:56+05:00)
 
 - PR #3633 is merged at `6315c62edb888bb8864928a41dd70a4c00be6e3d`; local `C:\final` was fast-forwarded to the same `origin/main`. Existing untracked `.gate_artifacts/` in `C:\final` was preserved.
 - T11 implementation remains in PR #3639: shared manual/effective QueueProfile availability policy; department off/on no longer overwrites manual profile activity; admin read metadata, QR selector, direct join, existing token, and permanent-address session paths use the shared policy. The runtime/test commit is `a47b327ab427daac75eb9e3778e59eb1b166ef45`; no runtime source change was made in this follow-up.
@@ -28,7 +28,7 @@ Last updated: 2026-10-09T09:50+05:00
 - PR body now lists `backend/openapi.json` as a description-only generated artifact, states there is no response-schema change, and distinguishes the failed freshness step from checks that were still pending/cancelled.
 - T11 staging/browser, immutable served-build provenance, and full `STAGING_VALIDATION.md` remain **NOT_RUN**. No Tier-2 deferral has been accepted. T18 remains NOT_RUN. Prior T10 staging evidence does not transfer to T11.
 - Task-owned `.scratch/` contains the stopped T11 test PostgreSQL data directory and remains untracked; do not stage or remove it. Earlier results remain: 73 PostgreSQL integration tests, 7 availability unit tests, and 6 lock-order tests passed on T11 runtime code. Scoped Ruff suppressed only documented pre-existing findings; formatter hooks were previously skipped and are not reported as passing.
-- Pending at this checkpoint: commit the OpenAPI snapshot together with this progress/evidence update, push `codex/aqs-T11-manual-availability`, and inspect all checks on the resulting exact PR HEAD. Keep merge with the user. Next runtime step remains after PR #3639 is merged and base is synced.
+- Pending at this checkpoint: commit this journal-only state update, push the local T11 commits to `codex/aqs-T11-manual-availability`, then inspect all checks on the resulting exact PR HEAD. Keep merge with the user. Next runtime step remains after PR #3639 is merged and base is synced.
 - Re-run after this update: `git diff --check`; the OpenAPI contract test already passed against the final snapshot. On the new remote HEAD, inspect backend tests, OpenAPI freshness, generated API type freshness, PR Required Gate, Code Quality and security checks. Treat path-aware skips as NOT_RUN, not PASS.
 ## Current checkpoint — PR #3633 description, exact-head CI, and Tier-2 status (2026-10-08T22:35+05:00)
 
