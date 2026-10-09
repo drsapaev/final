@@ -1004,6 +1004,108 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public-site/clinic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Получить публичные контакты клиники */
+        get: operations["public_site_get_clinic"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public-site/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Получить опубликованные услуги */
+        get: operations["public_site_list_services"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public-site/services/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Получить опубликованную услугу */
+        get: operations["public_site_get_service"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public-site/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Получить категории опубликованных услуг */
+        get: operations["public_site_list_categories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public-site/doctors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Получить опубликованных врачей */
+        get: operations["public_site_list_doctors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public-site/doctors/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Получить опубликованного врача */
+        get: operations["public_site_get_doctor"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/departments": {
         parameters: {
             query?: never;
@@ -35759,6 +35861,63 @@ export type components = {
                 [key: string]: unknown;
             };
         };
+        /** PublicSiteCategoryOut */
+        PublicSiteCategoryOut: {
+            /** Name */
+            name: string;
+        };
+        /** PublicSiteClinicOut */
+        PublicSiteClinicOut: {
+            /** Name */
+            name?: string | null;
+            /** Address */
+            address?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Email */
+            email?: string | null;
+        };
+        /** PublicSiteDoctorOut */
+        PublicSiteDoctorOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Bio */
+            bio: string;
+            /** Specialty */
+            specialty?: string | null;
+        };
+        /** PublicSiteNotFoundDetail */
+        PublicSiteNotFoundDetail: {
+            /**
+             * Code
+             * @constant
+             */
+            code: "public_content_not_found";
+        };
+        /** PublicSiteNotFoundOut */
+        PublicSiteNotFoundOut: {
+            detail: components["schemas"]["PublicSiteNotFoundDetail"];
+        };
+        /** PublicSiteServiceOut */
+        PublicSiteServiceOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /**
+             * Price
+             * @description Null means the localized site should display 'price on request'.
+             */
+            price: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Category */
+            category?: string | null;
+        };
         /**
          * PushDeviceErrorDetail
          * @description Body of HTTPException errors on this surface: ``{"detail": ...}``.
@@ -44395,6 +44554,203 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServiceCodeMappingsResponse"];
+                };
+            };
+        };
+    };
+    public_site_get_clinic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteClinicOut"];
+                };
+            };
+        };
+    };
+    public_site_list_services: {
+        parameters: {
+            query: {
+                locale: "uz-Latn" | "ru";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteServiceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_site_get_service: {
+        parameters: {
+            query: {
+                locale: "uz-Latn" | "ru";
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteServiceOut"];
+                };
+            };
+            /** @description Published service was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteNotFoundOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_site_list_categories: {
+        parameters: {
+            query: {
+                locale: "uz-Latn" | "ru";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteCategoryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_site_list_doctors: {
+        parameters: {
+            query: {
+                locale: "uz-Latn" | "ru";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteDoctorOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_site_get_doctor: {
+        parameters: {
+            query: {
+                locale: "uz-Latn" | "ru";
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteDoctorOut"];
+                };
+            };
+            /** @description Published doctor was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteNotFoundOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
