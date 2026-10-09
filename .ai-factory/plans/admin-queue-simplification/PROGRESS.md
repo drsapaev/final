@@ -2,13 +2,13 @@
 
 Plan version: 3.86
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: IN_PROGRESS — both review fixes are implemented and the three focused PostgreSQL integration modules pass locally. Exact baseline/remote PR HEAD is `93c506a87b5dd31c428da8ee1581c4035c739e7e`; local edits are uncommitted. Mandatory gate returned a bounded narrow override; execution prompt read. Tier-2 remains PARTIAL; no deferral has been accepted. Merge remains user-owned.
+Current status: IN_PROGRESS — both review fixes are committed and validated after syncing current main. Code commit `57965a1ca`; sync merge `df5fc486b`. Exact remote PR HEAD remains `93c506a87b5dd31c428da8ee1581c4035c739e7e`; push and exact-head CI are pending. Mandatory gate returned a bounded narrow override; execution prompt read. Tier-2 remains PARTIAL; no deferral has been accepted. Merge remains user-owned.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
-Base (`origin/main`): 7f30b231dfa66ac080ae376267e80889fa264bd8
+Base (`origin/main`): 8f3d325de18d3f8eede1b4b300926e6c2c65bebf
 Remote PR HEAD: 93c506a87b5dd31c428da8ee1581c4035c739e7e.
 Current changed paths: four backend modules, two focused integration tests, this plan's `PROGRESS.md`/`EVIDENCE.md`/`RESUME.md`, and the required `aif-fix` patch note. Preserve pre-existing untracked `.scratch/` and do not stage it.
-Last updated: 2026-10-09T16:35+05:00
+Last updated: 2026-10-09T17:01+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,9 +16,9 @@ Last updated: 2026-10-09T16:35+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS | PR #3639; P1/P2 fixes and local checks pass; base sync, push and exact-head CI pending | | EVIDENCE.md#t11-pr-3639-review-fix-implementation |
+| T11 | IN_PROGRESS | PR #3639; code fix `57965a1ca`, base sync `df5fc486b`; push and exact-head CI pending | | EVIDENCE.md#t11-pr-3639-review-fix-implementation |
 
-## Current checkpoint — T11 PR #3639 review fixes — 2026-10-09T16:35+05:00
+## Current checkpoint — T11 PR #3639 review fixes — 2026-10-09T17:01+05:00
 
 - Task ID `9af17c38-8235-4681-93e8-6a9864cbdb75`; continue the same T11 assignment. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Baseline local and remote PR HEAD `93c506a87b5dd31c428da8ee1581c4035c739e7e`; base `7f30b231dfa66ac080ae376267e80889fa264bd8`. Preserve existing untracked `.scratch/`.
 - Chosen mode: mandatory `gate` because the fix changes queue admission and department-derived availability. The normal gate stopped because no first-touch files were resolved. The required retry with `--known-root-cause backend/app/services/queue_svc/_core.py` returned `narrow_override`, `gate_misroute=false`, `override_used=true`; its first-touch was only `_core.py`. A subsequent reviewed scoped invocation with the exact paths below returned `narrow_override`, `handoff_required=true`, `gate_misroute=false`, `override_used=true`. The generated execution prompt was read and is followed. Do not change the gate/router.
@@ -27,11 +27,12 @@ Last updated: 2026-10-09T16:35+05:00
 - Denied: schema/models/migrations, gate/router, production/deployment, unrelated paths, other worktrees and scratch content, Tier-2 staging, formal GitHub review submission, and merge. PR-description changes require an explicit gate scope and remain out of this prework boundary.
 - Validation target: regression coverage for clinic-wide selection and join with one unavailable published parent plus a visible shared-tag sibling; lifecycle coverage for create-inactive → activate yielding a manually active profile with parent-effective availability; targeted PostgreSQL backend tests, `py_compile` if applicable, scoped lint, and `git diff --check`. After push, inspect checks on the exact new PR HEAD.
 - Stop conditions: gate requires changes outside the allowed scope; behavior would change queue ownership or explicit-publication policy; a disposable PostgreSQL target cannot be established; tests reveal existing patient/history mutation; or PR HEAD changes during work.
-- Completed: gate and scoped prompt; fail-first reproduction of both findings; shared-tag fail-closed checks now cover clinic-wide selection, direct join and `/queue/available-specialists`; a new auto-created profile starts manually active and follows parent effective availability. All three approved integration modules passed together on task-owned disposable PostgreSQL: **61 passed, 1 warning**. Final `py_compile`, scoped Ruff with known baseline I001/B023/C416 ignored, and `git diff --check` passed. The `aif-fix` patch note is present.
-- Changed but not verified: final PR commit and base synchronization have not been made; hosted checks have not run on these changes.
-- Remaining: inspect final diff, commit the exact approved paths, merge the three non-overlapping commits from current `origin/main` into the PR branch, rerun focused validation on that synchronized HEAD, push and inspect exact-head checks.
+- Completed: gate and scoped prompt; fail-first reproduction of both findings; shared-tag fail-closed checks now cover clinic-wide selection, direct join and `/queue/available-specialists`; a new auto-created profile starts manually active and follows parent effective availability. Code commit `57965a1ca` is synchronized with current `origin/main` by merge `df5fc486b`. On that synchronized HEAD all three approved PostgreSQL integration modules passed: **61 passed, 1 warning**. `py_compile`, scoped Ruff with known baseline I001/B023/C416 ignored, and `git diff --check` passed. The `aif-fix` patch note is present.
+- Commit hooks passed except `ruff`, `ruff-format`, and `black`: standard Ruff reports existing B023 in the changed department helper, and format hooks rewrote broad legacy formatting. Those hook-generated unstaged format changes were reviewed and discarded; the commit was retried with only those three hooks skipped after the scoped checks passed. All remaining hooks passed.
+- Changed but not verified: branch commits are local; push and exact-head CI have not run yet.
+- Remaining: commit this current checkpoint, fetch to confirm `origin/main` is still `8f3d325de`, push the PR branch and inspect exact-head checks.
 - Blocker: none for local validation. No staging, review submission, or merge is authorized in this scope.
-- Next exact action: review/stage only the listed T11 source/test/journal/patch files, commit, sync current `origin/main`, rerun focused PostgreSQL and static checks, push PR #3639 and verify checks on the exact new HEAD.
+- Next exact action: stage and commit only the T11 journal update, recheck remote refs, push the synchronized branch to PR #3639, and verify hosted checks on the new exact HEAD.
 
 ## Previous checkpoint — T11 PR #3639 RQ29 fixture follow-up — 2026-10-09T15:39+05:00
 
