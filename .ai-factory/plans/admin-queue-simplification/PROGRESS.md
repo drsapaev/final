@@ -2,13 +2,13 @@
 
 Plan version: 3.84
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: VALIDATED — runtime/test commit `a47b327ab427daac75eb9e3778e59eb1b166ef45` is committed; focused PostgreSQL/unit checks pass locally. Journals are pending a docs checkpoint; branch is not pushed and PR is not opened. Hosted staging/browser validation and T18 remain NOT_RUN.
+Current status: PR_OPEN — PR #3639 is open on exact HEAD `b68d2f986a27e4e8e2db4152b77b86e3ebecc062`, base `6315c62edb888bb8864928a41dd70a4c00be6e3d`; initial applicable CI is queued/running. No review decision or merge. Hosted staging/browser validation and T18 remain NOT_RUN.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 Base (`origin/main`): 6315c62edb888bb8864928a41dd70a4c00be6e3d
-Current local HEAD: a47b327ab427daac75eb9e3778e59eb1b166ef45 (runtime/test commit; journal changes pending)
-PR: none; preparing the T11 PR after final diff and body checks
-Last updated: 2026-10-09T09:32+05:00
+Current local HEAD: b68d2f986a27e4e8e2db4152b77b86e3ebecc062
+PR #3639: OPEN / MERGEABLE at exact HEAD b68d2f986a27e4e8e2db4152b77b86e3ebecc062; checks pending
+Last updated: 2026-10-09T09:36+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,9 +16,9 @@ Last updated: 2026-10-09T09:32+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | VALIDATED | codex/aqs-T11-manual-availability; no PR yet | | EVIDENCE.md#t11-local-validation-2026-10-09 |
+| T11 | PR_OPEN | PR #3639; HEAD b68d2f98 | | EVIDENCE.md#t11-pr-3639-open-exact-head-checks-pending |
 
-## Current checkpoint — T11 local validation (2026-10-09T09:32+05:00)
+## Current checkpoint — T11 PR #3639 (2026-10-09T09:36+05:00)
 
 - PR #3633 is merged at `6315c62edb888bb8864928a41dd70a4c00be6e3d`; local `C:\final` was fast-forwarded to the same `origin/main`. Existing untracked `.gate_artifacts/` in `C:\final` was preserved.
 - T10 latest isolated Tier-2 rerun is partial: PostgreSQL focused regressions 51/51 PASS; normal Admin password→TOTP and owned API checks PASS; exact frontend asset bytes matched the Start image, but immutable served-SHA attestation is NOT_RUN. Live queue/rebind specs, browser/UI/keyboard/viewport, and full `STAGING_VALIDATION.md` are NOT_RUN. The owned synthetic Compose project was torn down and absence verified. See `T10-PR3633-tier2-staging-report.md` and the newest T10 evidence entry; do not transfer these results to other commits.
@@ -29,9 +29,11 @@ Last updated: 2026-10-09T09:32+05:00
 - Temporary test infrastructure: local PostgreSQL 17 on loopback was stopped; `clinic_test_t11` was dropped; the failed WSL test container was removed. The task-owned data directory `.scratch/t11-pg-20261009` remains because the execution policy rejected its cleanup commands; keep it unstaged. Port 55437 is no longer serving this cluster.
 - Changed but not verified: exact-head hosted CI and formal human review, because no PR exists yet. No T11 staging/browser pass is claimed. Full staging and T18 remain required later by the plan.
 - PR-body quality gate: passed 19 unit tests, both documented samples and the filled T11 body after correcting missing required field labels. Final diff/scope review found no material blocker; two stale QR availability comments were corrected. Architecture/rules align; ROADMAP has no direct T11 link (non-blocking WARN).
-- Runtime/test commit: `a47b327ab427daac75eb9e3778e59eb1b166ef45`. Its parent remains the fresh `origin/main` base. Commit hooks passed except `ruff`, `ruff-format`, and `black`, which were skipped after their first attempt exposed three existing B023 findings and broad baseline rewrites; a scoped Ruff command passed with pre-existing rules suppressed. Details are in EVIDENCE.
-- Blocker: none for creating the T11 PR. Do not stage `.scratch/` or unrelated paths.
-- Next exact action: commit only the two plan journal files, push this branch, and open the PR. Wait for exact-head checks/review; do not merge.
+- Runtime/test commit: `a47b327ab427daac75eb9e3778e59eb1b166ef45`; journal checkpoint: `b68d2f986a27e4e8e2db4152b77b86e3ebecc062`. Base is fresh `origin/main` `6315c62edb888bb8864928a41dd70a4c00be6e3d`.
+- PR: [#3639](https://github.com/drsapaev/final/pull/3639), OPEN/MERGEABLE, exact HEAD `b68d2f986a27e4e8e2db4152b77b86e3ebecc062`. Initial CI snapshot: PR Review Quality Gate queued; CodeQL, formatting report, unified CI scope, secret scan and security scan running; GitGuardian passed; path-aware DAST and Supabase Preview skipped. Skips are not passes. Review decision empty; no merge.
+- Commit hooks passed except `ruff`, `ruff-format`, and `black`, which were skipped after their first attempt exposed three existing B023 findings and broad baseline rewrites; scoped Ruff passed with known existing findings suppressed. Details are in EVIDENCE.
+- Blocker: no local blocker; exact-head CI/review are pending. Keep `.scratch/` unstaged.
+- Next exact action: inspect all checks on exact PR HEAD `b68d2f98`; fix in-scope failures in the same PR and wait for checks again. Keep merge with the user.
 - Checks to rerun after any further runtime change: 73-test PostgreSQL integration command, 7-test unit command, lock-order test, changed-file `py_compile`, scoped Ruff, and `git diff --check`. For a docs-only adjustment, rerun the PR body gate and `git diff --check`.
 
 ## Current checkpoint — PR #3633 description, exact-head CI, and Tier-2 status (2026-10-08T22:35+05:00)

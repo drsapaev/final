@@ -39,8 +39,18 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Scope: source/test changes are limited to the T11 department lifecycle, shared profile availability and public/profile admission consumers, with focused integration/unit tests. No schema/migration, frontend runtime, route ownership, queue identity/numbering, token identity/expiry, clinical lifecycle, shared staging, production, or merge change.
 - Cleanup limitation: the stopped cluster data directory `.scratch/t11-pg-20261009` remains inside this worktree. It contains only the task-owned disposable cluster, has no reparse points, and is not staged. The environment rejected the approved-path deletion commands; no alternate cleanup mechanism was used. Do not add `.scratch/` to the PR.
 - NOT_RUN: T11 synthetic Compose/browser staging and served-build provenance; exact-head hosted CI and formal review (PR not yet open); full `docs/runbooks/STAGING_VALIDATION.md` and T18. This backend-only local PostgreSQL result does not claim those checks.
-- Result: local T11 acceptance tests PASS; runtime/test commit `a47b327a` is committed but not pushed or merged. The initial failed WSL attempt and residual stopped data directory are disclosed above.
-- Next exact action: record the source commit and hook handling in `PROGRESS.md`, commit only the two T11 journal files, push the branch, open one T11 PR, then inspect exact-head CI. User retains the merge decision.
+- Result: local T11 acceptance tests PASS; runtime/test commit `a47b327a` and journal commit `b68d2f98` are on the remote branch. The initial failed WSL attempt and residual stopped data directory are disclosed above.
+- Next exact action: inspect exact-head hosted checks for PR #3639, fix any in-scope failures in that PR, and update this checkpoint after the checks settle. User retains the merge decision.
+
+## T11 PR #3639 open — exact-head checks pending
+
+- PR: [#3639](https://github.com/drsapaev/final/pull/3639), title `fix(queue): preserve manual QueueProfile availability`, state OPEN, mergeable, no review decision. No formal review submission or merge occurred.
+- Exact PR HEAD: `b68d2f986a27e4e8e2db4152b77b86e3ebecc062`; base `main` is `6315c62edb888bb8864928a41dd70a4c00be6e3d`. The head includes runtime/test commit `a47b327ab427daac75eb9e3778e59eb1b166ef45` and this evidence/progress checkpoint.
+- Initial hosted-check snapshot from `gh pr view 3639 --json ...`: PR Review Quality Gate queued; Python formatting report, Frontend lint report, CodeQL Python/JavaScript/Actions, CI Scope, gitleaks, and security scan in progress; GitGuardian SUCCESS. Path-aware Dependabot classification, DAST Nightly and Supabase Preview were SKIPPED and are not counted as passes. All other checks remain pending until queried again on this exact head.
+- Local PR-body gate: PASS (19 gate tests, both documented sample bodies, and the exact T11 body). The body says Tier-2 NOT RUN and leaves deferral unacknowledged.
+- Local validation remains scoped to the source commit: 7 unit, 73 focused PostgreSQL integration, 6 PostgreSQL lock-order tests; compile and scoped Ruff PASS; final committed whitespace check PASS. Hosted CI, T11 staging/browser, served build provenance, full `STAGING_VALIDATION.md`, and T18 remain NOT_RUN.
+- Scope and cleanup: only the T11 paths and the two plan journals were committed. `.scratch/t11-pg-20261009` remains untracked and stopped in the worktree; do not stage it. No production or shared staging was used.
+- Next exact action: query applicable status checks on `b68d2f98`; do not treat skipped path-aware jobs as PASS. Fix any scoped red check on #3639, update PR/evidence, and leave merge to the user.
 
 ## T10 PR #3633 Tier-2 staging and CI follow-up — 2026-10-08T16:50+05:00
 
