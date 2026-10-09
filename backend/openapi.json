@@ -3285,6 +3285,307 @@
         }
       }
     },
+    "/api/v1/public-site/clinic": {
+      "get": {
+        "tags": [
+          "public-site"
+        ],
+        "summary": "Получить публичные контакты клиники",
+        "operationId": "public_site_get_clinic",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteClinicOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public-site/services": {
+      "get": {
+        "tags": [
+          "public-site"
+        ],
+        "summary": "Получить опубликованные услуги",
+        "operationId": "public_site_list_services",
+        "parameters": [
+          {
+            "name": "locale",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "uz-Latn",
+                "ru"
+              ],
+              "type": "string",
+              "title": "Locale"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicSiteServiceOut"
+                  },
+                  "title": "Response Public Site List Services"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public-site/services/{slug}": {
+      "get": {
+        "tags": [
+          "public-site"
+        ],
+        "summary": "Получить опубликованную услугу",
+        "operationId": "public_site_get_service",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "uz-Latn",
+                "ru"
+              ],
+              "type": "string",
+              "title": "Locale"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteServiceOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published service was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteNotFoundOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public-site/categories": {
+      "get": {
+        "tags": [
+          "public-site"
+        ],
+        "summary": "Получить категории опубликованных услуг",
+        "operationId": "public_site_list_categories",
+        "parameters": [
+          {
+            "name": "locale",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "uz-Latn",
+                "ru"
+              ],
+              "type": "string",
+              "title": "Locale"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicSiteCategoryOut"
+                  },
+                  "title": "Response Public Site List Categories"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public-site/doctors": {
+      "get": {
+        "tags": [
+          "public-site"
+        ],
+        "summary": "Получить опубликованных врачей",
+        "operationId": "public_site_list_doctors",
+        "parameters": [
+          {
+            "name": "locale",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "uz-Latn",
+                "ru"
+              ],
+              "type": "string",
+              "title": "Locale"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicSiteDoctorOut"
+                  },
+                  "title": "Response Public Site List Doctors"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public-site/doctors/{slug}": {
+      "get": {
+        "tags": [
+          "public-site"
+        ],
+        "summary": "Получить опубликованного врача",
+        "operationId": "public_site_get_doctor",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "uz-Latn",
+                "ru"
+              ],
+              "type": "string",
+              "title": "Locale"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteDoctorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published doctor was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteNotFoundOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/departments": {
       "get": {
         "tags": [
@@ -102201,6 +102502,194 @@
         ],
         "title": "PublicDirectionStartResponse",
         "description": "Short-lived session opened through the permanent public address.\n\nThe ``session_token`` drives the EXISTING QueueJoin flow\n(``/queue/join/:token`` semantics preserved); the internal\ndirection-scoped QR token is deliberately NOT returned."
+      },
+      "PublicSiteCategoryOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "PublicSiteCategoryOut"
+      },
+      "PublicSiteClinicOut": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PublicSiteClinicOut"
+      },
+      "PublicSiteDoctorOut": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "bio": {
+            "type": "string",
+            "title": "Bio"
+          },
+          "specialty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialty"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "bio"
+        ],
+        "title": "PublicSiteDoctorOut"
+      },
+      "PublicSiteNotFoundDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "public_content_not_found",
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "PublicSiteNotFoundDetail"
+      },
+      "PublicSiteNotFoundOut": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/PublicSiteNotFoundDetail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicSiteNotFoundOut"
+      },
+      "PublicSiteServiceOut": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price",
+            "description": "Null means the localized site should display 'price on request'."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "description",
+          "price"
+        ],
+        "title": "PublicSiteServiceOut"
       },
       "PushDeviceErrorDetail": {
         "properties": {
