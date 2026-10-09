@@ -84,6 +84,12 @@ def test_openapi_ai_v2_medical_responses_require_doctor_confirmation(
         ("/api/v1/telegram/onboarding/requests/{request_id}/create-patient", "post"),
         ("/api/v1/telegram/onboarding/requests/{request_id}/request-more-info", "post"),
         ("/api/v1/telegram/onboarding/requests/{request_id}/reject", "post"),
+        ("/api/v1/public-site/clinic", "get"),
+        ("/api/v1/public-site/services", "get"),
+        ("/api/v1/public-site/services/{slug}", "get"),
+        ("/api/v1/public-site/categories", "get"),
+        ("/api/v1/public-site/doctors", "get"),
+        ("/api/v1/public-site/doctors/{slug}", "get"),
         ("/api/v1/health", "get"),
     ],
 )
@@ -295,15 +301,16 @@ def test_openapi_queue_profile_binding_preview_and_conflict_are_typed(
     assert "detail" in conflict_contract["required"]
 
 
-
-def test_openapi_queue_profile_binding_409_variants_are_typed(client: TestClient) -> None:
+def test_openapi_queue_profile_binding_409_variants_are_typed(
+    client: TestClient,
+) -> None:
     schema = _get_openapi_schema(client)
     components = schema["components"]["schemas"]
 
     profile_update = schema["paths"]["/api/v1/queues/profiles/{profile_key}"]["put"]
-    response_schema = profile_update["responses"]["409"]["content"][
-        "application/json"
-    ]["schema"]
+    response_schema = profile_update["responses"]["409"]["content"]["application/json"][
+        "schema"
+    ]
     conflict_refs = {
         branch["$ref"]
         for branch in response_schema.get("anyOf", response_schema.get("oneOf", []))
@@ -325,14 +332,19 @@ def test_openapi_queue_profile_binding_409_variants_are_typed(client: TestClient
     provision = schema["paths"][
         "/api/v1/queue/admin/directions/{profile_key}/public-address/provision"
     ]["post"]
-    assert provision["responses"]["409"]["content"]["application/json"]["schema"][
-        "$ref"
-    ] == "#/components/schemas/QueueProfileBindingChangedResponse"
+    assert (
+        provision["responses"]["409"]["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/QueueProfileBindingChangedResponse"
+    )
 
     doctor_update = schema["paths"]["/api/v1/admin/doctors/{doctor_id}"]["put"]
-    assert doctor_update["responses"]["409"]["content"]["application/json"]["schema"][
-        "$ref"
-    ] == "#/components/schemas/QueueProfileBindingChangedResponse"
+    assert (
+        doctor_update["responses"]["409"]["content"]["application/json"]["schema"][
+            "$ref"
+        ]
+        == "#/components/schemas/QueueProfileBindingChangedResponse"
+    )
+
 
 def test_openapi_doctor_queue_workflow_exposes_canonical_ids(
     client: TestClient,

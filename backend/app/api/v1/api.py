@@ -94,6 +94,7 @@ from app.api.v1.endpoints import (
     phrase_suggest,
     print_api,
     print_templates,
+    public_site,
     push_devices,
     qr_queue,
     queue_auto_close,
@@ -180,12 +181,13 @@ api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 # read-only forms). Reuses the Mini App service layer; identity = JWT patient.
 # Included BEFORE patients.router: static paths (/patients/forms,
 # /patients/booking) must win over GET /patients/{patient_id}.
-api_router.include_router(
-    patient_portal.router, prefix="/patients", tags=["patients"]
-)
+api_router.include_router(patient_portal.router, prefix="/patients", tags=["patients"])
 api_router.include_router(patients.router, prefix="/patients", tags=["patients"])
 api_router.include_router(visits.router, prefix="/visits", tags=["visits"])
 api_router.include_router(services.router, prefix="/services")
+api_router.include_router(
+    public_site.router, prefix="/public-site", tags=["public-site"]
+)
 api_router.include_router(
     departments.router, prefix="/departments", tags=["departments"]
 )
@@ -297,8 +299,12 @@ api_router.include_router(ai_gateway.router, prefix="/ai/v2", tags=["ai-gateway"
 
 api_router.include_router(ai_chat.router, prefix="/ai/chat", tags=["ai-chat"])
 
-api_router.include_router(ai_cost_analytics.router, prefix="/ai/analytics", tags=["ai-cost-analytics"])
-api_router.include_router(ai_tracking.router, prefix="/ai/tracking", tags=["ai-tracking"])
+api_router.include_router(
+    ai_cost_analytics.router, prefix="/ai/analytics", tags=["ai-cost-analytics"]
+)
+api_router.include_router(
+    ai_tracking.router, prefix="/ai/tracking", tags=["ai-tracking"]
+)
 
 api_router.include_router(admin_finance.router, tags=["admin-finance"])
 
@@ -325,7 +331,9 @@ api_router.include_router(
     display_websocket.router, prefix="/display", tags=["display-websocket"]
 )
 api_router.include_router(board_ep.router, tags=["board"])
-api_router.include_router(payment_reconciliation.router, prefix="/payments", tags=["payment-reconciliation"])
+api_router.include_router(
+    payment_reconciliation.router, prefix="/payments", tags=["payment-reconciliation"]
+)
 api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_appointments.router, tags=["admin-appointments"])
 api_router.include_router(admin_clinic.router, prefix="/admin", tags=["admin"])
@@ -427,7 +435,9 @@ api_router.include_router(
     queue_reorder.router, prefix="/queue/reorder", tags=["queue-reorder"]
 )
 # Mobile-contract alias (Android client): PUT /api/v1/queue/move-entry.
-api_router.include_router(queue_reorder.alias_router, tags=["queue-reorder-mobile-alias"])
+api_router.include_router(
+    queue_reorder.alias_router, tags=["queue-reorder-mobile-alias"]
+)
 api_router.include_router(
     websocket_auth.router, prefix="/ws-auth", tags=["websocket-auth"]
 )
@@ -556,9 +566,7 @@ api_router.include_router(
 )
 
 # EMR v2 - Production EMR with versioning and audit
-api_router.include_router(
-    emr_v2.router, prefix="/v2", tags=["emr-v2"]
-)
+api_router.include_router(emr_v2.router, prefix="/v2", tags=["emr-v2"])
 
 # Mobile-contract alias (Android client): GET/POST /api/v1/emr/{visit_id} via
 # a NARROW alias router. Kept AFTER every static /emr/* router so those
@@ -567,21 +575,13 @@ api_router.include_router(
 api_router.include_router(emr_v2.alias_router, tags=["emr-v2-mobile-alias"])
 
 # Global Search - агрегированный поиск по всем доменам
-api_router.include_router(
-    global_search.router, tags=["global-search"]
-)
+api_router.include_router(global_search.router, tags=["global-search"])
 
 # Telemetry - Product metrics (NO PHI, events only)
-api_router.include_router(
-    telemetry.router, tags=["telemetry"]
-)
+api_router.include_router(telemetry.router, tags=["telemetry"])
 
 # User-to-user messaging system
-api_router.include_router(
-    messages.router, prefix="/messages", tags=["messages"]
-)
+api_router.include_router(messages.router, prefix="/messages", tags=["messages"])
 
 # Utils (Link preview, etc.)
-api_router.include_router(
-    utils.router, prefix="/utils", tags=["utils"]
-)
+api_router.include_router(utils.router, prefix="/utils", tags=["utils"])
