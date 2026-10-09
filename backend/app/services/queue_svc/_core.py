@@ -19,6 +19,24 @@ _queue_settings_context: ContextVar[_QueueSettingsContext | None] = ContextVar(
 _Command = TypeVar("_Command", bound=Callable[..., Any])
 
 
+def qr_doctor_owner_eligibility_filters() -> tuple[Any, ...]:
+    """SQL filters for the User side of QR Doctor eligibility.
+
+    Callers must inner-join ``User`` through ``Doctor.user_id``; that join
+    excludes legacy userless Doctor rows. Keep these predicates shared by
+    public selectors and QR admission so they cannot drift independently.
+    """
+    from sqlalchemy import func
+
+    from app.core.roles import DOCTOR_ROLE_SPELLINGS
+    from app.models.user import User
+
+    return (
+        User.is_active.is_(True),
+        func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
+    )
+
+
 def queue_settings_command(method: _Command) -> _Command:
     """Keep one settings snapshot across a service command and its nested calls."""
 

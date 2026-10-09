@@ -21,6 +21,8 @@ def get_available_specialists(
         from sqlalchemy.orm import joinedload
 
         from app.models.clinic import Doctor
+        from app.models.user import User
+        from app.services.queue_svc._core import qr_doctor_owner_eligibility_filters
 
         # Получаем всех активных врачей с eager loading user relationship.
         # Incomplete ("general" sentinel) profiles are excluded as well:
@@ -34,9 +36,11 @@ def get_available_specialists(
 
         doctors = (
             db.query(Doctor)
+            .join(User, Doctor.user_id == User.id)
             .filter(
                 Doctor.active == True,  # noqa: E712
                 Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+                *qr_doctor_owner_eligibility_filters(),
             )
             .options(joinedload(Doctor.user))
             .all()

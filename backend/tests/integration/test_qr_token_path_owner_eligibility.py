@@ -316,7 +316,7 @@ def test_shared_tag_candidate_policy_fails_closed_for_conflicting_parents():
     )
 
 
-def test_shared_tag_candidate_policy_allows_equivalent_visible_profiles():
+def test_shared_tag_candidate_policy_rejects_distinct_queue_keys_on_same_parent():
     from app.models.queue_profile import QueueProfile
     from app.services.queue_profile_availability import QueueProfileAvailability
     from app.services.queue_svc import QueueBusinessService
@@ -343,10 +343,16 @@ def test_shared_tag_candidate_policy_allows_equivalent_visible_profiles():
         ),
     ]
 
+    assert not QueueBusinessService._qr_profile_candidates_are_unambiguous(
+        profiles,
+        db=None,
+        availability_by_profile=dict.fromkeys(profiles, availability),
+    )
     assert QueueBusinessService._qr_profile_candidates_are_unambiguous(
         profiles,
         db=None,
         availability_by_profile=dict.fromkeys(profiles, availability),
+        route_queue_tag="rq09c-shared-tag",
     )
 
 
@@ -507,12 +513,13 @@ def test_existing_doctor_token_rejects_mixed_availability_for_shared_queue_tag(
         session.commit()
 
 
-def test_existing_doctor_token_allows_equivalent_visible_shared_queue_tags(
+def test_existing_doctor_token_rejects_distinct_profile_keys_sharing_a_tag(
     pg_session,
 ):
-    """Compatible profiles sharing one active parent keep the legacy token usable."""
+    """A shared tag cannot make distinct doctor queue keys interchangeable."""
     from app.models.queue_profile import QueueProfile
     from app.services.qr_queue import QRQueueService
+    from app.services.queue_svc import QueueValidationError
 
     session = pg_session
     user = _make_user(session, "rq09c_shared_ok", "Doctor", active=True)
@@ -541,10 +548,10 @@ def test_existing_doctor_token_allows_equivalent_visible_shared_queue_tags(
     )
     session.commit()
 
-    assert QRQueueService(session).get_qr_token_info(world["token"]) is not None
-    result = _join(session, world["token"])
-    assert result["success"] is True, result
-    assert len(_entries(session, world["queue_id"])) == 1
+    assert QRQueueService(session).get_qr_token_info(world["token"]) is None
+    with pytest.raises((QueueValidationError, ValueError)):
+        _join(session, world["token"])
+    assert _entries(session, world["queue_id"]) == []
 
 
 def test_resource_owned_surface_joins_without_doctor_role_gate(pg_session):

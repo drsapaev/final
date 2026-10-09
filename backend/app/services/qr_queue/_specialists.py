@@ -121,13 +121,18 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
         if not profile_by_specialty:
             return []
 
-        from app.core.roles import is_doctor_role_spelling
+        from app.models.user import User
         from app.services.queue_service import queue_service
+        from app.services.queue_svc._core import qr_doctor_owner_eligibility_filters
         from app.services.user_mgmt._base import is_doctor_profile_incomplete
 
         doctors = (
             self.db.query(Doctor)
-            .filter(Doctor.active == True)
+            .join(User, Doctor.user_id == User.id)
+            .filter(
+                Doctor.active == True,
+                *qr_doctor_owner_eligibility_filters(),
+            )
             .options(joinedload(Doctor.user))
             .order_by(Doctor.id.asc())
             .all()
@@ -150,11 +155,7 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             ):
                 continue
             owner = getattr(doctor, "user", None)
-            if (
-                owner is None
-                or not getattr(owner, "is_active", False)
-                or not is_doctor_role_spelling(getattr(owner, "role", None))
-            ):
+            if owner is None:
                 continue
             profile_key = self._normalize_specialty_key(profile.get("key"))
             selectable.append(

@@ -16,6 +16,9 @@ class _Query:
     def filter(self, *_conditions):
         return self
 
+    def join(self, *_entities, **_kwargs):
+        return self
+
     def options(self, *_options):
         return self
 
