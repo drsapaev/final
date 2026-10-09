@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
+
+from sqlalchemy import func
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_integration._helpers import (
@@ -12,6 +14,7 @@ from app.core.specialties import (
     expand_queue_tags,
 )
 from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
+from app.schemas.queue_profile_conflicts import QueueProfileBindingChangedResponse
 
 
 def _canonical_profile_tags(tags: list[str] | None, profile_key: str) -> list[str]:
@@ -35,6 +38,26 @@ def _canonical_profile_tags(tags: list[str] | None, profile_key: str) -> list[st
     if key_is_family and not tags_are_family:
         tag_list.append(profile_key)
     return expand_queue_tags(tag_list)
+
+
+def _profile_binding_values_equal(
+    field: str, left: Any, right: Any, profile_key: str
+) -> bool:
+    if field == "queue_tags":
+        return _canonical_profile_tags(left, profile_key) == _canonical_profile_tags(
+            right, profile_key
+        )
+    if field == "department_key":
+        return _normalize_department_key(left) == _normalize_department_key(right)
+    return left == right
+
+
+def _normalize_department_key(value: str | None) -> str | None:
+    """Treat empty admin Select values as an unassigned department."""
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 @router.get("/queues/profiles", response_model=dict[str, Any])
@@ -171,32 +194,58 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
     rendered preview can never authorize a destructive action (stale
     preview protection, ACCEPTANCE S-10). Significant links are:
 
-    - services whose queue_tag is owned by this profile (a delete would
-      orphan or silently untag them);
+    - services whose queue_tag is owned by this profile, and services
+      assigned through the profile's department_key;
+    - active doctors and QueueResources selected by the profile's tags;
     - daily queues (ANY day — historical rows included) whose queue_tag
       is owned by this profile: their entries are the profile's real
       usage history and possibly still-waiting patients;
     - waiting entries under those queues (must remain serviceable by
-      staff regardless of the profile's active state).
+      staff regardless of the profile's active state);
+    - active permanent public addresses linked to this profile.
     """
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
+    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
     from app.models.service import Service
 
-    tags = [t for t in (profile.queue_tags or []) if t]
+    # Runtime routing expands dental-family aliases even for legacy rows
+    # seeded before the canonical profile writer. Count links against that
+    # same effective tag set so a legacy alias is not mistaken for an
+    # unused binding.
+    tags = _canonical_profile_tags(profile.queue_tags, profile.key)
+    # Doctor-backed QR admission stores the profile key as its DailyQueue
+    # queue_tag (see join_queue_with_token), while the profile's queue_tags
+    # select eligible doctors. Include that canonical queue identity in the
+    # usage guard without rewriting the profile's persisted routing tags.
+    usage_tags = list(tags)
+    if profile.key and profile.key not in usage_tags:
+        usage_tags.append(profile.key)
     services = 0
+    department_services = 0
+    active_doctors = 0
+    active_queue_resources = 0
     daily_queues = 0
     entries_waiting = 0
     entries_total = 0
-    if tags:
-        services = db.query(Service).filter(Service.queue_tag.in_(tags)).count()
+    active_public_addresses = (
+        db.query(QueueDirectionPublicAddress)
+        .filter(
+            QueueDirectionPublicAddress.queue_profile_id == profile.id,
+            QueueDirectionPublicAddress.retired_at.is_(None),
+        )
+        .count()
+    )
+    if usage_tags:
+        services = db.query(Service).filter(Service.queue_tag.in_(usage_tags)).count()
         daily_queues = (
-            db.query(DailyQueue).filter(DailyQueue.queue_tag.in_(tags)).count()
+            db.query(DailyQueue).filter(DailyQueue.queue_tag.in_(usage_tags)).count()
         )
         if daily_queues:
             queue_ids = [
                 row.id
                 for row in db.query(DailyQueue.id)
-                .filter(DailyQueue.queue_tag.in_(tags))
+                .filter(DailyQueue.queue_tag.in_(usage_tags))
                 .all()
             ]
             entries_q = db.query(OnlineQueueEntry).filter(
@@ -206,11 +255,39 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
             entries_waiting = entries_q.filter(
                 OnlineQueueEntry.status == "waiting"
             ).count()
+    if tags:
+        active_doctors = (
+            db.query(Doctor)
+            .filter(
+                Doctor.active.is_(True),
+                func.lower(func.trim(Doctor.specialty)).in_(
+                    {tag.strip().lower() for tag in tags}
+                ),
+            )
+            .count()
+        )
+        active_queue_resources = (
+            db.query(QueueResource)
+            .filter(
+                QueueResource.active.is_(True),
+                QueueResource.queue_tag.in_(tags),
+            )
+            .count()
+        )
+    department_key = _normalize_department_key(profile.department_key)
+    if department_key:
+        department_services = (
+            db.query(Service).filter(Service.department_key == department_key).count()
+        )
     return {
         "services": services,
+        "department_services": department_services,
+        "active_doctors": active_doctors,
+        "active_queue_resources": active_queue_resources,
         "daily_queues": daily_queues,
         "entries_waiting": entries_waiting,
         "entries_total": entries_total,
+        "active_public_addresses": active_public_addresses,
     }
 
 
@@ -312,6 +389,138 @@ class QueueProfileUpdate(BaseModel):
     color: str | None = Field(None, max_length=20)
 
 
+class QueueProfileBindingSnapshot(BaseModel):
+    queue_tags: list[str]
+    department_key: str | None
+
+
+class QueueProfileLinkCounts(BaseModel):
+    services: int
+    department_services: int
+    active_doctors: int
+    active_queue_resources: int
+    daily_queues: int
+    entries_waiting: int
+    entries_total: int
+    active_public_addresses: int
+
+
+class QueueProfileImpactIdentity(BaseModel):
+    key: str
+
+
+class QueueProfileUpdateImpactPreview(BaseModel):
+    success: bool
+    profile: QueueProfileImpactIdentity
+    current: QueueProfileBindingSnapshot
+    proposed: QueueProfileBindingSnapshot
+    links: QueueProfileLinkCounts
+    changed_binding_fields: list[Literal["queue_tags", "department_key"]]
+    blocked_fields: list[Literal["queue_tags", "department_key"]]
+    can_update: bool
+
+
+class QueueProfileBindingConflictDetail(BaseModel):
+    reason: Literal["profile_binding_change_blocked"]
+    blocked_fields: list[Literal["queue_tags", "department_key"]]
+    links: QueueProfileLinkCounts
+    message: str
+
+
+class QueueProfileBindingConflictResponse(BaseModel):
+    detail: QueueProfileBindingConflictDetail
+
+
+class QueueProfileHttpError(BaseModel):
+    """FastAPI HTTPException envelope used by Admin preview errors."""
+
+    detail: str
+
+
+@router.post(
+    "/queues/profiles/{profile_key}/impact-preview",
+    response_model=QueueProfileUpdateImpactPreview,
+    responses={
+        401: {
+            "model": QueueProfileHttpError,
+            "description": "Authentication required.",
+        },
+        403: {"model": QueueProfileHttpError, "description": "Admin role required."},
+        404: {"model": QueueProfileHttpError, "description": "Profile not found."},
+    },
+)
+def preview_queue_profile_update(
+    profile_key: str,
+    profile_data: QueueProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Read-only impact preview for a proposed profile update.
+
+    A preview is informational. The PUT handler re-reads usage immediately
+    before applying any fields and never accepts a preview as authorization.
+    """
+    try:
+        from app.models.queue_profile import QueueProfile
+
+        profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
+        if not profile:
+            raise HTTPException(
+                status_code=404, detail=f"Profile '{profile_key}' not found"
+            )
+
+        proposed_update = profile_data.dict(exclude_unset=True)
+        current = {
+            "queue_tags": list(profile.queue_tags or []),
+            "department_key": profile.department_key,
+        }
+        proposed = dict(current)
+        if "queue_tags" in proposed_update:
+            candidate_tags = _canonical_profile_tags(
+                proposed_update["queue_tags"], profile.key
+            )
+            # Keep the legacy stored list visible for a semantically
+            # unchanged proposal; preview should describe the actual no-op.
+            proposed["queue_tags"] = (
+                current["queue_tags"]
+                if _profile_binding_values_equal(
+                    "queue_tags", current["queue_tags"], candidate_tags, profile.key
+                )
+                else candidate_tags
+            )
+        if "department_key" in proposed_update:
+            proposed["department_key"] = _normalize_department_key(
+                proposed_update["department_key"]
+            )
+
+        changed_binding_fields = [
+            field
+            for field in ("queue_tags", "department_key")
+            if not _profile_binding_values_equal(
+                field, current[field], proposed[field], profile.key
+            )
+        ]
+        links = _profile_link_counts(db, profile)
+        blocked_fields = changed_binding_fields if any(links.values()) else []
+
+        return {
+            "success": True,
+            "profile": QueueProfileImpactIdentity(key=profile.key),
+            "current": current,
+            "proposed": proposed,
+            "links": links,
+            "changed_binding_fields": changed_binding_fields,
+            "blocked_fields": blocked_fields,
+            "can_update": not blocked_fields,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error previewing queue profile update for {profile_key}: {e}")
+        db.rollback()
+        _raise_registrar_internal_error("queue profile update preview", e)
+
+
 @router.post("/queues/profiles", response_model=dict[str, Any])
 def create_queue_profile(
     profile_data: QueueProfileCreate,
@@ -326,9 +535,26 @@ def create_queue_profile(
     try:
         from app.models.queue_profile import QueueProfile
 
+        canonical_tags = _canonical_profile_tags(
+            profile_data.queue_tags, profile_data.key
+        )
+        from app.crud.queue_owner_invariant import lock_profile_link_scopes
+
+        # Serialize profile creation with department cascades and link
+        # writers. The duplicate check must happen after the shared scopes so
+        # a profile cannot appear after a department's cascade snapshot.
+        lock_profile_link_scopes(
+            db,
+            queue_tags=canonical_tags + [profile_data.key],
+            department_keys=[profile_data.department_key],
+        )
+
         # Check if key already exists
         existing = (
-            db.query(QueueProfile).filter(QueueProfile.key == profile_data.key).first()
+            db.query(QueueProfile)
+            .filter(QueueProfile.key == profile_data.key)
+            .populate_existing()
+            .first()
         )
         if existing:
             raise HTTPException(
@@ -344,9 +570,7 @@ def create_queue_profile(
             # D-1 (Codex round-6 P1): a dental-family profile must never be
             # persisted with tags blind to the canonical spelling (see
             # _canonical_profile_tags for the exact contract).
-            queue_tags=_canonical_profile_tags(
-                profile_data.queue_tags, profile_data.key
-            ),
+            queue_tags=canonical_tags,
             department_key=profile_data.department_key,
             display_order=profile_data.display_order,
             is_active=profile_data.is_active,
@@ -386,7 +610,20 @@ def create_queue_profile(
         _raise_registrar_internal_error("create queue profile", e)
 
 
-@router.put("/queues/profiles/{profile_key}", response_model=dict[str, Any])
+@router.put(
+    "/queues/profiles/{profile_key}",
+    response_model=dict[str, Any],
+    responses={
+        409: {
+            "model": QueueProfileBindingConflictResponse
+            | QueueProfileBindingChangedResponse,
+            "description": (
+                "Binding changes are blocked while the profile is in use, or "
+                "the submitted binding snapshot became stale."
+            ),
+        }
+    },
+)
 def update_queue_profile(
     profile_key: str,
     profile_data: QueueProfileUpdate,
@@ -401,20 +638,154 @@ def update_queue_profile(
     try:
         from app.models.queue_profile import QueueProfile
 
-        # Find profile
-        profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
+        # Read the binding without a row lock first. Link writers take the
+        # same owner-config scopes, so acquiring those scopes before this
+        # profile row keeps one lock order and closes check-then-create races.
+        candidate = (
+            db.query(QueueProfile)
+            .filter(QueueProfile.key == profile_key)
+            .populate_existing()
+            .first()
+        )
+        if not candidate:
+            raise HTTPException(
+                status_code=404, detail=f"Profile '{profile_key}' not found"
+            )
+
+        update_data = profile_data.dict(exclude_unset=True)
+        if "department_key" in update_data:
+            update_data["department_key"] = _normalize_department_key(
+                update_data["department_key"]
+            )
+        if "queue_tags" in update_data:
+            candidate_tags = _canonical_profile_tags(
+                update_data["queue_tags"], candidate.key
+            )
+            if _profile_binding_values_equal(
+                "queue_tags", candidate.queue_tags, candidate_tags, candidate.key
+            ):
+                update_data.pop("queue_tags")
+            else:
+                update_data["queue_tags"] = candidate_tags
+
+        candidate_bindings = {
+            "queue_tags": list(candidate.queue_tags or []),
+            "department_key": candidate.department_key,
+        }
+        changed_binding_fields = [
+            field
+            for field in ("queue_tags", "department_key")
+            if field in update_data
+            and not _profile_binding_values_equal(
+                field, candidate_bindings[field], update_data[field], candidate.key
+            )
+        ]
+        # Full-form clients send unchanged values. Drop them so a presentation
+        # edit can never overwrite a binding another admin changed while this
+        # request waited for the profile row.
+        for field in ("queue_tags", "department_key"):
+            if (
+                field in update_data
+                and field not in changed_binding_fields
+                and _profile_binding_values_equal(
+                    field,
+                    candidate_bindings[field],
+                    update_data[field],
+                    candidate.key,
+                )
+            ):
+                update_data.pop(field)
+
+        if changed_binding_fields:
+            from app.crud.queue_owner_invariant import lock_profile_binding_scopes
+
+            proposed_tags = update_data.get("queue_tags", candidate.queue_tags or [])
+            proposed_department = update_data.get(
+                "department_key", candidate.department_key
+            )
+            lock_profile_binding_scopes(
+                db,
+                queue_tags=(
+                    _canonical_profile_tags(candidate.queue_tags, candidate.key)
+                    + _canonical_profile_tags(proposed_tags, candidate.key)
+                    + [candidate.key]
+                ),
+                department_keys=[candidate.department_key, proposed_department],
+            )
+
+        # Serialize binding edits and public-address provisioning on this
+        # canonical row after the shared tag/department scopes are held.
+        profile = (
+            db.query(QueueProfile)
+            .filter(QueueProfile.key == profile_key)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
         if not profile:
             raise HTTPException(
                 status_code=404, detail=f"Profile '{profile_key}' not found"
             )
 
-        # Update fields (only those provided)
-        update_data = profile_data.dict(exclude_unset=True)
+        current_bindings = {
+            "queue_tags": list(profile.queue_tags or []),
+            "department_key": profile.department_key,
+        }
+        stale_fields = [
+            field
+            for field in ("queue_tags", "department_key")
+            if not _profile_binding_values_equal(
+                field,
+                candidate_bindings[field],
+                current_bindings[field],
+                profile.key,
+            )
+        ]
+        if stale_fields:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "reason": "profile_binding_changed",
+                    "stale_fields": stale_fields,
+                    "message": (
+                        "Привязка направления изменилась во время сохранения. "
+                        "Обновите страницу и повторите действие."
+                    ),
+                },
+            )
+
+        changed_binding_fields = [
+            field
+            for field in ("queue_tags", "department_key")
+            if field in update_data
+            and not _profile_binding_values_equal(
+                field, current_bindings[field], update_data[field], profile.key
+            )
+        ]
+        if changed_binding_fields:
+            # Recompute usage at command time. A preview is never authority
+            # to change a binding after the profile has become used.
+            links = _profile_link_counts(db, profile)
+            if any(links.values()):
+                logger.warning(
+                    "QueueProfile binding update blocked: "
+                    f"key={profile.key} fields={changed_binding_fields} links={links}"
+                )
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "reason": "profile_binding_change_blocked",
+                        "blocked_fields": changed_binding_fields,
+                        "links": links,
+                        "message": (
+                            "Связи используемого профиля менять нельзя. "
+                            "Разрешены только отображаемые поля и архивирование."
+                        ),
+                    },
+                )
+
         for field, value in update_data.items():
-            if field == "queue_tags":
-                # D-1 (Codex round-6 P1): same contract as creation (see
-                # _canonical_profile_tags).
-                value = _canonical_profile_tags(value, profile.key)
             if hasattr(profile, field):
                 setattr(profile, field, value)
 
@@ -462,11 +833,77 @@ def delete_queue_profile(
         from app.models.queue_profile import QueueProfile
         from app.models.service import Service
 
-        # Find profile
-        profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
+        candidate = (
+            db.query(QueueProfile)
+            .filter(QueueProfile.key == profile_key)
+            .populate_existing()
+            .first()
+        )
+        if not candidate:
+            raise HTTPException(
+                status_code=404, detail=f"Profile '{profile_key}' not found"
+            )
+
+        # Keep immutable scalar snapshots before waiting on advisory scopes.
+        # SQLAlchemy's identity map refreshes `candidate` when the locked
+        # query below uses populate_existing(); comparing ORM attributes
+        # afterward would compare the refreshed row to itself.
+        candidate_key = str(candidate.key)
+        candidate_queue_tags = list(candidate.queue_tags or [])
+        candidate_department_key = candidate.department_key
+
+        from app.crud.queue_owner_invariant import lock_profile_binding_scopes
+
+        lock_profile_binding_scopes(
+            db,
+            queue_tags=(
+                _canonical_profile_tags(candidate_queue_tags, candidate_key)
+                + [candidate_key]
+            ),
+            department_keys=[candidate_department_key],
+        )
+
+        # Re-read and lock after taking the same tag/dept scopes as link
+        # writers. Address provisioning is additionally serialized by this
+        # canonical row lock.
+        profile = (
+            db.query(QueueProfile)
+            .filter(QueueProfile.key == profile_key)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
         if not profile:
             raise HTTPException(
                 status_code=404, detail=f"Profile '{profile_key}' not found"
+            )
+
+        stale_fields = [
+            field
+            for field, old_value, new_value in (
+                ("queue_tags", candidate_queue_tags, profile.queue_tags),
+                (
+                    "department_key",
+                    candidate_department_key,
+                    profile.department_key,
+                ),
+            )
+            if not _profile_binding_values_equal(
+                field, old_value, new_value, candidate_key
+            )
+        ]
+        if stale_fields:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "reason": "profile_binding_changed",
+                    "stale_fields": stale_fields,
+                    "message": (
+                        "Привязка направления изменилась во время удаления. "
+                        "Обновите страницу и повторите действие."
+                    ),
+                },
             )
 
         # RQ-12.b (D-02 owner decision 2026-09-15): hard delete is allowed

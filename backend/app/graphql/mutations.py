@@ -1525,6 +1525,23 @@ class Mutation:
                     queue_entry=queue_entry_to_type(queue_entry),
                 )
 
+        except HTTPException as exc:
+            detail = exc.detail
+            if (
+                isinstance(detail, dict)
+                and detail.get("reason") == "profile_binding_changed"
+            ):
+                return QueueMutationResponse(
+                    success=False,
+                    message=detail.get("message")
+                    or "Queue direction changed; refresh and retry.",
+                    errors=["PROFILE_BINDING_CHANGED"],
+                )
+            return QueueMutationResponse(
+                success=False,
+                message=t("error.internal"),
+                errors=["INTERNAL_ERROR"],
+            )
         except Exception:
             return QueueMutationResponse(
                 success=False,

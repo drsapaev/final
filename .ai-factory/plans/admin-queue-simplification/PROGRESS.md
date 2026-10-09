@@ -1,40 +1,116 @@
 # Progress
 
-Plan version: 3.61
-Current task: T09.3
-Current status: PR_OPEN; preparing the docs-only follow-up for the review P2. Do not merge from the agent.
+Plan version: 3.84
+Current task: T10 — protect used QueueProfile bindings and address PR #3633 review.
+Current status: IN_PROGRESS — code fixes, exact-head CI, and PR description are updated. Tier-2 staging remains partial; extra race tests and full staging runbook are NOT_RUN.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
-Branch: codex/aqs-t093-cabinet-ui
-Base commit: 2c825dd439fd28eb5edf10f5ade7a83534f67c5a (verified equal to fresh origin/main before this docs repair)
-Latest code-bearing commit: 9b914d548b2fe2e120c4ed6076ed015e5ce1a610
-PR checkpoint before this docs repair: 8915ca7c97729fe516376d296cd4f16b711eb40b
-Last updated: 2026-10-08T08:23+05:00
+Branch: codex/aqs-T10-profile-guards
+Base (`origin/main`): 7bb02680e778ac56369503c4fd337ac9329da4b2
+Current local HEAD: evidence follow-up based on validated code HEAD b2f99ab66 and PR snapshot cb73091c0 (journal-only changes pending commit)
+PR remote HEAD at last query: cb73091c0d4a312153aca938014e94435239f118 (OPEN/CLEAN; applicable CI and PR-body checks passed; Tier-2 partial)
+Last updated: 2026-10-08T22:35+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T09.1 | MERGED | PR #3612 | 89b4888a013978182e45f34ac2e07a9679c497c9 | EVIDENCE.md#t091-pr-3612-merged |
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
-| T09.3 | PR_OPEN | PR #3620 | | EVIDENCE.md — docs handoff correction |
+| T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
+| T10 | IN_PROGRESS | PR #3633; HEAD cb73091c; user merges | | EVIDENCE.md#t10-pr-3633-description-and-ci-checkpoint-2026-10-08 |
 
-## Current checkpoint
-- Completed: T09.3 runtime/test change is unchanged since source commit `9b914d548`; its analytics fixture fix and prior queue UI fixes remain in PR #3620. Source HEAD `9b914d548` and PR documentation HEAD `8915ca7c9` both have recorded passing applicable exact-head CI; see EVIDENCE.md.
-- Review finding being addressed: mandatory `RESUME.md` named old source SHA `a4cc2a9c` and old base; the main plan incorrectly said the code was uncommitted and CI pending. This checkpoint aligns the main plan, resume entry and progress record, preserving older entries as superseded history.
-- Latest hosted evidence before this docs repair: unified run `37719601177` on PR HEAD `8915ca7c`; Backend 5,360 passed, 65 skipped, 25 deselected, 3 xfailed; Frontend E2E, unit/build/lint, parity, PR Required Gate and applicable quality/security checks passed. The two PR-body metadata checks also passed. Path-aware skips are NOT_RUN.
-- Focused read-only review validation on `8915ca7c`: cabinet screen Vitest **17 passed**; backend cabinet service/admin-linkage/analytics targets **31 passed, 1 warning**. Backend used its temporary SQLite test fixture and does not prove PostgreSQL locking. No runtime edit was made during review.
-- This follow-up changes only the four plan/checkpoint files named in EVIDENCE.md. On resume, inspect actual local status, remote PR HEAD/base, review state and checks; results for earlier SHAs do not prove a later docs checkpoint.
-- Tier 2 remains PARTIAL: no staging evidence was added for the current UI follow-up; four named live specs remain NOT_RUN; runtime base-image equivalence remains NOT_PROVEN; T18 and full pre-deploy `STAGING_VALIDATION.md` remain outstanding. No coverage is credited by the bounded deferral beyond its explicit scope.
-- Next exact action on continuation: check whether this docs checkpoint is present on the PR branch; if it is, inspect all applicable checks for the actual current HEAD. If all pass, report the PR ready for the user's merge. Do not merge or publish a review.
-- Stop if origin/main or the PR branch moved, any tracked path outside the four-document allowlist changed, or the repair requires runtime/staging/production work.
+## Current checkpoint — PR #3633 description, exact-head CI, and Tier-2 status (2026-10-08T22:35+05:00)
+
+- Actual state checked: worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final, branch codex/aqs-T10-profile-guards; local and PR remote HEAD are both cb73091c0d4a312153aca938014e94435239f118; base is 7bb02680e778ac56369503c4fd337ac9329da4b2. Tracked tree is clean; untracked scratch directories are preserved.
+- Review code changes pushed in 928642674 fix Doctor owner-config-before-row lock order with stale-specialty 409/no-write; block single/bulk department deletion when active Doctor/QueueResource mappings would be detached; publish typed stale-binding 409s for profile PUT, Doctor update, and public-address provision; and update OpenAPI/generated TypeScript plus focused regression tests. The previously open cross-writer P2 implementation and PostgreSQL concurrency tests are present on the branch. CI source fakes/scanners now match the real binding-snapshot query. Commit b2f99ab66 fixes the sole docs-freshness mismatch by writing the workflow-generated OpenAPI JSON trailing newline.
+- Exact-head hosted run 37813134735 completed successfully on b2f99ab66. Backend: **5,418 passed, 65 skipped, 25 deselected, 3 xfailed, 125 warnings**. Frontend unit tests, E2E, lint/type-check, build, OpenAPI freshness, generated API type freshness, Code Quality, Frontend–Backend Parity, Context Boundary, PR Required Gate, security/secret scans, i18n, regression audit, Telegram release gate, and metadata/workflow validation passed. The exact check snapshot is recorded in EVIDENCE. Path-aware skips include Docker, k6, integration, staging/production readiness, DAST, Supabase Preview, and standalone security; skips are not passes.
+- Exact documentation-only HEAD cb73091c0 passed run 37815639318 with no failed or pending checks: Backend, Frontend E2E, frontend unit/build/lint, OpenAPI/docs freshness, API parity, Context Boundary, Code Quality, PR Required Gate, Telegram, security and metadata passed. The updated PR body separately passed the local template gate (19 tests + samples) and remote validator; GitHub PR Review Quality Gate and PR Lifecycle Recommendation passed again after the body edit. Applicable path-aware skips remain documented and are not passes.
+- Local focused tests: **55 passed, 1 warning**. Scoped Ruff, compileall, frontend type-check, OpenAPI/generated-type parity, PyYAML workflow parse, `git diff --check`, theme check, icon-control audit, and local OpenAPI newline parity passed. The commit hook `check-yaml` could not launch because Windows Application Control returned WinError 4551; equivalent PyYAML parse passed. Do not report that hook as having run.
+- Bounded Tier-2 staging is PARTIAL. On an owned synthetic PostgreSQL staging project mounted to source content matching the review-fix code, normal Admin password→TOTP, four PG regressions (Doctor lock ordering/stale specialty; active Doctor single-delete and active QueueResource bulk-delete guards), authenticated single/bulk API checks, and synthetic cleanup passed. This does not attest the immutable served frontend revision. A separate no-build Compose attempt for the two tagged queue/rebind race tests timed out at `NATIVE_UNAVAILABLE (compose-up)`; those tests are NOT_RUN. The owned project was removed and checked absent. Host C: had 9 GiB free, below the 10-GiB build reserve; do not retry until capacity changes.
+- Remaining NOT_RUN: full `docs/runbooks/STAGING_VALIDATION.md`, T18/browser/UI/keyboard/viewport checks, served frontend artifact provenance, and the two staging race tests. No Tier-2 deferral has been accepted. CI/branch status is not a substitute for these staging checks.
+- Five GitHub review threads remain unresolved pending reviewer verification; the corresponding code fixes are present. No thread replies/resolutions or formal review submission were made. PR #3633 is OPEN/CLEAN; no merge commit exists. The description now records exact code/CI evidence and partial Tier-2 status; user owns the merge decision.
+- Next exact action: commit and push this journal-only follow-up; inspect the resulting exact-head checks. Then, when host capacity is restored above the runbook's 10-GiB build reserve, rerun only the two staging race scenarios in a fresh isolated synthetic project and record exact-head source provenance. If that remains unavailable, wait for the user's explicit bounded Tier-2 deferral decision. Full STAGING_VALIDATION.md/T18 remains a separate NOT_RUN requirement. Do not merge, submit a formal review, or write review-thread replies/resolutions.
+## Superseded checkpoint — T10 cross-writer P2, main sync and fresh PostgreSQL rerun (2026-10-08T20:18+05:00)
+
+- GitHub PR #3633 was OPEN at remote HEAD `98b71d52767d70f300812f2c3ba5bef195d5dbcd`, while GitHub `main` is `7bb02680e778ac56369503c4fd337ac9329da4b2`; PR was BEHIND. Local `02db899d893f1992cd956f0e6504e5e93b22b363` is a clean merge of that PR head and current `origin/main`. Push is pending. Preserve pre-existing untracked `.scratch/` and `frontend/.scratch/`.
+- User authorized fixing the remaining review finding and accepted the proposed stale-binding result: a writer that waits and then observes a changed binding returns HTTP 409 without writing.
+- Pre-edit gate/scope record remains in `EVIDENCE.md#t10-pr-3633-cross-writer-p2-prework`; gate result was `narrow_override`, `gate_misroute=yes`, `override_used=yes`, `handoff_required=yes`. User authorization covered the complete writer scope and HTTP 409/no-write stale-binding rule. Do not rerun the gate.
+- Implementation uses shared owner-config tag/department locks and checks the binding snapshot after lock wait. Profile PUT/delete lock old/proposed scopes, refresh the profile row and recheck links. Tagged queue, resource, service, doctor, role activation, and public-address writers now use the same boundary; adapters preserve conflict/no-write behavior. The default-service department path also participates.
+- Call-graph follow-up: bulk department import stages settings before `_ensure_department_integrations` takes its shared scope. Each CSV row now has a savepoint so a stale-binding conflict rolls back that whole row while preserving earlier/later successful rows. This is bounded to the same P2 and has a PostgreSQL regression.
+- Fresh PostgreSQL rerun on local HEAD `02db899d`: combined `test_queue_profile_lifecycle.py` and `test_admin_department_create_atomicity.py` — 42 passed, 0 skipped, 1 warning, 48.87s, using the task-owned no-volume PG16 container at loopback port 55493. The exact container was removed. Previous focused adapter/unit, Ruff, compileall and diff evidence remains recorded under `EVIDENCE.md#t10-pr-3633-cross-writer-p2-local-validation`.
+- Commit `e68f93bf7` passed non-rewriting pre-commit hooks including gitleaks. The first hook attempt exposed auto-formatters rewriting unrelated legacy code and existing Ruff findings; only those generated worktree changes were reversed. End-of-file fixer/Ruff auto-fix/Ruff format/Black were skipped on the successful commit; do not describe those hooks as passed.
+- The user separately selected Tier-2 staging for this follow-up. Authorized scope: one unique synthetic-only Compose project, free task-owned ports, an ignored env file, a task-owned validation script/report, normal synthetic Admin password→TOTP flow, and API-only checks of profile rebind versus public-address creation. Denied: shared/production staging, copied credentials/data, full ten-check certification, unrelated browser/UI work, deployment or flag changes. Stop if preflight cannot prove isolation, a selected port/project conflicts, or normal Admin 2FA cannot complete; tear down only the owned project.
+- Scope includes backend QueueProfile/link writers, department default-service/bulk-row writer, focused backend tests and T10 journals only. No schema/migration, frontend, generated OpenAPI/client, changed queue ownership, or clinical lifecycle behavior.
+- Next exact action: commit this checkpoint, push local HEAD `02db899d` to the existing PR branch, verify the PR now includes `origin/main`, then run `Preflight → Start → Session` using a unique ignored synthetic env. After staging, inspect exact-head CI. Do not merge, submit a formal review, or write review comments; user merges. Full STAGING_VALIDATION.md/browser/T18 remain separate.
+
+## Superseded checkpoint — T10 exact-head CI and review state (2026-10-08T17:19:46+05:00)
+
+- PR #3633 is OPEN/MERGEABLE at code/checkpoint HEAD `005477d4d59ee5cb1fe6f1983d39b2366a5fdcef`, base `885782648fd7b83b0687b33cf930ae608d94a026`, as last queried before this documentation-only checkpoint. Exact-hosted CI run `37774519034` and associated quality/security runs passed all applicable checks on that HEAD.
+- Code/runtime commits in that head include the test false-positive correction `979f6e81` and conflict-free merge commit `29a8ef16` incorporating latest `origin/main`. Tier-2 synthetic API staging passed on runtime commit `29a8ef16`; sanitized report is [T10-PR3633-tier2-staging-report.md](T10-PR3633-tier2-staging-report.md). The follow-up in this checkpoint changes plan/evidence documents only.
+- Exact-head CI PASS: backend suite, Frontend unit, E2E, build and lint, Frontend-Backend Parity, PR Required Gate, code quality, docs generation, Telegram Mini App gate, context boundary, locale checks, PR review quality, regression audit, lifecycle recommendation, CodeQL (Python/JS/actions), gitleaks, GitGuardian and security scanning.
+- Explicitly skipped and not treated as passes: Supabase Preview, DAST Nightly, metadata, Docker build, integration tests, k6, staging/production readiness, classify-and-route, and no-failure notification jobs. The bounded local Tier-2 staging report remains separate from the GitHub staging-readiness job.
+- Test correction addresses only the deterministic false positive where generated audit timestamp digits contained `7701`; it excludes `timestamp` from the stable-field assertion and changes no Telegram runtime behavior.
+- Review state: 9 inline threads are resolved; one P2 (`Serialize the usage check with link creation`) is still unresolved. It spans independent tagged DailyQueue/Service/QueueResource writers beyond the mandatory gate handoff and needs a defined stale-binding behavior. No partial fix or deferral was made. Keep merge on hold.
+- Tier-2 result is API-only; full `docs/runbooks/STAGING_VALIDATION.md`, T18, browser/UI/keyboard/viewport, frontend revision provenance, rollout and production remain NOT_RUN. The dedicated staging project was torn down and verified clean.
+- No formal review submission, PR-body update, merge or production action occurred. The plan/evidence checkpoint is being pushed as a documentation-only follow-up; inspect CI on its resulting exact head, treating path-aware skips separately.
+- Next exact action: verify the documentation-only push and its applicable required checks. Preserve merge HOLD until the P2 is fully addressed or a reviewer-approved bounded deferral is accepted.
+
+## Superseded checkpoint — PR #3633 serialization review blocker (2026-10-08T16:31+05:00)
+
+- Confirmed PR #3633 OPEN/MERGEABLE at exact code HEAD `00833c760c0f5d9d438c05526163bf6fc2db4140`, base `19c35ec62481dde45c9ea49146ecc4999aaf599f`. Code was committed and pushed fast-forward; no merge or formal review was submitted. The PR body now records scope, results and the unresolved blocker.
+- Fixed/revalidated review findings: active public addresses now block single/bulk department deletion; empty department key is a no-op; structured 409 is rendered; active Doctor, QueueResource, and department-linked Service mappings are counted; typed preview 401/403/404 are in OpenAPI and generated client types. Legacy unchanged tags and direct profile DELETE/address-provision locking were already fixed in earlier T10 commits and remain covered.
+- Review-thread state: 9 threads were replied to and resolved; only the P2 for serialization across all tagged `DailyQueue`/service/resource creation paths remains open. A bounded inventory found independent constructors in CRUD, GraphQL, services and repositories. No incomplete shared-lock patch was made. Merge remains on hold.
+- New task gate: the mandatory wrapper was run from `ai/langgraph` for the full serialization P2, with confirmed root `_queue_profiles.py` and `--handoff`. Result: `narrow_override`; `gate_misroute=yes`; `override_used=yes`; `handoff_required=yes`. Canonical anchors `AGENTS.md`, `docs/devbrain/PROJECT_MEMORY.md`, and `docs/devbrain/DEVBRAIN_STATUS.md` were read. First-touch list: `_queue_profiles.py`, backend entrypoint/staging Dockerfiles and compose files, `services/queue_service.py`, `models/online_queue.py`, and `tests/unit/test_queue_time_window.py`. The gate stops edits outside that exact list. Read-only inventory found relevant direct constructors also in `graphql/mutations.py`, `crud/online_queue.py`, `repositories/queue_api_repository.py`, `queue_limits_repository.py`, `visit_confirmation_repository.py`, `services/queue_svc/_operations.py`, and `services/force_majeure_service.py`; migration and dev-seed constructors also exist. The profile endpoint row lock, owner-config tag advisory locks, and per-day doctor/resource locks are distinct and do not establish complete coverage. No code edit was made after the gate.
+- Validation: PostgreSQL lifecycle plus OpenAPI tests — 70 passed, 1 warning; frontend focused Vitest — 6 passed; TypeScript check and production build passed; scoped ESLint — 0 errors, 4 warnings; Ruff, Black, py_compile, generated-type byte parity, and `git diff --check` passed. Standard npm generation failed in WSL Node 18 (`Invalid string length`); direct installed Node 24 CLI output matched byte-for-byte. Commit hooks passed except pinned `end-of-file-fixer`, `ruff-format`, and Black, skipped after they were shown to rewrite the OpenAPI EOF or unrelated legacy formatting; equivalent local checks passed.
+- Tier-2 staging: the bounded synthetic Admin API slice passed on prior runtime HEAD `c37179b6`, including TOTP and address provisioning/DELETE concurrency. It was not rerun for `00833c76`; do not treat the prior PASS as validating this follow-up. No deferral was accepted. Full STAGING_VALIDATION.md, T18, browser/UI E2E and served-frontend provenance remain NOT_RUN.
+- Hosted checks on `00833c76` at 2026-10-08T16:26+05:00: PR Review Quality Gate, PR Lifecycle Recommendation, Regression Audit, Gitleaks, i18n, security, frontend lint/build/unit, code quality, context boundary, API docs, and Telegram release gate passed. Backend tests and Frontend E2E were still in progress. DAST nightly and metadata checks were skipped; skipped jobs are not counted as passes. Combined commit status returned no separate commit statuses.
+- Gate decision required before code: serialize the usage check and every relevant link writer, then re-read current QueueProfile binding after waiting. Recommended behavior for a request using a tag removed during the wait is HTTP 409 with no write; this avoids creating an orphaned queue/service link. That stale-request behavior and the needed extra first-touch paths are not in the exact gate handoff. Keep the P2 open and merge held until a complete scope is authorized and validated, or the reviewer explicitly accepts a bounded deferral.
+- Next exact action: after human authorization of the wider writer scope and stale-tag outcome, prepare a concrete T10.1 first-touch list and execute the required gate/handoff; otherwise keep the current PR on hold. Preserve unrelated `.scratch/` and `frontend/.scratch/`.
+
+## Historical checkpoint — T10 bounded synthetic Tier-2 staging (2026-10-08T14:39:49+05:00)
+
+- PR #3633 was confirmed OPEN/MERGEABLE at exact HEAD c37179b6dfcb456c4e632a1a6f6eac1c2e9e322b, base 19c35ec62481dde45c9ea49146ecc4999aaf599f. The reviewed code/test commit and exact-head CI are already on this HEAD; the documentation-only update below requires new exact-head CI after push. User performs merge; no merge or review was submitted.
+- Exact environment: worktree HEAD c37179b6dfcb456c4e632a1a6f6eac1c2e9e322b, tracked worktree clean, WSL Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3, owned project codex-t10-pr3633-tier2-20261008, backend/frontend/PostgreSQL ports 18011/18090/55442. Backend/worker source mount and project ownership passed launcher checks. Frontend served-revision attestation remains false; no frontend revision claim is made.
+- Initial Check correctly refused the stale stack: all containers in the owned project had exited after the previous idle interval. No dependent test ran. The first Session wrapper returned helper PASS but launched an empty PowerShell child; the report was absent, so that attempt is NOT_RUN. The argument-forwarding mistake was corrected by invoking the documented PowerShell array directly and running Start immediately before Session.
+- Correct Start to Session run passed runtime readiness and executed the validator on this exact worktree. Standard synthetic Admin password login required TOTP enrollment; enrollment and verification completed normally, and the API reported TOTP enabled/verified. No bypass was used.
+- Queue guard PASS: a synthetic doctor-backed DailyQueue used queue_tag=profile.key while profile routing tags were [cardiology]. Impact preview counted the queue and blocked queue_tags; binding PUT returned 409; presentation-only PUT returned 200; re-read preserved the original tags; DELETE returned 409.
+- Permanent-address concurrency PASS: two Admin API requests were observed waiting behind the same PostgreSQL QueueProfile row lock in known order. Provision committed with HTTP 200; the following DELETE revalidated and returned 409. Impact preview reported one active address; subsequent DELETE also returned 409.
+- Sanitized local report: .scratch/T10-PR3633-tier2-staging-report.md. No patient or production data was used. No runtime code changed.
+- Teardown PASS: scripts/staging_down.ps1 -ProjectName codex-t10-pr3633-tier2-20261008 -EnvFile .scratch/t10-pr3633-staging.env; immediate verification found zero project containers, volumes, networks and images. The task-owned env file containing synthetic credentials was removed.
+- Scope: this is the T10 authenticated API acceptance slice only. Full STAGING_VALIDATION.md, T18, browser/UI E2E, served-frontend provenance, rollout and production remain NOT_RUN. No deferral was accepted.
+- Superseded next action: the plan checkpoint was committed/pushed, followed by the review-fix commit `00833c76`; see the current checkpoint above. The old instruction not to update the PR body no longer applies.
+
+## Superseded checkpoint — T10 additional review P2 fixes (2026-10-08T13:39+05:00)
+
+- Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-T10-profile-guards`. PR #3633 was OPEN at HEAD `5b45b9bdaffe341ae2ee67d9136bc0f04b9c1e60`, base `19c35ec62481dde45c9ea49146ecc4999aaf599f`; user merges. Current main has one later, unrelated clinic-settings migration. Preserve PR history; do not infer merge from chat.
+- New fixes: (1) `_profile_link_counts` counts the canonical `profile.key` as queue usage as well as effective expanded tags, because doctor QR join writes `DailyQueue.queue_tag=profile.key`; persisted routing tags remain unchanged. (2) DELETE locks/refreshes the `QueueProfile` row before checking dependencies, serializing it with address provision and binding PUT.
+- Gate: corrected mandatory gate invocation with confirmed root `_queue_profiles.py` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; I read the generated execution prompt. The explicit user request to fix these two exact findings authorizes the narrow endpoint/test change despite router first-touch omissions. The first malformed invocation did not run the gate and made no code change. No third gate run.
+- Actual source/test paths: `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, `backend/tests/integration/test_queue_profile_lifecycle.py`; source/test commit `37c6e4c7ebe1727dc1d0e96fc289618fda6a8a1a`. The current local HEAD contains the T10 journal checkpoint. No schema/OpenAPI/frontend/API-shape change.
+- Validation PASS on disposable PostgreSQL 16: `tests/integration/test_queue_profile_lifecycle.py` plus `test_rq16d_public_direction_runtime.py::test_collision_retry_generates_fresh_code` — **26 passed, 1 warning, 0 skipped**. Includes both new PostgreSQL regressions and the previous dental/edit/address-lock/collision cases. Scoped Ruff, Black, py_compile, `git diff --check`, and all applicable source commit hooks pass. The first attempt skipped because WSL idled; the successful run used an active WSL process and the owned disposable container. The combined successful run had no skipped tests.
+- Previous exact-head CI on the old PR HEAD passed applicable checks; CI for this new source revision is pending until push. Tier-2 staging remains `NOT_RUN`; no deferral accepted. No production or shared staging used.
+- Next exact action: commit the T10 journal checkpoint, push the source/test and docs commits to the existing PR branch, then inspect checks on the resulting exact HEAD. Do not merge or publish a review. Do not start T11 before user confirms merge, branch cleanup and main sync. Preserve unrelated scratch.
+
+## Superseded checkpoint — T10 generated-API validation before review P2 follow-up (2026-10-08T10:35+05:00)
+- Completed: PR #3620 / T09.3 merged at 2026-10-08T03:57:48Z. Fresh origin/main and T10 base are both 19c35ec62481dde45c9ea49146ecc4999aaf599f. GitHub confirms PR #3633 OPEN / MERGEABLE at `79a61c79837b7ffa1db40a031a7cca1b3f0d5505`; no merge is confirmed.
+- Changed: endpoint counts active permanent addresses, previews proposed binding values, blocks used-profile `queue_tags`/order/`department_key` mutations before assignment, and returns typed 409. Added PostgreSQL regressions and OpenAPI contract coverage, regenerated the spec/client types, and removed the stale schema-count claim from the generator header.
+- Validation PASS: Ruff check; Python `py_compile`; Black check; `backend/tests/test_openapi_contract.py` — previously 39 passed, 1 warning; `backend/tests/integration/test_queue_profile_lifecycle.py` — 21 passed, 1 warning on disposable PostgreSQL 16.15; frontend `tsc --noEmit` exit 0; generated type body exact match with installed `openapi-typescript` 7.13.0; runtime OpenAPI serialization parity. `git diff --check` must be rerun after this checkpoint.
+- WSL diagnosis: the first disposable PG container exited cleanly when Ubuntu became idle, causing a test attempt to skip all 20 cases. Keeping Ubuntu active for the duration of the run stabilized the same loopback-only PostgreSQL 16.15 container. The successful suite provisioned its own unique scratch DB and passed; the test container was stopped and removed.
+- Generation note: the repository npm generator previously failed under WSL Node 18.19 in Redocly with `Invalid string length`; direct invocation of the installed CLI under bundled Node 24 produced the exact current type body. `frontend/scripts/generate-api-types.sh` now uses a non-counting source header, preventing stale schema-count metadata. The ordinary npm generator is not recorded as run/pass.
+- Completed: PR body was updated and passed `scripts/check_pr_review_template.py`; the RBAC regression and evidence checkpoint were pushed in commit `16050140802c14a76051ca5379613d64eb8106a9`.
+- Previous exact PR HEAD `21f6be15` had all listed applicable checks pass. Full logs from `eeaa512f` confirmed `Frontend lint` failed only because generated API output lacked one LF before the generated comment; no other generated-content drift. Commit `79a61c79` adds the LF and removes stale counts from the generator source comment.
+- Local fix validation: exact Node24 / openapi-typescript 7.13.0 output now matches byte-for-byte (2,594,056 bytes); `npm run type-check` and `git diff --check` pass. The normal npm script via WSL Node18.19.1 fails with Redocly `Invalid string length`; only hosted Node24 freshness can close that gate.
+- Full workflow `37730206034` passed on exact HEAD `79a61c79`; then full workflow `37731779639` passed on exact source HEAD `7b8677d0`, including Frontend E2E, Backend tests, frontend unit/build/lint with generated freshness, parity, PR Required Gate, quality, docs, and applicable security/release gates. Path-aware skips are listed in EVIDENCE.md and are not passes. Superseded-run canceled jobs are not counted.
+- No staging was run and no T10 Tier-2 deferral is accepted. Earlier bounded staging gaps and full T18 validation remain outstanding.
+- Current source-bearing exact HEAD `7b8677d0` has all applicable checks green. This checkpoint is documentation-only and records the final result; leave #3633 for the user's merge. Do not start T11 before GitHub confirms merge, worktree cleanup, and main synchronization.
+- Checks to rerun after the next code change: Ruff, Python compile, OpenAPI contract, TypeScript check, generated artifact freshness, PostgreSQL profile lifecycle suite, and `git diff --check`.
 ## Superseded checkpoint — PR #3620 generic uncertain-retry local state (2026-10-07T16:08+05:00)
 
-Plan version: 3.56
+Plan version: 3.84
 Current task: T09.3
-Current status: IN_PROGRESS; local fix and regression are validated but not yet committed/pushed. Current remote PR HEAD before this fix: f85d7a0f8fc482b2401a8c040a18313077ef2156.
+Current status: IN_PROGRESS — review fixes are local; exact-head CI rerun and PR update are pending. Extra staging race rerun is NOT_RUN.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
 Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-07T16:08+05:00
+Last updated: 2026-10-08T21:45+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -51,9 +127,9 @@ Last updated: 2026-10-07T16:08+05:00
 - Checks to rerun after push: all applicable exact-head PR checks; staging remains NOT_RUN, and full STAGING_VALIDATION.md remains required before deployment.
 ## Superseded checkpoint — PR #3620 bounded Tier-2 deferral decision (2026-10-07T13:04+05:00)
 
-Plan version: 3.50
+Plan version: 3.84
 Current task: T09.3
-Current status: PR_OPEN; Tier 2 PARTIAL with a PR-specific bounded deferral accepted; independent code review and exact-head CI for the latest docs-only commit are pending.
+Current status: IN_PROGRESS — review fixes are local; exact-head CI rerun and PR update are pending. Extra staging race rerun is NOT_RUN.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final
 Branch: codex/aqs-t093-cabinet-ui
 Base / fresh origin/main: 300dd7e9b112dde5143e78d5149634c739ad9b3a
@@ -61,7 +137,7 @@ T09.3 code-evidence HEAD: 853b6c048cc19bc6a4bbfcc7582287c551baa2ca
 Current PR HEAD: 501435405b27327710c8b6934f7905bf11527ed0
 Decision commit: 501435405b27327710c8b6934f7905bf11527ed0
 PR: https://github.com/drsapaev/final/pull/3620
-Last updated: 2026-10-07T13:04+05:00
+Last updated: 2026-10-08T21:45+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -80,7 +156,7 @@ Last updated: 2026-10-07T13:04+05:00
 
 ## Current checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
 
-Plan version: 3.34
+Plan version: 3.84
 Current task/status: T09.2 review fixes / PR_OPEN — existing PR #3614.
 Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`
 Branch: `codex/aqs-T09.2-cabinet-apply`
@@ -105,13 +181,13 @@ Latest code/evidence HEAD: `3cd2bf1103cd5759c49d9ca73ad8fed4ac686a1f`
 
 ## Current authoritative checkpoint — T09.2 code-head CI passed (2026-10-06T13:39+05:00)
 
-Plan version: 3.30
+Plan version: 3.84
 Current task/status: T09.2 / PR_OPEN — [PR #3614](https://github.com/drsapaev/final/pull/3614). Generated API freshness correction commit: `80e5ad8`; evidence checkpoint commit: `ca6a1ba8e34ab02cb8773ca38256c33b22516895`.
 Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`
 Branch: `codex/aqs-T09.2-cabinet-apply`
 Base commit: `1d146d857e1570ff2259975f081f80dc0b31ae82` (merged PR #3613; synchronized with `origin/main`)
 Latest verified PR HEAD before this journal-only refresh: `ca6a1ba8e34ab02cb8773ca38256c33b22516895`; base `1d146d857e1570ff2259975f081f80dc0b31ae82`.
-Last updated: 2026-10-06T13:39+05:00
+Last updated: 2026-10-08T21:45+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -130,7 +206,7 @@ Last updated: 2026-10-06T13:39+05:00
 
 ## Current authoritative checkpoint — T09.1 continuation decision (2026-10-06T09:26+05:00)
 
-Plan version: 3.23
+Plan version: 3.84
 Current task/status: T09.1 / PR_OPEN — draft [PR #3612](https://github.com/drsapaev/final/pull/3612). Reviewed PR HEAD `a8f7980b1d160726e169050a8bc8f8043294a36b`; code HEAD `390e14b40d6eafb462e05d07f777c1e063a36c14`; current CI **26 success, 13 skipped, 0 failed, 0 pending**. No outstanding source-review P0/P1/P2.
 Decision: at the user's request for a continuation decision, the executing agent accepts a **#3612-specific backend/staging deferral** for this unused read-only preview. This is not a human/GitHub review, merge or deployment. UI Tier 1/Tier 2 are not applicable; no UI runtime changed. Full six-field record: `EVIDENCE.md#t091-pr-3612-continuation-decision`.
 Scope/mode: continuation of the existing T09.1 narrow override; documentation/PR-description only, no further gate run or scope expansion. Allowed edits: canonical plan, PROGRESS, RESUME, EVIDENCE and existing PR description. No runtime, test, generated API, migration, ops, auth-policy, staging or production changes.
@@ -139,10 +215,10 @@ Next exact action: validate/push this journal-only decision and check the result
 
 ## Historical checkpoint — T09.1 cabinet preview (2026-10-06T07:42:29+05:00)
 
-Plan version: 3.22
+Plan version: 3.84
 Execution permission: user authorized implementation of the full plan and said “мёрж и продолжать”; PR #3609 has been merged. Continue T09.1 only in its approved read-only preview scope.
 Current task: T09.1 — read-only preview and typed DTO for an explicit clinic-today cabinet reassignment.
-Current status: PR_OPEN — draft [PR #3612](https://github.com/drsapaev/final/pull/3612), latest PR HEAD `390e14b40d6eafb462e05d07f777c1e063a36c14`, base `6141fa33c1872d4c0da4c9d1a7f2e95ab3438d92`. Source review found no remaining P0/P1/P2 after the two OpenAPI fixes and generator-parity correction. Current check rollup: 29 success, 13 skipped, 0 failed; frontend E2E passed on rerun. PR description now passes local template validation and hosted PR Review Quality Gate. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-preview\final`, branch `codex/aqs-T09.1-cabinet-preview`. Main `C:\final` remains untouched and unrelated `.gate_artifacts/` is preserved.
+Current status: IN_PROGRESS — review fixes are local; exact-head CI rerun and PR update are pending. Extra staging race rerun is NOT_RUN.
 Mode: mandatory `gate` for queue mutation/audit domain. Initial gate and its one `--known-root-cause backend/app/services/queue_cabinet_management_api_service.py` retry both routed to migration / Alembic `0078_*.py`; generated prompts were read. This is a confirmed misroute because T09.1 is a read-only preview and adds no storage. After the required retry, use the narrow override grounded in the user's approved plan; record `gate_misroute=true`, `override_used=true`. Do not change the gate router or add a migration.
 Canonical anchors: T09 in `codex-admin-queue-simplification.md`; `backend/app/services/queue_cabinet_management_api_service.py`; `backend/app/repositories/queue_cabinet_management_api_repository.py`; `backend/app/api/v1/endpoints/queue_cabinet_management.py`; `backend/app/services/queue_domain_service.py::_build_cabinet_payload`; `backend/app/services/queue_status.py`; `backend/app/models/service_execution.py`; focused cabinet service tests.
 Allowed paths: the cabinet management service, repository, endpoint, `backend/tests/unit/test_queue_cabinet_management_api_service.py`, new focused integration tests if required, generated `backend/openapi.json` and `frontend/src/types/generated/api.ts`, and the canonical plan plus `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`.
@@ -162,10 +238,10 @@ Checks to run after this checkpoint is pushed: confirm exact-head backend, front
 
 ## Historical checkpoint — T08.3.3 GraphQL quota proof (2026-10-05T21:10:45+05:00)
 
-Plan version: 3.12
+Plan version: 3.84
 Execution permission: user authorized implementation of the full plan, then asked to fix and continue; PR #3607 was explicitly authorized and is now merged.
 Current task: T08.3.3 — direct GraphQL last-slot quota proof and source-backed reachable-writer parity.
-Current status: PR_OPEN — [#3609](https://github.com/drsapaev/final/pull/3609), current head `e84fd4d7edf7859ca5ea2534b65645149ed29e44`, base `main` at `589520ae132313ca9488f3994be8d28f6041975a`. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-3-graphql\final`, branch `codex/aqs-T08.3.3-graphql`. The main checkout fast-forwarded to the same base; unrelated untracked `.gate_artifacts/` was preserved.
+Current status: IN_PROGRESS — review fixes are local; exact-head CI rerun and PR update are pending. Extra staging race rerun is NOT_RUN.
 Mode: mandatory `gate`. Initial gate and its one `--known-root-cause backend/app/graphql/mutations.py` retry both returned `Mode: migration`, first-touch `backend/alembic/versions/0078_*.py`, because the description mentioned the writer evidence “table”. The generated execution prompt was read. The machine result did not set `gate_misroute`, but its Alembic route conflicts with the explicit test-only T08.3.3 plan; after the required retry, apply a narrow override grounded in the user's approved plan. Report `gate_misroute=true` (observed) and `override_used=true` (manual scope override); do not edit the router or migration.
 Canonical anchors: T08.3.3 in `codex-admin-queue-simplification.md`; `backend/app/graphql/mutations.py::_join_queue_impl`; `backend/tests/integration/test_daily_queue_lock_parity_pg.py`; `backend/app/services/queue_api_service.py::get_or_create_daily_queue`; `backend/app/repositories/queue_api_repository.py`; T08 writer coverage table in `EVIDENCE.md`.
 Allowed paths: `backend/tests/integration/test_daily_queue_lock_parity_pg.py`; `.ai-factory/plans/codex-admin-queue-simplification.md`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,EVIDENCE}.md`.
@@ -183,9 +259,9 @@ Checks to rerun after the next change: `git diff --check` before the checkpoint 
 
 ## Historical checkpoint — T08.3.2 clock P2 correction (2026-10-05T19:21:23+05:00)
 
-Plan version: 3.9
+Plan version: 3.84
 Current task: fix the remaining QR-session clock seam in PR #3607.
-Current status: PR_OPEN, locally validated and exact-head CI green. Code correction `8c8ac83e5ab16185404bf6c901aea15041214195`; latest branch checkpoint before this final record is `5fd78c4b3c78f4e4c8dfa2a7e18160c0edd00dff`. PR #3607 is OPEN, mergeable, clean against base `c1781c46a1b03c3404604542bcc9c4c9951f4c89`.
+Current status: IN_PROGRESS — review fixes are local; exact-head CI rerun and PR update are pending. Extra staging race rerun is NOT_RUN.
 Branch: `codex/aqs-T08.3.2-clockfix`; rebased onto fresh `origin/main` (dependency-only PR #3608).
 Mode: `gate_known_root_cause`. The mandatory rerun returned `narrow_override`, `execute`, `handoff_required=true`, `gate_misroute=true`, `override_used=true`; known owner `backend/tests/integration/test_qr_family_phone_identity.py`. The generated prompt was read. Its first-touch also listed unrelated ops/packaging files. Narrow basis: user explicitly requested correction of the review P2; approved T08.3.2 scope permits this existing test module and its plan journals only. No third gate run; no runtime/ops changes.
 Canonical anchors: `backend/tests/integration/test_qr_family_phone_identity.py`; `backend/app/services/queue_svc/_base.py::_now`; `backend/app/services/qr_queue/_base.py::_now`; `backend/app/services/qr_queue/_sessions.py::start_join_session`; current T08.3.2 plan/evidence.
@@ -201,10 +277,10 @@ Next exact action: commit and push this current progress checkpoint, then verify
 
 ## Current authoritative checkpoint — T08.3.2 post-merge P2 follow-up (2026-10-05T17:38:38+05:00)
 
-Plan version: 3.7
+Plan version: 3.84
 Execution permission: IMPLEMENTATION_ACTIVE — user asked “исправляй” for the confirmed P2 in the merged #3600 tests.
 Current task: remove wall-clock dependence from the four QR-session v1 PostgreSQL tests.
-Current status: PR_OPEN — [PR #3607](https://github.com/drsapaev/final/pull/3607), code/test commit `ae0bd8a7f24b27f7b1981911b2b9ecfaec9ede2f`; exact PR HEAD `d4d1524aa96f7260825b6f0caf1b9cb724044490` passed 10 checks, 4 were skipped, 0 failed. A new documentation-only checkpoint will require checking its resulting HEAD.
+Current status: IN_PROGRESS — review fixes are local; exact-head CI rerun and PR update are pending. Extra staging race rerun is NOT_RUN.
 Branch: `codex/aqs-T08.3.2-clockfix`; base `origin/main` = `ba03fdfb8d14d38a68a2d16df93145562cd87c63`; merge #3600 = `b3bd5272389da88513cc1ac23985b390489554f9`.
 Mode: `gate_known_root_cause`. Gate output was `gate_ok` / `execute`, `handoff_required=true`, with the confirmed test module plus unrelated Docker/Compose paths in first-touch; `gate_misroute=false`, `override_used=false`. Its execution prompt was read. The user's explicit P2 fix request and approved T08.3.2 test-only scope authorize this existing PG test module and plan checkpoint updates; only those paths were used. No runtime/ops changes.
 Canonical anchors: `backend/tests/integration/test_qr_family_phone_identity.py`; queue admission clock seam `backend/app/services/queue_svc/_base.py::_now` and `backend/app/services/queue_service.py::datetime`; T08.3.2 in the canonical plan; `docs/runbooks/AGENT_SESSION_WORKTREES.md` and `docs/runbooks/WSL_STAGING_SESSION.md`.
@@ -225,10 +301,10 @@ PR body quality gate passed (19 validator tests, samples and this body); PR #360
 
 ## Current authoritative checkpoint — T08.3.2 (2026-10-05T13:48:16+05:00)
 
-Plan version: 3.4
+Plan version: 3.84
 Execution permission: IMPLEMENTATION_ACTIVE — user said “продолжай” after T08.3.1 merged.
 Current task: T08.3.2 — real PostgreSQL proof for QR join-session transaction, replay snapshot and partial batches.
-Current status: PR_OPEN — [PR #3600](https://github.com/drsapaev/final/pull/3600), code/test commit `b3ca1a270aa8ac2b0808487a398442acb39c6466`. Applicable CI, security and quality checks passed for exact PR HEAD `27fccddc509f5e7557f57d1038c84dcd2eeae954`; path-aware jobs were skipped. This journal update requires a fresh exact-head check. Managed worktree base is `34ca6e59080dc679a6c7f921ac88a6aacb34e996`; branch `codex/aqs-T08.3.2-qr-session`.
+Current status: IN_PROGRESS — review fixes are local; exact-head CI rerun and PR update are pending. Extra staging race rerun is NOT_RUN.
 Mode: `gate_known_root_cause`. First mandatory gate routed to unrelated Docker/Compose packaging (`gate_misroute=false`, `override_used=false`, `handoff_required=true`). Required one retry with confirmed owner `backend/app/services/qr_queue/_sessions.py` returned `narrow_override` (`gate_misroute=true`, `override_used=true`, `handoff_required=true`). Its execution prompt was read. The returned first-touch list still contains unrelated packaging files and omits a test owner; apply the plan-approved narrow scope below. This is an explicit gate misroute/override and must be reported.
 Narrow override basis: the user's approved T08.3 plan explicitly allows the QR session service to remain read-only while adding real PostgreSQL proof in an existing QR-session PG test module or one newly gated module. No runtime behavior change is authorized by this checkpoint. If evidence reveals a runtime defect, stop and obtain a fresh gate before any runtime edit.
 Canonical anchors: `.ai-factory/plans/codex-admin-queue-simplification.md` T08.3.2; `backend/app/services/qr_queue/_sessions.py` (`complete_join_session`, `complete_join_session_multiple`, replay snapshot); `backend/tests/integration/test_qr_family_phone_identity.py` (synthetic scratch-PostgreSQL fixture and QR session flows); `backend/app/services/queue_domain_service.py` and focused allocator/quota tests as read-only references; `docs/runbooks/AGENT_SESSION_WORKTREES.md`; `docs/runbooks/CODEX_SUPERPOWERS_GUARD.md`.
@@ -247,10 +323,10 @@ Next exact action: commit and push this CI-evidence checkpoint, inspect checks o
 
 ## Current authoritative checkpoint — T08.3.1 (2026-10-05T00:28:28+05:00)
 
-Plan version: 3.0
+Plan version: 3.84
 Execution permission: IMPLEMENTATION_ACTIVE — user authorized sequential plan implementation and explicitly said “GO merge, потом продолжай”.
 Current task: T08.3.1 — PostgreSQL proof for the legacy queue-token admission transaction
-Current status: PR_OPEN. T08.3.1 passed local PostgreSQL/unit/static validation; PR #3599 is open, with code/test commit `465dc814e`; exact-head GitHub CI is pending. PR #3596 / T08.2c merged at `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`. Fresh worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-pg-proof\final`; branch `codex/aqs-T08.3-pg-proof`; base `origin/main` = merge commit above. Current PR contains two PostgreSQL integration tests and the approved plan checkpoint journals.
+Current status: IN_PROGRESS — review fixes are local; exact-head CI rerun and PR update are pending. Extra staging race rerun is NOT_RUN.
 Mode: `gate_known_root_cause`; retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, root-cause test owner `backend/tests/integration/test_daily_queue_lock_parity_pg.py`. The first gate routed the generic “PostgreSQL” keyword to unrelated Docker/Compose packaging. Narrow scope basis: approved T08.3 plan requires independent PostgreSQL concurrency proof and does not authorize packaging changes.
 Allowed paths: `backend/tests/integration/test_daily_queue_lock_parity_pg.py`; `.ai-factory/plans/codex-admin-queue-simplification.md`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,EVIDENCE}.md`.
 Denied paths: `backend/app/**`, `backend/alembic/**`, `backend/app/models/**`, `frontend/**`, `ops/**`, `output/**`, `test-results/**`, `storage/**`, production/live data, and all other tests. If a runtime defect appears, stop and obtain a new gate before changing runtime.
@@ -261,19 +337,19 @@ Checks to rerun if changed: the focused PostgreSQL module, the three queue quota
 
 > The T08.2c snapshot below is historical; its OPEN-PR and “do not start T08.3” instructions were superseded by the confirmed merge of PR #3596.
 
-Plan version: 2.9
+Plan version: 3.84
 Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 2026-10-01
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T08.2c — availability/report parity
-Current status: T08.2b / PR #3581 MERGED at `742bf08bd82da5f2ab8160ce474bdeab5694aa26`. T08.2c / PR #3596 remains OPEN and mergeable at exact remote HEAD `068fdbede3d08e0bfbd1384ecea7f27cf02827ed`, base `3da3e0ddaa1cf7afed7732905c6699ec4fafada5`. The five requested P2 fixes and focused regressions are committed and pushed; local tests and PR-body quality checks pass. Exact-head CI on current HEAD completed with 31 successful checks, 12 skipped checks, 0 failures. Skips are recorded below and are not passes. Worktree `C:\final\_wt_aqs_t082c_availability`, branch `codex/aqs-T08.2c-availability`. PR body now records the completed exact-head CI. Keep the PR open for the user's review/merge decision. T08.3 must wait for this PR cycle to close; v1 creation stays default-off and PostgreSQL concurrency proof belongs to T08.3.
+Current status: IN_PROGRESS — review fixes are local; exact-head CI rerun and PR update are pending. Extra staging race rerun is NOT_RUN.
 Last completed task: T08.2b — MERGED (#3581, merge commit `742bf08bd82da5f2ab8160ce474bdeab5694aa26`)
 Worktree: C:\final\_wt_aqs_t082c_availability
 Branch: codex/aqs-T08.2c-availability
 Base commit: 3da3e0ddaa1cf7afed7732905c6699ec4fafada5
 Current code commit: `4d301ad64208af81de53b1c7bf88f6735473b6da` (five P2 fixes, pushed to PR #3596)
 Current evidence checkpoint: `068fdbede3d08e0bfbd1384ecea7f27cf02827ed`; exact-head GitHub CI passed (31 success, 12 skipped, 0 failures), PR body refreshed and validated
-Last updated: 2026-10-04T19:07:37+05:00, Asia/Tashkent
+Last updated: 2026-10-08T21:45+05:00
 
 > Historical checkpoint superseded: current T07 status and exact-head evidence are recorded in dated sections below and in RESUME.md; do not use the earlier snapshot as a continuation instruction.
 

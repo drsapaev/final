@@ -1,5 +1,5 @@
 // ⚠️ АВТОГЕНЕРИРОВАННЫЙ ФАЙЛ — НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ!
-// Источник: backend/openapi.json (731 schemas, 997 paths)
+// Источник: backend/openapi.json
 // Регенерация: npm run generate:api-types
 // CI guard: npm run generate:api-types:check (fails if generated is stale)
 //
@@ -5991,7 +5991,14 @@ export type paths = {
          */
         get: operations["get_queue_profile_impact_preview_api_v1_queues_profiles__profile_key__impact_preview_get"];
         put?: never;
-        post?: never;
+        /**
+         * Preview Queue Profile Update
+         * @description Read-only impact preview for a proposed profile update.
+         *
+         *     A preview is informational. The PUT handler re-reads usage immediately
+         *     before applying any fields and never accepts a preview as authorization.
+         */
+        post: operations["preview_queue_profile_update_api_v1_queues_profiles__profile_key__impact_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -36222,6 +36229,49 @@ export type components = {
             };
         };
         /**
+         * QueueProfileBindingChangedDetail
+         * @description A stale binding snapshot that must be reloaded before retrying.
+         */
+        QueueProfileBindingChangedDetail: {
+            /**
+             * Reason
+             * @constant
+             */
+            reason: "profile_binding_changed";
+            /** Stale Fields */
+            stale_fields?: string[] | null;
+            /** Message */
+            message: string;
+        };
+        /** QueueProfileBindingChangedResponse */
+        QueueProfileBindingChangedResponse: {
+            detail: components["schemas"]["QueueProfileBindingChangedDetail"];
+        };
+        /** QueueProfileBindingConflictDetail */
+        QueueProfileBindingConflictDetail: {
+            /**
+             * Reason
+             * @constant
+             */
+            reason: "profile_binding_change_blocked";
+            /** Blocked Fields */
+            blocked_fields: ("queue_tags" | "department_key")[];
+            links: components["schemas"]["QueueProfileLinkCounts"];
+            /** Message */
+            message: string;
+        };
+        /** QueueProfileBindingConflictResponse */
+        QueueProfileBindingConflictResponse: {
+            detail: components["schemas"]["QueueProfileBindingConflictDetail"];
+        };
+        /** QueueProfileBindingSnapshot */
+        QueueProfileBindingSnapshot: {
+            /** Queue Tags */
+            queue_tags: string[];
+            /** Department Key */
+            department_key: string | null;
+        };
+        /**
          * QueueProfileCreate
          * @description Schema for creating a new QueueProfile
          */
@@ -36277,6 +36327,38 @@ export type components = {
             color?: string | null;
         };
         /**
+         * QueueProfileHttpError
+         * @description FastAPI HTTPException envelope used by Admin preview errors.
+         */
+        QueueProfileHttpError: {
+            /** Detail */
+            detail: string;
+        };
+        /** QueueProfileImpactIdentity */
+        QueueProfileImpactIdentity: {
+            /** Key */
+            key: string;
+        };
+        /** QueueProfileLinkCounts */
+        QueueProfileLinkCounts: {
+            /** Services */
+            services: number;
+            /** Department Services */
+            department_services: number;
+            /** Active Doctors */
+            active_doctors: number;
+            /** Active Queue Resources */
+            active_queue_resources: number;
+            /** Daily Queues */
+            daily_queues: number;
+            /** Entries Waiting */
+            entries_waiting: number;
+            /** Entries Total */
+            entries_total: number;
+            /** Active Public Addresses */
+            active_public_addresses: number;
+        };
+        /**
          * QueueProfileUpdate
          * @description Schema for updating an existing QueueProfile
          */
@@ -36302,6 +36384,21 @@ export type components = {
             icon?: string | null;
             /** Color */
             color?: string | null;
+        };
+        /** QueueProfileUpdateImpactPreview */
+        QueueProfileUpdateImpactPreview: {
+            /** Success */
+            success: boolean;
+            profile: components["schemas"]["QueueProfileImpactIdentity"];
+            current: components["schemas"]["QueueProfileBindingSnapshot"];
+            proposed: components["schemas"]["QueueProfileBindingSnapshot"];
+            links: components["schemas"]["QueueProfileLinkCounts"];
+            /** Changed Binding Fields */
+            changed_binding_fields: ("queue_tags" | "department_key")[];
+            /** Blocked Fields */
+            blocked_fields: ("queue_tags" | "department_key")[];
+            /** Can Update */
+            can_update: boolean;
         };
         /**
          * QueueReorderRequest
@@ -47205,6 +47302,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Direction binding changed while address provisioning was waiting. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileBindingChangedResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52994,6 +53100,68 @@ export interface operations {
             };
         };
     };
+    preview_queue_profile_update_api_v1_queues_profiles__profile_key__impact_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileUpdateImpactPreview"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileHttpError"];
+                };
+            };
+            /** @description Admin role required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileHttpError"];
+                };
+            };
+            /** @description Profile not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileHttpError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_queue_profile_api_v1_queues_profiles__profile_key__put: {
         parameters: {
             query?: never;
@@ -53018,6 +53186,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Binding changes are blocked while the profile is in use, or the submitted binding snapshot became stale. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileBindingConflictResponse"] | components["schemas"]["QueueProfileBindingChangedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -61688,6 +61865,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__clinic__DoctorOut"];
+                };
+            };
+            /** @description Doctor specialty changed while the update was waiting. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileBindingChangedResponse"];
                 };
             };
             /** @description Validation Error */

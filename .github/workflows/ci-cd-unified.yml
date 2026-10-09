@@ -2252,6 +2252,7 @@ jobs:
             # Сохраняем схему
             with open('openapi.json', 'w', encoding='utf-8') as f:
                 json.dump(openapi_schema, f, indent=2, ensure_ascii=False)
+                f.write('\n')
 
             print('✅ OpenAPI схема создана успешно')
             print(f'📊 Размер файла: {os.path.getsize(\"openapi.json\")} байт')

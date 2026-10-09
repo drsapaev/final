@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.crud.queue_owner_invariant import QueueProfileBindingChanged
 from app.graphql import mutations as gql_mutations
 from app.graphql.types import QueueEntryInput
 from app.models.clinic import Doctor
@@ -105,6 +106,65 @@ def test_join_queue_rejects_phone_only_tag_claim_owned_by_another_doctor(
         )
         .count()
         == 0
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.queue
+def test_join_queue_maps_stale_profile_binding_to_structured_conflict(
+    db_session,
+    test_doctor,
+    test_patient,
+    monkeypatch,
+) -> None:
+    queue_tag = "synthetic-profile-binding-change"
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_db_session",
+        lambda: contextlib.nullcontext(db_session),
+    )
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+
+    def reject_changed_binding(*args, **kwargs):
+        raise QueueProfileBindingChanged()
+
+    monkeypatch.setattr(
+        gql_mutations, "lock_and_resolve_active_tag_claim", reject_changed_binding
+    )
+    queues_before = (
+        db_session.query(DailyQueue)
+        .filter(
+            DailyQueue.specialist_id == test_doctor.id,
+            DailyQueue.queue_tag == queue_tag,
+        )
+        .count()
+    )
+
+    result = gql_mutations.Mutation._join_queue_impl(
+        SimpleNamespace(context=None),
+        QueueEntryInput(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            queue_tag=queue_tag,
+        ),
+    )
+
+    assert result.success is False
+    assert result.errors == ["PROFILE_BINDING_CHANGED"]
+    assert "refresh" in result.message.lower()
+    assert result.queue_entry is None
+    assert (
+        db_session.query(DailyQueue)
+        .filter(
+            DailyQueue.specialist_id == test_doctor.id,
+            DailyQueue.queue_tag == queue_tag,
+        )
+        .count()
+        == queues_before
     )
 
 

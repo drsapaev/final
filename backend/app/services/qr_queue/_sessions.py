@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import DBAPIError
 
+from app.crud.queue_owner_invariant import QueueProfileBindingChanged
 from app.services.qr_queue._base import *  # noqa: F401, F403
 from app.services.qr_queue._base import (
     JOIN_SESSION_JOINED_STATUS,
@@ -544,6 +545,12 @@ class SessionsMixin(QRQueueServiceMixinBase):
                 str(exc),
                 details=[{"specialist_id": None, "error": str(exc)}],
             ) from exc
+        except QueueProfileBindingChanged:
+            # A profile rebind invalidated this request while it waited for
+            # the shared tag scope. The entire join attempt, including any
+            # patient/session staging above, must remain uncommitted.
+            self.db.rollback()
+            raise
 
         queue_entry = join_result["entry"]
         queue_length_before = join_result["queue_length_before"]
@@ -767,6 +774,12 @@ class SessionsMixin(QRQueueServiceMixinBase):
                 lock_targets=batch_lock_targets,
                 token_str=qr_token.token,
             )
+        except QueueProfileBindingChanged:
+            # Unlike an optional ordering pre-lock failure, a profile rebind
+            # conflict invalidates the requested target. Roll back any
+            # patient/session staging and do not continue without the gate.
+            self.db.rollback()
+            raise
         except Exception as exc:  # noqa: BLE001 — pre-lock is best-effort
             logger.warning(
                 "[complete_join_session_multiple] tag scope pre-lock skipped: %s",
@@ -842,6 +855,12 @@ class SessionsMixin(QRQueueServiceMixinBase):
                     "specialist_id": specialist_id,
                     "error": str(exc),
                 }
+            except QueueProfileBindingChanged:
+                # A stale binding invalidates this whole join attempt. Never
+                # turn it into a partial batch success after earlier
+                # allocations were staged in the same transaction.
+                self.db.rollback()
+                raise
 
         # Restore the USER's original order (input-index ascending) for
         # both the response entries and the per-specialist error list.

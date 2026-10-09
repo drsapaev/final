@@ -43,6 +43,21 @@ class _FakeQueueDomainService:
         return SimpleNamespace(number=41)
 
 
+class _EmptyQuery:
+    def all(self):
+        return []
+
+
+class _FakeDb:
+    # The tag lock reads QueueProfile bindings before taking the
+    # PostgreSQL-only advisory lock. This unit fake supplies an empty
+    # catalog snapshot and no PostgreSQL bind.
+    bind = None
+
+    def query(self, *_entities):
+        return _EmptyQuery()
+
+
 @pytest.mark.unit
 def test_assign_same_day_queue_numbers_uses_explicit_create_branch_handoff():
     today = date.today()
@@ -75,7 +90,7 @@ def test_assign_same_day_queue_numbers_uses_explicit_create_branch_handoff():
     captured_handoffs = []
 
     service = RegistrarWizardQueueAssignmentService(
-        db=object(),
+        db=_FakeDb(),
         assignment_service_factory=lambda _: fake_assignment_service,
         create_entry_allocator=lambda handoff: (
             captured_handoffs.append(handoff) or SimpleNamespace(number=23)
@@ -139,7 +154,7 @@ def test_assign_same_day_queue_numbers_uses_queue_domain_boundary_by_default():
     fake_queue_domain_service = _FakeQueueDomainService()
 
     service = RegistrarWizardQueueAssignmentService(
-        db=object(),
+        db=_FakeDb(),
         assignment_service_factory=lambda _: fake_assignment_service,
         queue_domain_service_factory=lambda _: fake_queue_domain_service,
         lifecycle_service_factory=lambda db: SimpleNamespace(

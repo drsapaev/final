@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.crud.queue_owner_invariant import QueueProfileBindingChanged
 from app.models.online_queue import OnlineQueueEntry
 from app.models.visit import VisitService
 from app.services.queue_service import queue_service
@@ -149,6 +150,33 @@ def test_assign_queue_numbers_on_confirmation_raises_explicit_error_on_ambiguity
         .count()
         == 0
     )
+
+
+@pytest.mark.unit
+@pytest.mark.queue
+@pytest.mark.confirmation
+def test_profile_rebind_conflict_remains_a_retryable_confirmation_conflict(
+    db_session, test_visit, test_service, monkeypatch
+):
+    _attach_visit_service(db_session, test_visit, test_service)
+
+    def _binding_changed(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise QueueProfileBindingChanged()
+
+    monkeypatch.setattr(
+        "app.services.visit_confirmation_service.lock_and_resolve_active_tag_claim",
+        _binding_changed,
+    )
+
+    service = VisitConfirmationService(db_session)
+    with pytest.raises(VisitConfirmationDomainError) as exc_info:
+        service.assign_queue_numbers_on_confirmation(
+            test_visit,
+            confirmation_telegram_id="123456789",
+        )
+
+    assert exc_info.value.status_code == 409
+    assert "Queue direction changed" in exc_info.value.detail
 
 
 @pytest.mark.unit

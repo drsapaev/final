@@ -1145,7 +1145,9 @@ def get_or_create_daily_queue(
     # reuse this lock provides. Taken BEFORE the lookup, flush/commit
     # releases it at this function's own commit. PostgreSQL-only; the
     # sequential SQLite tests skip harmlessly.
-    queue_resource_routing.lock_daily_queue_creation(db, day, actual_specialist_id)
+    queue_resource_routing.lock_daily_queue_creation(
+        db, day, actual_specialist_id, queue_tag=queue_tag
+    )
 
     # Ищем очередь с учетом queue_tag
     query_filters = [

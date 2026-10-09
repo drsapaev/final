@@ -96,6 +96,28 @@ const getAvailableIcons = (t: (key: string, options?: Record<string, unknown>) =
     { name: 'Package', component: Package, label: t('admin2.qp_icon_package') },
 ];
 
+const apiErrorMessage = (error: unknown, fallback: string): string => {
+    if (typeof error !== 'object' || error === null) return fallback;
+    const response = (error as { response?: unknown }).response;
+    if (typeof response !== 'object' || response === null) return fallback;
+    const data = (response as { data?: unknown }).data;
+    if (typeof data !== 'object' || data === null) return fallback;
+    const detail = (data as { detail?: unknown }).detail;
+    if (typeof detail === 'string') return detail;
+    if (typeof detail !== 'object' || detail === null) return fallback;
+
+    const message = (detail as { message?: unknown }).message;
+    const blockedFields = (detail as { blocked_fields?: unknown }).blocked_fields;
+    const parts = [typeof message === 'string' ? message : ''];
+    if (Array.isArray(blockedFields)) {
+        const fields = blockedFields.filter(
+            (field): field is string => typeof field === 'string',
+        );
+        if (fields.length > 0) parts.push(`Заблокированные поля: ${fields.join(', ')}`);
+    }
+    return parts.filter(Boolean).join(' ') || fallback;
+};
+
 const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' }) => {
     const { t: rawT } = useTranslation();
   const t = rawT;
@@ -204,7 +226,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error updating profile:', err);
-            setError(String((err as Record<string, unknown> & { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.qp_update_error')));
+            setError(apiErrorMessage(err, t('admin2.qp_update_error')));
         } finally {
             setSaving(false);
         }

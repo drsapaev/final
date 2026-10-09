@@ -169,7 +169,9 @@ class VisitConfirmationRepository:
         # block → re-read → reuse this lock provides. flush-only
         # creation: the lock lives until the caller's single commit.
         # Advisory-first: nothing row-locked earlier in this flow.
-        lock_daily_queue_creation(self.db, day, actual_specialist_id)
+        lock_daily_queue_creation(
+            self.db, day, actual_specialist_id, queue_tag=queue_tag
+        )
 
         # QD-2E (Codex round-4 P1): поверхность для записи с решённым
         # врачом — очередь ЭТОГО врача (PR-26 per-doctor), не tag-only

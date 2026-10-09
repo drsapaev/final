@@ -146,7 +146,9 @@ def test_staff_cancel_visit_adapter_mutates_visit_and_queue_with_audit(
 
     assert result["success"] is True
     assert result["action"] == "staff_cancel_visit"
-    assert test_visit.status == "canceled"  # Issue #06: normalized from British to American
+    assert (
+        test_visit.status == "canceled"
+    )  # Issue #06: normalized from British to American
     assert entry.status == "cancelled"  # queue entry keeps British spelling
     assert wrong_owner_entry.status == "waiting"
     assert same_queue_other_patient.status == "waiting"
@@ -164,7 +166,11 @@ def test_staff_cancel_visit_adapter_mutates_visit_and_queue_with_audit(
     assert completed.payload["operation_key"] == "visit_cancel_or_move"
     assert completed.payload["target_type"] == "visit"
     assert completed.payload["domain_mutation"] is True
-    assert "7701" not in str(completed.payload)
+    # A timestamp can coincidentally contain the synthetic chat ID's digits.
+    non_timestamp_payload = {
+        key: value for key, value in completed.payload.items() if key != "timestamp"
+    }
+    assert "7701" not in str(non_timestamp_payload)
 
 
 def test_staff_move_visit_adapter_updates_date_and_preserves_queue_time(
@@ -433,7 +439,9 @@ def test_staff_refund_payment_adapter_records_failed_audit_on_policy_block(
     assert payment.status == "pending"
     assert _audit_actions(db_session) == ["staff_action_failed"]
     failed = (
-        db_session.query(AuditLog).filter(AuditLog.action == "staff_action_failed").one()
+        db_session.query(AuditLog)
+        .filter(AuditLog.action == "staff_action_failed")
+        .one()
     )
     assert failed.payload["operation_key"] == "refund_issue"
     assert failed.payload["result"] == "failed"

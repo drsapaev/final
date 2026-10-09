@@ -335,6 +335,9 @@ def _ensure_department_integrations(
     )
 
     if not existing_service:
+        from app.crud.queue_owner_invariant import lock_profile_link_scopes
+
+        lock_profile_link_scopes(db, department_keys=[department.key])
         service_name = opts.get("service_name") or f"Консультация {department.name_ru}"
         raw_service_code = opts.get("service_code") or f"{department.key}_consult"
         normalized_code = normalize_service_code(raw_service_code) or department.key

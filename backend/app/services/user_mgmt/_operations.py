@@ -267,6 +267,65 @@ class OperationsMixin(UserManagementServiceMixinBase):
                         },
                     )
 
+            # Queue owner-config scopes are a prerequisite for Doctor row
+            # locks. Bulk actions must collect every relevant specialty and
+            # acquire the union once in canonical order; taking scopes one
+            # user at a time can invert locks when input order differs across
+            # concurrent batches.
+            prelocked_doctor_tags: set[str] = set()
+            if action_data.action == "activate":
+                activation_rows = (
+                    db.query(Doctor.specialty)
+                    .join(User, User.id == Doctor.user_id)
+                    .filter(
+                        User.id.in_(action_data.user_ids),
+                        User.role.in_(DOCTOR_PROFILE_ROLES),
+                        Doctor.active.is_(False),
+                    )
+                    .all()
+                )
+                prelocked_doctor_tags.update(
+                    row.specialty for row in activation_rows if row.specialty
+                )
+            elif (
+                action_data.action == "change_role"
+                and action_data.role in DOCTOR_PROFILE_ROLES
+            ):
+                target_roles = (
+                    db.query(User.id, User.role)
+                    .filter(User.id.in_(action_data.user_ids))
+                    .all()
+                )
+                promoting_ids = [
+                    row.id
+                    for row in target_roles
+                    if row.role not in DOCTOR_PROFILE_ROLES
+                ]
+                if promoting_ids:
+                    existing_rows = (
+                        db.query(Doctor.user_id, Doctor.specialty)
+                        .filter(Doctor.user_id.in_(promoting_ids))
+                        .all()
+                    )
+                    tags_by_user: dict[int, set[str]] = {}
+                    for row in existing_rows:
+                        if row.specialty:
+                            tags_by_user.setdefault(row.user_id, set()).add(
+                                row.specialty
+                            )
+                    default_specialty = DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
+                        action_data.role, INCOMPLETE_DOCTOR_SPECIALTY
+                    )
+                    for user_id in promoting_ids:
+                        existing_tags = tags_by_user.get(user_id)
+                        if existing_tags:
+                            prelocked_doctor_tags.update(existing_tags)
+                        elif default_specialty:
+                            prelocked_doctor_tags.add(default_specialty)
+
+            if prelocked_doctor_tags:
+                lock_profile_link_scopes(db, queue_tags=sorted(prelocked_doctor_tags))
+
             # Phase 0 (PR #3320 round 3, review P1): bulk activate and bulk
             # change_role -> Patient are write paths into the login-resolver
             # predicate (active + role=Patient + UserProfile.phone +
@@ -391,7 +450,11 @@ class OperationsMixin(UserManagementServiceMixinBase):
                             if user.profile:
                                 user.profile.status = UserStatus.ACTIVE
                             self._sync_doctor_active(
-                                db, user_id, True, reason="bulk_activate"
+                                db,
+                                user_id,
+                                True,
+                                reason="bulk_activate",
+                                prelocked_queue_tags=prelocked_doctor_tags,
                             )
                         except Exception:
                             user.is_active = prev_is_active
@@ -435,7 +498,11 @@ class OperationsMixin(UserManagementServiceMixinBase):
                                 # preserved). No direct role writes bypassing the
                                 # contract.
                                 self._apply_role_change_doctor_lifecycle(
-                                    db, user, old_role, action_data.role
+                                    db,
+                                    user,
+                                    old_role,
+                                    action_data.role,
+                                    prelocked_queue_tags=prelocked_doctor_tags,
                                 )
                             except Exception:
                                 user.role = old_role
@@ -486,6 +553,12 @@ class OperationsMixin(UserManagementServiceMixinBase):
 
                     processed_count += 1
 
+                except QueueProfileBindingChanged:
+                    # This invalidates the batch's scope snapshot. Rolling
+                    # back is required: earlier per-user successes must not
+                    # commit after a later binding changed under the batch.
+                    db.rollback()
+                    raise
                 except Exception as e:
                     failed_count += 1
                     failed_users.append({"user_id": user_id, "error": str(e)})
@@ -502,6 +575,9 @@ class OperationsMixin(UserManagementServiceMixinBase):
                 },
             )
 
+        except QueueProfileBindingChanged:
+            db.rollback()
+            raise
         except Exception as e:
             db.rollback()
             logger.error(f"Error in bulk action: {e}")

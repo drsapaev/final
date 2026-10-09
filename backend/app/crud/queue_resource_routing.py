@@ -275,6 +275,12 @@ def lock_queue_tag_claim_scope(db: Session, queue_tag: str, day: date) -> None:
     same transaction is free, while inverting the order of two scopes
     across concurrent transactions can deadlock PostgreSQL.
     """
+    # Profile binding updates use the same transaction-scoped owner-config
+    # lock. Acquire it before the narrower day claim lock so a profile rebind
+    # cannot pass its usage check while a tagged queue is being created.
+    from app.crud.queue_owner_invariant import lock_profile_link_scopes
+
+    lock_profile_link_scopes(db, queue_tags=[queue_tag])
     if _bound_dialect_name(db) == "postgresql":
         db.execute(
             sa.text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
@@ -310,7 +316,13 @@ def daily_queue_creation_lock_key(day: date, specialist_id: int) -> str:
     return f"daily_queue:{day.isoformat()}:{specialist_id}"
 
 
-def lock_daily_queue_creation(db: Session, day: date, specialist_id: int) -> None:
+def lock_daily_queue_creation(
+    db: Session,
+    day: date,
+    specialist_id: int,
+    *,
+    queue_tag: str | None = None,
+) -> None:
     """Serialize the check-then-insert window for one doctor's day queue.
 
     Two concurrent creators that both observe "no queue for this doctor
@@ -332,6 +344,13 @@ def lock_daily_queue_creation(db: Session, day: date, specialist_id: int) -> Non
     skip — sequential no-duplicate pins cover that path, the same
     parity as ``lock_queue_tag_claim_scope``.
     """
+    if queue_tag:
+        # Doctor-owned tagged queues share profile binding serialization
+        # with the resource/tag claim path. This must precede the per-doctor
+        # day lock to keep one global order: owner-config -> daily queue.
+        from app.crud.queue_owner_invariant import lock_profile_link_scopes
+
+        lock_profile_link_scopes(db, queue_tags=[queue_tag])
     if _bound_dialect_name(db) == "postgresql":
         db.execute(
             sa.text("SELECT pg_advisory_xact_lock(hashtext(:k))"),

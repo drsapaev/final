@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy.orm import sessionmaker
 
 from app.crud.daily_queue_creation_policy import ONLINE_ISSUANCES_V1_POLICY_VERSION
+from app.crud.queue_owner_invariant import QueueProfileBindingChanged
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.user import User
@@ -100,6 +101,30 @@ def test_legacy_queue_limit_keeps_active_entry_count_and_fallback() -> None:
     assert allowed is True
     assert message == ""
     db.query.return_value.filter.return_value.count.assert_called_once()
+
+
+@pytest.mark.unit
+def test_legacy_queue_join_preserves_profile_binding_conflict_as_http_409(
+    monkeypatch,
+):
+    import app.api.v1.endpoints.queue as queue_endpoint
+
+    service = Mock()
+    service.join_queue_with_token.side_effect = QueueProfileBindingChanged()
+    db = Mock()
+    monkeypatch.setattr(queue_endpoint, "get_queue_service", lambda: service)
+
+    with pytest.raises(QueueProfileBindingChanged):
+        queue_endpoint.join_queue(
+            request=queue_endpoint.QueueJoinRequest(
+                token="synthetic-token",
+                patient_name="Synthetic Patient",
+                phone="+998900000111",
+            ),
+            db=db,
+        )
+
+    db.rollback.assert_called_once_with()
 
 
 @pytest.mark.unit

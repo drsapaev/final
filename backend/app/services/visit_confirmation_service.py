@@ -14,6 +14,7 @@ from typing import Any
 from app.core.config import settings
 from app.crud import clinic as crud_clinic
 from app.crud import telegram_config as crud_telegram
+from app.crud.queue_owner_invariant import QueueProfileBindingChanged
 from app.crud.queue_owner_policy import (
     eligible_real_doctor,
     owner_configuration_error,
@@ -792,6 +793,14 @@ class VisitConfirmationService:
                     detail=(
                         "Cannot unambiguously resolve an existing queue entry "
                         "for visit confirmation"
+                    ),
+                ) from exc
+            except QueueProfileBindingChanged as exc:
+                raise VisitConfirmationDomainError(
+                    status_code=409,
+                    detail=(
+                        "Queue direction changed during visit confirmation. "
+                        "Refresh and retry the confirmation."
                     ),
                 ) from exc
 
