@@ -37,7 +37,9 @@ class AuthenticationApiService:
         profile_loader,
         support_records_loader=None,
     ) -> dict:
-        if "full_name" in update_data and is_doctor_role_spelling(current_user.role):
+        if "full_name" in update_data and is_doctor_role_spelling(
+            getattr(current_user, "role", None)
+        ):
             full_name = update_data["full_name"]
             if not isinstance(full_name, str) or not full_name.strip():
                 logger.info("[FIX] Rejected an empty display name for a doctor account")
