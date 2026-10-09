@@ -102,6 +102,7 @@ class CoreMixin(QueueBusinessServiceMixinBase):
         specialty: Any,
         *,
         profiles: list[Any] | None = None,
+        prefer_exact_key: bool = False,
     ) -> list[Any]:
         """Return configured profiles matching one normalized queue tag.
 
@@ -129,15 +130,31 @@ class CoreMixin(QueueBusinessServiceMixinBase):
             }
             if normalized_specialty in profile_keys:
                 matched.append(profile)
+        if prefer_exact_key:
+            exact_key_matches = [
+                profile
+                for profile in matched
+                if cls._normalize_qr_specialty_key(profile.key)
+                == normalized_specialty
+            ]
+            if exact_key_matches:
+                return exact_key_matches
         return matched
 
     @classmethod
 
     def _get_qr_profile_candidates_for_doctor(
-        cls, db: Session, doctor: Doctor
+        cls,
+        db: Session,
+        doctor: Doctor,
+        *,
+        profiles: list[Any] | None = None,
     ) -> list[Any]:
         return cls._get_qr_profile_candidates_for_tag(
-            db, getattr(doctor, "specialty", None)
+            db,
+            getattr(doctor, "specialty", None),
+            profiles=profiles,
+            prefer_exact_key=True,
         )
 
     @classmethod
@@ -154,8 +171,8 @@ class CoreMixin(QueueBusinessServiceMixinBase):
             load_queue_profile_availability,
         )
 
-        profile_candidates = cls._get_qr_profile_candidates_for_tag(
-            db, getattr(doctor, "specialty", None), profiles=profiles
+        profile_candidates = cls._get_qr_profile_candidates_for_doctor(
+            db, doctor, profiles=profiles
         )
         resolved_availability = availability_by_profile
         if resolved_availability is None:

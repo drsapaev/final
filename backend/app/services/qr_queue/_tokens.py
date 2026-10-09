@@ -244,7 +244,12 @@ class TokensMixin(QRQueueServiceMixinBase):
                     # Unprofiled legacy resource tokens retain their old path.
                     profile_candidates = (
                         queue_service._get_qr_profile_candidates_for_tag(
-                            self.db, daily_queue.queue_tag
+                            self.db,
+                            daily_queue.queue_tag,
+                            prefer_exact_key=(
+                                getattr(daily_queue, "queue_resource_id", None)
+                                is None
+                            ),
                         )
                     )
                     if not profile_candidates:

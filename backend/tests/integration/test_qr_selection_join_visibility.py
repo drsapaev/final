@@ -839,6 +839,75 @@ def test_doctor_and_profile_joins_reject_unavailable_shared_resource_target(
 
 
 @pytest.mark.queue
+def test_available_profiles_with_different_parents_share_one_resource_target(
+    pg_session, monkeypatch
+):
+    """An explicit resource tag stays one target when every parent is available."""
+    from app.models.department import Department
+    from app.models.online_queue import DailyQueue, QueueResource
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import queue_service
+
+    monkeypatch.setattr(queue_service, "ONLINE_QUEUE_START_TIME", time(0, 0))
+    parent_a = Department(
+        key="rq09-profile-available-parent-a",
+        name_ru="RQ-09 Synthetic available parent A",
+        active=True,
+    )
+    parent_b = Department(
+        key="rq09-profile-available-parent-b",
+        name_ru="RQ-09 Synthetic available parent B",
+        active=True,
+    )
+    resource = QueueResource(
+        code="rq09-profile-available-resource",
+        queue_tag="rq09rsrcavailable",
+        display_name="RQ-09 Synthetic available resource",
+        active=True,
+    )
+    selected = QueueProfile(
+        key="rq09-profile-available-selected",
+        title="RQ-09 Synthetic available selected profile",
+        queue_tags=[resource.queue_tag],
+        department_key=parent_a.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    sibling = QueueProfile(
+        key="rq09-profile-available-sibling",
+        title="RQ-09 Synthetic available sibling profile",
+        queue_tags=[resource.queue_tag],
+        department_key=parent_b.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    pg_session.add_all([parent_a, parent_b, resource, selected, sibling])
+    pg_session.commit()
+    token = _clinic_wide_token(pg_session, "rq09-token-shared-available-resource")
+
+    result = queue_service.join_queue_with_token(
+        pg_session,
+        token_str=token.token,
+        patient_name="RQ09 Synthetic Shared Available Resource",
+        phone="+998900000934",
+        specialist_id_override=selected.id,
+        specialist_type="profile",
+    )
+
+    assert result.get("entry") is not None, result
+    daily_queue = (
+        pg_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == _clinic_day(),
+            DailyQueue.queue_tag == resource.queue_tag,
+        )
+        .one()
+    )
+    assert daily_queue.queue_resource_id == resource.id
+    assert daily_queue.specialist_id is None
+
+
+@pytest.mark.queue
 def test_available_specialists_excludes_ineligible_doctor_owners(
     pg_client, pg_session
 ):

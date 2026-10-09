@@ -240,7 +240,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                         else str(profile.key)
                     ),
                     availability.state,
-                    availability.parent_department_key,
+                    (
+                        availability.parent_department_key
+                        if route_queue_tag is None
+                        else None
+                    ),
                 )
             )
 
@@ -1127,7 +1131,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             )
             if specialist is not None:
                 profile_candidates = self._get_qr_profile_candidates_for_tag(
-                    db, daily_queue.queue_tag
+                    db,
+                    daily_queue.queue_tag,
+                    prefer_exact_key=(
+                        getattr(daily_queue, "queue_resource_id", None) is None
+                    ),
                 )
                 if not profile_candidates:
                     profile_candidates = self._get_qr_profile_candidates_for_doctor(

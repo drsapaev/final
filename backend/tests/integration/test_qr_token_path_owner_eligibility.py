@@ -316,16 +316,23 @@ def test_shared_tag_candidate_policy_fails_closed_for_conflicting_parents():
     )
 
 
-def test_shared_tag_candidate_policy_rejects_distinct_queue_keys_on_same_parent():
+def test_shared_tag_policy_distinguishes_doctor_keys_from_resource_tag():
     from app.models.queue_profile import QueueProfile
     from app.services.queue_profile_availability import QueueProfileAvailability
     from app.services.queue_svc import QueueBusinessService
 
-    availability = QueueProfileAvailability(
+    availability_a = QueueProfileAvailability(
         state="available",
         is_available=True,
         reason_codes=(),
         parent_department_key="rq09c-shared-parent",
+        parent_active=True,
+    )
+    availability_b = QueueProfileAvailability(
+        state="available",
+        is_available=True,
+        reason_codes=(),
+        parent_department_key="rq09c-other-parent",
         parent_active=True,
     )
     profiles = [
@@ -346,14 +353,49 @@ def test_shared_tag_candidate_policy_rejects_distinct_queue_keys_on_same_parent(
     assert not QueueBusinessService._qr_profile_candidates_are_unambiguous(
         profiles,
         db=None,
-        availability_by_profile=dict.fromkeys(profiles, availability),
+        availability_by_profile={
+            profiles[0]: availability_a,
+            profiles[1]: availability_b,
+        },
     )
     assert QueueBusinessService._qr_profile_candidates_are_unambiguous(
         profiles,
         db=None,
-        availability_by_profile=dict.fromkeys(profiles, availability),
+        availability_by_profile={
+            profiles[0]: availability_a,
+            profiles[1]: availability_b,
+        },
         route_queue_tag="rq09c-shared-tag",
     )
+
+
+def test_doctor_profile_resolution_prefers_exact_canonical_key_over_alias():
+    from types import SimpleNamespace
+
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_svc import QueueBusinessService
+
+    specialty = "rq09c-canonical-doctor-key"
+    canonical = QueueProfile(
+        key=specialty,
+        queue_tags=[specialty],
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    alias = QueueProfile(
+        key="rq09c-doctor-alias-direction",
+        queue_tags=[specialty],
+        is_active=True,
+        show_on_qr_page=True,
+    )
+
+    candidates = QueueBusinessService._get_qr_profile_candidates_for_doctor(
+        db=None,
+        doctor=SimpleNamespace(specialty=specialty),
+        profiles=[alias, canonical],
+    )
+
+    assert candidates == [canonical]
 
 
 def test_owner_inactive_ghost_cannot_join_via_doctor_token(pg_session):
@@ -552,6 +594,44 @@ def test_existing_doctor_token_rejects_distinct_profile_keys_sharing_a_tag(
     with pytest.raises((QueueValidationError, ValueError)):
         _join(session, world["token"])
     assert _entries(session, world["queue_id"]) == []
+
+
+def test_existing_doctor_token_prefers_exact_profile_key_over_shared_tag_alias(
+    pg_session,
+):
+    """A doctor token's canonical queue key disambiguates alias profiles."""
+    from app.models.queue_profile import QueueProfile
+    from app.services.qr_queue import QRQueueService
+
+    session = pg_session
+    user = _make_user(session, "rq09c_token_exact", "Doctor", active=True)
+    doctor = _make_doctor(session, user.id)
+    queue_tag = f"rq09c-token-exact-{doctor.id}"
+    world = _seed_doctor_token(session, "exact-key", doctor.id, queue_tag=queue_tag)
+    session.add_all(
+        [
+            QueueProfile(
+                key=queue_tag,
+                title="Synthetic canonical doctor profile",
+                queue_tags=[queue_tag],
+                is_active=True,
+                show_on_qr_page=True,
+            ),
+            QueueProfile(
+                key=f"rq09c-token-alias-{doctor.id}",
+                title="Synthetic alias profile",
+                queue_tags=[queue_tag],
+                is_active=True,
+                show_on_qr_page=True,
+            ),
+        ]
+    )
+    session.commit()
+
+    assert QRQueueService(session).get_qr_token_info(world["token"]) is not None
+    result = _join(session, world["token"])
+    assert result
+    assert _entries(session, world["queue_id"])
 
 
 def test_resource_owned_surface_joins_without_doctor_role_gate(pg_session):

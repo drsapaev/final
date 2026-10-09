@@ -1,14 +1,14 @@
 # Progress
 
-Plan version: 3.86
+Plan version: 3.87
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: IN_PROGRESS — P1 and both P2 findings from the supplied review are implemented and committed locally (`d38cc2b3`), synced with fresh `origin/main` by merge `01cb01f1`, and validated on disposable PostgreSQL. The changes are not pushed; PR #3639 still points to `1445e01f8a7c779e59f2dd109f0cab291570aef4`. Tier-2 remains PARTIAL; no deferral has been accepted. User owns merge.
+Current status: IN_PROGRESS — T11 fixes locally validated on PR #3639 base `a593fed1`; five focused PostgreSQL integration modules pass 72/72. User approved the narrow `_tokens.py` plus regression-test scope extension. Commit/push and exact-head hosted CI remain; Tier-2 remains PARTIAL, no deferral accepted, and the user owns merge.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
-PR base: 8f3d325de18d3f8eede1b4b300926e6c2c65bebf; current `origin/main`: a396ee505b6f53318b4360ca81827759125c79ca (one commit ahead of the PR base).
-Remote PR HEAD: 1445e01f8a7c779e59f2dd109f0cab291570aef4.
-Current changed paths: four backend modules, three focused test files, this plan's `PROGRESS.md`/`EVIDENCE.md`/`RESUME.md`. Preserve pre-existing untracked `.scratch/` and do not stage it.
-Last updated: 2026-10-09T22:33+05:00
+PR base / `origin/main`: a396ee505b6f53318b4360ca81827759125c79ca.
+Remote and local PR HEAD before this follow-up: a593fed10c4803f110f082bd7d589c1a64217b44.
+Current changed paths: `backend/app/services/queue_svc/_core.py`, `backend/app/services/queue_svc/_operations.py`, `backend/app/services/qr_queue/_tokens.py` (approved narrow extension), `backend/tests/integration/test_qr_token_path_owner_eligibility.py`, `backend/tests/integration/test_qr_selection_join_visibility.py`, and these plan journals. Preserve pre-existing untracked `.scratch/` and do not stage it.
+Last updated: 2026-10-09T23:39+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,7 +16,20 @@ Last updated: 2026-10-09T22:33+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS | PR #3639 OPEN at remote `1445e01f`; source fix `d38cc2b3` + main sync `01cb01f1` committed locally, push pending | | EVIDENCE.md#t11-pr-3639-review-p1-p2-fixes-local-validation |
+| T11 | IN_PROGRESS | PR #3639 OPEN at old HEAD `a593fed1`; local follow-up 72/72 focused PG tests; commit/push pending | | EVIDENCE.md#t11-pr-3639-token-info-fix-focused-postgresql-validation |
+
+## Current checkpoint — PR #3639 backend CI regression — 2026-10-09T23:39+05:00
+
+- Exact PR HEAD before this local fix is `a593fed10c4803f110f082bd7d589c1a64217b44`, base/current `origin/main` `a396ee505b6f53318b4360ca81827759125c79ca`; PR remains OPEN. Its old exact-head Unified CI run `37967418406` had Backend failure: 9 failed, 5459 passed, 66 skipped, 25 deselected, 3 xfailed. The local follow-up passes 72 tests across five focused PostgreSQL integration modules and needs commit/push plus exact-head CI.
+- Execution mode: previously required gate returned scoped `narrow_override` after the normal and known-root-cause attempts misrouted. The user has now explicitly authorized only the narrow extension to `backend/app/services/qr_queue/_tokens.py` and a focused regression in `backend/tests/integration/test_qr_token_path_owner_eligibility.py`; this is not authorization for other files, staging, PR-body edits, formal review, merge, or production. Gate/router remains denied.
+- Canonical anchors: queue ownership ADR, QR token-path implementation, queue profile candidate/availability helpers, and the focused token-path integration tests. First-touch for this continuation: `_tokens.py` and the existing token-path test. Validation target: the previously failing doctor-family token cases and related failing PostgreSQL nodes on a confirmed disposable local database. First stop condition: no verified disposable PostgreSQL or a need to edit any path beyond the explicit extension and existing T11 scope.
+- Local in-scope changes: exact QueueProfile-key candidates take precedence for doctor-owned routes when a canonical key exists; admission and token-info apply the preference only to doctor-owned daily queues. Resource-owned queues keep all shared-tag candidates and fail closed when any published candidate is unavailable. Explicit resource/profile routing treats the shared queue tag as the target identity while checking every candidate.
+- Local verification: five integration modules (`test_qr_token_path_owner_eligibility.py`, `test_qr_selection_join_visibility.py`, `test_qr_family_phone_identity.py`, `test_rq24b_cross_panel_s21_pg.py`, `test_rq29_end_to_end_path_pg.py`) — **72 passed, 2 warnings** on task-owned synthetic PostgreSQL 17 at `127.0.0.1:55437`; test databases were cleaned and the cluster started for this run was stopped. Initial run was 71 passed / 1 failed only because the resource test asserted a nonexistent `success` key; corrected to its `entry` return contract, then full rerun passed. Scoped Ruff with known existing C416 ignored, py_compile via scripts/run_python.ps1, and git diff --check — **PASS**.
+- No local blocker remains for this code slice. The old exact-head hosted run remains red until the updated branch is pushed and checks complete.
+- Tier-2 staging/browser/provenance and full `STAGING_VALIDATION.md` are NOT_RUN; Tier-2 is PARTIAL, no deferral accepted. No staging, PR body, review, or merge action occurred.
+- Next exact action: review the final allowlisted diff, commit and push the same PR branch without force, then inspect checks for the new exact HEAD. Keep Tier-2 staging, PR-body edits, formal review, deferral, and merge outside this scope; the user owns merge.
+
+## Previous checkpoint — PR #3639 review P1/P2 fixes — 2026-10-09T22:33+05:00
 
 ## Current checkpoint — PR #3639 review P1/P2 fixes — 2026-10-09T22:33+05:00
 
