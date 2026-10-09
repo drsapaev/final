@@ -254,6 +254,7 @@ const ServiceCatalog = () => {
   const [websiteLoaded, setWebsiteLoaded] = useState(false);
   const [websiteOpen, setWebsiteOpen] = useState(false);
   const websiteLoadingRef = useRef(false);
+  const websiteSaveInProgressRef = useRef(false);
   const websiteRefreshQueuedRef = useRef(false);
   const websiteDirtyServiceIdRef = useRef<string | null>(null);
   const websiteDirtyFieldsRef = useRef<Partial<WebsiteServiceFormState>>({});
@@ -411,6 +412,11 @@ const ServiceCatalog = () => {
   };
 
   async function loadWebsiteContent(force = false) {
+    if (websiteSaveInProgressRef.current) {
+      websiteRefreshQueuedRef.current = true;
+      logger.debug('[FIX] Queued website content refresh until save completes');
+      return;
+    }
     if (websiteLoadingRef.current) {
       if (force) websiteRefreshQueuedRef.current = true;
       return;
@@ -465,7 +471,13 @@ const ServiceCatalog = () => {
   };
 
   const saveWebsiteContent = async (operation: WebsiteContentOperation) => {
-    if (!selectedWebsiteService || !websiteLoaded || websiteLoadingRef.current) return;
+    if (
+      !selectedWebsiteService ||
+      !websiteLoaded ||
+      websiteLoadingRef.current ||
+      websiteSaveInProgressRef.current
+    ) return;
+    websiteSaveInProgressRef.current = true;
     setWebsiteSaving(true);
     setWebsiteError('');
     setWebsiteNotice('');
@@ -500,7 +512,13 @@ const ServiceCatalog = () => {
         : typeof detail === 'string' ? detail : undefined;
       setWebsiteError(detailMessage || t('admin2.sc_site_content_save_error'));
     } finally {
+      websiteSaveInProgressRef.current = false;
       setWebsiteSaving(false);
+      if (websiteRefreshQueuedRef.current) {
+        websiteRefreshQueuedRef.current = false;
+        logger.debug('[FIX] Reloading website content after save completed');
+        void loadWebsiteContent(true);
+      }
     }
   };
 
