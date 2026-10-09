@@ -8,6 +8,66 @@ from app.api.v1.endpoints.services_ep._helpers import (
     router,
 )  # noqa: F401
 from app.crud.queue_owner_invariant import OwnerInvariantViolation
+from app.schemas.public_site_admin import (
+    WebsiteServiceContentOut,
+    WebsiteServiceContentUpdate,
+)
+from app.services.public_site_admin_service import (
+    PublicSiteAdminService,
+    WebsiteContentServiceError,
+)
+
+
+@router.get(
+    "/admin/website-content",
+    response_model=list[WebsiteServiceContentOut],
+    summary="Получить website-контент услуг для админки",
+)
+async def get_admin_service_website_content(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Read website fields without expanding the unauthenticated catalog DTO."""
+    return PublicSiteAdminService(db).list_service_content()
+
+
+@router.get(
+    "/admin/website-content/{service_id}",
+    response_model=WebsiteServiceContentOut,
+    summary="Получить website-контент услуги для админки",
+)
+async def get_admin_service_website_content_item(
+    service_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    try:
+        return PublicSiteAdminService(db).get_service_content(service_id)
+    except WebsiteContentServiceError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=exc.as_detail()
+        ) from exc
+
+
+@router.put(
+    "/admin/website-content/{service_id}",
+    response_model=WebsiteServiceContentOut,
+    summary="Изменить и опубликовать website-контент услуги",
+)
+async def update_admin_service_website_content(
+    service_id: int,
+    payload: WebsiteServiceContentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    try:
+        return PublicSiteAdminService(db).update_service_content(
+            service_id, payload, actor_user_id=current_user.id
+        )
+    except WebsiteContentServiceError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=exc.as_detail()
+        ) from exc
 
 
 @router.get("", response_model=list[ServiceOut], summary="Каталог услуг")

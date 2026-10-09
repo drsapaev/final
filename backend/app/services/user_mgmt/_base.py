@@ -174,9 +174,7 @@ def _mapped_specialty_selectable(db: Session, specialty: str) -> bool:
         MedicalSpecialtyCatalogService,
     )
 
-    return MedicalSpecialtyCatalogService(db).is_selectable_for_onboarding(
-        specialty
-    )
+    return MedicalSpecialtyCatalogService(db).is_selectable_for_onboarding(specialty)
 
 
 class UserManagementServiceMixinBase:
@@ -312,6 +310,10 @@ class UserManagementServiceMixinBase:
                     raise DoctorSpecialtyNotSelectableError(stored_specialty)
 
         values: dict[str, object] = {"active": active}
+        if not active or detach_owner:
+            # The public card must stay hidden after account deactivation or
+            # unlinking. Reactivation does not restore website visibility.
+            values["show_on_website"] = False
         if detach_owner:
             values["user_id"] = None
         filters = [Doctor.user_id == user_id]
@@ -319,9 +321,7 @@ class UserManagementServiceMixinBase:
             # No-op sync: skip rows already in the requested state.
             filters.append(Doctor.active != active)
         updated = (
-            db.query(Doctor)
-            .filter(*filters)
-            .update(values, synchronize_session=False)
+            db.query(Doctor).filter(*filters).update(values, synchronize_session=False)
         )
         if updated:
             logger.info(
@@ -466,19 +466,11 @@ class UserManagementServiceMixinBase:
                     # remains the only guard, same as before this change).
                     db.add(Doctor(**values))
                     db.flush()
-                doctor = (
-                    db.query(Doctor)
-                    .filter(Doctor.user_id == user.id)
-                    .first()
-                )
+                doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
                 if doctor is None:  # pragma: no cover — defensive
                     db.add(Doctor(**values))
                     db.flush()
-                    doctor = (
-                        db.query(Doctor)
-                        .filter(Doctor.user_id == user.id)
-                        .first()
-                    )
+                    doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
                 logger.info(
                     "Doctor profile ensured on role promotion: user_id=%s "
                     "role=%s doctor_id=%s specialty=%r (incomplete=%s)",
@@ -532,143 +524,3 @@ class UserManagementServiceMixinBase:
                 False,
                 reason="role_demotion_from_doctor_role",
             )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

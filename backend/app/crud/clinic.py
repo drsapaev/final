@@ -2,6 +2,7 @@
 CRUD операции для управления клиникой в админ панели
 """
 
+import logging
 from datetime import date
 from typing import Any
 
@@ -26,6 +27,8 @@ from app.schemas.clinic import (
     ServiceCategoryUpdate,
 )
 from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
+
+logger = logging.getLogger(__name__)
 
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
@@ -272,6 +275,26 @@ def get_doctor_by_id(db: Session, doctor_id: int) -> Doctor | None:
     return db.query(Doctor).filter(Doctor.id == doctor_id).first()
 
 
+def get_doctor_by_id_for_update(db: Session, doctor_id: int) -> Doctor | None:
+    """Lock and refresh a Doctor row before website publication changes."""
+    return (
+        db.query(Doctor)
+        .filter(Doctor.id == doctor_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+
+
+def get_doctor_website_slug_conflict(
+    db: Session, *, slug: str, exclude_doctor_id: int | None = None
+) -> Doctor | None:
+    query = db.query(Doctor).filter(Doctor.slug == slug)
+    if exclude_doctor_id is not None:
+        query = query.filter(Doctor.id != exclude_doctor_id)
+    return query.first()
+
+
 def get_doctor_by_user_id(db: Session, user_id: int) -> Doctor | None:
     """Получить врача по ID пользователя"""
     return db.query(Doctor).filter(Doctor.user_id == user_id).first()
@@ -348,10 +371,7 @@ def update_doctor(db: Session, doctor_id: int, doctor: DoctorUpdate) -> Doctor |
     # shared with tagged queue joins, then lock and revalidate the row. This
     # preserves the global owner-config -> Doctor row lock order.
     candidate = (
-        db.query(Doctor)
-        .filter(Doctor.id == doctor_id)
-        .populate_existing()
-        .first()
+        db.query(Doctor).filter(Doctor.id == doctor_id).populate_existing().first()
     )
     if not candidate:
         return None
@@ -393,19 +413,58 @@ def update_doctor(db: Session, doctor_id: int, doctor: DoctorUpdate) -> Doctor |
         if field == "specialty":
             # D-1: canonicalize on update too (PUT /admin/doctors path).
             value = canonical_specialty(value)
+        if field == "active" and value is False:
+            # Deactivation hides the public card. A later reactivation must
+            # require an explicit website republish operation.
+            if db_doctor.show_on_website:
+                logger.info("[FIX] Hid the doctor website card during deactivation")
+            db_doctor.show_on_website = False
         setattr(db_doctor, field, value)
 
     db.commit()
     db.refresh(db_doctor)
     return db_doctor
 
+
 def delete_doctor(db: Session, doctor_id: int) -> bool:
-    """Удалить врача (мягкое удаление)"""
-    db_doctor = get_doctor_by_id(db, doctor_id)
+    """Удалить врача (мягкое удаление)."""
+    candidate = (
+        db.query(Doctor).filter(Doctor.id == doctor_id).populate_existing().first()
+    )
+    if not candidate:
+        return False
+
+    candidate_specialty = canonical_specialty(candidate.specialty)
+    lock_profile_link_scopes(db, queue_tags=[candidate_specialty])
+
+    db_doctor = (
+        db.query(Doctor)
+        .filter(Doctor.id == doctor_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
     if not db_doctor:
         return False
 
+    if canonical_specialty(db_doctor.specialty) != candidate_specialty:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "profile_binding_changed",
+                "stale_fields": ["specialty"],
+                "message": (
+                    "Специальность врача изменилась во время удаления. "
+                    "Обновите карточку и повторите действие."
+                ),
+            },
+        )
+
+    if db_doctor.show_on_website:
+        logger.info("[FIX] Hid the doctor website card during deletion")
     db_doctor.active = False
+    db_doctor.show_on_website = False
     db.commit()
     return True
 

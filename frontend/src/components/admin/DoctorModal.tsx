@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Save, User, Mail, Phone, MapPin } from 'lucide-react';
 import {
   Label,
@@ -10,10 +10,14 @@ import {
   Input,
   Modal,
   Select,
+  Textarea,
 } from '../ui/macos';
 import type { SelectChangeEvent } from '../ui/macos/Select';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
+import { api } from '../../api/client';
+import logger from '../../utils/logger';
+import type { WebsiteDoctorContent } from '../../types/domain/clinic';
 
 interface DoctorUser {
   id: string | number;
@@ -96,6 +100,18 @@ const DoctorModal = ({
   const [specialtyOptions, setSpecialtyOptions] = useState<
     { value: string; label: string }[]
   >([]);
+  const [websiteContent, setWebsiteContent] = useState<WebsiteDoctorContent | null>(null);
+  const [websiteForm, setWebsiteForm] = useState({ bio_ru: '', bio_uz: '', slug: '' });
+  const [websiteLoading, setWebsiteLoading] = useState(false);
+  const [websiteSaving, setWebsiteSaving] = useState(false);
+  const [websiteError, setWebsiteError] = useState('');
+  const [websiteNotice, setWebsiteNotice] = useState('');
+  const websiteLoadErrorTranslation = useRef(t);
+  const websiteRequestGeneration = useRef(0);
+
+  useEffect(() => {
+    websiteLoadErrorTranslation.current = t;
+  }, [t]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -149,6 +165,59 @@ const DoctorModal = ({
       cancelled = true;
     };
   }, [isOpen, language]);
+
+  useEffect(() => {
+    const requestGeneration = ++websiteRequestGeneration.current;
+    if (!isOpen || !doctor?.id) {
+      setWebsiteContent(null);
+      setWebsiteForm({ bio_ru: '', bio_uz: '', slug: '' });
+      setWebsiteError('');
+      setWebsiteNotice('');
+      setWebsiteLoading(false);
+      setWebsiteSaving(false);
+      return;
+    }
+
+    let cancelled = false;
+    setWebsiteLoading(true);
+    setWebsiteSaving(false);
+    setWebsiteError('');
+    setWebsiteContent(null);
+    setWebsiteForm({ bio_ru: '', bio_uz: '', slug: '' });
+    api.get(`/admin/doctors/${doctor.id}/website-content`)
+      .then((response) => {
+        if (cancelled || requestGeneration !== websiteRequestGeneration.current) return;
+        const content = response.data as WebsiteDoctorContent;
+        setWebsiteContent(content);
+        setWebsiteForm({
+          bio_ru: content.bio_ru || '',
+          bio_uz: content.bio_uz || '',
+          slug: content.slug || '',
+        });
+      })
+      .catch((error: unknown) => {
+        if (cancelled || requestGeneration !== websiteRequestGeneration.current) return;
+        const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+        const detailMessage = typeof detail === 'object' && detail !== null
+          ? (detail as { message?: string }).message
+          : typeof detail === 'string' ? detail : undefined;
+        setWebsiteError(
+          detailMessage || websiteLoadErrorTranslation.current('admin2.dmdl_site_load_error'),
+        );
+      })
+      .finally(() => {
+        if (!cancelled && requestGeneration === websiteRequestGeneration.current) {
+          setWebsiteLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (requestGeneration === websiteRequestGeneration.current) {
+        websiteRequestGeneration.current += 1;
+      }
+    };
+  }, [doctor?.id, isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -261,6 +330,71 @@ const DoctorModal = ({
     } catch (error: unknown) {
       setSubmitError((error instanceof Error ? error.message : String(error)) || t('admin2.dmdl_err_save_fallback'));
     }
+  };
+
+  const saveWebsiteContent = async (
+    operation: 'save_draft' | 'save_published' | 'publish' | 'unpublish' | 'republish',
+  ) => {
+    if (!doctor?.id) return;
+    setWebsiteSaving(true);
+    setWebsiteError('');
+    setWebsiteNotice('');
+    const requestGeneration = websiteRequestGeneration.current;
+    const requestedDoctorId = doctor.id;
+    try {
+      const response = await api.put(
+        `/admin/doctors/${requestedDoctorId}/website-content`,
+        { ...websiteForm, operation },
+      );
+      const content = response.data as WebsiteDoctorContent;
+      if (
+        requestGeneration !== websiteRequestGeneration.current ||
+        String(content.id) !== String(requestedDoctorId)
+      ) {
+        logger.debug('[FIX] Ignored stale website doctor save response');
+        return;
+      }
+      setWebsiteContent(content);
+      setWebsiteForm({
+        bio_ru: content.bio_ru || '',
+        bio_uz: content.bio_uz || '',
+        slug: content.slug || '',
+      });
+      setWebsiteNotice(t('admin2.dmdl_site_save_success'));
+    } catch (error: unknown) {
+      if (requestGeneration !== websiteRequestGeneration.current) {
+        logger.debug('[FIX] Ignored stale website doctor save error');
+        return;
+      }
+      const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      const detailMessage = typeof detail === 'object' && detail !== null
+        ? (detail as { message?: string }).message
+        : typeof detail === 'string' ? detail : undefined;
+      setWebsiteError(detailMessage || t('admin2.dmdl_site_save_error'));
+    } finally {
+      if (requestGeneration === websiteRequestGeneration.current) {
+        setWebsiteSaving(false);
+      }
+    }
+  };
+
+  const websiteMissingFields = websiteContent ? [
+    ...(!websiteContent.display_name?.trim() ? ['display_name'] : []),
+    ...(!websiteForm.bio_ru.trim() ? ['bio_ru'] : []),
+    ...(!websiteForm.bio_uz.trim() ? ['bio_uz'] : []),
+    ...(!websiteForm.slug.trim() ? ['slug'] : []),
+    ...(!websiteContent.active || !websiteContent.owner_active ? ['active'] : []),
+  ] : [];
+
+  const websiteFieldLabel = (field: string) => {
+    const keys: Record<string, string> = {
+      display_name: 'dmdl_site_display_name',
+      bio_ru: 'dmdl_site_bio_ru',
+      bio_uz: 'dmdl_site_bio_uz',
+      slug: 'dmdl_site_slug',
+      active: 'dmdl_active_label',
+    };
+    return t(`admin2.${keys[field] || field}`);
   };
 
   const renderFieldError = (field: keyof DoctorFormState) =>
@@ -437,6 +571,122 @@ const DoctorModal = ({
             description={t('admin2.dmdl_active_description')}
           />
         </div>
+
+        {doctor?.id && (
+          <section aria-labelledby="doctor-site-content-title" className="admin-flex-col-16">
+            <div className="admin-flex items-center justify-between gap-8">
+              <div>
+                <h3 id="doctor-site-content-title" className="admin-title-20">
+                  {t('admin2.dmdl_site_content_title')}
+                </h3>
+                <p className="admin-hint-text-12-secondary-mt-4">
+                  {t('admin2.dmdl_site_content_help')}
+                </p>
+              </div>
+              {websiteContent && (
+                <Badge variant={websiteContent.show_on_website ? 'success' : 'outline'}>
+                  {websiteContent.show_on_website
+                    ? t('admin2.sitepub_status_published')
+                    : t('admin2.sitepub_status_draft')}
+                </Badge>
+              )}
+            </div>
+
+            {websiteLoading && <p role="status">{t('admin2.sitepub_loading')}</p>}
+            {websiteError && <Alert type="error" className="admin-mb-12">{websiteError}</Alert>}
+            {websiteNotice && <Alert type="success" className="admin-mb-12">{websiteNotice}</Alert>}
+
+            {websiteContent && (
+              <>
+                <div className="admin-grid-autofit-220-16">
+                  <div>
+                    <Label htmlFor="doctor-site-display-name" className="admin-label-block-mb-8">
+                      {t('admin2.dmdl_site_display_name')}
+                    </Label>
+                    <Input id="doctor-site-display-name" value={websiteContent.display_name || ''} readOnly />
+                  </div>
+                  <div>
+                    <Label htmlFor="doctor-site-slug" required className="admin-label-block-mb-8">
+                      {t('admin2.dmdl_site_slug')}
+                    </Label>
+                    <Input
+                      id="doctor-site-slug"
+                      value={websiteForm.slug}
+                      onChange={(event) => setWebsiteForm((current) => ({ ...current, slug: event.target.value }))}
+                      disabled={websiteSaving || websiteLoading || websiteContent.slug_locked}
+                      maxLength={160}
+                    />
+                    {websiteContent.slug_locked && (
+                      <p className="admin-hint-text-12-secondary-mt-4">{t('admin2.dmdl_site_slug_locked')}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="doctor-site-bio-ru" required className="admin-label-block-mb-8">
+                      {t('admin2.dmdl_site_bio_ru')}
+                    </Label>
+                    <Textarea
+                      id="doctor-site-bio-ru"
+                      value={websiteForm.bio_ru}
+                      onChange={(event) => setWebsiteForm((current) => ({ ...current, bio_ru: event.target.value }))}
+                      disabled={websiteSaving || websiteLoading}
+                      minRows={3}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="doctor-site-bio-uz" required className="admin-label-block-mb-8">
+                      {t('admin2.dmdl_site_bio_uz')}
+                    </Label>
+                    <Textarea
+                      id="doctor-site-bio-uz"
+                      value={websiteForm.bio_uz}
+                      onChange={(event) => setWebsiteForm((current) => ({ ...current, bio_uz: event.target.value }))}
+                      disabled={websiteSaving || websiteLoading}
+                      minRows={3}
+                    />
+                  </div>
+                </div>
+
+                {websiteMissingFields.length > 0 && (
+                  <p role="status" className="admin-hint-text-12-secondary-mt-4">
+                    {t('admin2.dmdl_site_missing_fields')}: {websiteMissingFields.map(websiteFieldLabel).join(', ')}
+                  </p>
+                )}
+                {(!websiteContent.active || !websiteContent.owner_active) && (
+                  <p role="status" className="admin-hint-text-12-secondary-mt-4">
+                    {t('admin2.dmdl_site_active_required')}
+                  </p>
+                )}
+
+                <div className="admin-flex-wrap-8">
+                  {!websiteContent.show_on_website && (
+                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('save_draft')} disabled={websiteSaving || websiteLoading}>
+                      {websiteSaving ? t('admin2.sitepub_saving') : t('admin2.sitepub_save_draft')}
+                    </Button>
+                  )}
+                  {websiteContent.show_on_website && (
+                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('save_published')} disabled={websiteSaving || websiteLoading || websiteMissingFields.length > 0}>
+                      {websiteSaving ? t('admin2.sitepub_saving') : t('admin2.sitepub_save_published')}
+                    </Button>
+                  )}
+                  {!websiteContent.show_on_website && (
+                    <Button type="button" onClick={() => void saveWebsiteContent(websiteContent.website_first_published_at ? 'republish' : 'publish')} disabled={websiteSaving || websiteLoading || websiteMissingFields.length > 0}>
+                      {websiteSaving
+                        ? t('admin2.sitepub_saving')
+                        : websiteContent.website_first_published_at
+                          ? t('admin2.sitepub_republish')
+                          : t('admin2.sitepub_publish')}
+                    </Button>
+                  )}
+                  {websiteContent.show_on_website && (
+                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('unpublish')} disabled={websiteSaving || websiteLoading}>
+                      {t('admin2.sitepub_unpublish')}
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+        )}
 
         <div
           className="admin-modal-actions-footer"
