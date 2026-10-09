@@ -2,13 +2,13 @@
 
 Plan version: 3.86
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: MERGE_HOLD — P1/P2 review fixes are committed locally (`de15904d`) and validated on merge commit `75d103445500ecb3232784f72c94a4439d1a47e8`, which includes current `origin/main` `7f30b231dfa66ac080ae376267e80889fa264bd8`. The remote PR is still at `532ecffae456b9141b54c8f45d83c1981a8f61e5`; push and exact-head CI are pending. Tier-2 remains PARTIAL, no deferral is accepted, and user owns the merge decision.
+Current status: MERGE_HOLD — P1/P2 review fixes are committed locally (`de15904d`) and validated on merge commit `75d103445500ecb3232784f72c94a4439d1a47e8`, which includes current `origin/main` `7f30b231dfa66ac080ae376267e80889fa264bd8`. The review-fix branch was pushed as `216682a3bb4074e7d760098ab645e65b92f6add5`; exact-head CI run `37912393421` found one OpenAPI freshness failure from an optional description sentence. That sentence is removed locally within the approved endpoint-file scope; retest/push pending. Tier-2 remains PARTIAL, no deferral is accepted, and user owns the merge decision.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 Base (`origin/main`): 7f30b231dfa66ac080ae376267e80889fa264bd8
-Remote PR HEAD: 532ecffae456b9141b54c8f45d83c1981a8f61e5; local tested HEAD: 75d103445500ecb3232784f72c94a4439d1a47e.
-Current changed paths: review fix commit `de15904d` (five source/test paths); this checkpoint updates only T11 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Preserve untracked task-owned `.scratch/`; do not stage generated artifacts.
-Last updated: 2026-10-09T14:34+05:00
+Remote PR HEAD: 216682a3bb4074e7d760098ab645e65b92f6add5; code behavior tested on 75d103445500ecb3232784f72c94a4439d1a47e.
+Current changed paths: review fix commit `de15904d` (five source/test paths); local follow-up removes one optional endpoint docstring sentence to fix exact-head OpenAPI freshness; T11 `PROGRESS.md`/`EVIDENCE.md`/`RESUME.md` record this checkpoint. Preserve untracked task-owned `.scratch/`; do not stage generated artifacts.
+Last updated: 2026-10-09T14:42+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,15 +16,16 @@ Last updated: 2026-10-09T14:34+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS / MERGE_HOLD | PR #3639; local tested HEAD 75d10344; remote pending push | | EVIDENCE.md#t11-pr-3639-review-fixes-local-validation-on-merged-base |
+| T11 | IN_PROGRESS / MERGE_HOLD | PR #3639; remote 216682a3; OpenAPI follow-up pending push | | EVIDENCE.md#t11-openapi-freshness-failure-correction-prework |
 
-## Current checkpoint — T11 PR #3639 review fixes — 2026-10-09T14:34+05:00
+## Current checkpoint — T11 PR #3639 OpenAPI freshness follow-up — 2026-10-09T14:42+05:00
 
-- Local branch HEAD `75d103445500ecb3232784f72c94a4439d1a47e` merges code-fix commit `de15904de99e97976764ed2f105e42bcd3b7a106` with fresh `origin/main` `7f30b231dfa66ac080ae376267e80889fa264bd8`. The remote PR remains at `532ecffae456b9141b54c8f45d83c1981a8f61e5`; the fix and journal checkpoint have not yet been pushed. No branch history was rewritten.
+- Local tested code HEAD `75d103445500ecb3232784f72c94a4439d1a47e8` merges code-fix commit `de15904de99e97976764ed2f105e42bcd3b7a106` with fresh `origin/main` `7f30b231dfa66ac080ae376267e80889fa264bd8`. PR #3639 is pushed at `216682a3bb4074e7d760098ab645e65b92f6add5`; base is current main `7f30b231dfa66ac080ae376267e80889fa264bd8`.
 - Both review findings are fixed locally: legacy token info/admission now reject published shared-tag targets with unavailable or conflicting parent scope while preserving equivalent visible same-parent profiles; available-specialists applies pagination after eligibility and reports the full eligible total. Regression coverage exercises both failure and positive shared-tag paths.
-- Exact local validation on this HEAD: disposable PostgreSQL token integration module **10 passed, 1 warning**; focused unit/API selector and shared-tag policy selection **4 passed, 19 deselected, 1 warning**; `py_compile`, scoped Ruff, `git diff --check`, and commit hooks (including pinned `ruff-format` and Black) passed. Owned disposable PostgreSQL container on loopback port 55542 was removed; WSL keeper was stopped.
+- Exact local validation on code HEAD `75d10344`: disposable PostgreSQL token integration module **10 passed, 1 warning**; focused unit/API selector and shared-tag policy selection **4 passed, 19 deselected, 1 warning**; `py_compile`, scoped Ruff, `git diff --check`, and commit hooks (including pinned `ruff-format` and Black) passed. Owned disposable PostgreSQL container on loopback port 55542 was removed; WSL keeper was stopped.
+- Exact-head Unified CI run `37912393421` failed only the OpenAPI freshness job: generated output differed by the optional available-specialists description sentence. That sentence is removed locally in the already approved endpoint file; the diff is one deletion and `git diff --check` passes. Backend, frontend unit/E2E, and code-quality jobs were pending at the last snapshot; the correction must be pushed before resolution is confirmed.
 - The separate T11 synthetic staging result remains 7/7 for its bounded cases, but frontend provenance, browser/Admin routes, keyboard/viewports, full `STAGING_VALIDATION.md`, and T18 remain NOT_RUN. Tier-2 stays PARTIAL; no deferral is accepted. Merge remains HOLD pending push, exact-head CI/review, and an explicit Tier-2 decision.
-- Next exact action: commit the three journal updates, push the existing branch to PR #3639, inspect current GitHub review threads and exact-head checks, then update the PR description through its quality gate. Do not submit a formal approval, accept a deferral, or merge.
+- Next exact action: commit the one-line endpoint docstring correction and updated T11 journal checkpoint, push normally, then inspect every applicable check on the resulting exact PR HEAD. Update PR body HEAD/evidence after passing the local body gate. Do not submit a formal approval, accept a deferral, or merge.
 
 ## Previous checkpoint — T11 staging and review checkpoint — 2026-10-09T13:25+05:00
 

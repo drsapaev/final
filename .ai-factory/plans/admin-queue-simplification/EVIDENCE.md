@@ -2,6 +2,15 @@
 
 Do not put secrets, patient data, tokens or full network payloads here. Record exact commands, results and limitations. Update after each meaningful validation and before handing off.
 
+## T11 OpenAPI freshness failure — correction prework — 2026-10-09
+
+- Commit under inspection: PR #3639 HEAD `216682a3bb4074e7d760098ab645e65b92f6add5`, base `7f30b231dfa66ac080ae376267e80889fa264bd8`. The Docs job in Unified CI run `37912393421` failed only `OpenAPI spec freshness`: generated OpenAPI differed from `backend/openapi.json` by the optional description sentence added in `backend/app/api/v1/endpoints/qr_queue/_specialists.py`; no request/response schema or operation change was reported.
+- Execution mode: continuation of the existing T11 mandatory queue-domain gate and its approved source/test scope. No new gate call is made. The failure is a generated-description mismatch in the already approved first-touch endpoint file; remove only the optional docstring sentence so behavior and response shape remain unchanged. Do not broaden scope by editing `backend/openapi.json`.
+- Allowed paths: `backend/app/api/v1/endpoints/qr_queue/_specialists.py` for the one-line description correction and T11 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md` for this checkpoint. Denied: generated artifacts, schemas/migrations, any other source/test path, gate/router, staging/production, `.scratch/` except the task-owned temporary PR-body candidate, review submission, and merge.
+- Validation target: verify the source diff is exactly the docstring sentence removal; `git diff --check`; rely on exact-head CI OpenAPI freshness after the follow-up push. Stop if generated output reveals any additional schema/description delta or requires touching an unapproved path.
+- Correction: removed only the optional docstring sentence from the already allowed endpoint file. The observed OpenAPI mismatch is now absent from the source diff; request/response schema and runtime pagination code are unchanged. Local `git diff --check` passes. Exact-head CI after publication remains required to confirm OpenAPI freshness.
+- Current result: PR #3639 HEAD `216682a3` has one confirmed failure in OpenAPI freshness; its generated diff was exactly the removed sentence. Other required jobs were still pending at the last snapshot. The scoped follow-up and this evidence update are local and have not yet been pushed.
+
 ## T11 PR #3639 review fixes — local validation on merged base — 2026-10-09
 
 - Commit under test: code-fix commit `de15904de99e97976764ed2f105e42bcd3b7a106`; tests and scope were rechecked on local HEAD `75d103445500ecb3232784f72c94a4439d1a47e`, which merges current `origin/main` `7f30b231dfa66ac080ae376267e80889fa264bd8`. Before publication the remote PR still points to `532ecffae456b9141b54c8f45d83c1981a8f61e5`; no exact-head hosted CI result exists for the new commit yet.
