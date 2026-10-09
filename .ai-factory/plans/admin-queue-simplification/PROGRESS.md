@@ -2,13 +2,13 @@
 
 Plan version: 3.86
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: MERGE_HOLD — P1/P2 review fixes are committed locally (`de15904d`) and validated on merge commit `75d103445500ecb3232784f72c94a4439d1a47e8`, which includes current `origin/main` `7f30b231dfa66ac080ae376267e80889fa264bd8`. PR HEAD `b9ac82f6` removed the optional docstring sentence but exact-head CI run `37913307841` still found a one-character OpenAPI description mismatch (terminal period). That punctuation is removed locally within the same approved endpoint-file scope; retest/push pending. Tier-2 remains PARTIAL, no deferral is accepted, and user owns the merge decision.
+Current status: PR_OPEN — PR #3639 is OPEN/MERGEABLE at exact HEAD `6be3badb610d69e3c9c3dd26d2d3bbfcac942d49`, based on `7f30b231dfa66ac080ae376267e80889fa264bd8`. The two previously reviewed P1/P2 findings and the RQ29 fixture regression are committed. Exact-head applicable CI is green. Tier-2 remains PARTIAL; no deferral has been accepted. Merge remains user-owned.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 Base (`origin/main`): 7f30b231dfa66ac080ae376267e80889fa264bd8
-Remote PR HEAD: b9ac82f66fcade4b8f80e14f1c4a740ed0f50b6e; code behavior tested on 75d103445500ecb3232784f72c94a4439d1a47e.
-Current changed paths: review fix commit `de15904d` (five source/test paths); local follow-up removes terminal punctuation from the endpoint docstring to align the generated OpenAPI description; T11 `PROGRESS.md`/`EVIDENCE.md`/`RESUME.md` record this checkpoint. Preserve untracked task-owned `.scratch/`; do not stage generated artifacts.
-Last updated: 2026-10-09T14:52+05:00
+Remote PR HEAD: 6be3badb610d69e3c9c3dd26d2d3bbfcac942d49.
+Current changed paths: T11 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` journal updates only; preserve untracked task-owned `.scratch/` and do not stage it.
+Last updated: 2026-10-09T15:39+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,16 +16,16 @@ Last updated: 2026-10-09T14:52+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS / MERGE_HOLD | PR #3639; remote b9ac82f6; OpenAPI punctuation follow-up pending push | | EVIDENCE.md#t11-openapi-freshness-failure-correction-prework |
+| T11 | PR_OPEN | PR #3639; exact HEAD 6be3badb; applicable exact-head CI green | | EVIDENCE.md#t11-rq29-fixture-follow-up-exact-head-validation |
 
-## Current checkpoint — T11 PR #3639 OpenAPI punctuation follow-up — 2026-10-09T14:52+05:00
+## Current checkpoint — T11 PR #3639 RQ29 fixture follow-up — 2026-10-09T15:39+05:00
 
-- Local tested code HEAD `75d103445500ecb3232784f72c94a4439d1a47e8` merges code-fix commit `de15904de99e97976764ed2f105e42bcd3b7a106` with fresh `origin/main` `7f30b231dfa66ac080ae376267e80889fa264bd8`. PR #3639 is pushed at `b9ac82f66fcade4b8f80e14f1c4a740ed0f50b6e`; base is current main `7f30b231dfa66ac080ae376267e80889fa264bd8`.
-- Both review findings are fixed locally: legacy token info/admission now reject published shared-tag targets with unavailable or conflicting parent scope while preserving equivalent visible same-parent profiles; available-specialists applies pagination after eligibility and reports the full eligible total. Regression coverage exercises both failure and positive shared-tag paths.
-- Exact local validation on code HEAD `75d10344`: disposable PostgreSQL token integration module **10 passed, 1 warning**; focused unit/API selector and shared-tag policy selection **4 passed, 19 deselected, 1 warning**; `py_compile`, scoped Ruff, `git diff --check`, and commit hooks (including pinned `ruff-format` and Black) passed. Owned disposable PostgreSQL container on loopback port 55542 was removed; WSL keeper was stopped.
-- Exact-head Unified CI run `37913307841` on `b9ac82f6` failed only OpenAPI freshness: after the optional sentence removal, output differed only because source description retained a final period missing from the committed snapshot. The period is removed locally in the already approved endpoint file. Frontend build/lint and separate review-quality/security checks passed; backend, frontend unit/E2E, and code quality were pending at the last snapshot. Push the correction and verify the new exact head.
-- The separate T11 synthetic staging result remains 7/7 for its bounded cases, but frontend provenance, browser/Admin routes, keyboard/viewports, full `STAGING_VALIDATION.md`, and T18 remain NOT_RUN. Tier-2 stays PARTIAL; no deferral is accepted. Merge remains HOLD pending push, exact-head CI/review, and an explicit Tier-2 decision.
-- Next exact action: verify the punctuation-only endpoint diff and `git diff --check`, commit with repository hooks, and normal-push. Update PR body HEAD/evidence through the local body gate, then inspect every applicable check on the resulting exact PR HEAD. Do not submit a formal approval, accept a deferral, or merge.
+- Exact PR HEAD and local HEAD are `6be3badb610d69e3c9c3dd26d2d3bbfcac942d49`; base is `7f30b231dfa66ac080ae376267e80889fa264bd8`. The code-only commit changes `backend/tests/integration/test_rq29_end_to_end_path_pg.py` to keep the synthetic public lab profile on `LAB_TAG` alone; this avoids colliding with an existing cardiology token fixture under the shared-tag policy. Runtime code and the shared-tag guard are unchanged by this commit.
+- Exact-head Unified CI passed the Backend job, including `test_rq29_combined_path`, and applicable frontend unit/E2E/build/lint, OpenAPI/docs, parity, Code Quality, Context Boundary, PR Required Gate, Regression Audit, PR Review Quality, lifecycle recommendation, i18n, CodeQL, Gitleaks, GitGuardian, and security checks. Path-aware jobs marked skipped remain skipped, not passes. Full check/run details: `EVIDENCE.md#t11-rq29-fixture-follow-up-exact-head-validation`.
+- Local `py_compile` for the changed test and `git diff --check` passed. Local pytest was NOT_RUN: collection could not establish a configured disposable database, and the host listener was not verified as disposable, so it was left untouched. Hosted Backend CI is the PostgreSQL regression evidence for this exact HEAD.
+- Tier-2 was not rerun on this exact HEAD. Prior bounded staging on an earlier code revision does not establish exact-head frontend provenance or close the remaining browser/Admin, keyboard/viewport, full `docs/runbooks/STAGING_VALIDATION.md`, and T18 gaps. Tier-2 stays PARTIAL; no deferral is accepted. No staging project was started in this continuation.
+- The only source change in commit `6be3badb` is the RQ29 integration fixture. Current uncommitted work is limited to these three journals; preserve `.scratch/`. PR description has not been refreshed because it is outside the exact file scope returned by the gate. No formal review or merge was submitted.
+- Next exact action: inspect `git diff --check` and the three journal diffs, then commit/push only the journals if desired under this task's continuation. Recheck exact-head CI after that journal commit. Keep merge with the user; after the user merges, verify the merge and sync `origin/main` before starting the next PR cycle.
 
 ## Previous checkpoint — T11 staging and review checkpoint — 2026-10-09T13:25+05:00
 
