@@ -1,14 +1,14 @@
 # Progress
 
-Plan version: 3.85
+Plan version: 3.86
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: PR_OPEN — PR #3639 is OPEN/MERGEABLE at exact remote HEAD `35f30506fcd511c0dc81a5d87ae6122e5de0242d`, based on merged #3633 (`6315c62edb888bb8864928a41dd70a4c00be6e3d`). Exact-head applicable CI passed; path-aware checks skipped by CI remain SKIPPED, not PASS. T11 Tier-2 staging is PARTIAL; no deferral is accepted and #3639 is not merged.
+Current status: PR_OPEN — PR #3639 is OPEN/MERGEABLE at exact remote HEAD `e9f0338b4a65d2d063ad20835e05cb2b991ac467`, based on merged #3633 (`6315c62edb888bb8864928a41dd70a4c00be6e3d`). Runtime/test code staged at `35f30506fcd511c0dc81a5d87ae6122e5de0242d`; `e9f0338b` adds only journals. Exact-head applicable CI on `e9f0338b` passed; path-aware skips remain SKIPPED, not PASS. T11 Tier-2 is PARTIAL; no deferral is accepted and #3639 is not merged.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 Base (`origin/main`): 6315c62edb888bb8864928a41dd70a4c00be6e3d
-Remote PR HEAD: 35f30506fcd511c0dc81a5d87ae6122e5de0242d (same as local HEAD); source/test corrections and generated artifacts are pushed.
+Remote PR HEAD: e9f0338b4a65d2d063ad20835e05cb2b991ac467 (same as local HEAD); code under test remains `35f30506fcd511c0dc81a5d87ae6122e5de0242d`.
 Current changed paths: T11 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` only. Preserve untracked task-owned `.scratch/` and ignored sanitized `output/staging/t11-live-report.json`; do not stage generated artifacts.
-Last updated: 2026-10-09T11:32+05:00
+Last updated: 2026-10-09T11:50+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -18,16 +18,16 @@ Last updated: 2026-10-09T11:32+05:00
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
 | T11 | IN_PROGRESS | PR #3639; exact HEAD 35f30506 | | EVIDENCE.md#t11-pr-3639-tier2-staging-completed |
 
-## Current checkpoint — T11 PR #3639 Tier-2 staging — 2026-10-09T11:32+05:00
+## Current checkpoint — T11 PR #3639 CI complete after journal push — 2026-10-09T11:50+05:00
 
-- PR #3639 is OPEN/MERGEABLE at `35f30506fcd511c0dc81a5d87ae6122e5de0242d`; base is merged T10 commit `6315c62edb888bb8864928a41dd70a4c00be6e3d`. Local branch and remote PR head match. User owns merge; no review submission, deferral acceptance, or merge occurred.
-- Exact-head Unified CI run `37890312414` and associated PR/security workflows passed all applicable blocking checks, including Backend, Frontend unit/E2E/build/lint, OpenAPI/docs, API parity, Code Quality, PR Required Gate, Context Boundary, CodeQL, secret/security scans, Regression Audit, PR Review Quality Gate, and lifecycle recommendation. Path-aware integration, k6, staging/production readiness, Docker, DAST, Supabase Preview, Telegram release, metadata, and classify/routing jobs were skipped; skips are not passes.
+- PR #3639 is OPEN/MERGEABLE at `e9f0338b4a65d2d063ad20835e05cb2b991ac467`; base is merged T10 commit `6315c62edb888bb8864928a41dd70a4c00be6e3d`. Local branch and remote PR head match. Runtime/test code staged at `35f30506fcd511c0dc81a5d87ae6122e5de0242d`; later commit `e9f0338b` is journal-only. User owns merge; no review submission, deferral acceptance, or merge occurred.
+- Exact-head Unified CI run `37894158852` passed all applicable blocking checks: Backend, Frontend unit/E2E/build/lint, OpenAPI/docs, API parity, Code Quality, PR Required Gate, Context Boundary, CodeQL, secret/security scans, Regression Audit, PR Review Quality Gate, and lifecycle recommendation. Path-aware integration, k6, staging/production readiness, Docker, DAST, Supabase Preview, Telegram release, metadata, notify, and classify/routing jobs were skipped; skips are not passes.
 - T11 staging used only synthetic project `clinic-aqs-pr3639-20261009` with backend/frontend ports `18361/18362`, PostgreSQL `55539`, Ubuntu-24.04, and the exact PR worktree. Canonical Preflight, Start and Session passed in one held WSL session. Host C: had 12 GiB free, WSL backing drive D: 18 GiB, Linux `/` and Docker root 904 GiB each; reserve checks passed. Ordinary Admin password→TOTP enrollment/login challenge and Admin RBAC passed. The PostgreSQL policy matrix passed for Department off/on, manual archive, standalone profile, missing parent and conflicting parent. Relevant entry-methods and permanent-address refusals passed with safe behavior; no production data or 2FA bypass was used.
 - Staging began with no existing daily queues or entries; aggregate counts stayed `0/0`. This proves no mutation in the empty synthetic database, not preservation of nonempty history. Doctor mapped-selector no-leak was NOT_RUN because no eligible Doctor cards existed. Direct legacy QR-token join was NOT_RUN because the fixture had no queue owner and creating one exceeded the authorized fixture scope. Browser/Admin routes, keyboard, nonempty history, immutable frontend checksum and full `STAGING_VALIDATION.md`/T18 were NOT_RUN. The launcher reports `served_revision_verified=false`; do not claim served frontend SHA provenance. Full per-case record: `EVIDENCE.md#t11-pr-3639-tier2-staging-completed`; sanitized artifact: `output/staging/t11-live-report.json`.
 - Teardown through canonical `staging_down.ps1` passed for the owned Compose project. Follow-up found zero owned containers, volumes, networks, or images. No other project was touched. Earlier failed attempts were harness/setup failures before test execution and are excluded from PASS counts.
 - Tier-2 is **PARTIAL**, not complete. No deferral is accepted. Separate T10 PR #3633 still has two queue/rebind staging race tests NOT_RUN; T11 evidence does not close them.
 - PR #3639 body now records exact-head CI and staging results, with the Tier-2 partial status and each major NOT_RUN item explicit. The proposed and live PR-body gate passed 19 tests, both sample bodies, and the live body. No review/merge action was taken.
-- Current local changes are journals only. Next exact action: run `git diff --check`, inspect the three-file scope, commit/push only T11 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`, then inspect checks for the new exact head. Do not submit review or merge. After user merges, sync main and proceed to the next unblocked plan task.
+- Journal-only commit `e9f0338b` is pushed and exact-head applicable CI is green. Next exact action: the user decides whether to merge #3639 or request additional Tier-2 evidence; do not submit a review or merge. After user confirms merge, sync main and proceed to the next unblocked plan task.
 
 ## Superseded checkpoint — T11 backend CI repair committed locally (2026-10-09T10:46+05:00)
 
