@@ -2,13 +2,13 @@
 
 Plan version: 3.84
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: PR_OPEN — PR #3639 is open on exact HEAD `b68d2f986a27e4e8e2db4152b77b86e3ebecc062`, base `6315c62edb888bb8864928a41dd70a4c00be6e3d`; initial applicable CI is queued/running. No review decision or merge. Hosted staging/browser validation and T18 remain NOT_RUN.
+Current status: PR_OPEN — PR #3639 remains open; the latest remote head observed before this follow-up was `c62d13fdfc48eab2861660a94d135c4d4237535b`, base `6315c62edb888bb8864928a41dd70a4c00be6e3d`. The CI run at the previous code checkpoint reported OpenAPI freshness failure; a workflow-equivalent generated snapshot is now prepared locally. No review decision or merge. T11 Tier-2 staging and T18 remain NOT_RUN.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 Base (`origin/main`): 6315c62edb888bb8864928a41dd70a4c00be6e3d
-Current local HEAD: b68d2f986a27e4e8e2db4152b77b86e3ebecc062
-PR #3639: OPEN / MERGEABLE at exact HEAD b68d2f986a27e4e8e2db4152b77b86e3ebecc062; checks pending
-Last updated: 2026-10-09T09:36+05:00
+Previous local/remote PR HEAD: c62d13fdfc48eab2861660a94d135c4d4237535b
+Current tracked pending paths: `backend/openapi.json`, `PROGRESS.md`, and `EVIDENCE.md`; `.scratch/` remains untracked and excluded.
+Last updated: 2026-10-09T09:50+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,26 +16,20 @@ Last updated: 2026-10-09T09:36+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | PR_OPEN | PR #3639; HEAD b68d2f98 | | EVIDENCE.md#t11-pr-3639-open-exact-head-checks-pending |
+| T11 | PR_OPEN | PR #3639; latest observed remote HEAD c62d13fd | | EVIDENCE.md#t11-pr-3639-openapi-freshness-follow-up |
 
-## Current checkpoint — T11 PR #3639 (2026-10-09T09:36+05:00)
+## Current checkpoint — T11 PR #3639 OpenAPI freshness follow-up (2026-10-09T09:50+05:00)
 
 - PR #3633 is merged at `6315c62edb888bb8864928a41dd70a4c00be6e3d`; local `C:\final` was fast-forwarded to the same `origin/main`. Existing untracked `.gate_artifacts/` in `C:\final` was preserved.
-- T10 latest isolated Tier-2 rerun is partial: PostgreSQL focused regressions 51/51 PASS; normal Admin password→TOTP and owned API checks PASS; exact frontend asset bytes matched the Start image, but immutable served-SHA attestation is NOT_RUN. Live queue/rebind specs, browser/UI/keyboard/viewport, and full `STAGING_VALIDATION.md` are NOT_RUN. The owned synthetic Compose project was torn down and absence verified. See `T10-PR3633-tier2-staging-report.md` and the newest T10 evidence entry; do not transfer these results to other commits.
-- T11 starts at base `6315c62edb888bb8864928a41dd70a4c00be6e3d` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`.
-- Pre-edit mode and gate: mandatory `gate`; initial run stopped with `no first-touch files could be resolved`. Confirmed root cause is `_helpers.py:_sync_department_active_to_profiles`; one retry with `--known-root-cause backend/app/api/v1/endpoints/admin_departments/_helpers.py` returned `narrow_override`, `gate_misroute=false`, `override_used=true`, and no handoff. The user's approved T11 plan explicitly authorizes the bounded lifecycle and consumer scope. No gate/router code changed.
-- Implemented the shared parent/manual availability policy; department off/on no longer writes `QueueProfile.is_active`; admin profile reads include effective state/reasons; public QR selectors, direct joins, already-issued queue tokens, and permanent public-address flows recheck the policy. Batch doctor target resolution reuses preloaded profiles/availability rather than issuing a parent lookup per doctor.
-- Local validation: 73/73 PostgreSQL integration tests, 7/7 availability unit tests, and 6/6 PostgreSQL lock-order tests passed; changed backend files compiled and `git diff --check` passed. Scoped Ruff passed with only pre-existing `I001`, `B023`, and `C416` findings suppressed; the unfiltered run reports those five findings on untouched lines. Exact commands/results are in EVIDENCE.
-- Temporary test infrastructure: local PostgreSQL 17 on loopback was stopped; `clinic_test_t11` was dropped; the failed WSL test container was removed. The task-owned data directory `.scratch/t11-pg-20261009` remains because the execution policy rejected its cleanup commands; keep it unstaged. Port 55437 is no longer serving this cluster.
-- Changed but not verified: exact-head hosted CI and formal human review, because no PR exists yet. No T11 staging/browser pass is claimed. Full staging and T18 remain required later by the plan.
-- PR-body quality gate: passed 19 unit tests, both documented samples and the filled T11 body after correcting missing required field labels. Final diff/scope review found no material blocker; two stale QR availability comments were corrected. Architecture/rules align; ROADMAP has no direct T11 link (non-blocking WARN).
-- Runtime/test commit: `a47b327ab427daac75eb9e3778e59eb1b166ef45`; journal checkpoint: `b68d2f986a27e4e8e2db4152b77b86e3ebecc062`. Base is fresh `origin/main` `6315c62edb888bb8864928a41dd70a4c00be6e3d`.
-- PR: [#3639](https://github.com/drsapaev/final/pull/3639), OPEN/MERGEABLE, exact HEAD `b68d2f986a27e4e8e2db4152b77b86e3ebecc062`. Initial CI snapshot: PR Review Quality Gate queued; CodeQL, formatting report, unified CI scope, secret scan and security scan running; GitGuardian passed; path-aware DAST and Supabase Preview skipped. Skips are not passes. Review decision empty; no merge.
-- Commit hooks passed except `ruff`, `ruff-format`, and `black`, which were skipped after their first attempt exposed three existing B023 findings and broad baseline rewrites; scoped Ruff passed with known existing findings suppressed. Details are in EVIDENCE.
-- Blocker: no local blocker; exact-head CI/review are pending. Keep `.scratch/` unstaged.
-- Next exact action: inspect all checks on exact PR HEAD `b68d2f98`; fix in-scope failures in the same PR and wait for checks again. Keep merge with the user.
-- Checks to rerun after any further runtime change: 73-test PostgreSQL integration command, 7-test unit command, lock-order test, changed-file `py_compile`, scoped Ruff, and `git diff --check`. For a docs-only adjustment, rerun the PR body gate and `git diff --check`.
-
+- T11 implementation remains in PR #3639: shared manual/effective QueueProfile availability policy; department off/on no longer overwrites manual profile activity; admin read metadata, QR selector, direct join, existing token, and permanent-address session paths use the shared policy. The runtime/test commit is `a47b327ab427daac75eb9e3778e59eb1b166ef45`; no runtime source change was made in this follow-up.
+- Hosted run `37884519814` was on prior head `b68d2f986a27e4e8e2db4152b77b86e3ebecc062`. Its OpenAPI freshness step failed because the generated `backend/openapi.json` description still documented manual `is_active` without Department-parent eligibility. The backend job was still running and Code Quality was cancelled when inspected; do not infer the full run result from that failure. On newer head `c62d13fdfc48eab2861660a94d135c4d4237535b`, Unified CI run `37884661645` also failed the OpenAPI freshness step; Backend tests and Code Quality were still running when queried, so the overall run result was incomplete.
+- The local `backend/openapi.json` change now matches the description already present in app code. It was regenerated with the workflow's `app.openapi()` → `json.dump(indent=2, ensure_ascii=False)` behavior, including the trailing newline. Diff is one generated description line; no response schema or runtime behavior changes.
+- Focused OpenAPI contract tests on the regenerated snapshot: **40 passed, 1 warning**. PR-body gate after updating the scope/evidence: **19 tests passed**, both documented samples passed, and the live PR body passed. `git diff --check` passed after the journal edit.
+- PR body now lists `backend/openapi.json` as a description-only generated artifact, states there is no response-schema change, and distinguishes the failed freshness step from checks that were still pending/cancelled.
+- T11 staging/browser, immutable served-build provenance, and full `STAGING_VALIDATION.md` remain **NOT_RUN**. No Tier-2 deferral has been accepted. T18 remains NOT_RUN. Prior T10 staging evidence does not transfer to T11.
+- Task-owned `.scratch/` contains the stopped T11 test PostgreSQL data directory and remains untracked; do not stage or remove it. Earlier results remain: 73 PostgreSQL integration tests, 7 availability unit tests, and 6 lock-order tests passed on T11 runtime code. Scoped Ruff suppressed only documented pre-existing findings; formatter hooks were previously skipped and are not reported as passing.
+- Pending at this checkpoint: commit the OpenAPI snapshot together with this progress/evidence update, push `codex/aqs-T11-manual-availability`, and inspect all checks on the resulting exact PR HEAD. Keep merge with the user. Next runtime step remains after PR #3639 is merged and base is synced.
+- Re-run after this update: `git diff --check`; the OpenAPI contract test already passed against the final snapshot. On the new remote HEAD, inspect backend tests, OpenAPI freshness, generated API type freshness, PR Required Gate, Code Quality and security checks. Treat path-aware skips as NOT_RUN, not PASS.
 ## Current checkpoint — PR #3633 description, exact-head CI, and Tier-2 status (2026-10-08T22:35+05:00)
 
 - Actual state checked: worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final, branch codex/aqs-T10-profile-guards; local and PR remote HEAD are both cb73091c0d4a312153aca938014e94435239f118; base is 7bb02680e778ac56369503c4fd337ac9329da4b2. Tracked tree is clean; untracked scratch directories are preserved.
