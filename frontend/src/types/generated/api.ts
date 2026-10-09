@@ -712,6 +712,44 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/services/admin/website-content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Получить website-контент услуг для админки
+         * @description Read website fields without expanding the unauthenticated catalog DTO.
+         */
+        get: operations["get_admin_service_website_content_api_v1_services_admin_website_content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/services/admin/website-content/{service_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Получить website-контент услуги для админки */
+        get: operations["get_admin_service_website_content_item_api_v1_services_admin_website_content__service_id__get"];
+        /** Изменить и опубликовать website-контент услуги */
+        put: operations["update_admin_service_website_content_api_v1_services_admin_website_content__service_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/services": {
         parameters: {
             query?: never;
@@ -10856,6 +10894,30 @@ export type paths = {
          * @description Удалить врача (мягкое удаление).
          */
         delete: operations["delete_doctor_api_v1_admin_doctors__doctor_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/doctors/{doctor_id}/website-content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Doctor Website Content
+         * @description Read the Admin-only website fields for one doctor.
+         */
+        get: operations["get_doctor_website_content_api_v1_admin_doctors__doctor_id__website_content_get"];
+        /**
+         * Update Doctor Website Content
+         * @description Apply one explicit Admin publication operation to a doctor.
+         */
+        put: operations["update_doctor_website_content_api_v1_admin_doctors__doctor_id__website_content_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -41521,6 +41583,89 @@ export type components = {
             };
         };
         /**
+         * WebsiteContentOperation
+         * @enum {string}
+         */
+        WebsiteContentOperation: "save_draft" | "save_published" | "publish" | "unpublish" | "republish";
+        /** WebsiteDoctorContentOut */
+        WebsiteDoctorContentOut: {
+            /** Id */
+            id: number;
+            /** Active */
+            active: boolean;
+            /** Owner Active */
+            owner_active?: boolean | null;
+            /** Display Name */
+            display_name?: string | null;
+            /** Bio Ru */
+            bio_ru?: string | null;
+            /** Bio Uz */
+            bio_uz?: string | null;
+            /** Slug */
+            slug?: string | null;
+            /** Show On Website */
+            show_on_website: boolean;
+            /** Website First Published At */
+            website_first_published_at?: string | null;
+            /** Slug Locked */
+            slug_locked: boolean;
+            /** Missing Fields */
+            missing_fields?: string[];
+            /** Action Result */
+            action_result?: string | null;
+        };
+        /** WebsiteDoctorContentUpdate */
+        WebsiteDoctorContentUpdate: {
+            /** Slug */
+            slug?: string | null;
+            operation: components["schemas"]["WebsiteContentOperation"];
+            /** Bio Ru */
+            bio_ru?: string | null;
+            /** Bio Uz */
+            bio_uz?: string | null;
+        };
+        /** WebsiteServiceContentOut */
+        WebsiteServiceContentOut: {
+            /** Id */
+            id: number;
+            /** Active */
+            active: boolean;
+            /** Name Ru */
+            name_ru: string;
+            /** Name Uz */
+            name_uz?: string | null;
+            /** Description Ru */
+            description_ru?: string | null;
+            /** Description Uz */
+            description_uz?: string | null;
+            /** Slug */
+            slug?: string | null;
+            /** Show On Website */
+            show_on_website: boolean;
+            /** Website First Published At */
+            website_first_published_at?: string | null;
+            /** Slug Locked */
+            slug_locked: boolean;
+            /** Missing Fields */
+            missing_fields?: string[];
+            /** Action Result */
+            action_result?: string | null;
+        };
+        /** WebsiteServiceContentUpdate */
+        WebsiteServiceContentUpdate: {
+            /** Slug */
+            slug?: string | null;
+            operation: components["schemas"]["WebsiteContentOperation"];
+            /** Name Ru */
+            name_ru?: string | null;
+            /** Name Uz */
+            name_uz?: string | null;
+            /** Description Ru */
+            description_ru?: string | null;
+            /** Description Uz */
+            description_uz?: string | null;
+        };
+        /**
          * WeeklyScheduleUpdate
          * @description Обновление расписания на всю неделю
          */
@@ -43748,6 +43893,92 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_service_website_content_api_v1_services_admin_website_content_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebsiteServiceContentOut"][];
+                };
+            };
+        };
+    };
+    get_admin_service_website_content_item_api_v1_services_admin_website_content__service_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                service_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebsiteServiceContentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_service_website_content_api_v1_services_admin_website_content__service_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                service_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebsiteServiceContentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebsiteServiceContentOut"];
                 };
             };
             /** @description Validation Error */
@@ -61917,6 +62148,72 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_doctor_website_content_api_v1_admin_doctors__doctor_id__website_content_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doctor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebsiteDoctorContentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_doctor_website_content_api_v1_admin_doctors__doctor_id__website_content_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doctor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebsiteDoctorContentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebsiteDoctorContentOut"];
                 };
             };
             /** @description Validation Error */

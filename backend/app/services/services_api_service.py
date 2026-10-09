@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
@@ -23,6 +24,18 @@ from app.services.service_mapping import (
     get_allowed_service_code_prefixes,
     normalize_service_code,
     resolve_queue_group_key,
+)
+
+logger = logging.getLogger(__name__)
+_WEBSITE_PUBLICATION_BATCH_FIELDS = frozenset(
+    {
+        "name_uz",
+        "description_ru",
+        "description_uz",
+        "slug",
+        "show_on_website",
+        "website_first_published_at",
+    }
 )
 
 
@@ -459,6 +472,12 @@ class ServicesApiService:
             if not category:
                 raise ValueError("Selected category not found")
 
+        if "name" in update_data:
+            name = update_data["name"]
+            if name is None or not str(name).strip():
+                raise ValueError("Service name cannot be empty")
+            update_data["name"] = str(name).strip()
+
         # RQ-17 §3.1(б)/(в): serialization-scope мутации Service. Ретег
         # Service.queue_tag (поле writable: ServiceUpdate.queue_tag,
         # PUT /services/{service_id}) меняет ДВА service-set разом —
@@ -485,6 +504,11 @@ class ServicesApiService:
 
         for field, value in update_data.items():
             setattr(service, field, value)
+
+        if update_data.get("active") is False:
+            # Deactivation removes the card from public visibility. A later
+            # activation does not republish it automatically.
+            service.show_on_website = False
 
         if affected_tags:
             if update_data.get("requires_doctor"):
@@ -528,6 +552,7 @@ class ServicesApiService:
             # критической секции (round-4 brief)
             lock_owner_config_scope(db, service.queue_tag)
         service.active = False
+        service.show_on_website = False
         self.repository.add(service)
         if service.queue_tag:
             db.flush()
@@ -586,6 +611,59 @@ class ServicesApiService:
         """
         from sqlalchemy.exc import SQLAlchemyError
 
+        active_fields = [field for field in ("active", "is_active") if field in updates]
+        if active_fields:
+            normalized_values: dict[str, bool] = {}
+            for field in active_fields:
+                value = updates[field]
+                if isinstance(value, bool):
+                    normalized_values[field] = value
+                elif type(value) is int and value in (0, 1):
+                    normalized_values[field] = bool(value)
+                else:
+                    logger.warning(
+                        "[FIX] Rejected a non-boolean service batch activity value"
+                    )
+                    raise ValueError("Service activity updates must use true or false")
+
+            if len(set(normalized_values.values())) > 1:
+                logger.warning(
+                    "[FIX] Rejected conflicting activity fields in service batch update"
+                )
+                raise ValueError("active and is_active must have the same value")
+
+            normalized_active = next(iter(normalized_values.values()))
+            if "is_active" in active_fields:
+                logger.debug(
+                    "[FIX] Normalized the legacy is_active service batch field"
+                )
+            updates = {
+                **{
+                    key: value
+                    for key, value in updates.items()
+                    if key not in active_fields
+                },
+                "active": normalized_active,
+            }
+
+        website_fields = sorted(_WEBSITE_PUBLICATION_BATCH_FIELDS.intersection(updates))
+        if website_fields:
+            logger.warning(
+                "[FIX] Rejected website-owned fields in service batch update: %s",
+                website_fields,
+            )
+            raise ValueError(
+                "Website publication fields must be changed through the website content endpoint"
+            )
+
+        if "name" in updates:
+            name = updates["name"]
+            normalized_name = str(name).strip() if name is not None else ""
+            if not normalized_name:
+                logger.warning("[FIX] Rejected blank service name in batch update")
+                raise ValueError("Service name cannot be empty")
+            updates = {**updates, "name": normalized_name}
+
         # repository-boundary: ORM-запрос batch-локов живёт в
         # ServicesApiRepository (гейт прямых ORM-вызовов сервис-слоя)
         rows = self.repository.get_services_for_update(service_ids)
@@ -596,17 +674,13 @@ class ServicesApiService:
             if service_id not in by_id
         ]
         services = [
-            by_id[service_id]
-            for service_id in service_ids
-            if service_id in by_id
+            by_id[service_id] for service_id in service_ids if service_id in by_id
         ]
         if not services:
             return [], failed_services
 
         retag_requested = "queue_tag" in updates
-        owner_sensitive_flip = ("active" in updates) or (
-            "requires_doctor" in updates
-        )
+        owner_sensitive_flip = ("active" in updates) or ("requires_doctor" in updates)
         affected: set[str] = set()
         affected_departments: set[str] = set()
         for service in services:
@@ -644,6 +718,10 @@ class ServicesApiService:
                 for field, value in updates.items():
                     if hasattr(service, field):
                         setattr(service, field, value)
+                if updates.get("active") is False:
+                    # The batch endpoint is another canonical deactivation
+                    # path; reactivation must not restore public visibility.
+                    service.show_on_website = False
 
             if affected_tags:
                 if updates.get("requires_doctor"):

@@ -9,9 +9,12 @@ Ghost-doctor prevention contract (PR: fix/doctor-lifecycle-ghost-doctor):
 - /auth/me stops advertising specialty/doctor_id/cabinet once the Doctor
   profile is inactive (no clinical panel routing for deactivated doctors).
 """
+
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
+
+import pytest
 
 from app.core.security import get_password_hash
 from app.models.clinic import Doctor
@@ -81,9 +84,7 @@ def test_delete_user_deactivates_doctor_and_preserves_history(
     user, doctor = _create_doctor_with_profile(db_session, "del")
     visit = _create_visit(db_session, doctor)
 
-    response = client.delete(
-        f"/api/v1/users/users/{user.id}", headers=auth_headers
-    )
+    response = client.delete(f"/api/v1/users/users/{user.id}", headers=auth_headers)
     assert response.status_code == 200, response.text
 
     # User is gone
@@ -106,6 +107,10 @@ def test_bulk_deactivate_then_activate_mirrors_to_doctor(
     client, db_session, auth_headers
 ):
     user, doctor = _create_doctor_with_profile(db_session, "bulk")
+    doctor.show_on_website = True
+    doctor.slug = "synthetic-bulk-doctor"
+    doctor.website_first_published_at = datetime.now(UTC)
+    db_session.commit()
 
     response = client.post(
         "/api/v1/users/users/bulk-action",
@@ -114,7 +119,11 @@ def test_bulk_deactivate_then_activate_mirrors_to_doctor(
     )
     assert response.status_code == 200, response.text
     db_session.expire_all()
-    assert db_session.query(Doctor).filter(Doctor.id == doctor.id).one().active is False
+    doctor_row = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+    assert doctor_row.active is False
+    assert doctor_row.show_on_website is False
+    assert doctor_row.slug == "synthetic-bulk-doctor"
+    first_published_at = doctor_row.website_first_published_at
 
     response = client.post(
         "/api/v1/users/users/bulk-action",
@@ -123,7 +132,10 @@ def test_bulk_deactivate_then_activate_mirrors_to_doctor(
     )
     assert response.status_code == 200, response.text
     db_session.expire_all()
-    assert db_session.query(Doctor).filter(Doctor.id == doctor.id).one().active is True
+    doctor_row = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+    assert doctor_row.active is True
+    assert doctor_row.show_on_website is False
+    assert doctor_row.website_first_published_at == first_published_at
 
 
 def test_bulk_delete_deactivates_doctor(client, db_session, auth_headers):
@@ -163,6 +175,34 @@ def test_update_user_is_active_mirrors_to_doctor(client, db_session, auth_header
     assert response.status_code == 200, response.text
     db_session.expire_all()
     assert db_session.query(Doctor).filter(Doctor.id == doctor.id).one().active is True
+
+
+@pytest.mark.parametrize("empty_name", [None, "   "])
+def test_clearing_published_doctor_owner_name_unpublishes_card_atomically(
+    client, db_session, auth_headers, empty_name
+):
+    user, doctor = _create_doctor_with_profile(db_session, "website-name")
+    doctor.show_on_website = True
+    doctor.slug = "synthetic-owner-name"
+    doctor.website_first_published_at = datetime.now(UTC)
+    db_session.commit()
+    first_published_at = doctor.website_first_published_at
+
+    response = client.put(
+        f"/api/v1/users/users/{user.id}",
+        json={"full_name": empty_name},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    doctor_row = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+    assert doctor_row.show_on_website is False
+    assert doctor_row.slug == "synthetic-owner-name"
+    assert doctor_row.website_first_published_at is not None
+    assert doctor_row.website_first_published_at.replace(
+        tzinfo=UTC
+    ) == first_published_at.replace(tzinfo=UTC)
 
 
 def _patch_auth_me_sessionlocal(monkeypatch, db_session) -> None:
@@ -208,7 +248,6 @@ def test_auth_me_hides_doctor_fields_for_inactive_doctor(
     assert body["doctor_id"] is None
     assert body["specialty"] is None
     assert body["cabinet"] is None
-
 
 
 # ---------------------------------------------------------------------------
@@ -335,9 +374,7 @@ def test_legacy_dentist_to_canonical_doctor_keeps_profile(
     assert doctors[0].active is True
 
 
-def test_doctor_to_admin_demotion_deactivates_profile(
-    client, db_session, auth_headers
-):
+def test_doctor_to_admin_demotion_deactivates_profile(client, db_session, auth_headers):
     """Doctor -> Admin: same demotion contract (decision #17 matrix)."""
     user, doctor = _create_doctor_with_profile(db_session, "adm")
 
@@ -349,15 +386,10 @@ def test_doctor_to_admin_demotion_deactivates_profile(
     assert response.status_code == 200, response.text
 
     db_session.expire_all()
-    assert (
-        db_session.query(Doctor).filter(Doctor.id == doctor.id).one().active
-        is False
-    )
+    assert db_session.query(Doctor).filter(Doctor.id == doctor.id).one().active is False
 
 
-def test_admin_to_doctor_promotion_creates_profile(
-    client, db_session, auth_headers
-):
+def test_admin_to_doctor_promotion_creates_profile(client, db_session, auth_headers):
     """Admin -> Doctor: promotion contract applies to any non-doctor role."""
     user = _create_user_with_role(db_session, "adm2doc", "Admin")
 
@@ -415,9 +447,7 @@ def test_create_active_userless_doctor_rejected(client, db_session, auth_headers
     )
     assert response.status_code == 400, response.text
     assert "user_id" in response.json()["detail"]
-    assert (
-        db_session.query(Doctor).filter(Doctor.user_id.is_(None)).count() == 0
-    )
+    assert db_session.query(Doctor).filter(Doctor.user_id.is_(None)).count() == 0
 
 
 def test_create_inactive_userless_doctor_allowed_for_history(
@@ -456,10 +486,7 @@ def test_activate_userless_doctor_rejected(client, db_session, auth_headers):
     assert response.status_code == 400, response.text
 
     db_session.expire_all()
-    assert (
-        db_session.query(Doctor).filter(Doctor.id == doctor.id).one().active
-        is False
-    )
+    assert db_session.query(Doctor).filter(Doctor.id == doctor.id).one().active is False
 
 
 def test_unset_user_on_active_doctor_rejected(client, db_session, auth_headers):

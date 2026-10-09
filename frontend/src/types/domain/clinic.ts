@@ -229,6 +229,22 @@ export interface Doctor {
   schedules?: unknown;
 }
 
+/** Admin-only website publication fields; public API responses use a separate DTO. */
+export interface WebsiteDoctorContent {
+  id: number;
+  active: boolean;
+  owner_active: boolean | null;
+  display_name: string | null;
+  bio_ru: string | null;
+  bio_uz: string | null;
+  slug: string | null;
+  show_on_website: boolean;
+  website_first_published_at: string | null;
+  slug_locked: boolean;
+  missing_fields: string[];
+  action_result?: string | null;
+}
+
 export interface Transaction {
   id: string | number;
   patient_id?: PatientId;

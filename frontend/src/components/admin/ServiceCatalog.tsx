@@ -1,6 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState, useEffect } from 'react';
-import type { CSSProperties } from "react";
+import { useState, useEffect, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import ServiceAuditHistory from './ServiceAuditHistory';
@@ -21,6 +21,7 @@ import {
   AlertCircle,
   Activity,
   Heart,
+  Globe,
   Scissors,
   Stethoscope,
   TestTube,
@@ -37,6 +38,8 @@ import {
   AppEmpty,
   Alert,
   Checkbox,
+  Label,
+  Textarea,
 } from '../ui/macos';
 import { DataTable } from '../ui/DataTable';
 import {
@@ -81,6 +84,34 @@ interface ServiceItem {
   is_consultation?: boolean;
   allow_doctor_price_override?: boolean;
   [key: string]: unknown;
+}
+
+interface WebsiteServiceContent {
+  id: number;
+  active: boolean;
+  name_ru: string;
+  name_uz: string | null;
+  description_ru: string | null;
+  description_uz: string | null;
+  slug: string | null;
+  show_on_website: boolean;
+  website_first_published_at: string | null;
+  slug_locked: boolean;
+}
+
+type WebsiteContentOperation =
+  | 'save_draft'
+  | 'save_published'
+  | 'publish'
+  | 'unpublish'
+  | 'republish';
+
+interface WebsiteServiceFormState {
+  name_ru: string;
+  name_uz: string;
+  description_ru: string;
+  description_uz: string;
+  slug: string;
 }
 
 interface CategoryItem {
@@ -213,6 +244,23 @@ const ServiceCatalog = () => {
   const confirm = confirmRaw;
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<ServiceItem[]>([]);
+  const [websiteServices, setWebsiteServices] = useState<WebsiteServiceContent[]>([]);
+  const [websiteServiceId, setWebsiteServiceId] = useState('');
+  const [websiteForm, setWebsiteForm] = useState<WebsiteServiceFormState>({
+    name_ru: '', name_uz: '', description_ru: '', description_uz: '', slug: ''
+  });
+  const [websiteSaving, setWebsiteSaving] = useState(false);
+  const [websiteLoading, setWebsiteLoading] = useState(false);
+  const [websiteLoaded, setWebsiteLoaded] = useState(false);
+  const [websiteOpen, setWebsiteOpen] = useState(false);
+  const websiteLoadingRef = useRef(false);
+  const websiteSaveInProgressRef = useRef(false);
+  const websiteRefreshQueuedRef = useRef(false);
+  const websiteDirtyServiceIdRef = useRef<string | null>(null);
+  const websiteDirtyFieldsRef = useRef<Partial<WebsiteServiceFormState>>({});
+  const previousWebsiteServiceIdRef = useRef<string | null>(null);
+  const [websiteError, setWebsiteError] = useState('');
+  const [websiteNotice, setWebsiteNotice] = useState('');
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [doctors, setDoctors] = useState<DoctorItem[]>([]);
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
@@ -253,6 +301,62 @@ const ServiceCatalog = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  const selectedWebsiteService = websiteServices.find(
+    (item) => String(item.id) === websiteServiceId
+  );
+
+  useEffect(() => {
+    const selectionChanged = previousWebsiteServiceIdRef.current !== websiteServiceId;
+    previousWebsiteServiceIdRef.current = websiteServiceId;
+
+    if (!selectedWebsiteService) {
+      websiteDirtyServiceIdRef.current = null;
+      setWebsiteForm({ name_ru: '', name_uz: '', description_ru: '', description_uz: '', slug: '' });
+      if (selectionChanged) {
+        setWebsiteError('');
+        setWebsiteNotice('');
+      }
+      return;
+    }
+    const dirtyFields = websiteDirtyServiceIdRef.current === websiteServiceId
+      ? websiteDirtyFieldsRef.current
+      : {};
+    if (websiteDirtyServiceIdRef.current !== websiteServiceId) {
+      websiteDirtyServiceIdRef.current = null;
+      websiteDirtyFieldsRef.current = {};
+    }
+    const nextForm = {
+      name_ru: selectedWebsiteService.name_ru || '',
+      name_uz: selectedWebsiteService.name_uz || '',
+      description_ru: selectedWebsiteService.description_ru || '',
+      description_uz: selectedWebsiteService.description_uz || '',
+      slug: selectedWebsiteService.slug || '',
+    };
+    setWebsiteForm({ ...nextForm, ...dirtyFields });
+    if (Object.keys(dirtyFields).length > 0) {
+      logger.debug('[FIX] Refreshed non-dirty website fields after catalog update');
+    } else {
+      websiteDirtyServiceIdRef.current = null;
+      websiteDirtyFieldsRef.current = {};
+    }
+    if (selectionChanged) {
+      setWebsiteError('');
+      setWebsiteNotice('');
+    }
+  }, [selectedWebsiteService, websiteServiceId]);
+
+  const updateWebsiteField = (field: keyof WebsiteServiceFormState, value: string) => {
+    if (websiteDirtyServiceIdRef.current !== websiteServiceId) {
+      websiteDirtyServiceIdRef.current = websiteServiceId;
+      websiteDirtyFieldsRef.current = {};
+    }
+    websiteDirtyFieldsRef.current = {
+      ...websiteDirtyFieldsRef.current,
+      [field]: value,
+    };
+    setWebsiteForm((current) => ({ ...current, [field]: value }));
+  };
 
   const loadData = async () => {
     try {
@@ -305,6 +409,139 @@ const ServiceCatalog = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  async function loadWebsiteContent(force = false) {
+    if (websiteSaveInProgressRef.current) {
+      websiteRefreshQueuedRef.current = true;
+      logger.debug('[FIX] Queued website content refresh until save completes');
+      return;
+    }
+    if (websiteLoadingRef.current) {
+      if (force) websiteRefreshQueuedRef.current = true;
+      return;
+    }
+    if (websiteLoaded && !force) return;
+
+    websiteLoadingRef.current = true;
+    setWebsiteLoading(true);
+    setWebsiteError('');
+    try {
+      const response = await api.get('/services/admin/website-content');
+      if (websiteRefreshQueuedRef.current) return;
+
+      const rows = response.data as WebsiteServiceContent[];
+      setWebsiteServices(rows);
+      setWebsiteServiceId((current) =>
+        rows.some((row) => String(row.id) === current)
+          ? current
+          : String(rows[0]?.id ?? '')
+      );
+      setWebsiteLoaded(true);
+    } catch (error) {
+      if (!websiteRefreshQueuedRef.current) {
+        logger.error('Ошибка загрузки website-контента услуг:', error);
+        setWebsiteError(t('admin2.sc_site_content_load_error'));
+        setWebsiteLoaded(false);
+      }
+    } finally {
+      websiteLoadingRef.current = false;
+      setWebsiteLoading(false);
+      if (websiteRefreshQueuedRef.current) {
+        websiteRefreshQueuedRef.current = false;
+        void loadWebsiteContent(true);
+      }
+    }
+  }
+
+  const toggleWebsiteEditor = () => {
+    const nextOpen = !websiteOpen;
+    setWebsiteOpen(nextOpen);
+    if (nextOpen) void loadWebsiteContent();
+  };
+
+  const refreshWebsiteContent = () => {
+    setWebsiteLoaded(false);
+    if (websiteOpen || websiteLoadingRef.current) void loadWebsiteContent(true);
+  };
+
+  const refreshCatalog = () => {
+    void loadData();
+    refreshWebsiteContent();
+  };
+
+  const saveWebsiteContent = async (operation: WebsiteContentOperation) => {
+    if (
+      !selectedWebsiteService ||
+      !websiteLoaded ||
+      websiteLoadingRef.current ||
+      websiteSaveInProgressRef.current
+    ) return;
+    websiteSaveInProgressRef.current = true;
+    setWebsiteSaving(true);
+    setWebsiteError('');
+    setWebsiteNotice('');
+    try {
+      const response = await api.put(
+        `/services/admin/website-content/${selectedWebsiteService.id}`,
+        { ...websiteForm, operation }
+      );
+      const saved = response.data as WebsiteServiceContent;
+      if (websiteDirtyServiceIdRef.current === String(saved.id)) {
+        websiteDirtyServiceIdRef.current = null;
+        websiteDirtyFieldsRef.current = {};
+      }
+      setWebsiteServices((items) => {
+        const exists = items.some((item) => item.id === saved.id);
+        return exists
+          ? items.map((item) => item.id === saved.id ? saved : item)
+          : [...items, saved];
+      });
+      setServices((items) => items.map((item) =>
+        String(item.id) === String(saved.id)
+          ? { ...item, name: saved.name_ru, active: saved.active }
+          : item
+      ));
+      setWebsiteLoaded(true);
+      setWebsiteNotice(t('admin2.sc_site_content_save_success'));
+    } catch (error) {
+      const responseData = (error as { response?: { data?: { detail?: unknown } } })?.response?.data;
+      const detail = responseData?.detail;
+      const detailMessage = typeof detail === 'object' && detail !== null
+        ? (detail as { message?: string }).message
+        : typeof detail === 'string' ? detail : undefined;
+      setWebsiteError(detailMessage || t('admin2.sc_site_content_save_error'));
+    } finally {
+      websiteSaveInProgressRef.current = false;
+      setWebsiteSaving(false);
+      if (websiteRefreshQueuedRef.current) {
+        websiteRefreshQueuedRef.current = false;
+        logger.debug('[FIX] Reloading website content after save completed');
+        void loadWebsiteContent(true);
+      }
+    }
+  };
+
+  const websiteMissingFields = selectedWebsiteService ? [
+    ...(!websiteForm.name_ru.trim() ? ['name_ru'] : []),
+    ...(!websiteForm.name_uz.trim() ? ['name_uz'] : []),
+    ...(!websiteForm.description_ru.trim() ? ['description_ru'] : []),
+    ...(!websiteForm.description_uz.trim() ? ['description_uz'] : []),
+    ...(!websiteForm.slug.trim() ? ['slug'] : []),
+    ...(!selectedWebsiteService.active ? ['active'] : []),
+  ] : [];
+  const websiteEditorUnavailable = websiteSaving || websiteLoading || !websiteLoaded;
+
+  const websiteFieldLabel = (field: string) => {
+    const keys: Record<string, string> = {
+      name_ru: 'sc_site_name_ru',
+      name_uz: 'sc_site_name_uz',
+      description_ru: 'sc_site_description_ru',
+      description_uz: 'sc_site_description_uz',
+      slug: 'sc_site_slug',
+      active: 'sc_status_active',
+    };
+    return t(`admin2.${keys[field] || field}`);
   };
 
   const filteredServices = services.filter((service) => {
@@ -360,6 +597,7 @@ const ServiceCatalog = () => {
       });
       setEditingService(null);
       setShowAddForm(false);
+      refreshWebsiteContent();
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
 
@@ -428,6 +666,7 @@ const ServiceCatalog = () => {
       }
 
       setMessage({ type: 'success', text: String(responseData.message || t('admin2.sc_service_deleted')) });
+      refreshWebsiteContent();
     } catch (error) {
       // ❌ ОТКАТ: Возвращаем старое состояние при ошибке
       setServices(oldServices);
@@ -476,7 +715,7 @@ const ServiceCatalog = () => {
   const handleBatchEditComplete = () => {
     setShowBatchEdit(false);
     setSelectedServiceIds(new Set());
-    loadData();
+    refreshCatalog();
   };
 
   if (loading) {
@@ -517,7 +756,7 @@ const ServiceCatalog = () => {
               {t('admin2.sc_edit_count_btn', { count: selectedServiceIds.size })}
             </Button>
           )}
-          <Button variant="outline" onClick={loadData} disabled={loading}>
+          <Button variant="outline" onClick={refreshCatalog} disabled={loading}>
             <RefreshCw size={16} className="mr-2" />
             {t('admin2.sc_refresh_btn')}
           </Button>
@@ -536,6 +775,168 @@ const ServiceCatalog = () => {
         onClose={() => setMessage({ type: '', text: '' })} />
 
       }
+
+      <Card variant="default" className="p-6">
+        <div className="admin-flex items-center justify-between gap-8">
+          <div>
+            <h3 className="admin-title-20">{t('admin2.sc_site_content_title')}</h3>
+            <p className="admin-hint-text-12-secondary-mt-4">{t('admin2.sc_site_content_help')}</p>
+          </div>
+          <Button type="button" variant="outline" onClick={toggleWebsiteEditor} aria-expanded={websiteOpen} aria-controls="service-website-editor">
+            <Globe size={16} aria-hidden="true" />
+            {websiteOpen ? t('admin2.sc_site_content_close') : t('admin2.sc_site_content_open')}
+          </Button>
+        </div>
+        {websiteOpen && (
+          <div id="service-website-editor" className="admin-flex-col-16 mt-16">
+            {websiteLoading && <p role="status">{t('admin2.sitepub_loading')}</p>}
+            {websiteError && <Alert type="error" title={websiteError} />}
+            {websiteNotice && <Alert type="success" title={websiteNotice} />}
+            {!websiteLoading && websiteLoaded && websiteServices.length === 0 && (
+              <p role="status" className="admin-hint-text-12-secondary-mt-4">
+                {t('admin2.sc_site_content_empty')}
+              </p>
+            )}
+            {websiteServices.length > 0 && (
+              <div className="admin-flex-col-16">
+            <div className="admin-grid-auto-250-12">
+              <div>
+                <Label htmlFor="service-website-selector" className="admin-label-block-sm-med-primary-mb-8">
+                  {t('admin2.sc_site_service_label')}
+                </Label>
+                <Select
+                  id="service-website-selector"
+                  value={websiteServiceId}
+                  onValueChange={(value) => setWebsiteServiceId(String(value))}
+                  options={websiteServices.map((item) => ({
+                    value: String(item.id),
+                    label: `${item.name_ru} · ${item.show_on_website ? t('admin2.sitepub_status_published') : t('admin2.sitepub_status_draft')}`,
+                  }))}
+                />
+              </div>
+              {selectedWebsiteService && (
+                <div className="admin-flex items-end gap-8">
+                  <Badge variant={selectedWebsiteService.show_on_website ? 'success' : 'outline'}>
+                    {selectedWebsiteService.show_on_website
+                      ? t('admin2.sitepub_status_published')
+                      : t('admin2.sitepub_status_draft')}
+                  </Badge>
+                  {!selectedWebsiteService.active && (
+                    <span className="admin-hint-text-12-secondary-mt-4">
+                      {t('admin2.sc_site_active_required')}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {selectedWebsiteService && (
+              <>
+                <div className="admin-grid-auto-250-12">
+                  <div>
+                    <Label htmlFor="service-site-name-ru" required className="admin-label-block-sm-med-primary-mb-8">
+                      {t('admin2.sc_site_name_ru')}
+                    </Label>
+                    <Input
+                      id="service-site-name-ru"
+                      value={websiteForm.name_ru}
+                      onChange={(event) => updateWebsiteField('name_ru', event.target.value)}
+                      disabled={websiteEditorUnavailable}
+                      maxLength={256}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="service-site-name-uz" required className="admin-label-block-sm-med-primary-mb-8">
+                      {t('admin2.sc_site_name_uz')}
+                    </Label>
+                    <Input
+                      id="service-site-name-uz"
+                      value={websiteForm.name_uz}
+                      onChange={(event) => updateWebsiteField('name_uz', event.target.value)}
+                      disabled={websiteEditorUnavailable}
+                      maxLength={256}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="service-site-slug" required className="admin-label-block-sm-med-primary-mb-8">
+                      {t('admin2.sc_site_slug')}
+                    </Label>
+                    <Input
+                      id="service-site-slug"
+                      value={websiteForm.slug}
+                      onChange={(event) => updateWebsiteField('slug', event.target.value)}
+                      disabled={websiteEditorUnavailable || selectedWebsiteService.slug_locked}
+                      maxLength={160}
+                    />
+                    {selectedWebsiteService.slug_locked && (
+                      <p className="admin-hint-text-12-secondary-mt-4">{t('admin2.sc_site_slug_locked')}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="service-site-description-ru" required className="admin-label-block-sm-med-primary-mb-8">
+                      {t('admin2.sc_site_description_ru')}
+                    </Label>
+                    <Textarea
+                      id="service-site-description-ru"
+                      value={websiteForm.description_ru}
+                      onChange={(event) => updateWebsiteField('description_ru', event.target.value)}
+                      disabled={websiteEditorUnavailable}
+                      minRows={3}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="service-site-description-uz" required className="admin-label-block-sm-med-primary-mb-8">
+                      {t('admin2.sc_site_description_uz')}
+                    </Label>
+                    <Textarea
+                      id="service-site-description-uz"
+                      value={websiteForm.description_uz}
+                      onChange={(event) => updateWebsiteField('description_uz', event.target.value)}
+                      disabled={websiteEditorUnavailable}
+                      minRows={3}
+                    />
+                  </div>
+                </div>
+
+                {websiteMissingFields.length > 0 && (
+                  <p role="status" className="admin-hint-text-12-secondary-mt-4">
+                    {t('admin2.sc_site_missing_fields')}: {websiteMissingFields.map(websiteFieldLabel).join(', ')}
+                  </p>
+                )}
+
+                <div className="admin-flex-wrap-8">
+                  {!selectedWebsiteService.show_on_website && (
+                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('save_draft')} disabled={websiteEditorUnavailable}>
+                      {websiteSaving ? t('admin2.sitepub_saving') : t('admin2.sitepub_save_draft')}
+                    </Button>
+                  )}
+                  {selectedWebsiteService.show_on_website && (
+                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('save_published')} disabled={websiteEditorUnavailable || websiteMissingFields.length > 0}>
+                      {websiteSaving ? t('admin2.sitepub_saving') : t('admin2.sitepub_save_published')}
+                    </Button>
+                  )}
+                  {!selectedWebsiteService.show_on_website && (
+                    <Button type="button" onClick={() => void saveWebsiteContent(selectedWebsiteService.website_first_published_at ? 'republish' : 'publish')} disabled={websiteEditorUnavailable || websiteMissingFields.length > 0}>
+                      {websiteSaving
+                        ? t('admin2.sitepub_saving')
+                        : selectedWebsiteService.website_first_published_at
+                          ? t('admin2.sitepub_republish')
+                          : t('admin2.sitepub_publish')}
+                    </Button>
+                  )}
+                  {selectedWebsiteService.show_on_website && (
+                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('unpublish')} disabled={websiteEditorUnavailable}>
+                      {t('admin2.sitepub_unpublish')}
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+            )}
+          </div>
+        )}
+      </Card>
 
       {/* Фильтры */}
       <Card

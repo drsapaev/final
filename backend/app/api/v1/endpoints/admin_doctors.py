@@ -26,11 +26,19 @@ from app.schemas.clinic import (
     SpecialtyVocabularyItem,
     WeeklyScheduleUpdate,
 )
+from app.schemas.public_site_admin import (
+    WebsiteDoctorContentOut,
+    WebsiteDoctorContentUpdate,
+)
 from app.schemas.queue_profile_conflicts import QueueProfileBindingChangedResponse
 from app.services.admin_doctors_stats_service import AdminDoctorsStatsService
 from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
     MedicalSpecialtyCatalogService,
+)
+from app.services.public_site_admin_service import (
+    PublicSiteAdminService,
+    WebsiteContentServiceError,
 )
 from app.services.user_mgmt._base import (
     DOCTOR_PROFILE_ROLES,
@@ -43,8 +51,7 @@ logger = logging.getLogger(__name__)
 ADMIN_DOCTORS_PUBLIC_ERROR = "Internal server error"
 
 DOCTOR_ROLE_VALUES = {
-    str(role.value) if hasattr(role, "value") else str(role)
-    for role in DOCTOR_ROLES
+    str(role.value) if hasattr(role, "value") else str(role) for role in DOCTOR_ROLES
 }
 
 
@@ -171,7 +178,10 @@ def get_doctors(
         # the crud query (not after the row cap) so pagination cannot crowd
         # real doctors out of the page.
         doctors = crud_clinic.get_doctors(
-            db, skip=skip, limit=limit, active_only=active_only,
+            db,
+            skip=skip,
+            limit=limit,
+            active_only=active_only,
             exclude_internal_only=True,
         )
         if specialty:
@@ -186,9 +196,10 @@ def get_doctors(
 
 
 @router.get("/doctors/available-users", response_model=list[DoctorUserOption])
-def get_available_doctor_users(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
+def get_available_doctor_users(
+    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
     offset: int = Query(default=0, ge=0, description="Смещение"),
-doctor_id: int | None = Query(
+    doctor_id: int | None = Query(
         None,
         description="ID редактируемого врача, чтобы вернуть уже привязанного пользователя",
     ),
@@ -218,7 +229,9 @@ doctor_id: int | None = Query(
         else:
             query = query.filter(User.id.notin_(list(linked_map.keys())))
 
-    users = query.order_by(User.is_active.desc(), User.full_name.asc(), User.username.asc()).all()
+    users = query.order_by(
+        User.is_active.desc(), User.full_name.asc(), User.username.asc()
+    ).all()
     return [
         DoctorUserOption(
             **(
@@ -303,8 +316,6 @@ def get_doctor_specialty_vocabulary(
     ]
 
 
-
-
 @router.get("/doctors-catalog", response_model=list[SpecialtyVocabularyItem])
 def admin_list_medical_specialties(
     db: Session = Depends(get_db),
@@ -315,14 +326,18 @@ def admin_list_medical_specialties(
 
     return [
         SpecialtyVocabularyItem(
-            code=row.code, title_ru=row.title_ru,
-            title_uz=row.title_uz, title_en=row.title_en,
+            code=row.code,
+            title_ru=row.title_ru,
+            title_uz=row.title_uz,
+            title_en=row.title_en,
         )
         for row in list_all(db)
     ]
 
 
-@router.post("/doctors-catalog", response_model=SpecialtyVocabularyItem, status_code=201)
+@router.post(
+    "/doctors-catalog", response_model=SpecialtyVocabularyItem, status_code=201
+)
 def admin_create_medical_specialty(
     payload: SpecialtyCatalogCreateIn,
     db: Session = Depends(get_db),
@@ -339,17 +354,23 @@ def admin_create_medical_specialty(
 
     try:
         row = catalog_create(
-            db, code=payload.code, title_ru=payload.title_ru,
-            title_uz=payload.title_uz, title_en=payload.title_en,
-            active=payload.active, sort_order=payload.sort_order,
+            db,
+            code=payload.code,
+            title_ru=payload.title_ru,
+            title_uz=payload.title_uz,
+            title_en=payload.title_en,
+            active=payload.active,
+            sort_order=payload.sort_order,
         )
     except SpecialtyCatalogValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SpecialtyCatalogConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return SpecialtyVocabularyItem(
-        code=row.code, title_ru=row.title_ru,
-        title_uz=row.title_uz, title_en=row.title_en,
+        code=row.code,
+        title_ru=row.title_ru,
+        title_uz=row.title_uz,
+        title_en=row.title_en,
     )
 
 
@@ -368,7 +389,8 @@ def admin_update_medical_specialty(
     from app.services.specialty_catalog_admin import update as catalog_update
 
     row = catalog_update(
-        db, code,
+        db,
+        code,
         title_ru=payload.get("title_ru"),
         title_uz=payload.get("title_uz"),
         title_en=payload.get("title_en"),
@@ -378,8 +400,10 @@ def admin_update_medical_specialty(
     if row is None:
         raise HTTPException(status_code=404, detail="Специальность не найдена")
     return SpecialtyVocabularyItem(
-        code=row.code, title_ru=row.title_ru,
-        title_uz=row.title_uz, title_en=row.title_en,
+        code=row.code,
+        title_ru=row.title_ru,
+        title_uz=row.title_uz,
+        title_en=row.title_en,
     )
 
 
@@ -510,8 +534,6 @@ def _validate_active_doctor_has_user(user_id: int | None, active: bool) -> None:
         )
 
 
-
-
 def _validate_specialty_assignable(db: Session, specialty: str | None) -> None:
     """Catalog write-boundary (Codex P1): any NEW specialty assignment through
     the admin doctors API must reference an ACTIVE catalog code (migration
@@ -622,7 +644,7 @@ def create_doctor(
             "description": (
                 "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
             ),
-        }
+        },
     },
 )
 def update_doctor(
@@ -658,9 +680,7 @@ def update_doctor(
             # Reassignment stays allowed when the old owner is gone (userless
             # row repair) or has no doctor-family role anymore.
             old_owner = (
-                db.query(User)
-                .filter(User.id == existing_doctor.user_id)
-                .first()
+                db.query(User).filter(User.id == existing_doctor.user_id).first()
             )
             old_owner_role = (
                 str(old_owner.role.value)
@@ -723,9 +743,7 @@ def update_doctor(
             # first (the lifecycle mirror deactivates the profile) — only
             # then may the link be detached.
             old_owner = (
-                db.query(User)
-                .filter(User.id == existing_doctor.user_id)
-                .first()
+                db.query(User).filter(User.id == existing_doctor.user_id).first()
             )
             old_owner_role = (
                 str(old_owner.role.value)
@@ -752,7 +770,9 @@ def update_doctor(
             != (existing_doctor.specialty or "").strip()
         )
         resulting_active = (
-            doctor.active if "active" in doctor.model_fields_set else existing_doctor.active
+            doctor.active
+            if "active" in doctor.model_fields_set
+            else existing_doctor.active
         )
         activating_inactive_profile = resulting_active and not existing_doctor.active
         if specialty_changed or (
@@ -774,9 +794,11 @@ def update_doctor(
             # value the activation would carry into the active state.
             _validate_specialty_assignable(
                 db,
-                doctor.specialty
-                if specialty_payload_present
-                else existing_doctor.specialty,
+                (
+                    doctor.specialty
+                    if specialty_payload_present
+                    else existing_doctor.specialty
+                ),
             )
 
         updated_doctor = crud_clinic.update_doctor(db, doctor_id, doctor)
@@ -800,6 +822,48 @@ def update_doctor(
         raise _admin_doctors_http_error(exc, "update_doctor") from exc
     except Exception as exc:
         raise _admin_doctors_http_error(exc, "update_doctor") from exc
+
+
+@router.get(
+    "/doctors/{doctor_id}/website-content",
+    response_model=WebsiteDoctorContentOut,
+)
+def get_doctor_website_content(
+    doctor_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Read the Admin-only website fields for one doctor."""
+    try:
+        return PublicSiteAdminService(db).get_doctor_content(doctor_id)
+    except WebsiteContentServiceError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=exc.as_detail()
+        ) from exc
+    except Exception as exc:
+        raise _admin_doctors_http_error(exc, "get_doctor_website_content") from exc
+
+
+@router.put(
+    "/doctors/{doctor_id}/website-content",
+    response_model=WebsiteDoctorContentOut,
+)
+def update_doctor_website_content(
+    doctor_id: int,
+    payload: WebsiteDoctorContentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Apply one explicit Admin publication operation to a doctor."""
+    try:
+        return PublicSiteAdminService(db).update_doctor_content(doctor_id, payload)
+    except WebsiteContentServiceError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=exc.as_detail()
+        ) from exc
+    except Exception as exc:
+        db.rollback()
+        raise _admin_doctors_http_error(exc, "update_doctor_website_content") from exc
 
 
 @router.delete("/doctors/{doctor_id}", response_model=dict[str, Any])
