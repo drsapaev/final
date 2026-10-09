@@ -6,6 +6,7 @@ import logging
 from datetime import date
 from typing import Any
 
+from fastapi import HTTPException, status
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
@@ -13,6 +14,7 @@ from app.core.specialties import (
     canonical_specialty,
     specialty_variants,
 )
+from app.crud.queue_owner_invariant import lock_profile_link_scopes
 from app.models.clinic import ClinicSettings, Doctor, Schedule, ServiceCategory
 from app.schemas.clinic import (
     ClinicSettingsCreate,
@@ -352,6 +354,8 @@ def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:
     data = doctor.model_dump()
     if "specialty" in data:
         data["specialty"] = canonical_specialty(data["specialty"])
+    if data.get("specialty"):
+        lock_profile_link_scopes(db, queue_tags=[data["specialty"]])
     db_doctor = Doctor(**data)
     db.add(db_doctor)
     db.commit()
@@ -360,12 +364,52 @@ def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:
 
 
 def update_doctor(db: Session, doctor_id: int, doctor: DoctorUpdate) -> Doctor | None:
-    """Обновить врача"""
-    db_doctor = get_doctor_by_id_for_update(db, doctor_id)
+    """Обновить врача."""
+    update_data = doctor.model_dump(exclude_unset=True)
+
+    # Read the candidate without a row lock, take the owner-config locks
+    # shared with tagged queue joins, then lock and revalidate the row. This
+    # preserves the global owner-config -> Doctor row lock order.
+    candidate = (
+        db.query(Doctor).filter(Doctor.id == doctor_id).populate_existing().first()
+    )
+    if not candidate:
+        return None
+
+    candidate_specialty = canonical_specialty(candidate.specialty)
+    if "specialty" in update_data:
+        update_data["specialty"] = canonical_specialty(update_data["specialty"])
+    new_specialty = update_data.get("specialty", candidate_specialty)
+    lock_profile_link_scopes(
+        db,
+        queue_tags=[candidate_specialty, new_specialty],
+    )
+
+    db_doctor = (
+        db.query(Doctor)
+        .filter(Doctor.id == doctor_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
     if not db_doctor:
         return None
 
-    for field, value in doctor.model_dump(exclude_unset=True).items():
+    if canonical_specialty(db_doctor.specialty) != candidate_specialty:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "profile_binding_changed",
+                "stale_fields": ["specialty"],
+                "message": (
+                    "Специальность врача изменилась во время сохранения. "
+                    "Обновите карточку и повторите действие."
+                ),
+            },
+        )
+
+    for field, value in update_data.items():
         if field == "specialty":
             # D-1: canonicalize on update too (PUT /admin/doctors path).
             value = canonical_specialty(value)
@@ -383,10 +427,39 @@ def update_doctor(db: Session, doctor_id: int, doctor: DoctorUpdate) -> Doctor |
 
 
 def delete_doctor(db: Session, doctor_id: int) -> bool:
-    """Удалить врача (мягкое удаление)"""
-    db_doctor = get_doctor_by_id_for_update(db, doctor_id)
+    """Удалить врача (мягкое удаление)."""
+    candidate = (
+        db.query(Doctor).filter(Doctor.id == doctor_id).populate_existing().first()
+    )
+    if not candidate:
+        return False
+
+    candidate_specialty = canonical_specialty(candidate.specialty)
+    lock_profile_link_scopes(db, queue_tags=[candidate_specialty])
+
+    db_doctor = (
+        db.query(Doctor)
+        .filter(Doctor.id == doctor_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
     if not db_doctor:
         return False
+
+    if canonical_specialty(db_doctor.specialty) != candidate_specialty:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "profile_binding_changed",
+                "stale_fields": ["specialty"],
+                "message": (
+                    "Специальность врача изменилась во время удаления. "
+                    "Обновите карточку и повторите действие."
+                ),
+            },
+        )
 
     if db_doctor.show_on_website:
         logger.info("[FIX] Hid the doctor website card during deletion")

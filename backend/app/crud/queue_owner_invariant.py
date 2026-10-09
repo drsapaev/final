@@ -36,8 +36,10 @@ from __future__ import annotations
 from datetime import date
 
 import sqlalchemy as sa
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.specialties import expand_queue_tags, specialty_variants
 from app.crud.queue_resource_routing import _bound_dialect_name
 from app.models.online_queue import DailyQueue, QueueResource
 from app.models.service import Service
@@ -49,6 +51,22 @@ class OwnerInvariantViolation(ValueError):
     """Отказ инварианта §3.1: RESOURCE_SURFACE != ∅ при запрещённом
     service-set (0 doctorless или >= 1 requires_doctor), либо попытка
     смены `queue_tag`/`code` по §3.2. Endpoint-слой маппит в HTTP 409."""
+
+
+class QueueProfileBindingChanged(HTTPException):
+    """A link writer waited through a rebind and must be retried (HTTP 409)."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "profile_binding_changed",
+                "message": (
+                    "Queue direction binding changed while this request was "
+                    "waiting; refresh the direction and retry."
+                ),
+            },
+        )
 
 
 def affected_service_tags(old_tag: str | None, new_tag: str | None) -> list[str]:
@@ -87,6 +105,133 @@ def lock_owner_config_scopes(db: Session, queue_tags: list[str]) -> None:
     """
     for tag in sorted(set(queue_tags)):
         lock_owner_config_scope(db, tag)
+
+
+def _profile_binding_snapshot(
+    db: Session,
+    *,
+    queue_tags: set[str],
+    department_keys: set[str],
+) -> tuple[tuple[int, str, tuple[str, ...], str | None], ...]:
+    """Read current profile bindings that overlap the requested link scopes.
+
+    QueueProfile is a small admin-owned catalog, so read its binding fields
+    and match in Python. Matching case-folded tags is needed because active
+    Doctor usage is counted case-insensitively, while other link tables retain
+    their historical exact-tag contract.
+    """
+    if not queue_tags and not department_keys:
+        return ()
+
+    from app.models.queue_profile import QueueProfile
+
+    query = db.query(
+        QueueProfile.id,
+        QueueProfile.key,
+        QueueProfile.queue_tags,
+        QueueProfile.department_key,
+    )
+    rows = query.all()
+
+    requested_tags = {tag.strip().lower() for tag in queue_tags if tag.strip()}
+    matched = []
+    for profile_id, key, raw_tags, department_key in rows:
+        effective_tags = tuple(expand_queue_tags(list(raw_tags or [])))
+        normalized_profile_tags = {tag.strip().lower() for tag in effective_tags}
+        if not (
+            key.strip().lower() in requested_tags
+            or requested_tags.intersection(normalized_profile_tags)
+            or department_key in department_keys
+        ):
+            continue
+        matched.append(
+            (
+                int(profile_id),
+                str(key),
+                effective_tags,
+                str(department_key) if department_key is not None else None,
+            )
+        )
+    return tuple(sorted(matched))
+
+
+def _lock_profile_binding_scopes(
+    db: Session,
+    *,
+    queue_tags: set[str],
+    department_keys: set[str],
+) -> None:
+    """Acquire all profile-link advisory locks in one canonical order."""
+    # Keep the historical exact-tag lock while adding normalized variants.
+    # Profile usage treats active Doctor specialties case-insensitively, and
+    # the dental family has multiple persisted aliases. Every side of a
+    # binding/link race must therefore share at least one identical lock key.
+    lock_tags: set[str] = set()
+    for tag in queue_tags:
+        trimmed = tag.strip()
+        for variant in specialty_variants(trimmed):
+            if variant:
+                lock_tags.add(variant)
+                lock_tags.add(variant.lower())
+
+    scopes = sorted(
+        {
+            *(('department', key) for key in department_keys),
+            *(('tag', tag) for tag in lock_tags),
+        },
+        key=lambda scope: f"owner_config:{scope[0]}:{scope[1]}",
+    )
+    for scope_type, value in scopes:
+        if scope_type == "tag":
+            lock_owner_config_scope(db, value)
+        elif _bound_dialect_name(db) == "postgresql":
+            db.execute(
+                sa.text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
+                {"k": f"owner_config:department:{value}"},
+            )
+
+
+def lock_profile_binding_scopes(
+    db: Session,
+    *,
+    queue_tags: list[str] | set[str] = (),
+    department_keys: list[str] | set[str] = (),
+) -> None:
+    """Lock old/proposed binding scopes before an administrative mutation.
+
+    Callers must first read the candidate scopes without a row lock, acquire
+    this canonical sorted lock set, then re-read/lock the profile row and
+    verify the binding snapshot before checking link counts.
+    """
+    tags = {value.strip() for value in queue_tags if value and value.strip()}
+    departments = {
+        value.strip() for value in department_keys if value and value.strip()
+    }
+    _lock_profile_binding_scopes(db, queue_tags=tags, department_keys=departments)
+
+
+def lock_profile_link_scopes(
+    db: Session,
+    *,
+    queue_tags: list[str] | set[str] = (),
+    department_keys: list[str] | set[str] = (),
+) -> None:
+    """Serialize a link writer and reject a stale profile binding.
+
+    The snapshot is read before waiting. If an administrative rebind commits
+    while this writer waits on the shared scope, the second read differs and
+    the caller receives the queue service's standard HTTP-409 conflict. No
+    caller write should be flushed before invoking this helper.
+    """
+    tags = {value.strip() for value in queue_tags if value and value.strip()}
+    departments = {
+        value.strip() for value in department_keys if value and value.strip()
+    }
+    before = _profile_binding_snapshot(db, queue_tags=tags, department_keys=departments)
+    _lock_profile_binding_scopes(db, queue_tags=tags, department_keys=departments)
+    after = _profile_binding_snapshot(db, queue_tags=tags, department_keys=departments)
+    if before != after:
+        raise QueueProfileBindingChanged()
 
 
 def tag_service_set_state(db: Session, queue_tag: str) -> tuple[int, int]:

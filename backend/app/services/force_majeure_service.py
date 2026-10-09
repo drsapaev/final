@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.crud.clinic import clinic_today
 from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.crud.queue_resource_routing import (
+    lock_daily_queue_creation,
     resolve_registry_tag_queue_for_specialist,
 )
 from app.models.clinic import Doctor
@@ -386,12 +387,22 @@ class ForceMajeureService:
         параллельную врачебную; теги без строки реестра сохраняют
         прежний путь врача байт-идентично."""
         doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
+        queue_tag = None
+        if doctor is not None and doctor.specialty:
+            queue_tag = doctor.specialty.lower().replace(" ", "_")
         if doctor is not None and doctor.specialty:
             registry_queue = QueueApiRepository(self.db).get_or_create_registry_queue(
                 day=target_date, queue_tag=doctor.specialty
             )
             if registry_queue is not None:
                 return registry_queue
+
+        # This legacy doctor-owned path creates tagged DailyQueue rows too.
+        # Take the same profile/tag scope before the doctor/day lock and
+        # repeat the lookup under that scope to avoid a stale check-then-insert.
+        lock_daily_queue_creation(
+            self.db, target_date, specialist_id, queue_tag=queue_tag
+        )
 
         queue = (
             self.db.query(DailyQueue)
@@ -402,11 +413,6 @@ class ForceMajeureService:
         )
 
         if not queue:
-            # Получаем информацию о специалисте
-            queue_tag = None
-            if doctor and doctor.specialty:
-                queue_tag = doctor.specialty.lower().replace(" ", "_")
-
             queue = DailyQueue(
                 day=target_date,
                 specialist_id=specialist_id,

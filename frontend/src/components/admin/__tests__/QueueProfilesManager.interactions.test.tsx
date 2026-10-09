@@ -105,6 +105,31 @@ describe('QueueProfilesManager interactions', () => {
     expect(screen.getByRole('dialog', { name: 'Новая вкладка' })).toBeInTheDocument();
   });
 
+  it('shows the typed binding conflict message and blocked fields', async () => {
+    const user = userEvent.setup();
+    apiMock.put.mockRejectedValueOnce({
+      response: {
+        data: {
+          detail: {
+            reason: 'profile_binding_change_blocked',
+            message: 'Связи используемого профиля менять нельзя.',
+            blocked_fields: ['queue_tags', 'department_key'],
+          },
+        },
+      },
+    });
+    await renderManager();
+
+    await user.click(screen.getAllByTitle('Редактировать')[0]);
+    await user.click(screen.getByRole('button', { name: 'Сохранить вкладку очереди' }));
+
+    expect(
+      await screen.findByText(
+        'Связи используемого профиля менять нельзя. Заблокированные поля: queue_tags, department_key',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('traps keyboard focus, closes on Escape, and restores focus to the opener', async () => {
     const user = userEvent.setup();
     await renderManager();

@@ -422,3 +422,43 @@ def test_duplicate_key_conflict_is_consistent(db_session):
     assert counts["departments"] == 1
     assert counts["queue_settings"] == 1
     assert counts["registration_settings"] == 1
+
+
+def test_bulk_binding_conflict_rolls_back_only_the_conflicting_row(
+    db_session, monkeypatch
+):
+    """A stale binding conflict must not commit a half-created CSV row."""
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints.admin_departments import _crud
+    from app.api.v1.endpoints.admin_departments._helpers import DepartmentCreate
+    from app.crud import queue_owner_invariant
+    from app.schemas.department import BulkCreateDepartmentsRequest
+
+    original_lock = queue_owner_invariant.lock_profile_link_scopes
+
+    def _conflict_first_row(db, *, queue_tags=(), department_keys=()):
+        if "r1" in department_keys:
+            raise queue_owner_invariant.QueueProfileBindingChanged()
+        return original_lock(
+            db, queue_tags=queue_tags, department_keys=department_keys
+        )
+
+    monkeypatch.setattr(queue_owner_invariant, "lock_profile_link_scopes", _conflict_first_row)
+    payload = BulkCreateDepartmentsRequest(
+        departments=[
+            DepartmentCreate(key="r1", name_ru="Stale binding"),
+            DepartmentCreate(key="r2", name_ru="Good row"),
+        ]
+    )
+
+    result = _crud.bulk_create_departments(
+        payload, db=db_session, current_user=SimpleNamespace(id=999, role="Admin")
+    )
+
+    assert result["created"] == 1
+    assert result["skipped"] == 1
+    assert "binding changed" in result["errors"][0]
+    assert _counts(db_session, "r1") == {"departments": 0}
+    assert _counts(db_session, "r2")["departments"] == 1
+    _cleanup(db_session, "r2")

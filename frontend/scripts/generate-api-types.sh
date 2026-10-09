@@ -3,7 +3,7 @@
 # Phase 0.5 — OpenAPI → TypeScript types generation pipeline.
 # Plan: JS-to-TS-Migration-Plan v3, section 0.5.2
 #
-# Source of truth: backend/openapi.json (FastAPI-generated, 731 schemas / 997 paths)
+# Source of truth: backend/openapi.json (FastAPI-generated)
 # Output: src/types/generated/api.ts (read-only after generation)
 #
 # CI runs `generate:api-types:check` to fail if generated types are stale.
@@ -34,7 +34,7 @@ npx openapi-typescript "$OPENAPI_PATH" \
 
 # Prepend warning header so nobody edits the file by hand.
 HEADER='// ⚠️ АВТОГЕНЕРИРОВАННЫЙ ФАЙЛ — НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ!
-// Источник: backend/openapi.json (731 schemas, 997 paths)
+// Источник: backend/openapi.json
 // Регенерация: npm run generate:api-types
 // CI guard: npm run generate:api-types:check (fails if generated is stale)
 //

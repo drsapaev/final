@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 # from app.models.patient import Patient  # Временно отключено
 from app.api.deps import get_current_user, require_roles
+from app.crud.queue_owner_invariant import QueueProfileBindingChanged
 from app.db.session import get_db
 from app.models.clinic import Doctor
 from app.models.user import User
@@ -309,6 +310,12 @@ def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
             },
         )
 
+    except QueueProfileBindingChanged:
+        # A profile rebind won the shared lock while this tagged admission
+        # waited. Preserve the typed 409 and discard any earlier uncommitted
+        # work in the legacy request flow.
+        db.rollback()
+        raise
     except Exception as e:
         logger.error(f"Ошибка при записи в очередь: {str(e)}")
         return QueueJoinResponse(success=False, message=f"Ошибка сервера: {str(e)}")

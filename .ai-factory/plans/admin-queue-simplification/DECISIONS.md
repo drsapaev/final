@@ -140,3 +140,9 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - Once a command's outcome is unknown, a later non-success response from its same-key retry does not settle the earlier outcome. Preserve the original preview, body/key and draft lock until a successful idempotency replay confirms the stored result. In contrast, a definitive refusal on the first apply may keep the current correction/re-preview flow.
 - This behavior covers refusals that occur before replay, including ordinary principal-resolution 403, CSRF 403, cooldown 429 and stale-state 409. It does not change the middleware, RBAC, response contract or queue ownership.
 - Source: PR #3620 review probe, `backend/app/middleware/idempotency_middleware.py` fail-closed principal resolution, and focused cabinet UI regressions.
+
+## T10 — OpenAPI and generated client scope — 2026-10-08
+
+- **User decision:** in response to the T10 scope clarification, the user explicitly approved adding OpenAPI and generated API types.
+- **Included artifacts:** `backend/openapi.json`, focused OpenAPI contract tests, and `frontend/src/types/generated/api.ts`; no frontend runtime UI or adapter behavior is included.
+- **Technical choice:** remove the hard-coded schema/path totals from `frontend/scripts/generate-api-types.sh`'s generated-file header. Those totals would become inaccurate as soon as this OpenAPI change adds schemas; the generic source label stays correct across future regeneration. This changes metadata only, not the generation command or API behavior.

@@ -75,6 +75,7 @@ from app.models.queue_direction_public_address import (
     QueueDirectionPublicAddress,
     normalize_public_code,
 )
+from app.schemas.queue_profile_conflicts import QueueProfileBindingChangedResponse
 from app.services.queue_svc import QueueBusinessService
 
 
@@ -268,6 +269,10 @@ def get_direction_entry_methods(
         401: {"description": "Требуется аутентификация"},
         403: {"description": "Только роль Admin"},
         404: {"description": "Направление не найдено"},
+        409: {
+            "model": QueueProfileBindingChangedResponse,
+            "description": "Direction binding changed while address provisioning was waiting.",
+        },
     },
 )
 def provision_public_address(

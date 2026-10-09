@@ -8062,6 +8062,16 @@
           "404": {
             "description": "Направление не найдено"
           },
+          "409": {
+            "description": "Direction binding changed while address provisioning was waiting.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileBindingChangedResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -17881,6 +17891,92 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "registrar"
+        ],
+        "summary": "Preview Queue Profile Update",
+        "description": "Read-only impact preview for a proposed profile update.\n\nA preview is informational. The PUT handler re-reads usage immediately\nbefore applying any fields and never accepts a preview as authorization.",
+        "operationId": "preview_queue_profile_update_api_v1_queues_profiles__profile_key__impact_preview_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueProfileUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileUpdateImpactPreview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin role required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profile not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileHttpError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/queues/profiles/{profile_key}": {
@@ -17926,6 +18022,24 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Update Queue Profile Api V1 Queues Profiles  Profile Key  Put"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Binding changes are blocked while the profile is in use, or the submitted binding snapshot became stale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/QueueProfileBindingConflictResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QueueProfileBindingChangedResponse"
+                    }
+                  ],
+                  "title": "Response 409 Update Queue Profile Api V1 Queues Profiles  Profile Key  Put"
                 }
               }
             }
@@ -32263,6 +32377,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/app__schemas__clinic__DoctorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Doctor specialty changed while the update was waiting.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileBindingChangedResponse"
                 }
               }
             }
@@ -103461,6 +103585,127 @@
         "title": "QueuePositionResponse",
         "description": "Ответ с информацией о позиции в очереди"
       },
+      "QueueProfileBindingChangedDetail": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "const": "profile_binding_changed",
+            "title": "Reason"
+          },
+          "stale_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale Fields"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "message"
+        ],
+        "title": "QueueProfileBindingChangedDetail",
+        "description": "A stale binding snapshot that must be reloaded before retrying."
+      },
+      "QueueProfileBindingChangedResponse": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/QueueProfileBindingChangedDetail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "QueueProfileBindingChangedResponse"
+      },
+      "QueueProfileBindingConflictDetail": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "const": "profile_binding_change_blocked",
+            "title": "Reason"
+          },
+          "blocked_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "queue_tags",
+                "department_key"
+              ]
+            },
+            "type": "array",
+            "title": "Blocked Fields"
+          },
+          "links": {
+            "$ref": "#/components/schemas/QueueProfileLinkCounts"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "blocked_fields",
+          "links",
+          "message"
+        ],
+        "title": "QueueProfileBindingConflictDetail"
+      },
+      "QueueProfileBindingConflictResponse": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/QueueProfileBindingConflictDetail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "QueueProfileBindingConflictResponse"
+      },
+      "QueueProfileBindingSnapshot": {
+        "properties": {
+          "queue_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Queue Tags"
+          },
+          "department_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queue_tags",
+          "department_key"
+        ],
+        "title": "QueueProfileBindingSnapshot"
+      },
       "QueueProfileCreate": {
         "properties": {
           "key": {
@@ -103563,6 +103808,81 @@
         ],
         "title": "QueueProfileCreate",
         "description": "Schema for creating a new QueueProfile"
+      },
+      "QueueProfileHttpError": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "QueueProfileHttpError",
+        "description": "FastAPI HTTPException envelope used by Admin preview errors."
+      },
+      "QueueProfileImpactIdentity": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "QueueProfileImpactIdentity"
+      },
+      "QueueProfileLinkCounts": {
+        "properties": {
+          "services": {
+            "type": "integer",
+            "title": "Services"
+          },
+          "department_services": {
+            "type": "integer",
+            "title": "Department Services"
+          },
+          "active_doctors": {
+            "type": "integer",
+            "title": "Active Doctors"
+          },
+          "active_queue_resources": {
+            "type": "integer",
+            "title": "Active Queue Resources"
+          },
+          "daily_queues": {
+            "type": "integer",
+            "title": "Daily Queues"
+          },
+          "entries_waiting": {
+            "type": "integer",
+            "title": "Entries Waiting"
+          },
+          "entries_total": {
+            "type": "integer",
+            "title": "Entries Total"
+          },
+          "active_public_addresses": {
+            "type": "integer",
+            "title": "Active Public Addresses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "services",
+          "department_services",
+          "active_doctors",
+          "active_queue_resources",
+          "daily_queues",
+          "entries_waiting",
+          "entries_total",
+          "active_public_addresses"
+        ],
+        "title": "QueueProfileLinkCounts"
       },
       "QueueProfileUpdate": {
         "properties": {
@@ -103679,6 +103999,64 @@
         "type": "object",
         "title": "QueueProfileUpdate",
         "description": "Schema for updating an existing QueueProfile"
+      },
+      "QueueProfileUpdateImpactPreview": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/QueueProfileImpactIdentity"
+          },
+          "current": {
+            "$ref": "#/components/schemas/QueueProfileBindingSnapshot"
+          },
+          "proposed": {
+            "$ref": "#/components/schemas/QueueProfileBindingSnapshot"
+          },
+          "links": {
+            "$ref": "#/components/schemas/QueueProfileLinkCounts"
+          },
+          "changed_binding_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "queue_tags",
+                "department_key"
+              ]
+            },
+            "type": "array",
+            "title": "Changed Binding Fields"
+          },
+          "blocked_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "queue_tags",
+                "department_key"
+              ]
+            },
+            "type": "array",
+            "title": "Blocked Fields"
+          },
+          "can_update": {
+            "type": "boolean",
+            "title": "Can Update"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "profile",
+          "current",
+          "proposed",
+          "links",
+          "changed_binding_fields",
+          "blocked_fields",
+          "can_update"
+        ],
+        "title": "QueueProfileUpdateImpactPreview"
       },
       "QueueReorderRequest": {
         "properties": {

@@ -18,6 +18,10 @@ from app.core.specialties import (
     INCOMPLETE_DOCTOR_SPECIALTY,  # noqa: F401 — SSOT: core/specialties (D-1)
     canonical_specialty,
 )
+from app.crud.queue_owner_invariant import (
+    QueueProfileBindingChanged,
+    lock_profile_link_scopes,
+)
 from app.models.clinic import Doctor  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.user_profile import (  # noqa: F401
@@ -170,9 +174,7 @@ def _mapped_specialty_selectable(db: Session, specialty: str) -> bool:
         MedicalSpecialtyCatalogService,
     )
 
-    return MedicalSpecialtyCatalogService(db).is_selectable_for_onboarding(
-        specialty
-    )
+    return MedicalSpecialtyCatalogService(db).is_selectable_for_onboarding(specialty)
 
 
 class UserManagementServiceMixinBase:
@@ -187,6 +189,7 @@ class UserManagementServiceMixinBase:
         reason: str = "owner_state_change",
         detach_owner: bool = False,
         pending_role: str | None = None,
+        prelocked_queue_tags: set[str] | None = None,
     ) -> int:
         """Mirror User.is_active onto the linked Doctor profile(s).
 
@@ -242,6 +245,42 @@ class UserManagementServiceMixinBase:
                     reason,
                 )
                 return 0
+            candidate_doctors = (
+                db.query(Doctor)
+                .filter(Doctor.user_id == user_id, Doctor.active.is_(False))
+                .populate_existing()
+                .all()
+            )
+            candidate_snapshot = tuple(
+                sorted((row.id, row.specialty or "") for row in candidate_doctors)
+            )
+            pending_doctor_tags = {
+                row.specialty for row in candidate_doctors if row.specialty
+            }
+            if pending_doctor_tags:
+                if prelocked_queue_tags is None:
+                    # Keep the owner-config -> Doctor row lock order used by
+                    # doctor edits and tagged queue admission. A Doctor row
+                    # must never be locked while waiting on these scopes.
+                    lock_profile_link_scopes(db, queue_tags=sorted(pending_doctor_tags))
+                elif not pending_doctor_tags.issubset(prelocked_queue_tags):
+                    # Bulk actions pre-acquire the union of all target scopes
+                    # before processing any Doctor row. If a binding changed
+                    # after that snapshot, abort rather than acquiring a new
+                    # scope while earlier Doctor rows may already be locked.
+                    raise QueueProfileBindingChanged()
+            inactive_doctors = (
+                db.query(Doctor)
+                .filter(Doctor.user_id == user_id, Doctor.active.is_(False))
+                .with_for_update()
+                .populate_existing()
+                .all()
+            )
+            locked_snapshot = tuple(
+                sorted((row.id, row.specialty or "") for row in inactive_doctors)
+            )
+            if candidate_snapshot != locked_snapshot:
+                raise QueueProfileBindingChanged()
             # Codex #3031 round-3 P1: the shared mirror is ALSO the
             # activation-only path (update_user {"is_active": true} and bulk
             # activate) — enforce the same catalog contract the promotion
@@ -260,11 +299,7 @@ class UserManagementServiceMixinBase:
             # update_user translates it into the remediation 400, and
             # bulk_action_users pre-flights it (round-3 P2) before any
             # per-user work.
-            for row in (
-                db.query(Doctor)
-                .filter(Doctor.user_id == user_id, Doctor.active.is_(False))
-                .all()
-            ):
+            for row in inactive_doctors:
                 stored_specialty = (row.specialty or "").strip()
                 stored_canonical = canonical_specialty(stored_specialty)
                 if (
@@ -286,9 +321,7 @@ class UserManagementServiceMixinBase:
             # No-op sync: skip rows already in the requested state.
             filters.append(Doctor.active != active)
         updated = (
-            db.query(Doctor)
-            .filter(*filters)
-            .update(values, synchronize_session=False)
+            db.query(Doctor).filter(*filters).update(values, synchronize_session=False)
         )
         if updated:
             logger.info(
@@ -307,6 +340,8 @@ class UserManagementServiceMixinBase:
         user: User,
         old_role: str,
         new_role: str,
+        *,
+        prelocked_queue_tags: set[str] | None = None,
     ) -> None:
         """Enforce the lifecycle invariant across a role change:
 
@@ -337,9 +372,45 @@ class UserManagementServiceMixinBase:
             return  # transition inside or outside the doctor family
 
         if new_is_doctor:
-            existing = (
-                db.query(Doctor).filter(Doctor.user_id == user.id).first()
+            default_specialty = DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
+                new_role, INCOMPLETE_DOCTOR_SPECIALTY
             )
+            candidate = (
+                db.query(Doctor)
+                .filter(Doctor.user_id == user.id)
+                .populate_existing()
+                .first()
+            )
+            candidate_snapshot = (
+                (candidate.id, candidate.specialty or "")
+                if candidate is not None
+                else None
+            )
+            candidate_scope = (
+                candidate.specialty if candidate is not None else default_specialty
+            )
+            if candidate_scope:
+                if prelocked_queue_tags is None:
+                    # Acquire the tag scope before the Doctor FOR UPDATE.
+                    lock_profile_link_scopes(db, queue_tags=[candidate_scope])
+                elif candidate_scope not in prelocked_queue_tags:
+                    raise QueueProfileBindingChanged()
+
+            existing = (
+                db.query(Doctor)
+                .filter(Doctor.user_id == user.id)
+                .with_for_update()
+                .populate_existing()
+                .first()
+            )
+            existing_snapshot = (
+                (existing.id, existing.specialty or "")
+                if existing is not None
+                else None
+            )
+            if candidate_snapshot != existing_snapshot:
+                raise QueueProfileBindingChanged()
+
             if existing is None:
                 # Codex round-8 P2: a concurrent promotion of the same user
                 # (or a parallel admin create) can insert the profile first;
@@ -351,9 +422,7 @@ class UserManagementServiceMixinBase:
                 # the morning_assignment docstring): the loser simply adopts
                 # whichever row is in the table after the statement, and the
                 # caller's role-change transaction stays intact.
-                specialty = DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
-                    new_role, INCOMPLETE_DOCTOR_SPECIALTY
-                )
+                specialty = default_specialty
                 # Codex #3010 follow-up P1: the role-change lifecycle is the
                 # SHARED provisioning path (create and promotion must not
                 # drift) — a role-mapped specialty that is no longer a
@@ -397,19 +466,11 @@ class UserManagementServiceMixinBase:
                     # remains the only guard, same as before this change).
                     db.add(Doctor(**values))
                     db.flush()
-                doctor = (
-                    db.query(Doctor)
-                    .filter(Doctor.user_id == user.id)
-                    .first()
-                )
+                doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
                 if doctor is None:  # pragma: no cover — defensive
                     db.add(Doctor(**values))
                     db.flush()
-                    doctor = (
-                        db.query(Doctor)
-                        .filter(Doctor.user_id == user.id)
-                        .first()
-                    )
+                    doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
                 logger.info(
                     "Doctor profile ensured on role promotion: user_id=%s "
                     "role=%s doctor_id=%s specialty=%r (incomplete=%s)",
@@ -463,143 +524,3 @@ class UserManagementServiceMixinBase:
                 False,
                 reason="role_demotion_from_doctor_role",
             )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
