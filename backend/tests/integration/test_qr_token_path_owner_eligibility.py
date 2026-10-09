@@ -141,7 +141,9 @@ def pg_engine():
 
         engine = create_engine(sa_url, future=True)
         with engine.connect() as conn:
-            version = conn.execute(text("select version_num from alembic_version")).scalar()
+            version = conn.execute(
+                text("select version_num from alembic_version")
+            ).scalar()
         assert version, "alembic_version must be present after upgrade"
         yield engine
     finally:
@@ -216,7 +218,13 @@ def _make_doctor(
     return doctor
 
 
-def _seed_doctor_token(session, suffix: str, doctor_id: int) -> dict:
+def _seed_doctor_token(
+    session,
+    suffix: str,
+    doctor_id: int,
+    *,
+    queue_tag: str = "cardiology",
+) -> dict:
     """Non-clinic-wide token scoped to the doctor + a live doctor-owned
     queue on the clinic day."""
     from app.models.online_queue import DailyQueue, QueueToken
@@ -225,7 +233,7 @@ def _seed_doctor_token(session, suffix: str, doctor_id: int) -> dict:
     queue = DailyQueue(
         day=day,
         specialist_id=doctor_id,
-        queue_tag="cardiology",
+        queue_tag=queue_tag,
         active=True,
     )
     session.add(queue)
@@ -236,7 +244,7 @@ def _seed_doctor_token(session, suffix: str, doctor_id: int) -> dict:
         token=f"rq09c-token-{suffix}",
         day=day,
         specialist_id=doctor_id,
-        department="cardiology",
+        department=queue_tag,
         expires_at=local_now + timedelta(hours=2),
         active=True,
     )
@@ -262,6 +270,84 @@ def _entries(session, queue_id: int | None = None) -> list:
     if queue_id is not None:
         query = query.filter(OnlineQueueEntry.queue_id == queue_id)
     return query.all()
+
+
+def test_shared_tag_candidate_policy_fails_closed_for_conflicting_parents():
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_profile_availability import QueueProfileAvailability
+    from app.services.queue_svc import QueueBusinessService
+
+    unavailable_parent = QueueProfileAvailability(
+        state="unavailable",
+        is_available=False,
+        reason_codes=("parent_inactive",),
+        parent_department_key="rq09c-off-parent",
+        parent_active=False,
+    )
+    available_standalone = QueueProfileAvailability(
+        state="available",
+        is_available=True,
+        reason_codes=(),
+        parent_department_key=None,
+        parent_active=None,
+    )
+    profiles = [
+        QueueProfile(
+            key="rq09c-off-direction",
+            queue_tags=["rq09c-shared-tag"],
+            is_active=True,
+            show_on_qr_page=True,
+        ),
+        QueueProfile(
+            key="rq09c-standalone-direction",
+            queue_tags=["rq09c-shared-tag"],
+            is_active=True,
+            show_on_qr_page=True,
+        ),
+    ]
+
+    assert not QueueBusinessService._qr_profile_candidates_are_unambiguous(
+        profiles,
+        db=None,
+        availability_by_profile={
+            profiles[0]: unavailable_parent,
+            profiles[1]: available_standalone,
+        },
+    )
+
+
+def test_shared_tag_candidate_policy_allows_equivalent_visible_profiles():
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_profile_availability import QueueProfileAvailability
+    from app.services.queue_svc import QueueBusinessService
+
+    availability = QueueProfileAvailability(
+        state="available",
+        is_available=True,
+        reason_codes=(),
+        parent_department_key="rq09c-shared-parent",
+        parent_active=True,
+    )
+    profiles = [
+        QueueProfile(
+            key="rq09c-shared-a",
+            queue_tags=["rq09c-shared-tag"],
+            is_active=True,
+            show_on_qr_page=True,
+        ),
+        QueueProfile(
+            key="rq09c-shared-b",
+            queue_tags=["rq09c-shared-tag"],
+            is_active=True,
+            show_on_qr_page=True,
+        ),
+    ]
+
+    assert QueueBusinessService._qr_profile_candidates_are_unambiguous(
+        profiles,
+        db=None,
+        availability_by_profile=dict.fromkeys(profiles, availability),
+    )
 
 
 def test_owner_inactive_ghost_cannot_join_via_doctor_token(pg_session):
@@ -366,6 +452,99 @@ def test_existing_doctor_token_refuses_after_parent_department_is_disabled(
         department = session.query(Department).filter_by(key="cardiology").one()
         department.active = original_active
         session.commit()
+
+
+def test_existing_doctor_token_rejects_mixed_availability_for_shared_queue_tag(
+    pg_session,
+):
+    """A visible sibling cannot make a shared-tag token bypass its disabled parent."""
+    from app.models.department import Department
+    from app.models.queue_profile import QueueProfile
+    from app.services.qr_queue import QRQueueService
+    from app.services.queue_svc import QueueValidationError
+
+    session = pg_session
+    user = _make_user(session, "rq09c_shared_off", "Doctor", active=True)
+    doctor = _make_doctor(session, user.id)
+    queue_tag = f"rq09c-shared-off-{doctor.id}"
+    world = _seed_doctor_token(session, "shared-off", doctor.id, queue_tag=queue_tag)
+    session.add_all(
+        [
+            QueueProfile(
+                key=f"rq09c-parented-shared-{doctor.id}",
+                title="Synthetic parented shared-tag profile",
+                queue_tags=[queue_tag],
+                department_key="cardiology",
+                is_active=True,
+                show_on_qr_page=True,
+            ),
+            QueueProfile(
+                key=f"rq09c-visible-shared-{doctor.id}",
+                title="Synthetic visible shared-tag sibling",
+                queue_tags=[queue_tag],
+                department_key=None,
+                is_active=True,
+                show_on_qr_page=True,
+            ),
+        ]
+    )
+    department = session.query(Department).filter_by(key="cardiology").one()
+    original_active = department.active
+    department.active = False
+    session.commit()
+
+    try:
+        # The stored QR token only names the DailyQueue tag. Two profiles
+        # sharing that tag with different effective parents are ambiguous.
+        assert QRQueueService(session).get_qr_token_info(world["token"]) is None
+        with pytest.raises((QueueValidationError, ValueError)):
+            _join(session, world["token"])
+        assert _entries(session, world["queue_id"]) == []
+    finally:
+        session.rollback()
+        department = session.query(Department).filter_by(key="cardiology").one()
+        department.active = original_active
+        session.commit()
+
+
+def test_existing_doctor_token_allows_equivalent_visible_shared_queue_tags(
+    pg_session,
+):
+    """Compatible profiles sharing one active parent keep the legacy token usable."""
+    from app.models.queue_profile import QueueProfile
+    from app.services.qr_queue import QRQueueService
+
+    session = pg_session
+    user = _make_user(session, "rq09c_shared_ok", "Doctor", active=True)
+    doctor = _make_doctor(session, user.id)
+    queue_tag = f"rq09c-shared-ok-{doctor.id}"
+    world = _seed_doctor_token(session, "shared-ok", doctor.id, queue_tag=queue_tag)
+    session.add_all(
+        [
+            QueueProfile(
+                key=f"rq09c-equivalent-a-{doctor.id}",
+                title="Synthetic equivalent shared-tag profile A",
+                queue_tags=[queue_tag],
+                department_key="cardiology",
+                is_active=True,
+                show_on_qr_page=True,
+            ),
+            QueueProfile(
+                key=f"rq09c-equivalent-b-{doctor.id}",
+                title="Synthetic equivalent shared-tag profile B",
+                queue_tags=[queue_tag],
+                department_key="cardiology",
+                is_active=True,
+                show_on_qr_page=True,
+            ),
+        ]
+    )
+    session.commit()
+
+    assert QRQueueService(session).get_qr_token_info(world["token"]) is not None
+    result = _join(session, world["token"])
+    assert result["success"] is True, result
+    assert len(_entries(session, world["queue_id"])) == 1
 
 
 def test_resource_owned_surface_joins_without_doctor_role_gate(pg_session):

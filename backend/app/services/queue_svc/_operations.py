@@ -191,6 +191,53 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
     """Operations methods."""
 
     @classmethod
+    def _qr_profile_candidates_are_unambiguous(
+        cls,
+        profiles: list[Any],
+        db: Session,
+        availability_by_profile: dict[Any, Any],
+    ) -> bool:
+        """Require every shared-tag candidate to describe the same public target.
+
+        A legacy token stores a queue tag, not a QueueProfile ID. Internal
+        overview profiles are not booking targets, so only profiles with
+        saved publication intent participate. If published profiles sharing
+        the tag disagree on availability or resolved parent, the token cannot
+        identify which target it was issued for and must fail closed.
+        Equivalent visible profiles on the same parent remain usable.
+        """
+        target_profiles = [
+            profile
+            for profile in profiles
+            if bool(getattr(profile, "show_on_qr_page", False))
+        ]
+        if not target_profiles:
+            return False
+
+        target_scopes: set[tuple[str, str | None]] = set()
+        for profile in target_profiles:
+            availability = availability_by_profile.get(profile)
+            if availability is None or not cls._is_qr_visible_profile(
+                profile,
+                db,
+                availability=availability,
+            ):
+                logger.warning(
+                    "[queue token] rejected unavailable published QueueProfile target: candidates=%d",
+                    len(target_profiles),
+                )
+                return False
+            target_scopes.add((availability.state, availability.parent_department_key))
+
+        if len(target_scopes) != 1:
+            logger.warning(
+                "[queue token] rejected ambiguous shared QueueProfile tag: candidates=%d",
+                len(target_profiles),
+            )
+            return False
+        return True
+
+    @classmethod
     def check_queue_time_window(
         cls,
         target_date: date,
@@ -631,9 +678,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         # moved to queue_resource_routing (one SSOT shared with the four
         # legacy creation paths) — byte-identical identity, see
         # daily_queue_creation_lock_key.
-        lock_daily_queue_creation(
-            db, day, actual_specialist_id, queue_tag=queue_tag
-        )
+        lock_daily_queue_creation(db, day, actual_specialist_id, queue_tag=queue_tag)
 
         # PR-26: ARCHITECTURE FIX — queue is owned by DOCTOR, not by queue_tag.
         #
@@ -1032,9 +1077,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             # that is now archived, parent-off, dangling, or conflicting
             # cannot be bypassed by an already-issued token.
             specialist = queue_token.specialist or (
-                db.query(Doctor)
-                .filter(Doctor.id == queue_token.specialist_id)
-                .first()
+                db.query(Doctor).filter(Doctor.id == queue_token.specialist_id).first()
             )
             if specialist is not None:
                 profile_candidates = self._get_qr_profile_candidates_for_tag(
@@ -1052,13 +1095,10 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     availability_by_profile = load_queue_profile_availability(
                         db, profile_candidates
                     )
-                    if not any(
-                        self._is_qr_visible_profile(
-                            profile,
-                            db,
-                            availability=availability_by_profile[profile],
-                        )
-                        for profile in profile_candidates
+                    if not self._qr_profile_candidates_are_unambiguous(
+                        profile_candidates,
+                        db,
+                        availability_by_profile,
                     ):
                         raise QueueValidationError(
                             "Специалист недоступен для QR-записи"
@@ -1388,9 +1428,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         else:
             profile_rows = []
         profiles_by_id = {profile.id: profile for profile in profile_rows}
-        availability_by_profile = load_queue_profile_availability(
-            db, profile_rows
-        )
+        availability_by_profile = load_queue_profile_availability(db, profile_rows)
         doctors_by_id: dict[int, Doctor] = {}
         if doctor_selection_ids:
             eligible_doctors = (
