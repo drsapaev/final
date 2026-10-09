@@ -61,16 +61,59 @@ class PublicSiteReadService:
             return None
         return name_ru if locale == "ru" else name_uz
 
+    @staticmethod
+    def _service_content_is_complete(service: Service) -> bool:
+        """Use one Python whitespace rule for selecting and shaping a card."""
+        return all(
+            _clean_text(value) is not None
+            for value in (
+                service.slug,
+                service.name,
+                service.name_uz,
+                service.description_ru,
+                service.description_uz,
+            )
+        )
+
+    @staticmethod
+    def _doctor_content_is_complete(doctor: Doctor) -> bool:
+        """A public doctor card requires a name and both localized bios."""
+        return all(
+            _clean_text(value) is not None
+            for value in (
+                doctor.slug,
+                doctor.user.full_name if doctor.user else None,
+                doctor.bio_ru,
+                doctor.bio_uz,
+            )
+        )
+
+    def _eligible_services(self) -> list[Service]:
+        return [
+            row
+            for row in self.repository.list_public_services()
+            if self._service_content_is_complete(row)
+        ]
+
+    def _eligible_doctors(self) -> list[Doctor]:
+        return [
+            row
+            for row in self.repository.list_public_doctors()
+            if self._doctor_content_is_complete(row)
+        ]
+
     @classmethod
     def _service_out(
         cls, service: Service, locale: PublicSiteLocale
-    ) -> PublicSiteServiceOut:
+    ) -> PublicSiteServiceOut | None:
+        if not cls._service_content_is_complete(service):
+            return None
+
         name = _localized(service.name, service.name_uz, locale)
         description = _localized(service.description_ru, service.description_uz, locale)
-        # Publication validation requires both locales. Keep the guard here so
-        # malformed rows can never turn into an empty or cross-language card.
-        if not name or not description or not service.slug:
-            raise ValueError("published service content is incomplete")
+        # Completeness was checked for both locales before serialization.
+        if name is None or description is None or service.slug is None:
+            return None
 
         price = service.price
         currency = _clean_text(service.currency)
@@ -88,10 +131,12 @@ class PublicSiteReadService:
         )
 
     def list_services(self, locale: PublicSiteLocale) -> list[PublicSiteServiceOut]:
-        return [
-            self._service_out(row, locale)
-            for row in self.repository.list_public_services()
-        ]
+        result = []
+        for row in self._eligible_services():
+            card = self._service_out(row, locale)
+            if card is not None:
+                result.append(card)
+        return result
 
     def get_service(
         self, slug: str, locale: PublicSiteLocale
@@ -109,22 +154,27 @@ class PublicSiteReadService:
             name = cls._category_name(category, locale)
             if category is not None and name is not None:
                 names[category.id] = name
+        # The public DTO exposes labels only, so repeated localized labels
+        # intentionally represent one category in the selected locale.
         unique_names = sorted(set(names.values()), key=str.casefold)
         return [PublicSiteCategoryOut(name=name) for name in unique_names]
 
     def list_categories(self, locale: PublicSiteLocale) -> list[PublicSiteCategoryOut]:
-        return self._category_rows(self.repository.list_public_services(), locale)
+        return self._category_rows(self._eligible_services(), locale)
 
     @staticmethod
     def _doctor_out(
         doctor: Doctor,
         locale: PublicSiteLocale,
         specialties: dict[str, object],
-    ) -> PublicSiteDoctorOut:
+    ) -> PublicSiteDoctorOut | None:
+        if not PublicSiteReadService._doctor_content_is_complete(doctor):
+            return None
+
         name = _clean_text(doctor.user.full_name if doctor.user else None)
         bio = _localized(doctor.bio_ru, doctor.bio_uz, locale)
-        if not name or not bio or not doctor.slug:
-            raise ValueError("published doctor content is incomplete")
+        if name is None or bio is None or doctor.slug is None:
+            return None
 
         specialty_title = None
         specialty = specialties.get(doctor.specialty)
@@ -139,17 +189,22 @@ class PublicSiteReadService:
         )
 
     def list_doctors(self, locale: PublicSiteLocale) -> list[PublicSiteDoctorOut]:
-        doctors = self.repository.list_public_doctors()
+        doctors = self._eligible_doctors()
         specialties = self.repository.list_specialties_by_code(
             {doctor.specialty for doctor in doctors if doctor.specialty}
         )
-        return [self._doctor_out(doctor, locale, specialties) for doctor in doctors]
+        result = []
+        for doctor in doctors:
+            card = self._doctor_out(doctor, locale, specialties)
+            if card is not None:
+                result.append(card)
+        return result
 
     def get_doctor(
         self, slug: str, locale: PublicSiteLocale
     ) -> PublicSiteDoctorOut | None:
         doctor = self.repository.get_public_doctor_by_slug(slug)
-        if doctor is None:
+        if doctor is None or not self._doctor_content_is_complete(doctor):
             return None
         specialties = self.repository.list_specialties_by_code(
             {doctor.specialty} if doctor.specialty else set()

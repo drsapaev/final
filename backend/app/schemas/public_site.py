@@ -23,6 +23,18 @@ class PublicSiteClinicOut(BaseModel):
     email: str | None = None
 
 
+class PublicSiteNotFoundDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: Literal["public_content_not_found"]
+
+
+class PublicSiteNotFoundOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    detail: PublicSiteNotFoundDetail
+
+
 class PublicSiteCategoryOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

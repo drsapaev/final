@@ -35887,6 +35887,18 @@ export type components = {
             /** Specialty */
             specialty?: string | null;
         };
+        /** PublicSiteNotFoundDetail */
+        PublicSiteNotFoundDetail: {
+            /**
+             * Code
+             * @constant
+             */
+            code: "public_content_not_found";
+        };
+        /** PublicSiteNotFoundOut */
+        PublicSiteNotFoundOut: {
+            detail: components["schemas"]["PublicSiteNotFoundDetail"];
+        };
         /** PublicSiteServiceOut */
         PublicSiteServiceOut: {
             /** Slug */
@@ -44618,6 +44630,15 @@ export interface operations {
                     "application/json": components["schemas"]["PublicSiteServiceOut"];
                 };
             };
+            /** @description Published service was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteNotFoundOut"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44711,6 +44732,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicSiteDoctorOut"];
+                };
+            };
+            /** @description Published doctor was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteNotFoundOut"];
                 };
             };
             /** @description Validation Error */

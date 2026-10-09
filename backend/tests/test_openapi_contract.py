@@ -105,6 +105,33 @@ def test_openapi_contains_critical_routes(
     ), f"Missing method in OpenAPI: {method.upper()} {path}"
 
 
+def test_openapi_documents_public_site_detail_not_found_contract(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    components = schema["components"]["schemas"]
+
+    for path in (
+        "/api/v1/public-site/services/{slug}",
+        "/api/v1/public-site/doctors/{slug}",
+    ):
+        operation = schema["paths"][path]["get"]
+        assert (
+            operation["responses"]["404"]["content"]["application/json"]["schema"][
+                "$ref"
+            ]
+            == "#/components/schemas/PublicSiteNotFoundOut"
+        )
+
+    not_found = components["PublicSiteNotFoundOut"]
+    assert not_found["required"] == ["detail"]
+    detail_ref = not_found["properties"]["detail"]["$ref"]
+    detail_name = detail_ref.rsplit("/", maxsplit=1)[-1]
+    detail = components[detail_name]
+    assert detail["required"] == ["code"]
+    assert detail["properties"]["code"]["const"] == "public_content_not_found"
+
+
 def test_openapi_queue_join_contract_has_request_and_responses(
     client: TestClient,
 ) -> None:

@@ -12,6 +12,7 @@ from app.schemas.public_site import (
     PublicSiteClinicOut,
     PublicSiteDoctorOut,
     PublicSiteLocale,
+    PublicSiteNotFoundOut,
     PublicSiteServiceOut,
 )
 from app.services.public_site_read_service import PublicSiteReadService
@@ -56,6 +57,12 @@ def list_public_services(
 @router.get(
     "/services/{slug}",
     response_model=PublicSiteServiceOut,
+    responses={
+        404: {
+            "model": PublicSiteNotFoundOut,
+            "description": "Published service was not found.",
+        }
+    },
     operation_id="public_site_get_service",
     summary="Получить опубликованную услугу",
 )
@@ -99,6 +106,12 @@ def list_public_doctors(
 @router.get(
     "/doctors/{slug}",
     response_model=PublicSiteDoctorOut,
+    responses={
+        404: {
+            "model": PublicSiteNotFoundOut,
+            "description": "Published doctor was not found.",
+        }
+    },
     operation_id="public_site_get_doctor",
     summary="Получить опубликованного врача",
 )

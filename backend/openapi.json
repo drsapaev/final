@@ -3398,6 +3398,16 @@
               }
             }
           },
+          "404": {
+            "description": "Published service was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteNotFoundOut"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3549,6 +3559,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PublicSiteDoctorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published doctor was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteNotFoundOut"
                 }
               }
             }
@@ -102582,6 +102602,34 @@
           "bio"
         ],
         "title": "PublicSiteDoctorOut"
+      },
+      "PublicSiteNotFoundDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "public_content_not_found",
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "PublicSiteNotFoundDetail"
+      },
+      "PublicSiteNotFoundOut": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/PublicSiteNotFoundDetail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicSiteNotFoundOut"
       },
       "PublicSiteServiceOut": {
         "properties": {

@@ -192,6 +192,106 @@ def test_public_catalog_filters_and_allowlists(client, db_session):
     assert categories.json() == [{"name": active_category.name_uz}]
 
 
+def test_malformed_published_services_are_omitted_and_details_are_not_found(
+    client, db_session
+):
+    valid = _service(db_session, "valid-service")
+    tab_only = _service(db_session, "tab-only-description")
+    tab_only.description_ru = "\t"
+    newline_only = _service(db_session, "newline-only-description")
+    newline_only.description_uz = "\r\n"
+    db_session.commit()
+
+    expected_not_found = {"detail": {"code": "public_content_not_found"}}
+    for locale in ("ru", "uz-Latn"):
+        response = client.get(
+            "/api/v1/public-site/services",
+            params={"locale": locale},
+        )
+        assert response.status_code == 200, response.text
+        assert [row["slug"] for row in response.json()] == [valid.slug]
+
+        for slug in (tab_only.slug, newline_only.slug):
+            malformed_detail = client.get(
+                f"/api/v1/public-site/services/{slug}",
+                params={"locale": locale},
+            )
+            unknown_detail = client.get(
+                "/api/v1/public-site/services/unknown-service",
+                params={"locale": locale},
+            )
+            assert malformed_detail.status_code == 404
+            assert malformed_detail.json() == expected_not_found
+            assert malformed_detail.json() == unknown_detail.json()
+
+
+def test_malformed_published_doctors_are_omitted_and_details_are_not_found(
+    client, db_session
+):
+    valid = _doctor(db_session, "valid-doctor")
+    tab_only_bio = _doctor(db_session, "tab-only-bio")
+    tab_only_bio.bio_ru = "\t"
+    newline_only_bio = _doctor(db_session, "newline-only-bio")
+    newline_only_bio.bio_uz = "\n"
+    blank_display_name = _doctor(db_session, "blank-display-name")
+    assert blank_display_name.user is not None
+    blank_display_name.user.full_name = "\t\r\n"
+    db_session.commit()
+
+    expected_not_found = {"detail": {"code": "public_content_not_found"}}
+    malformed_slugs = (
+        tab_only_bio.slug,
+        newline_only_bio.slug,
+        blank_display_name.slug,
+    )
+    for locale in ("ru", "uz-Latn"):
+        response = client.get(
+            "/api/v1/public-site/doctors",
+            params={"locale": locale},
+        )
+        assert response.status_code == 200, response.text
+        assert [row["slug"] for row in response.json()] == [valid.slug]
+
+        for slug in malformed_slugs:
+            malformed_detail = client.get(
+                f"/api/v1/public-site/doctors/{slug}",
+                params={"locale": locale},
+            )
+            unknown_detail = client.get(
+                "/api/v1/public-site/doctors/unknown-doctor",
+                params={"locale": locale},
+            )
+            assert malformed_detail.status_code == 404
+            assert malformed_detail.json() == expected_not_found
+            assert malformed_detail.json() == unknown_detail.json()
+
+
+def test_public_categories_are_unique_by_localized_display_name(client, db_session):
+    first_category = _category(db_session, "synthetic-same-label-a")
+    second_category = _category(db_session, "synthetic-same-label-b")
+    first_category.name_ru = second_category.name_ru = "SYNTHETIC Общая категория"
+    first_category.name_uz = "SYNTHETIC Birinchi turkum"
+    second_category.name_uz = "SYNTHETIC Ikkinchi turkum"
+    db_session.commit()
+    _service(db_session, "same-label-service-a", category=first_category)
+    _service(db_session, "same-label-service-b", category=second_category)
+
+    russian = client.get(
+        "/api/v1/public-site/categories",
+        params={"locale": "ru"},
+    )
+    uzbek = client.get(
+        "/api/v1/public-site/categories",
+        params={"locale": "uz-Latn"},
+    )
+    assert russian.status_code == uzbek.status_code == 200
+    assert russian.json() == [{"name": "SYNTHETIC Общая категория"}]
+    assert {row["name"] for row in uzbek.json()} == {
+        "SYNTHETIC Birinchi turkum",
+        "SYNTHETIC Ikkinchi turkum",
+    }
+
+
 def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
     client, db_session
 ):
@@ -237,6 +337,7 @@ def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
 
 
 def test_hidden_and_unknown_details_share_public_not_found_response(client, db_session):
+    expected_not_found = {"detail": {"code": "public_content_not_found"}}
     _service(db_session, "hidden-service", published=False)
     hidden_service = client.get(
         "/api/v1/public-site/services/hidden-service",
@@ -247,7 +348,7 @@ def test_hidden_and_unknown_details_share_public_not_found_response(client, db_s
         params={"locale": "ru"},
     )
     assert hidden_service.status_code == unknown_service.status_code == 404
-    assert hidden_service.json() == unknown_service.json()
+    assert hidden_service.json() == unknown_service.json() == expected_not_found
 
     hidden_doctor = _doctor(db_session, "hidden-doctor", published=False)
     hidden_doctor_response = client.get(
@@ -261,7 +362,11 @@ def test_hidden_and_unknown_details_share_public_not_found_response(client, db_s
     assert (
         hidden_doctor_response.status_code == unknown_doctor_response.status_code == 404
     )
-    assert hidden_doctor_response.json() == unknown_doctor_response.json()
+    assert (
+        hidden_doctor_response.json()
+        == unknown_doctor_response.json()
+        == expected_not_found
+    )
 
 
 def test_public_catalog_requires_a_supported_locale(client):

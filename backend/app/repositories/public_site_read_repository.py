@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.clinic import ClinicSettings, Doctor
@@ -12,7 +12,7 @@ from app.models.user import User
 
 
 class PublicSiteReadRepository:
-    """Queries only rows eligible to be shaped as public website content."""
+    """Queries active, published candidates for the public website read model."""
 
     CLINIC_SETTING_KEYS = (
         "clinic_name",
@@ -29,15 +29,6 @@ class PublicSiteReadRepository:
         return (
             Service.active.is_(True),
             Service.show_on_website.is_(True),
-            Service.slug.is_not(None),
-            func.trim(Service.slug) != "",
-            func.trim(Service.name) != "",
-            Service.name_uz.is_not(None),
-            func.trim(Service.name_uz) != "",
-            Service.description_ru.is_not(None),
-            func.trim(Service.description_ru) != "",
-            Service.description_uz.is_not(None),
-            func.trim(Service.description_uz) != "",
         )
 
     @staticmethod
@@ -45,15 +36,7 @@ class PublicSiteReadRepository:
         return (
             Doctor.active.is_(True),
             Doctor.show_on_website.is_(True),
-            Doctor.slug.is_not(None),
-            func.trim(Doctor.slug) != "",
-            Doctor.bio_ru.is_not(None),
-            func.trim(Doctor.bio_ru) != "",
-            Doctor.bio_uz.is_not(None),
-            func.trim(Doctor.bio_uz) != "",
             User.is_active.is_(True),
-            User.full_name.is_not(None),
-            func.trim(User.full_name) != "",
         )
 
     def list_public_services(self) -> list[Service]:
