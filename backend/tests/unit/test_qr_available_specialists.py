@@ -19,6 +19,9 @@ class _Query:
     def options(self, *_options):
         return self
 
+    def order_by(self, *_expressions):
+        return self
+
     def offset(self, value):
         self._offset = value
         return self
@@ -73,8 +76,16 @@ def test_available_specialists_filters_before_pagination_and_reports_full_total(
         ),
     ]
     availability = {
-        profiles[0]: SimpleNamespace(is_available=True),
-        profiles[1]: SimpleNamespace(is_available=False),
+        profiles[0]: SimpleNamespace(
+            state="available",
+            is_available=True,
+            parent_department_key=None,
+        ),
+        profiles[1]: SimpleNamespace(
+            state="unavailable",
+            is_available=False,
+            parent_department_key=None,
+        ),
     }
     monkeypatch.setattr(
         queue_profile_availability,
