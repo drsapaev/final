@@ -105,8 +105,16 @@ class AuthenticationApiService:
                 if composed_name:
                     profile.full_name = composed_name
 
-            if getattr(profile, "full_name", None):
-                current_user.full_name = profile.full_name
+            profile_full_name = getattr(profile, "full_name", None)
+            if is_doctor_role_spelling(getattr(current_user, "role", None)):
+                if isinstance(profile_full_name, str) and profile_full_name.strip():
+                    current_user.full_name = profile_full_name
+                elif profile_full_name:
+                    logger.info(
+                        "[FIX] Ignored a blank profile display name for a doctor account"
+                    )
+            elif profile_full_name:
+                current_user.full_name = profile_full_name
 
             if phone_updated:
                 profile.phone_verified = False

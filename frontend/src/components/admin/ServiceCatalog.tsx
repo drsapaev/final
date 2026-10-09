@@ -465,7 +465,7 @@ const ServiceCatalog = () => {
   };
 
   const saveWebsiteContent = async (operation: WebsiteContentOperation) => {
-    if (!selectedWebsiteService) return;
+    if (!selectedWebsiteService || !websiteLoaded || websiteLoadingRef.current) return;
     setWebsiteSaving(true);
     setWebsiteError('');
     setWebsiteNotice('');
@@ -512,6 +512,7 @@ const ServiceCatalog = () => {
     ...(!websiteForm.slug.trim() ? ['slug'] : []),
     ...(!selectedWebsiteService.active ? ['active'] : []),
   ] : [];
+  const websiteEditorUnavailable = websiteSaving || websiteLoading || !websiteLoaded;
 
   const websiteFieldLabel = (field: string) => {
     const keys: Record<string, string> = {
@@ -822,7 +823,7 @@ const ServiceCatalog = () => {
                       id="service-site-name-ru"
                       value={websiteForm.name_ru}
                       onChange={(event) => updateWebsiteField('name_ru', event.target.value)}
-                      disabled={websiteSaving}
+                      disabled={websiteEditorUnavailable}
                       maxLength={256}
                     />
                   </div>
@@ -834,7 +835,7 @@ const ServiceCatalog = () => {
                       id="service-site-name-uz"
                       value={websiteForm.name_uz}
                       onChange={(event) => updateWebsiteField('name_uz', event.target.value)}
-                      disabled={websiteSaving}
+                      disabled={websiteEditorUnavailable}
                       maxLength={256}
                     />
                   </div>
@@ -846,7 +847,7 @@ const ServiceCatalog = () => {
                       id="service-site-slug"
                       value={websiteForm.slug}
                       onChange={(event) => updateWebsiteField('slug', event.target.value)}
-                      disabled={websiteSaving || selectedWebsiteService.slug_locked}
+                      disabled={websiteEditorUnavailable || selectedWebsiteService.slug_locked}
                       maxLength={160}
                     />
                     {selectedWebsiteService.slug_locked && (
@@ -861,7 +862,7 @@ const ServiceCatalog = () => {
                       id="service-site-description-ru"
                       value={websiteForm.description_ru}
                       onChange={(event) => updateWebsiteField('description_ru', event.target.value)}
-                      disabled={websiteSaving}
+                      disabled={websiteEditorUnavailable}
                       minRows={3}
                     />
                   </div>
@@ -873,7 +874,7 @@ const ServiceCatalog = () => {
                       id="service-site-description-uz"
                       value={websiteForm.description_uz}
                       onChange={(event) => updateWebsiteField('description_uz', event.target.value)}
-                      disabled={websiteSaving}
+                      disabled={websiteEditorUnavailable}
                       minRows={3}
                     />
                   </div>
@@ -887,17 +888,17 @@ const ServiceCatalog = () => {
 
                 <div className="admin-flex-wrap-8">
                   {!selectedWebsiteService.show_on_website && (
-                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('save_draft')} disabled={websiteSaving}>
+                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('save_draft')} disabled={websiteEditorUnavailable}>
                       {websiteSaving ? t('admin2.sitepub_saving') : t('admin2.sitepub_save_draft')}
                     </Button>
                   )}
                   {selectedWebsiteService.show_on_website && (
-                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('save_published')} disabled={websiteSaving || websiteMissingFields.length > 0}>
+                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('save_published')} disabled={websiteEditorUnavailable || websiteMissingFields.length > 0}>
                       {websiteSaving ? t('admin2.sitepub_saving') : t('admin2.sitepub_save_published')}
                     </Button>
                   )}
                   {!selectedWebsiteService.show_on_website && (
-                    <Button type="button" onClick={() => void saveWebsiteContent(selectedWebsiteService.website_first_published_at ? 'republish' : 'publish')} disabled={websiteSaving || websiteMissingFields.length > 0}>
+                    <Button type="button" onClick={() => void saveWebsiteContent(selectedWebsiteService.website_first_published_at ? 'republish' : 'publish')} disabled={websiteEditorUnavailable || websiteMissingFields.length > 0}>
                       {websiteSaving
                         ? t('admin2.sitepub_saving')
                         : selectedWebsiteService.website_first_published_at
@@ -906,7 +907,7 @@ const ServiceCatalog = () => {
                     </Button>
                   )}
                   {selectedWebsiteService.show_on_website && (
-                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('unpublish')} disabled={websiteSaving}>
+                    <Button type="button" variant="outline" onClick={() => void saveWebsiteContent('unpublish')} disabled={websiteEditorUnavailable}>
                       {t('admin2.sitepub_unpublish')}
                     </Button>
                   )}

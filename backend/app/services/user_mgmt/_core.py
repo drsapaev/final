@@ -549,31 +549,6 @@ class CoreMixin(UserManagementServiceMixinBase):
                         if hasattr(user.profile, field):
                             setattr(user.profile, field, value)
 
-            # Website publication requires an owner display name. Keep the
-            # public card valid when an Admin clears that name through the
-            # user-management path; this update shares the same transaction.
-            # Lock every linked row, including hidden cards: a publisher may
-            # already hold that row while validating the current owner name.
-            if "full_name" in update_data and not (user.full_name or "").strip():
-                linked_doctors = (
-                    db.query(Doctor)
-                    .filter(Doctor.user_id == user_id)
-                    .order_by(Doctor.id.asc())
-                    .with_for_update()
-                    .populate_existing()
-                    .all()
-                )
-                hidden_published_card = False
-                for doctor in linked_doctors:
-                    if doctor.show_on_website:
-                        doctor.show_on_website = False
-                        hidden_published_card = True
-                if hidden_published_card:
-                    logger.info(
-                        "[FIX] Hid the public doctor card after its owner "
-                        "display name was cleared"
-                    )
-
             # Ghost-doctor prevention: mirror is_active onto Doctor profile
             if "is_active" in update_data and user.is_active != old_is_active:
                 # Codex #3031 round-7 P2: pass the pending role when the
@@ -600,6 +575,31 @@ class CoreMixin(UserManagementServiceMixinBase):
             # handled by the same contract (see _apply_role_change_doctor_lifecycle).
             if "role" in update_data and user.role != old_role:
                 self._apply_role_change_doctor_lifecycle(db, user, old_role, user.role)
+
+            # Website publication requires an owner display name. Keep the
+            # public card valid when an Admin clears that name through the
+            # user-management path; this update shares the same transaction.
+            # Run after lifecycle mutations, which acquire owner-config scopes
+            # before Doctor rows, to preserve the queue/profile lock order.
+            if "full_name" in update_data and not (user.full_name or "").strip():
+                linked_doctors = (
+                    db.query(Doctor)
+                    .filter(Doctor.user_id == user_id)
+                    .order_by(Doctor.id.asc())
+                    .with_for_update()
+                    .populate_existing()
+                    .all()
+                )
+                hidden_published_card = False
+                for doctor in linked_doctors:
+                    if doctor.show_on_website:
+                        doctor.show_on_website = False
+                        hidden_published_card = True
+                if hidden_published_card:
+                    logger.info(
+                        "[FIX] Hid the public doctor card after its owner "
+                        "display name was cleared"
+                    )
 
             # Логируем обновление
             self._log_user_action(
