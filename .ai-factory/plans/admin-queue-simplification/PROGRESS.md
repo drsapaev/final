@@ -1,14 +1,14 @@
 # Progress
 
-Plan version: 3.84
+Plan version: 3.85
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: PR_OPEN — PR #3639 is OPEN/MERGEABLE at remote HEAD `bb55443f`, based on merged #3633 (`6315c62e`). Generated API commit `2b90c34a` and test-only fix commit `66afece7` are local and not pushed. All commit hooks passed on the test-fix commit; PR body gate passed. Hosted CI has not run on these corrections. #3639 is not merged.
+Current status: PR_OPEN — PR #3639 is OPEN/MERGEABLE at exact remote HEAD `35f30506fcd511c0dc81a5d87ae6122e5de0242d`, based on merged #3633 (`6315c62edb888bb8864928a41dd70a4c00be6e3d`). Exact-head applicable CI passed; path-aware checks skipped by CI remain SKIPPED, not PASS. T11 Tier-2 staging is PARTIAL; no deferral is accepted and #3639 is not merged.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 Base (`origin/main`): 6315c62edb888bb8864928a41dd70a4c00be6e3d
-Remote PR HEAD: bb55443f; latest source/test commit: 66afece7
-Current changed paths: nine allowed backend integration test modules and T11 `PROGRESS.md`/`EVIDENCE.md`/`RESUME.md`; local generated artifact commit is one ahead of remote. Task-owned `.scratch/` remains untracked and must be preserved.
-Last updated: 2026-10-09T10:46+05:00
+Remote PR HEAD: 35f30506fcd511c0dc81a5d87ae6122e5de0242d (same as local HEAD); source/test corrections and generated artifacts are pushed.
+Current changed paths: T11 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` only. Preserve untracked task-owned `.scratch/` and ignored sanitized `output/staging/t11-live-report.json`; do not stage generated artifacts.
+Last updated: 2026-10-09T11:32+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,9 +16,20 @@ Last updated: 2026-10-09T10:46+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS | PR #3639; remote bb55443f, local 2b90c34a plus local test fixes | | EVIDENCE.md#t11-backend-ci-repair-validation |
+| T11 | IN_PROGRESS | PR #3639; exact HEAD 35f30506 | | EVIDENCE.md#t11-pr-3639-tier2-staging-completed |
 
-## Current checkpoint — T11 backend CI repair committed locally (2026-10-09T10:46+05:00)
+## Current checkpoint — T11 PR #3639 Tier-2 staging — 2026-10-09T11:32+05:00
+
+- PR #3639 is OPEN/MERGEABLE at `35f30506fcd511c0dc81a5d87ae6122e5de0242d`; base is merged T10 commit `6315c62edb888bb8864928a41dd70a4c00be6e3d`. Local branch and remote PR head match. User owns merge; no review submission, deferral acceptance, or merge occurred.
+- Exact-head Unified CI run `37890312414` and associated PR/security workflows passed all applicable blocking checks, including Backend, Frontend unit/E2E/build/lint, OpenAPI/docs, API parity, Code Quality, PR Required Gate, Context Boundary, CodeQL, secret/security scans, Regression Audit, PR Review Quality Gate, and lifecycle recommendation. Path-aware integration, k6, staging/production readiness, Docker, DAST, Supabase Preview, Telegram release, metadata, and classify/routing jobs were skipped; skips are not passes.
+- T11 staging used only synthetic project `clinic-aqs-pr3639-20261009` with backend/frontend ports `18361/18362`, PostgreSQL `55539`, Ubuntu-24.04, and the exact PR worktree. Canonical Preflight, Start and Session passed in one held WSL session. Host C: had 12 GiB free, WSL backing drive D: 18 GiB, Linux `/` and Docker root 904 GiB each; reserve checks passed. Ordinary Admin password→TOTP enrollment/login challenge and Admin RBAC passed. The PostgreSQL policy matrix passed for Department off/on, manual archive, standalone profile, missing parent and conflicting parent. Relevant entry-methods and permanent-address refusals passed with safe behavior; no production data or 2FA bypass was used.
+- Staging began with no existing daily queues or entries; aggregate counts stayed `0/0`. This proves no mutation in the empty synthetic database, not preservation of nonempty history. Doctor mapped-selector no-leak was NOT_RUN because no eligible Doctor cards existed. Direct legacy QR-token join was NOT_RUN because the fixture had no queue owner and creating one exceeded the authorized fixture scope. Browser/Admin routes, keyboard, nonempty history, immutable frontend checksum and full `STAGING_VALIDATION.md`/T18 were NOT_RUN. The launcher reports `served_revision_verified=false`; do not claim served frontend SHA provenance. Full per-case record: `EVIDENCE.md#t11-pr-3639-tier2-staging-completed`; sanitized artifact: `output/staging/t11-live-report.json`.
+- Teardown through canonical `staging_down.ps1` passed for the owned Compose project. Follow-up found zero owned containers, volumes, networks, or images. No other project was touched. Earlier failed attempts were harness/setup failures before test execution and are excluded from PASS counts.
+- Tier-2 is **PARTIAL**, not complete. No deferral is accepted. Separate T10 PR #3633 still has two queue/rebind staging race tests NOT_RUN; T11 evidence does not close them.
+- PR #3639 body now records exact-head CI and staging results, with the Tier-2 partial status and each major NOT_RUN item explicit. The proposed and live PR-body gate passed 19 tests, both sample bodies, and the live body. No review/merge action was taken.
+- Current local changes are journals only. Next exact action: run `git diff --check`, inspect the three-file scope, commit/push only T11 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`, then inspect checks for the new exact head. Do not submit review or merge. After user merges, sync main and proceed to the next unblocked plan task.
+
+## Superseded checkpoint — T11 backend CI repair committed locally (2026-10-09T10:46+05:00)
 
 - T10 PR #3633 is confirmed merged at `6315c62e`. PR #3639 remains OPEN/MERGEABLE at remote `bb55443f`; generated API commit `2b90c34a` and test-fix commit `66afece7` are unpushed. Do not merge #3639.
 - T11 test corrections are limited to the nine paths recorded in `EVIDENCE.md#t11-backend-ci-repair-validation`: selectable-profile fixtures now have active/unambiguous parents (or are explicitly standalone), and admin-only `effective_availability` is asserted separately from CSV projection. Runtime, schema, OpenAPI and frontend runtime are unchanged.

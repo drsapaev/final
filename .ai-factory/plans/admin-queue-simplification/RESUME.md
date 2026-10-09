@@ -1,3 +1,12 @@
+## Current resume — T11 PR #3639 Tier-2 staging partial — 2026-10-09T11:32+05:00
+
+- Continue in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Exact local and remote PR #3639 HEAD is `35f30506fcd511c0dc81a5d87ae6122e5de0242d`; base is merged #3633 commit `6315c62edb888bb8864928a41dd70a4c00be6e3d`. PR is OPEN/MERGEABLE. Do not merge or submit a review; the user performs merge.
+- Exact-head CI run `37890312414` and associated blocking workflows passed. Read `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` for the check classes that passed and path-aware skips. Skips are not passes.
+- Bounded T11 synthetic staging completed under owned project `clinic-aqs-pr3639-20261009`, ports `18361/18362/55539`, Ubuntu-24.04. Preflight/Start/Session passed; ordinary Admin password→TOTP and PostgreSQL parent/manual-availability matrix passed; canonical teardown verified no owned resources remain. Sanitized per-run report is `output/staging/t11-live-report.json`; full evidence is in `EVIDENCE.md#t11-pr-3639-tier2-staging-completed`.
+- Tier-2 remains PARTIAL. Do not claim immutable served frontend provenance: helper reports `served_revision_verified=false`. NOT_RUN: mapped Doctor selector no-leak (no eligible Doctor cards), direct legacy token join (no owner fixture within approved scope), browser/Admin routes and keyboard, nonempty queue/history behavior, exact frontend checksum, full `STAGING_VALIDATION.md`, and T18. T10's two queue/rebind races are a separate open follow-up. No deferral is accepted.
+- Only current tracked changes should be T11 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`; preserve `.scratch/` and ignored staging report. PR body is updated and the candidate/live body gates passed (19 tests and both samples).
+- Next exact action: run `git diff --check`, commit and push only the three T11 journals; inspect CI on the resulting exact PR head. Keep merge with the user. After user confirms merge, sync `origin/main` and start the next unblocked plan task from a fresh base.
+
 ## Current resume — T11 PR #3639 backend CI repair (2026-10-09T10:46+05:00)
 
 - Continue in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Local branch contains generated-client commit `2b90c34a` and test-fix commit `66afece7`; PR #3639 is OPEN/MERGEABLE at remote `bb55443f`, base/merged T10 commit `6315c62e`. Both local commits are pending push. `C:\final` main checkout was not modified.
