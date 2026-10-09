@@ -256,6 +256,7 @@ const ServiceCatalog = () => {
   const websiteLoadingRef = useRef(false);
   const websiteRefreshQueuedRef = useRef(false);
   const websiteDirtyServiceIdRef = useRef<string | null>(null);
+  const websiteDirtyFieldsRef = useRef<Partial<WebsiteServiceFormState>>({});
   const previousWebsiteServiceIdRef = useRef<string | null>(null);
   const [websiteError, setWebsiteError] = useState('');
   const [websiteNotice, setWebsiteNotice] = useState('');
@@ -317,18 +318,27 @@ const ServiceCatalog = () => {
       }
       return;
     }
-    if (websiteDirtyServiceIdRef.current === websiteServiceId) {
-      logger.debug('[FIX] Preserved unsaved website content during catalog refresh');
-      return;
+    const dirtyFields = websiteDirtyServiceIdRef.current === websiteServiceId
+      ? websiteDirtyFieldsRef.current
+      : {};
+    if (websiteDirtyServiceIdRef.current !== websiteServiceId) {
+      websiteDirtyServiceIdRef.current = null;
+      websiteDirtyFieldsRef.current = {};
     }
-    websiteDirtyServiceIdRef.current = null;
-    setWebsiteForm({
+    const nextForm = {
       name_ru: selectedWebsiteService.name_ru || '',
       name_uz: selectedWebsiteService.name_uz || '',
       description_ru: selectedWebsiteService.description_ru || '',
       description_uz: selectedWebsiteService.description_uz || '',
       slug: selectedWebsiteService.slug || '',
-    });
+    };
+    setWebsiteForm({ ...nextForm, ...dirtyFields });
+    if (Object.keys(dirtyFields).length > 0) {
+      logger.debug('[FIX] Refreshed non-dirty website fields after catalog update');
+    } else {
+      websiteDirtyServiceIdRef.current = null;
+      websiteDirtyFieldsRef.current = {};
+    }
     if (selectionChanged) {
       setWebsiteError('');
       setWebsiteNotice('');
@@ -336,7 +346,14 @@ const ServiceCatalog = () => {
   }, [selectedWebsiteService, websiteServiceId]);
 
   const updateWebsiteField = (field: keyof WebsiteServiceFormState, value: string) => {
-    websiteDirtyServiceIdRef.current = websiteServiceId;
+    if (websiteDirtyServiceIdRef.current !== websiteServiceId) {
+      websiteDirtyServiceIdRef.current = websiteServiceId;
+      websiteDirtyFieldsRef.current = {};
+    }
+    websiteDirtyFieldsRef.current = {
+      ...websiteDirtyFieldsRef.current,
+      [field]: value,
+    };
     setWebsiteForm((current) => ({ ...current, [field]: value }));
   };
 
@@ -460,6 +477,7 @@ const ServiceCatalog = () => {
       const saved = response.data as WebsiteServiceContent;
       if (websiteDirtyServiceIdRef.current === String(saved.id)) {
         websiteDirtyServiceIdRef.current = null;
+        websiteDirtyFieldsRef.current = {};
       }
       setWebsiteServices((items) => {
         const exists = items.some((item) => item.id === saved.id);

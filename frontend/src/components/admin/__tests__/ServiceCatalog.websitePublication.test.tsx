@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,6 +58,11 @@ vi.mock('../../../api/client', () => {
         });
         return Promise.resolve({ data: { ...websiteService } });
       }
+      Object.assign(catalogService, payload);
+      Object.assign(websiteService, {
+        name_ru: catalogService.name,
+        active: catalogService.active,
+      });
       return Promise.resolve({ data: { ...catalogService, ...payload } });
     }),
     delete: vi.fn(() => {
@@ -145,6 +150,49 @@ describe('ServiceCatalog website publication editor', () => {
     ));
     expect(await screen.findByText('Опубликовано')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Снять с публикации' })).toBeInTheDocument();
+  });
+
+  it('refreshes non-dirty website fields after the catalog service is renamed', async () => {
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider>
+        <ServiceCatalog />
+      </ThemeProvider>,
+    );
+
+    await screen.findByRole('heading', { name: 'Контент и публикация на сайте' });
+    await user.click(screen.getByRole('button', { name: 'Открыть редактор сайта' }));
+    const websiteDescription = await screen.findByRole('textbox', { name: /Описание на русском/ });
+    fireEvent.change(websiteDescription, { target: { value: 'SYNTHETIC edited website description.' } });
+
+    await user.click(screen.getByRole('button', { name: 'Edit service SYNTHETIC консультация' }));
+    const editHeading = await screen.findByRole('heading', { name: 'Редактирование услуги' });
+    const editModal = editHeading.closest('.admin-modal-overlay');
+    expect(editModal).not.toBeNull();
+    fireEvent.change(
+      within(editModal as HTMLElement).getByDisplayValue('SYNTHETIC консультация'),
+      { target: { value: 'SYNTHETIC новое название' } },
+    );
+    await user.click(within(editModal as HTMLElement).getByRole('button', { name: 'Сохранить' }));
+    await user.click(screen.getByRole('button', { name: /Подтвердить/ }));
+
+    expect(await screen.findByRole('cell', { name: 'SYNTHETIC новое название' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /Название на русском/ }))
+        .toHaveValue('SYNTHETIC новое название');
+      expect(screen.getByRole('textbox', { name: /Описание на русском/ }))
+        .toHaveValue('SYNTHETIC edited website description.');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith(
+      '/services/admin/website-content/41',
+      expect.objectContaining({
+        operation: 'save_draft',
+        name_ru: 'SYNTHETIC новое название',
+        description_ru: 'SYNTHETIC edited website description.',
+      }),
+    ));
   });
 
   it('reloads website publication state after a service is deactivated', async () => {
