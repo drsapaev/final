@@ -2,13 +2,13 @@
 
 Plan version: 3.87
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: IN_PROGRESS — T11 fixes locally validated on PR #3639 base `a593fed1`; five focused PostgreSQL integration modules pass 72/72. User approved the narrow `_tokens.py` plus regression-test scope extension. Commit/push and exact-head hosted CI remain; Tier-2 remains PARTIAL, no deferral accepted, and the user owns merge.
+Current status: IN_PROGRESS — T11 implementation commit `6ea00b8f` is pushed to PR #3639; five focused PostgreSQL integration modules pass 72/72 and exact-head hosted CI is green. Tier-2 remains PARTIAL; staging was not run, no deferral accepted, and the user owns merge.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 PR base / `origin/main`: a396ee505b6f53318b4360ca81827759125c79ca.
-Remote and local PR HEAD before this follow-up: a593fed10c4803f110f082bd7d589c1a64217b44.
-Current changed paths: `backend/app/services/queue_svc/_core.py`, `backend/app/services/queue_svc/_operations.py`, `backend/app/services/qr_queue/_tokens.py` (approved narrow extension), `backend/tests/integration/test_qr_token_path_owner_eligibility.py`, `backend/tests/integration/test_qr_selection_join_visibility.py`, and these plan journals. Preserve pre-existing untracked `.scratch/` and do not stage it.
-Last updated: 2026-10-09T23:39+05:00
+Latest validated code-bearing PR commit: 6ea00b8fcfc67e201deed121a9201ef673410611; base / `origin/main`: a396ee505b6f53318b4360ca81827759125c79ca.
+Implementation paths in `6ea00b8f`: `backend/app/services/queue_svc/_core.py`, `backend/app/services/queue_svc/_operations.py`, `backend/app/services/qr_queue/_tokens.py` (approved narrow extension), `backend/tests/integration/test_qr_token_path_owner_eligibility.py`, and `backend/tests/integration/test_qr_selection_join_visibility.py`. Current pending journal paths: `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Preserve pre-existing untracked `.scratch/` and do not stage it.
+Last updated: 2026-10-10T00:08+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,18 +16,17 @@ Last updated: 2026-10-09T23:39+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS | PR #3639 OPEN at old HEAD `a593fed1`; local follow-up 72/72 focused PG tests; commit/push pending | | EVIDENCE.md#t11-pr-3639-token-info-fix-focused-postgresql-validation |
+| T11 | IN_PROGRESS | PR #3639 OPEN; code commit `6ea00b8f`; focused PG 72/72; exact-head CI success; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-exact-head-ci-after-token-info-fix-2026-10-10t0006 |
 
-## Current checkpoint — PR #3639 backend CI regression — 2026-10-09T23:39+05:00
+## Current checkpoint — PR #3639 exact-head CI green; Tier-2 still partial — 2026-10-10T00:08+05:00
 
-- Exact PR HEAD before this local fix is `a593fed10c4803f110f082bd7d589c1a64217b44`, base/current `origin/main` `a396ee505b6f53318b4360ca81827759125c79ca`; PR remains OPEN. Its old exact-head Unified CI run `37967418406` had Backend failure: 9 failed, 5459 passed, 66 skipped, 25 deselected, 3 xfailed. The local follow-up passes 72 tests across five focused PostgreSQL integration modules and needs commit/push plus exact-head CI.
-- Execution mode: previously required gate returned scoped `narrow_override` after the normal and known-root-cause attempts misrouted. The user has now explicitly authorized only the narrow extension to `backend/app/services/qr_queue/_tokens.py` and a focused regression in `backend/tests/integration/test_qr_token_path_owner_eligibility.py`; this is not authorization for other files, staging, PR-body edits, formal review, merge, or production. Gate/router remains denied.
-- Canonical anchors: queue ownership ADR, QR token-path implementation, queue profile candidate/availability helpers, and the focused token-path integration tests. First-touch for this continuation: `_tokens.py` and the existing token-path test. Validation target: the previously failing doctor-family token cases and related failing PostgreSQL nodes on a confirmed disposable local database. First stop condition: no verified disposable PostgreSQL or a need to edit any path beyond the explicit extension and existing T11 scope.
-- Local in-scope changes: exact QueueProfile-key candidates take precedence for doctor-owned routes when a canonical key exists; admission and token-info apply the preference only to doctor-owned daily queues. Resource-owned queues keep all shared-tag candidates and fail closed when any published candidate is unavailable. Explicit resource/profile routing treats the shared queue tag as the target identity while checking every candidate.
-- Local verification: five integration modules (`test_qr_token_path_owner_eligibility.py`, `test_qr_selection_join_visibility.py`, `test_qr_family_phone_identity.py`, `test_rq24b_cross_panel_s21_pg.py`, `test_rq29_end_to_end_path_pg.py`) — **72 passed, 2 warnings** on task-owned synthetic PostgreSQL 17 at `127.0.0.1:55437`; test databases were cleaned and the cluster started for this run was stopped. Initial run was 71 passed / 1 failed only because the resource test asserted a nonexistent `success` key; corrected to its `entry` return contract, then full rerun passed. Scoped Ruff with known existing C416 ignored, py_compile via scripts/run_python.ps1, and git diff --check — **PASS**.
-- No local blocker remains for this code slice. The old exact-head hosted run remains red until the updated branch is pushed and checks complete.
-- Tier-2 staging/browser/provenance and full `STAGING_VALIDATION.md` are NOT_RUN; Tier-2 is PARTIAL, no deferral accepted. No staging, PR body, review, or merge action occurred.
-- Next exact action: review the final allowlisted diff, commit and push the same PR branch without force, then inspect checks for the new exact HEAD. Keep Tier-2 staging, PR-body edits, formal review, deferral, and merge outside this scope; the user owns merge.
+- The latest validated code-bearing commit for PR #3639 is `6ea00b8fcfc67e201deed121a9201ef673410611`; GitHub reported PR OPEN/mergeable at that point. Base / `origin/main` is `a396ee505b6f53318b4360ca81827759125c79ca`. Unified CI run `37976219686` and applicable quality, security, review-quality, lifecycle, and regression workflows completed successfully on that code commit. Path-aware skips remain skips, not passes.
+- Execution boundary: the previously required gate returned a scoped `narrow_override` after a documented misroute. User authorized the narrow `_tokens.py` plus focused regression extension. That authorization did not include staging, PR-body edits, formal review, deferral acceptance, merge, or production. Gate/router remains untouched.
+- Code behavior: for doctor-owned queues, an exact canonical QueueProfile key takes precedence in candidate resolution during admission and token-info. Resource-owned queues retain all shared-tag candidates and fail closed when a published candidate is unavailable.
+- Local verification: five focused PostgreSQL integration modules — **72 passed, 2 warnings** on task-owned synthetic PostgreSQL 17 at `127.0.0.1:55437`; test databases were cleaned and the cluster started for validation was stopped. Scoped Ruff, py_compile, and `git diff --check` passed. Pinned Gitleaks v8.21.2 in WSL Docker passed all changed tracked files after the native hook was blocked by Windows App Control; Ruff-format/Black were skipped because they rewrite unrelated legacy formatting, with other hooks passing.
+- Tier-2 staging on this code, Admin 2FA, named browser specs, served-frontend provenance, and the full `STAGING_VALIDATION.md` remain **NOT_RUN**. Tier-2 is PARTIAL; no deferral accepted. Do not treat GitHub E2E or local PostgreSQL tests as Tier-2 staging evidence.
+- Current journal changes are documentation-only. Preserve `.scratch/`; stage no scratch files. Do not merge, submit review, edit PR body, or start another PR cycle. The user owns the merge decision.
+- Next exact action: if this checkpoint has not yet been published, commit/push only the three T11 journals after confirming journal-only scope; then inspect applicable checks on that resulting PR HEAD. Afterward wait for the user's merge decision or explicit staging instruction; do not start another task/PR cycle.
 
 ## Previous checkpoint — PR #3639 review P1/P2 fixes — 2026-10-09T22:33+05:00
 

@@ -3065,3 +3065,14 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: hosted CI has not run on this new local diff; exact-head run still refers to pre-fix commit `a593fed1`. Tier-2 staging, Admin 2FA, browser specs, served-frontend provenance, and full staging runbook remain NOT_RUN.
 - PR: #3639 OPEN, branch `codex/aqs-T11-manual-availability`.
 - Merge commit: none.
+
+## T11 PR #3639 exact-head CI after token-info fix — 2026-10-10T00:06+05:00
+
+- Exact commit tested: `6ea00b8fcfc67e201deed121a9201ef673410611`; base `a396ee505b6f53318b4360ca81827759125c79ca`. PR #3639 remains OPEN and GitHub reports `mergeable=true`.
+- GitHub run: Unified CI `37976219686` completed with conclusion **success**. Backend tests passed in 10m47s; Frontend E2E passed in 13m59s; PR Required Gate passed. Frontend build, lint, unit tests, Code Quality, OpenAPI/docs generation, Frontend–Backend Parity, Context Boundary, Regression Audit, security scans, Gitleaks, CodeQL, and PR review-quality checks all passed on this exact HEAD.
+- Path-aware skips are not passes: staging and production readiness reports, Docker build, integration-test job, load tests, Telegram release gate, DAST, metadata, and Supabase Preview were skipped. They are not claims of validation.
+- Local validation remains: five focused PostgreSQL modules **72 passed, 2 warnings** on task-owned synthetic PostgreSQL 17; scoped Ruff, py_compile, and `git diff --check` passed. The pre-commit Gitleaks binary was blocked by App Control, but the pinned v8.21.2 WSL Docker scanner passed all changed tracked files. Ruff-format/Black were skipped because they rewrite unrelated legacy formatting; other local hooks passed.
+- Scope: commit `6ea00b8f` fixes QR doctor-owned canonical-key resolution in admission and token-info, preserves stricter shared-resource candidate validation, and adds regression coverage. No staging, production, formal review, deferral, or merge action occurred.
+- Remaining limitation: Tier-2 staging on the current code, Admin 2FA staging flow, served-frontend provenance, and the full `STAGING_VALIDATION.md` remain **NOT_RUN**. Tier-2 is PARTIAL; no deferral has been accepted. A prior/current GitHub E2E pass is not a replacement for the required Tier-2 synthetic staging validation.
+- PR: #3639 OPEN at `6ea00b8fcfc67e201deed121a9201ef673410611`.
+- Merge commit: none; merge remains user-owned.

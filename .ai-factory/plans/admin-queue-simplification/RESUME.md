@@ -1,4 +1,13 @@
-## Current resume — T11 PR #3639 focused fix validated; push pending — 2026-10-09T23:39+05:00
+## Current resume — PR #3639 exact-head CI green; Tier-2 partial — 2026-10-10T00:08+05:00
+
+- Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Latest validated code-bearing PR commit is `6ea00b8fcfc67e201deed121a9201ef673410611`; at that check PR #3639 was OPEN/MERGEABLE. Base / `origin/main` is `a396ee505b6f53318b4360ca81827759125c79ca`. Preserve pre-existing untracked `.scratch/`; never stage it.
+- Implementation commit `6ea00b8f` contains the approved QR token/profile resolution fix. Five focused PostgreSQL modules passed **72 tests, 2 warnings** on task-owned synthetic PostgreSQL 17; scoped Ruff, py_compile, and `git diff --check` passed. Exact-head Unified CI run `37976219686` and applicable associated workflows are green. See `EVIDENCE.md#t11-pr-3639-exact-head-ci-after-token-info-fix-2026-10-10t0006`.
+- Native Gitleaks was blocked by Windows App Control; pinned Gitleaks v8.21.2 in WSL Docker passed all changed tracked files. Ruff-format/Black were skipped because they rewrite unrelated legacy formatting; other applicable hooks passed.
+- Tier-2 remains **PARTIAL**. Staging on `6ea00b8f`, Admin 2FA, named browser specs, served frontend provenance, and the complete `STAGING_VALIDATION.md` checklist are **NOT_RUN**. No deferral accepted. Do not claim CI E2E as staging proof.
+- This continuation changes only the three T11 journals. Do not stage `.scratch/`; do not make runtime changes, edit PR body, submit formal review, accept deferral, merge, or start another PR cycle. The user's “Разрешаю” authorized the narrow `_tokens.py`/regression scope only, not staging or merge.
+- Next exact action: if the journal checkpoint is not yet published, verify `git diff --check` and journal-only scope, commit/push without force, and inspect applicable checks on the resulting PR HEAD. Then wait for the user's merge decision or explicit staging instruction.
+
+## Previous resume — T11 PR #3639 focused fix validated; push pending — 2026-10-09T23:39+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 remains OPEN at remote HEAD `a593fed10c4803f110f082bd7d589c1a64217b44`, base `a396ee505b6f53318b4360ca81827759125c79ca`. Preserve untracked `.scratch/`; do not stage it.
 - Implemented the approved fix: doctor-owned queue candidate lookup prefers an exact canonical QueueProfile key during both admission and token-info validation; resource-owned queues retain shared-tag ambiguity and availability checks. Added token and resource regressions.
