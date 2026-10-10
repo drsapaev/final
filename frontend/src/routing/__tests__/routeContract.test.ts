@@ -3,6 +3,11 @@ import { renderRouteDocsMarkdown } from '../routeDocsSnapshot';
 import { resolveSetupRedirect } from '../routeGuards';
 import { ROUTE_REGISTRY, SIDEBAR_PRESETS } from '../routeRegistry';
 import {
+  getPublicSitePath,
+  PUBLIC_SITE_ROUTE_DEFINITIONS,
+  resolvePublicSiteRoute,
+} from '../publicSiteRouteEntries';
+import {
   getCompatibilityRedirects,
   getAdminNavSections,
   getEffectiveRouteByPath,
@@ -137,6 +142,55 @@ function assertRouteSpecificChromeHeadings(routeHeadingContract: RouteHeadingCon
 }
 
 describe('route contract invariants', () => {
+  it('registers public-site pages in both locales and keeps their canonical URLs', () => {
+    for (const definition of PUBLIC_SITE_ROUTE_DEFINITIONS) {
+      const route = getRouteById(definition.id) as {
+        path?: string;
+        group?: string;
+        auth?: string;
+        owner?: string;
+        component?: string;
+      } | undefined;
+
+      expect(route).toBeTruthy();
+      expect(route?.path).toBe(definition.path);
+      expect(route?.group).toBe('public');
+      expect(route?.auth).toBe('public');
+      expect(route?.owner).toMatch(/^public-site\./);
+      expect(route?.component).toBe('PublicSiteFallback');
+    }
+
+    expect(resolvePublicSiteRoute('/')).toMatchObject({ kind: 'home', locale: 'uz-Latn' });
+    expect(resolvePublicSiteRoute('/ru')).toMatchObject({ kind: 'home', locale: 'ru' });
+    expect(resolvePublicSiteRoute('/ru/services/derma')).toMatchObject({
+      kind: 'service',
+      locale: 'ru',
+      slug: 'derma',
+    });
+    expect(getPublicSitePath('doctor', 'ru', 'dermatolog')).toBe('/ru/doctors/dermatolog');
+    expect(resolvePublicSiteRoute('/ru/services/derma/extra')).toBeNull();
+  });
+
+  it('keeps Clinic OS, queue, and visit-entry routes outside the public-site renderer', () => {
+    const clinicRoutes = [
+      { id: 'login', path: '/login', directPath: '/login' },
+      { id: 'registrar-home', path: '/registrar', directPath: '/registrar' },
+      { id: 'registrar-welcome', path: '/registrar/welcome', directPath: '/registrar/welcome' },
+      { id: 'registrar-queue', path: '/registrar/queue', directPath: '/registrar/queue' },
+      { id: 'queue-join', path: '/queue/join', directPath: '/queue/join' },
+      { id: 'queue-join-direction', path: '/q/:publicCode', directPath: '/q/SYNTHETIC-CODE' },
+      { id: 'confirm-visit', path: '/confirm-visit', directPath: '/confirm-visit' },
+      { id: 'clinical-appointments', path: '/clinical/appointments', directPath: '/clinical/appointments' },
+      { id: 'cashier-home', path: '/cashier', directPath: '/cashier' },
+      { id: 'admin-dashboard', path: '/admin', directPath: '/admin' },
+    ];
+
+    for (const route of clinicRoutes) {
+      expect(getRouteById(route.id)?.path, route.id).toBe(route.path);
+      expect(resolvePublicSiteRoute(route.directPath), route.directPath).toBeNull();
+    }
+  });
+
   it('keeps the dermatologist sidebar focused on queue, visit, and patients', () => {
     expect(SIDEBAR_PRESETS.dermatology.items.map((item) => item.id)).toEqual([
       'queue',

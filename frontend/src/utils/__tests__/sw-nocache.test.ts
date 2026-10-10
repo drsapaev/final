@@ -20,6 +20,7 @@ type SWInternals = {
     offlineFallbackUrl?: string,
   ) => Promise<{ ok: boolean }>;
   isNoCachePath: (pathname: string) => boolean;
+  staticFiles: string[];
   syncClinicData: () => Promise<void>;
 };
 
@@ -49,7 +50,7 @@ function compileSW(
     'clients',
     'console',
     'fetch',
-    `${code}\nreturn { networkFirst, isNoCachePath, syncClinicData };`,
+    `${code}\nreturn { networkFirst, isNoCachePath, syncClinicData, staticFiles: STATIC_FILES };`,
   );
   return factory(
     { addEventListener: vi.fn(), skipWaiting: vi.fn(), registration: {} },
@@ -127,6 +128,47 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
     expect(sw.isNoCachePath('/api/v1/print/x')).toBe(true);
     expect(sw.isNoCachePath('/api/v1/patients')).toBe(false);
     expect(sw.isNoCachePath('/api/v1/queue')).toBe(false);
+  });
+
+  it.each([
+    '/',
+    '/ru',
+    '/ru/services',
+    '/ru/doctors/dermatolog',
+    '/services',
+    '/services/skin-care',
+    '/doctors',
+    '/prices',
+    '/contacts',
+    '/sitemap.xml',
+  ])('does not cache public HTML or sitemap at %s', (pathname) => {
+    const sw = compileSW(vi.fn(), makeCacheStubs().caches);
+    expect(sw.isNoCachePath(pathname)).toBe(true);
+  });
+
+  it('does not keep the dynamically rendered public root in the install cache', () => {
+    const sw = compileSW(vi.fn(), makeCacheStubs().caches);
+    expect(sw.staticFiles).not.toContain('/');
+  });
+
+  it('does not replay an older public page when a navigation fails offline', async () => {
+    const stalePage = { html: 'old published card' };
+    const offlinePage = { html: 'offline fallback' };
+    const stubs = makeCacheStubs();
+    stubs.caches.match = vi.fn(async (key: unknown) =>
+      key === '/offline.html' ? offlinePage : stalePage,
+    );
+    const sw = compileSW(vi.fn(async () => { throw new Error('offline'); }), stubs.caches);
+
+    await expect(
+      sw.networkFirst(
+        { url: 'https://clinic.test/services/skin-care' },
+        'DYNAMIC_CACHE',
+        '/offline.html',
+      ),
+    ).resolves.toBe(offlinePage);
+    expect(stubs.caches.match).toHaveBeenCalledTimes(1);
+    expect(stubs.caches.match).toHaveBeenCalledWith('/offline.html');
   });
 
   it('background sync never fetches or caches the user profile (auth/me)', async () => {

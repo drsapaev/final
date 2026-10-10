@@ -760,6 +760,13 @@ jobs:
         cd frontend
         npm run build
 
+    - name: 🏗️ Сборка Nitro для Vercel
+      env:
+        NITRO_PRESET: vercel
+      run: |
+        cd frontend
+        npm run build:ssr
+
   frontend-e2e:
     name: Frontend e2e
     runs-on: ubuntu-latest
