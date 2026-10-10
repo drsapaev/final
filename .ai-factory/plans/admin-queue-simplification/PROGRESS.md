@@ -1,14 +1,14 @@
 # Progress
 
-Plan version: 3.87
+Plan version: 3.88
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: IN_PROGRESS — both new PR #3639 review findings are fixed locally; focused PostgreSQL modules and static checks pass. Push and exact-head CI are pending. Tier-2 remains PARTIAL; no new staging or deferral is recorded, and the user owns merge.
+Current status: IN_PROGRESS — PR #3639 review P1/P2 fixes are in code-bearing commit `d36235360f60f08ea0de1ff6883164604f8f163e`; bounded Tier-2 staging passed Admin 2FA and both PostgreSQL modules (24/24, no skips). Tier-2 remains PARTIAL because frontend provenance, named browser specs, and the full staging runbook remain NOT_RUN. No deferral is accepted; merge remains user-owned.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 PR base / `origin/main`: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed (local sync commit `cfe6dfc89`).
-Latest validated code-bearing PR commit: 6ea00b8fcfc67e201deed121a9201ef673410611; newest unvalidated source baseline after main sync: `cfe6dfc89`.
-Implementation paths in `6ea00b8f`: `backend/app/services/queue_svc/_core.py`, `backend/app/services/queue_svc/_operations.py`, `backend/app/services/qr_queue/_tokens.py` (approved narrow extension), `backend/tests/integration/test_qr_token_path_owner_eligibility.py`, and `backend/tests/integration/test_qr_selection_join_visibility.py`. Current pending journal paths: `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Preserve pre-existing untracked `.scratch/` and do not stage it.
-Last updated: 2026-10-10T13:04+05:00
+Latest validated code-bearing PR commit: `d36235360f60f08ea0de1ff6883164604f8f163e`; at the last read, PR #3639 was OPEN/MERGEABLE at that code HEAD, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. Recheck live PR HEAD after this journal-only update.
+Implementation paths in `d3623536`: `backend/app/services/queue_svc/_core.py`, `backend/app/services/queue_svc/_operations.py`, `backend/app/services/qr_queue/_tokens.py`, and the two focused PostgreSQL integration modules. Current journal updates are pending in `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Preserve pre-existing untracked `.scratch/` and do not stage it.
+Last updated: 2026-10-10T22:19+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,9 +16,21 @@ Last updated: 2026-10-10T13:04+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS | PR #3639 OPEN; review P1/P2 fixed locally; focused PG 24/24; push/CI pending; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-second-review-fixes-local-validation-2026-10-10 |
+| T11 | IN_PROGRESS | PR #3639 OPEN; code-bearing commit `d3623536`; review P1/P2 fixed; exact-head CI green; bounded staging P1/P2/Admin checks PASS; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-tier-2-bounded-validation-2026-10-10 |
 
-## Current checkpoint — PR #3639 review fixes locally validated; publish pending — 2026-10-10T13:04+05:00
+## Current checkpoint — PR #3639 bounded Tier-2 staging passed; remaining Tier-2 gaps are explicit — 2026-10-10T22:19+05:00
+
+- At validation time PR #3639 was OPEN/MERGEABLE with code-bearing HEAD `d36235360f60f08ea0de1ff6883164604f8f163e`, based on `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. The checked-out branch is `codex/aqs-T11-manual-availability`. This follow-up changes only journals; refresh live PR state before the next action.
+- Bounded staging used only synthetic Compose project `clinic-aqs-pr3639-followup-20261009`, ports `18401/18402/55540`, Ubuntu-24.04, and the canonical Preflight → Start → Session flow. Exact commit and tracked worktree cleanliness were verified before execution.
+- Preflight, Start, service readiness and WSL boot stability passed. Ordinary Admin password login, TOTP enrollment, a new password-plus-TOTP challenge, and Admin-only queue-profile GET all passed (HTTP 200); no auth bypass was used.
+- Both focused PostgreSQL modules passed **24/24, zero skips/failures/errors**. The selector-to-admission P1 case and resource-token P2 positive/negative cases each passed. The selector fixture used a task-owned local database migrated to Alembic head, then dropped it before session completion.
+- Canonical teardown passed and verified zero project containers, volumes and networks. The task-owned PostgreSQL was inside that project. WSL boot stayed stable. No source, schema, launcher, Compose, gate, production, PR body, review, or merge operation occurred.
+- `served_revision_verified=false`; no independent served-static checksum artifact was generated. Named browser specs and the complete `docs/runbooks/STAGING_VALIDATION.md` checklist remain NOT_RUN. Tier-2 is therefore PARTIAL, and no deferral is accepted.
+- The previous diagnostic attempt had 10 selector-fixture skips because its Alembic scratch path fell back to schema-less `/postgres`; the documented pre-provisioned local-DB path fixed the harness for this successful run. This was a test-harness adjustment only; no tracked runtime/test file changed.
+- Generated env, helper scripts, Admin report, live report and JUnit XML are ignored under `ops/staging.env` / `output/staging/`; preserve them as evidence and never stage them. Preserve unrelated `.scratch/`.
+- This evidence update changes only the three T11 journals. After publishing it to the existing PR branch, inspect checks on the resulting exact HEAD. Do not submit a review, accept a deferral, or merge; the user owns those decisions.
+
+## Superseded checkpoint — PR #3639 review fixes locally validated; publish pending — 2026-10-10T13:04+05:00
 
 - PR remote HEAD remains `d2c7247fed43c8355c4f217ca40f9f7eac50ba7f`; local branch is based on clean main-sync merge `cfe6dfc89` including `origin/main` `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. No source changes have been committed or pushed yet.
 - P1 fixed: clinic-wide public selector now builds doctor card fields from the same resolved `qr_profile` that admission uses. Resource token P2 fixed in both `validate_queue_token()` and `get_qr_token_info()` by passing the actual daily queue tag only for resource-owned queues. The availability helper still rejects any unavailable published candidate.

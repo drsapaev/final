@@ -1,4 +1,15 @@
-## Current resume — PR #3639 second review fixes locally validated; push pending (2026-10-10T13:04+05:00)
+# Resume
+
+## Current resume — T11 bounded Tier-2 staging slice passed; remaining gaps are recorded — 2026-10-10T22:19+05:00
+
+- Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. The validated code-bearing commit is `d36235360f60f08ea0de1ff6883164604f8f163e`; at the last read PR #3639 was OPEN/MERGEABLE and base was `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. Refresh live PR HEAD after this journal-only update. Preserve pre-existing `.scratch/` and all ignored staging env/artifacts.
+- P1/P2 implementation is unchanged on this HEAD. Exact-head applicable CI is green; path-aware skipped jobs are not passes.
+- Bounded synthetic Tier-2 staging passed via canonical Preflight → Start → Session → teardown. Ordinary Admin password→TOTP enrollment→fresh password+TOTP challenge and protected queue-profiles GET passed (HTTP 200). Focused PostgreSQL modules passed **24/24, zero skips/failures/errors**; both requested resource-token P2 tests and selector-card P1 test are individually PASS. The selector module used a pre-provisioned Alembic-head database within this same owned staging PostgreSQL and dropped it before Session ended.
+- Canonical teardown verified zero owned containers, volumes and networks; WSL boot stayed stable. Sanitized live report is `output/staging/t11-d3623536-preprovisioned-attempt-report.json`; JUnit is `output/staging/t11-qr-review-postgres-preprovisioned.xml`; Admin report is `output/staging/t11-admin-2fa-report.json`.
+- `served_revision_verified=false`; no independent static-file checksum artifact exists. Named browser specs and the full `docs/runbooks/STAGING_VALIDATION.md` checklist are NOT_RUN. Tier-2 is PARTIAL; no deferral has been accepted.
+- This checkpoint changes only `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. After publishing the journal-only commit, recheck all applicable checks on the resulting exact PR HEAD. Do not change PR body, submit a review, accept a deferral, or merge unless the user explicitly asks; merge remains user-owned.
+
+## Superseded resume — PR #3639 second review fixes locally validated; push pending (2026-10-10T13:04+05:00)
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 remote HEAD: `d2c7247fed43c8355c4f217ca40f9f7eac50ba7f`; current main: `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`; local sync merge: `cfe6dfc89`. Preserve all existing `.scratch/` contents.
 - Fixed P1: the public card is built from `_get_qr_visible_profile_for_doctor()`'s actual result. Fixed P2 in both `validate_queue_token()` and `get_qr_token_info()` by passing the actual daily queue tag only for resource-owned queues; all-candidates-available remains fail-closed.
