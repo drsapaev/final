@@ -4,27 +4,31 @@
   --public-site-hero-padding: clamp(28px, 6vw, 68px);
   --public-site-section-gap: clamp(38px, 6vw, 68px);
   --public-site-runtime-padding: clamp(24px, 5vw, 48px);
+  --public-site-surface: var(--mac-bg-content);
+  --public-site-ink: var(--mac-text-primary);
+  --public-site-muted-ink: var(--mac-text-secondary);
+  --public-site-border: var(--mac-border);
 
   min-height: 100vh;
-  background: #f6faf9;
-  color: #183638;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--mac-bg-primary);
+  color: var(--public-site-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
   line-height: 1.6;
 }
 
 .public-site a {
-  color: #126a68;
+  color: var(--mac-link-ink);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
 }
 
 .public-site a:hover {
-  color: #084a4a;
+  color: color-mix(in srgb, var(--mac-success-strong), var(--mac-text-primary) 18%);
 }
 
 .public-site a:focus-visible {
   border-radius: 4px;
-  outline: 3px solid #e2a83b;
+  outline: 3px solid var(--mac-warning-strong);
   outline-offset: 3px;
 }
 
@@ -41,15 +45,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  border-bottom: 1px solid #dce9e6;
+  border-bottom: 1px solid var(--public-site-border);
 }
 
-.public-site__brand {
+.public-site .public-site__brand {
   display: inline-flex;
   min-width: max-content;
   align-items: center;
   gap: 10px;
-  color: #183638 !important;
+  color: var(--public-site-ink);
   font-size: 1rem;
   font-weight: 700;
   text-decoration: none;
@@ -61,8 +65,8 @@
   height: 38px;
   place-items: center;
   border-radius: 12px;
-  background: #0d6260;
-  color: #fff;
+  background: var(--mac-success-strong);
+  color: var(--mac-text-on-accent);
   font-size: 1.15rem;
 }
 
@@ -83,7 +87,7 @@
 .public-site__language {
   min-width: 46px;
   padding: 7px 10px;
-  border: 1px solid #bfd5d1;
+  border: 1px solid var(--public-site-border);
   border-radius: 999px;
   text-align: center;
 }
@@ -96,14 +100,14 @@
 .public-site__hero {
   max-width: 790px;
   padding: var(--public-site-hero-padding);
-  border: 1px solid #d9e9e5;
+  border: 1px solid var(--public-site-border);
   border-radius: 24px;
-  background: #eaf4f1;
+  background: var(--mac-bg-secondary);
 }
 
 .public-site__eyebrow {
   margin: 0 0 10px;
-  color: #397573;
+  color: var(--mac-link-ink);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -119,7 +123,7 @@
 .public-site h1 {
   max-width: 850px;
   margin: 0 0 16px;
-  color: #123b3d;
+  color: var(--public-site-ink);
   font-size: clamp(2rem, 5vw, 3.8rem);
   line-height: 1.1;
   letter-spacing: -0.035em;
@@ -127,14 +131,14 @@
 
 .public-site h2 {
   margin: 0;
-  color: #123b3d;
+  color: var(--public-site-ink);
   font-size: clamp(1.35rem, 2.3vw, 1.8rem);
   line-height: 1.25;
 }
 
 .public-site__lead {
   max-width: 690px;
-  color: #496769;
+  color: var(--public-site-muted-ink);
   font-size: clamp(1.08rem, 2.2vw, 1.3rem);
 }
 
@@ -145,25 +149,25 @@
   margin-top: 26px;
 }
 
-.public-site__button {
+.public-site a.public-site__button {
   display: inline-flex;
   min-height: 46px;
   align-items: center;
   justify-content: center;
   padding: 10px 18px;
-  border: 1px solid #8bb7b1;
+  border: 1px solid var(--public-site-border);
   border-radius: 12px;
-  background: #fff;
-  color: #124f4f !important;
+  background: var(--public-site-surface);
+  color: var(--public-site-ink);
   font-weight: 700;
   text-align: center;
   text-decoration: none;
 }
 
-.public-site__button--primary {
-  border-color: #0d6260;
-  background: #0d6260;
-  color: #fff !important;
+.public-site a.public-site__button--primary {
+  border-color: var(--mac-success-strong);
+  background: var(--mac-success-strong);
+  color: var(--mac-text-on-accent);
 }
 
 .public-site__section {
@@ -197,17 +201,17 @@
   justify-content: space-between;
   gap: 24px;
   padding: 20px 22px;
-  border: 1px solid #dce9e6;
+  border: 1px solid var(--public-site-border);
   border-radius: 16px;
-  background: #fff;
+  background: var(--public-site-surface);
 }
 
 .public-site__list-item p {
   margin: 6px 0 0;
 }
 
-.public-site__list-title {
-  color: #183638 !important;
+.public-site a.public-site__list-title {
+  color: var(--public-site-ink);
   font-size: 1.08rem;
   font-weight: 700;
   text-decoration: none;
@@ -222,21 +226,21 @@
 
 .public-site__price {
   margin-block: 26px;
-  color: #0d6260;
+  color: var(--mac-success-strong);
   font-size: 1.5rem;
   font-weight: 700;
 }
 
 .public-site__muted,
 .public-site__empty {
-  color: #587071;
+  color: var(--public-site-muted-ink);
 }
 
 .public-site__empty {
   padding: 22px;
-  border: 1px solid #dce9e6;
+  border: 1px solid var(--public-site-border);
   border-radius: 14px;
-  background: #fff;
+  background: var(--public-site-surface);
 }
 
 .public-site__contact-list {
@@ -251,13 +255,13 @@
   gap: 3px;
   margin: 0;
   padding: 16px 18px;
-  border: 1px solid #dce9e6;
+  border: 1px solid var(--public-site-border);
   border-radius: 14px;
-  background: #fff;
+  background: var(--public-site-surface);
 }
 
 .public-site__contact-list span {
-  color: #587071;
+  color: var(--public-site-muted-ink);
   font-size: 0.88rem;
 }
 
@@ -267,13 +271,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  border-top: 1px solid #dce9e6;
-  color: #587071;
+  border-top: 1px solid var(--public-site-border);
+  color: var(--public-site-muted-ink);
   font-size: 0.92rem;
 }
 
 .public-site__footer a {
-  color: #126a68;
+  color: var(--mac-link-ink);
 }
 
 .public-site__runtime-message,
@@ -281,10 +285,10 @@
   width: min(100% - 40px, 760px);
   margin: 12vh auto;
   padding: var(--public-site-runtime-padding);
-  border: 1px solid #dce9e6;
+  border: 1px solid var(--public-site-border);
   border-radius: 20px;
-  background: #fff;
-  color: #183638;
+  background: var(--public-site-surface);
+  color: var(--public-site-ink);
 }
 
 .public-site__runtime-message h1,
@@ -343,11 +347,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .public-site *,
-  .public-site *::before,
-  .public-site *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+  html body .public-site,
+  html body .public-site *,
+  html body .public-site *::before,
+  html body .public-site *::after {
+    scroll-behavior: auto;
+    animation-duration: 0.01ms;
+    transition-duration: 0.01ms;
   }
 }
