@@ -388,6 +388,7 @@
       "src/pages/FileSystemPage.tsx",
       "src/pages/MobilePatientDashboard.tsx",
       "src/pages/SecurityPage.tsx",
+      "src/publicSiteHandler.tsx",
       "src/services/index.ts",
       "src/services/payment.ts",
       "src/theme/tokens/index.ts",
@@ -414,7 +415,7 @@
       "src/utils/websocketAuth.ts",
       "src/utils/wizardTester.ts"
     ],
-    "unreferencedFileCount": 93,
+    "unreferencedFileCount": 94,
     "navCyrillicLabels": 0,
     "a11yCssImported": false,
     "cssFilesWithDarkSelectors": 13,
