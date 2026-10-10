@@ -172,14 +172,23 @@ describe('route contract invariants', () => {
   });
 
   it('keeps Clinic OS, queue, and visit-entry routes outside the public-site renderer', () => {
-    expect(getRouteById('login')?.path).toBe('/login');
-    expect(getRouteById('queue-join')?.path).toBe('/queue/join');
-    expect(getRouteById('queue-join-direction')?.path).toBe('/q/:publicCode');
-    expect(getRouteById('confirm-visit')?.path).toBe('/confirm-visit');
-    expect(resolvePublicSiteRoute('/login')).toBeNull();
-    expect(resolvePublicSiteRoute('/queue/join')).toBeNull();
-    expect(resolvePublicSiteRoute('/q/ABC123')).toBeNull();
-    expect(resolvePublicSiteRoute('/confirm-visit')).toBeNull();
+    const clinicRoutes = [
+      { id: 'login', path: '/login', directPath: '/login' },
+      { id: 'registrar-home', path: '/registrar', directPath: '/registrar' },
+      { id: 'registrar-welcome', path: '/registrar/welcome', directPath: '/registrar/welcome' },
+      { id: 'registrar-queue', path: '/registrar/queue', directPath: '/registrar/queue' },
+      { id: 'queue-join', path: '/queue/join', directPath: '/queue/join' },
+      { id: 'queue-join-direction', path: '/q/:publicCode', directPath: '/q/SYNTHETIC-CODE' },
+      { id: 'confirm-visit', path: '/confirm-visit', directPath: '/confirm-visit' },
+      { id: 'clinical-appointments', path: '/clinical/appointments', directPath: '/clinical/appointments' },
+      { id: 'cashier-home', path: '/cashier', directPath: '/cashier' },
+      { id: 'admin-dashboard', path: '/admin', directPath: '/admin' },
+    ];
+
+    for (const route of clinicRoutes) {
+      expect(getRouteById(route.id)?.path, route.id).toBe(route.path);
+      expect(resolvePublicSiteRoute(route.directPath), route.directPath).toBeNull();
+    }
   });
 
   it('keeps the dermatologist sidebar focused on queue, visit, and patients', () => {

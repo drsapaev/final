@@ -954,6 +954,51 @@ test.describe('Public-site SSR browser layout smoke', () => {
     await verifyVisibleLayout(page, '.public-site__hero');
   });
 
+  test('SSR colors resolve from the public page token fallbacks', async ({ page }) => {
+    const response = await page.goto('http://127.0.0.1:5278/');
+    expect(response?.status()).toBe(200);
+
+    const colors = await page.locator('.public-site').evaluate((element) => {
+      const hero = element.querySelector('.public-site__hero');
+      const navigationLink = element.querySelector('.public-site__nav a');
+      return {
+        pageBackground: getComputedStyle(element).backgroundColor,
+        heroBackground: hero ? getComputedStyle(hero).backgroundColor : null,
+        navigationLink: navigationLink ? getComputedStyle(navigationLink).color : null,
+      };
+    });
+
+    expect(colors).toEqual({
+      pageBackground: 'rgb(238, 243, 250)',
+      heroBackground: 'rgb(227, 235, 245)',
+      navigationLink: 'rgb(0, 102, 214)',
+    });
+  });
+
+  test('Clinic OS deep links still receive the SPA shell directly', async ({ page }) => {
+    const appPaths = [
+      '/login',
+      '/registrar',
+      '/registrar/welcome',
+      '/registrar/queue',
+      '/queue/join',
+      '/q/SYNTHETIC-CODE',
+      '/confirm-visit',
+      '/clinical/appointments',
+      '/cashier',
+      '/admin',
+    ];
+
+    for (const path of appPaths) {
+      const response = await page.request.get(path);
+      expect(response.status(), path).toBe(200);
+      expect(response.headers()['content-type'], path).toContain('text/html');
+      const html = await response.text();
+      expect(html, path).toContain('id="root"');
+      expect(html, path).not.toContain('id="public-site-root"');
+    }
+  });
+
   test('Russian services page has localized HTML, metadata, and a published link', async ({ page }) => {
     const response = await page.goto('http://127.0.0.1:5278/ru/services');
     expect(response?.status()).toBe(200);

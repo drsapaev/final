@@ -4,31 +4,37 @@
   --public-site-hero-padding: clamp(28px, 6vw, 68px);
   --public-site-section-gap: clamp(38px, 6vw, 68px);
   --public-site-runtime-padding: clamp(24px, 5vw, 48px);
-  --public-site-surface: var(--mac-bg-content);
-  --public-site-ink: var(--mac-text-primary);
-  --public-site-muted-ink: var(--mac-text-secondary);
-  --public-site-border: var(--mac-border);
+  --public-site-background: var(--mac-bg-primary, #eef3fa);
+  --public-site-panel: var(--mac-bg-secondary, #e3ebf5);
+  --public-site-surface: var(--mac-bg-content, #f4f7fb);
+  --public-site-ink: var(--mac-text-primary, #000000);
+  --public-site-muted-ink: var(--mac-text-secondary, #455568);
+  --public-site-border: var(--mac-border, #b8c8da);
+  --public-site-link: var(--mac-link-ink, #0066d6);
+  --public-site-success: var(--mac-success-strong, #147a38);
+  --public-site-on-accent: var(--mac-text-on-accent, #ffffff);
+  --public-site-warning: var(--mac-warning-strong, #a86200);
 
   min-height: 100vh;
-  background: var(--mac-bg-primary);
+  background: var(--public-site-background);
   color: var(--public-site-ink);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
   line-height: 1.6;
 }
 
 .public-site a {
-  color: var(--mac-link-ink);
+  color: var(--public-site-link);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
 }
 
 .public-site a:hover {
-  color: color-mix(in srgb, var(--mac-success-strong), var(--mac-text-primary) 18%);
+  color: color-mix(in srgb, var(--public-site-success), var(--public-site-ink) 18%);
 }
 
 .public-site a:focus-visible {
   border-radius: 4px;
-  outline: 3px solid var(--mac-warning-strong);
+  outline: 3px solid var(--public-site-warning);
   outline-offset: 3px;
 }
 
@@ -65,8 +71,8 @@
   height: 38px;
   place-items: center;
   border-radius: 12px;
-  background: var(--mac-success-strong);
-  color: var(--mac-text-on-accent);
+  background: var(--public-site-success);
+  color: var(--public-site-on-accent);
   font-size: 1.15rem;
 }
 
@@ -102,12 +108,12 @@
   padding: var(--public-site-hero-padding);
   border: 1px solid var(--public-site-border);
   border-radius: 24px;
-  background: var(--mac-bg-secondary);
+  background: var(--public-site-panel);
 }
 
 .public-site__eyebrow {
   margin: 0 0 10px;
-  color: var(--mac-link-ink);
+  color: var(--public-site-link);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -165,9 +171,9 @@
 }
 
 .public-site a.public-site__button--primary {
-  border-color: var(--mac-success-strong);
-  background: var(--mac-success-strong);
-  color: var(--mac-text-on-accent);
+  border-color: var(--public-site-success);
+  background: var(--public-site-success);
+  color: var(--public-site-on-accent);
 }
 
 .public-site__section {
@@ -226,7 +232,7 @@
 
 .public-site__price {
   margin-block: 26px;
-  color: var(--mac-success-strong);
+  color: var(--public-site-success);
   font-size: 1.5rem;
   font-weight: 700;
 }
@@ -277,7 +283,7 @@
 }
 
 .public-site__footer a {
-  color: var(--mac-link-ink);
+  color: var(--public-site-link);
 }
 
 .public-site__runtime-message,
