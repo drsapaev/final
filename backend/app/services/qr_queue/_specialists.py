@@ -42,9 +42,10 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
     def _get_clinic_wide_selectable_specialists(self) -> list[dict[str, Any]]:
         """RQ-09: the PUBLIC clinic-wide selection mirrors the JOIN contract.
 
-        Visibility — ADMIN-controlled SSOT (PR-28):
-        ``QueueProfile.is_active`` + ``show_on_qr_page`` are the only
-        profile constraints. No hard-coded hidden keys
+        Visibility — ADMIN-controlled SSOT (PR-28/T11):
+        manual ``QueueProfile.is_active``, ``show_on_qr_page``, and the
+        resolved Department parent availability jointly gate each profile.
+        No hard-coded hidden keys
         (``QueueBusinessService.QR_HIDDEN_PROFILE_KEYS == set()``) and no
         ``INITIAL_QUEUE_PROFILES`` fallback: when every direction is
         hidden the public page must offer a correct EMPTY state (the
@@ -64,20 +65,34 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
         from app.models.queue_profile import QueueProfile
 
         try:
-            profiles = (
+            published_profiles = (
                 self.db.query(QueueProfile)
-                .filter(
-                    QueueProfile.is_active == True,
-                    QueueProfile.show_on_qr_page == True,
-                )
+                .filter(QueueProfile.show_on_qr_page == True)
                 .order_by(QueueProfile.display_order)
                 .all()
             )
+            from app.services.queue_profile_availability import (
+                load_queue_profile_availability,
+                queue_profile_is_qr_selectable,
+            )
+
+            availability_by_profile = load_queue_profile_availability(
+                self.db, published_profiles
+            )
+            profiles = [
+                profile
+                for profile in published_profiles
+                if queue_profile_is_qr_selectable(
+                    profile, availability_by_profile[profile]
+                )
+            ]
         except Exception:
             logger.warning(
                 "[QRQueueService] queue_profiles unavailable; offering empty selection",
                 exc_info=True,
             )
+            published_profiles = []
+            availability_by_profile = {}
             profiles = []
 
         profile_by_specialty: dict[str, dict[str, Any]] = {}
@@ -106,12 +121,18 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
         if not profile_by_specialty:
             return []
 
-        from app.core.roles import is_doctor_role_spelling
+        from app.models.user import User
+        from app.services.queue_service import queue_service
+        from app.services.queue_svc._core import qr_doctor_owner_eligibility_filters
         from app.services.user_mgmt._base import is_doctor_profile_incomplete
 
         doctors = (
             self.db.query(Doctor)
-            .filter(Doctor.active == True)
+            .join(User, Doctor.user_id == User.id)
+            .filter(
+                Doctor.active == True,
+                *qr_doctor_owner_eligibility_filters(),
+            )
             .options(joinedload(Doctor.user))
             .order_by(Doctor.id.asc())
             .all()
@@ -123,15 +144,28 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             if is_doctor_profile_incomplete(raw_specialty):
                 continue
             specialty = self._normalize_specialty_key(raw_specialty)
-            profile = profile_by_specialty.get(specialty)
-            if not profile or doctor.id in seen_ids:
+            display_profile = profile_by_specialty.get(specialty)
+            if not display_profile or doctor.id in seen_ids:
                 continue
+            qr_profile = queue_service._get_qr_visible_profile_for_doctor(
+                self.db,
+                doctor,
+                profiles=published_profiles,
+                availability_by_profile=availability_by_profile,
+            )
+            if not qr_profile:
+                continue
+            profile = {
+                "key": qr_profile.key,
+                "title": qr_profile.title,
+                "title_ru": qr_profile.title_ru,
+                "queue_tags": qr_profile.queue_tags or [],
+                "color": qr_profile.color,
+                "icon": qr_profile.icon,
+                "order": qr_profile.display_order,
+            }
             owner = getattr(doctor, "user", None)
-            if (
-                owner is None
-                or not getattr(owner, "is_active", False)
-                or not is_doctor_role_spelling(getattr(owner, "role", None))
-            ):
+            if owner is None:
                 continue
             profile_key = self._normalize_specialty_key(profile.get("key"))
             selectable.append(
@@ -161,5 +195,3 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             seen_ids.add(doctor.id)
 
         return selectable
-
-

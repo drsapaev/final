@@ -10,16 +10,16 @@ every patient-facing doctor selector — not only the web POST /appointments:
 An inactive (ghost-mirrored) or incomplete ("general" sentinel) doctor must
 be neither bookable nor selectable by patients on any of these surfaces.
 """
+
 from __future__ import annotations
 
 from datetime import date, timedelta
 from uuid import uuid4
 
-import pytest
-
 from app.core.security import get_password_hash
 from app.models.clinic import Doctor
 from app.models.patient import Patient
+from app.models.queue_profile import QueueProfile
 from app.models.user import User
 
 
@@ -106,9 +106,7 @@ def _deactivate_owner(client, auth_headers, user_id: int) -> None:
 
 
 class TestMobileBookingEligibility:
-    def test_book_deactivated_doctor_rejected(
-        self, client, db_session, auth_headers
-    ):
+    def test_book_deactivated_doctor_rejected(self, client, db_session, auth_headers):
         owner = _make_doctor(db_session, "cardiology", active=True)
         patient_user, _ = _make_patient_user(db_session)
         _deactivate_owner(client, auth_headers, owner.user_id)
@@ -126,9 +124,7 @@ class TestMobileBookingEligibility:
         assert response.status_code == 409, response.text
         assert "деактивирован" in response.json()["detail"]
 
-    def test_book_incomplete_doctor_rejected(
-        self, client, db_session, auth_headers
-    ):
+    def test_book_incomplete_doctor_rejected(self, client, db_session, auth_headers):
         owner = _make_doctor(db_session, "general", active=True)
         patient_user, _ = _make_patient_user(db_session)
 
@@ -166,9 +162,7 @@ class TestMobileBookingEligibility:
 
 
 class TestPatientFacingSelectors:
-    def test_mobile_doctors_hides_incomplete(
-        self, client, db_session, auth_headers
-    ):
+    def test_mobile_doctors_hides_incomplete(self, client, db_session, auth_headers):
         good = _make_doctor(db_session, "cardiology", active=True)
         incomplete = _make_doctor(db_session, "general", active=True)
         patient_user, _ = _make_patient_user(db_session)
@@ -195,6 +189,21 @@ class TestPatientFacingSelectors:
         inactive_owner = _make_doctor(db_session, "dermatology", active=True)
         _deactivate_owner(client, auth_headers, inactive_owner.user_id)
 
+        # T11's public selector requires a configured published direction;
+        # this test is about Doctor eligibility, so use a standalone profile.
+        db_session.add(
+            QueueProfile(
+                key="cardiology",
+                title="Synthetic cardiology",
+                title_ru="SYNTHETIC-Кардиология",
+                queue_tags=["cardiology"],
+                department_key=None,
+                is_active=True,
+                show_on_qr_page=True,
+            )
+        )
+        db_session.flush()
+
         response = client.get("/api/v1/queue/available-specialists")
         assert response.status_code == 200, response.text
         specialists = response.json()
@@ -205,10 +214,7 @@ class TestPatientFacingSelectors:
             if isinstance(specialists, dict)
             else specialists
         )
-        doctor_ids = {
-            row.get("id") if isinstance(row, dict) else None
-            for row in rows
-        }
+        doctor_ids = {row.get("id") if isinstance(row, dict) else None for row in rows}
         assert good.id in doctor_ids
         assert incomplete.id not in doctor_ids
         assert inactive_owner.id not in doctor_ids
@@ -231,9 +237,7 @@ class TestMobileBookingRound3Fixes:
             "/api/v1/mobile/appointments/book", json=payload, headers=headers
         )
 
-    def test_book_occupied_slot_rejected(
-        self, client, db_session, auth_headers
-    ):
+    def test_book_occupied_slot_rejected(self, client, db_session, auth_headers):
         owner = _make_doctor(db_session, "cardiology", active=True)
         patient_user, _ = _make_patient_user(db_session)
         headers = _patient_login(client, patient_user)
@@ -249,9 +253,7 @@ class TestMobileBookingRound3Fixes:
         assert second.status_code == 409, second.text
         assert "занято" in second.json()["detail"]
 
-    def test_book_preserves_complaint_and_notes(
-        self, client, db_session, auth_headers
-    ):
+    def test_book_preserves_complaint_and_notes(self, client, db_session, auth_headers):
         owner = _make_doctor(db_session, "cardiology", active=True)
         patient_user, _ = _make_patient_user(db_session)
         headers = _patient_login(client, patient_user)
@@ -269,9 +271,7 @@ class TestMobileBookingRound3Fixes:
         assert "болит голова" in (row.notes or "")
         assert "аллергия на лидокаин" in (row.notes or "")
 
-    def test_book_persists_requested_services(
-        self, client, db_session, auth_headers
-    ):
+    def test_book_persists_requested_services(self, client, db_session, auth_headers):
         owner = _make_doctor(db_session, "cardiology", active=True)
         patient_user, _ = _make_patient_user(db_session)
 
@@ -285,9 +285,7 @@ class TestMobileBookingRound3Fixes:
         db_session.refresh(s2)
 
         headers = _patient_login(client, patient_user)
-        response = self._book(
-            client, headers, owner.id, services=[s1.id, s2.id]
-        )
+        response = self._book(client, headers, owner.id, services=[s1.id, s2.id])
         assert response.status_code == 200, response.text
 
         from app.models.appointment import Appointment
@@ -300,16 +298,12 @@ class TestMobileBookingRound3Fixes:
         assert "ЭКГ" in (row.services or [])
         assert "Консультация кардиолога" in (row.services or [])
 
-    def test_book_unknown_service_rejected(
-        self, client, db_session, auth_headers
-    ):
+    def test_book_unknown_service_rejected(self, client, db_session, auth_headers):
         owner = _make_doctor(db_session, "cardiology", active=True)
         patient_user, _ = _make_patient_user(db_session)
         headers = _patient_login(client, patient_user)
 
-        response = self._book(
-            client, headers, owner.id, services=[999999]
-        )
+        response = self._book(client, headers, owner.id, services=[999999])
         assert response.status_code == 400, response.text
 
 
@@ -317,9 +311,7 @@ class TestMobileBookingRound4Fixes:
     """Round-4 Codex findings: no false slot-conflict for date-only bookings;
     inactive services are unavailable to mobile bookings."""
 
-    def test_date_only_bookings_do_not_conflict(
-        self, client, db_session, auth_headers
-    ):
+    def test_date_only_bookings_do_not_conflict(self, client, db_session, auth_headers):
         """preferred_time is optional: the occupancy query must be skipped
         when no time was selected — otherwise the FIRST date-only booking
         for a doctor+date (appointment_time IS NULL) would 409 every later
@@ -350,9 +342,7 @@ class TestMobileBookingRound4Fixes:
             " — date-only bookings must not collide with each other"
         )
 
-    def test_book_inactive_service_rejected(
-        self, client, db_session, auth_headers
-    ):
+    def test_book_inactive_service_rejected(self, client, db_session, auth_headers):
         owner = _make_doctor(db_session, "cardiology", active=True)
         patient_user, _ = _make_patient_user(db_session)
 
@@ -376,9 +366,7 @@ class TestMobileBookingRound4Fixes:
         assert response.status_code == 400, response.text
         assert "недоступны" in response.json()["detail"]
 
-    def test_book_active_service_still_persists(
-        self, client, db_session, auth_headers
-    ):
+    def test_book_active_service_still_persists(self, client, db_session, auth_headers):
         owner = _make_doctor(db_session, "cardiology", active=True)
         patient_user, _ = _make_patient_user(db_session)
 

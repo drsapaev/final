@@ -149,7 +149,9 @@ def pg_engine():
 
         engine = create_engine(sa_url, future=True)
         with engine.connect() as conn:
-            version = conn.execute(text("select version_num from alembic_version")).scalar()
+            version = conn.execute(
+                text("select version_num from alembic_version")
+            ).scalar()
         assert version, "alembic_version must be present after upgrade"
         yield engine
     finally:
@@ -251,7 +253,14 @@ def _make_visible_profile_at(session, explicit_id: int, key: str):
     """Insert a QR-visible profile with an EXPLICIT id (the collision
     under test) and re-sync the id sequence so later auto-inserts stay
     consistent."""
+    from app.models.department import Department
     from app.models.queue_profile import QueueProfile
+
+    department = session.query(Department).filter(Department.key == key).first()
+    if department is None:
+        session.add(Department(key=key, name_ru=f"SYNTHETIC-{key}", active=True))
+    else:
+        department.active = True
 
     profile = QueueProfile(
         id=explicit_id,
@@ -327,7 +336,9 @@ def _entry_queue(session, join_result: dict):
     from app.models.online_queue import OnlineQueueEntry
 
     entry_id = join_result["entries"][0]["queue_entry_id"]
-    entry = session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    entry = (
+        session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    )
     return entry.queue
 
 
@@ -360,7 +371,9 @@ def test_untyped_doctor_id_with_colliding_profile_id_keeps_selected_doctor(pg_se
     The untyped join must land on D1's (day, D1, tag) row — never on the
     profile route's least-loaded pick (D2)."""
     session = pg_session
-    d1 = _make_eligible_doctor_above_profiles(session, "rq09b_collision_d1", "rq09bcard")
+    d1 = _make_eligible_doctor_above_profiles(
+        session, "rq09b_collision_d1", "rq09bcard"
+    )
     profile = _make_visible_profile_at(session, d1.id, "rq09bcard")
     assert profile.id == d1.id
     d2 = _make_eligible_doctor(session, "rq09b_collision_d2", "rq09bcard")
@@ -400,7 +413,9 @@ def test_explicit_doctor_type_joins_chosen_doctor_under_collision(pg_session):
     """(c) explicit ``specialist_entity_types=['doctor']`` resolves the
     chosen doctor directly even under the id collision."""
     session = pg_session
-    d1 = _make_eligible_doctor_above_profiles(session, "rq09b_explicit_doc", "rq09bcard2")
+    d1 = _make_eligible_doctor_above_profiles(
+        session, "rq09b_explicit_doc", "rq09bcard2"
+    )
     _make_visible_profile_at(session, d1.id, "rq09bcard2")
     _make_eligible_doctor(session, "rq09b_explicit_doc2", "rq09bcard2")
     world = _seed_clinic_wide_token(session, "explicitdoc")
@@ -419,7 +434,9 @@ def test_explicit_profile_type_resolves_profile_route(pg_session):
     в конкретного допустимого исполнителя) — least-loaded routing among
     the profile's eligible doctors."""
     session = pg_session
-    d1 = _make_eligible_doctor_above_profiles(session, "rq09b_explicit_prof", "rq09bcard3")
+    d1 = _make_eligible_doctor_above_profiles(
+        session, "rq09b_explicit_prof", "rq09bcard3"
+    )
     profile = _make_visible_profile_at(session, d1.id + 3, "rq09bcard3")
     world = _seed_clinic_wide_token(session, "explicitprof")
 
@@ -434,7 +451,9 @@ def test_explicit_profile_type_resolves_profile_route(pg_session):
 def test_unknown_entity_type_rejected(pg_session):
     """(e) an unknown explicit type is rejected, not guessed."""
     session = pg_session
-    d1 = _make_eligible_doctor_above_profiles(session, "rq09b_unknown_type", "rq09bcard4")
+    d1 = _make_eligible_doctor_above_profiles(
+        session, "rq09b_unknown_type", "rq09bcard4"
+    )
     _make_visible_profile_at(session, d1.id, "rq09bcard4")
     world = _seed_clinic_wide_token(session, "unknown")
 

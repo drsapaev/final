@@ -1916,26 +1916,18 @@ def test_delete_unused_profile_succeeds(pg_client, pg_session, pg_admin_user):
 
 
 # ============================================================
-# RQ-13.a — department ↔ profile lifecycle coherence (D-06)
-#
-# Owner decision D-06 (APPROVED 2026-09-15, E-039): effective settings
-# resolve server-side clinic → department → owner; deactivating a
-# department BLOCKS new records but keeps waiting patients serviceable
-# and never finishes/blocks existing service. Plan RQ-13: rename/order/
-# active must be traced to профиль/QR/запись — today the profile only
-# MIRRORS the department at creation time and diverges afterwards (F-12):
-# rename leaves diverging titles, deactivation hides nothing on the tab
-# or QR layer, and department hard-delete destroys the 1:1 profile via
-# raw db.delete() bypassing the RQ-12.b D-02 guard (waiting patients
-# would disappear from every tab surface — S-11 violation).
+# T11 — department lifecycle and QueueProfile manual availability
 #
 # Contract pinned here:
-# - deactivating a department hides ALL profiles linked to it
-#   (department_key == dept.key or the 1:1 key == dept.key) on the
-#   registrar tabs AND the public QR page; queues/entries are untouched;
-# - reactivating restores ONLY the 1:1 department-owned profile
-#   (key == dept.key AND department_key == dept.key); independently
-#   archived profiles are never resurrected (D-02 coherence);
+# - QueueProfile.is_active is manual archive intent and is never changed by
+#   department off/on;
+# - a disabled parent blocks new QR selection/join through effective
+#   availability while staff tabs keep the manually active profile visible
+#   so existing queues remain serviceable;
+# - explicit department_key and the existing own-key convention resolve to
+#   one parent; dangling explicit or conflicting links fail closed;
+# - reactivation restores effective availability only for profiles whose
+#   persisted manual is_active remains true;
 # - renaming syncs title/title_ru of the 1:1 profile only; display_order
 #   and icon/color stay independent axes (F-19/RQ-23 territory);
 # - DELETE /admin/departments/{id} is blocked with 409 when any linked
@@ -2004,6 +1996,113 @@ def _public_keys(pg_client) -> set[str]:
     return {p["specialty"] for p in items}
 
 
+@pytest.mark.queue
+@pytest.mark.usefixtures("queue_admission_open")
+def test_public_catalog_matches_shared_resource_profile_admission(
+    pg_client, pg_session
+):
+    """Catalog and profile join agree on every published resource-tag sibling."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from app.crud.clinic import clinic_today
+    from app.models.department import Department
+    from app.models.online_queue import DailyQueue, QueueResource, QueueToken
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import QueueValidationError, queue_service
+
+    suffix = uuid.uuid4().hex[:10]
+    queue_tag = f"rq3639r{suffix}"
+    parent_a = Department(
+        key=f"rq3639-a-{suffix}",
+        name_ru="Synthetic shared-resource parent A",
+        active=True,
+    )
+    parent_b = Department(
+        key=f"rq3639-b-{suffix}",
+        name_ru="Synthetic shared-resource parent B",
+        active=False,
+    )
+    resource = QueueResource(
+        code=f"rq3639-resource-{suffix}",
+        queue_tag=queue_tag,
+        display_name="Synthetic shared QueueResource",
+        active=True,
+    )
+    profile_a = QueueProfile(
+        key=f"rq3639-profile-a-{suffix}",
+        title="Synthetic shared profile A",
+        queue_tags=[queue_tag],
+        department_key=parent_a.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    profile_b = QueueProfile(
+        key=f"rq3639-profile-b-{suffix}",
+        title="Synthetic shared profile B",
+        queue_tags=[queue_tag],
+        department_key=parent_b.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
+    token = QueueToken(
+        token=f"rq3639-{suffix}",
+        day=clinic_today(pg_session),
+        specialist_id=None,
+        department="clinic",
+        is_clinic_wide=True,
+        expires_at=local_now + timedelta(hours=2),
+        active=True,
+    )
+    pg_session.add_all([parent_a, parent_b, resource, profile_a, profile_b, token])
+    pg_session.commit()
+
+    # A is individually available, but the shared resource target is not:
+    # B's published target has an inactive parent. The public catalog must
+    # not offer A when profile admission will fail closed for the same tag.
+    assert profile_a.key not in _public_keys(pg_client)
+    with pytest.raises(QueueValidationError, match="Профиль направления неоднозначен"):
+        queue_service.join_queue_with_token(
+            pg_session,
+            token_str=token.token,
+            patient_name=f"RQ3639 Synthetic Patient {suffix}",
+            phone="+998900363900",
+            specialist_id_override=profile_a.id,
+            specialist_type="profile",
+        )
+    pg_session.rollback()
+    assert (
+        pg_session.query(DailyQueue)
+        .filter_by(day=token.day, queue_tag=queue_tag)
+        .count()
+        == 0
+    )
+
+    # Once both published siblings are bookable, both appear and the same
+    # selected resource route admits an entry.
+    parent_b.active = True
+    pg_session.commit()
+    visible_keys = _public_keys(pg_client)
+    assert {profile_a.key, profile_b.key} <= visible_keys
+
+    result = queue_service.join_queue_with_token(
+        pg_session,
+        token_str=token.token,
+        patient_name=f"RQ3639 Synthetic Patient {suffix}",
+        phone="+998900363900",
+        specialist_id_override=profile_a.id,
+        specialist_type="profile",
+    )
+    assert result.get("entry") is not None
+    queue = (
+        pg_session.query(DailyQueue)
+        .filter_by(day=token.day, queue_resource_id=resource.id)
+        .one()
+    )
+    assert queue.queue_tag == queue_tag
+
+
 def _seed_waiting_entry_for_department(pg_session, dept_key: str, suffix: str) -> dict:
     """One active DailyQueue + one waiting entry under a tag owned by the
     department's 1:1 profile (expand_queue_tags guarantees the bare key
@@ -2070,12 +2169,10 @@ def _seed_active_public_address_for_department(
     return {"profile_id": profile.id, "address_id": address.id}
 
 
-def test_department_deactivation_hides_linked_profiles_and_qr(
+def test_department_deactivation_preserves_manual_state_and_blocks_new_qr(
     pg_client, pg_session, pg_admin_user
 ):
-    """D-06: department deactivation blocks new records at the tab/QR
-    layer (both surfaces are driven by QueueProfile.is_active) while the
-    queues/entries themselves are left untouched."""
+    """A parent blocks new QR admission without hiding staff-service tabs."""
     headers = _dep_headers(pg_admin_user)
     dept = _create_department(pg_client, headers, "hide")
     dept_key = dept["key"]
@@ -2109,20 +2206,83 @@ def test_department_deactivation_hides_linked_profiles_and_qr(
 
     pg_session.expire_all()
     linked = _linked_profiles(pg_session, dept_key)
-    assert all(
-        not p.is_active for p in linked
-    ), "deactivation must hide every linked profile"
-    assert dept_key not in _tab_keys(pg_client, headers)
+    assert all(p.is_active for p in linked), (
+        "department deactivation must preserve persisted manual profile state"
+    )
+    assert dept_key in _tab_keys(pg_client, headers), (
+        "staff must retain access to existing queue tabs"
+    )
     assert dept_key not in _public_keys(pg_client)
+    admin_profiles = pg_client.get(
+        "/api/v1/queues/profiles?active_only=false", headers=headers
+    )
+    assert admin_profiles.status_code == 200, admin_profiles.text
+    own_facts = next(
+        profile
+        for profile in admin_profiles.json()["profiles"]
+        if profile["key"] == dept_key
+    )
+    assert own_facts["is_active"] is True
+    assert own_facts["effective_availability"] == {
+        "state": "unavailable",
+        "is_available": False,
+        "reason_codes": ["parent_inactive"],
+        "parent_department_key": dept_key,
+        "parent_active": False,
+    }
 
 
-def test_department_reactivation_restores_only_own_profile(
+def test_department_created_inactive_keeps_profile_manual_state_active(
     pg_client, pg_session, pg_admin_user
 ):
-    """D-06 + D-02 coherence: reactivation returns the department's own
-    1:1 tab; independently archived profiles are NOT resurrected — the
-    archive decision made through the profile endpoint (RQ-12.b) stays
-    in force (predictable un-archive)."""
+    """Parent activity is derived availability, not a manual profile archive."""
+    from app.models.queue_profile import QueueProfile
+
+    headers = _dep_headers(pg_admin_user)
+    dept = _create_department(pg_client, headers, "createdoff", active=False)
+    dept_key = dept["key"]
+    profile = pg_session.query(QueueProfile).filter_by(key=dept_key).one()
+    assert profile.is_active is True
+
+    def profile_facts():
+        response = pg_client.get(
+            "/api/v1/queues/profiles?active_only=false", headers=headers
+        )
+        assert response.status_code == 200, response.text
+        return next(
+            item for item in response.json()["profiles"] if item["key"] == dept_key
+        )
+
+    unavailable = profile_facts()
+    assert unavailable["is_active"] is True
+    assert unavailable["effective_availability"] == {
+        "state": "unavailable",
+        "is_available": False,
+        "reason_codes": ["parent_inactive"],
+        "parent_department_key": dept_key,
+        "parent_active": False,
+    }
+
+    activated = pg_client.post(
+        f"/api/v1/admin/departments/{dept['id']}/toggle", headers=headers
+    )
+    assert activated.status_code == 200, activated.text
+    pg_session.expire_all()
+    profile = pg_session.query(QueueProfile).filter_by(key=dept_key).one()
+    assert profile.is_active is True
+    assert profile_facts()["effective_availability"] == {
+        "state": "available",
+        "is_available": True,
+        "reason_codes": [],
+        "parent_department_key": dept_key,
+        "parent_active": True,
+    }
+
+
+def test_department_reactivation_preserves_manual_archives(
+    pg_client, pg_session, pg_admin_user
+):
+    """Off/on changes effective state only; persisted false values survive."""
     headers = _dep_headers(pg_admin_user)
     dept = _create_department(pg_client, headers, "restore")
     dept_key = dept["key"]
@@ -2141,14 +2301,11 @@ def test_department_reactivation_restores_only_own_profile(
     pg_session.add(sub)
     pg_session.commit()
 
-    # Admin archives the sub-profile through the profile endpoint first
-    # (the RQ-12.b archive transition, is_active=False).
-    resp = pg_client.put(
-        "/api/v1/queues/profiles/rq13arestore-sub",
-        headers=_dep_headers(pg_admin_user),
-        json={"is_active": False},
-    )
-    assert resp.status_code == 200, resp.text
+    # Both manual archive choices predate department off/on.
+    own = pg_session.query(QueueProfile).filter(QueueProfile.key == dept_key).one()
+    own.is_active = False
+    sub.is_active = False
+    pg_session.commit()
 
     # Deactivate the department, then reactivate it.
     resp = pg_client.post(
@@ -2161,7 +2318,7 @@ def test_department_reactivation_restores_only_own_profile(
     pg_session.expire_all()
     own_mid = pg_session.query(_QP).filter(_QP.key == dept_key).first()
     sub_mid = pg_session.query(_QP).filter(_QP.key == "rq13arestore-sub").first()
-    assert own_mid.is_active is False, "deactivation must hide own profile"
+    assert own_mid.is_active is False
     assert sub_mid.is_active is False
 
     resp = pg_client.post(
@@ -2176,8 +2333,98 @@ def test_department_reactivation_restores_only_own_profile(
         .filter(QueueProfile.key == "rq13arestore-sub")
         .first()
     )
-    assert own.is_active is True, "1:1 profile must be restored"
-    assert sub_row.is_active is False, "manual archive must not resurrect"
+    assert own.is_active is False, "department activation must not restore manual archives"
+    assert sub_row.is_active is False, "department activation must not restore manual archives"
+
+
+def test_bulk_department_off_on_never_writes_profile_activity(
+    pg_client, pg_session, pg_admin_user
+):
+    headers = _dep_headers(pg_admin_user)
+    dept = _create_department(pg_client, headers, "bulkstate")
+    dept_key = dept["key"]
+    from app.models.queue_profile import QueueProfile
+
+    own = pg_session.query(QueueProfile).filter_by(key=dept_key).one()
+    own.is_active = False
+    pg_session.commit()
+
+    off = pg_client.patch(
+        "/api/v1/admin/departments/bulk-activate",
+        headers=headers,
+        json={"ids": [dept["id"]], "active": False},
+    )
+    assert off.status_code == 200, off.text
+    on = pg_client.patch(
+        "/api/v1/admin/departments/bulk-activate",
+        headers=headers,
+        json={"ids": [dept["id"]], "active": True},
+    )
+    assert on.status_code == 200, on.text
+
+    pg_session.expire_all()
+    own = pg_session.query(QueueProfile).filter_by(key=dept_key).one()
+    assert own.is_active is False
+
+
+def test_profile_parent_batch_resolves_with_one_department_query(
+    pg_client, pg_session, pg_admin_user
+):
+    from sqlalchemy import event
+
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_profile_availability import (
+        load_queue_profile_availability,
+    )
+
+    headers = _dep_headers(pg_admin_user)
+    dept = _create_department(pg_client, headers, "batchparent")
+    linked = QueueProfile(
+        key="rq13a-batch-child",
+        title="Batch child",
+        queue_tags=["rq13a-batch-child"],
+        department_key=dept["key"],
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    standalone = QueueProfile(
+        key="rq13a-batch-standalone",
+        title="Batch standalone",
+        queue_tags=["rq13a-batch-standalone"],
+        department_key=None,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    pg_session.add_all([linked, standalone])
+    pg_session.commit()
+    profiles = [
+        pg_session.query(QueueProfile).filter_by(key=dept["key"]).one(),
+        pg_session.query(QueueProfile).filter_by(key=linked.key).one(),
+        pg_session.query(QueueProfile).filter_by(key=standalone.key).one(),
+    ]
+
+    statements: list[str] = []
+    engine = pg_session.get_bind()
+
+    def record_department_select(_conn, _cursor, statement, _parameters, _context, _many):
+        normalized = " ".join(statement.lower().replace('"', "").split())
+        table_tokens = {token.rstrip(",;") for token in normalized.split()}
+        if any(
+            token == "departments" or token.endswith(".departments")
+            for token in table_tokens
+        ):
+            statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", record_department_select)
+    try:
+        availability = load_queue_profile_availability(pg_session, profiles)
+    finally:
+        event.remove(engine, "before_cursor_execute", record_department_select)
+
+    assert len(statements) == 1
+    assert availability[profiles[0]].parent_department_key == dept["key"]
+    assert availability[profiles[1]].parent_department_key == dept["key"]
+    assert availability[profiles[2]].state == "available"
 
 
 def test_department_rename_syncs_own_profile_titles_only(
@@ -2376,9 +2623,10 @@ def test_department_bulk_delete_blocked_when_profile_has_active_public_address(
     assert address.retired_at is None
 
 
-def test_bulk_deactivation_follows_hide_contract(pg_client, pg_session, pg_admin_user):
-    """PR-18 bulk-activate must follow the same D-06 contract as the
-    single-department toggle (one contract, not two behaviors)."""
+def test_bulk_deactivation_preserves_manual_profile_state(
+    pg_client, pg_session, pg_admin_user
+):
+    """Department availability must not overwrite manual archive intent."""
     headers = _dep_headers(pg_admin_user)
     d1 = _create_department(pg_client, headers, "b1")
     d2 = _create_department(pg_client, headers, "b2")
@@ -2394,9 +2642,19 @@ def test_bulk_deactivation_follows_hide_contract(pg_client, pg_session, pg_admin
     for dept_key in (d1["key"], d2["key"]):
         linked = _linked_profiles(pg_session, dept_key)
         assert linked, "1:1 profile must exist"
+        assert all(p.is_active for p in linked), (
+            f"bulk deactivation must preserve manual profile state for {dept_key}"
+        )
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+        )
+
+        availability = load_queue_profile_availability(pg_session, linked)
         assert all(
-            not p.is_active for p in linked
-        ), f"bulk deactivation must hide {dept_key}"
+            not availability[profile].is_available
+            and "parent_inactive" in availability[profile].reason_codes
+            for profile in linked
+        ), f"bulk deactivation must block new admission for {dept_key}"
 
 
 # ---------------------------------------------------------------------------

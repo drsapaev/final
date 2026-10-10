@@ -19,6 +19,24 @@ _queue_settings_context: ContextVar[_QueueSettingsContext | None] = ContextVar(
 _Command = TypeVar("_Command", bound=Callable[..., Any])
 
 
+def qr_doctor_owner_eligibility_filters() -> tuple[Any, ...]:
+    """SQL filters for the User side of QR Doctor eligibility.
+
+    Callers must inner-join ``User`` through ``Doctor.user_id``; that join
+    excludes legacy userless Doctor rows. Keep these predicates shared by
+    public selectors and QR admission so they cannot drift independently.
+    """
+    from sqlalchemy import func
+
+    from app.core.roles import DOCTOR_ROLE_SPELLINGS
+    from app.models.user import User
+
+    return (
+        User.is_active.is_(True),
+        func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
+    )
+
+
 def queue_settings_command(method: _Command) -> _Command:
     """Keep one settings snapshot across a service command and its nested calls."""
 
@@ -56,38 +74,53 @@ class CoreMixin(QueueBusinessServiceMixinBase):
     @classmethod
 
 
-    def _is_qr_visible_profile(cls, profile: Any) -> bool:
+    def _is_qr_visible_profile(
+        cls,
+        profile: Any,
+        db: Session,
+        *,
+        availability: Any | None = None,
+    ) -> bool:
         key = cls._normalize_qr_specialty_key(getattr(profile, "key", None))
-        return (
-            bool(key)
-            and key not in cls.QR_HIDDEN_PROFILE_KEYS
-            and bool(getattr(profile, "is_active", False))
-            and bool(getattr(profile, "show_on_qr_page", False))
+        if not key or key in cls.QR_HIDDEN_PROFILE_KEYS:
+            return False
+
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+            queue_profile_is_qr_selectable,
         )
+        if availability is None:
+            availability = load_queue_profile_availability(db, [profile])[profile]
+        return queue_profile_is_qr_selectable(profile, availability)
 
     @classmethod
 
 
-    def _get_qr_visible_profile_for_doctor(cls, db: Session, doctor: Doctor):
+    def _get_qr_profile_candidates_for_tag(
+        cls,
+        db: Session,
+        specialty: Any,
+        *,
+        profiles: list[Any] | None = None,
+        prefer_exact_key: bool = False,
+    ) -> list[Any]:
+        """Return configured profiles matching one normalized queue tag.
+
+        Inactive rows stay in this result so an issued token can
+        distinguish a configured-but-unavailable profile from a legacy
+        tag that has never been represented by QueueProfile.
+        """
         from app.models.queue_profile import QueueProfile
 
-        doctor_specialty = cls._normalize_qr_specialty_key(
-            getattr(doctor, "specialty", None)
-        )
-        if not doctor_specialty:
-            return None
+        normalized_specialty = cls._normalize_qr_specialty_key(specialty)
+        if not normalized_specialty:
+            return []
 
-        profiles = (
-            db.query(QueueProfile)
-            .filter(
-                QueueProfile.is_active == True,
-                QueueProfile.show_on_qr_page == True,
-            )
-            .all()
+        profile_rows = (
+            profiles if profiles is not None else db.query(QueueProfile).all()
         )
-        for profile in profiles:
-            if not cls._is_qr_visible_profile(profile):
-                continue
+        matched: list[Any] = []
+        for profile in profile_rows:
             profile_keys = {
                 cls._normalize_qr_specialty_key(profile.key),
                 *(
@@ -95,7 +128,67 @@ class CoreMixin(QueueBusinessServiceMixinBase):
                     for tag in (profile.queue_tags or [])
                 ),
             }
-            if doctor_specialty in profile_keys:
+            if normalized_specialty in profile_keys:
+                matched.append(profile)
+        if prefer_exact_key:
+            exact_key_matches = [
+                profile
+                for profile in matched
+                if cls._normalize_qr_specialty_key(profile.key)
+                == normalized_specialty
+            ]
+            if exact_key_matches:
+                return exact_key_matches
+        return matched
+
+    @classmethod
+
+    def _get_qr_profile_candidates_for_doctor(
+        cls,
+        db: Session,
+        doctor: Doctor,
+        *,
+        profiles: list[Any] | None = None,
+    ) -> list[Any]:
+        return cls._get_qr_profile_candidates_for_tag(
+            db,
+            getattr(doctor, "specialty", None),
+            profiles=profiles,
+            prefer_exact_key=True,
+        )
+
+    @classmethod
+
+    def _get_qr_visible_profile_for_doctor(
+        cls,
+        db: Session,
+        doctor: Doctor,
+        *,
+        profiles: list[Any] | None = None,
+        availability_by_profile: dict[Any, Any] | None = None,
+    ):
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+        )
+
+        profile_candidates = cls._get_qr_profile_candidates_for_doctor(
+            db, doctor, profiles=profiles
+        )
+        resolved_availability = availability_by_profile
+        if resolved_availability is None:
+            resolved_availability = load_queue_profile_availability(
+                db, profile_candidates
+            )
+        if not cls._qr_profile_candidates_are_unambiguous(
+            profile_candidates,
+            db,
+            resolved_availability,
+        ):
+            return None
+        for profile in profile_candidates:
+            if cls._is_qr_visible_profile(
+                profile, db, availability=resolved_availability[profile]
+            ):
                 return profile
         return None
 

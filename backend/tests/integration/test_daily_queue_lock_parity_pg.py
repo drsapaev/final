@@ -169,6 +169,7 @@ def _seed_v1_token_admission(engine, *, cap: int, token_count: int):
     from app.crud.daily_queue_creation_policy import (
         ONLINE_ISSUANCES_V1_POLICY_VERSION,
     )
+    from app.models.department import Department
     from app.models.online_queue import DailyQueue, QueueToken
     from app.models.queue_profile import QueueProfile
 
@@ -178,6 +179,13 @@ def _seed_v1_token_admission(engine, *, cap: int, token_count: int):
     token_values = [f"t083-synthetic-{uuid.uuid4().hex}" for _ in range(token_count)]
 
     with Session(engine) as seed:
+        seed.add(
+            Department(
+                key="cardiology",
+                name_ru="SYNTHETIC-Кардиология",
+                active=True,
+            )
+        )
         seed.add(
             QueueProfile(
                 key="cardiology",
