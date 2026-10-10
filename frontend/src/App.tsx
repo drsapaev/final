@@ -25,6 +25,7 @@ import { CommandPalette, type CommandProfile } from './components/common/Command
 import GlobalNotificationCenter from './components/notifications/GlobalNotificationCenter';
 import Health from './pages/Health';
 import Landing from './pages/Landing';
+import { PublicSiteFallback } from './publicSitePage';
 import LoginFormStyled from './components/auth/LoginFormStyled';
 import Setup from './pages/Setup';
 import { useSetupStatus } from './hooks/useSetupStatus';
@@ -102,6 +103,7 @@ const IntegrationDemo = lazy(() => import('./components/integration/IntegrationD
 
 const ROUTE_COMPONENTS = {
   Landing,
+  PublicSiteFallback,
   ResetPasswordPage,
   LoginFormStyled,
   ChangePasswordRequired,
