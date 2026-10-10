@@ -165,19 +165,35 @@ describe('public-site SSR request handler', () => {
     const fetchImpl = createFetch(() => {
       throw new Error('must not fetch for app routes');
     });
-    const response = await handlePublicSiteRequest(
-      new Request('https://preview.kosmed.test/login'),
-      { apiOrigin: 'https://api.kosmed.test', deploymentEnvironment: 'preview' },
-      assets,
-      fetchImpl,
-    );
-    const html = await response.text();
+    const appPaths = [
+      '/login',
+      '/registrar',
+      '/registrar/welcome',
+      '/registrar/queue',
+      '/queue/join',
+      '/q/SYNTHETIC-CODE',
+      '/confirm-visit',
+      '/clinical/appointments',
+      '/cashier',
+      '/admin',
+    ];
 
-    expect(response.status).toBe(200);
-    expect(html).toContain('Clinic OS');
-    expect(html).toContain('id="root"');
-    expect(html).toContain('/assets/clinic-app.js');
-    expect(html).not.toContain('id="public-site-root"');
+    for (const pathname of appPaths) {
+      const response = await handlePublicSiteRequest(
+        new Request(`https://preview.kosmed.test${pathname}`),
+        { apiOrigin: 'https://api.kosmed.test', deploymentEnvironment: 'preview' },
+        assets,
+        fetchImpl,
+      );
+      const html = await response.text();
+
+      expect(response.status, pathname).toBe(200);
+      expect(html, pathname).toContain('Clinic OS');
+      expect(html, pathname).toContain('id="root"');
+      expect(html, pathname).toContain('/assets/clinic-app.js');
+      expect(html, pathname).not.toContain('id="public-site-root"');
+    }
+
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
