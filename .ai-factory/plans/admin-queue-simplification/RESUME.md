@@ -1,14 +1,15 @@
 # Resume
 
-## Current resume — PR #3639 public catalog/admission P2 locally validated — 2026-10-10T23:41+05:00
+## Current resume — PR #3639 public catalog/admission P2 and exact-head CI complete — 2026-10-10T23:56+05:00
 
-- Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 last read OPEN/MERGEABLE at remote HEAD `c74217cd1f19f316bed406051db31665ece204b1`; base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. New code/test/journal edits are uncommitted; refresh PR HEAD before publishing.
+- Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 is OPEN/MERGEABLE at exact HEAD `6522e8c0046d824aaefa31960582ce26f7cef708`, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`; exact-head CI is complete with 27 SUCCESS / 13 SKIPPED / no pending or failures. The worktree is clean before this journal-only checkpoint.
 - Latest P2: public `GET /api/v1/queues/profiles/public` could expose profile A although profile admission rejects A because another published profile on the same QueueResource tag has an inactive parent. Fixed by extracting the existing admission resource-tag resolver into `QueueBusinessService` and using its shared-tag bookability guard in the public catalog with `clinic_today(db)`. Token target planning and actual profile admission now call the same route resolver.
 - Regression `test_public_catalog_matches_shared_resource_profile_admission` exercises both catalog and real `join_queue_with_token`: inactive sibling -> A hidden and join rejected without queue creation; activate sibling -> both visible and the selected resource-owned join succeeds.
 - Local PostgreSQL validation: `test_queue_profile_lifecycle.py`, `test_qr_selection_join_visibility.py`, and `test_qr_token_path_owner_eligibility.py` — **71 passed, 1 warning, 0 skipped/failures/errors** on a task-owned temporary `pgserver` PostgreSQL instance, with each module using and dropping its own scratch DB. A Windows-to-WSL Docker PG attempt timed out; an existing `rq13ui_verify.py` attempt skipped because its proxy assumes a Unix-socket URI while current `pgserver` exposes TCP. The final run used the direct current loopback URI and passed. Temporary database process/data were cleaned up.
-- Scoped Ruff, `py_compile`, and `git diff --check` pass. Tracked changes are limited to `_operations.py`, registrar `_queue_profiles.py`, `test_queue_profile_lifecycle.py`, and T11 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`; preserve `.scratch/`.
-- Tier-2 remains PARTIAL from the previous bounded staging run: frontend provenance, named browser specs, and the full staging runbook are NOT_RUN. No deferral accepted. Do not edit PR body, submit formal review, accept deferral, stage, or merge in this code-fix slice.
-- Next exact action: final scope checks, commit only the six approved tracked paths, push without force to the existing PR branch, then inspect CI on the resulting exact head. Merge remains user-owned.
+- Scoped Ruff, `py_compile`, and `git diff --check` passed. Three PostgreSQL integration modules passed 71/71. The public catalog now shares the admission-side resource tag and bookability decision.
+- Exact-head checks are complete: 27 SUCCESS and 13 SKIPPED (including readiness, integration, Docker, load, and preview jobs); PR Required Gate passed. Skips are not passes. PR merge state is CLEAN, but PR #3639 remains open and merge is user-owned.
+- Tier-2 remains PARTIAL: served frontend provenance, named browser specs, and the full staging runbook remain NOT_RUN. No deferral is accepted. The source-fix scope prohibited staging and PR-body edits; no formal review or merge was performed.
+- Next exact action: proceed only with a separately scoped staging-evidence or PR-description task; do not merge, submit a formal review, or accept a deferral without the user's explicit decision.
 
 ## Previous resume — T11 bounded Tier-2 staging slice passed; remaining gaps are recorded — 2026-10-10T22:19+05:00
 

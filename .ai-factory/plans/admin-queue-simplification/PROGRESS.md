@@ -2,13 +2,13 @@
 
 Plan version: 3.88
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: IN_PROGRESS — the new public-catalog/admission P2 is fixed locally and focused PostgreSQL coverage passes 71/71 across three modules. Source, test, and journal changes are pending commit/push. PR #3639 remote HEAD remains `c74217cd1f19f316bed406051db31665ece204b1`; Tier-2 remains PARTIAL (frontend provenance, named browser specs, full staging runbook NOT_RUN). No deferral is accepted; merge remains user-owned.
+Current status: IN_PROGRESS — the public-catalog/admission P2 is fixed and pushed in `6522e8c0046d824aaefa31960582ce26f7cef708`. Focused PostgreSQL coverage passed 71/71 across three modules. Exact-head GitHub checks: 27 SUCCESS, 13 SKIPPED, 0 pending/failed; PR Required Gate passed. PR #3639 is OPEN/MERGEABLE with merge state CLEAN, based on `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. Tier-2 remains PARTIAL (served frontend provenance, named browser specs, full staging runbook NOT_RUN); no deferral is accepted and merge remains user-owned.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 PR base / `origin/main`: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed (local sync commit `cfe6dfc89`).
-Latest validated source commit: `d36235360f60f08ea0de1ff6883164604f8f163e`; current local changes extend it with the public-catalog parity P2 fix and its integration test. Recheck live PR HEAD before commit/push.
+Latest validated source commit: `6522e8c0046d824aaefa31960582ce26f7cef708` (includes the public-catalog parity P2 fix and integration regression); the worktree is clean after the journal checkpoint is committed.
 Implementation paths for the new P2: `backend/app/services/queue_svc/_operations.py`, `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, and `backend/tests/integration/test_queue_profile_lifecycle.py`. Preserve pre-existing untracked `.scratch/` and do not stage it.
-Last updated: 2026-10-10T23:41+05:00
+Last updated: 2026-10-10T23:56+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,16 +16,18 @@ Last updated: 2026-10-10T23:41+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS | PR #3639 OPEN at `c74217cd`; new public-catalog P2 fixed locally; 71 focused PG tests, Ruff, py_compile PASS; commit/push and exact-head CI pending; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-public-catalog-admission-parity-p2-2026-10-10 |
+| T11 | IN_PROGRESS | PR #3639 OPEN at `6522e8c`; 71 focused PG tests PASS; exact-head CI 27 SUCCESS / 13 SKIPPED; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-exact-head-ci-after-public-catalog-p2-2026-10-10 |
 
-## Current checkpoint — PR #3639 public catalog/admission P2 locally validated — 2026-10-10T23:41+05:00
+## Current checkpoint — PR #3639 public catalog/admission P2 and exact-head CI complete — 2026-10-10T23:56+05:00
 
 - The repeat review's P2 is fixed locally: the public catalog uses the canonical QueueBusinessService bookability guard and the same QueueResource tag resolver as profile admission. The resolver is also reused by token target planning, avoiding another copy of resource-route selection.
 - Regression `test_public_catalog_matches_shared_resource_profile_admission` checks both surfaces: with one inactive published sibling, the individually available profile is absent from the catalog and its direct profile join is rejected; after parent activation, both appear and the resource-owned join succeeds.
 - The three focused PostgreSQL modules passed **71 passed, 1 warning, 0 skips/failures/errors** on a temporary local `pgserver` instance. Scoped Ruff, py_compile, and `git diff --check` passed. A pre-existing helper (`scripts/rq13ui_verify.py`) was NOT_RUN successfully because its Unix-socket proxy assumes the older pgserver URI shape; the same module was then run with the current direct TCP loopback URI from the `pgserver` API. No tracked helper was changed.
-- Remote PR #3639 was read as OPEN/MERGEABLE at `c74217cd1f19f316bed406051db31665ece204b1`, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`; on that older exact head 25 checks were SUCCESS and 13 were SKIPPED. The new P2 changes are not yet on GitHub, so exact-head CI must be rerun after push.
-- Current tracked edits: `_operations.py`, registrar `_queue_profiles.py`, `test_queue_profile_lifecycle.py`, and the T11 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. No staging, PR-body, review, deferral, or merge action occurred. Tier-2 remains PARTIAL and no deferral is accepted.
-- Next exact action: run final scope/diff checks, commit only these six allowed files, push without force to the existing PR branch, and inspect checks on the resulting exact HEAD. Do not merge or submit a formal review.
+- At the previous checkpoint, remote PR #3639 was still at `c74217cd1f19f316bed406051db31665ece204b1`; that older head had 25 SUCCESS and 13 SKIPPED. It is superseded by the pushed `6522e8c` code head and the exact-head CI evidence below.
+- Code and focused regression were committed and pushed in `6522e8c0046d824aaefa31960582ce26f7cef708`; exact-head check-runs completed with 27 SUCCESS, 13 SKIPPED, 0 pending/failed. PR Required Gate, Backend tests, Frontend E2E/unit/build, parity, lint, Code Quality, security, and documentation jobs passed. Staging/production readiness, Docker, integration, load, DAST, Supabase preview, Telegram, metadata, routing classification, and failure-notification jobs were skipped; skips are not passes.
+- PR #3639 remains OPEN/MERGEABLE, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`, merge state CLEAN. The repeat-review public-catalog P2 is fixed in source and covered locally; the three PostgreSQL integration modules passed 71/71, plus scoped Ruff, `py_compile`, and `git diff --check`.
+- Tier-2 remains PARTIAL: served frontend revision provenance is unverified, named browser specs and the complete `docs/runbooks/STAGING_VALIDATION.md` checklist are NOT_RUN. The source-fix execution scope prohibited a new staging run. No deferral, PR-body update, formal review, or merge occurred; these remain separate decisions/actions.
+- Next exact action: refresh the PR description only after a separately authorized PR-body scope, and continue remaining Tier-2 evidence only under a validation-specific gate. Do not merge, submit a formal review, or accept a deferral.
 
 ## Previous checkpoint — PR #3639 bounded Tier-2 staging passed; remaining Tier-2 gaps are explicit — 2026-10-10T22:19+05:00
 

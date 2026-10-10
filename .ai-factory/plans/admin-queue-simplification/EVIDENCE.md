@@ -3166,3 +3166,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Next exact action: final scope check, commit only the six allowed tracked paths, push without force to the existing branch, and inspect all applicable checks on the new exact PR head.
 - PR: #3639 OPEN at last read, remote HEAD `c74217cd1f19f316bed406051db31665ece204b1`.
 - Merge commit: none.
+
+## T11 PR #3639 exact-head CI after public-catalog P2 — 2026-10-10T23:56+05:00
+
+- Commit under test: `6522e8c0046d824aaefa31960582ce26f7cef708`; base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. GitHub PR #3639 was OPEN/MERGEABLE with merge state CLEAN at this exact HEAD.
+- Exact commit check-runs: **27 SUCCESS, 13 SKIPPED, 0 pending, 0 failed**. `PR Required Gate`, Backend tests, Frontend E2E/unit/build, Frontend–Backend Parity, lint, Code Quality, CodeQL, security/secret scans, regression audit, OpenAPI/docs generation, locale checks, and context-boundary checks passed.
+- The 13 skipped jobs are staging readiness, production readiness, k6 load, integration, one security scan, Docker build, two failure notifications, Telegram Mini App, metadata, classify-and-route, nightly DAST, and Supabase Preview. They are skipped by workflow/path policy and are not treated as successful validation.
+- Local validation remains the 71/71 PostgreSQL integration results and scoped Ruff, `py_compile`, and `git diff --check` recorded in the preceding implementation entry. No runtime changes were made after `6522e8c` for this journal update.
+- Actual changed files for the source fix are the service resolver, public profile endpoint, and focused PostgreSQL lifecycle test; the remaining files in `6522e8c` are the T11 progress/evidence/resume journals. No migrations, schema, compose, launcher, gate, production, PR description, formal review, deferral, or merge changes occurred.
+- Tier-2 remains PARTIAL: served frontend revision provenance is unverified; named browser specs and the complete `docs/runbooks/STAGING_VALIDATION.md` checklist are NOT_RUN. The source-fix scope explicitly excluded staging, so this checkpoint does not claim Tier-2 completion.
+- Result: source P2 fixed and exact-head CI green for all completed applicable checks; PR remains open for user review/merge decision. No merge commit.
