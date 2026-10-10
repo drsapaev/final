@@ -1,14 +1,14 @@
 # Progress
 
-Plan version: 3.88
+Plan version: 3.89
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: IN_PROGRESS — public-catalog/admission P2 is fixed and pushed in code commit `6522e8c0046d824aaefa31960582ce26f7cef708`. Focused PostgreSQL coverage passed 71/71, and the exact P2 regression passed on the owned synthetic staging PostgreSQL plus live public catalog HTTP 200. Exact code-head CI: 27 SUCCESS / 13 SKIPPED; the subsequent journal-head CI passed 25 SUCCESS / 13 SKIPPED, with no pending/failures and PR Required Gate green. PR #3639 remains OPEN/MERGEABLE, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. Tier-2 remains PARTIAL (served frontend provenance, named browser specs, full staging runbook NOT_RUN); no deferral is accepted and merge remains user-owned.
+Current status: IN_PROGRESS — the public-catalog/admission P2 is fixed in runtime commit `6522e8c0046d824aaefa31960582ce26f7cef708`; same-runtime focused PostgreSQL coverage passed 71/71. On journal head `d4b2b6244055ae56b9addf6cbfd1ecbb4172016e`, owned synthetic staging confirmed 254/254 frontend file hashes, standard Admin password+TOTP, Department off/on, manual archive, and public catalog HTTP 200. Seven of ten selected PostgreSQL cases passed; three QR selector/join nodes skipped after fallback to schema-less `/postgres`. A separate synthetic retry passed Preflight but canonical Start failed before Session; teardown verified empty. Tier-2 remains PARTIAL: legacy live browser specs and full `STAGING_VALIDATION.md` are NOT_RUN. No deferral is accepted; merge remains user-owned.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 PR base / `origin/main`: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed (local sync commit `cfe6dfc89`).
-Latest validated source commit: `6522e8c0046d824aaefa31960582ce26f7cef708` (includes the public-catalog parity P2 fix and integration regression). The staging run used the same source tree at journal checkpoint `5d732a8ea7e182b500037a41ca344b4988047928`. This checkpoint is being updated with the staging evidence.
+Latest validated runtime source commit: `6522e8c0046d824aaefa31960582ce26f7cef708` (includes the public-catalog parity P2 fix and integration regression). Staging used exact worktree/journal head `d4b2b6244055ae56b9addf6cbfd1ecbb4172016e`; the intervening diff changes only these three T11 journals.
 Implementation paths for the new P2: `backend/app/services/queue_svc/_operations.py`, `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, and `backend/tests/integration/test_queue_profile_lifecycle.py`. Preserve pre-existing untracked `.scratch/` and do not stage it.
-Last updated: 2026-10-11T00:56+05:00
+Last updated: 2026-10-11T02:36+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,9 +16,20 @@ Last updated: 2026-10-11T00:56+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS | PR #3639 OPEN; P2 code `6522e8c`; 71 focused PG PASS; staging target regression PASS; exact-head CI green; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-bounded-staging-public-catalog-p2-2026-10-11 |
+| T11 | IN_PROGRESS | PR #3639 OPEN; code `6522e8c`; same-runtime PG 71/71; staging frontend/Admin/lifecycle/catalog PASS; PG 7 PASS / 3 join SKIP; retry Start failed and cleaned; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-tier2-follow-up-staging-2026-10-11 |
 
-## Current checkpoint — PR #3639 public catalog/admission P2 and bounded staging pass — 2026-10-11T00:56+05:00
+## Current checkpoint — PR #3639 T11 Tier-2 follow-up — 2026-10-11T02:36+05:00
+
+- PR #3639 remains OPEN/MERGEABLE on base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. Exact local/remote journal head at validation was `d4b2b6244055ae56b9addf6cbfd1ecbb4172016e`; runtime code-bearing commit remains `6522e8c0046d824aaefa31960582ce26f7cef708`. The code diff between these commits changes only the three T11 journals.
+- Prior same-runtime PostgreSQL validation: **71 passed, 1 warning, 0 skipped/failures/errors** across lifecycle, QR selector/join visibility, and QR token eligibility modules. This covers the join assertions skipped in the current staging Session.
+- Owned tier2b staging passed Preflight/Start, health and public catalog HTTP 200, standard Admin password→TOTP enrollment→fresh password+TOTP challenge and protected route (HTTP 200), Department off/on, manual archive, public catalog/admission regression, and resource-token positive/negative cases. Frontend provenance: source `d4b2b624`, frontend tree `6ed3414510aa3429320c2732882044ce7bd7b4f9`, image `sha256:ae95361774287f6fc086ed57bed49d0aa4736050975aa5f3dea4e511bfab1e50`; **254/254** static files matched HTTP, manifest SHA-256 `6af83024f96185ab4b8fdde0f9f9733491a4921370adc954a062559dfcd1a4ca`.
+- Tier2b JUnit was **7 passed, 3 skipped, 0 failed/errors**. Skips: `test_admin_shown_ecg_direction_is_selectable_and_joinable`, `test_clinic_wide_specialist_card_uses_the_profile_selected_for_admission`, and `test_parent_off_removes_selection_and_blocks_direct_qr_join`. The staging helper's fallback `DATABASE_URL` pointed at schema-less `/postgres`; those test nodes are not counted as staging passes. Their same-runtime PostgreSQL module passed in the separate 71/71 run.
+- Tier2c used another isolated project and a corrected pre-provisioned app-DB fallback. Preflight passed; canonical Start failed before Session. Teardown passed and exact-label verification found zero containers, volumes, networks, and images; the private env was removed. Earlier harness/WSL timeout attempts and safe reports are in the latest EVIDENCE entry.
+- No application, schema, Compose, launcher, gate, production, PR-body, review, deferral, or merge change occurred. Every started task-owned project was cleaned and verified empty; original `ops/staging.env` and foreign staging remained untouched.
+- Tier-2 remains PARTIAL. The target T11 behaviors have current staging coverage plus same-runtime PostgreSQL join evidence; the three legacy live browser specs and full `docs/runbooks/STAGING_VALIDATION.md` remain NOT_RUN. No deferral has been accepted.
+- Next exact action: commit and push only `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`, verify exact-head CI, then present any limited deferral decision for the remaining legacy live specs to the user. Do not alter PR body, submit formal review, accept deferral, or merge under this scope.
+
+## Previous checkpoint — PR #3639 public catalog/admission P2 and bounded staging pass — 2026-10-11T00:56+05:00
 
 - The repeat review's P2 is fixed locally: the public catalog uses the canonical QueueBusinessService bookability guard and the same QueueResource tag resolver as profile admission. The resolver is also reused by token target planning, avoiding another copy of resource-route selection.
 - Regression `test_public_catalog_matches_shared_resource_profile_admission` checks both surfaces: with one inactive published sibling, the individually available profile is absent from the catalog and its direct profile join is rejected; after parent activation, both appear and the resource-owned join succeeds.
