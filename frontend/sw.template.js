@@ -8,8 +8,9 @@
  * вернувшиеся пользователи не остаются на старой сборке после деплоя.
  */
 
+/* eslint-disable no-console -- Keep generic service-worker diagnostics without logging request or patient data. */
+
 const BUILD_VERSION = '__SW_BUILD_VERSION__';
-const CACHE_NAME = `clinic-pwa-${BUILD_VERSION}`;
 const STATIC_CACHE = `clinic-static-${BUILD_VERSION}`;
 const DYNAMIC_CACHE = `clinic-dynamic-${BUILD_VERSION}`;
 const API_CACHE = `clinic-api-${BUILD_VERSION}`;
@@ -20,7 +21,6 @@ const CURRENT_CACHES = [STATIC_CACHE, DYNAMIC_CACHE, API_CACHE, ...PERSISTENT_CA
 
 // Файлы для кэширования при установке
 const STATIC_FILES = [
-  '/',
   '/manifest.json',
   '/favicon.ico',
   '/offline.html',
@@ -53,6 +53,12 @@ const API_CACHE_PATTERNS = [
 
 // API endpoints которые НЕ нужно кэшировать
 const NO_CACHE_PATTERNS = [
+  // Public-site HTML and sitemap reflect current publication state and must
+  // never be replayed from Cache Storage, including the offline fallback.
+  /^\/$/,
+  /^\/ru(?:\/|$)/,
+  /^\/(?:services|doctors|prices|contacts)(?:\/|$)/,
+  /^\/sitemap\.xml$/,
   /\/api\/v1\/auth\/login/,
   /\/api\/v1\/auth\/logout/,
   /\/api\/v1\/auth\/me/,
@@ -76,8 +82,8 @@ self.addEventListener('install', (event) => {
         // Кэшируем файлы по одному, чтобы избежать ошибок
         return Promise.allSettled(
           STATIC_FILES.map(url =>
-            cache.add(url).catch(err => {
-              console.warn(`Service Worker: Failed to cache ${url}:`, err);
+            cache.add(url).catch(() => {
+              console.warn('Service Worker: Failed to cache a static file');
               return null;
             })
           )
@@ -87,8 +93,8 @@ self.addEventListener('install', (event) => {
         console.log('Service Worker: Installation complete');
         return self.skipWaiting();
       })
-      .catch((error) => {
-        console.error('Service Worker: Installation failed', error);
+      .catch(() => {
+        console.error('Service Worker: Installation failed');
       })
   );
 });
@@ -104,7 +110,7 @@ self.addEventListener('activate', (event) => {
     );
 
     await Promise.all(stale.map((name) => {
-      console.log('Service Worker: Deleting old cache', name);
+      console.log('Service Worker: Deleting an old cache');
       return caches.delete(name);
     }));
 
@@ -113,7 +119,7 @@ self.addEventListener('activate', (event) => {
       try {
         await self.registration.sync.register(BACKGROUND_SYNC_TAG);
         console.log('Service Worker: Background sync registered');
-      } catch (error) {
+      } catch {
         console.log('Service Worker: Background sync not supported');
       }
     }
@@ -125,7 +131,7 @@ self.addEventListener('activate', (event) => {
           minInterval: 24 * 60 * 60 * 1000, // 24 часа
         });
         console.log('Service Worker: Periodic sync registered');
-      } catch (error) {
+      } catch {
         console.log('Service Worker: Periodic sync not supported');
       }
     }
@@ -180,8 +186,8 @@ async function handleRequest(request) {
     // Для остальных запросов - сеть с кэшем
     return await networkFirst(request, DYNAMIC_CACHE);
 
-  } catch (error) {
-    console.error('Service Worker: Request failed', request.url, error);
+  } catch {
+    console.error('Service Worker: Request failed');
 
     // Возвращаем офлайн страницу для навигации
     if (request.mode === 'navigate' || isHtmlRequest(request)) {
@@ -218,7 +224,7 @@ async function cacheFirst(request, cacheName) {
 
     return networkResponse;
   } catch (error) {
-    console.warn('Service Worker: Cache first failed for', request.url, error);
+    console.warn('Service Worker: Cache first failed');
     // Возвращаем кэшированный ответ, если есть
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
@@ -245,9 +251,9 @@ async function networkFirst(request, cacheName, offlineFallbackUrl) {
 
     return networkResponse;
   } catch (error) {
-    console.warn('Service Worker: Network request failed, trying cache:', request.url);
+    console.warn('Service Worker: Network request failed, trying cache');
 
-    const cachedResponse = await caches.match(request);
+    const cachedResponse = noCache ? undefined : await caches.match(request);
 
     if (cachedResponse) {
       return cachedResponse;
@@ -259,7 +265,7 @@ async function networkFirst(request, cacheName, offlineFallbackUrl) {
     }
 
     // Если нет кэша, возвращаем ошибку с более информативным сообщением
-    console.error('Service Worker: No cache available for:', request.url);
+    console.error('Service Worker: No cache available');
     throw error;
   }
 }
@@ -330,7 +336,7 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'explore') {
     event.waitUntil(
-      clients.openWindow('/')
+      self.clients.openWindow('/')
     );
   } else if (event.action === 'close') {
     // Просто закрываем уведомление
@@ -338,14 +344,14 @@ self.addEventListener('notificationclick', (event) => {
   } else {
     // По умолчанию открываем главную страницу
     event.waitUntil(
-      clients.openWindow('/')
+      self.clients.openWindow('/')
     );
   }
 });
 
 // Синхронизация в фоне
 self.addEventListener('sync', (event) => {
-  console.log('Service Worker: Background sync', event.tag);
+  console.log('Service Worker: Background sync requested');
 
   if (event.tag === 'background-sync') {
     event.waitUntil(doBackgroundSync());
@@ -372,14 +378,14 @@ async function doBackgroundSync() {
       });
     });
 
-  } catch (error) {
-    console.error('Service Worker: Background sync failed', error);
+  } catch {
+    console.error('Service Worker: Background sync failed');
   }
 }
 
 // Обработка сообщений от основного потока
 self.addEventListener('message', (event) => {
-  console.log('Service Worker: Message received', event.data);
+  console.log('Service Worker: Message received');
 
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
@@ -397,7 +403,7 @@ self.addEventListener('message', (event) => {
 
 // Periodic Background Sync (если поддерживается)
 self.addEventListener('periodicsync', (event) => {
-  console.log('Service Worker: Periodic sync', event.tag);
+  console.log('Service Worker: Periodic sync requested');
 
   if (event.tag === 'clinic-data-sync') {
     event.waitUntil(syncClinicData());
@@ -424,15 +430,15 @@ async function syncClinicData() {
         const response = await fetch(endpoint);
         if (response.ok) {
           await cache.put(endpoint, response.clone());
-          console.log(`Service Worker: Synced ${endpoint}`);
+          console.log('Service Worker: Synced an endpoint');
         }
-      } catch (error) {
-        console.log(`Service Worker: Failed to sync ${endpoint}`, error);
+      } catch {
+        console.log('Service Worker: Failed to sync an endpoint');
       }
     }
 
-  } catch (error) {
-    console.error('Service Worker: Clinic data sync failed', error);
+  } catch {
+    console.error('Service Worker: Clinic data sync failed');
   }
 }
 
@@ -464,15 +470,15 @@ async function processOfflineQueue() {
         const response = await fetch(request);
         if (response.ok) {
           await cache.delete(request);
-          console.log('Service Worker: Processed offline request', request.url);
+          console.log('Service Worker: Processed an offline request');
         }
-      } catch (error) {
+      } catch {
         console.log('Service Worker: Still offline, keeping request in queue');
       }
     }
-  } catch (error) {
-    console.error('Service Worker: Error processing offline queue', error);
+  } catch {
+    console.error('Service Worker: Error processing offline queue');
   }
 }
 
-console.log(`Service Worker: Loaded (build ${BUILD_VERSION}) with enhanced PWA features`);
+console.log('Service Worker: Loaded with enhanced PWA features');

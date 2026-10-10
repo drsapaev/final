@@ -1,8 +1,7 @@
 {
-  "buildCommand": "npm --prefix frontend run build",
+  "buildCommand": "npm --prefix frontend run build:ssr",
   "installCommand": "npm --prefix frontend ci --legacy-peer-deps",
   "framework": "vite",
-  "outputDirectory": "frontend/dist",
   "git": {
     "deploymentEnabled": {
       "**": false,
@@ -21,12 +20,6 @@
           "value": "no-cache, no-store, must-revalidate"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
     }
   ]
 }
