@@ -4,37 +4,30 @@
   --public-site-hero-padding: clamp(28px, 6vw, 68px);
   --public-site-section-gap: clamp(38px, 6vw, 68px);
   --public-site-runtime-padding: clamp(24px, 5vw, 48px);
-  --public-site-background: var(--mac-bg-primary, #eef3fa);
-  --public-site-panel: var(--mac-bg-secondary, #e3ebf5);
-  --public-site-surface: var(--mac-bg-content, #f4f7fb);
-  --public-site-ink: var(--mac-text-primary, #000000);
-  --public-site-muted-ink: var(--mac-text-secondary, #455568);
-  --public-site-border: var(--mac-border, #b8c8da);
-  --public-site-link: var(--mac-link-ink, #0066d6);
-  --public-site-success: var(--mac-success-strong, #147a38);
-  --public-site-on-accent: var(--mac-text-on-accent, #ffffff);
-  --public-site-warning: var(--mac-warning-strong, #a86200);
-
   min-height: 100vh;
-  background: var(--public-site-background);
-  color: var(--public-site-ink);
+  background: var(--mac-bg-primary, rgb(238, 243, 250));
+  color: var(--mac-text-primary, rgb(0, 0, 0));
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
   line-height: 1.6;
 }
 
 .public-site a {
-  color: var(--public-site-link);
+  color: var(--mac-link-ink, rgb(0, 102, 214));
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
 }
 
 .public-site a:hover {
-  color: color-mix(in srgb, var(--public-site-success), var(--public-site-ink) 18%);
+  color: color-mix(
+    in srgb,
+    var(--mac-success-strong, rgb(20, 122, 56)),
+    var(--mac-text-primary, rgb(0, 0, 0)) 18%
+  );
 }
 
 .public-site a:focus-visible {
   border-radius: 4px;
-  outline: 3px solid var(--public-site-warning);
+  outline: 3px solid var(--mac-warning-strong, rgb(168, 98, 0));
   outline-offset: 3px;
 }
 
@@ -51,7 +44,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  border-bottom: 1px solid var(--public-site-border);
+  border-bottom: 1px solid var(--mac-border, rgb(184, 200, 218));
 }
 
 .public-site .public-site__brand {
@@ -59,7 +52,7 @@
   min-width: max-content;
   align-items: center;
   gap: 10px;
-  color: var(--public-site-ink);
+  color: var(--mac-text-primary, rgb(0, 0, 0));
   font-size: 1rem;
   font-weight: 700;
   text-decoration: none;
@@ -71,8 +64,8 @@
   height: 38px;
   place-items: center;
   border-radius: 12px;
-  background: var(--public-site-success);
-  color: var(--public-site-on-accent);
+  background: var(--mac-success-strong, rgb(20, 122, 56));
+  color: var(--mac-text-on-accent, rgb(255, 255, 255));
   font-size: 1.15rem;
 }
 
@@ -93,7 +86,7 @@
 .public-site__language {
   min-width: 46px;
   padding: 7px 10px;
-  border: 1px solid var(--public-site-border);
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
   border-radius: 999px;
   text-align: center;
 }
@@ -106,14 +99,14 @@
 .public-site__hero {
   max-width: 790px;
   padding: var(--public-site-hero-padding);
-  border: 1px solid var(--public-site-border);
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
   border-radius: 24px;
-  background: var(--public-site-panel);
+  background: var(--mac-bg-secondary, rgb(227, 235, 245));
 }
 
 .public-site__eyebrow {
   margin: 0 0 10px;
-  color: var(--public-site-link);
+  color: var(--mac-link-ink, rgb(0, 102, 214));
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -129,7 +122,7 @@
 .public-site h1 {
   max-width: 850px;
   margin: 0 0 16px;
-  color: var(--public-site-ink);
+  color: var(--mac-text-primary, rgb(0, 0, 0));
   font-size: clamp(2rem, 5vw, 3.8rem);
   line-height: 1.1;
   letter-spacing: -0.035em;
@@ -137,14 +130,14 @@
 
 .public-site h2 {
   margin: 0;
-  color: var(--public-site-ink);
+  color: var(--mac-text-primary, rgb(0, 0, 0));
   font-size: clamp(1.35rem, 2.3vw, 1.8rem);
   line-height: 1.25;
 }
 
 .public-site__lead {
   max-width: 690px;
-  color: var(--public-site-muted-ink);
+  color: var(--mac-text-secondary, rgb(69, 85, 104));
   font-size: clamp(1.08rem, 2.2vw, 1.3rem);
 }
 
@@ -161,19 +154,19 @@
   align-items: center;
   justify-content: center;
   padding: 10px 18px;
-  border: 1px solid var(--public-site-border);
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
   border-radius: 12px;
-  background: var(--public-site-surface);
-  color: var(--public-site-ink);
+  background: var(--mac-bg-content, rgb(244, 247, 251));
+  color: var(--mac-text-primary, rgb(0, 0, 0));
   font-weight: 700;
   text-align: center;
   text-decoration: none;
 }
 
 .public-site a.public-site__button--primary {
-  border-color: var(--public-site-success);
-  background: var(--public-site-success);
-  color: var(--public-site-on-accent);
+  border-color: var(--mac-success-strong, rgb(20, 122, 56));
+  background: var(--mac-success-strong, rgb(20, 122, 56));
+  color: var(--mac-text-on-accent, rgb(255, 255, 255));
 }
 
 .public-site__section {
@@ -207,9 +200,9 @@
   justify-content: space-between;
   gap: 24px;
   padding: 20px 22px;
-  border: 1px solid var(--public-site-border);
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
   border-radius: 16px;
-  background: var(--public-site-surface);
+  background: var(--mac-bg-content, rgb(244, 247, 251));
 }
 
 .public-site__list-item p {
@@ -217,7 +210,7 @@
 }
 
 .public-site a.public-site__list-title {
-  color: var(--public-site-ink);
+  color: var(--mac-text-primary, rgb(0, 0, 0));
   font-size: 1.08rem;
   font-weight: 700;
   text-decoration: none;
@@ -232,21 +225,21 @@
 
 .public-site__price {
   margin-block: 26px;
-  color: var(--public-site-success);
+  color: var(--mac-success-strong, rgb(20, 122, 56));
   font-size: 1.5rem;
   font-weight: 700;
 }
 
 .public-site__muted,
 .public-site__empty {
-  color: var(--public-site-muted-ink);
+  color: var(--mac-text-secondary, rgb(69, 85, 104));
 }
 
 .public-site__empty {
   padding: 22px;
-  border: 1px solid var(--public-site-border);
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
   border-radius: 14px;
-  background: var(--public-site-surface);
+  background: var(--mac-bg-content, rgb(244, 247, 251));
 }
 
 .public-site__contact-list {
@@ -261,13 +254,13 @@
   gap: 3px;
   margin: 0;
   padding: 16px 18px;
-  border: 1px solid var(--public-site-border);
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
   border-radius: 14px;
-  background: var(--public-site-surface);
+  background: var(--mac-bg-content, rgb(244, 247, 251));
 }
 
 .public-site__contact-list span {
-  color: var(--public-site-muted-ink);
+  color: var(--mac-text-secondary, rgb(69, 85, 104));
   font-size: 0.88rem;
 }
 
@@ -277,13 +270,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  border-top: 1px solid var(--public-site-border);
-  color: var(--public-site-muted-ink);
+  border-top: 1px solid var(--mac-border, rgb(184, 200, 218));
+  color: var(--mac-text-secondary, rgb(69, 85, 104));
   font-size: 0.92rem;
 }
 
 .public-site__footer a {
-  color: var(--public-site-link);
+  color: var(--mac-link-ink, rgb(0, 102, 214));
 }
 
 .public-site__runtime-message,
@@ -291,10 +284,10 @@
   width: min(100% - 40px, 760px);
   margin: 12vh auto;
   padding: var(--public-site-runtime-padding);
-  border: 1px solid var(--public-site-border);
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
   border-radius: 20px;
-  background: var(--public-site-surface);
-  color: var(--public-site-ink);
+  background: var(--mac-bg-content, rgb(244, 247, 251));
+  color: var(--mac-text-primary, rgb(0, 0, 0));
 }
 
 .public-site__runtime-message h1,
