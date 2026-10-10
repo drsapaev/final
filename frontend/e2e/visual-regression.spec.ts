@@ -975,7 +975,8 @@ test.describe('Public-site SSR browser layout smoke', () => {
     });
   });
 
-  test('Clinic OS deep links still receive the SPA shell directly', async ({ page }) => {
+  test('Clinic OS deep links still receive the SPA shell from Nitro directly', async ({ page }) => {
+    const nitroOrigin = 'http://127.0.0.1:5278';
     const appPaths = [
       '/login',
       '/registrar',
@@ -990,7 +991,7 @@ test.describe('Public-site SSR browser layout smoke', () => {
     ];
 
     for (const path of appPaths) {
-      const response = await page.request.get(path);
+      const response = await page.request.get(new URL(path, nitroOrigin).toString());
       expect(response.status(), path).toBe(200);
       expect(response.headers()['content-type'], path).toContain('text/html');
       const html = await response.text();
