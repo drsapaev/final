@@ -3,6 +3,9 @@ import { defineConfig } from 'nitro';
 const productionDomain = process.env.VERCEL_PROJECT_PRODUCTION_URL;
 
 export default defineConfig({
+  // Vercel's project root is the repository root while Nitro's root is
+  // frontend/. Put the Build Output API tree where the platform discovers it.
+  output: process.env.VERCEL === '1' ? { dir: '../.vercel/output' } : undefined,
   // Public routes need direct route handlers: Nitro server-entry middleware
   // treats a 404 Response as fallthrough to the SPA renderer.
   serverEntry: false,
