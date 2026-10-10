@@ -691,3 +691,155 @@ def test_resource_owned_surface_joins_without_doctor_role_gate(pg_session):
     assert len(entries) == 1
     # The entry landed on the RESOURCE-owned queue, not a doctor queue.
     assert entries[0].queue_id == resource_queue.id
+
+
+def test_resource_owned_legacy_token_accepts_multiple_profiles_for_one_tag(
+    pg_session,
+):
+    """Different profile keys may share one available resource-owned queue."""
+    from app.models.online_queue import DailyQueue, QueueResource, QueueToken
+    from app.models.queue_profile import QueueProfile
+    from app.services.qr_queue import QRQueueService
+    from app.services.queue_service import queue_service
+    from app.services.queue_svc import QueueValidationError
+
+    session = pg_session
+    user = _make_user(session, "rq09c_resource_profiles_ok", "Lab", active=True)
+    synth = _make_doctor(session, user.id, specialty="rq09cresprof")
+    queue_tag = synth.specialty
+    resource = QueueResource(
+        code=f"rq09c-rp-{synth.id}",
+        queue_tag=queue_tag,
+        display_name="RQ-09.c synthetic shared-profile resource",
+        active=True,
+        start_number_online=1,
+        max_online_per_day=15,
+        default_cabinet="L1",
+    )
+    session.add(resource)
+    session.flush()
+    resource_queue = DailyQueue(
+        day=_clinic_day(),
+        specialist_id=None,
+        queue_resource_id=resource.id,
+        queue_tag=queue_tag,
+        active=True,
+    )
+    local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
+    token = QueueToken(
+        token=f"rq09c-resource-shared-{synth.id}",
+        day=_clinic_day(),
+        specialist_id=synth.id,
+        department=queue_tag,
+        expires_at=local_now + timedelta(hours=2),
+        active=True,
+    )
+    profiles = [
+        QueueProfile(
+            key=f"rq09c-resource-profile-a-{synth.id}",
+            title="Synthetic resource profile A",
+            queue_tags=[queue_tag],
+            is_active=True,
+            show_on_qr_page=True,
+        ),
+        QueueProfile(
+            key=f"rq09c-resource-profile-b-{synth.id}",
+            title="Synthetic resource profile B",
+            queue_tags=[queue_tag],
+            is_active=True,
+            show_on_qr_page=True,
+        ),
+    ]
+    session.add_all([resource_queue, token, *profiles])
+    session.commit()
+
+    token_info = QRQueueService(session).get_qr_token_info(token.token)
+    validation_error = None
+    try:
+        queue_service.validate_queue_token(session, token.token)
+    except QueueValidationError as exc:
+        validation_error = str(exc)
+    assert token_info is not None and validation_error is None, {
+        "token_info_available": token_info is not None,
+        "validation_error": validation_error,
+    }
+    result = _join(session, token.token)
+    assert result
+    entries = _entries(session, resource_queue.id)
+    assert len(entries) == 1
+    assert entries[0].queue_id == resource_queue.id
+
+
+def test_resource_owned_legacy_token_fails_closed_for_unavailable_profile(
+    pg_session,
+):
+    """A valid sibling cannot bypass an unavailable shared resource target."""
+    from app.models.department import Department
+    from app.models.online_queue import DailyQueue, QueueResource, QueueToken
+    from app.models.queue_profile import QueueProfile
+    from app.services.qr_queue import QRQueueService
+    from app.services.queue_service import queue_service
+    from app.services.queue_svc import QueueValidationError
+
+    session = pg_session
+    user = _make_user(session, "rq09c_resource_profiles_off", "Lab", active=True)
+    synth = _make_doctor(session, user.id, specialty="rq09cresoff")
+    queue_tag = synth.specialty
+    parent = Department(
+        key=f"rq09c-off-parent-{synth.id}",
+        name_ru="RQ-09.c synthetic inactive parent",
+        active=False,
+    )
+    resource = QueueResource(
+        code=f"rq09c-ro-{synth.id}",
+        queue_tag=queue_tag,
+        display_name="RQ-09.c synthetic resource with unavailable profile",
+        active=True,
+        start_number_online=1,
+        max_online_per_day=15,
+        default_cabinet="L1",
+    )
+    session.add_all([parent, resource])
+    session.flush()
+    resource_queue = DailyQueue(
+        day=_clinic_day(),
+        specialist_id=None,
+        queue_resource_id=resource.id,
+        queue_tag=queue_tag,
+        active=True,
+    )
+    local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
+    token = QueueToken(
+        token=f"rq09c-resource-off-{synth.id}",
+        day=_clinic_day(),
+        specialist_id=synth.id,
+        department=queue_tag,
+        expires_at=local_now + timedelta(hours=2),
+        active=True,
+    )
+    profiles = [
+        QueueProfile(
+            key=f"rq09c-resource-off-a-{synth.id}",
+            title="Synthetic unavailable resource profile",
+            queue_tags=[queue_tag],
+            department_key=parent.key,
+            is_active=True,
+            show_on_qr_page=True,
+        ),
+        QueueProfile(
+            key=f"rq09c-resource-off-b-{synth.id}",
+            title="Synthetic available resource sibling",
+            queue_tags=[queue_tag],
+            is_active=True,
+            show_on_qr_page=True,
+        ),
+    ]
+    session.add_all([resource_queue, token, *profiles])
+    session.commit()
+
+    assert QRQueueService(session).get_qr_token_info(token.token) is None
+    with pytest.raises(QueueValidationError):
+        queue_service.validate_queue_token(session, token.token)
+    with pytest.raises((QueueValidationError, ValueError)):
+        _join(session, token.token)
+    assert _entries(session, resource_queue.id) == []

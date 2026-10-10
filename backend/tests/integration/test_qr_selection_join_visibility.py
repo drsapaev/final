@@ -608,6 +608,82 @@ def test_admin_shown_ecg_direction_is_selectable_and_joinable(
 
 
 @pytest.mark.queue
+def test_clinic_wide_specialist_card_uses_the_profile_selected_for_admission(
+    pg_client, pg_session, monkeypatch
+):
+    """The public label and doctor join must resolve the same profile key."""
+    from app.models.online_queue import DailyQueue
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import QueueBusinessService
+
+    monkeypatch.setattr(
+        QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0)
+    )
+    specialty = "rq09canon"
+    _user, doctor = _doctor_with_user(
+        pg_session,
+        specialty=specialty,
+        label="canon",
+        role="Doctor",
+    )
+    exact_profile = QueueProfile(
+        key=specialty,
+        title="Exact profile title",
+        title_ru="Exact profile display",
+        queue_tags=[specialty],
+        is_active=True,
+        show_on_qr_page=True,
+        display_order=10,
+    )
+    alias_profile = QueueProfile(
+        key="rq09canonicalalias",
+        title="Alias profile title",
+        title_ru="Alias profile display",
+        queue_tags=[specialty],
+        is_active=True,
+        show_on_qr_page=True,
+        display_order=1,
+    )
+    pg_session.add_all([exact_profile, alias_profile])
+    pg_session.commit()
+    _clinic_wide_token(pg_session, "rq09-token-canonical-profile")
+    pg_session.expire_all()
+
+    selectable = _selectable(pg_client, "rq09-token-canonical-profile")
+    entry = next((item for item in selectable if item["id"] == doctor.id), None)
+    assert entry is not None, selectable
+    assert entry["specialty"] == specialty
+    assert entry["specialty_display"] == exact_profile.title_ru
+
+    start_resp = pg_client.post(
+        "/api/v1/queue/join/start",
+        json={"token": "rq09-token-canonical-profile"},
+    )
+    assert start_resp.status_code == 200, start_resp.text
+    complete_resp = pg_client.post(
+        "/api/v1/queue/join/complete",
+        json={
+            "session_token": start_resp.json()["session_token"],
+            "patient_name": "RQ09 Synthetic Canonical Patient",
+            "phone": "+998900000902",
+            "specialist_ids": [doctor.id],
+        },
+    )
+    assert complete_resp.status_code == 200, complete_resp.text
+    assert complete_resp.json()["success"] is True
+
+    daily_queue = (
+        pg_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == _clinic_day(),
+            DailyQueue.specialist_id == doctor.id,
+        )
+        .one()
+    )
+    assert daily_queue.queue_tag == entry["specialty"] == specialty
+
+
+@pytest.mark.queue
 def test_same_parent_shared_tag_with_distinct_profile_keys_fails_closed(
     pg_client, pg_session, monkeypatch
 ):

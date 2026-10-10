@@ -270,6 +270,11 @@ class TokensMixin(QRQueueServiceMixinBase):
                             profile_candidates,
                             self.db,
                             availability_by_profile,
+                            route_queue_tag=(
+                                daily_queue.queue_tag
+                                if daily_queue.queue_resource_id is not None
+                                else None
+                            ),
                         ):
                             return None
 

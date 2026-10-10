@@ -1,3 +1,14 @@
+## Current resume — PR #3639 second review fixes locally validated; push pending (2026-10-10T13:04+05:00)
+
+- Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 remote HEAD: `d2c7247fed43c8355c4f217ca40f9f7eac50ba7f`; current main: `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`; local sync merge: `cfe6dfc89`. Preserve all existing `.scratch/` contents.
+- Fixed P1: the public card is built from `_get_qr_visible_profile_for_doctor()`'s actual result. Fixed P2 in both `validate_queue_token()` and `get_qr_token_info()` by passing the actual daily queue tag only for resource-owned queues; all-candidates-available remains fail-closed.
+- Added PostgreSQL coverage for the card-to-join profile key, two available profiles sharing one resource tag across token info/validation/join, and an unavailable candidate negative case.
+- Gate: required normal and known-root runs already completed via canonical launcher. Scoped retry result is `narrow_override`, with misroute and override recorded; generated prompt read. Do not change gate/router. Exact allowlist and stop conditions are in `PROGRESS.md` current checkpoint and `EVIDENCE.md#t11-pr-3639-follow-up-review-findings-prework`.
+- Local validation: both focused PostgreSQL modules **24/24, 1 warning**; targeted new regression nodes **3/3, 1 warning**; Ruff and py_compile passed; `git diff --check` passed. The task-owned loopback PostgreSQL container was removed, all module scratch DBs were dropped, port 55437 is closed. Full evidence: `EVIDENCE.md#t11-pr-3639-second-review-fixes-local-validation-2026-10-10`.
+- PR remote HEAD remains `d2c7247f`; local branch is synced to current main via `cfe6dfc89`. Review fix is uncommitted. Preserve `.scratch/`, do not stage it.
+- Do not run staging in this source-fix slice, update PR body, submit formal review, or merge. Tier-2 staging remains PARTIAL and must be completed as a separate bounded validation step.
+- Next exact action: inspect final allowed-path diff, commit/push the existing PR branch without force, and inspect exact-head CI. Keep PR body, formal review, merge, and the separately gated Tier-2 staging run out of this source-fix slice.
+
 ## Current resume — PR #3639 exact-head CI green; Tier-2 partial — 2026-10-10T00:08+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Latest validated code-bearing PR commit is `6ea00b8fcfc67e201deed121a9201ef673410611`; at that check PR #3639 was OPEN/MERGEABLE. Base / `origin/main` is `a396ee505b6f53318b4360ca81827759125c79ca`. Preserve pre-existing untracked `.scratch/`; never stage it.

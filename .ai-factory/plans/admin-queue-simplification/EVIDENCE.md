@@ -3076,3 +3076,50 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: Tier-2 staging on the current code, Admin 2FA staging flow, served-frontend provenance, and the full `STAGING_VALIDATION.md` remain **NOT_RUN**. Tier-2 is PARTIAL; no deferral has been accepted. A prior/current GitHub E2E pass is not a replacement for the required Tier-2 synthetic staging validation.
 - PR: #3639 OPEN at `6ea00b8fcfc67e201deed121a9201ef673410611`.
 - Merge commit: none; merge remains user-owned.
+
+## T11 PR #3639 follow-up review findings prework — 2026-10-10T12:51+05:00
+
+- Commit under test: local base-sync `cfe6dfc89` includes current `origin/main` `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`; PR #3639 remote HEAD remains `d2c7247fed43c8355c4f217ca40f9f7eac50ba7f`.
+- Environment: dedicated Windows worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`. Existing `.scratch/` is untracked and must be preserved.
+- Execution mode: mandatory `gate`; initial routing misrouted. Canonical `run_agent_gate.ps1` known-root retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, and `handoff_required=true`; the generated execution prompt was read. The supplied human review is the scope basis. No gate/router edits.
+- Allowed paths: QR selector `_specialists.py`, token routing `_operations.py` and `_tokens.py`, the two existing focused PostgreSQL integration modules, and T11 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Denied: schema/models/migrations, unrelated runtime/tests, gate/router, production/deployment, staging during this source-fix slice, PR body, formal review, merge, and pre-existing `.scratch/` content other than a verified task-owned disposable DB used for tests.
+- Current changed paths before runtime edits: the two allowlisted integration modules and the three T11 journals; main-sync commit `cfe6dfc89` changes only package manifests from `origin/main`.
+- Original failures: reviewer reports selector/display profile can differ from exact-key admission profile; resource-owned legacy token validation/info omit actual `DailyQueue.queue_tag` when validating shared profile candidates.
+- Validation command: focused PostgreSQL nodes in `test_qr_selection_join_visibility.py` and `test_qr_token_path_owner_eligibility.py`, via `scripts/run_backend_pytest.ps1` with explicit local disposable admin DSNs.
+- Result: expected defect reproduction. The selector returned alias key `rq09canonicalalias` instead of exact key `rq09canon`; resource token-info rejected two available same-tag profiles as ambiguous. The unavailable-profile negative case passed and created no entry. Initial fixture-only failures (field length and route tag not matching the doctor's specialty) were corrected before recording this result.
+- Scope check: no staging, production, PR metadata, formal review, deferral acceptance, or merge. Tier-2 remains PARTIAL.
+- Remaining limitation: runtime fixes, full focused suite, and exact-head CI are pending. Stop if a change outside the allowed paths is required.
+- PR: #3639 OPEN; merge remains user-owned.
+- Merge commit: none.
+
+## T11 PR #3639 second review findings fail-first — 2026-10-10T12:59+05:00
+
+- Commit under test: local branch synchronized to current `origin/main` at `cfe6dfc89`; PR remote source remains `d2c7247f` before these test changes.
+- Environment: dedicated Windows worktree; task-owned PostgreSQL 17 container `clinic-aqs-pr3639-review-pg-20261010`, loopback `127.0.0.1:55437`, ephemeral tmpfs and synthetic data. Existing local PostgreSQL service on port 5432 was not used.
+- Execution mode: existing mandatory-gate `narrow_override`, exact file scope, misroute, and override are recorded above; no additional gate was run because scope did not change.
+- Allowed paths: QR selector and token routing runtime files, two focused integration modules, and three T11 journals.
+- Actual changed paths: two focused integration modules and three T11 journals; runtime source is unchanged.
+- Original failure: public selector can advertise an alias profile while admission uses a canonical exact key; resource token validation/info rejects valid profiles with distinct keys sharing one resource tag.
+- Validation command: `scripts/run_backend_pytest.ps1` for the selector-to-join test and two resource-token nodes.
+- Result: **expected reproduction**. P1 failed because the selector exposed `rq09canonicalalias` instead of `rq09canon`. P2 positive failed with `[QR availability] rejected ambiguous shared QueueProfile tag: candidates=2`; the unavailable-candidate negative passed and no entry was created. Earlier fixture-only failures were corrected first.
+- Relevant artifact: each module provisioned and dropped its unique scratch test database; container data used tmpfs. Keep this task-owned container only through the post-fix rerun, then remove it.
+- Scope check: no runtime, schema, staging, production, PR metadata, review, or merge changes. Existing `.scratch/` remains untracked and no scratch file is staged.
+- Remaining limitation: runtime fix, complete PG suite, static checks, push and exact-head CI remain pending.
+- PR: #3639 OPEN.
+- Merge commit: none.
+
+## T11 PR #3639 second review fixes local validation — 2026-10-10T13:04+05:00
+
+- Commit under test: uncommitted source/test diff on local main-sync branch `cfe6dfc89`; PR remote HEAD remains `d2c7247f`.
+- Environment: Windows worktree. PostgreSQL 17 ran in task-owned Docker container `clinic-aqs-pr3639-review-pg-20261010`, loopback-only `127.0.0.1:55437`, with tmpfs data and synthetic fixtures. Container was stopped and removed; port is closed. Existing local server on 5432 was untouched.
+- Execution mode: same mandatory-gate `narrow_override`; no scope change. Gate misroute/override and exact allowed/denied paths are recorded in `EVIDENCE.md#t11-pr-3639-follow-up-review-findings-prework-2026-10-10`.
+- Allowed paths: `backend/app/services/qr_queue/_specialists.py`, `backend/app/services/queue_svc/_operations.py`, `backend/app/services/qr_queue/_tokens.py`, the two focused PostgreSQL test modules, and three T11 journal files.
+- Actual changed paths: those three runtime files, two integration test modules, and `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. No schema, migration, frontend runtime, gate, production, or staging files changed.
+- Original failure: public card displayed an alias while admission chose the canonical exact profile; both legacy token-info and token-validation rejected multiple available QueueProfiles sharing one resource route tag.
+- Validation command: `scripts/run_backend_pytest.ps1` on the three new regression nodes and again on complete `test_qr_selection_join_visibility.py` plus `test_qr_token_path_owner_eligibility.py` modules; scoped `ruff check` and Python `py_compile` on all five runtime/test files; `git diff --check`.
+- Result: targeted regressions **3 passed, 1 warning**; both full focused PostgreSQL modules **24 passed, 1 warning**; Ruff **PASS**; py_compile **PASS**; diff check **PASS**. The fail-first aliases and ambiguity are now resolved, while the unavailable-parent negative remains blocked with no entry.
+- Relevant artifact: PostgreSQL module fixtures created/dropped their unique test databases. Query confirmed no `rq09_check_*` / `rq09c_check_*` scratch databases remained before container teardown. The container had no persistent mounts and was removed; Windows loopback port 55437 is closed.
+- Scope check: no staging, production, PR description, formal review, deferral acceptance, or merge action. `.scratch/` remains untracked and untouched outside this temporary container/test payload.
+- Remaining limitation: changes are not committed/pushed; exact-head hosted CI and Tier-2 staging are pending. PR description has stale references and must be reconciled in a separately authorized scope before merge.
+- PR: #3639 OPEN; no merge commit.

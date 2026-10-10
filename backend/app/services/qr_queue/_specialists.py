@@ -144,16 +144,26 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             if is_doctor_profile_incomplete(raw_specialty):
                 continue
             specialty = self._normalize_specialty_key(raw_specialty)
-            profile = profile_by_specialty.get(specialty)
-            if not profile or doctor.id in seen_ids:
+            display_profile = profile_by_specialty.get(specialty)
+            if not display_profile or doctor.id in seen_ids:
                 continue
-            if not queue_service._get_qr_visible_profile_for_doctor(
+            qr_profile = queue_service._get_qr_visible_profile_for_doctor(
                 self.db,
                 doctor,
                 profiles=published_profiles,
                 availability_by_profile=availability_by_profile,
-            ):
+            )
+            if not qr_profile:
                 continue
+            profile = {
+                "key": qr_profile.key,
+                "title": qr_profile.title,
+                "title_ru": qr_profile.title_ru,
+                "queue_tags": qr_profile.queue_tags or [],
+                "color": qr_profile.color,
+                "icon": qr_profile.icon,
+                "order": qr_profile.display_order,
+            }
             owner = getattr(doctor, "user", None)
             if owner is None:
                 continue

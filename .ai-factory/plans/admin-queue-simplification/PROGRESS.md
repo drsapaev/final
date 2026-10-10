@@ -2,13 +2,13 @@
 
 Plan version: 3.87
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: IN_PROGRESS — T11 implementation commit `6ea00b8f` is pushed to PR #3639; five focused PostgreSQL integration modules pass 72/72 and exact-head hosted CI is green. Tier-2 remains PARTIAL; staging was not run, no deferral accepted, and the user owns merge.
+Current status: IN_PROGRESS — both new PR #3639 review findings are fixed locally; focused PostgreSQL modules and static checks pass. Push and exact-head CI are pending. Tier-2 remains PARTIAL; no new staging or deferral is recorded, and the user owns merge.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
-PR base / `origin/main`: a396ee505b6f53318b4360ca81827759125c79ca.
-Latest validated code-bearing PR commit: 6ea00b8fcfc67e201deed121a9201ef673410611; base / `origin/main`: a396ee505b6f53318b4360ca81827759125c79ca.
+PR base / `origin/main`: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed (local sync commit `cfe6dfc89`).
+Latest validated code-bearing PR commit: 6ea00b8fcfc67e201deed121a9201ef673410611; newest unvalidated source baseline after main sync: `cfe6dfc89`.
 Implementation paths in `6ea00b8f`: `backend/app/services/queue_svc/_core.py`, `backend/app/services/queue_svc/_operations.py`, `backend/app/services/qr_queue/_tokens.py` (approved narrow extension), `backend/tests/integration/test_qr_token_path_owner_eligibility.py`, and `backend/tests/integration/test_qr_selection_join_visibility.py`. Current pending journal paths: `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Preserve pre-existing untracked `.scratch/` and do not stage it.
-Last updated: 2026-10-10T00:08+05:00
+Last updated: 2026-10-10T13:04+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,7 +16,34 @@ Last updated: 2026-10-10T00:08+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS | PR #3639 OPEN; code commit `6ea00b8f`; focused PG 72/72; exact-head CI success; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-exact-head-ci-after-token-info-fix-2026-10-10t0006 |
+| T11 | IN_PROGRESS | PR #3639 OPEN; review P1/P2 fixed locally; focused PG 24/24; push/CI pending; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-second-review-fixes-local-validation-2026-10-10 |
+
+## Current checkpoint — PR #3639 review fixes locally validated; publish pending — 2026-10-10T13:04+05:00
+
+- PR remote HEAD remains `d2c7247fed43c8355c4f217ca40f9f7eac50ba7f`; local branch is based on clean main-sync merge `cfe6dfc89` including `origin/main` `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. No source changes have been committed or pushed yet.
+- P1 fixed: clinic-wide public selector now builds doctor card fields from the same resolved `qr_profile` that admission uses. Resource token P2 fixed in both `validate_queue_token()` and `get_qr_token_info()` by passing the actual daily queue tag only for resource-owned queues. The availability helper still rejects any unavailable published candidate.
+- Added three PostgreSQL regressions: selector/title/final queue tag agreement; resource token acceptance for two available shared-tag profiles with direct token validation and join; fail-closed token info/validation/join when one parent is inactive.
+- Fail-first evidence is in `EVIDENCE.md#t11-pr-3639-second-review-findings-fail-first-2026-10-10`.
+- Local validation PASS: both focused PostgreSQL modules **24 passed, 1 warning** on task-owned PostgreSQL 17 container with loopback-only port `55437` and tmpfs. The three directly targeted new cases separately passed **3/3**. All fixture scratch databases were dropped; only the named container was used and it has been stopped; port is closed. Existing PostgreSQL service port 5432 was not used.
+- Scoped Ruff passed for all five runtime/test files (`C416` ignored as known baseline); `py_compile` passed for the same five files; `git diff --check` passed. The merge from current main introduced only `frontend/package.json` and `frontend/package-lock.json`; do not stage those separately as source changes—they are part of the base-sync commit.
+- Changed tracked paths: the three allowed QR runtime files, two allowed integration modules, and T11 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Preserve unrelated `.scratch/`; stage no scratch data or payloads.
+- Tier-2 remains PARTIAL: staging on this code, current Admin 2FA, remaining named browser specs, served frontend provenance and full `STAGING_VALIDATION.md` are NOT_RUN. No deferral is accepted. PR description still references stale evidence and was not changed under this gate's scope.
+- Next exact action: inspect the complete staged diff, run final scope/diff checks, commit and push the existing PR branch without force, then inspect all applicable checks on that exact HEAD. After CI, handle Tier-2 staging in a separately gated validation slice; do not merge or publish a review.
+
+## Current checkpoint — PR #3639 second review findings; fail-first reproduced — 2026-10-10T12:59+05:00
+
+- PR #3639 remote HEAD is `d2c7247fed43c8355c4f217ca40f9f7eac50ba7f`; reviewer reports base behind current main `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. The local worktree has merged that main commit cleanly as `cfe6dfc89`; no runtime code has changed. The merge introduced only `frontend/package.json` and `frontend/package-lock.json`. Preserve pre-existing untracked `.scratch/`.
+- New P1: public specialist selector may display the first `display_order` alias while admission resolves a different exact-key QueueProfile. New P2: resource-owned legacy QR token validation and info omit the actual `daily_queue.queue_tag` when checking shared candidates, unlike the resource admission helper.
+- Chosen mode: mandatory queue-policy `gate`; canonical launcher was run from `ai/langgraph`. Normal run misrouted and required a known-root retry. The scoped retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. Human basis is this review report specifying both defects and their focused regressions. Gate/router must remain unchanged.
+- Canonical anchors: `AGENTS.md`; `docs/adr/ADR-001-queue-ownership-and-specialty-architecture.md`; `backend/app/services/queue_profile_availability.py`; `backend/app/services/qr_queue/_specialists.py`; `backend/app/services/queue_svc/_core.py`; resource-target ambiguity helper in `_operations.py`; token validation/info paths; the two existing PostgreSQL integration modules.
+- First-touch and allowed paths: `backend/app/services/qr_queue/_specialists.py`, `backend/app/services/queue_svc/_operations.py`, `backend/app/services/qr_queue/_tokens.py`, `backend/tests/integration/test_qr_selection_join_visibility.py`, `backend/tests/integration/test_qr_token_path_owner_eligibility.py`, and this plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Denied paths/actions: schema/models/migrations, other runtime/tests, gate/router, production/deployment, staging in this source-fix slice, PR description, formal review, merge, and pre-existing `.scratch/` contents except a confirmed task-owned disposable PostgreSQL cluster for testing.
+- Fail-first PostgreSQL evidence: public card regression advertised alias `rq09canonicalalias` while expected doctor route key is `rq09canon`; resource-token positive regression was rejected as ambiguous with two available profiles; unavailable-profile negative regression passed and confirmed fail-closed. Tests used a task-owned temporary PostgreSQL 17 container on loopback port 55437 with tmpfs data; fixture databases were dropped.
+- Actual changed paths before runtime edits: the two allowlisted integration test files plus the three T11 journals. No runtime source has changed.
+- Validation target: correct the two runtime causes, then rerun both focused PostgreSQL modules and regression nodes, `py_compile`, scoped Ruff, `git diff --check`, commit/push without force, and inspect exact-head CI.
+- First stop condition: stop if public selector/admission target identity is unclear, PostgreSQL cannot be proven disposable/local, a needed edit leaves the allowed paths, or tests show ownership/history mutation.
+- Tier-2 remains PARTIAL and is still required separately after source fixes. No staging, deferral, review submission, PR-body edit, or merge has occurred.
+- Next exact action: use the resolver's actual selected `QueueProfile` to create the public card, and pass `DailyQueue.queue_tag` as resource route identity in both legacy-token validation and token-info.
 
 ## Current checkpoint — PR #3639 exact-head CI green; Tier-2 still partial — 2026-10-10T00:08+05:00
 
