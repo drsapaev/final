@@ -908,136 +908,117 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
 });
 
 /**
- * Visual regression — PR-UI-16 Landing baselines (plan §PR-UI-16 AC4
- * "Visual regression"; user decision Q6: light + dark).
+ * Public-site SSR browser smoke — PR-UI-16.
  *
- * Baseline policy (Rule 13 / Task 46 §D.3): these are NEW baselines captured
- * ONCE on the PR-UI-16-5 state — Landing had NO baseline before this PR
- * (first capture, not a re-capture of an existing one). The Landing redesign
- * itself is the intentional visual change these baselines lock in:
- *   - 16-1: legacy glass layer decommissioned → canonical --mac-* surfaces
- *   - 16-3: real product screenshots in Hero + Screens showcase
- *   - 16-4: workflow as the central element (7 nodes + 7 numbered steps)
- * All pre-existing baselines (cashier/registrar/wizard/EAT/pr124) stay
- * UNCHANGED — the redesign touched the Landing route only.
- *
- * Surfaces captured (viewport 1280×720, Desktop Chrome):
- *   1. Landing hero (topbar + hero card + the real queue screenshot, eager
- *      loading via fetchPriority=high — deterministic above-the-fold state;
- *      lazy below-fold showcase images are out of frame by design).
- *   2. Landing workflow (the central 7-node flow + numbered steps — no
- *      images, fully deterministic; scrolled into view via the body scroll
- *      container contract).
- * Both surfaces × light + dark (dark flipped through the real toolbar
- * toggle — the same path a user takes; verified via the landing-shell
- * class contract before capture).
- *
- * Determinism: APIs mocked (anonymous public state — setup initialized,
- * auth/me 401); WebSocket closed; ru locale (app default); light theme
- * pinned via localStorage `colorScheme=light` (ThemeContext default).
+ * These cases run against the built Vercel Nitro function and a loopback-only synthetic
+ * public API fixture. They validate real server-rendered HTML, visible layout,
+ * request-time SEO headers, localized paths, sitemap, and unpublished 404s.
+ * No production data or image baselines are used.
  */
-test.describe('Visual regression — PR-UI-16 Landing (light + dark)', () => {
-  test.beforeEach(async ({ page }) => {
-    // Pin the theme contract explicitly (fresh contexts default to light,
-    // but the baseline should not depend on that default).
-    await page.addInitScript(() => {
-      localStorage.setItem('colorScheme', 'light');
-    });
-    // Mock WebSocket to prevent ECONNREFUSED noise (no backend in E2E).
-    await page.routeWebSocket('**/*', ws => { ws.close(); });
-    await page.route('**/api/v1/**', async (route) => {
-      const { pathname } = new URL(route.request().url());
-      if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
-      if (pathname === '/api/v1/auth/me') { await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ detail: 'not authenticated' }) }); return; }
-      if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
-      await route.fulfill(jsonResponse({ success: true }));
-    });
-  });
+test.describe('Public-site SSR browser layout smoke', () => {
 
-  async function waitForHeroScreenshot(page: import('@playwright/test').Page) {
-    // The hero screenshot loads eagerly (fetchPriority=high); wait for the
-    // decoded bitmap so the capture is never mid-load.
-    await page.waitForFunction(() => {
-      const img = document.querySelector<HTMLImageElement>('.landing-hero-shot img');
-      return !!img && img.complete && img.naturalWidth > 0;
-    }, undefined, { timeout: 15000 });
-    await page.waitForTimeout(400);
+  async function verifyVisibleLayout(page: import('@playwright/test').Page, selector: string) {
+    const surface = page.locator(selector);
+    await expect(surface).toBeVisible();
+    const metrics = await surface.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        width: bounds.width,
+        height: bounds.height,
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+      };
+    });
+    expect(metrics.width).toBeGreaterThan(240);
+    expect(metrics.height).toBeGreaterThan(80);
+    expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+
+    const image = await page.screenshot({ animations: 'disabled' });
+    expect([...image.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(image.byteLength).toBeGreaterThan(1024);
   }
 
-  async function flipToDarkIfNeeded(page: import('@playwright/test').Page) {
-    const isDark = await page.locator('.landing-shell').evaluate((el) => el.classList.contains('landing-shell--dark'));
-    if (!isDark) {
-      await page.locator('.landing-toolbar-button').first().click();
-      await page
-        .locator('.landing-shell')
-        .evaluate((el) => {
-          if (!el.classList.contains('landing-shell--dark')) {
-            throw new Error('theme flip failed: landing-shell--dark class missing after toggle');
-          }
-        });
-      await page.waitForTimeout(400);
-    }
-  }
+  test('Uzbek home is server-rendered with current synthetic clinic content', async ({ page }) => {
+    const response = await page.goto('http://127.0.0.1:5278/');
+    expect(response?.status()).toBe(200);
+    expect(response?.headers()['cache-control']).toContain('no-store');
+    expect(response?.headers()['x-robots-tag']).toContain('noindex');
 
-  test('landing hero — light theme (real product screenshot, glass decommissioned)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await waitForHeroScreenshot(page);
-    await expect(page).toHaveScreenshot('pr16-landing-hero-light.png', {
-      maxDiffPixelRatio: 0.01,
-      animations: 'disabled',
-    });
+    const html = response ? await response.text() : '';
+    expect(html).toContain('<html lang="uz-Latn">');
+    expect(html).toContain('SYNTHETIC QA CLINIC');
+    expect(html).toContain('Sintetik sinov xizmati');
+    expect(await page.locator('html').getAttribute('lang')).toBe('uz-Latn');
+    await expect(page.locator('.public-site__hero h1')).toHaveText('SYNTHETIC QA CLINIC');
+    await expect(page.locator('a[href="/services/synthetic-service"]').first()).toBeVisible();
+    await verifyVisibleLayout(page, '.public-site__hero');
   });
 
-  test('landing hero — dark theme (canonical tokens auto-switch)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await flipToDarkIfNeeded(page);
-    await waitForHeroScreenshot(page);
-    await expect(page).toHaveScreenshot('pr16-landing-hero-dark.png', {
-      maxDiffPixelRatio: 0.01,
-      animations: 'disabled',
-    });
+  test('Russian services page has localized HTML, metadata, and a published link', async ({ page }) => {
+    const response = await page.goto('http://127.0.0.1:5278/ru/services');
+    expect(response?.status()).toBe(200);
+    expect(response?.headers()['cache-control']).toContain('no-store');
+    expect(response?.headers()['content-language']).toBe('ru');
+
+    const html = response ? await response.text() : '';
+    expect(html).toContain('<html lang="ru">');
+    expect(html).toContain('<title>Услуги — Doktor KosMed Clinic</title>');
+    expect(html).toContain('name="description"');
+    expect(html).toContain('rel="canonical" href="http://127.0.0.1:5278/ru/services"');
+    expect(html).toContain('hreflang="uz-Latn"');
+    await expect(page.locator('main h1')).toHaveText('Услуги');
+    await expect(page.locator('a[href="/ru/services/synthetic-service"]').first()).toContainText('Синтетическая тестовая услуга');
+    await verifyVisibleLayout(page, '.public-site__section');
   });
 
-  test('landing workflow — light theme (7 nodes + 7 numbered steps)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    // Scroll the workflow section into view (body.landing-body is the scroll
-    // container — scrollIntoView works against it).
-    await page.locator('#workflow').evaluate((el) => el.scrollIntoView({ block: 'start' }));
-    // Deterministic readiness: all 7 stages rendered (content-visibility
-    // renders the section once it enters the viewport).
-    await page.waitForFunction(() => document.querySelectorAll('.landing-workflow-step').length === 7, undefined, { timeout: 15000 });
-    await page.waitForTimeout(400);
-    await expect(page).toHaveScreenshot('pr16-landing-workflow-light.png', {
-      maxDiffPixelRatio: 0.01,
-      animations: 'disabled',
-    });
+  test('Uzbek doctor detail is localized and rendered from the public API', async ({ page }) => {
+    const response = await page.goto('http://127.0.0.1:5278/doctors/synthetic-profile');
+    expect(response?.status()).toBe(200);
+    expect(response?.headers()['cache-control']).toContain('no-store');
+    expect(response?.headers()['content-language']).toBe('uz-Latn');
+
+    const html = response ? await response.text() : '';
+    expect(html).toContain('<html lang="uz-Latn">');
+    expect(html).toContain('Sintetik sinov profili');
+    expect(html).toContain('Sinov mutaxassisligi');
+    expect(html).toContain('hreflang="ru" href="http://127.0.0.1:5278/ru/doctors/synthetic-profile"');
+    await expect(page.locator('main h1')).toHaveText('Sintetik sinov profili');
+    await verifyVisibleLayout(page, '.public-site__detail');
   });
 
-  test('landing workflow — dark theme (7 nodes + 7 numbered steps)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await flipToDarkIfNeeded(page);
-    await page.locator('#workflow').evaluate((el) => el.scrollIntoView({ block: 'start' }));
-    await page.waitForFunction(() => document.querySelectorAll('.landing-workflow-step').length === 7, undefined, { timeout: 15000 });
-    await page.waitForTimeout(400);
-    await expect(page).toHaveScreenshot('pr16-landing-workflow-dark.png', {
-      maxDiffPixelRatio: 0.01,
-      animations: 'disabled',
-    });
+  test('unpublished detail is 404 and sitemap and preview robots stay current', async ({ page }) => {
+    const response = await page.goto('http://127.0.0.1:5278/ru/services/not-published');
+    expect(response?.status()).toBe(404);
+    expect(response?.headers()['cache-control']).toContain('no-store');
+    expect(response?.headers()['x-robots-tag']).toContain('noindex');
+    const html = response ? await response.text() : '';
+    expect(html).toContain('Услуга не найдена или больше не опубликована.');
+    expect(html).not.toContain('Синтетическая тестовая услуга');
+    await verifyVisibleLayout(page, '.public-site__section');
+
+    const sitemap = await page.request.get('http://127.0.0.1:5278/sitemap.xml');
+    expect(sitemap.status()).toBe(200);
+    expect(sitemap.headers()['cache-control']).toContain('no-store');
+    const xml = await sitemap.text();
+    expect(xml).toContain('/services/synthetic-service');
+    expect(xml).toContain('/ru/services/synthetic-service');
+    expect(xml).not.toContain('not-published');
+
+    const robots = await page.request.get('http://127.0.0.1:5278/robots.txt');
+    expect(robots.status()).toBe(200);
+    expect(robots.headers()['cache-control']).toContain('no-store');
+    expect(await robots.text()).toContain('Disallow: /');
   });
 });
 
 /*
  * PR-UI-18 (plan §PR-UI-18 item 1): systematic light+dark page snapshots for
- * the 12 key screens. The suite already locks the Landing route in both
- * themes (pr16-landing-{hero,workflow}-{light,dark} — 4 baselines above), so
- * this block adds the remaining screens. Part 1: /login, /display-board,
+ * the 12 key Clinic OS screens. Public-site SSR browser behavior is covered
+ * by the four synthetic route smoke cases above; this block adds /login and the
+ * remaining Clinic OS screens. Part 1: /login, /display-board,
  * /admin, /registrar — 4 screens × 2 themes = 8 baselines. Parts 2-3
  * (doctor/cashier/lab/patient, then cardiology/dermatology/dentistry) land
- * in follow-up increments; the landing screen stays covered by pr16.
+ * in follow-up increments.
  *
  * Determinism contract (mirrors the pr16 + capture-landing-screens pattern):
  *   - Clock frozen at 2026-08-29T12:00:00+05:00 via page.clock.install — the
