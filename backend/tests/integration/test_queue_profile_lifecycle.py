@@ -1996,6 +1996,113 @@ def _public_keys(pg_client) -> set[str]:
     return {p["specialty"] for p in items}
 
 
+@pytest.mark.queue
+@pytest.mark.usefixtures("queue_admission_open")
+def test_public_catalog_matches_shared_resource_profile_admission(
+    pg_client, pg_session
+):
+    """Catalog and profile join agree on every published resource-tag sibling."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from app.crud.clinic import clinic_today
+    from app.models.department import Department
+    from app.models.online_queue import DailyQueue, QueueResource, QueueToken
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import QueueValidationError, queue_service
+
+    suffix = uuid.uuid4().hex[:10]
+    queue_tag = f"rq3639r{suffix}"
+    parent_a = Department(
+        key=f"rq3639-a-{suffix}",
+        name_ru="Synthetic shared-resource parent A",
+        active=True,
+    )
+    parent_b = Department(
+        key=f"rq3639-b-{suffix}",
+        name_ru="Synthetic shared-resource parent B",
+        active=False,
+    )
+    resource = QueueResource(
+        code=f"rq3639-resource-{suffix}",
+        queue_tag=queue_tag,
+        display_name="Synthetic shared QueueResource",
+        active=True,
+    )
+    profile_a = QueueProfile(
+        key=f"rq3639-profile-a-{suffix}",
+        title="Synthetic shared profile A",
+        queue_tags=[queue_tag],
+        department_key=parent_a.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    profile_b = QueueProfile(
+        key=f"rq3639-profile-b-{suffix}",
+        title="Synthetic shared profile B",
+        queue_tags=[queue_tag],
+        department_key=parent_b.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
+    token = QueueToken(
+        token=f"rq3639-{suffix}",
+        day=clinic_today(pg_session),
+        specialist_id=None,
+        department="clinic",
+        is_clinic_wide=True,
+        expires_at=local_now + timedelta(hours=2),
+        active=True,
+    )
+    pg_session.add_all([parent_a, parent_b, resource, profile_a, profile_b, token])
+    pg_session.commit()
+
+    # A is individually available, but the shared resource target is not:
+    # B's published target has an inactive parent. The public catalog must
+    # not offer A when profile admission will fail closed for the same tag.
+    assert profile_a.key not in _public_keys(pg_client)
+    with pytest.raises(QueueValidationError, match="Профиль направления неоднозначен"):
+        queue_service.join_queue_with_token(
+            pg_session,
+            token_str=token.token,
+            patient_name=f"RQ3639 Synthetic Patient {suffix}",
+            phone="+998900363900",
+            specialist_id_override=profile_a.id,
+            specialist_type="profile",
+        )
+    pg_session.rollback()
+    assert (
+        pg_session.query(DailyQueue)
+        .filter_by(day=token.day, queue_tag=queue_tag)
+        .count()
+        == 0
+    )
+
+    # Once both published siblings are bookable, both appear and the same
+    # selected resource route admits an entry.
+    parent_b.active = True
+    pg_session.commit()
+    visible_keys = _public_keys(pg_client)
+    assert {profile_a.key, profile_b.key} <= visible_keys
+
+    result = queue_service.join_queue_with_token(
+        pg_session,
+        token_str=token.token,
+        patient_name=f"RQ3639 Synthetic Patient {suffix}",
+        phone="+998900363900",
+        specialist_id_override=profile_a.id,
+        specialist_type="profile",
+    )
+    assert result.get("entry") is not None
+    queue = (
+        pg_session.query(DailyQueue)
+        .filter_by(day=token.day, queue_resource_id=resource.id)
+        .one()
+    )
+    assert queue.queue_tag == queue_tag
+
+
 def _seed_waiting_entry_for_department(pg_session, dept_key: str, suffix: str) -> dict:
     """One active DailyQueue + one waiting entry under a tag owned by the
     department's 1:1 profile (expand_queue_tags guarantees the bare key

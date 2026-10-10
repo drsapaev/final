@@ -2,13 +2,13 @@
 
 Plan version: 3.88
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: IN_PROGRESS — PR #3639 review P1/P2 fixes are in code-bearing commit `d36235360f60f08ea0de1ff6883164604f8f163e`; bounded Tier-2 staging passed Admin 2FA and both PostgreSQL modules (24/24, no skips). Tier-2 remains PARTIAL because frontend provenance, named browser specs, and the full staging runbook remain NOT_RUN. No deferral is accepted; merge remains user-owned.
+Current status: IN_PROGRESS — the new public-catalog/admission P2 is fixed locally and focused PostgreSQL coverage passes 71/71 across three modules. Source, test, and journal changes are pending commit/push. PR #3639 remote HEAD remains `c74217cd1f19f316bed406051db31665ece204b1`; Tier-2 remains PARTIAL (frontend provenance, named browser specs, full staging runbook NOT_RUN). No deferral is accepted; merge remains user-owned.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 PR base / `origin/main`: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed (local sync commit `cfe6dfc89`).
-Latest validated code-bearing PR commit: `d36235360f60f08ea0de1ff6883164604f8f163e`; at the last read, PR #3639 was OPEN/MERGEABLE at that code HEAD, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. Recheck live PR HEAD after this journal-only update.
-Implementation paths in `d3623536`: `backend/app/services/queue_svc/_core.py`, `backend/app/services/queue_svc/_operations.py`, `backend/app/services/qr_queue/_tokens.py`, and the two focused PostgreSQL integration modules. Current journal updates are pending in `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Preserve pre-existing untracked `.scratch/` and do not stage it.
-Last updated: 2026-10-10T22:19+05:00
+Latest validated source commit: `d36235360f60f08ea0de1ff6883164604f8f163e`; current local changes extend it with the public-catalog parity P2 fix and its integration test. Recheck live PR HEAD before commit/push.
+Implementation paths for the new P2: `backend/app/services/queue_svc/_operations.py`, `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, and `backend/tests/integration/test_queue_profile_lifecycle.py`. Preserve pre-existing untracked `.scratch/` and do not stage it.
+Last updated: 2026-10-10T23:41+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,9 +16,18 @@ Last updated: 2026-10-10T22:19+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS | PR #3639 OPEN; code-bearing commit `d3623536`; review P1/P2 fixed; exact-head CI green; bounded staging P1/P2/Admin checks PASS; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-tier-2-bounded-validation-2026-10-10 |
+| T11 | IN_PROGRESS | PR #3639 OPEN at `c74217cd`; new public-catalog P2 fixed locally; 71 focused PG tests, Ruff, py_compile PASS; commit/push and exact-head CI pending; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-public-catalog-admission-parity-p2-2026-10-10 |
 
-## Current checkpoint — PR #3639 bounded Tier-2 staging passed; remaining Tier-2 gaps are explicit — 2026-10-10T22:19+05:00
+## Current checkpoint — PR #3639 public catalog/admission P2 locally validated — 2026-10-10T23:41+05:00
+
+- The repeat review's P2 is fixed locally: the public catalog uses the canonical QueueBusinessService bookability guard and the same QueueResource tag resolver as profile admission. The resolver is also reused by token target planning, avoiding another copy of resource-route selection.
+- Regression `test_public_catalog_matches_shared_resource_profile_admission` checks both surfaces: with one inactive published sibling, the individually available profile is absent from the catalog and its direct profile join is rejected; after parent activation, both appear and the resource-owned join succeeds.
+- The three focused PostgreSQL modules passed **71 passed, 1 warning, 0 skips/failures/errors** on a temporary local `pgserver` instance. Scoped Ruff, py_compile, and `git diff --check` passed. A pre-existing helper (`scripts/rq13ui_verify.py`) was NOT_RUN successfully because its Unix-socket proxy assumes the older pgserver URI shape; the same module was then run with the current direct TCP loopback URI from the `pgserver` API. No tracked helper was changed.
+- Remote PR #3639 was read as OPEN/MERGEABLE at `c74217cd1f19f316bed406051db31665ece204b1`, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`; on that older exact head 25 checks were SUCCESS and 13 were SKIPPED. The new P2 changes are not yet on GitHub, so exact-head CI must be rerun after push.
+- Current tracked edits: `_operations.py`, registrar `_queue_profiles.py`, `test_queue_profile_lifecycle.py`, and the T11 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. No staging, PR-body, review, deferral, or merge action occurred. Tier-2 remains PARTIAL and no deferral is accepted.
+- Next exact action: run final scope/diff checks, commit only these six allowed files, push without force to the existing PR branch, and inspect checks on the resulting exact HEAD. Do not merge or submit a formal review.
+
+## Previous checkpoint — PR #3639 bounded Tier-2 staging passed; remaining Tier-2 gaps are explicit — 2026-10-10T22:19+05:00
 
 - At validation time PR #3639 was OPEN/MERGEABLE with code-bearing HEAD `d36235360f60f08ea0de1ff6883164604f8f163e`, based on `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. The checked-out branch is `codex/aqs-T11-manual-availability`. This follow-up changes only journals; refresh live PR state before the next action.
 - Bounded staging used only synthetic Compose project `clinic-aqs-pr3639-followup-20261009`, ports `18401/18402/55540`, Ubuntu-24.04, and the canonical Preflight → Start → Session flow. Exact commit and tracked worktree cleanliness were verified before execution.

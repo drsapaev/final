@@ -288,6 +288,63 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         )
 
     @classmethod
+    def _qr_profile_resource_tag(
+        cls,
+        db: Session,
+        profile: Any,
+        day: date,
+    ) -> str | None:
+        """Resolve the first resource tag a profile join would use today.
+
+        Keep this resolver shared by token target planning, profile admission,
+        and the public catalog so their interpretation of QueueResource
+        routing cannot drift.
+        """
+        profile_key = getattr(profile, "key", None)
+        if not profile_key:
+            return None
+        queue_tags = expand_queue_tags(
+            list(getattr(profile, "queue_tags", None) or [profile_key])
+        )
+        return next(
+            (
+                tag
+                for tag in queue_tags
+                if queue_resource_routing.tag_routes_to_resource(db, tag, day)
+                is not None
+                or queue_resource_routing.resolve_tag_resource(db, tag) is not None
+            ),
+            None,
+        )
+
+    @classmethod
+    def is_qr_profile_target_bookable(
+        cls,
+        db: Session,
+        profile: Any,
+        *,
+        day: date,
+        availability: Any | None = None,
+    ) -> bool:
+        """Apply the same published-target guard used by profile admission.
+
+        Public catalog entries are actionable choices, not merely published
+        records. A shared resource tag is selectable only when every published
+        profile that resolves to that target is available and unambiguous.
+        """
+        if not cls._is_qr_visible_profile(profile, db, availability=availability):
+            return False
+        profile_key = getattr(profile, "key", None)
+        if not profile_key:
+            return False
+        resource_tag = cls._qr_profile_resource_tag(db, profile, day)
+        return cls._qr_profile_target_is_unambiguous(
+            db,
+            resource_tag or profile_key,
+            profile,
+        )
+
+    @classmethod
     def check_queue_time_window(
         cls,
         target_date: date,
@@ -1501,25 +1558,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             )
             doctors_by_id = {doctor.id: doctor for doctor in eligible_doctors}
 
-        def _profile_target_tag(profile) -> str | None:
-            profile_key = getattr(profile, "key", None)
-            if not profile_key:
-                return None
-            queue_tags = expand_queue_tags(
-                list(getattr(profile, "queue_tags", None) or [profile_key])
-            )
-            resource_tag = next(
-                (
-                    tag
-                    for tag in queue_tags
-                    if queue_resource_routing.tag_routes_to_resource(db, tag, day)
-                    is not None
-                    or queue_resource_routing.resolve_tag_resource(db, tag) is not None
-                ),
-                None,
-            )
-            return resource_tag or profile_key
-
         for index, specialist_id in enumerate(specialist_ids):
             specialist_type = (
                 str(specialist_entity_types[index]).strip().lower()
@@ -1538,7 +1576,8 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                         availability=availability_by_profile[queue_profile],
                     ):
                         continue
-                    tag = _profile_target_tag(queue_profile)
+                    tag = self._qr_profile_resource_tag(db, queue_profile, day)
+                    tag = tag or queue_profile.key
                     if tag and self._qr_profile_target_is_unambiguous(
                         db, tag, queue_profile
                     ):
@@ -1720,17 +1759,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 # pre-create, GQL joinQueue) uses — routing through doctor
                 # selection here would fork a parallel legacy queue and
                 # re-create the split-queue incident class.
-                resource_tag = next(
-                    (
-                        tag
-                        for tag in queue_tags
-                        if queue_resource_routing.tag_routes_to_resource(db, tag, day)
-                        is not None
-                        or queue_resource_routing.resolve_tag_resource(db, tag)
-                        is not None
-                    ),
-                    None,
-                )
+                resource_tag = self._qr_profile_resource_tag(db, queue_profile, day)
                 if specialist_type == "profile" and not self._qr_profile_target_is_unambiguous(
                     db, resource_tag or profile_key, queue_profile
                 ):
