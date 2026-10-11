@@ -65,15 +65,19 @@ prerequisite фиксируйте и устраняйте до тестов.
 в `-Action Session -CommandArgs @(...)`: keeper работает до конца команды.
 Обычный `Start` удерживает WSL только на время запуска.
 
-Адреса текущего локального staging; для отдельного проекта выберите свободные:
+Staging публикуется только на loopback-интерфейсе хоста. Значения sample env
+подходят для браузера на Windows:
 
-- Frontend: `http://<STAGING_PUBLIC_HOST>:18080`
-- Backend docs: `http://<STAGING_PUBLIC_HOST>:18001/docs`
-- Postgres: `127.0.0.1:55432`
+- Frontend: `http://127.0.0.1:18080`
+- Backend docs: `http://127.0.0.1:18001/docs`
+- Postgres: `127.0.0.1:15432` (порт из sample env)
 
-В sample env PostgreSQL host port — `15432`; задавайте фактический порт явно.
-Launcher проверяет project, порты, mounts, health и доступ из Windows, вызывает
-Docker внутри WSL через local socket и всегда выбирает `ops/compose.staging.yml`.
+Сохраняйте `STAGING_PUBLIC_HOST=127.0.0.1`. Если меняете frontend-порт,
+согласованно обновите `STAGING_PUBLIC_BASE_URL`, `STAGING_PUBLIC_WS_URL`,
+`STAGING_PUBLIC_WS_HOST` и `CORS_ORIGINS`, оставляя host loopback-адресом.
+Подключение с другого компьютера напрямую недоступно. Launcher проверяет
+project, порты, mounts, health и доступ из Windows, вызывает Docker внутри WSL
+через local socket и всегда выбирает `ops/compose.staging.yml`.
 HEAD/mount и image IDs сами по себе не доказывают commit собранного frontend:
 helper явно сообщает `served_revision_verified=false` и `worktree_dirty`.
 Не выводите env или полный resolved Compose config: в них secrets.
