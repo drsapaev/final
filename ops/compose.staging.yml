@@ -96,7 +96,7 @@ services:
     command: ["/bin/bash", "/entrypoint.sh"]
     ports:
       # Windows production uses host port 18000; keep staging separate by default.
-      - "${STAGING_BACKEND_PORT:-18001}:18000"
+      - "127.0.0.1:${STAGING_BACKEND_PORT:-18001}:18000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -123,7 +123,7 @@ services:
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
         VITE_SENTRY_ENV: staging
     ports:
-      - "${STAGING_FRONTEND_PORT:-18080}:80"
+      - "127.0.0.1:${STAGING_FRONTEND_PORT:-18080}:80"
     depends_on:
       backend:
         condition: service_healthy
