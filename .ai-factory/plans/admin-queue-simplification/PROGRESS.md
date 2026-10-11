@@ -2,14 +2,14 @@
 
 Plan version: 3.89
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: PR_OPEN — the three previously skipped PostgreSQL staging nodes passed 3/3 on exact PR HEAD 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3. Tier-2 remains PARTIAL; served frontend provenance, remaining named browser/Admin specs and the full staging runbook remain open. No runtime/test/launcher/Compose/gate source edits in this evidence checkpoint.
+Current status: PR_OPEN — the three previously skipped PostgreSQL staging nodes passed 3/3 on exact code HEAD 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3. Exact-head CI on journal checkpoint e2f5da0782c17152a34b9d4a9cd9956c10830173 completed with 27 success, 13 path-aware skips, 0 failures/pending. Tier-2 remains PARTIAL; provenance, remaining live specs and the full staging runbook remain open.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 PR base / `origin/main`: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed (local sync commit `cfe6dfc89`).
-Latest validated runtime source commit: 6522e8c0046d824aaefa31960582ce26f7cef708 (includes the public-catalog parity P2 fix and integration regression). The three target staging nodes ran against exact PR/worktree HEAD 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3; this checkpoint changes only T11 journals.
+Latest validated runtime source commit: 6522e8c0046d824aaefa31960582ce26f7cef708. The three target nodes ran against exact code HEAD 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3; journal-only CI was green on e2f5da0782c17152a34b9d4a9cd9956c10830173.
 Implementation paths for the new P2: `backend/app/services/queue_svc/_operations.py`, `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, and `backend/tests/integration/test_queue_profile_lifecycle.py`. Preserve pre-existing untracked `.scratch/` and do not stage it.
 Latest owned staging run clinic-aqs-pr3639-tier2e-20261011 passed canonical Preflight, Start, Session and all three target PostgreSQL nodes. Teardown verified zero owned containers, volumes, networks and images; the private env was removed. Sanitized JUnit and ignored helper/logs remain under output/staging/.
-Last updated: 2026-10-11T16:23+05:00
+Last updated: 2026-10-11T16:39+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -17,9 +17,19 @@ Last updated: 2026-10-11T16:23+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | PR_OPEN | PR #3639; three Tier-2 PostgreSQL nodes PASS; remaining Tier-2 items and final review unresolved | | EVIDENCE.md#t11-pr-3639-three-skipped-postgresql-staging-nodes-pass-2026-10-11 |
+| T11 | PR_OPEN | PR #3639; three Tier-2 PostgreSQL nodes PASS; e2f5da0 CI 27 success/13 skipped; Tier-2 partial and no accepted deferral | | EVIDENCE.md#t11-pr-3639-post-staging-exact-head-ci-and-body-update-2026-10-11 |
 
-## Current checkpoint — PR #3639 T11 three skipped PostgreSQL staging nodes passed — 2026-10-11T16:23+05:00
+## Current checkpoint — PR #3639 staging pass and exact-head CI green; Tier-2 still partial — 2026-10-11T16:39+05:00
+
+- Exact code HEAD tested in staging: 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3; runtime source: 6522e8c0046d824aaefa31960582ce26f7cef708. The three requested PostgreSQL cases passed 3/3 in owned synthetic Compose; teardown verified zero owned resources.
+- Journal-only checkpoint e2f5da0782c17152a34b9d4a9cd9956c10830173 passed exact-head CI: 27 success, 13 path-aware skipped, 0 failed/pending; required backend, frontend unit/E2E, parity and PR Required Gate passed. The skipped jobs remain skips.
+- PR body reflects the three PASS nodes, remaining NOT_RUN items, 27/13 CI result and no accepted deferral. Its review-template gate passed 19 tests plus both sample bodies.
+- Read-only review of the latest public-catalog/admission fix found no P0/P1/P2 correctness blocker. Non-blocking P3 follow-up: catalog checks reload candidate profiles/availability per displayed profile; query growth was not measured and no optimization was made under the validation-only scope.
+- Remaining NOT_RUN: served frontend revision provenance, named browser/Admin live specs, keyboard/viewport, full docs/runbooks/STAGING_VALIDATION.md and T18. No deferral accepted; merge remains on hold.
+- GitHub has no submitted human review (reviews=[]); local code review is favorable for the reviewed fix. The PR remains OPEN; this work does not authorize merge.
+- Next exact action: decide whether to close remaining Tier-2 gaps with a safe harness or request an explicit limited deferral, then finish the independent review gate. Preserve all NOT_RUN labels until verified.
+
+## Historical checkpoint — PR #3639 T11 three skipped PostgreSQL staging nodes passed — 2026-10-11T16:23+05:00
 
 - Exact tested PR/worktree HEAD: 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3; base: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed. Runtime source under test: 6522e8c0046d824aaefa31960582ce26f7cef708.
 - The approved harness-only narrow_override remained in force. Canonical Preflight, Start and one Session passed; only the three previously skipped PostgreSQL nodes ran, with 3 passed, 0 skipped, 0 failed. JUnit SHA-256: cbe772b21f33377f8f6d6f5f264ae01df4a445693c11e9f0b0905175c31ff30a.

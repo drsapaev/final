@@ -3270,3 +3270,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: WSL preflight reports served_revision_verified=false; the frontend was built in this worktree but its served static bytes were not attested in this run. Remaining named browser/Admin live specs and the complete docs/runbooks/STAGING_VALIDATION.md remain NOT_RUN. Tier-2 remains PARTIAL; no deferral, final code review or merge has occurred.
 - PR: #3639 OPEN; tested code-bearing PR HEAD 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3; documentation update and PR-body refresh pending.
 - Merge commit: none.
+
+## T11 PR #3639 post-staging exact-head CI and body update — 2026-10-11T16:39+05:00
+
+- Code under test: `0b6dcdf6937c0e6684ea6fd7893405cd40b148b3`; runtime source `6522e8c0046d824aaefa31960582ce26f7cef708`. The preceding evidence section records canonical staging setup, exactly three requested PostgreSQL tests (3 passed, 0 skipped/errors), JUnit SHA, and complete teardown.
+- Journal-only PR commit `e2f5da0782c17152a34b9d4a9cd9956c10830173` completed exact-head CI: 27 success, 13 path-aware skip, 0 failure, 0 pending. Backend tests, frontend unit/E2E, frontend-backend parity, PR Required Gate, security, lint, build, documentation and review gates passed. Skips remain skips.
+- PR description was refreshed with the accurate Tier-2 status and validated using `scripts/run_pr_review_gate_checks.py`: 19 unit tests passed, both sample bodies passed, current PR body passed. PR remains OPEN; merge state was CLEAN/MERGEABLE after CI, but reviewDecision is empty and no human review was submitted.
+- Local read-only review of the latest catalog/admission fix found no P0/P1/P2 correctness blocker: the catalog now calls the shared target-bookability check and the PostgreSQL regression covers unavailable sibling rejection and successful admission when both parents are active.
+- Non-blocking P3 performance follow-up: `get_queue_profiles_public` invokes target ambiguity resolution per displayed profile; that path can reload all QueueProfiles and candidate availability each time. The resulting query growth was not measured here. No runtime edit was authorized or made.
+- Remaining Tier-2: `served_revision_verified=false`; named browser/Admin live specs, keyboard and viewport checks, full `docs/runbooks/STAGING_VALIDATION.md`, and T18 remain NOT_RUN. No deferral accepted; keep merge on hold.
+- Scope/validation: only the three T11 journals changed for this checkpoint; commit hooks and `git diff --check` pass. No runtime/test/launcher/Compose/gate/router, production, or foreign staging changes.

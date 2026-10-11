@@ -1,12 +1,12 @@
 # Resume
 
-## Current resume — PR #3639 three skipped PostgreSQL staging nodes pass — 2026-10-11T16:23+05:00
+## Current resume — PR #3639 staging pass, exact-head CI green, Tier-2 partial — 2026-10-11T16:39+05:00
 
-- Continue task 9af17c38-8235-4681-93e8-6a9864cbdb75 in C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final, branch codex/aqs-T11-manual-availability. Exact tested PR HEAD: 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3. Base: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed. Runtime source: 6522e8c0046d824aaefa31960582ce26f7cef708.
-- User-authorized scope stays harness-only: canonical Preflight, Start, one Session with the exact three test nodes, teardown, T11 journals and PR description. No source, launcher, Compose, gate, router, production, foreign staging or merge before final review.
-- Validation passed on WSL Ubuntu-24.04, Docker 29.1.3, Compose 2.40.3. Canonical Preflight PASS, Start PASS, Session PASS. Fresh synthetic PostgreSQL DB migrated to Alembic head. The three target nodes passed 3/3 with zero skips/failures/errors; JUnit hash is cbe772b21f33377f8f6d6f5f264ae01df4a445693c11e9f0b0905175c31ff30a.
-- Canonical teardown passed and exact project-label queries found zero containers, volumes, networks and local images. The private env was removed. Full static frontend provenance remains NOT_RUN (preflight reports served_revision_verified=false); remaining legacy browser/Admin specs and the full staging runbook also remain NOT_RUN. Tier-2 is PARTIAL; no deferral has been accepted.
-- Next exact action: commit and push only PROGRESS.md, EVIDENCE.md and RESUME.md; refresh PR body; inspect exact-head CI; perform the separate final code review. Leave merge on hold until all required review and Tier-2 decisions are resolved.
+- User-authorized scope was harness-only: canonical Preflight, Start, one Session with the exact three test nodes, teardown, T11 journals and PR description. This was completed without runtime, test-source, launcher, Compose, gate/router, production or foreign staging edits.
+- Exact staging result: 3/3 PostgreSQL nodes PASS on code HEAD 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3; JUnit SHA-256 cbe772b21f33377f8f6d6f5f264ae01df4a445693c11e9f0b0905175c31ff30a. Canonical teardown found zero owned resources and removed the private env.
+- Journal-only PR head e2f5da0782c17152a34b9d4a9cd9956c10830173 has 27 CI successes, 13 path-aware skips, no failures/pending; the PR body was updated and passed its template gate.
+- Tier-2 remains PARTIAL: served frontend provenance, remaining named browser/Admin live specs, keyboard/viewport and full staging runbook remain NOT_RUN. No deferral has been accepted; do not merge under this checkpoint.
+- Next exact action: resolve the remaining Tier-2 scope by running a safe harness or obtaining an explicit limited-deferral decision, then complete the independent final review.
 ## Historical resume — PR #3639 T11 retry blocked after low-memory Docker timeouts — 2026-10-11T07:42:52+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Staging ran against code-bearing HEAD `69b81e2735eba7b04cef75662cd98ea6f3410a70`; current journal-only PR HEAD is `f76220d95ddd571e4fc9a9925cabba146f04cc0e`; base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`; runtime source `6522e8c0046d824aaefa31960582ce26f7cef708` is unchanged. PR body was refreshed.
