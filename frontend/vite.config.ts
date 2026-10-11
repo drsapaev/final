@@ -4,6 +4,7 @@
 import { defineConfig } from "vite";
 import type { Plugin, PluginOption } from "vite";
 import react from "@vitejs/plugin-react";
+import { nitro } from "nitro/vite";
 import { visualizer } from "rollup-plugin-visualizer";
 import fs from "node:fs";
 import path from "node:path";
@@ -66,8 +67,13 @@ if (process.env.SENTRY_AUTH_TOKEN && process.env.VITE_SENTRY_DSN) {
   }
 }
 
-function createPlugins(enableBundleVisualizer: boolean): PluginOption[] {
-  const plugins: PluginOption[] = [react(), ...sentryPlugin, serviceWorkerCacheBustingPlugin()];
+function createPlugins(enableBundleVisualizer: boolean, enableNitro: boolean): PluginOption[] {
+  const plugins: PluginOption[] = [
+    ...(enableNitro ? [nitro()] : []),
+    react(),
+    ...sentryPlugin,
+    serviceWorkerCacheBustingPlugin(),
+  ];
 
   if (enableBundleVisualizer) {
     plugins.push(
@@ -93,6 +99,7 @@ export default defineConfig(({ mode }) => ({
     mode === "analyze" ||
       process.env.ANALYZE_BUNDLE === "true" ||
       process.env.VITE_BUNDLE_ANALYZE === "true",
+    mode === "ssr",
   ),
   resolve: {
     alias: {
