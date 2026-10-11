@@ -7,22 +7,22 @@
 ♿ Accessibility: Maintains `aria-label` for screen reader support while providing visual tooltip for sighted users.
 
 ## Cyclic Execution Evidence
-Not applicable: no cyclic execution loops were modified.
+Not applicable: No cyclic execution loops were modified.
 
 ## Contract Impact
-Not applicable: no contracts or APIs were modified.
+Not applicable: No contracts or APIs were modified.
 
 ## RBAC / Permissions
-Not applicable: no permission changes.
+Not applicable: No permission changes.
 
 ## Notification / Realtime
-Not applicable: no realtime or notification changes.
+Not applicable: No realtime or notification changes.
 
 ## Frontend Resilience
-Not applicable: these are cosmetic visual changes.
+Not applicable: These are cosmetic visual changes.
 
 ## Scope Gate
-Not applicable: this is a small UX enhancement that doesn't change scope.
+Not applicable: This is a small UX enhancement that doesn't change scope.
 
 ## Validation
-Not applicable: ran lint checks and test suite. Tested locally that components render.
+Not applicable: Ran lint checks and test suite. Tested locally that components render.
