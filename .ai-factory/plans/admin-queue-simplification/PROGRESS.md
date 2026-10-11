@@ -2,13 +2,14 @@
 
 Plan version: 3.89
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: IN_PROGRESS — the public-catalog/admission P2 is fixed in runtime commit `6522e8c0046d824aaefa31960582ce26f7cef708`; same-runtime focused PostgreSQL coverage passed 71/71. On journal head `d4b2b6244055ae56b9addf6cbfd1ecbb4172016e`, owned synthetic staging confirmed 254/254 frontend file hashes, standard Admin password+TOTP, Department off/on, manual archive, and public catalog HTTP 200. Seven of ten selected PostgreSQL cases passed; three QR selector/join nodes skipped after fallback to schema-less `/postgres`. A separate synthetic retry passed Preflight but canonical Start failed before Session; teardown verified empty. Tier-2 remains PARTIAL: legacy live browser specs and full `STAGING_VALIDATION.md` are NOT_RUN. No deferral is accepted; merge remains user-owned.
+Current status: BLOCKED — bounded Tier-2 retry stopped after canonical Preflight because WSL backing volume `D:` had 9.90 GiB free, below the 10 GiB build reserve required by Start. Start and Session did not run; all three target tests remain NOT_RUN. No tracked runtime, test, launcher, Compose, or gate source edits. The mandatory gate misrouted to Compose ownership; its known-root retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Human basis: user's explicit local-harness-only validation request.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 PR base / `origin/main`: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed (local sync commit `cfe6dfc89`).
 Latest validated runtime source commit: `6522e8c0046d824aaefa31960582ce26f7cef708` (includes the public-catalog parity P2 fix and integration regression). Staging used exact worktree/journal head `d4b2b6244055ae56b9addf6cbfd1ecbb4172016e`; the intervening diff changes only these three T11 journals.
 Implementation paths for the new P2: `backend/app/services/queue_svc/_operations.py`, `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, and `backend/tests/integration/test_queue_profile_lifecycle.py`. Preserve pre-existing untracked `.scratch/` and do not stage it.
-Last updated: 2026-10-11T02:36+05:00
+Last staging project attempt: `clinic-aqs-pr3639-tier2d-20261011`, ports backend `18427`, frontend `18428`, PostgreSQL `55546`; services were not started, exact-label checks found no owned containers, volumes, networks, or images, and its private env file was removed.
+Last updated: 2026-10-11T06:52+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -16,9 +17,19 @@ Last updated: 2026-10-11T02:36+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | IN_PROGRESS | PR #3639 OPEN; code `6522e8c`; same-runtime PG 71/71; staging frontend/Admin/lifecycle/catalog PASS; PG 7 PASS / 3 join SKIP; retry Start failed and cleaned; Tier-2 partial | | EVIDENCE.md#t11-pr-3639-tier2-follow-up-staging-2026-10-11 |
+| T11 | BLOCKED | PR #3639 retry used source HEAD `f260aeb`; runtime `6522e8c`; waiting for WSL backing-disk reserve before the three skipped PG nodes can run | | EVIDENCE.md#t11-pr-3639-three-skipped-nodes-retry-blocked-on-wsl-storage-2026-10-11 |
 
-## Current checkpoint — PR #3639 T11 Tier-2 follow-up — 2026-10-11T02:36+05:00
+## Current checkpoint — PR #3639 T11 three-node Tier-2 retry blocked — 2026-10-11T06:52+05:00
+
+- At the start of this validation, PR #3639 was OPEN/MERGEABLE at exact local/remote HEAD `f260aeb5125fde3743af0f966d1061287372b930`, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. Runtime source remains `6522e8c0046d824aaefa31960582ce26f7cef708`; this blocked attempt did not modify it.
+- Canonical Preflight passed, but WSL backing volume `D:` has `10,632,667,136` bytes free (9.90 GiB), about 100 MiB below the 10 GiB build reserve needed by Start. DockerRootDir has ample space but does not remove the backing-volume constraint. Start and Session were not run.
+- The three target nodes remain NOT_RUN: `test_admin_shown_ecg_direction_is_selectable_and_joinable`, `test_clinic_wide_specialist_card_uses_the_profile_selected_for_admission`, and `test_parent_off_removes_selection_and_blocks_direct_qr_join`. No new test PASS, FAIL, or skip result exists.
+- Teardown/resource check: zero owned containers, volumes, networks, and matching project images. The task-owned private env file was removed. No runtime, test, launcher, Compose, gate/router, production, or foreign staging changes occurred; `.scratch/` and prior evidence were preserved.
+- Exact-head GitHub CI has all applicable blocking jobs successful. Path-aware jobs remain skipped and are not passes. Tier-2 remains PARTIAL; no deferral accepted.
+- PR description records this blocked outcome and keeps merge on hold. No formal review or merge was submitted.
+- Next exact action: after safely freeing enough on the WSL backing volume to meet the 10 GiB build reserve (12 GiB free is the working target), recreate only this project's private synthetic env, rerun canonical Preflight, then Start and one Session containing only these three node IDs with a distinct synthetic database at Alembic head. Require all three PASS, teardown and verify zero owned resources, update evidence/body, then conduct final review. Do not merge before that PASS and review. Full `STAGING_VALIDATION.md` remains required before production.
+
+## Superseded checkpoint — PR #3639 T11 Tier-2 follow-up — 2026-10-11T02:36+05:00
 
 - PR #3639 remains OPEN/MERGEABLE on base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. Exact local/remote journal head at validation was `d4b2b6244055ae56b9addf6cbfd1ecbb4172016e`; runtime code-bearing commit remains `6522e8c0046d824aaefa31960582ce26f7cef708`. The code diff between these commits changes only the three T11 journals.
 - Prior same-runtime PostgreSQL validation: **71 passed, 1 warning, 0 skipped/failures/errors** across lifecycle, QR selector/join visibility, and QR token eligibility modules. This covers the join assertions skipped in the current staging Session.

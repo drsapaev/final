@@ -1,6 +1,19 @@
 # Resume
 
-## Current resume — PR #3639 T11 bounded Tier-2 evidence — 2026-10-11T02:36+05:00
+## Current resume — PR #3639 three-node Tier-2 retry blocked on WSL storage — 2026-10-11T06:52+05:00
+
+- Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. The retry started from PR HEAD `f260aeb5125fde3743af0f966d1061287372b930`; base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`; runtime source `6522e8c0046d824aaefa31960582ce26f7cef708`. The journal-only checkpoint will create a newer PR HEAD without changing runtime source.
+- User authorized local harness-only correction, canonical staging Preflight → Start → Session for only the three skipped PostgreSQL nodes, teardown, journal/PR-description updates, and merge only after those nodes PASS and final review. No tracked runtime/test/launcher/Compose/gate edits; no production or foreign staging access.
+- Gate: initial mandatory run misrouted to Compose/Docker source ownership. Required known-root retry on `backend/tests/integration/test_qr_selection_join_visibility.py` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; prompt read. User's exact no-source-edit harness scope is the override basis.
+- Target nodes: `test_admin_shown_ecg_direction_is_selectable_and_joinable`, `test_clinic_wide_specialist_card_uses_the_profile_selected_for_admission`, and `test_parent_off_removes_selection_and_blocks_direct_qr_join`.
+- Latest canonical Preflight passed for project `clinic-aqs-pr3639-tier2d-20261011`, ports 18427/18428/55546, but WSL backing D: had 9.90 GiB free, below the 10 GiB build reserve. A read-only recheck measured 10,632,667,136 bytes free (~100 MiB short); DockerRootDir had ample space. Start/Session and all three tests are NOT_RUN.
+- Sequence: canonical Preflight; canonical Start; one canonical Session wrapping only those three node IDs with fresh JUnit; require three pass, zero skips/failures/errors; canonical teardown and exact owned-resource check; remove only this attempt's env.
+- Teardown state: exact project has zero containers, volumes, networks, and matching project images; private env `output/staging/t11-pr3639-tier2d.env` is absent. Preserve `.scratch/` and prior ignored evidence.
+- Resume only after D: has at least the required 10 GiB free (12 GiB is the working target). Recreate the private env, run canonical Preflight, then Start, then one Session limited to the three target IDs. Point `RQ09_PG_ADMIN_URL` to this project's PostgreSQL and `DATABASE_URL` fallback to a distinct synthetic DB already at Alembic head; prove routing without exposing credentials. Stop on any mismatch, skip, or failure.
+- Then teardown and verify zero owned resources; remove only this attempt's env; update journals and PR body with actual test results; run `git diff --check`; inspect exact-head CI and final review. Merge only if all three tests PASS and review has no blocker. Full `docs/runbooks/STAGING_VALIDATION.md` remains mandatory before production.
+- Preserve pre-existing `.scratch/` and prior ignored evidence.
+
+## Superseded resume — PR #3639 T11 bounded Tier-2 evidence — 2026-10-11T02:36+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 was OPEN on exact local/remote head `d4b2b6244055ae56b9addf6cbfd1ecbb4172016e`, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`; runtime-bearing code remains `6522e8c0046d824aaefa31960582ce26f7cef708`. Only journal paths are authorized for this checkpoint. Preserve unrelated `.scratch/`.
 - Same-runtime focused PostgreSQL evidence: **71 passed, 1 warning, 0 skipped/failures/errors** across lifecycle, QR selector/join visibility, and QR token eligibility modules. The current staging Session skipped the three QR selector/join nodes because the helper fallback DATABASE_URL targeted schema-less `/postgres`; do not count these as stage passes. The separate same-runtime 71/71 module run did pass them.
