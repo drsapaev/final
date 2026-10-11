@@ -2,14 +2,14 @@
 
 Plan version: 3.89
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
-Current status: BLOCKED — the WSL disk reserve is now sufficient, but canonical Docker preflight timed out twice while Windows and WSL available RAM were low. The project is torn down; the three target tests remain NOT_RUN. No runtime/test/launcher/Compose/gate source edits.
+Current status: PR_OPEN — the three previously skipped PostgreSQL staging nodes passed 3/3 on exact PR HEAD 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3. Tier-2 remains PARTIAL; served frontend provenance, remaining named browser/Admin specs and the full staging runbook remain open. No runtime/test/launcher/Compose/gate source edits in this evidence checkpoint.
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final
 Branch: codex/aqs-T11-manual-availability
 PR base / `origin/main`: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed (local sync commit `cfe6dfc89`).
-Latest validated runtime source commit: `6522e8c0046d824aaefa31960582ce26f7cef708` (includes the public-catalog parity P2 fix and integration regression). Staging used exact worktree/journal head `d4b2b6244055ae56b9addf6cbfd1ecbb4172016e`; the intervening diff changes only these three T11 journals.
+Latest validated runtime source commit: 6522e8c0046d824aaefa31960582ce26f7cef708 (includes the public-catalog parity P2 fix and integration regression). The three target staging nodes ran against exact PR/worktree HEAD 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3; this checkpoint changes only T11 journals.
 Implementation paths for the new P2: `backend/app/services/queue_svc/_operations.py`, `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, and `backend/tests/integration/test_queue_profile_lifecycle.py`. Preserve pre-existing untracked `.scratch/` and do not stage it.
-Most recent attempt `clinic-aqs-pr3639-tier2e-20261011` was fully torn down and verified with zero containers, volumes, networks, and images; its private env was removed. Corrected ignored helper/logs remain under `output/staging/` for a future retry.
-Last updated: 2026-10-11T07:41:50+05:00
+Latest owned staging run clinic-aqs-pr3639-tier2e-20261011 passed canonical Preflight, Start, Session and all three target PostgreSQL nodes. Teardown verified zero owned containers, volumes, networks and images; the private env was removed. Sanitized JUnit and ignored helper/logs remain under output/staging/.
+Last updated: 2026-10-11T16:23+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -17,9 +17,19 @@ Last updated: 2026-10-11T07:41:50+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | BLOCKED | PR #3639 at `f76220d9`; WSL storage cleared, but Docker preflight timed out while Windows/WSL RAM was low; three PostgreSQL nodes remain NOT_RUN | | EVIDENCE.md#t11-pr-3639-three-node-staging-retry-blocked-by-low-host-memory-2026-10-11 |
+| T11 | PR_OPEN | PR #3639; three Tier-2 PostgreSQL nodes PASS; remaining Tier-2 items and final review unresolved | | EVIDENCE.md#t11-pr-3639-three-skipped-postgresql-staging-nodes-pass-2026-10-11 |
 
-## Current checkpoint — PR #3639 T11 three-node Tier-2 retry blocked by host memory — 2026-10-11T07:42:52+05:00
+## Current checkpoint — PR #3639 T11 three skipped PostgreSQL staging nodes passed — 2026-10-11T16:23+05:00
+
+- Exact tested PR/worktree HEAD: 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3; base: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed. Runtime source under test: 6522e8c0046d824aaefa31960582ce26f7cef708.
+- The approved harness-only narrow_override remained in force. Canonical Preflight, Start and one Session passed; only the three previously skipped PostgreSQL nodes ran, with 3 passed, 0 skipped, 0 failed. JUnit SHA-256: cbe772b21f33377f8f6d6f5f264ae01df4a445693c11e9f0b0905175c31ff30a.
+- The session provisioned an isolated synthetic fallback DB, migrated it to Alembic head, and dropped it. Owned Compose teardown passed; verification found zero containers, volumes, networks or local images. Private env removed.
+- Changed in this checkpoint: T11 PROGRESS.md, EVIDENCE.md, RESUME.md only. No runtime, tests, launcher, Compose, gate/router, production or foreign staging changes.
+- Remaining: served frontend revision provenance (served_revision_verified=false), remaining named browser/Admin live specs, and full docs/runbooks/STAGING_VALIDATION.md are NOT_RUN. Tier-2 remains PARTIAL; no deferral is accepted.
+- Blocker: final review and explicit resolution of remaining Tier-2 requirements. Merge stays on hold.
+- Next exact action: commit/push the three journals, refresh PR #3639 description, verify checks on the resulting exact HEAD, then perform the final code review. Do not merge before those decisions are complete.
+
+## Historical checkpoint — PR #3639 T11 three-node Tier-2 retry blocked by host memory — 2026-10-11T07:42:52+05:00
 
 - Staging ran against code-bearing/journal HEAD `69b81e2735eba7b04cef75662cd98ea6f3410a70`. After teardown, journal-only checkpoint `f76220d95ddd571e4fc9a9925cabba146f04cc0e` was committed/pushed and the PR body refreshed. Current PR #3639 is OPEN/MERGEABLE on HEAD `f76220d95ddd571e4fc9a9925cabba146f04cc0e`, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`; runtime source remains `6522e8c0046d824aaefa31960582ce26f7cef708`.
 - The user freed disk space. At final cleanup C: had 17.17 GiB and WSL backing D: had 13.83 GiB free; this exceeds the 10 GiB build reserve. While the stack was running, Windows available physical RAM fell to 122 MiB and WSL available memory to about 945 MiB. After teardown, Windows recovered to 911 MiB and WSL to 3,234 MiB. Low memory correlated with two canonical Docker timeouts; no OOM or kernel crash was observed.
