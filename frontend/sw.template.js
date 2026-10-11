@@ -196,10 +196,13 @@ async function handleRequest(request) {
       return new Response('Офлайн режим', { status: 503 });
     }
 
-    // Для API запросов возвращаем кэшированный ответ
-    const cachedResponse = await caches.match(request);
-    if (cachedResponse) {
-      return cachedResponse;
+    // Sensitive and publication-sensitive routes must not replay an older
+    // response from Cache Storage after the network-first request failed.
+    if (!isNoCachePath(url.pathname)) {
+      const cachedResponse = await caches.match(request);
+      if (cachedResponse) {
+        return cachedResponse;
+      }
     }
 
     return new Response('Нет подключения к интернету', { status: 503 });

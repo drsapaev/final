@@ -938,6 +938,14 @@ test.describe('Public-site SSR browser layout smoke', () => {
     expect(image.byteLength).toBeGreaterThan(1024);
   }
 
+  test('Vite static root retains the existing Clinic OS landing page', async ({ page }) => {
+    const response = await page.goto('http://localhost:5173/');
+    expect(response?.status()).toBe(200);
+    await expect(page.locator('.landing-shell')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+    await expect(page.locator('.public-site__runtime-message')).toHaveCount(0);
+  });
+
   test('Uzbek home is server-rendered with current synthetic clinic content', async ({ page }) => {
     const response = await page.goto('http://127.0.0.1:5278/');
     expect(response?.status()).toBe(200);
@@ -951,6 +959,7 @@ test.describe('Public-site SSR browser layout smoke', () => {
     expect(await page.locator('html').getAttribute('lang')).toBe('uz-Latn');
     await expect(page.locator('.public-site__hero h1')).toHaveText('SYNTHETIC QA CLINIC');
     await expect(page.locator('a[href="/services/synthetic-service"]').first()).toBeVisible();
+    await expect(page.locator('a[href="/login"]')).toHaveText('Xodimlar uchun kirish');
     await verifyVisibleLayout(page, '.public-site__hero');
   });
 
@@ -1013,6 +1022,7 @@ test.describe('Public-site SSR browser layout smoke', () => {
     expect(html).toContain('rel="canonical" href="http://127.0.0.1:5278/ru/services"');
     expect(html).toContain('hreflang="uz-Latn"');
     await expect(page.locator('main h1')).toHaveText('Услуги');
+    await expect(page.locator('a[href="/login"]')).toHaveText('Вход для персонала');
     await expect(page.locator('a[href="/ru/services/synthetic-service"]').first()).toContainText('Синтетическая тестовая услуга');
     await verifyVisibleLayout(page, '.public-site__section');
   });

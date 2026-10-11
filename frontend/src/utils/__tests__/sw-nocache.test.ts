@@ -11,9 +11,15 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-type SWRequest = { url: string; method?: string };
+type SWRequest = {
+  url: string;
+  method?: string;
+  mode?: string;
+  headers?: { get: (name: string) => string | null };
+};
 
 type SWInternals = {
+  handleRequest: (request: SWRequest) => Promise<Response>;
   networkFirst: (
     request: SWRequest,
     cacheName: string,
@@ -50,7 +56,7 @@ function compileSW(
     'clients',
     'console',
     'fetch',
-    `${code}\nreturn { networkFirst, isNoCachePath, syncClinicData, staticFiles: STATIC_FILES };`,
+    `${code}\nreturn { handleRequest, networkFirst, isNoCachePath, syncClinicData, staticFiles: STATIC_FILES };`,
   );
   return factory(
     { addEventListener: vi.fn(), skipWaiting: vi.fn(), registration: {} },
@@ -115,6 +121,23 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
     await expect(
       sw.networkFirst({ url: 'https://clinic.test/api/v1/payments/test' }, 'DYNAMIC_CACHE'),
     ).rejects.toThrow('offline');
+  });
+
+  it('does not replay a pre-existing auth/me cache entry through the outer offline handler', async () => {
+    const stubs = makeCacheStubs();
+    stubs.caches.match = vi.fn(async () => new Response('private cached profile'));
+    const sw = compileSW(vi.fn(async () => { throw new Error('offline'); }), stubs.caches);
+
+    const response = await sw.handleRequest({
+      url: 'https://clinic.test/api/v1/auth/me',
+      method: 'GET',
+      mode: 'cors',
+      headers: { get: () => null },
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.text()).toBe('Нет подключения к интернету');
+    expect(stubs.caches.match).not.toHaveBeenCalled();
   });
 
   it('isNoCachePath matches every declared denylist pattern and nothing else', () => {

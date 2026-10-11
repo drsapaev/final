@@ -17,6 +17,7 @@ interface Copy {
   doctors: string;
   prices: string;
   contacts: string;
+  staffLogin: string;
   language: string;
   serviceDetails: string;
   doctorDetails: string;
@@ -48,6 +49,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     doctors: 'Врачи',
     prices: 'Цены',
     contacts: 'Контакты',
+    staffLogin: 'Вход для персонала',
     language: 'Язык',
     serviceDetails: 'Информация об услуге',
     doctorDetails: 'Информация о враче',
@@ -77,6 +79,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     doctors: 'Shifokorlar',
     prices: 'Narxlar',
     contacts: 'Kontaktlar',
+    staffLogin: 'Xodimlar uchun kirish',
     language: 'Til',
     serviceDetails: 'Xizmat haqida',
     doctorDetails: 'Shifokor haqida',
@@ -172,6 +175,7 @@ function SiteHeader({ locale, route, copy }: {
         <a href={localizePath('doctors', locale)}>{copy.doctors}</a>
         <a href={localizePath('prices', locale)}>{copy.prices}</a>
         <a href={localizePath('contacts', locale)}>{copy.contacts}</a>
+        <a href="/login">{copy.staffLogin}</a>
       </nav>
       <a className="public-site__language" href={switchPath} aria-label={copy.language}>
         {otherLocale === 'ru' ? 'RU' : 'O‘Z'}

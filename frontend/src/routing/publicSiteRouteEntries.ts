@@ -71,7 +71,9 @@ export const PUBLIC_SITE_ROUTE_ENTRIES = PUBLIC_SITE_ROUTE_DEFINITIONS.map((rout
   nav: false,
   title: 'Doktor KosMed Clinic',
   owner: `public-site.${route.kind}`,
-  component: 'PublicSiteFallback',
+  // Keep the existing Vite-only landing route usable when the app is served
+  // without Nitro. Vercel's Nitro handler still owns public-site SSR routes.
+  component: route.id === 'landing' ? 'Landing' : 'PublicSiteFallback',
   legacyRedirectFrom: [],
   layout: { hideHeader: true, hideSidebar: true, pageTitle: 'Doktor KosMed Clinic' },
 }));
