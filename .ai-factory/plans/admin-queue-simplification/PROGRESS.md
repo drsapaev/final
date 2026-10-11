@@ -9,7 +9,7 @@ PR base / `origin/main`: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed (local sync co
 Latest validated runtime source commit: `6522e8c0046d824aaefa31960582ce26f7cef708` (includes the public-catalog parity P2 fix and integration regression). Staging used exact worktree/journal head `d4b2b6244055ae56b9addf6cbfd1ecbb4172016e`; the intervening diff changes only these three T11 journals.
 Implementation paths for the new P2: `backend/app/services/queue_svc/_operations.py`, `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, and `backend/tests/integration/test_queue_profile_lifecycle.py`. Preserve pre-existing untracked `.scratch/` and do not stage it.
 Most recent attempt `clinic-aqs-pr3639-tier2e-20261011` was fully torn down and verified with zero containers, volumes, networks, and images; its private env was removed. Corrected ignored helper/logs remain under `output/staging/` for a future retry.
-Last updated: 2026-10-11T07:38:55+05:00
+Last updated: 2026-10-11T07:41:50+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -17,11 +17,11 @@ Last updated: 2026-10-11T07:38:55+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | BLOCKED | PR #3639 at `69b81e2`; WSL storage cleared, but Docker preflight timed out while Windows/WSL RAM was low; three PostgreSQL nodes remain NOT_RUN | | EVIDENCE.md#t11-pr-3639-three-node-staging-retry-blocked-by-low-host-memory-2026-10-11 |
+| T11 | BLOCKED | PR #3639 at `f76220d9`; WSL storage cleared, but Docker preflight timed out while Windows/WSL RAM was low; three PostgreSQL nodes remain NOT_RUN | | EVIDENCE.md#t11-pr-3639-three-node-staging-retry-blocked-by-low-host-memory-2026-10-11 |
 
-## Current checkpoint — PR #3639 T11 three-node Tier-2 retry blocked by host memory — 2026-10-11T07:38:31+05:00
+## Current checkpoint — PR #3639 T11 three-node Tier-2 retry blocked by host memory — 2026-10-11T07:42:52+05:00
 
-- PR #3639 is OPEN/MERGEABLE on local/remote HEAD `69b81e2735eba7b04cef75662cd98ea6f3410a70`, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. Runtime-bearing source remains `6522e8c0046d824aaefa31960582ce26f7cef708`; no runtime or tracked test code changed.
+- Staging ran against code-bearing/journal HEAD `69b81e2735eba7b04cef75662cd98ea6f3410a70`. After teardown, journal-only checkpoint `f76220d95ddd571e4fc9a9925cabba146f04cc0e` was committed/pushed and the PR body refreshed. Current PR #3639 is OPEN/MERGEABLE on HEAD `f76220d95ddd571e4fc9a9925cabba146f04cc0e`, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`; runtime source remains `6522e8c0046d824aaefa31960582ce26f7cef708`.
 - The user freed disk space. At final cleanup C: had 17.17 GiB and WSL backing D: had 13.83 GiB free; this exceeds the 10 GiB build reserve. While the stack was running, Windows available physical RAM fell to 122 MiB and WSL available memory to about 945 MiB. After teardown, Windows recovered to 911 MiB and WSL to 3,234 MiB. Low memory correlated with two canonical Docker timeouts; no OOM or kernel crash was observed.
 - Owned project `clinic-aqs-pr3639-tier2e-20261011` ports 18427/18428/55546: canonical Preflight PASS, Start PASS, read-only Check PASS, Stop PASS, and final `scripts/staging_down.ps1` PASS. Exact verification found zero project containers, volumes, networks, and images. Its synthetic env was removed. WSL boot id during the run was `c32ea20c-2615-4336-8562-7a50cd2b0341`.
 - The required nodes remain NOT_RUN: `test_admin_shown_ecg_direction_is_selectable_and_joinable`, `test_clinic_wide_specialist_card_uses_the_profile_selected_for_admission`, and `test_parent_off_removes_selection_and_blocks_direct_qr_join`.
