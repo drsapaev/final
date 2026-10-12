@@ -17,6 +17,7 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Sanitized result artifact: `output/staging/t11-pr3639-tier2f-artifacts/authenticated-browser-cycle-20261012.json`; source reports remain task-local under `output/staging/t11-pr3639-tier2f-pw/`. No credentials, tokens, patient payload, or raw browser log was added to the journals.
 - Actual tracked scope for this checkpoint: only these three T11 journals. Runtime source and tracked tests are unchanged. Stop condition: product-facing responsive overflow and incomplete direction/QR flows require separate source-level review and authorization before any runtime fix.
 - Next exact action: keep PR #3639 on merge hold. Prepare a narrow source fix/review for the viewport overflow and two route failures, then validate affected routes plus public join/archive on a fresh authorized synthetic cycle. Do not accept Tier-2 deferral from these results.
+- Journal publication: the first evidence update was committed as `fce37176b694c8c54f589ff81b9f93186fd2ac77` and pushed normally to the PR branch; standard hooks passed. At the post-push snapshot, that documentation-only HEAD was OPEN/MERGEABLE with merge state BLOCKED, 18 checks passing, 4 pending, 7 skipped, and 0 failures. A later checkpoint update may advance the PR HEAD; recheck before any action.
 
 ## T11 PR #3639 three-node staging retry blocked by low host memory — 2026-10-11T07:38+05:00
 
