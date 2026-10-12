@@ -100,7 +100,7 @@ node bin/archify.mjs doctor
 node bin/archify.mjs demo <output-directory>
 ```
 
-When shell access is unavailable, hand-place architecture SVG into `assets/template.html`, use CSS semantic classes rather than inline colors, and follow the visual review contract in `references/delivery-contract.md`.
+When shell access is unavailable, copy `assets/template.html` into the diagram output folder and edit only that copy; never modify the vendored source template. Hand-place the architecture SVG in the copied template, use CSS semantic classes rather than inline colors, and follow the visual review contract in `references/delivery-contract.md`.
 
 ## Output
 
