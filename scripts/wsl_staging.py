@@ -39,6 +39,7 @@ PUBLIC_ORIGIN_KEYS = (
     "CORS_ORIGINS",
 )
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost"}
+LOOPBACK_BIND_IP = "127.0.0.1"
 INSPECT = (
     '{"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
     '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
@@ -307,8 +308,12 @@ def effective_ports(
             raise GuardError(
                 "PORT_CONTEXT_MISMATCH: resolved Compose ports differ from the selected env"
             )
-        if service == "postgres" and item.get("host_ip") != "127.0.0.1":
-            raise GuardError("POSTGRES_EXPOSED: PostgreSQL must bind to loopback")
+        if item.get("host_ip") != LOOPBACK_BIND_IP:
+            if service == "postgres":
+                raise GuardError("POSTGRES_EXPOSED: PostgreSQL must bind to loopback")
+            raise GuardError(
+                "STAGING_PORT_EXPOSED: published staging services must bind to loopback"
+            )
         ports[service] = port
     if len(set(ports.values())) != len(ports):
         raise GuardError("PORT_COLLISION: staging services must use distinct ports")
@@ -352,12 +357,25 @@ def validate_ownership(
                     "SOURCE_MISMATCH: existing container mounts different source"
                 )
             service = container.get("service")
-            if service in ports and any(
-                int(b["HostPort"]) != ports[service] for b in bindings
-            ):
-                raise GuardError(
-                    "PORT_CONTEXT_MISMATCH: existing project uses different ports"
-                )
+            if service in ports:
+                if len(bindings) != 1:
+                    raise GuardError(
+                        "PORT_CONTEXT_MISMATCH: expected one published binding"
+                    )
+                try:
+                    host_port = int(bindings[0]["HostPort"])
+                except (KeyError, TypeError, ValueError):
+                    raise GuardError(
+                        "PORT_CONTEXT_MISMATCH: invalid published port"
+                    ) from None
+                if host_port != ports[service]:
+                    raise GuardError(
+                        "PORT_CONTEXT_MISMATCH: existing project uses different ports"
+                    )
+                if bindings[0].get("HostIp") != LOOPBACK_BIND_IP:
+                    raise GuardError(
+                        "STAGING_PORT_EXPOSED: existing staging services must bind to loopback"
+                    )
             owned.append(container)
         elif container.get("status") == "running" and any(
             int(b["HostPort"]) in ports.values() for b in bindings

@@ -43,10 +43,14 @@ def compose_config():
     for service, (_, _, target) in guard.PORT_KEYS.items():
         services[service] = {
             "ports": [
-                {"published": str(PORTS[service]), "target": target, "protocol": "tcp"}
+                {
+                    "published": str(PORTS[service]),
+                    "target": target,
+                    "protocol": "tcp",
+                    "host_ip": "127.0.0.1",
+                }
             ]
         }
-    services["postgres"]["ports"][0]["host_ip"] = "127.0.0.1"
     for service in ("backend", "worker"):
         services.setdefault(service, {})["volumes"] = [
             {"type": "bind", "source": LINUX_ROOT + "/backend", "target": "/app"}
@@ -55,6 +59,7 @@ def compose_config():
 
 
 def container(service="backend", *, project=PROJECT, status="running", **changes):
+    target_port = guard.PORT_KEYS[service][2] if service in PORTS else None
     result = {
         "project": project,
         "service": service,
@@ -62,7 +67,11 @@ def container(service="backend", *, project=PROJECT, status="running", **changes
         "files": LINUX_ROOT + "/ops/compose.staging.yml",
         "mounts": [{"Destination": "/app", "Source": LINUX_ROOT + "/backend"}],
         "ports": (
-            {"18000/tcp": [{"HostPort": str(PORTS[service])}]}
+            {
+                f"{target_port}/tcp": [
+                    {"HostIp": "127.0.0.1", "HostPort": str(PORTS[service])}
+                ]
+            }
             if service in PORTS
             else {}
         ),
@@ -639,6 +648,29 @@ def test_effective_ports_rejects_exposed_postgresql():
         guard.effective_ports(config, VALUES, LINUX_ROOT)
 
 
+@pytest.mark.parametrize(
+    "service,host_ip,error_code",
+    [
+        ("backend", "0.0.0.0", "STAGING_PORT_EXPOSED"),
+        ("backend", "::", "STAGING_PORT_EXPOSED"),
+        ("backend", None, "STAGING_PORT_EXPOSED"),
+        ("frontend", "0.0.0.0", "STAGING_PORT_EXPOSED"),
+        ("frontend", "::", "STAGING_PORT_EXPOSED"),
+        ("frontend", None, "STAGING_PORT_EXPOSED"),
+        ("postgres", None, "POSTGRES_EXPOSED"),
+    ],
+)
+def test_effective_ports_rejects_non_loopback_bindings(service, host_ip, error_code):
+    config = compose_config()
+    binding = config["services"][service]["ports"][0]
+    if host_ip is None:
+        binding.pop("host_ip")
+    else:
+        binding["host_ip"] = host_ip
+    with pytest.raises(guard.GuardError, match=error_code):
+        guard.effective_ports(config, VALUES, LINUX_ROOT)
+
+
 @pytest.mark.parametrize("service", ["backend", "worker"])
 def test_effective_config_rejects_foreign_source(service):
     config = compose_config()
@@ -701,6 +733,50 @@ def test_ownership_rejects_changed_existing_mount_and_port():
             PORTS,
         )
     existing = container(ports={"18000/tcp": [{"HostPort": "19002"}]})
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+def test_ownership_accepts_loopback_runtime_binding(service):
+    existing = container(service=service)
+    assert guard.validate_ownership(
+        [existing],
+        PROJECT,
+        LINUX_ROOT,
+        LINUX_ROOT + "/ops/compose.staging.yml",
+        PORTS,
+    ) == [existing]
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize("host_ip", ["0.0.0.0", "::", None])
+def test_ownership_rejects_non_loopback_runtime_bindings(service, host_ip):
+    existing = container(service=service)
+    target_port = guard.PORT_KEYS[service][2]
+    binding = existing["ports"][f"{target_port}/tcp"][0]
+    if host_ip is None:
+        binding.pop("HostIp")
+    else:
+        binding["HostIp"] = host_ip
+    with pytest.raises(guard.GuardError, match="STAGING_PORT_EXPOSED"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+def test_ownership_rejects_missing_runtime_published_binding():
+    existing = container(ports={})
     with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
         guard.validate_ownership(
             [existing],
