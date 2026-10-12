@@ -20,9 +20,9 @@ permissions:
 
 jobs:
   portable-smoke:
-    name: Portable package smoke test
+    name: Portable and browser integration smoke tests
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -31,6 +31,16 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Run portable smoke suite
+      - name: Locate preinstalled Chrome
+        shell: bash
+        run: |
+          chrome_path="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$chrome_path" ]; then
+            echo "Chrome or Chromium is required for the Archify browser integration smoke test." >&2
+            exit 1
+          fi
+          echo "ARCHIFY_CHROME=$chrome_path" >> "$GITHUB_ENV"
+
+      - name: Run package smoke suite
         working-directory: .agents/skills/archify
         run: npm test

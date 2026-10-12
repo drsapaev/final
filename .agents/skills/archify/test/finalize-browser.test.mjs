@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(skillRoot, 'bin/archify.mjs');
 
-test('finalize proves all four gates in real Chrome with bounded mixed-case sidecars and repeat delivery', {
+test('finalize proves all four gates and standalone browser-check in real Chrome', {
   skip: !process.env.ARCHIFY_CHROME,
 }, t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-finalize-browser-'));
@@ -39,4 +39,24 @@ test('finalize proves all four gates in real Chrome with bounded mixed-case side
     assert.equal(fs.readFileSync(captureSentinel, 'utf8'), 'existing capture evidence');
     assert.deepEqual(fs.readdirSync(dir).filter(name => name.endsWith('.png')), ['unrelated.visual-check.light.png']);
   }
+
+  const browserCheckDirectory = path.join(dir, 'standalone-browser-check');
+  fs.mkdirSync(browserCheckDirectory);
+  const browserCheck = spawnSync(process.execPath, [
+    cli, 'browser-check', output, '--json', '--require-provenance', '--out-dir', browserCheckDirectory,
+  ], { cwd: skillRoot, encoding: 'utf8', env: process.env, timeout: 180000 });
+  assert.equal(browserCheck.status, 0, browserCheck.stderr || browserCheck.stdout);
+  const receipt = JSON.parse(browserCheck.stdout);
+  assert.equal(receipt.command, 'browser-check');
+  assert.equal(receipt.status, 'pass');
+  assert.equal(receipt.provenance, 'current');
+  assert.equal(receipt.artifact.path, output);
+  assert.equal(receipt.deliveryReceiptId, JSON.parse(fs.readFileSync(evidence.receipt)).stages.deliver.receipt.receiptId);
+  assert.equal(receipt.containment.status, 'pass');
+  assert.equal(receipt.containment.viewports.length, 4);
+  assert.equal(receipt.themeStates.viewports.length, 6);
+  assert.equal(receipt.captures.status, 'not-requested');
+  assert.deepEqual(receipt.captures.screenshots, []);
+  const standaloneReceiptPath = path.join(browserCheckDirectory, receipt.sidecars.receipt);
+  assert.equal(JSON.parse(fs.readFileSync(standaloneReceiptPath, 'utf8')).status, 'pass');
 });

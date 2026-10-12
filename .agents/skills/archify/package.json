@@ -17,8 +17,9 @@
     "generate:validators": "node scripts/generate-validators.mjs",
     "check:validators": "node scripts/generate-validators.mjs --check",
     "test:portable": "node --test test/portable-smoke.test.mjs",
+    "test:integration": "node --test test/finalize-browser.test.mjs",
     "test:webm": "node test/webm-artifact.smoke.mjs && node --test test/site-language-integration.mjs",
-    "test": "npm run test:portable"
+    "test": "npm run test:portable && npm run test:integration"
   },
   "devDependencies": {
     "ajv": "^8.17.1",
