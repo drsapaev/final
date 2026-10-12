@@ -1,8 +1,8 @@
 {
   "version": 1,
   "description": "UI_AUDIT_PLAN.md Phase 0 baseline. Ratchet: values may only improve (decrease). To move the baseline intentionally run: node scripts/ui-baseline.mjs --write-baseline and justify the change in the PR description.",
-  "generatedAt": "2026-09-24T03:15:01.984Z",
-  "gitCommit": "712ba53f0",
+  "generatedAt": "2026-10-12T19:07:46.741Z",
+  "gitCommit": "9cc7988b",
   "metrics": {
     "tokenSourceFiles": [
       {
@@ -45,7 +45,7 @@
     "tokenSourceFileCount": 9,
     "tokenFamilies": {
       "admin": 1,
-      "other": 165,
+      "other": 170,
       "surface": 7,
       "text-legacy": 10,
       "mac": 133,
@@ -62,12 +62,11 @@
       "theme/tokens-legacy.ts": -1,
       "theme/tokens/ dir": 1
     },
-    "undefinedVarNameCount": 152,
-    "undefinedVarUsages": 273,
+    "undefinedVarNameCount": 149,
+    "undefinedVarUsages": 265,
     "undefinedVarNames": [
       "--accent",
       "--admin-ai",
-      "--admin-banner-border",
       "--admin-bd-c1",
       "--admin-bd-c2",
       "--admin-bd1",
@@ -81,7 +80,6 @@
       "--admin-bsh",
       "--admin-bsh1",
       "--admin-bsh2",
-      "--admin-btn-color",
       "--admin-col",
       "--admin-col2",
       "--admin-col3",
@@ -127,6 +125,7 @@
       "--admin-radius",
       "--admin-right",
       "--admin-span",
+      "--admin-span-color",
       "--admin-ta",
       "--admin-tab-bg",
       "--admin-tab-fw",
@@ -167,7 +166,6 @@
       "--mac-bg-elev-1",
       "--mac-bg-hover",
       "--mac-bg-page",
-      "--mac-blue-600",
       "--mac-border-hover",
       "--mac-danger-600",
       "--mac-danger-bg",
@@ -195,7 +193,6 @@
       "--mac-shadow-color",
       "--mac-shadow-xs",
       "--mac-spacing-md",
-      "--mac-surface",
       "--mac-surface-secondary",
       "--mac-text-disabled",
       "--mac-text-inverse",
@@ -218,13 +215,13 @@
       "--warning-border",
       "--warning-text"
     ],
-    "varUsagesTotal": 12701,
-    "varUsagesNoFallback": 11366,
+    "varUsagesTotal": 12823,
+    "varUsagesNoFallback": 11230,
     "cssHexOutsideTokens": 743,
-    "tsxHex": 384,
-    "tsxHexFiles": 64,
-    "inlineStyles": 2471,
-    "inlineStyleFiles": 213,
+    "tsxHex": 380,
+    "tsxHexFiles": 65,
+    "inlineStyles": 2241,
+    "inlineStyleFiles": 206,
     "cssImportant": 309,
     "tsxImportant": 47,
     "modalFilesOutsideKit": [
@@ -253,17 +250,17 @@
       "src/hooks/useModal.tsx"
     ],
     "modalFilesOutsideKitCount": 23,
-    "kitModalImporters": 15,
-    "kitDialogImporters": 14,
+    "kitModalImporters": 16,
+    "kitDialogImporters": 12,
     "reactToastifyImporters": 45,
-    "notifyServiceImporters": 58,
+    "notifyServiceImporters": 56,
     "customToastProviderImporters": 3,
     "macTabImporters": 7,
     "modernTabsImporters": 0,
     "tablistRoles": 7,
     "macEmptyStateImporters": 0,
-    "appEmptyImporters": 43,
-    "appLoadingImporters": 9,
+    "appEmptyImporters": 44,
+    "appLoadingImporters": 11,
     "stateWrapperImporters": 2,
     "breakpointsUnique": [
       360,
@@ -420,7 +417,7 @@
     "a11yCssImported": false,
     "cssFilesWithDarkSelectors": 13,
     "prefersSchemeRootBlocks": 2,
-    "isDarkBranches": 105,
+    "isDarkBranches": 104,
     "inlineStyleAttributePatches": 57
   }
 }
