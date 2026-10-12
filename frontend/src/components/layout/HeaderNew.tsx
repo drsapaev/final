@@ -796,7 +796,7 @@ export default function HeaderNew() {
 
 
   return (
-    <header className="app-header" style={headerStyle}>
+    <header className="app-header" data-role={roleNormalized} style={headerStyle}>
       <div className="hdr-left" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {backButton}
         {brand}

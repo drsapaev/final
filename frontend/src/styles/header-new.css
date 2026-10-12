@@ -123,6 +123,52 @@ html {
     overflow-x: auto;
     scrollbar-width: none;
   }
+
+  /* Admin pages need the full command/search surface at narrow widths, but
+     the intrinsic brand + controls columns can exceed the viewport even
+     after the center navigation starts panning. Stack the existing regions
+     inside the header so document scrolling stays within the page width. */
+  .app-header[data-role="admin"] {
+    display: flex !important;
+    flex-wrap: wrap;
+    row-gap: 8px !important;
+    height: auto !important;
+    min-height: 54px;
+    padding: 8px 12px !important;
+  }
+
+  .app-header[data-role="admin"] > .hdr-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-header[data-role="admin"] > .hdr-center {
+    flex: 1 0 100%;
+    order: 2;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-header[data-role="admin"] > .hdr-right {
+    flex: 1 0 100%;
+    order: 3;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: flex-end;
+  }
+
+  .app-header[data-role="admin"] .hdr-controls {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap !important;
+    justify-content: flex-end;
+    white-space: normal !important;
+  }
+
+  .app-header[data-role="admin"] .hdr-controls > [aria-hidden="true"] {
+    display: none;
+  }
 }
 
 /* P1-1: roleNav label collapse (Кассир link + CTA text). Measured on main
