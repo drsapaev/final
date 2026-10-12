@@ -80,6 +80,7 @@ secrets/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+.archify/
 
 # Agent skills CLI (machine-specific local symlinks, not shareable)
 .zcode/

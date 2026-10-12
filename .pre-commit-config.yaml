@@ -4,6 +4,7 @@ repos:
     hooks:
       - id: check-added-large-files
         args: ['--maxkb=300']
+        exclude: '^\.agents/skills/archify/(assets/template\.html|renderers/shared/generated-validators\.mjs)$'
       - id: check-merge-conflict
       - id: detect-private-key
       - id: check-yaml
