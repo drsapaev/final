@@ -84,17 +84,19 @@ Both scripts detect whether `docker.exe` exists on Windows PATH and
 otherwise wrap `wsl -d Ubuntu-24.04 -- docker`, converting paths.
 
 Current local staging uses backend `127.0.0.1:18001`, frontend
-`127.0.0.1:18080`, and Postgres `127.0.0.1:55432`. Windows production uses
-backend `:18000`. Set `STAGING_BACKEND_PORT=18001` (or another free port)
-and `STAGING_POSTGRES_HOST_PORT=55432` explicitly in the untracked staging
-env file before starting Compose. The sample and Compose backend fallback
-now both use `18001`; the sample Postgres port is `15432`, while the current
-local staging contour uses `55432`. Check the effective project name and
-port bindings with the helper's compact result, then check staging backend health at
-`http://127.0.0.1:18001/api/v1/health`. Do not print the env file or
-interpolated Compose configuration into logs because it contains secrets.
-Postgres is loopback-bound; the current Compose file publishes backend and
-frontend host ports on all interfaces, so verify intended LAN access.
+`127.0.0.1:18080`, and a loopback-bound Postgres port. Windows production uses
+backend `:18000`. Compose binds the staging Postgres, backend, and frontend
+host ports to `127.0.0.1`; the app ports are not available to LAN clients.
+Set `STAGING_BACKEND_PORT=18001` (or another free port) and
+`STAGING_POSTGRES_HOST_PORT` explicitly in the untracked staging env file before
+starting Compose. The sample Postgres port is `15432`; the current local
+staging contour may use `55432`. Keep the sample's public host, base URL,
+WebSocket URL/host, and CORS origins aligned with the loopback frontend address
+and its selected port. Check the effective project name and port bindings with
+the helper's compact result, then check staging backend health at
+`http://127.0.0.1:18001/api/v1/health`. The helper also checks access from
+Windows through WSL forwarding. Do not print the env file or interpolated
+Compose configuration into logs because it contains secrets.
 
 Use synthetic staging fixtures only. Never restore or copy production
 patient data into this environment. Role-by-role checks live in

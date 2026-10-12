@@ -31,6 +31,14 @@ PORT_KEYS = {
     "frontend": ("STAGING_FRONTEND_PORT", 18080, 80),
     "postgres": ("STAGING_POSTGRES_HOST_PORT", 55432, 5432),
 }
+PUBLIC_ORIGIN_KEYS = (
+    "STAGING_PUBLIC_HOST",
+    "STAGING_PUBLIC_BASE_URL",
+    "STAGING_PUBLIC_WS_URL",
+    "STAGING_PUBLIC_WS_HOST",
+    "CORS_ORIGINS",
+)
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost"}
 INSPECT = (
     '{"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
     '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
@@ -150,7 +158,11 @@ def context_values(path: Path) -> dict[str, str]:
         raise GuardError(
             "ENV_MISSING: prepare an ignored synthetic staging env in this worktree"
         )
-    keys = {"COMPOSE_PROJECT_NAME", *(v[0] for v in PORT_KEYS.values())}
+    keys = {
+        "COMPOSE_PROJECT_NAME",
+        *(v[0] for v in PORT_KEYS.values()),
+        *PUBLIC_ORIGIN_KEYS,
+    }
     values = {}
     for line in path.read_text(encoding="utf-8-sig").splitlines():
         match = re.match(r"^\s*([A-Z_]+)\s*=\s*(.*?)\s*$", line)
@@ -178,6 +190,95 @@ def context_values(path: Path) -> dict[str, str]:
             "PROJECT_REQUIRED: set an explicit unique COMPOSE_PROJECT_NAME"
         )
     return values
+
+
+def validate_public_origins(values: dict[str, str], frontend_port: int) -> None:
+    """Reject stale public/client origins before a staging runtime action."""
+    if any(not values.get(key) for key in PUBLIC_ORIGIN_KEYS):
+        raise GuardError(
+            "PUBLIC_ORIGIN_REQUIRED: configure every staging public origin explicitly"
+        )
+
+    public_host = values["STAGING_PUBLIC_HOST"].casefold()
+    if public_host not in LOOPBACK_HOSTS:
+        raise GuardError("PUBLIC_HOST_INVALID: staging public host must be loopback")
+
+    def origin_parts(value: str, scheme: str, *, allow_root_path: bool):
+        if any(char in value for char in "\r\n\t"):
+            return None
+        try:
+            parsed = urlsplit(value)
+            port = parsed.port
+        except ValueError:
+            return None
+        allowed_paths = ("", "/") if allow_root_path else ("",)
+        host = parsed.hostname.casefold() if parsed.hostname else None
+        if (
+            parsed.scheme.casefold() != scheme
+            or host not in LOOPBACK_HOSTS
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in allowed_paths
+            or parsed.query
+            or parsed.fragment
+            or "?" in value
+            or "#" in value
+        ):
+            return None
+        return host, port
+
+    def require_public_origin(key: str, scheme: str) -> None:
+        parts = origin_parts(values[key], scheme, allow_root_path=True)
+        if parts is None:
+            raise GuardError("PUBLIC_ORIGIN_INVALID: staging origins must use loopback")
+        host, port = parts
+        if host != public_host or port != frontend_port:
+            raise GuardError(
+                "PUBLIC_ORIGIN_CONTEXT_MISMATCH: staging origins must match the frontend host and port"
+            )
+
+    require_public_origin("STAGING_PUBLIC_BASE_URL", "http")
+    require_public_origin("STAGING_PUBLIC_WS_URL", "ws")
+
+    try:
+        ws_host = urlsplit("//" + values["STAGING_PUBLIC_WS_HOST"])
+        ws_host_port = ws_host.port
+    except ValueError:
+        raise GuardError(
+            "PUBLIC_ORIGIN_INVALID: WebSocket host must be host:port"
+        ) from None
+    parsed_ws_host = ws_host.hostname.casefold() if ws_host.hostname else None
+    if (
+        parsed_ws_host not in LOOPBACK_HOSTS
+        or ws_host.username is not None
+        or ws_host.password is not None
+        or ws_host.path
+        or ws_host.query
+        or ws_host.fragment
+        or any(
+            char in values["STAGING_PUBLIC_WS_HOST"] for char in "\r\n\t/?#"
+        )
+    ):
+        raise GuardError("PUBLIC_ORIGIN_INVALID: WebSocket host must be loopback host:port")
+    if parsed_ws_host != public_host or ws_host_port != frontend_port:
+        raise GuardError(
+            "PUBLIC_ORIGIN_CONTEXT_MISMATCH: WebSocket host must match the frontend host and port"
+        )
+
+    cors_origins = values["CORS_ORIGINS"].split(",")
+    if not cors_origins or any(not origin.strip() for origin in cors_origins):
+        raise GuardError(
+            "PUBLIC_ORIGIN_INVALID: CORS origins must be non-empty loopback origins"
+        )
+    for origin in cors_origins:
+        parts = origin_parts(origin.strip(), "http", allow_root_path=False)
+        if parts is None:
+            raise GuardError("PUBLIC_ORIGIN_INVALID: CORS origins must use loopback")
+        _, port = parts
+        if port != frontend_port:
+            raise GuardError(
+                "PUBLIC_ORIGIN_CONTEXT_MISMATCH: CORS origins must match the frontend port"
+            )
 
 
 def effective_ports(
@@ -677,6 +778,8 @@ class WslStaging:
         self.host_storage(build_possible=build_possible, recovery=args.action == "stop")
         with self.keeper() as keeper:
             self.preflight()
+            if args.action != "stop":
+                validate_public_origins(self.values, self.ports["frontend"])
             if args.action != "stop":
                 self.linux_storage(build_possible=build_possible)
             boot = self.summary["boot_id"]
