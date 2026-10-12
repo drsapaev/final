@@ -1,0 +1,46 @@
+name: Archify Skill Smoke Test
+
+on:
+  pull_request:
+    paths:
+      - '.agents/skills/archify/**'
+      - '.github/workflows/archify-skill.yml'
+      - '.gitignore'
+  push:
+    branches:
+      - main
+    paths:
+      - '.agents/skills/archify/**'
+      - '.github/workflows/archify-skill.yml'
+      - '.gitignore'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-smoke:
+    name: Portable and browser integration smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      - name: Locate preinstalled Chrome
+        shell: bash
+        run: |
+          chrome_path="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$chrome_path" ]; then
+            echo "Chrome or Chromium is required for the Archify browser integration smoke test." >&2
+            exit 1
+          fi
+          echo "ARCHIFY_CHROME=$chrome_path" >> "$GITHUB_ENV"
+
+      - name: Run package smoke suite
+        working-directory: .agents/skills/archify
+        run: npm test

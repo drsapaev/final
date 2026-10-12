@@ -22,10 +22,10 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
-    
+
     /* Screenshot on failure */
     screenshot: 'only-on-failure',
-    
+
     /* Video on failure */
     video: 'retain-on-failure',
   },
@@ -74,9 +74,17 @@ export default defineConfig({
       // frontend https://clinic.example.com + API https://api.clinic.example.com
       // — same-site, cross-origin) where the CSRF double-submit cookie only
       // travels when XHRs are sent with withCredentials: true.
-      command: 'VITE_API_BASE_URL=http://localhost:5999 npm run dev -- --port 5199 --strictPort',
+      command: process.platform === 'win32'
+        ? 'node -e "process.env.VITE_API_BASE_URL=\'http://localhost:5999\'; import(\'vite\').then(async ({createServer})=>{const server=await createServer({server:{host:\'localhost\',port:5199,strictPort:true}}); await server.listen();})"'
+        : 'VITE_API_BASE_URL=http://localhost:5999 npm run dev -- --port 5199 --strictPort',
       url: 'http://localhost:5199',
       reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: 'node e2e/support/public-site-ssr.mjs',
+      url: 'http://127.0.0.1:5278/',
+      reuseExistingServer: false,
+      timeout: 180_000,
     },
   ],
 });

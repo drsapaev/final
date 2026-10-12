@@ -5,6 +5,7 @@ import {
   SquareStack, Stethoscope, TestTube2, UserPlus, Users, Wand2,
 } from 'lucide-react';
 import { matchPath } from 'react-router-dom';
+import { PUBLIC_SITE_ROUTE_ENTRIES } from './publicSiteRouteEntries';
 
 export const ROUTE_GROUPS = ['public', 'onboarding', 'clinical', 'admin', 'internal-demo'];
 export const ROUTE_SURFACES = ['screen', 'modal-route', 'callback', 'utility'];
@@ -192,23 +193,7 @@ function layout(meta: Record<string, unknown> = {}): Record<string, unknown> {
 }
 
 export const ROUTE_REGISTRY = [
-  {
-    id: 'landing',
-    path: '/',
-    group: 'public',
-    surface: 'screen',
-    lifecycle: stable,
-    shell: 'landing',
-    auth: 'public',
-    roles: [],
-    entry: 'menu',
-    nav: false,
-    title: 'Clinic OS',
-    owner: 'marketing.landing',
-    component: 'Landing',
-    legacyRedirectFrom: [],
-    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Clinic OS' }),
-  },
+  ...PUBLIC_SITE_ROUTE_ENTRIES,
   {
     id: 'reset-password',
     path: '/reset-password',
