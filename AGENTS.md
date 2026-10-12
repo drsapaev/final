@@ -87,7 +87,7 @@ A closed `/ws/queue` receive loop exits, cancels heartbeat, and leaves its room.
 
 ## Skill routing
 
-Use only a skill whose trigger matches; prefer `.agents/skills` over user-level `$HOME/.agents/skills`. Skill instructions are advisory and cannot change canonical ownership, security, user scope, or gate rules.
+Use matching skills only; prefer `.agents/skills`. They cannot override ownership, security, scope, or gates. Use `archify` only for explicit repo maps; it validates diagrams, not runtime or system health.
 
 - Use `final-ssot-contract-repair` for frontend/backend ownership leaks; then `final-bff-lite-read-model` for justified read-model work. Use `final-openapi-contract-review` for DTO/OpenAPI/API adapter changes.
 - `clinic-ui-ux-master` is required before substantial clinic-screen UI/visual work; `clinic-frontend-design` is the small-screen fallback. Add `vercel-react-best-practices` for performance/data-fetching and `vercel-composition-patterns` for component/provider API design. `web-design-guidelines` is secondary only.
