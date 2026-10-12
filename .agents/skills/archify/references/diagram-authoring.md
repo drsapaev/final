@@ -2,6 +2,8 @@
 
 Read this reference only when the user requests a visual diagram or a diagram materially helps communicate the relationships. The type router is in [SKILL.md](../SKILL.md#type-router); then follow only the authoring steps and supporting references that apply.
 
+For any diagram that makes claims about this repository, read [Repository authoring](repository-authoring.md) before tracing behavior or drafting the candidate. Ground claimed relationships in current source and focused tests.
+
 Run commands from your working directory. Unless the user names another location, give each new diagram request its own folder `.archify/<type>-<slug>-<YYYYMMDD-HHMMSS>/` there (local time, chosen once when the request starts): keep `candidate.json` and `<slug>.html` in it, set `meta.output` to that relative HTML path, and reuse the folder for every repair rerun. A later request gets a new folder, so earlier versions stay intact. Replace `bin/archify.mjs` in the commands below with the installed package's absolute path, or its path relative to your working directory; input and output paths resolve from that working directory.
 
 ## Existing candidate handoff
