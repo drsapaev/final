@@ -30,6 +30,11 @@ VALUES = {
     "STAGING_BACKEND_PORT": "19001",
     "STAGING_FRONTEND_PORT": "19080",
     "STAGING_POSTGRES_HOST_PORT": "55441",
+    "STAGING_PUBLIC_HOST": "127.0.0.1",
+    "STAGING_PUBLIC_BASE_URL": "http://127.0.0.1:19080",
+    "STAGING_PUBLIC_WS_URL": "ws://127.0.0.1:19080",
+    "STAGING_PUBLIC_WS_HOST": "127.0.0.1:19080",
+    "CORS_ORIGINS": "http://127.0.0.1:19080,http://localhost:19080",
 }
 
 
@@ -508,6 +513,80 @@ def test_local_file_prevents_escape_and_keeps_spaces(tmp_path):
 
 def test_effective_ports_accepts_canonical_worktree_bindings():
     assert guard.effective_ports(compose_config(), VALUES, LINUX_ROOT) == PORTS
+
+
+def test_public_origins_accept_loopback_aliases_on_frontend_port():
+    assert guard.validate_public_origins(VALUES, PORTS["frontend"]) is None
+
+
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("STAGING_PUBLIC_HOST", "example.invalid"),
+        ("STAGING_PUBLIC_BASE_URL", "http://example.invalid:19080"),
+        ("STAGING_PUBLIC_BASE_URL", "http://127.0.0.1:19081"),
+        ("STAGING_PUBLIC_BASE_URL", "http://localhost:19080"),
+        ("STAGING_PUBLIC_BASE_URL", "http://127.0.0.1:19080?"),
+        ("STAGING_PUBLIC_WS_URL", "ws://example.invalid:19080"),
+        ("STAGING_PUBLIC_WS_URL", "ws://127.0.0.1:19081"),
+        ("STAGING_PUBLIC_WS_HOST", "example.invalid:19080"),
+        ("STAGING_PUBLIC_WS_HOST", "127.0.0.1:19081"),
+        ("STAGING_PUBLIC_WS_HOST", "127.0.0.1:19080#"),
+        (
+            "CORS_ORIGINS",
+            "http://127.0.0.1:19080,http://example.invalid:19080",
+        ),
+        ("CORS_ORIGINS", "http://localhost:19081"),
+        ("CORS_ORIGINS", "http://localhost:19080#"),
+    ],
+)
+def test_public_origins_reject_stale_or_mismatched_values(key, value):
+    values = VALUES.copy()
+    values[key] = value
+    with pytest.raises(guard.GuardError, match="PUBLIC_") as error:
+        guard.validate_public_origins(values, PORTS["frontend"])
+    assert value not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "key", guard.PUBLIC_ORIGIN_KEYS
+)
+def test_public_origins_require_all_context_values(key):
+    values = VALUES.copy()
+    del values[key]
+    with pytest.raises(guard.GuardError, match="PUBLIC_ORIGIN_REQUIRED"):
+        guard.validate_public_origins(values, PORTS["frontend"])
+
+
+@pytest.mark.parametrize("action", ["preflight", "start"])
+def test_preflight_rejects_stale_public_origin_before_compose_mutation(
+    session, monkeypatch, action
+):
+    staging, keeper = session
+    staging.values["STAGING_PUBLIC_BASE_URL"] = "http://example.invalid:19080"
+    monkeypatch.setattr(
+        staging,
+        "compose_command",
+        lambda *a, **k: pytest.fail("stale public origin must stop before Compose"),
+    )
+    with pytest.raises(guard.GuardError, match="PUBLIC_"):
+        staging.execute(args(action))
+    assert keeper.stdin.closed and keeper.waited
+
+
+def test_stop_remains_available_when_public_origin_is_stale(session, monkeypatch):
+    staging, keeper = session
+    staging.values["STAGING_PUBLIC_BASE_URL"] = "http://example.invalid:19080"
+    calls = []
+    monkeypatch.setattr(
+        staging,
+        "compose_command",
+        lambda *a, **k: calls.append((a, k)),
+    )
+    result = staging.execute(args("stop"))
+    assert result["result"] == "PASS"
+    assert calls == [(('down',), {"timeout": 180})]
+    assert keeper.stdin.closed and keeper.waited
 
 
 @pytest.mark.parametrize("port", [18000, 5173, 5432, 1023, 65536])
