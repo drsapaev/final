@@ -39,12 +39,14 @@ PUBLIC_ORIGIN_KEYS = (
     "CORS_ORIGINS",
 )
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost"}
+LOOPBACK_BIND_IP = "127.0.0.1"
 INSPECT = (
     '{"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
     '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
     '"root":{{json (index .Config.Labels "com.docker.compose.project.working_dir")}},'
     '"files":{{json (index .Config.Labels "com.docker.compose.project.config_files")}},'
     '"mounts":{{json .Mounts}},"ports":{{json .NetworkSettings.Ports}},'
+    '"host_port_bindings":{{json .HostConfig.PortBindings}},'
     '"image":{{json .Image}},'
     '"status":{{json .State.Status}},'
     '"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}}}'
@@ -282,7 +284,11 @@ def validate_public_origins(values: dict[str, str], frontend_port: int) -> None:
 
 
 def effective_ports(
-    config: dict, values: dict[str, str], linux_root: str
+    config: dict,
+    values: dict[str, str],
+    linux_root: str,
+    *,
+    stop_recovery: bool = False,
 ) -> dict[str, int]:
     ports = {}
     for service, (key, default, target) in PORT_KEYS.items():
@@ -307,8 +313,12 @@ def effective_ports(
             raise GuardError(
                 "PORT_CONTEXT_MISMATCH: resolved Compose ports differ from the selected env"
             )
-        if service == "postgres" and item.get("host_ip") != "127.0.0.1":
-            raise GuardError("POSTGRES_EXPOSED: PostgreSQL must bind to loopback")
+        if not stop_recovery and item.get("host_ip") != LOOPBACK_BIND_IP:
+            if service == "postgres":
+                raise GuardError("POSTGRES_EXPOSED: PostgreSQL must bind to loopback")
+            raise GuardError(
+                "STAGING_PORT_EXPOSED: published staging services must bind to loopback"
+            )
         ports[service] = port
     if len(set(ports.values())) != len(ports):
         raise GuardError("PORT_COLLISION: staging services must use distinct ports")
@@ -327,15 +337,43 @@ def effective_ports(
 
 
 def validate_ownership(
-    containers: list[dict], project: str, root: str, compose: str, ports: dict[str, int]
+    containers: list[dict],
+    project: str,
+    root: str,
+    compose: str,
+    ports: dict[str, int],
+    *,
+    enforce_port_bindings: bool = True,
 ) -> list[dict]:
     owned = []
+
+    def validate_bindings(mapping: dict | None, service: str) -> None:
+        expected_key = f"{PORT_KEYS[service][2]}/tcp"
+        if not isinstance(mapping, dict) or set(mapping) != {expected_key}:
+            raise GuardError(
+                "PORT_CONTEXT_MISMATCH: expected the configured container TCP port"
+            )
+        bindings = mapping[expected_key]
+        if not isinstance(bindings, list) or len(bindings) != 1:
+            raise GuardError(
+                "PORT_CONTEXT_MISMATCH: expected one published binding"
+            )
+        try:
+            host_port = int(bindings[0]["HostPort"])
+        except (KeyError, TypeError, ValueError):
+            raise GuardError(
+                "PORT_CONTEXT_MISMATCH: invalid published port"
+            ) from None
+        if host_port != ports[service]:
+            raise GuardError(
+                "PORT_CONTEXT_MISMATCH: existing project uses different ports"
+            )
+        if bindings[0].get("HostIp") != LOOPBACK_BIND_IP:
+            raise GuardError(
+                "STAGING_PORT_EXPOSED: existing staging services must bind to loopback"
+            )
+
     for container in containers:
-        bindings = [
-            b
-            for group in (container.get("ports") or {}).values()
-            for b in (group or [])
-        ]
         if container.get("project") == project:
             if (
                 container.get("root") != root + "/ops"
@@ -352,19 +390,25 @@ def validate_ownership(
                     "SOURCE_MISMATCH: existing container mounts different source"
                 )
             service = container.get("service")
-            if service in ports and any(
-                int(b["HostPort"]) != ports[service] for b in bindings
-            ):
-                raise GuardError(
-                    "PORT_CONTEXT_MISMATCH: existing project uses different ports"
-                )
+            if enforce_port_bindings and service in ports:
+                # NetworkSettings.Ports reflects active publications and is empty
+                # on stopped containers. HostConfig.PortBindings preserves the
+                # configured binding in both states and is always authoritative
+                # for a container that may be started again.
+                validate_bindings(container.get("host_port_bindings"), service)
+                if container.get("status") == "running":
+                    validate_bindings(container.get("ports"), service)
             owned.append(container)
-        elif container.get("status") == "running" and any(
-            int(b["HostPort"]) in ports.values() for b in bindings
-        ):
-            raise GuardError(
-                "FOREIGN_PORT: a selected port belongs to another Docker project; preserve it"
-            )
+        elif enforce_port_bindings and container.get("status") == "running":
+            bindings = [
+                binding
+                for group in (container.get("ports") or {}).values()
+                for binding in (group or [])
+            ]
+            if any(int(binding["HostPort"]) in ports.values() for binding in bindings):
+                raise GuardError(
+                    "FOREIGN_PORT: a selected port belongs to another Docker project; preserve it"
+                )
     return owned
 
 
@@ -649,7 +693,7 @@ class WslStaging:
                     f"WSL_DISK_LOW: root or Docker storage needs {reserve} GiB free; recover space before staging"
                 )
 
-    def preflight(self) -> list[dict]:
+    def preflight(self, *, stop_recovery: bool = False) -> list[dict]:
         main = Path(
             native(
                 [
@@ -699,28 +743,36 @@ class WslStaging:
             raise GuardError(
                 "PROJECT_CONTEXT_MISMATCH: effective Compose project differs"
             )
-        self.ports = effective_ports(config, self.values, self.linux_root)
+        self.ports = effective_ports(
+            config,
+            self.values,
+            self.linux_root,
+            stop_recovery=stop_recovery,
+        )
         self.summary["ports"] = self.ports
-        validate_windows_listeners(self.ports)
+        if not stop_recovery:
+            validate_windows_listeners(self.ports)
         owned = validate_ownership(
             self.containers(),
             self.project,
             self.linux_root,
             self.linux_compose,
             self.ports,
+            enforce_port_bindings=not stop_recovery,
         )
-        owned_ports = {
-            int(b["HostPort"])
-            for c in owned
-            if c.get("status") == "running"
-            for group in (c.get("ports") or {}).values()
-            for b in group or []
-        }
-        for port in self.ports.values():
-            if tcp_ready(port) and port not in owned_ports:
-                raise GuardError(
-                    "HOST_PORT: selected Windows port is already in use outside this project"
-                )
+        if not stop_recovery:
+            owned_ports = {
+                int(b["HostPort"])
+                for c in owned
+                if c.get("status") == "running"
+                for group in (c.get("ports") or {}).values()
+                for b in group or []
+            }
+            for port in self.ports.values():
+                if tcp_ready(port) and port not in owned_ports:
+                    raise GuardError(
+                        "HOST_PORT: selected Windows port is already in use outside this project"
+                    )
         free = None
         if not getattr(self, "storage_recovery", False):
             free = self.summary.get("host_disk_free_gib")
@@ -777,7 +829,7 @@ class WslStaging:
         build_possible = args.action in {"start", "session"} and not args.no_build
         self.host_storage(build_possible=build_possible, recovery=args.action == "stop")
         with self.keeper() as keeper:
-            self.preflight()
+            self.preflight(stop_recovery=args.action == "stop")
             if args.action != "stop":
                 validate_public_origins(self.values, self.ports["frontend"])
             if args.action != "stop":
