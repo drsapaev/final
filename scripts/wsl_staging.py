@@ -46,6 +46,7 @@ INSPECT = (
     '"root":{{json (index .Config.Labels "com.docker.compose.project.working_dir")}},'
     '"files":{{json (index .Config.Labels "com.docker.compose.project.config_files")}},'
     '"mounts":{{json .Mounts}},"ports":{{json .NetworkSettings.Ports}},'
+    '"host_port_bindings":{{json .HostConfig.PortBindings}},'
     '"image":{{json .Image}},'
     '"status":{{json .State.Status}},'
     '"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}}}'
@@ -335,12 +336,33 @@ def validate_ownership(
     containers: list[dict], project: str, root: str, compose: str, ports: dict[str, int]
 ) -> list[dict]:
     owned = []
-    for container in containers:
+
+    def validate_bindings(mapping: dict | None, service: str) -> None:
         bindings = [
-            b
-            for group in (container.get("ports") or {}).values()
-            for b in (group or [])
+            binding
+            for group in (mapping or {}).values()
+            for binding in (group or [])
         ]
+        if len(bindings) != 1:
+            raise GuardError(
+                "PORT_CONTEXT_MISMATCH: expected one published binding"
+            )
+        try:
+            host_port = int(bindings[0]["HostPort"])
+        except (KeyError, TypeError, ValueError):
+            raise GuardError(
+                "PORT_CONTEXT_MISMATCH: invalid published port"
+            ) from None
+        if host_port != ports[service]:
+            raise GuardError(
+                "PORT_CONTEXT_MISMATCH: existing project uses different ports"
+            )
+        if bindings[0].get("HostIp") != LOOPBACK_BIND_IP:
+            raise GuardError(
+                "STAGING_PORT_EXPOSED: existing staging services must bind to loopback"
+            )
+
+    for container in containers:
         if container.get("project") == project:
             if (
                 container.get("root") != root + "/ops"
@@ -358,31 +380,24 @@ def validate_ownership(
                 )
             service = container.get("service")
             if service in ports:
-                if len(bindings) != 1:
-                    raise GuardError(
-                        "PORT_CONTEXT_MISMATCH: expected one published binding"
-                    )
-                try:
-                    host_port = int(bindings[0]["HostPort"])
-                except (KeyError, TypeError, ValueError):
-                    raise GuardError(
-                        "PORT_CONTEXT_MISMATCH: invalid published port"
-                    ) from None
-                if host_port != ports[service]:
-                    raise GuardError(
-                        "PORT_CONTEXT_MISMATCH: existing project uses different ports"
-                    )
-                if bindings[0].get("HostIp") != LOOPBACK_BIND_IP:
-                    raise GuardError(
-                        "STAGING_PORT_EXPOSED: existing staging services must bind to loopback"
-                    )
+                # NetworkSettings.Ports reflects active publications and is empty
+                # on stopped containers. HostConfig.PortBindings preserves the
+                # configured binding in both states and is always authoritative
+                # for a container that may be started again.
+                validate_bindings(container.get("host_port_bindings"), service)
+                if container.get("status") == "running":
+                    validate_bindings(container.get("ports"), service)
             owned.append(container)
-        elif container.get("status") == "running" and any(
-            int(b["HostPort"]) in ports.values() for b in bindings
-        ):
-            raise GuardError(
-                "FOREIGN_PORT: a selected port belongs to another Docker project; preserve it"
-            )
+        elif container.get("status") == "running":
+            bindings = [
+                binding
+                for group in (container.get("ports") or {}).values()
+                for binding in (group or [])
+            ]
+            if any(int(binding["HostPort"]) in ports.values() for binding in bindings):
+                raise GuardError(
+                    "FOREIGN_PORT: a selected port belongs to another Docker project; preserve it"
+                )
     return owned
 
 

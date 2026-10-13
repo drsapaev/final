@@ -60,21 +60,23 @@ def compose_config():
 
 def container(service="backend", *, project=PROJECT, status="running", **changes):
     target_port = guard.PORT_KEYS[service][2] if service in PORTS else None
+    configured_bindings = (
+        {
+            f"{target_port}/tcp": [
+                {"HostIp": "127.0.0.1", "HostPort": str(PORTS[service])}
+            ]
+        }
+        if service in PORTS
+        else {}
+    )
     result = {
         "project": project,
         "service": service,
         "root": LINUX_ROOT + "/ops",
         "files": LINUX_ROOT + "/ops/compose.staging.yml",
         "mounts": [{"Destination": "/app", "Source": LINUX_ROOT + "/backend"}],
-        "ports": (
-            {
-                f"{target_port}/tcp": [
-                    {"HostIp": "127.0.0.1", "HostPort": str(PORTS[service])}
-                ]
-            }
-            if service in PORTS
-            else {}
-        ),
+        "ports": deepcopy(configured_bindings) if status == "running" else {},
+        "host_port_bindings": configured_bindings,
         "status": status,
         "health": "healthy",
     }
@@ -756,6 +758,18 @@ def test_ownership_accepts_loopback_runtime_binding(service):
 
 
 @pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+def test_ownership_accepts_stopped_container_with_saved_loopback_binding(service):
+    existing = container(service=service, status="exited")
+    assert guard.validate_ownership(
+        [existing],
+        PROJECT,
+        LINUX_ROOT,
+        LINUX_ROOT + "/ops/compose.staging.yml",
+        PORTS,
+    ) == [existing]
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
 @pytest.mark.parametrize("host_ip", ["0.0.0.0", "::", None])
 def test_ownership_rejects_non_loopback_runtime_bindings(service, host_ip):
     existing = container(service=service)
@@ -765,7 +779,59 @@ def test_ownership_rejects_non_loopback_runtime_bindings(service, host_ip):
         binding.pop("HostIp")
     else:
         binding["HostIp"] = host_ip
+    assert existing["host_port_bindings"][f"{target_port}/tcp"][0] == {
+        "HostIp": "127.0.0.1", "HostPort": str(PORTS[service])
+    }
     with pytest.raises(guard.GuardError, match="STAGING_PORT_EXPOSED"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize("host_ip", ["0.0.0.0", "::", None])
+def test_ownership_rejects_non_loopback_saved_binding_for_stopped_container(
+    service, host_ip
+):
+    existing = container(service=service, status="exited")
+    target_port = guard.PORT_KEYS[service][2]
+    binding = existing["host_port_bindings"][f"{target_port}/tcp"][0]
+    if host_ip is None:
+        binding.pop("HostIp")
+    else:
+        binding["HostIp"] = host_ip
+    with pytest.raises(guard.GuardError, match="STAGING_PORT_EXPOSED"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+@pytest.mark.parametrize("status", ["running", "exited"])
+def test_ownership_rejects_missing_saved_published_binding(status):
+    existing = container(status=status, host_port_bindings={})
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+def test_ownership_rejects_configured_binding_that_differs_from_runtime():
+    existing = container()
+    existing["host_port_bindings"]["18000/tcp"][0]["HostPort"] = "19002"
+    assert existing["ports"]["18000/tcp"][0]["HostPort"] == str(PORTS["backend"])
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
         guard.validate_ownership(
             [existing],
             PROJECT,
