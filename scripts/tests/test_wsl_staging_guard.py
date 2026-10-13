@@ -673,6 +673,29 @@ def test_effective_ports_rejects_non_loopback_bindings(service, host_ip, error_c
         guard.effective_ports(config, VALUES, LINUX_ROOT)
 
 
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize("host_ip", ["0.0.0.0", "::", None])
+def test_effective_ports_allows_legacy_binding_only_for_stop_recovery(
+    service, host_ip
+):
+    config = compose_config()
+    binding = config["services"][service]["ports"][0]
+    if host_ip is None:
+        binding.pop("host_ip")
+    else:
+        binding["host_ip"] = host_ip
+
+    with pytest.raises(guard.GuardError, match="EXPOSED"):
+        guard.effective_ports(config, VALUES, LINUX_ROOT)
+
+    assert (
+        guard.effective_ports(
+            config, VALUES, LINUX_ROOT, stop_recovery=True
+        )
+        == PORTS
+    )
+
+
 @pytest.mark.parametrize("service", ["backend", "worker"])
 def test_effective_config_rejects_foreign_source(service):
     config = compose_config()
@@ -1428,18 +1451,18 @@ def test_preflight_blocks_production_checkout_before_docker(staging, monkeypatch
 
 
 @pytest.mark.parametrize(
-    ("action", "status", "host_ip"),
+    ("action", "status", "host_ip", "compose_host_ip"),
     [
-        ("preflight", None, None),
-        ("preflight", "running", "0.0.0.0"),
-        ("stop", "running", "0.0.0.0"),
-        ("stop", "exited", "0.0.0.0"),
-        ("stop", "running", "::"),
-        ("stop", "exited", "::"),
+        ("preflight", None, None, "127.0.0.1"),
+        ("preflight", "running", "0.0.0.0", "0.0.0.0"),
+        ("stop", "running", "0.0.0.0", "0.0.0.0"),
+        ("stop", "exited", "0.0.0.0", None),
+        ("stop", "running", "::", "::"),
+        ("stop", "exited", "::", "::"),
     ],
 )
 def test_real_preflight_checks_context_and_stop_bypasses_capacity_probes(
-    staging, monkeypatch, action, status, host_ip
+    staging, monkeypatch, action, status, host_ip, compose_host_ip
 ):
     calls = []
     mutations = []
@@ -1487,7 +1510,14 @@ def test_real_preflight_checks_context_and_stop_bypasses_capacity_probes(
         if argv == ("compose", "version", "--short"):
             return "2.40.3"
         if argv[0] == "compose" and argv[-3:] == ("config", "--format", "json"):
-            return json.dumps(compose_config())
+            config = compose_config()
+            for service in guard.PORT_KEYS:
+                binding = config["services"][service]["ports"][0]
+                if compose_host_ip is None:
+                    binding.pop("host_ip")
+                else:
+                    binding["host_ip"] = compose_host_ip
+            return json.dumps(config)
         if argv[0] == "compose" and argv[-1] == "down":
             mutations.append((argv, kwargs))
             return ""
@@ -1546,7 +1576,10 @@ def test_real_preflight_checks_context_and_stop_bypasses_capacity_probes(
                 staging.preflight()
         assert not mutations
     assert staging.summary["commit"] == "a" * 40
-    assert staging.summary["ports"] == PORTS
+    if action == "preflight" and compose_host_ip != "127.0.0.1":
+        assert "ports" not in staging.summary
+    else:
+        assert staging.summary["ports"] == PORTS
     if action == "preflight" and status is not None:
         assert "wsl_available_mib" not in staging.summary
     else:

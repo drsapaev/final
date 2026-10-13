@@ -284,7 +284,11 @@ def validate_public_origins(values: dict[str, str], frontend_port: int) -> None:
 
 
 def effective_ports(
-    config: dict, values: dict[str, str], linux_root: str
+    config: dict,
+    values: dict[str, str],
+    linux_root: str,
+    *,
+    stop_recovery: bool = False,
 ) -> dict[str, int]:
     ports = {}
     for service, (key, default, target) in PORT_KEYS.items():
@@ -309,7 +313,7 @@ def effective_ports(
             raise GuardError(
                 "PORT_CONTEXT_MISMATCH: resolved Compose ports differ from the selected env"
             )
-        if item.get("host_ip") != LOOPBACK_BIND_IP:
+        if not stop_recovery and item.get("host_ip") != LOOPBACK_BIND_IP:
             if service == "postgres":
                 raise GuardError("POSTGRES_EXPOSED: PostgreSQL must bind to loopback")
             raise GuardError(
@@ -739,7 +743,12 @@ class WslStaging:
             raise GuardError(
                 "PROJECT_CONTEXT_MISMATCH: effective Compose project differs"
             )
-        self.ports = effective_ports(config, self.values, self.linux_root)
+        self.ports = effective_ports(
+            config,
+            self.values,
+            self.linux_root,
+            stop_recovery=stop_recovery,
+        )
         self.summary["ports"] = self.ports
         if not stop_recovery:
             validate_windows_listeners(self.ports)
