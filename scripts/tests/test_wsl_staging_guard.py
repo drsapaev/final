@@ -120,7 +120,7 @@ def session(staging, monkeypatch):
     keeper = KeeperProcess()
     monkeypatch.setattr(guard.subprocess, "Popen", lambda *args, **kwargs: keeper)
 
-    def preflight():
+    def preflight(**kwargs):
         staging.linux_root = LINUX_ROOT
         staging.linux_env = LINUX_ROOT + "/ops/staging.env"
         staging.linux_compose = LINUX_ROOT + "/ops/compose.staging.yml"
@@ -699,6 +699,32 @@ def test_ownership_rejects_reused_project_from_another_context(field, value):
         )
 
 
+@pytest.mark.parametrize(
+    ("changes", "error_code"),
+    [
+        ({"root": "/mnt/c/foreign-session/ops"}, "PROJECT_OWNERSHIP"),
+        (
+            {"files": "/mnt/c/session with spaces/ops/other-compose.yml"},
+            "PROJECT_OWNERSHIP",
+        ),
+        (
+            {"mounts": [{"Destination": "/app", "Source": "/mnt/c/foreign/backend"}]},
+            "SOURCE_MISMATCH",
+        ),
+    ],
+)
+def test_stop_ownership_mode_still_rejects_other_worktree(changes, error_code):
+    with pytest.raises(guard.GuardError, match=error_code):
+        guard.validate_ownership(
+            [container(**changes)],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+            enforce_port_bindings=False,
+        )
+
+
 def test_ownership_rejects_foreign_project_port_and_preserves_stopped_project():
     foreign = container(project="another-agent")
     with pytest.raises(guard.GuardError, match="FOREIGN_PORT"):
@@ -817,6 +843,37 @@ def test_ownership_rejects_non_loopback_saved_binding_for_stopped_container(
 @pytest.mark.parametrize("status", ["running", "exited"])
 def test_ownership_rejects_missing_saved_published_binding(status):
     existing = container(status=status, host_port_bindings={})
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize(
+    ("status", "mapping_name"),
+    [
+        ("running", "host_port_bindings"),
+        ("running", "ports"),
+        ("exited", "host_port_bindings"),
+    ],
+)
+@pytest.mark.parametrize("mismatch", ["target", "protocol"])
+def test_ownership_rejects_wrong_container_port_or_protocol(
+    service, status, mapping_name, mismatch
+):
+    existing = container(service=service, status=status)
+    expected_port = guard.PORT_KEYS[service][2]
+    wrong_port = expected_port + 1 if mismatch == "target" else expected_port
+    protocol = "udp" if mismatch == "protocol" else "tcp"
+    expected_key = f"{expected_port}/tcp"
+    mapping = existing[mapping_name]
+    mapping[f"{wrong_port}/{protocol}"] = mapping.pop(expected_key)
+
     with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
         guard.validate_ownership(
             [existing],
@@ -990,7 +1047,7 @@ def test_missing_child_closes_keeper(session, monkeypatch):
 def test_preflight_failure_closes_keeper_without_child(session, monkeypatch):
     staging, keeper = session
 
-    def preflight():
+    def preflight(**kwargs):
         raise guard.GuardError("FOREIGN_PORT")
 
     monkeypatch.setattr(staging, "preflight", preflight)
@@ -1370,12 +1427,33 @@ def test_preflight_blocks_production_checkout_before_docker(staging, monkeypatch
         staging.preflight()
 
 
-@pytest.mark.parametrize("action", ["preflight", "stop"])
+@pytest.mark.parametrize(
+    ("action", "status", "host_ip"),
+    [
+        ("preflight", None, None),
+        ("preflight", "running", "0.0.0.0"),
+        ("stop", "running", "0.0.0.0"),
+        ("stop", "exited", "0.0.0.0"),
+        ("stop", "running", "::"),
+        ("stop", "exited", "::"),
+    ],
+)
 def test_real_preflight_checks_context_and_stop_bypasses_capacity_probes(
-    staging, monkeypatch, action
+    staging, monkeypatch, action, status, host_ip
 ):
     calls = []
     mutations = []
+    existing = []
+    if status is not None:
+        unsafe = container(status=status)
+        target_port = guard.PORT_KEYS["backend"][2]
+        for mapping_name in ("host_port_bindings", "ports"):
+            for binding in unsafe[mapping_name].get(f"{target_port}/tcp", []):
+                binding["HostIp"] = host_ip
+        existing = [unsafe]
+        if action == "stop":
+            # A foreign project may occupy a selected port. Stop must leave it alone.
+            existing.append(container(project="another-agent"))
 
     def native(argv, **kwargs):
         calls.append(argv)
@@ -1408,38 +1486,71 @@ def test_real_preflight_checks_context_and_stop_bypasses_capacity_probes(
             return "29.1.3"
         if argv == ("compose", "version", "--short"):
             return "2.40.3"
-        raise AssertionError(argv)
-
-    def compose(*command, **kwargs):
-        if command == ("config", "--format", "json"):
+        if argv[0] == "compose" and argv[-3:] == ("config", "--format", "json"):
             return json.dumps(compose_config())
-        assert action == "stop" and command == ("down",)
-        mutations.append((command, kwargs))
+        if argv[0] == "compose" and argv[-1] == "down":
+            mutations.append((argv, kwargs))
+            return ""
+        raise AssertionError(argv)
 
     monkeypatch.setattr(guard, "native", native)
     monkeypatch.setattr(staging, "wsl", wsl)
     monkeypatch.setattr(staging, "docker", docker)
-    monkeypatch.setattr(staging, "compose_command", compose)
-    monkeypatch.setattr(staging, "containers", list)
-    monkeypatch.setattr(guard, "validate_windows_listeners", lambda ports: None)
-    monkeypatch.setattr(guard, "tcp_ready", lambda port: False)
+    monkeypatch.setattr(staging, "containers", lambda: existing)
+    monkeypatch.setattr(
+        guard,
+        "validate_windows_listeners",
+        lambda ports: pytest.fail("Stop must not require a clear listener check")
+        if action == "stop"
+        else None,
+    )
+    monkeypatch.setattr(
+        guard,
+        "tcp_ready",
+        lambda port: pytest.fail("Stop must not require host port readiness")
+        if action == "stop"
+        else False,
+    )
     if action == "stop":
         keeper = KeeperProcess()
         monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: keeper)
         monkeypatch.setattr(guard.shutil, "disk_usage", lambda *a: pytest.fail("Stop capacity probe"))
         monkeypatch.setattr(staging, "linux_storage", lambda **k: pytest.fail("Stop Linux probe"))
         assert staging.execute(args("stop"))["result"] == "PASS"
-        assert mutations == [(('down',), {"timeout": 180})]
+        assert mutations == [
+            (
+                (
+                    "compose",
+                    "--project-directory",
+                    LINUX_ROOT + "/ops",
+                    "--project-name",
+                    PROJECT,
+                    "--env-file",
+                    LINUX_ROOT + "/ops/staging.env",
+                    "-f",
+                    LINUX_ROOT + "/ops/compose.staging.yml",
+                    "down",
+                ),
+                {"timeout": 180, "operation": "compose-down"},
+            )
+        ]
         assert keeper.stdin.closed and keeper.waited
     else:
         monkeypatch.setattr(
             guard.shutil, "disk_usage", lambda root: SimpleNamespace(free=20 * guard.GIB)
         )
-        assert staging.preflight() == []
+        if status is None:
+            assert staging.preflight() == []
+        else:
+            with pytest.raises(guard.GuardError, match="STAGING_PORT_EXPOSED"):
+                staging.preflight()
         assert not mutations
     assert staging.summary["commit"] == "a" * 40
     assert staging.summary["ports"] == PORTS
-    assert staging.summary["wsl_available_mib"] == 2048
+    if action == "preflight" and status is not None:
+        assert "wsl_available_mib" not in staging.summary
+    else:
+        assert staging.summary["wsl_available_mib"] == 2048
     assert len(calls) == 4  # No checkout, reset, up/down or any other mutation.
 
 

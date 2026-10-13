@@ -333,17 +333,24 @@ def effective_ports(
 
 
 def validate_ownership(
-    containers: list[dict], project: str, root: str, compose: str, ports: dict[str, int]
+    containers: list[dict],
+    project: str,
+    root: str,
+    compose: str,
+    ports: dict[str, int],
+    *,
+    enforce_port_bindings: bool = True,
 ) -> list[dict]:
     owned = []
 
     def validate_bindings(mapping: dict | None, service: str) -> None:
-        bindings = [
-            binding
-            for group in (mapping or {}).values()
-            for binding in (group or [])
-        ]
-        if len(bindings) != 1:
+        expected_key = f"{PORT_KEYS[service][2]}/tcp"
+        if not isinstance(mapping, dict) or set(mapping) != {expected_key}:
+            raise GuardError(
+                "PORT_CONTEXT_MISMATCH: expected the configured container TCP port"
+            )
+        bindings = mapping[expected_key]
+        if not isinstance(bindings, list) or len(bindings) != 1:
             raise GuardError(
                 "PORT_CONTEXT_MISMATCH: expected one published binding"
             )
@@ -379,7 +386,7 @@ def validate_ownership(
                     "SOURCE_MISMATCH: existing container mounts different source"
                 )
             service = container.get("service")
-            if service in ports:
+            if enforce_port_bindings and service in ports:
                 # NetworkSettings.Ports reflects active publications and is empty
                 # on stopped containers. HostConfig.PortBindings preserves the
                 # configured binding in both states and is always authoritative
@@ -388,7 +395,7 @@ def validate_ownership(
                 if container.get("status") == "running":
                     validate_bindings(container.get("ports"), service)
             owned.append(container)
-        elif container.get("status") == "running":
+        elif enforce_port_bindings and container.get("status") == "running":
             bindings = [
                 binding
                 for group in (container.get("ports") or {}).values()
@@ -682,7 +689,7 @@ class WslStaging:
                     f"WSL_DISK_LOW: root or Docker storage needs {reserve} GiB free; recover space before staging"
                 )
 
-    def preflight(self) -> list[dict]:
+    def preflight(self, *, stop_recovery: bool = False) -> list[dict]:
         main = Path(
             native(
                 [
@@ -734,26 +741,29 @@ class WslStaging:
             )
         self.ports = effective_ports(config, self.values, self.linux_root)
         self.summary["ports"] = self.ports
-        validate_windows_listeners(self.ports)
+        if not stop_recovery:
+            validate_windows_listeners(self.ports)
         owned = validate_ownership(
             self.containers(),
             self.project,
             self.linux_root,
             self.linux_compose,
             self.ports,
+            enforce_port_bindings=not stop_recovery,
         )
-        owned_ports = {
-            int(b["HostPort"])
-            for c in owned
-            if c.get("status") == "running"
-            for group in (c.get("ports") or {}).values()
-            for b in group or []
-        }
-        for port in self.ports.values():
-            if tcp_ready(port) and port not in owned_ports:
-                raise GuardError(
-                    "HOST_PORT: selected Windows port is already in use outside this project"
-                )
+        if not stop_recovery:
+            owned_ports = {
+                int(b["HostPort"])
+                for c in owned
+                if c.get("status") == "running"
+                for group in (c.get("ports") or {}).values()
+                for b in group or []
+            }
+            for port in self.ports.values():
+                if tcp_ready(port) and port not in owned_ports:
+                    raise GuardError(
+                        "HOST_PORT: selected Windows port is already in use outside this project"
+                    )
         free = None
         if not getattr(self, "storage_recovery", False):
             free = self.summary.get("host_disk_free_gib")
@@ -810,7 +820,7 @@ class WslStaging:
         build_possible = args.action in {"start", "session"} and not args.no_build
         self.host_storage(build_possible=build_possible, recovery=args.action == "stop")
         with self.keeper() as keeper:
-            self.preflight()
+            self.preflight(stop_recovery=args.action == "stop")
             if args.action != "stop":
                 validate_public_origins(self.values, self.ports["frontend"])
             if args.action != "stop":
