@@ -30,6 +30,11 @@ VALUES = {
     "STAGING_BACKEND_PORT": "19001",
     "STAGING_FRONTEND_PORT": "19080",
     "STAGING_POSTGRES_HOST_PORT": "55441",
+    "STAGING_PUBLIC_HOST": "127.0.0.1",
+    "STAGING_PUBLIC_BASE_URL": "http://127.0.0.1:19080",
+    "STAGING_PUBLIC_WS_URL": "ws://127.0.0.1:19080",
+    "STAGING_PUBLIC_WS_HOST": "127.0.0.1:19080",
+    "CORS_ORIGINS": "http://127.0.0.1:19080,http://localhost:19080",
 }
 
 
@@ -38,10 +43,14 @@ def compose_config():
     for service, (_, _, target) in guard.PORT_KEYS.items():
         services[service] = {
             "ports": [
-                {"published": str(PORTS[service]), "target": target, "protocol": "tcp"}
+                {
+                    "published": str(PORTS[service]),
+                    "target": target,
+                    "protocol": "tcp",
+                    "host_ip": "127.0.0.1",
+                }
             ]
         }
-    services["postgres"]["ports"][0]["host_ip"] = "127.0.0.1"
     for service in ("backend", "worker"):
         services.setdefault(service, {})["volumes"] = [
             {"type": "bind", "source": LINUX_ROOT + "/backend", "target": "/app"}
@@ -50,17 +59,24 @@ def compose_config():
 
 
 def container(service="backend", *, project=PROJECT, status="running", **changes):
+    target_port = guard.PORT_KEYS[service][2] if service in PORTS else None
+    configured_bindings = (
+        {
+            f"{target_port}/tcp": [
+                {"HostIp": "127.0.0.1", "HostPort": str(PORTS[service])}
+            ]
+        }
+        if service in PORTS
+        else {}
+    )
     result = {
         "project": project,
         "service": service,
         "root": LINUX_ROOT + "/ops",
         "files": LINUX_ROOT + "/ops/compose.staging.yml",
         "mounts": [{"Destination": "/app", "Source": LINUX_ROOT + "/backend"}],
-        "ports": (
-            {"18000/tcp": [{"HostPort": str(PORTS[service])}]}
-            if service in PORTS
-            else {}
-        ),
+        "ports": deepcopy(configured_bindings) if status == "running" else {},
+        "host_port_bindings": configured_bindings,
         "status": status,
         "health": "healthy",
     }
@@ -104,7 +120,7 @@ def session(staging, monkeypatch):
     keeper = KeeperProcess()
     monkeypatch.setattr(guard.subprocess, "Popen", lambda *args, **kwargs: keeper)
 
-    def preflight():
+    def preflight(**kwargs):
         staging.linux_root = LINUX_ROOT
         staging.linux_env = LINUX_ROOT + "/ops/staging.env"
         staging.linux_compose = LINUX_ROOT + "/ops/compose.staging.yml"
@@ -510,6 +526,80 @@ def test_effective_ports_accepts_canonical_worktree_bindings():
     assert guard.effective_ports(compose_config(), VALUES, LINUX_ROOT) == PORTS
 
 
+def test_public_origins_accept_loopback_aliases_on_frontend_port():
+    assert guard.validate_public_origins(VALUES, PORTS["frontend"]) is None
+
+
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("STAGING_PUBLIC_HOST", "example.invalid"),
+        ("STAGING_PUBLIC_BASE_URL", "http://example.invalid:19080"),
+        ("STAGING_PUBLIC_BASE_URL", "http://127.0.0.1:19081"),
+        ("STAGING_PUBLIC_BASE_URL", "http://localhost:19080"),
+        ("STAGING_PUBLIC_BASE_URL", "http://127.0.0.1:19080?"),
+        ("STAGING_PUBLIC_WS_URL", "ws://example.invalid:19080"),
+        ("STAGING_PUBLIC_WS_URL", "ws://127.0.0.1:19081"),
+        ("STAGING_PUBLIC_WS_HOST", "example.invalid:19080"),
+        ("STAGING_PUBLIC_WS_HOST", "127.0.0.1:19081"),
+        ("STAGING_PUBLIC_WS_HOST", "127.0.0.1:19080#"),
+        (
+            "CORS_ORIGINS",
+            "http://127.0.0.1:19080,http://example.invalid:19080",
+        ),
+        ("CORS_ORIGINS", "http://localhost:19081"),
+        ("CORS_ORIGINS", "http://localhost:19080#"),
+    ],
+)
+def test_public_origins_reject_stale_or_mismatched_values(key, value):
+    values = VALUES.copy()
+    values[key] = value
+    with pytest.raises(guard.GuardError, match="PUBLIC_") as error:
+        guard.validate_public_origins(values, PORTS["frontend"])
+    assert value not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "key", guard.PUBLIC_ORIGIN_KEYS
+)
+def test_public_origins_require_all_context_values(key):
+    values = VALUES.copy()
+    del values[key]
+    with pytest.raises(guard.GuardError, match="PUBLIC_ORIGIN_REQUIRED"):
+        guard.validate_public_origins(values, PORTS["frontend"])
+
+
+@pytest.mark.parametrize("action", ["preflight", "start"])
+def test_preflight_rejects_stale_public_origin_before_compose_mutation(
+    session, monkeypatch, action
+):
+    staging, keeper = session
+    staging.values["STAGING_PUBLIC_BASE_URL"] = "http://example.invalid:19080"
+    monkeypatch.setattr(
+        staging,
+        "compose_command",
+        lambda *a, **k: pytest.fail("stale public origin must stop before Compose"),
+    )
+    with pytest.raises(guard.GuardError, match="PUBLIC_"):
+        staging.execute(args(action))
+    assert keeper.stdin.closed and keeper.waited
+
+
+def test_stop_remains_available_when_public_origin_is_stale(session, monkeypatch):
+    staging, keeper = session
+    staging.values["STAGING_PUBLIC_BASE_URL"] = "http://example.invalid:19080"
+    calls = []
+    monkeypatch.setattr(
+        staging,
+        "compose_command",
+        lambda *a, **k: calls.append((a, k)),
+    )
+    result = staging.execute(args("stop"))
+    assert result["result"] == "PASS"
+    assert calls == [(('down',), {"timeout": 180})]
+    assert keeper.stdin.closed and keeper.waited
+
+
 @pytest.mark.parametrize("port", [18000, 5173, 5432, 1023, 65536])
 def test_effective_ports_rejects_production_and_invalid_ports(port):
     config = compose_config()
@@ -560,6 +650,52 @@ def test_effective_ports_rejects_exposed_postgresql():
         guard.effective_ports(config, VALUES, LINUX_ROOT)
 
 
+@pytest.mark.parametrize(
+    "service,host_ip,error_code",
+    [
+        ("backend", "0.0.0.0", "STAGING_PORT_EXPOSED"),
+        ("backend", "::", "STAGING_PORT_EXPOSED"),
+        ("backend", None, "STAGING_PORT_EXPOSED"),
+        ("frontend", "0.0.0.0", "STAGING_PORT_EXPOSED"),
+        ("frontend", "::", "STAGING_PORT_EXPOSED"),
+        ("frontend", None, "STAGING_PORT_EXPOSED"),
+        ("postgres", None, "POSTGRES_EXPOSED"),
+    ],
+)
+def test_effective_ports_rejects_non_loopback_bindings(service, host_ip, error_code):
+    config = compose_config()
+    binding = config["services"][service]["ports"][0]
+    if host_ip is None:
+        binding.pop("host_ip")
+    else:
+        binding["host_ip"] = host_ip
+    with pytest.raises(guard.GuardError, match=error_code):
+        guard.effective_ports(config, VALUES, LINUX_ROOT)
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize("host_ip", ["0.0.0.0", "::", None])
+def test_effective_ports_allows_legacy_binding_only_for_stop_recovery(
+    service, host_ip
+):
+    config = compose_config()
+    binding = config["services"][service]["ports"][0]
+    if host_ip is None:
+        binding.pop("host_ip")
+    else:
+        binding["host_ip"] = host_ip
+
+    with pytest.raises(guard.GuardError, match="EXPOSED"):
+        guard.effective_ports(config, VALUES, LINUX_ROOT)
+
+    assert (
+        guard.effective_ports(
+            config, VALUES, LINUX_ROOT, stop_recovery=True
+        )
+        == PORTS
+    )
+
+
 @pytest.mark.parametrize("service", ["backend", "worker"])
 def test_effective_config_rejects_foreign_source(service):
     config = compose_config()
@@ -583,6 +719,32 @@ def test_ownership_rejects_reused_project_from_another_context(field, value):
             LINUX_ROOT,
             LINUX_ROOT + "/ops/compose.staging.yml",
             PORTS,
+        )
+
+
+@pytest.mark.parametrize(
+    ("changes", "error_code"),
+    [
+        ({"root": "/mnt/c/foreign-session/ops"}, "PROJECT_OWNERSHIP"),
+        (
+            {"files": "/mnt/c/session with spaces/ops/other-compose.yml"},
+            "PROJECT_OWNERSHIP",
+        ),
+        (
+            {"mounts": [{"Destination": "/app", "Source": "/mnt/c/foreign/backend"}]},
+            "SOURCE_MISMATCH",
+        ),
+    ],
+)
+def test_stop_ownership_mode_still_rejects_other_worktree(changes, error_code):
+    with pytest.raises(guard.GuardError, match=error_code):
+        guard.validate_ownership(
+            [container(**changes)],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+            enforce_port_bindings=False,
         )
 
 
@@ -622,6 +784,145 @@ def test_ownership_rejects_changed_existing_mount_and_port():
             PORTS,
         )
     existing = container(ports={"18000/tcp": [{"HostPort": "19002"}]})
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+def test_ownership_accepts_loopback_runtime_binding(service):
+    existing = container(service=service)
+    assert guard.validate_ownership(
+        [existing],
+        PROJECT,
+        LINUX_ROOT,
+        LINUX_ROOT + "/ops/compose.staging.yml",
+        PORTS,
+    ) == [existing]
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+def test_ownership_accepts_stopped_container_with_saved_loopback_binding(service):
+    existing = container(service=service, status="exited")
+    assert guard.validate_ownership(
+        [existing],
+        PROJECT,
+        LINUX_ROOT,
+        LINUX_ROOT + "/ops/compose.staging.yml",
+        PORTS,
+    ) == [existing]
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize("host_ip", ["0.0.0.0", "::", None])
+def test_ownership_rejects_non_loopback_runtime_bindings(service, host_ip):
+    existing = container(service=service)
+    target_port = guard.PORT_KEYS[service][2]
+    binding = existing["ports"][f"{target_port}/tcp"][0]
+    if host_ip is None:
+        binding.pop("HostIp")
+    else:
+        binding["HostIp"] = host_ip
+    assert existing["host_port_bindings"][f"{target_port}/tcp"][0] == {
+        "HostIp": "127.0.0.1", "HostPort": str(PORTS[service])
+    }
+    with pytest.raises(guard.GuardError, match="STAGING_PORT_EXPOSED"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize("host_ip", ["0.0.0.0", "::", None])
+def test_ownership_rejects_non_loopback_saved_binding_for_stopped_container(
+    service, host_ip
+):
+    existing = container(service=service, status="exited")
+    target_port = guard.PORT_KEYS[service][2]
+    binding = existing["host_port_bindings"][f"{target_port}/tcp"][0]
+    if host_ip is None:
+        binding.pop("HostIp")
+    else:
+        binding["HostIp"] = host_ip
+    with pytest.raises(guard.GuardError, match="STAGING_PORT_EXPOSED"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+@pytest.mark.parametrize("status", ["running", "exited"])
+def test_ownership_rejects_missing_saved_published_binding(status):
+    existing = container(status=status, host_port_bindings={})
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+@pytest.mark.parametrize("service", ["backend", "frontend", "postgres"])
+@pytest.mark.parametrize(
+    ("status", "mapping_name"),
+    [
+        ("running", "host_port_bindings"),
+        ("running", "ports"),
+        ("exited", "host_port_bindings"),
+    ],
+)
+@pytest.mark.parametrize("mismatch", ["target", "protocol"])
+def test_ownership_rejects_wrong_container_port_or_protocol(
+    service, status, mapping_name, mismatch
+):
+    existing = container(service=service, status=status)
+    expected_port = guard.PORT_KEYS[service][2]
+    wrong_port = expected_port + 1 if mismatch == "target" else expected_port
+    protocol = "udp" if mismatch == "protocol" else "tcp"
+    expected_key = f"{expected_port}/tcp"
+    mapping = existing[mapping_name]
+    mapping[f"{wrong_port}/{protocol}"] = mapping.pop(expected_key)
+
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+def test_ownership_rejects_configured_binding_that_differs_from_runtime():
+    existing = container()
+    existing["host_port_bindings"]["18000/tcp"][0]["HostPort"] = "19002"
+    assert existing["ports"]["18000/tcp"][0]["HostPort"] == str(PORTS["backend"])
+    with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
+        guard.validate_ownership(
+            [existing],
+            PROJECT,
+            LINUX_ROOT,
+            LINUX_ROOT + "/ops/compose.staging.yml",
+            PORTS,
+        )
+
+
+def test_ownership_rejects_missing_runtime_published_binding():
+    existing = container(ports={})
     with pytest.raises(guard.GuardError, match="PORT_CONTEXT_MISMATCH"):
         guard.validate_ownership(
             [existing],
@@ -769,7 +1070,7 @@ def test_missing_child_closes_keeper(session, monkeypatch):
 def test_preflight_failure_closes_keeper_without_child(session, monkeypatch):
     staging, keeper = session
 
-    def preflight():
+    def preflight(**kwargs):
         raise guard.GuardError("FOREIGN_PORT")
 
     monkeypatch.setattr(staging, "preflight", preflight)
@@ -1149,12 +1450,33 @@ def test_preflight_blocks_production_checkout_before_docker(staging, monkeypatch
         staging.preflight()
 
 
-@pytest.mark.parametrize("action", ["preflight", "stop"])
+@pytest.mark.parametrize(
+    ("action", "status", "host_ip", "compose_host_ip"),
+    [
+        ("preflight", None, None, "127.0.0.1"),
+        ("preflight", "running", "0.0.0.0", "0.0.0.0"),
+        ("stop", "running", "0.0.0.0", "0.0.0.0"),
+        ("stop", "exited", "0.0.0.0", None),
+        ("stop", "running", "::", "::"),
+        ("stop", "exited", "::", "::"),
+    ],
+)
 def test_real_preflight_checks_context_and_stop_bypasses_capacity_probes(
-    staging, monkeypatch, action
+    staging, monkeypatch, action, status, host_ip, compose_host_ip
 ):
     calls = []
     mutations = []
+    existing = []
+    if status is not None:
+        unsafe = container(status=status)
+        target_port = guard.PORT_KEYS["backend"][2]
+        for mapping_name in ("host_port_bindings", "ports"):
+            for binding in unsafe[mapping_name].get(f"{target_port}/tcp", []):
+                binding["HostIp"] = host_ip
+        existing = [unsafe]
+        if action == "stop":
+            # A foreign project may occupy a selected port. Stop must leave it alone.
+            existing.append(container(project="another-agent"))
 
     def native(argv, **kwargs):
         calls.append(argv)
@@ -1187,38 +1509,81 @@ def test_real_preflight_checks_context_and_stop_bypasses_capacity_probes(
             return "29.1.3"
         if argv == ("compose", "version", "--short"):
             return "2.40.3"
+        if argv[0] == "compose" and argv[-3:] == ("config", "--format", "json"):
+            config = compose_config()
+            for service in guard.PORT_KEYS:
+                binding = config["services"][service]["ports"][0]
+                if compose_host_ip is None:
+                    binding.pop("host_ip")
+                else:
+                    binding["host_ip"] = compose_host_ip
+            return json.dumps(config)
+        if argv[0] == "compose" and argv[-1] == "down":
+            mutations.append((argv, kwargs))
+            return ""
         raise AssertionError(argv)
-
-    def compose(*command, **kwargs):
-        if command == ("config", "--format", "json"):
-            return json.dumps(compose_config())
-        assert action == "stop" and command == ("down",)
-        mutations.append((command, kwargs))
 
     monkeypatch.setattr(guard, "native", native)
     monkeypatch.setattr(staging, "wsl", wsl)
     monkeypatch.setattr(staging, "docker", docker)
-    monkeypatch.setattr(staging, "compose_command", compose)
-    monkeypatch.setattr(staging, "containers", list)
-    monkeypatch.setattr(guard, "validate_windows_listeners", lambda ports: None)
-    monkeypatch.setattr(guard, "tcp_ready", lambda port: False)
+    monkeypatch.setattr(staging, "containers", lambda: existing)
+    monkeypatch.setattr(
+        guard,
+        "validate_windows_listeners",
+        lambda ports: pytest.fail("Stop must not require a clear listener check")
+        if action == "stop"
+        else None,
+    )
+    monkeypatch.setattr(
+        guard,
+        "tcp_ready",
+        lambda port: pytest.fail("Stop must not require host port readiness")
+        if action == "stop"
+        else False,
+    )
     if action == "stop":
         keeper = KeeperProcess()
         monkeypatch.setattr(guard.subprocess, "Popen", lambda *a, **k: keeper)
         monkeypatch.setattr(guard.shutil, "disk_usage", lambda *a: pytest.fail("Stop capacity probe"))
         monkeypatch.setattr(staging, "linux_storage", lambda **k: pytest.fail("Stop Linux probe"))
         assert staging.execute(args("stop"))["result"] == "PASS"
-        assert mutations == [(('down',), {"timeout": 180})]
+        assert mutations == [
+            (
+                (
+                    "compose",
+                    "--project-directory",
+                    LINUX_ROOT + "/ops",
+                    "--project-name",
+                    PROJECT,
+                    "--env-file",
+                    LINUX_ROOT + "/ops/staging.env",
+                    "-f",
+                    LINUX_ROOT + "/ops/compose.staging.yml",
+                    "down",
+                ),
+                {"timeout": 180, "operation": "compose-down"},
+            )
+        ]
         assert keeper.stdin.closed and keeper.waited
     else:
         monkeypatch.setattr(
             guard.shutil, "disk_usage", lambda root: SimpleNamespace(free=20 * guard.GIB)
         )
-        assert staging.preflight() == []
+        if status is None:
+            assert staging.preflight() == []
+        else:
+            with pytest.raises(guard.GuardError, match="STAGING_PORT_EXPOSED"):
+                staging.preflight()
         assert not mutations
     assert staging.summary["commit"] == "a" * 40
-    assert staging.summary["ports"] == PORTS
-    assert staging.summary["wsl_available_mib"] == 2048
+    if action == "preflight" and compose_host_ip != "127.0.0.1":
+        assert "ports" not in staging.summary
+    else:
+        assert staging.summary["ports"] == PORTS
+    if action == "preflight" and status is not None:
+        assert "wsl_available_mib" not in staging.summary
+    else:
+        assert staging.summary["wsl_available_mib"] == 2048
     assert len(calls) == 4  # No checkout, reset, up/down or any other mutation.
 
 
