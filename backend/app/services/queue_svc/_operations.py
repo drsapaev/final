@@ -22,7 +22,7 @@ from app.crud.queue_resource_routing import (
     lock_daily_queue_creation,  # Lock-parity follow-up to the #3511 review
     lock_queue_tag_claim_scope,  # Round-6 (P1-2): canonical batch pre-lock
 )
-from app.models.online_queue import QueueResource
+from app.models.online_queue import DailyQueue, QueueResource
 
 # RQ-16.d (E-055 §11): the provision retry loop generates FRESH opaque
 # codes; imported by NAME at module level so tests can monkeypatch the
@@ -264,6 +264,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         selected_profile: Any,
         *,
         profiles: list[Any] | None = None,
+        lock_parent_rows: bool = False,
     ) -> bool:
         """Validate all published profiles that can resolve ``queue_tag``."""
         from app.services.queue_profile_availability import (
@@ -275,11 +276,12 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         )
         selected_key = getattr(selected_profile, "key", None)
         if not selected_key or not any(
-            getattr(candidate, "key", None) == selected_key
-            for candidate in candidates
+            getattr(candidate, "key", None) == selected_key for candidate in candidates
         ):
             return False
-        availability_by_profile = load_queue_profile_availability(db, candidates)
+        availability_by_profile = load_queue_profile_availability(
+            db, candidates, lock_parent_rows=lock_parent_rows
+        )
         return cls._qr_profile_candidates_are_unambiguous(
             candidates,
             db,
@@ -342,6 +344,143 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             db,
             resource_tag or profile_key,
             profile,
+        )
+
+    @classmethod
+    def public_qr_catalog_bookable_profiles(
+        cls,
+        db: Session,
+        profiles: list[Any],
+        *,
+        day: date,
+        availability_by_profile: dict[Any, Any],
+    ) -> list[Any]:
+        """Filter a loaded profile catalog using bounded batch reads.
+
+        Admission treats every published profile sharing the resolved tag as
+        one target. The public catalog must use that same set while avoiding
+        per-profile QueueProfile, Department, QueueResource, and DailyQueue
+        queries.
+        """
+        if not profiles:
+            return []
+
+        queue_tags: set[str] = set()
+        profiles_by_tag: dict[str, list[Any]] = {}
+        for profile in profiles:
+            profile_key = getattr(profile, "key", None)
+            raw_profile_tags = getattr(profile, "queue_tags", None)
+            route_tags = expand_queue_tags(
+                list(raw_profile_tags or ([profile_key] if profile_key else []))
+            )
+            candidate_tags = set(route_tags)
+            if profile_key:
+                candidate_tags.add(profile_key)
+            queue_tags.update(tag for tag in route_tags if tag)
+            for tag in candidate_tags:
+                if not tag:
+                    continue
+                normalized_tag = cls._normalize_qr_specialty_key(tag)
+                if normalized_tag:
+                    profiles_by_tag.setdefault(normalized_tag, []).append(profile)
+
+        resource_route_tags: set[str] = set()
+        if queue_tags:
+            active_registry_tags = {
+                row[0]
+                for row in db.query(QueueResource.queue_tag)
+                .filter(
+                    QueueResource.active.is_(True),
+                    QueueResource.queue_tag.in_(sorted(queue_tags)),
+                )
+                .all()
+            }
+            first_active_queue_owner_by_tag: dict[str, int | None] = {}
+            active_queue_rows = (
+                db.query(DailyQueue.queue_tag, DailyQueue.queue_resource_id)
+                .filter(
+                    DailyQueue.day == day,
+                    DailyQueue.active.is_(True),
+                    DailyQueue.queue_tag.in_(sorted(queue_tags)),
+                )
+                .order_by(DailyQueue.id.asc())
+                .all()
+            )
+            for tag, resource_id in active_queue_rows:
+                first_active_queue_owner_by_tag.setdefault(tag, resource_id)
+            resource_route_tags = active_registry_tags | {
+                tag
+                for tag, resource_id in first_active_queue_owner_by_tag.items()
+                if resource_id is not None
+            }
+
+        bookable: list[Any] = []
+        for profile in profiles:
+            availability = availability_by_profile.get(profile)
+            if availability is None or not cls._is_qr_visible_profile(
+                profile, db, availability=availability
+            ):
+                continue
+
+            profile_key = getattr(profile, "key", None)
+            if not profile_key:
+                continue
+            resource_tag = next(
+                (
+                    tag
+                    for tag in expand_queue_tags(
+                        list(getattr(profile, "queue_tags", None) or [profile_key])
+                    )
+                    if tag in resource_route_tags
+                ),
+                None,
+            )
+            route_tag = resource_tag or profile_key
+            candidates = profiles_by_tag.get(
+                cls._normalize_qr_specialty_key(route_tag), []
+            )
+            if not any(
+                getattr(candidate, "key", None) == profile_key
+                for candidate in candidates
+            ):
+                continue
+            if cls._qr_profile_candidates_are_unambiguous(
+                candidates,
+                db,
+                availability_by_profile,
+                route_queue_tag=route_tag,
+            ):
+                bookable.append(profile)
+        return bookable
+
+    @classmethod
+    def _queue_profiles_are_bookable_under_parent_locks(
+        cls, db: Session, daily_queue: DailyQueue
+    ) -> bool:
+        """Recheck a token queue's profile targets under Department locks."""
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+        )
+
+        profile_candidates = cls._get_qr_profile_candidates_for_tag(
+            db,
+            daily_queue.queue_tag,
+            prefer_exact_key=daily_queue.queue_resource_id is None,
+        )
+        if not profile_candidates:
+            return True
+        availability_by_profile = load_queue_profile_availability(
+            db, profile_candidates, lock_parent_rows=True
+        )
+        return cls._qr_profile_candidates_are_unambiguous(
+            profile_candidates,
+            db,
+            availability_by_profile,
+            route_queue_tag=(
+                daily_queue.queue_tag
+                if daily_queue.queue_resource_id is not None
+                else None
+            ),
         )
 
     @classmethod
@@ -1760,8 +1899,14 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 # selection here would fork a parallel legacy queue and
                 # re-create the split-queue incident class.
                 resource_tag = self._qr_profile_resource_tag(db, queue_profile, day)
-                if specialist_type == "profile" and not self._qr_profile_target_is_unambiguous(
-                    db, resource_tag or profile_key, queue_profile
+                if (
+                    specialist_type == "profile"
+                    and not self._qr_profile_target_is_unambiguous(
+                        db,
+                        resource_tag or profile_key,
+                        queue_profile,
+                        lock_parent_rows=True,
+                    )
                 ):
                     raise QueueValidationError(
                         "Профиль направления неоднозначен для QR-записи"
@@ -1966,7 +2111,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     # or ineligible owner row resolves to the same refusal.
                     raise QueueValidationError("Специалист недоступен для записи")
 
-                qr_profile = self._get_qr_visible_profile_for_doctor(db, doctor)
+                qr_profile = self._get_qr_visible_profile_for_doctor(
+                    db, doctor, lock_parent_rows=True
+                )
                 if not qr_profile:
                     raise QueueValidationError("Специалист недоступен для QR-записи")
 
@@ -2032,6 +2179,15 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             if not daily_queue:
                 raise QueueNotFoundError("Очередь ещё не активна")
             queue_tag = daily_queue.queue_tag
+            # Token validation may have read the parent Department before a
+            # concurrent admin toggle. Re-resolve and hold shared parent-row
+            # locks here, before the DailyQueue lock and admission write, so
+            # either the ticket commits first or this join observes the
+            # committed inactive state.
+            if not self._queue_profiles_are_bookable_under_parent_locks(
+                db, daily_queue
+            ):
+                raise QueueValidationError("Специалист недоступен для QR-записи")
             if queue_tag:
                 tag_claim = _lock_and_resolve_tag_claim(
                     db,

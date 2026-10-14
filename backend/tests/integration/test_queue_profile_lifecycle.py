@@ -1283,9 +1283,9 @@ def test_tagged_daily_queue_writer_serializes_profile_binding_update(
                 if update_future.done():
                     break
                 time.sleep(0.02)
-            assert update_waited_for_writer, (
-                "binding update must wait for tagged writer"
-            )
+            assert (
+                update_waited_for_writer
+            ), "binding update must wait for tagged writer"
         finally:
             allow_writer_commit.set()
 
@@ -1431,9 +1431,9 @@ def test_tagged_daily_queue_writer_rejects_binding_changed_while_waiting(
                 if writer_future.done():
                     break
                 time.sleep(0.02)
-            assert writer_waited_for_update, (
-                "tagged writer must wait for profile update"
-            )
+            assert (
+                writer_waited_for_update
+            ), "tagged writer must wait for profile update"
         finally:
             allow_update_commit.set()
 
@@ -1569,7 +1569,9 @@ def test_tagged_service_writer_rejects_binding_changed_while_waiting(
                 if writer_future.done():
                     break
                 time.sleep(0.02)
-            assert writer_waited_for_update, "service writer must wait for profile update"
+            assert (
+                writer_waited_for_update
+            ), "service writer must wait for profile update"
         finally:
             allow_update_commit.set()
 
@@ -1580,9 +1582,7 @@ def test_tagged_service_writer_rejects_binding_changed_while_waiting(
     pg_session.expire_all()
     pg_session.refresh(profile)
     assert profile.queue_tags == [new_tag]
-    assert (
-        pg_session.query(Service).filter(Service.name == service_name).count() == 0
-    )
+    assert pg_session.query(Service).filter(Service.name == service_name).count() == 0
 
 
 def _public_profile_keys(pg_client) -> set[str]:
@@ -2103,6 +2103,229 @@ def test_public_catalog_matches_shared_resource_profile_admission(
     assert queue.queue_tag == queue_tag
 
 
+@pytest.mark.queue
+def test_public_profile_catalog_uses_bounded_query_count(
+    pg_client, pg_engine, pg_session
+):
+    """Public profile query work stays bounded as the catalog grows."""
+    from sqlalchemy import event
+
+    from app.models.queue_profile import QueueProfile
+
+    suffix = uuid.uuid4().hex[:10]
+    profiles = [
+        QueueProfile(
+            key=f"rq3639-batch-{suffix}-{index}",
+            title=f"Synthetic batch profile {index}",
+            queue_tags=[f"rq3639-batch-{suffix}-{index}"],
+            department_key=None,
+            is_active=True,
+            show_on_qr_page=True,
+            display_order=index,
+        )
+        for index in range(16)
+    ]
+    pg_session.add_all(profiles)
+    pg_session.commit()
+
+    statements: list[str] = []
+
+    def record_selects(_conn, _cursor, statement, _parameters, _context, _many):
+        if statement.lstrip().lower().startswith(("select", "with")):
+            statements.append(statement)
+
+    def read_catalog_query_count() -> tuple[int, set[str]]:
+        statements.clear()
+        event.listen(pg_engine, "before_cursor_execute", record_selects)
+        try:
+            response = pg_client.get("/api/v1/queues/profiles/public")
+        finally:
+            event.remove(pg_engine, "before_cursor_execute", record_selects)
+
+        assert response.status_code == 200, response.text
+        keys = {item["specialty"] for item in response.json().get("specialists", [])}
+        return len(statements), keys
+
+    count_with_sixteen_profiles, returned_keys = read_catalog_query_count()
+    assert {profile.key for profile in profiles} <= returned_keys
+
+    pg_session.query(QueueProfile).filter(
+        QueueProfile.id.in_([profile.id for profile in profiles[1:]])
+    ).update({QueueProfile.show_on_qr_page: False}, synchronize_session=False)
+    pg_session.commit()
+    count_with_one_profile, returned_keys = read_catalog_query_count()
+    assert profiles[0].key in returned_keys
+    assert not ({profile.key for profile in profiles[1:]} & returned_keys)
+    assert count_with_sixteen_profiles == count_with_one_profile, (
+        "public catalog SELECT count must stay constant as the profile count "
+        f"grows ({count_with_one_profile} vs {count_with_sixteen_profiles})"
+    )
+
+
+@pytest.mark.queue
+@pytest.mark.usefixtures("queue_admission_open")
+def test_department_toggle_waits_for_qr_admission_using_parent(
+    pg_engine, pg_session, monkeypatch
+):
+    """A Department cannot turn off after QR eligibility and before ticket commit."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.crud.clinic import clinic_today
+    from app.models.department import Department
+    from app.models.online_queue import QueueResource, QueueToken
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import queue_service
+
+    suffix = uuid.uuid4().hex[:10]
+    parent = Department(
+        key=f"rq3639-race-dept-{suffix}",
+        name_ru="Synthetic QR admission lock parent",
+        active=True,
+    )
+    resource = QueueResource(
+        code=f"rq3639-race-resource-{suffix}",
+        queue_tag=f"rq3639-race-tag-{suffix}",
+        display_name="Synthetic QR admission resource",
+        active=True,
+    )
+    profile = QueueProfile(
+        key=f"rq3639-race-profile-{suffix}",
+        title="Synthetic QR admission profile",
+        queue_tags=[resource.queue_tag],
+        department_key=parent.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    token = QueueToken(
+        token=f"rq3639-race-{suffix}",
+        day=clinic_today(pg_session),
+        specialist_id=None,
+        department="clinic",
+        is_clinic_wide=True,
+        expires_at=datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
+        + timedelta(hours=2),
+        active=True,
+    )
+    pg_session.add_all([parent, resource, profile, token])
+    pg_session.commit()
+    parent_id = parent.id
+    profile_id = profile.id
+    token_value = token.token
+
+    session_factory = sessionmaker(bind=pg_engine, future=True)
+    eligibility_checked = threading.Event()
+    allow_join_to_continue = threading.Event()
+    toggle_started = threading.Event()
+    pids: dict[str, int] = {}
+    original_get_or_create = queue_service.get_or_create_daily_queue
+
+    def pause_before_queue_create(
+        db, *, day, specialist_id, queue_tag=None, defaults=None
+    ):
+        eligibility_checked.set()
+        if not allow_join_to_continue.wait(timeout=10):
+            raise TimeoutError("test did not release the QR admission")
+        return original_get_or_create(
+            db,
+            day=day,
+            specialist_id=specialist_id,
+            queue_tag=queue_tag,
+            defaults=defaults,
+        )
+
+    monkeypatch.setattr(
+        queue_service, "get_or_create_daily_queue", pause_before_queue_create
+    )
+
+    def join_queue():
+        db = session_factory()
+        try:
+            pids["join"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            return queue_service.join_queue_with_token(
+                db,
+                token_str=token_value,
+                patient_name=f"SYNTHETIC-RQ3639-{suffix}",
+                phone=f"+99890{int(suffix[:7], 16) % 10_000_000:07d}",
+                specialist_id_override=profile_id,
+                specialist_type="profile",
+            )
+        finally:
+            db.close()
+
+    def disable_parent():
+        db = session_factory()
+        try:
+            pids["toggle"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            toggle_started.set()
+            db.execute(
+                text("UPDATE departments SET active = FALSE WHERE id = :id"),
+                {"id": parent_id},
+            )
+            db.commit()
+        finally:
+            db.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        join_future = executor.submit(join_queue)
+        toggle_future = None
+        try:
+            assert eligibility_checked.wait(
+                timeout=5
+            ), "QR join did not reach queue creation after checking the parent"
+            toggle_future = executor.submit(disable_parent)
+            assert toggle_started.wait(timeout=5), "Department toggle did not start"
+
+            deadline = time.monotonic() + 5
+            blocked_by_join = False
+            while time.monotonic() < deadline:
+                with pg_engine.connect() as connection:
+                    blockers = connection.execute(
+                        text("SELECT pg_blocking_pids(:pid)"),
+                        {"pid": pids["toggle"]},
+                    ).scalar_one()
+                if pids["join"] in blockers:
+                    blocked_by_join = True
+                    break
+                if toggle_future.done():
+                    break
+                time.sleep(0.02)
+            assert (
+                blocked_by_join
+            ), "Department toggle must wait on the QR admission's parent lock"
+        finally:
+            allow_join_to_continue.set()
+
+        joined = join_future.result(timeout=10)
+        assert toggle_future is not None
+        toggle_future.result(timeout=10)
+
+    from app.models.department import Department as DepartmentModel
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+
+    pg_session.expire_all()
+    assert (
+        pg_session.query(DepartmentModel).filter_by(id=parent_id).one().active is False
+    )
+    queue = (
+        pg_session.query(DailyQueue)
+        .filter_by(day=token.day, queue_resource_id=resource.id)
+        .one()
+    )
+    entry = (
+        pg_session.query(OnlineQueueEntry)
+        .filter_by(queue_id=queue.id, patient_name=f"SYNTHETIC-RQ3639-{suffix}")
+        .one()
+    )
+    assert joined["entry"].id == entry.id
+
+
 def _seed_waiting_entry_for_department(pg_session, dept_key: str, suffix: str) -> dict:
     """One active DailyQueue + one waiting entry under a tag owned by the
     department's 1:1 profile (expand_queue_tags guarantees the bare key
@@ -2206,12 +2429,12 @@ def test_department_deactivation_preserves_manual_state_and_blocks_new_qr(
 
     pg_session.expire_all()
     linked = _linked_profiles(pg_session, dept_key)
-    assert all(p.is_active for p in linked), (
-        "department deactivation must preserve persisted manual profile state"
-    )
-    assert dept_key in _tab_keys(pg_client, headers), (
-        "staff must retain access to existing queue tabs"
-    )
+    assert all(
+        p.is_active for p in linked
+    ), "department deactivation must preserve persisted manual profile state"
+    assert dept_key in _tab_keys(
+        pg_client, headers
+    ), "staff must retain access to existing queue tabs"
     assert dept_key not in _public_keys(pg_client)
     admin_profiles = pg_client.get(
         "/api/v1/queues/profiles?active_only=false", headers=headers
@@ -2333,8 +2556,12 @@ def test_department_reactivation_preserves_manual_archives(
         .filter(QueueProfile.key == "rq13arestore-sub")
         .first()
     )
-    assert own.is_active is False, "department activation must not restore manual archives"
-    assert sub_row.is_active is False, "department activation must not restore manual archives"
+    assert (
+        own.is_active is False
+    ), "department activation must not restore manual archives"
+    assert (
+        sub_row.is_active is False
+    ), "department activation must not restore manual archives"
 
 
 def test_bulk_department_off_on_never_writes_profile_activity(
@@ -2406,7 +2633,9 @@ def test_profile_parent_batch_resolves_with_one_department_query(
     statements: list[str] = []
     engine = pg_session.get_bind()
 
-    def record_department_select(_conn, _cursor, statement, _parameters, _context, _many):
+    def record_department_select(
+        _conn, _cursor, statement, _parameters, _context, _many
+    ):
         normalized = " ".join(statement.lower().replace('"', "").split())
         table_tokens = {token.rstrip(",;") for token in normalized.split()}
         if any(
@@ -2642,9 +2871,9 @@ def test_bulk_deactivation_preserves_manual_profile_state(
     for dept_key in (d1["key"], d2["key"]):
         linked = _linked_profiles(pg_session, dept_key)
         assert linked, "1:1 profile must exist"
-        assert all(p.is_active for p in linked), (
-            f"bulk deactivation must preserve manual profile state for {dept_key}"
-        )
+        assert all(
+            p.is_active for p in linked
+        ), f"bulk deactivation must preserve manual profile state for {dept_key}"
         from app.services.queue_profile_availability import (
             load_queue_profile_availability,
         )
@@ -2880,9 +3109,9 @@ def test_user_reactivation_takes_owner_scope_before_doctor_row_lock(
             join_session.close()
         result = future.result(timeout=15)
 
-    assert blocked_by_doctor_row is False, (
-        f"{mutation_path} activation locked Doctor before waiting for owner scope"
-    )
+    assert (
+        blocked_by_doctor_row is False
+    ), f"{mutation_path} activation locked Doctor before waiting for owner scope"
     if mutation_path == "single":
         assert result[0] is True, result
     else:
@@ -2939,9 +3168,7 @@ def test_profile_delete_rejects_binding_rebound_while_waiting(pg_engine, pg_admi
             pids["writer"] = writer.execute(
                 sa.text("SELECT pg_backend_pid()")
             ).scalar_one()
-            lock_profile_binding_scopes(
-                writer, queue_tags=[old_tag, new_tag]
-            )
+            lock_profile_binding_scopes(writer, queue_tags=[old_tag, new_tag])
             profile = (
                 writer.query(QueueProfile)
                 .filter(QueueProfile.key == key)
@@ -3104,9 +3331,9 @@ def test_department_delete_serializes_with_active_doctor_link_writer(
                 if delete_future.done():
                     break
                 time.sleep(0.02)
-            assert delete_waited, (
-                "department deletion must acquire owner-config scopes before counts"
-            )
+            assert (
+                delete_waited
+            ), "department deletion must acquire owner-config scopes before counts"
         finally:
             allow_link_commit.set()
         doctor_id = writer_future.result(timeout=10)
@@ -3135,7 +3362,9 @@ def test_department_delete_serializes_with_active_doctor_link_writer(
             assert verify.get(Department, clean_department["id"]) is not None
 
 
-def test_doctor_update_and_tagged_graphql_join_follow_owner_config_lock_order(pg_engine):
+def test_doctor_update_and_tagged_graphql_join_follow_owner_config_lock_order(
+    pg_engine,
+):
     """A tagged GraphQL admission holds owner-config before Doctor FOR SHARE.
 
     A concurrent specialty edit must wait for that config lock before it
@@ -3368,4 +3597,6 @@ def test_department_bulk_delete_blocked_when_active_resource_mapping_exists(
     assert pg_session.query(Department).filter_by(id=blocked["id"]).one()
     assert pg_session.query(Department).filter_by(id=clean["id"]).one()
     assert pg_session.query(QueueProfile).filter_by(id=profile.id).one()
-    assert pg_session.query(QueueResource).filter_by(id=resource_id).one().active is True
+    assert (
+        pg_session.query(QueueResource).filter_by(id=resource_id).one().active is True
+    )

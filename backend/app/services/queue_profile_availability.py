@@ -60,9 +60,7 @@ def resolve_queue_profile_availability(
     different departments, neither is selected.
     """
     profile_key = normalize_department_key(getattr(profile, "key", None))
-    explicit_key = normalize_department_key(
-        getattr(profile, "department_key", None)
-    )
+    explicit_key = normalize_department_key(getattr(profile, "department_key", None))
     explicit_parent = departments_by_key.get(explicit_key) if explicit_key else None
     own_parent = departments_by_key.get(profile_key) if profile_key else None
 
@@ -121,8 +119,17 @@ def resolve_queue_profile_availability(
 def load_queue_profile_availability(
     db: Session,
     profiles: list[Any] | tuple[Any, ...],
+    *,
+    lock_parent_rows: bool = False,
 ) -> dict[Any, QueueProfileAvailability]:
-    """Resolve a collection with one bounded parent lookup (no N+1 reads)."""
+    """Resolve a collection with one bounded parent lookup (no N+1 reads).
+
+    Admission callers may request shared locks on resolved Department rows.
+    PostgreSQL then serializes a concurrent ``Department.active`` update
+    with the admission transaction. ``populate_existing`` is required
+    because profile resolution may already have loaded the same Department
+    into the Session identity map before the lock is acquired.
+    """
     profile_rows = list(profiles)
     if not profile_rows:
         return {}
@@ -139,11 +146,19 @@ def load_queue_profile_availability(
 
     departments_by_key: dict[str, Department] = {}
     if candidate_keys:
-        departments = (
+        query = (
             db.query(Department)
             .filter(Department.key.in_(sorted(candidate_keys)))
-            .all()
+            .order_by(Department.id.asc())
+            .populate_existing()
         )
+        if (
+            lock_parent_rows
+            and db.bind is not None
+            and db.bind.dialect.name == "postgresql"
+        ):
+            query = query.with_for_update(read=True)
+        departments = query.all()
         departments_by_key = {department.key: department for department in departments}
 
     return {

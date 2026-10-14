@@ -151,12 +151,12 @@ def get_queue_profiles_public(
     try:
         from app.models.queue_profile import QueueProfile
 
-        # Получаем только активные профили, которые видны на QR странице
+        # Load every published profile once, including manually archived
+        # siblings. The shared-target guard must see those unavailable rows;
+        # the service filters them from the public result afterward.
         profiles = (
             db.query(QueueProfile)
-            .filter(
-                QueueProfile.is_active == True, QueueProfile.show_on_qr_page == True
-            )
+            .filter(QueueProfile.show_on_qr_page.is_(True))
             .order_by(QueueProfile.display_order)
             .all()
         )
@@ -166,16 +166,12 @@ def get_queue_profiles_public(
 
         availability_by_profile = load_queue_profile_availability(db, profiles)
         catalog_day = clinic_today(db)
-        profiles = [
-            profile
-            for profile in profiles
-            if queue_service.is_qr_profile_target_bookable(
-                db,
-                profile,
-                day=catalog_day,
-                availability=availability_by_profile[profile],
-            )
-        ]
+        profiles = queue_service.public_qr_catalog_bookable_profiles(
+            db,
+            profiles,
+            day=catalog_day,
+            availability_by_profile=availability_by_profile,
+        )
 
         return {
             "success": True,
