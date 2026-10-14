@@ -3609,3 +3609,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - GitHub snapshot on 63de0e66: base b5af956756836405beaa025e38c9459c0d238d60; required CodeQL and gitleaks PASS; journal/security/i18n/review-quality checks PASS; path-aware jobs SKIPPED; Unified CI workflow 38573036057 remained pending with no jobs at the last check. PR #3639 remains OPEN, mergeState BLOCKED, and reviews=[].
 - Result: exact served frontend provenance is PASS for 63de0e66. This closes the stale served-build provenance item for this code tree; it does not close the remaining live-spec or full-runbook gaps.
 - Next exact action: refresh Unified CI once, publish the updated evidence in the PR description, and obtain an independent review plus an explicit disposition for the remaining Tier-2 gaps before any merge.
+
+## T11 PR #3639 — code-bearing CI completion — 2026-10-14T20:05+05:00
+
+- Exact code-bearing head: 8e9883fa2c5b914fe53dab482ccdef8530db3b9c; base: b5af956756836405beaa025e38c9459c0d238d60. The frontend/backend/ops source tree is unchanged from the provenance-tested 63de0e66 and the focused UI-fix source 8c8ea4805.
+- Unified CI run 38574596376 completed on 8e9883fa: Backend tests, Frontend E2E, Frontend unit, build, lint, Frontend–Backend Parity, Code Quality, docs/OpenAPI freshness, Metadata, Context Boundary, CI Scope, and PR Required Gate all PASS. CodeQL, gitleaks, security, i18n, regression audit, PR review quality, lifecycle recommendation, and GitGuardian PASS. DAST, Telegram, Supabase, Docker/load/integration and path-aware readiness jobs were SKIPPED; skips are not passes.
+- Current GitHub state: PR OPEN and mergeable; mergeState CLEAN; reviewDecision unset; reviews=[]; no Tier-2 deferral. This means GitHub has no check blocker; the validation plan still holds merge because three named live specs are NOT_RUN and the full pre-deploy runbook is PARTIAL.
+- The earlier 44/44 focused interaction/CSV tests, TypeScript, scoped ESLint, normal hooks, and exact frontend provenance on 63de0e66 remain as recorded above. No new runtime test or staging cycle was run after the provenance pass.
+- User clarified the reported 409 occurs on profile deletion. The UI now renders the structured refusal; the exact production refusal code/revision remains unknown. No production change or data access was made.
+- Result: applicable CI is green on the code-bearing head. Tier 2 remains PARTIAL and the existing PR recommendation remains HOLD until independent review and an explicit disposition for the remaining three tests.
+- Next exact action: continue the already selected safe-harness path for the remaining live-spec gaps with a fresh bounded pre-work and owned synthetic project; do not treat skipped checks as PASS or merge before validation/disposition.

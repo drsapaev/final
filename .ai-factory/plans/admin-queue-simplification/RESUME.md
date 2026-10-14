@@ -1,6 +1,25 @@
 # Resume
 
-## Current authoritative checkpoint — T11.1 exact frontend provenance — 2026-10-14T18:45+05:00
+## Current authoritative checkpoint — T11.1 code-bearing CI green; Tier 2 partial — 2026-10-14T20:05+05:00
+
+Plan version: 3.91
+Current task: T11 PR_OPEN / #3639; T11.1 IN_PROGRESS; T11.1a VALIDATED.
+Task ID: 9af17c38-8235-4681-93e8-6a9864cbdb75.
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final.
+Branch: codex/aqs-T11-manual-availability.
+Code-bearing head reviewed by CI and staging: 8e9883fa2c5b914fe53dab482ccdef8530db3b9c; base b5af956756836405beaa025e38c9459c0d238d60. A docs-only checkpoint commit may follow; query actual HEAD before resuming.
+GitHub PR state at the snapshot: OPEN, mergeable, mergeState CLEAN; reviewDecision unset; reviews=[].
+
+- Deletion 409 confirmed by the user. The structured error rendering fix is in 8c8ea4805; it surfaces backend reasons without changing delete guards or auto-archiving. Production was not changed; the exact live refusal reason/revision is unknown.
+- Focused local validation: 44/44 interaction/CSV tests, TypeScript, scoped ESLint (0 errors, 4 existing warnings), and normal hooks PASS.
+- Canonical exact-source provenance on 63de0e66 PASS: Preflight/Start/Session/teardown, service-worker SHA match, 254/254 served files byte-matched, zero owned resources, private env restored. Runtime source is unchanged on code-bearing head 8e9883fa2.
+- Unified CI 38574596376 on 8e9883fa2: all applicable tests and required gates PASS, including Backend, Frontend E2E, Frontend unit/build/lint, parity, code quality, docs, metadata, context boundary, PR Required Gate, CodeQL, and gitleaks. Path-aware/nightly jobs remain SKIPPED.
+- Tier 2 remains PARTIAL: admin-navigation.spec.ts, queue-system.spec.ts, and panel-qa-admin-live.spec.ts remain NOT_RUN; docs/runbooks/STAGING_VALIDATION.md remains PARTIAL. No Tier-2 deferral has been accepted. GitHub is technically mergeable, but the plan recommendation is HOLD pending these gaps and independent review.
+- Preserve unrelated .scratch/. Do not deploy, touch production or foreign staging, submit a review as the user, accept a deferral, or merge without explicit instruction.
+- Next exact action: prepare the next bounded synthetic harness pre-work for the three remaining live specs; use a fresh owned project and record each outcome separately. If an existing spec cannot be safely adapted, keep it NOT_RUN and request a PR-specific disposition.
+
+
+## Historical checkpoint — T11.1 exact frontend provenance — 2026-10-14T18:45+05:00
 
 Plan version: 3.91
 Current task: T11 PR_OPEN / #3639; T11.1 IN_PROGRESS; T11.1a VALIDATED locally and on the recorded code-bearing CI head.
