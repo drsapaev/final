@@ -1,6 +1,25 @@
 # Resume
 
-## Current — provenance passed; branch synced; Unified CI pending — 2026-10-14T13:27+05:00
+## Current authoritative checkpoint — plan 3.90 / T11 / reported 409 — 2026-10-14T13:53+05:00
+
+Plan version: 3.90
+Current task: T11 — PR #3639, PR_OPEN; T11.1 diagnostic PLANNED.
+Task ID: `9af17c38-8235-4681-93e8-6a9864cbdb75` (same original Tier-2 workstream).
+Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`
+Branch: `codex/aqs-T11-manual-availability`
+Base / fresh origin/main: `266182fe2a91df813d3e4830747d5b7a86f14230`
+HEAD before this docs update: `3e287ca853ad0150a546c929c15520e6f02f523c` (local = PR; main is ancestor; 0 behind).
+
+- Start with [canonical plan](../codex-admin-queue-simplification.md), then this checkpoint, DECISIONS and the last EVIDENCE entry. Earlier checkpoints below are historical even if their original wording says current. After a docs commit use actual `git rev-parse HEAD` and live PR state; this recorded pre-edit SHA is not self-updating.
+- T00–T10 are MERGED; GitHub confirms T10 #3633 merge `6315c62edb888bb8864928a41dd70a4c00be6e3d`. T11 #3639 remains OPEN/BLOCKED; T12–T18 PLANNED. Do not restart T06 from the old plan footer.
+- Provenance is PASS on exact source `35717fafa154baf9fb8b79cbe0910fb9dbbbcc6b`, embedded SHA exact, image-to-HTTP bytes 254/254, zero mismatches, owned teardown PASS. Old mismatch/NOT_PROVIDED entries are superseded for that artifact. Prior browser 22/22, PG and runbook PASS remain tied to their recorded source commits; no tests reran in this docs slice.
+- Current remaining gates: CI on the new docs commit, independent review (reviews=[]), three named legacy live-spec NOT_RUN, full pre-deploy runbook PARTIAL. Pre-edit HEAD `3e287ca8` completed CI by 14:05 with 26 PASS / 12 SKIPPED / 0 FAIL / 0 PENDING, including applicable required checks; skipped jobs are not passes. No accepted Tier-2 deferral; merge HOLD. The PR body also needs reconciliation with the newer provenance evidence.
+- U1 / T11.1: reported URL may address profile key `specialists` via PUT/DELETE, not a separate specialists GET. Method/action/reason/initiator/deployed revisions UNKNOWN. Current code's initial list GET is `/queues/profiles?active_only=false`; dynamic save/delete URL and structured backend 409 guards exist. Do not add an endpoint, remove guards, declare stale cache, or label the report fixed from a console status alone.
+- Authorized side action is documentation sync only: canonical plan, PROGRESS, RESUME, DECISIONS, EVIDENCE; current PR description may be reconciled with those already recorded facts. Runtime/tests/migrations, staging execution, production, gate/router, review/deferral/merge are excluded. Pre-existing `.scratch/` is preserved.
+- Next exact action: verify that plan 3.90 is committed/published by comparing actual local HEAD, diff and live #3639. Commit/push only the five docs if this update is still local; if already clean/published, skip that completed step. Read the reconciled PR description and CI on its actual SHA, then collect the missing T11.1 facts. Do not start staging or T12 in this documentation-only slice.
+- Next implementation decision: establish T11.1 method/action/reason/revision with safe read-only evidence, reproduce mutations only in owned synthetic staging, and assign the smallest owner/scope. A T11 regression stays in #3639; a pre-existing/deployment issue gets a distinct recorded follow-up after the current PR cycle. Missing evidence stays UNRESOLVED and needs an explicit merge-risk disposition.
+
+## Historical — provenance passed; branch synced; Unified CI pending — 2026-10-14T13:27+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 is OPEN at local/remote HEAD `5e6e73bb2e07ed09e172ca850ce4aa4eb8849a79`, based on current main `266182fe2a91df813d3e4830747d5b7a86f14230` via a no-conflict merge.
 - User authorized a staging-only provenance change in `frontend/Dockerfile.staging` and `ops/compose.staging.yml`. It passes `VERCEL_GIT_COMMIT_SHA` to Vite; app runtime is unchanged. Commit is `35717fafa154baf9fb8b79cbe0910fb9dbbbcc6b`.
@@ -18,7 +37,7 @@
 - Tier-2 remains PARTIAL / merge HOLD. Earlier synthetic Admin 2FA, PostgreSQL 10/10, RQ-18 3/3 and RQ-17 3/3 are recorded against prior code snapshots; exact embedded frontend SHA provenance and full `docs/runbooks/STAGING_VALIDATION.md` remain NOT_RUN and are not closed by local checks.
 - Next exact action: verify `.scratch/` is the only worktree residue, run `git diff --check`, and push the branch normally. Then check CI on the new exact PR HEAD and refresh PR evidence without claiming unrun staging. Do not merge; user performs merge.
 
-## Current — local UI-ratchet fix validated; remote PR unchanged — 2026-10-14T09:19+05:00
+## Historical — local UI-ratchet fix validated; remote PR unchanged — 2026-10-14T09:19+05:00
 
 - Continue T11 task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Local HEAD `1e5055014ea67f07958acda1127ccf9b7cccac62` includes `origin/main` only through `039b96403`; current `origin/main=6d69ced8afc093618a2bd155ec943679f8124611`. PR #3639 remains OPEN, remote HEAD `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`, BEHIND. No PR update, review, deferral or merge.
 - Current source delta fixes the known Regression Audit Gate failure in the already-authorized HeaderNew scope: six responsive `!important` rules were the exact `cssImportant 309→315` increase. Static header structure moved from inline props to CSS; the baseline JSON stayed unchanged.
@@ -28,7 +47,7 @@
 - A normal `git commit --only` for T11 paths stopped before commit because pre-commit requires the modified `.pre-commit-config.yaml` to be included in the temporary commit index. The hook config is orthogonal and staged separately; no `--no-verify` or other bypass was used.
 - Next: resolve that packaging scope explicitly (separate hook-maintenance cycle after this PR or include it only with explicit T11 scope approval). Preserve all files; do not retry a mixed-scope commit or bypass hooks. After scope resolution, sync current `origin/main`, then rerun exact-head CI and any required owned synthetic staging. Keep merge HOLD until remaining evidence and final review are complete.
 
-## Current resume — owned Tier-2 RQ-18 cycle passes; provenance and hook remain open — 2026-10-13T17:12+05:00
+## Historical resume — owned Tier-2 RQ-18 cycle passes; provenance and hook remain open — 2026-10-13T17:12+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`, local HEAD `1e5055014ea67f07958acda1127ccf9b7cccac62`. Live PR #3639 is OPEN at remote HEAD `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`, MERGEABLE/BEHIND. Refresh both before a future publish/review action; no PR operation was performed here.
 - User explicitly accepted loss of the unregistered `D:\WSL\UbuntuProof` backup. It was deleted; path now absent. C:/D: free space measured 16.2/13.2 GiB.
@@ -38,7 +57,7 @@
 - Final exact-project teardown passed; independent queries found zero containers, networks, volumes and images. Full `docs/runbooks/STAGING_VALIDATION.md` is NOT_RUN. Tier-2 remains PARTIAL and merge HOLD; no deferral was accepted.
 - Next exact step: keep PR #3639 unchanged. Have the Windows policy owner resolve the hook-signing block through an approved route, then rerun normal hooks and inspect the exact diff. Any push/review/deferral/merge requires its own existing authorization and exact-head checks.
 
-## Current resume — commit hook and WSL build reserve block remaining Tier-2 — 2026-10-13T14:53+05:00
+## Historical resume — commit hook and WSL build reserve block remaining Tier-2 — 2026-10-13T14:53+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 remains at remote HEAD `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`; local branch is synced with fresh `origin/main` by merge commit `1e5055014ea67f07958acda1127ccf9b7cccac62`. Do not treat the local merge as a PR update.
 - The approved API-client 429 fix and three regression tests are staged; 17 focused tests pass. Type-check, lint (one pre-existing warning), and build passed before sync; sync changed only six upstream staging/runbook files. Three journal files have uncommitted edits. A stash copy is retained for recovery.
@@ -47,7 +66,7 @@
 - `D:\WSL\UbuntuProof` is unregistered but contains an 8.83-GiB VHDX. A repository restore-audit script explicitly says the original VHDX was not touched, and its expected restored copy/report are missing. No deletion performed; wait for the user's choice before removing this possible backup.
 - Next exact action: free ≥10 GiB, preferably 12 GiB, on D: and obtain an approved resolution for the signed-hook block. Then rerun Preflight; after the regular commit hooks pass, commit/push and perform one owned synthetic staging cycle. Keep merge HOLD; do not claim the QR booking/archive scenarios passed.
 
-## Current resume — RQ-18 global cooldown blocker — 2026-10-12T23:21+05:00
+## Historical resume — RQ-18 global cooldown blocker — 2026-10-12T23:21+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 remains OPEN at HEAD `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`; last checked MERGEABLE/BEHIND. No review, deferral, PR-body update or merge.
 - Latest exact-HEAD canonical runs: both Preflight/Start passed, both 254/254 frontend byte checks and normal Admin 2FA passed, both owned teardowns verified zero resources. Viewport/keyboard 16/16 and RQ-17 3/3 passed. In both runs RQ-18 Admin successfully provisioned a permanent QR, then the post-reload setup read failed; patient join/archive/reactivation were consequently skipped.
@@ -56,7 +75,7 @@
 - Remaining: Tier-2 PARTIAL/FAIL, merge HOLD, no accepted deferral; embedded frontend SHA NOT_PROVIDED; full staging runbook NOT_RUN. See `EVIDENCE.md#t11-pr-3639-rq17-rq18-follow-up-2026-10-12`.
 - Next exact action: await scope decision on the global 429 cooldown. If authorized, run mandatory gate for a narrowly defined client cooldown fix, read any generated handoff prompt, add focused regression tests and then re-run the owned QR setup/join/archive scenario. If not authorized, leave runtime unchanged and keep #3639 on hold.
 
-## Current resume — authenticated staging exposed responsive and T18 failures — 2026-10-12T16:58+05:00
+## Historical resume — authenticated staging exposed responsive and T18 failures — 2026-10-12T16:58+05:00
 
 - Task `9af17c38-8235-4681-93e8-6a9864cbdb75`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Code-bearing staging commit is `b890c9dd38413eaa79e2e8d6facb63904cdd6fa8`; base is `0b1281688eb74be71f07c1ed630905bfea089d6e`. A journal-only commit was pushed after the test; refresh live PR HEAD and CI before resuming. No PR review, deferral, body update, or merge was performed.
 - Existing validation-only `narrow_override` applies after two recorded gate misroutes. Local ignored harness fix resolved the Registrar auth race. Fresh canonical Preflight/Start passed; backend, 254/254 frontend byte comparison, synthetic Registrar, normal Admin password→TOTP login, and Registrar UI login passed.
@@ -65,7 +84,7 @@
 - Tier-2 remains PARTIAL/FAIL; merge HOLD. Full `docs/runbooks/STAGING_VALIDATION.md` is NOT_RUN. The current user-approved slice forbids runtime edits; do not change source or repeat staging until a separate source-fix scope is approved. Preserve only the three T11 journal changes; no runtime/test source changed.
 - Next exact action: review the affected canonical frontend route/layout and RQ-17/RQ-18 route expectations, prepare the narrow implementation scope, then run targeted browser checks and public join/archive on a new authorized synthetic cycle. Do not accept a Tier-2 deferral based on this run.
 
-## Current resume — memory diagnosis complete; single cycle recorded — 2026-10-12T16:11+05:00
+## Historical resume — memory diagnosis complete; single cycle recorded — 2026-10-12T16:11+05:00
 
 - Same task `9af17c38-8235-4681-93e8-6a9864cbdb75`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`; PR head/base `b890c9dd38413eaa79e2e8d6facb63904cdd6fa8` / `0b1281688eb74be71f07c1ed630905bfea089d6e`. CI retry attempt 2 SUCCESS.
 - Memory diagnosis complete: 7.69 GiB usable RAM is total capacity, not currently free RAM; app/Windows/kernel compression/pools/shared GPU/background clinic services explain observed use. WSL was stopped at the diagnostic snapshot; Fast Startup evidence preserves the older kernel uptime. No leak/OOM was established and no system settings/processes were changed.
@@ -74,7 +93,7 @@
 - Prepared ignored local harness after teardown: safe native stdout/stderr capture with actual exit code, report freshness guard, successful missing-image query and resource-list exit checks. Windows PowerShell stderr+exit0/exit7 probes, syntax, and freshness guard PASS. No second staging cycle was run.
 - Next exact validation action: recheck PR head and owned project state, then one canonical wrapper cycle. It must collect actual browser outcomes/new reports; Tier-2 remains PARTIAL. Keep production/foreign staging unchanged and do not bypass the previously blocked normal commit hooks. Three T11 journals remain local/staged; `.scratch/` is preserved.
 
-## Current resume — memory diagnosis complete; artificial RAM hold superseded — 2026-10-12T15:57+05:00
+## Historical resume — memory diagnosis complete; artificial RAM hold superseded — 2026-10-12T15:57+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75`, worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`; PR #3639 OPEN/MERGEABLE/CLEAN at head `b890c9dd38413eaa79e2e8d6facb63904cdd6fa8`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`.
 - CI attempt 2 completed SUCCESS, including Frontend E2E and PR Required Gate. No additional CI rerun is needed.
@@ -83,7 +102,7 @@
 - Safe task-local harness fingerprint is already updated to the synced frontend tree (`e01d4bb3`); parser and tree assertion passed. Three T11 journal files remain local/staged; prior docs commit was blocked by Windows App Control, which must not be bypassed.
 - Next: run the existing canonical wrapper once for Preflight → Start → one Session → exact-project teardown. Stop on actual launcher/resource/ownership/runtime failures; keep production and foreign staging untouched. Tier-2 remains PARTIAL until valid browser/provenance evidence is collected.
 
-## Current resume — Preflight passed; CI retry running; host RAM below floor — 2026-10-12T15:33+05:00
+## Historical resume — Preflight passed; CI retry running; host RAM below floor — 2026-10-12T15:33+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 remains OPEN at head `b890c9dd38413eaa79e2e8d6facb63904cdd6fa8`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`.
 - After the reboot, the canonical Preflight passed on this exact commit. Windows free RAM was 835 MiB before the call, 882 MiB during it, and 1392 MiB afterward; all are below the recorded 3072 MiB floor. Do not run Start/Session below that threshold. The owned project's resource check found 0 containers, networks, and volumes.
@@ -93,7 +112,7 @@
 - Windows free RAM measured 1797 MiB at 15:33, below the 3072 MiB floor. Next: finish observing the one CI retry; once free RAM reaches 3072 MiB, recheck PR HEAD and owned ports/resources and execute the existing task-local wrapper exactly once for Preflight → Start → one Session → teardown. If below floor, stop before Start. Retry journal commit only through normal hooks.
 - Tier-2 remains PARTIAL / merge HOLD; no deferral, review, or merge has been made in this task.
 
-## Current resume — PR branch synced to main; staging held by host RAM — 2026-10-12T14:02+05:00
+## Historical resume — PR branch synced to main; staging held by host RAM — 2026-10-12T14:02+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 is OPEN at head `b890c9dd38413eaa79e2e8d6facb63904cdd6fa8`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`; branch was synchronized with and pushed to the fresh `origin/main` by a normal merge, with no conflict.
 - Canonical Preflight ran against this exact merge commit and returned PASS: C: 17 GiB free, WSL backing D: 12 GiB free, WSL available 3208 MiB, Docker 29.1.3 / Compose 2.40.3, no warnings. Runtime readiness is `NOT_RUN` by design at Preflight.
@@ -103,7 +122,7 @@
 - The evidence-only commit was attempted after staging just the three T11 journals, but local pre-commit hooks reported Windows App Control `WinError 4551`; commit did not succeed and nothing was pushed. The three intended journal files remain staged. Do not bypass or disable hooks.
 - Next action: after host RAM reaches 3072 MiB, recheck PR HEAD and port/resource ownership, then execute the existing task-local canonical wrapper once for Preflight → Start → one Session → teardown. Preserve `.scratch/` and do not alter production or foreign staging. Afterward retry committing/pushing the journal checkpoint through normal hooks if permitted. Tier-2 remains PARTIAL / merge HOLD until evidence and human review are complete.
 
-## Current resume — Tier-2 retry stopped before Session on Windows RAM guard — 2026-10-11T19:25+05:00
+## Historical resume — Tier-2 retry stopped before Session on Windows RAM guard — 2026-10-11T19:25+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 is OPEN at exact HEAD `74ad12be98424e2b76a134dc0b35e9dec0644ee4`, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed` (BEHIND). No runtime/test-source change.
 - User explicitly requested closing remaining NOT_RUN with a safe harness. Canonical gate stopped twice (normal: known root cause required; known-root retry: unsafe/out-of-repo scope). A bounded `narrow_override` was used only for validation in the own synthetic staging project; `frontend/src/stores/auth.ts` was read-only. No gate/router edits.
@@ -114,7 +133,7 @@
 - Private env/harness under ignored `output/staging/t11-pr3639-tier2f-*` remains because a prior explicit deletion was rejected by command policy. Do not bypass that policy. Existing `.scratch/` remains preserved; prior self-created memory payload cleanup was likewise rejected.
 - Next exact action: wait until Windows available RAM is at least 3 GiB, then recheck PR HEAD and run canonical Preflight only. If it passes, run the sessionStorage-aware harness once through Preflight → Start → one Session → teardown. Do not start below the RAM floor or retry an unexplained failure.
 
-## Current resume — PR #3639 remaining Tier-2 cannot close in this staging attempt — 2026-10-11T18:52+05:00
+## Historical resume — PR #3639 remaining Tier-2 cannot close in this staging attempt — 2026-10-11T18:52+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR/worktree HEAD tested: `74ad12be98424e2b76a134dc0b35e9dec0644ee4`; base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`.
 - Source-backed harness diagnosis: staff auth keys live in frontend `sessionStorage`, not Playwright `storageState`. The first two per-test browser result sets were unauthenticated diagnostics and are not valid product verdicts. A private transfer fixture was added but its Playwright global setup exited before a fresh report. PowerShell's native exit handling was made explicit; the next canonical Start then failed in `compose-up` before Session.
@@ -124,7 +143,7 @@
 - Automatic task-memory capture succeeded at revision 44. Deletion of the exact self-created `.scratch/codex-memory-9af17c38-8235-4681-93e8-6a9864cbdb75-20261011.json` was rejected by the same policy, so that one payload is also pending cleanup. `git diff --check` passed; only the three T11 journals are tracked-dirty.
 - Next exact action: hand back the Compose-start/authenticated-browser blockers plus the cleanup rejection. Do not retry Start, update PR, submit review, accept deferral, or merge in this slice.
 
-## Current resume — PR #3639 staging pass, exact-head CI green, Tier-2 partial — 2026-10-11T16:39+05:00
+## Historical resume — PR #3639 staging pass, exact-head CI green, Tier-2 partial — 2026-10-11T16:39+05:00
 
 - User-authorized scope was harness-only: canonical Preflight, Start, one Session with the exact three test nodes, teardown, T11 journals and PR description. This was completed without runtime, test-source, launcher, Compose, gate/router, production or foreign staging edits.
 - Exact staging result: 3/3 PostgreSQL nodes PASS on code HEAD 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3; JUnit SHA-256 cbe772b21f33377f8f6d6f5f264ae01df4a445693c11e9f0b0905175c31ff30a. Canonical teardown found zero owned resources and removed the private env.
@@ -153,7 +172,7 @@
 - Tier-2 is still PARTIAL: the three named legacy live browser specs and the complete `docs/runbooks/STAGING_VALIDATION.md` remain NOT_RUN. No deferral has been accepted, no formal review submitted, and no merge or PR-body edit occurred.
 - Next exact action: run `git diff --check`, confirm only `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` are tracked changes, commit/push that evidence checkpoint, and inspect exact-head CI. Then present a separate user-owned decision about any narrow deferral for remaining legacy live specs. Do not accept deferral or merge without explicit authorization.
 
-## Current resume — PR #3639 public catalog/admission P2 staging regression passed — 2026-10-11T00:56+05:00
+## Historical resume — PR #3639 public catalog/admission P2 staging regression passed — 2026-10-11T00:56+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. The staging run used journal checkpoint `5d732a8ea7e182b500037a41ca344b4988047928`, whose exact-head CI was green (25 SUCCESS / 13 SKIPPED, no pending/failures). Code-bearing source remains `6522e8c0046d824aaefa31960582ce26f7cef708`; base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. The three T11 journals now need a validation-evidence commit and fresh CI.
 - Latest P2: public `GET /api/v1/queues/profiles/public` could expose profile A although profile admission rejects A because another published profile on the same QueueResource tag has an inactive parent. Fixed by extracting the existing admission resource-tag resolver into `QueueBusinessService` and using its shared-tag bookability guard in the public catalog with `clinic_today(db)`. Token target planning and actual profile admission now call the same route resolver.
@@ -186,7 +205,7 @@
 - Do not run staging in this source-fix slice, update PR body, submit formal review, or merge. Tier-2 staging remains PARTIAL and must be completed as a separate bounded validation step.
 - Next exact action: inspect final allowed-path diff, commit/push the existing PR branch without force, and inspect exact-head CI. Keep PR body, formal review, merge, and the separately gated Tier-2 staging run out of this source-fix slice.
 
-## Current resume — PR #3639 exact-head CI green; Tier-2 partial — 2026-10-10T00:08+05:00
+## Historical resume — PR #3639 exact-head CI green; Tier-2 partial — 2026-10-10T00:08+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Latest validated code-bearing PR commit is `6ea00b8fcfc67e201deed121a9201ef673410611`; at that check PR #3639 was OPEN/MERGEABLE. Base / `origin/main` is `a396ee505b6f53318b4360ca81827759125c79ca`. Preserve pre-existing untracked `.scratch/`; never stage it.
 - Implementation commit `6ea00b8f` contains the approved QR token/profile resolution fix. Five focused PostgreSQL modules passed **72 tests, 2 warnings** on task-owned synthetic PostgreSQL 17; scoped Ruff, py_compile, and `git diff --check` passed. Exact-head Unified CI run `37976219686` and applicable associated workflows are green. See `EVIDENCE.md#t11-pr-3639-exact-head-ci-after-token-info-fix-2026-10-10t0006`.
@@ -246,7 +265,7 @@
 - Stop conditions: PR HEAD changes; Preflight or source/owner isolation fails; required disk/VHD reserve is unavailable; normal Admin TOTP cannot be completed; a typed owner/queue/token cannot be constructed under current schema without weakening invariants; or the system mutates existing queue/history during Department off/on. Record a runtime finding without fixing it here. Teardown only this named project through the canonical helper and verify it is absent.
 - Next exact action: confirm the selected ports/project are free, create only the synthetic ignored env, then run canonical Preflight. Start and all scenario checks must run in a single canonical Session; capture sanitized per-case results and frontend provenance honestly, then teardown this project.
 
-## Current resume — T11 PR #3639 CI complete; Tier-2 partial — 2026-10-09T11:50+05:00
+## Historical resume — T11 PR #3639 CI complete; Tier-2 partial — 2026-10-09T11:50+05:00
 
 - Continue in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Exact local and remote PR #3639 HEAD is journal-only commit `e9f0338b4a65d2d063ad20835e05cb2b991ac467`; runtime/test code staged at `35f30506fcd511c0dc81a5d87ae6122e5de0242d`; base is merged #3633 commit `6315c62edb888bb8864928a41dd70a4c00be6e3d`. PR is OPEN/MERGEABLE. Do not merge or submit a review; the user performs merge.
 - Exact-head CI run `37894158852` and associated blocking workflows passed. Read `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` for passed check classes and path-aware skips. Skips are not passes.
@@ -269,7 +288,7 @@
 - Tier-2 T11 staging, ordinary Admin 2FA, browser cases, served-build provenance, full `STAGING_VALIDATION.md` and T18 remain **NOT_RUN**; no deferral accepted. T10's two queue/rebind staging race scenarios remain separate and NOT_RUN.
 - PR body has been refreshed; the local body gate passed 19 tests, both documented samples and the live PR body. The first commit attempt triggered Black formatting in six approved test modules; the second commit `66afece7` passed all applicable hooks. `py_compile` and `git diff --check` pass after formatting.
 - Next exact action: push the existing PR branch and inspect exact-head required CI. Tier-2 staging, ordinary Admin 2FA, browser checks and served-build provenance remain NOT_RUN; no deferral is accepted. Do not submit review or merge; the user performs merge.
-## Current resume — PR #3633 description and Tier-2 follow-up (2026-10-08T22:35+05:00)
+## Historical resume — PR #3633 description and Tier-2 follow-up (2026-10-08T22:35+05:00)
 
 - Continue in `C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final`, branch `codex/aqs-T10-profile-guards`. HEAD at the last remote snapshot is `cb73091c0d4a312153aca938014e94435239f118`; base is `7bb02680e778ac56369503c4fd337ac9329da4b2`. The current follow-up updates only PROGRESS/RESUME/EVIDENCE and is pending commit/push.
 - Fixes are pushed in `928642674`; the OpenAPI freshness workflow newline correction is in `b2f99ab66`. Exact-head CI run `37813134735` passed on b2f99ab66, including Backend (**5,418 passed, 65 skipped, 25 deselected, 3 xfailed**), Frontend unit/E2E/lint/build, OpenAPI/API type freshness, parity, PR Required Gate and listed quality/security gates. Path-aware skips are documented in `PROGRESS.md` and are not passes.
@@ -414,7 +433,7 @@ Exact-head CI on `6803195e` found one compatibility regression: `test_doctor_cal
 
 Follow-up local validation: display and cabinet focused suites passed (27 passed, 1 existing provider warning); Ruff, Ruff format check, `py_compile`, `git diff --check`, and commit hooks passed. Exact-head checks on `3cd2bf11` completed **30 success, 13 skipped, 0 failed, 0 pending**. First E2E attempt failed an unrelated lab dirty-guard locator timeout while Vite proxy returned `ECONNREFUSED`; retry passed. PR-body validation passed 19 unit tests and both sample bodies; remote description records the corrections and final evidence. Staging/browser/full-system validation remains NOT_RUN; no deferral accepted; merge HOLD. Next: commit/push this progress checkpoint, verify the resulting docs-only HEAD, then await independent review and a separate staging/deferral decision. Do not merge or begin T09.3.
 
-## Current continuation checkpoint — T09.2 exact code-head CI passed (2026-10-06T13:39+05:00)
+## Historical continuation checkpoint — T09.2 exact code-head CI passed (2026-10-06T13:39+05:00)
 
 - PR #3613 was merged by the user at `1d146d857e1570ff2259975f081f80dc0b31ae82`; local `main` and `origin/main` are synchronized to that commit. Its safe idempotency-key log fingerprint resolves the earlier T09.2 scope hold; details remain in historical evidence.
 - Current task is T09.2 locked apply/strict audit/replay. Implementation and post-sync local validation are complete; [PR #3614](https://github.com/drsapaev/final/pull/3614) is open at verified code/evidence HEAD `ca6a1ba8e34ab02cb8773ca38256c33b22516895`; generated artifact correction is `80e5ad8`. The pinned generator now matches the complete artifact. GitHub run `37435553039` on this exact HEAD completed **26 success / 13 skipped / 0 failed / 0 pending**; frontend lint/API freshness, backend tests, E2E, build/unit, OpenAPI freshness, Code Quality, parity, Context Boundary, and PR Required Gate passed. Two duplicate Lifecycle/Review Quality executions were cancelled while replacement runs on the same HEAD passed. This checkpoint refresh changes only plan journals; its new docs-only HEAD will be checked separately. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t09-2-cabinet-apply\final`, branch `codex/aqs-T09.2-cabinet-apply`, base `1d146d857e1570ff2259975f081f80dc0b31ae82`. Current status: **PR_OPEN**.
@@ -469,7 +488,7 @@ Follow-up local validation: display and cabinet focused suites passed (27 passed
 - Next: commit/push this progress record, check its new docs-only HEAD, and update the PR body with that final head. Then wait for the user's review/merge decision. Do not merge or start T08.3.3 without separate user instruction.
 - Do not merge or start T08.3.3 without the user's separate instruction after review and green checks.
 
-## Current continuation checkpoint — T08.3.2 post-merge P2 follow-up (2026-10-05T17:38:38+05:00)
+## Historical continuation checkpoint — T08.3.2 post-merge P2 follow-up (2026-10-05T17:38:38+05:00)
 
 - PR #3600 is merged at `b3bd5272389da88513cc1ac23985b390489554f9`. Fresh `origin/main` is `ba03fdfb8d14d38a68a2d16df93145562cd87c63`; it contains the merge and QR PostgreSQL tests.
 - Current branch: `codex/aqs-T08.3.2-clockfix`, from a clean managed worktree at that base. Code/test commit `ae0bd8a7f24b27f7b1981911b2b9ecfaec9ede2f` is pushed in [PR #3607](https://github.com/drsapaev/final/pull/3607); exact PR HEAD `d4d1524aa96f7260825b6f0caf1b9cb724044490` passed 10 checks, 4 skipped, 0 failed. The evidence-only checkpoint below will create a new HEAD requiring fresh checks. The sole code owner is `backend/tests/integration/test_qr_family_phone_identity.py`; no runtime changes are authorized.
@@ -482,7 +501,7 @@ Follow-up local validation: display and cabinet focused suites passed (27 passed
 
 > The checkpoint below is historical and predates the #3600 merge and its deterministic-clock follow-up.
 
-## Current continuation checkpoint — T08.3.2 (2026-10-05T13:48:16+05:00)
+## Historical continuation checkpoint — T08.3.2 (2026-10-05T13:48:16+05:00)
 
 - T08.3.1 / PR #3599 is merged at `a452c54e5851611476c1b2ac3e3298aeff467eca`. Fresh worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-2-qr-session\final`, branch `codex/aqs-T08.3.2-qr-session`, base `origin/main`/HEAD `34ca6e59080dc679a6c7f921ac88a6aacb34e996`; clean before this checkpoint.
 - Current slice is test-only. The approved contract is now locally validated with independent real-PostgreSQL evidence for exact replay without a second issuance, single and multi outer-transaction rollback, and permitted partial multi-target success/error/counter persistence. `QUEUE_POLICY_V2_CREATION_ENABLED` remains default-off. No runtime code changed.
@@ -497,7 +516,7 @@ Plan version: 3.4
 Last updated: 2026-10-05T13:48:16+05:00, Asia/Tashkent
 Execution permission: IMPLEMENTATION_ACTIVE; user authorized continuing the plan, confirmed PR #3596 was merged, and said continue. GitHub merge commit: `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`.
 
-## Current continuation checkpoint — T08.3.1 PostgreSQL quota race proof (2026-10-05T00:28:28+05:00)
+## Historical continuation checkpoint — T08.3.1 PostgreSQL quota race proof (2026-10-05T00:28:28+05:00)
 
 - PR #3596 / T08.2c is MERGED at `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7`. Fresh isolated worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t08-3-pg-proof\final`; branch `codex/aqs-T08.3-pg-proof`; base `origin/main` is the merge commit above.
 - Current bounded subtask T08.3.1 adds real independent-PostgreSQL-session proof for the existing queue-token admission transaction: simultaneous independent patients competing for the last v1 slot, exact-token duplicate retry after capacity is consumed, and rollback of `entry + online_issued_count + token usage`. This does not certify the separate QR-session response snapshot/partial-batch transaction or direct GraphQL writer; those remain later T08.3 subtasks.
@@ -518,7 +537,7 @@ Execution permission: IMPLEMENTATION_ACTIVE; user authorized continuing the plan
 - Local checks: two focused unit modules **57 passed, 1 warning** using SQLite fixtures; scoped Ruff, Python compile, focused formatter ranges, and `git diff --check` pass. The PR body gate passed 19 unit tests, both sample bodies, and the updated body. Exact-head CI on `068fdbed` finished **31 success, 12 skipped, 0 failure**. PostgreSQL race tests, staging/browser validation, and production behavior are NOT_RUN.
 - Commit `4d301ad64208af81de53b1c7bf88f6735473b6da` contains the fixes; `068fdbede3d08e0bfbd1384ecea7f27cf02827ed` is the current evidence-only PR head. The body now reports completed exact-head CI and passed the local validator plus remote PR Review Quality Gate. All commit hooks passed except `check-added-large-files`, skipped after Windows Application Control blocked its executable (`WinError 4551`). Skips on the exact head include staging/production readiness, integration, Docker, k6 load, metadata, selected security/DAST, Supabase Preview, and failure notifications; these are not passes. No review was submitted and no merge was performed. Next: await the user's independent review/merge decision. Keep PR #3596 open; do not begin T08.3 until the #3596 cycle closes.
 
-## Current continuation checkpoint — T08.2c exact-head validation
+## Historical continuation checkpoint — T08.2c exact-head validation
 
 > Historical and superseded by the authoritative checkpoint above. Its former next-action and exact-head check statements do not describe the current local diff.
 
@@ -631,7 +650,7 @@ Older timestamped “Active step — T08.1b” records below are historical and 
 - Earlier T03/T05/T06 worktrees and scratch were preserved per their checkpoints. Do not delete, clean, reset or rewrite them while doing T07. Use only this worktree for T07 code.
 - Older PR-open text in timestamped EVIDENCE is historical. Current state is the header/table in PROGRESS and this RESUME; the latest appended exact-head review entry supersedes earlier T07 CI/review observations.
 - T07 runtime code originated at `84ec10b40`; later commits include OpenAPI preservation, deterministic test setup, review fixes `f26a79fe`, `4595d67a`, and `c92862b7`, plus QR response-contract follow-up `a8ce8a6d`. Earlier PR heads `e7be14cd`, `1e74d645`, `ead1dbf7`, and `0c258a007` each had their own check sets; the latest exact-head result is recorded in the final T07 checkpoint of `EVIDENCE.md`. Path-aware skips are not passes. A Codex technical COMMENT exists; independent human review is absent. The PR-specific bounded deferral acknowledgement is checked under user delegation; this is not a GitHub self-approval. The branch is based on `cc446a85654f`; work only in the T07 worktree, never rebase in `C:\final`.
-## Current resume — PR #3639 exact-head backend CI regression — 2026-10-09T23:00+05:00
+## Historical resume — PR #3639 exact-head backend CI regression — 2026-10-09T23:00+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 remains OPEN at exact HEAD `a593fed10c4803f110f082bd7d589c1a64217b44`, base `a396ee505b6f53318b4360ca81827759125c79ca`; local HEAD matches. Preserve untracked `.scratch/` and do not stage it.
 - Hosted backend CI on that exact HEAD failed 9 tests (four QR family token cases, four RQ24b cross-panel cases, one RQ29 combined-path case). Most failures share the overly broad alias/parent ambiguity interaction; the full test-node list and CI summary are in `EVIDENCE.md#t11-pr-3639-ci-regression-follow-up-2026-10-09`.

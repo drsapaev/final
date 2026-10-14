@@ -1,6 +1,25 @@
 # Progress
 
-## Current authoritative continuation — provenance PASS; main synced; Unified CI pending — 2026-10-14T13:27+05:00
+## Current authoritative checkpoint — plan 3.90 / T11 / reported 409 — 2026-10-14T13:53+05:00
+
+Plan version: 3.90
+Current task: T11 — PR #3639, PR_OPEN; T11.1 diagnostic PLANNED.
+Task ID: `9af17c38-8235-4681-93e8-6a9864cbdb75` (same original Tier-2 workstream).
+Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`
+Branch: `codex/aqs-T11-manual-availability`
+Base / fresh origin/main: `266182fe2a91df813d3e4830747d5b7a86f14230`
+HEAD before this docs update: `3e287ca853ad0150a546c929c15520e6f02f523c` (local = PR; main is ancestor; 0 behind).
+
+- Start with [canonical plan](../codex-admin-queue-simplification.md), then this checkpoint, DECISIONS and the last EVIDENCE entry. Earlier checkpoints below are historical even if their original wording says current. After a docs commit use actual `git rev-parse HEAD` and live PR state; this recorded pre-edit SHA is not self-updating.
+- T00–T10 are MERGED; GitHub confirms T10 #3633 merge `6315c62edb888bb8864928a41dd70a4c00be6e3d`. T11 #3639 remains OPEN/BLOCKED; T12–T18 PLANNED. Do not restart T06 from the old plan footer.
+- Provenance is PASS on exact source `35717fafa154baf9fb8b79cbe0910fb9dbbbcc6b`, embedded SHA exact, image-to-HTTP bytes 254/254, zero mismatches, owned teardown PASS. Old mismatch/NOT_PROVIDED entries are superseded for that artifact. Prior browser 22/22, PG and runbook PASS remain tied to their recorded source commits; no tests reran in this docs slice.
+- Current remaining gates: CI on the new docs commit, independent review (reviews=[]), three named legacy live-spec NOT_RUN, full pre-deploy runbook PARTIAL. Pre-edit HEAD `3e287ca8` completed CI by 14:05 with 26 PASS / 12 SKIPPED / 0 FAIL / 0 PENDING, including applicable required checks; skipped jobs are not passes. No accepted Tier-2 deferral; merge HOLD. The PR body also needs reconciliation with the newer provenance evidence.
+- U1 / T11.1: reported URL may address profile key `specialists` via PUT/DELETE, not a separate specialists GET. Method/action/reason/initiator/deployed revisions UNKNOWN. Current code's initial list GET is `/queues/profiles?active_only=false`; dynamic save/delete URL and structured backend 409 guards exist. Do not add an endpoint, remove guards, declare stale cache, or label the report fixed from a console status alone.
+- Authorized side action is documentation sync only: canonical plan, PROGRESS, RESUME, DECISIONS, EVIDENCE; current PR description may be reconciled with those already recorded facts. Runtime/tests/migrations, staging execution, production, gate/router, review/deferral/merge are excluded. Pre-existing `.scratch/` is preserved.
+- Next exact action: verify that plan 3.90 is committed/published by comparing actual local HEAD, diff and live #3639. Commit/push only the five docs if this update is still local; if already clean/published, skip that completed step. Read the reconciled PR description and CI on its actual SHA, then collect the missing T11.1 facts. Do not start staging or T12 in this documentation-only slice.
+- Next implementation decision: establish T11.1 method/action/reason/revision with safe read-only evidence, reproduce mutations only in owned synthetic staging, and assign the smallest owner/scope. A T11 regression stays in #3639; a pre-existing/deployment issue gets a distinct recorded follow-up after the current PR cycle. Missing evidence stays UNRESOLVED and needs an explicit merge-risk disposition.
+
+## Historical authoritative continuation — provenance PASS; main synced; Unified CI pending — 2026-10-14T13:27+05:00
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 is OPEN at local and remote HEAD `5e6e73bb2e07ed09e172ca850ce4aa4eb8849a79`, synced to `origin/main` `266182fe2a91df813d3e4830747d5b7a86f14230` with merge commit; PR base matches.
 - User explicitly authorized the staging-only provenance patch in `frontend/Dockerfile.staging` and `ops/compose.staging.yml`. Commit `35717fafa154baf9fb8b79cbe0910fb9dbbbcc6b` passes `VERCEL_GIT_COMMIT_SHA` through the staging frontend build. No application runtime behavior changed.
@@ -37,7 +56,7 @@
 - Current Git scope is the two feature commits plus two base-sync merge commits; no force-push or PR merge is intended. Only `.scratch/` is untracked. No staging was run in this continuation.
 - Next exact action: push `codex/aqs-T11-manual-availability` normally (remote ref is still the verified ancestor `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`), then inspect exact-head CI and PR body. Keep merge with the user and retain Tier-2 HOLD until remaining evidence or a separately explicit deferral decision.
 
-## Current continuation — responsive-header ratchet repaired locally — 2026-10-14T09:19+05:00
+## Historical continuation — responsive-header ratchet repaired locally — 2026-10-14T09:19+05:00
 
 - Task `9af17c38-8235-4681-93e8-6a9864cbdb75`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`; local HEAD `1e5055014ea67f07958acda1127ccf9b7cccac62`. `origin/main` is now `6d69ced8afc093618a2bd155ec943679f8124611`; the local merge contains main only through `039b96403`. PR #3639 remains OPEN at remote HEAD `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`, BEHIND. No GitHub write was made.
 - Found and repaired the exact old Regression Audit Gate failure: the responsive Admin CSS added six `!important` declarations and raised `cssImportant` 309→315. Structural header layout now lives in CSS, allowing the mobile rules to apply without `!important`; the ratchet baseline was not edited.
@@ -59,7 +78,7 @@
 - Validation target: focused HeaderNew Vitest, frontend type-check/build as needed, `node frontend/scripts/ui-baseline.mjs --check`, `git diff --check`, and viewport verification at 375/768/1280/1920 against the already recorded narrow Admin layout contract.
 - First stop condition: if the responsive behavior cannot be preserved by moving structural inline styles to CSS within the three allowed paths, stop and report the scope expansion required.
 
-## Current authoritative checkpoint — RQ-18 source assertions and synthetic staging PASS — 2026-10-13T17:12+05:00
+## Historical authoritative checkpoint — RQ-18 source assertions and synthetic staging PASS — 2026-10-13T17:12+05:00
 
 - Task `9af17c38-8235-4681-93e8-6a9864cbdb75`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`; branch `codex/aqs-T11-manual-availability`; local HEAD `1e5055014ea67f07958acda1127ccf9b7cccac62`. Live PR #3639 remains OPEN at remote HEAD `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`, MERGEABLE/BEHIND. No GitHub mutation.
 - User confirmed deletion with acknowledged backup loss. `D:\WSL\UbuntuProof` is absent; C: had 16.2 GiB and WSL backing D: had 13.2 GiB free at final check.
@@ -72,7 +91,7 @@
 - Tier-2 remains PARTIAL / merge HOLD: exact embedded revision provenance and full `docs/runbooks/STAGING_VALIDATION.md` are NOT_RUN; exact PR head has not received these local changes and is BEHIND base. No review submission, deferral acceptance, PR-body change, push, or merge.
 - Next exact action: preserve this evidence, then obtain an approved Code Integrity resolution for the normal commit hook; do not bypass it. Recheck exact PR head and CI before any separately authorized publish step.
 
-## Current continuation — main synced; staging blocked by storage reserve and commit policy — 2026-10-13T14:53+05:00
+## Historical continuation — main synced; staging blocked by storage reserve and commit policy — 2026-10-13T14:53+05:00
 
 - Task `9af17c38-8235-4681-93e8-6a9864cbdb75`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`; branch `codex/aqs-T11-manual-availability`. Local HEAD is merge commit `1e5055014ea67f07958acda1127ccf9b7cccac62`, which syncs PR branch `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a` with `origin/main` through `039b96403df69ec01507a20c5ee2be819a2d068e`. PR itself was not pushed or otherwise changed.
 - Approved narrow change remains staged: request-scoped handling of route-specific HTTP 429 cooldowns in `frontend/src/api/client.ts` plus `client.rateLimit.test.ts`. The three T11 journal files contain local edits. Existing `.scratch/` contents were preserved; a recovery stash remains until final reconciliation.
@@ -93,7 +112,7 @@
 - Stop boundary: changing global API cooldown behavior affects all frontend routes and requires a separate scope decision plus mandatory gate. Await the user’s response to the explicit scope question before editing `frontend/src/api/client.ts`. Keep prior narrow HeaderNew/RQ harness work intact.
 - Evidence: `EVIDENCE.md#t11-pr-3639-rq17-rq18-follow-up-2026-10-12`; task-local sanitized reports under `output/staging/t11-pr3639-tier2f-pw/`.
 
-## Current checkpoint — tracked source narrowed after normal hook rejection — 2026-10-12
+## Historical checkpoint — tracked source narrowed after normal hook rejection — 2026-10-12
 
 - Task `9af17c38-8235-4681-93e8-6a9864cbdb75`; PR #3639 branch `codex/aqs-T11-manual-availability`; current HEAD `0de33022e6705073dbaa93d46e1e734952aab39b`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`. This is a local continuation; refresh remote PR state before push/staging.
 - The normal commit hook rejected the first attempt because its ESLint hook tried to lint `frontend/e2e/rq17-setup-directions-live.spec.ts` and `rq18-permanent-qr-live.spec.ts`, which are excluded from the configured TypeScript project. No hook was bypassed and no global ESLint/TypeScript configuration was changed. The tracked E2E files were restored to their original content; their index entries must also be restored before commit.
@@ -102,7 +121,7 @@
 - Existing local verification remains: focused HeaderNew test 18/18 PASS; frontend build PASS; type-check PASS; header CSS Stylelint PASS; scoped source ESLint has no errors and reports 10 pre-existing warnings; `git diff --check` PASS. E2E lint/commit failure is recorded above and must not be represented as a passing check.
 - Next exact action: restore the two E2E index entries to HEAD, verify the cached file list contains only the three HeaderNew files and this journal, retry normal commit hooks, then push only after checking current PR HEAD. After push, run the prepared owned-project canonical validation exactly once, inspect fresh results, and verify teardown. Tier-2 is still PARTIAL until that cycle produces browser evidence.
 
-## Current checkpoint — authorized responsive-header fix and staging-spec diagnosis — 2026-10-12
+## Historical checkpoint — authorized responsive-header fix and staging-spec diagnosis — 2026-10-12
 
 - Task ID `9af17c38-8235-4681-93e8-6a9864cbdb75`; PR #3639 exact local/remote HEAD `0de33022e6705073dbaa93d46e1e734952aab39b`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`; branch `codex/aqs-T11-manual-availability`. PR remains OPEN, mergeable but blocked. `origin/main` currently equals the PR base; no rebase needed before this fix.
 - User explicitly authorized a separate narrow slice for the 375/768 px overflow and analysis/fix of RQ-17/RQ-18 routing/browser failures, followed by QR join/archive verification. This does not authorize review submission, deferral acceptance, PR-body edits, merge, production, or broad route/API/queue changes.
@@ -118,7 +137,7 @@
 - Next exact action: commit the six allowed tracked paths without `.scratch/` or generated `output/`, push the PR branch and verify exact-head CI. Then run only the 16 Admin viewport cases plus RQ-17/RQ-18 on the existing owned synthetic project via the canonical Preflight → Start → Session cycle; inspect fresh outcomes, prove public QR join/archive/re-activation, teardown, and verify zero owned resources. If an application defect appears outside HeaderNew or route-test assumptions, stop and request a new scope.
 - Tier-2 stays PARTIAL/FAIL and merge stays HOLD until fresh staging evidence and exact-head CI/review are complete. The 3 GiB host-memory hold is superseded; follow canonical Preflight instead.
 
-## Current checkpoint — authenticated Tier-2 run found product failures — 2026-10-12T16:58+05:00
+## Historical checkpoint — authenticated Tier-2 run found product failures — 2026-10-12T16:58+05:00
 
 - Task `9af17c38-8235-4681-93e8-6a9864cbdb75`; staging tested code-bearing commit `b890c9dd38413eaa79e2e8d6facb63904cdd6fa8`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`. Exact PR HEAD was rechecked before the cycle. A journal-only commit was subsequently pushed; always recheck the live PR HEAD before resuming. PR remains open and merge-blocked. CI attempt 2 passed on the tested code head; the follow-up journal commit started a new CI run. No review, deferral or merge decision was made.
 - Execution mode: the existing validation-only `narrow_override` following the two recorded gate misroutes. The local harness race was repaired only in ignored `output/staging/t11-pr3639-tier2f-pw/`: Registrar waits for sessionStorage and the `/registrar` URL after ordinary login; anonymous QR contexts receive the owned staging baseURL; reporter records safe runner error codes; zero-test failures no longer count dependent suites as failed test results. No assertions were relaxed.
@@ -129,7 +148,7 @@
 - Tracked scope remains only the three T11 journals. Ignored harness edits: `global-setup.cjs`, `safe-reporter.cjs`, `session.ps1`, and two copied contexts in `specs/rq18-permanent-qr-live.spec.ts`. Runtime source and tracked tests are unchanged. Stop condition hit: a product-facing viewport failure and incomplete QR/join flow require a separate implementation scope.
 - Next exact action: keep #3639 on merge hold; prepare a narrowly scoped source review/fix for horizontal overflow and the two route failures, then rerun the affected scenarios in a new authorized validation cycle. Before resuming, refresh PR HEAD and CI. Do not accept a Tier-2 deferral or merge based on this run.
 
-## Current checkpoint — next canonical cycle authorized — 2026-10-12T16:25+05:00
+## Historical checkpoint — next canonical cycle authorized — 2026-10-12T16:25+05:00
 
 - User requested continuation. Exact local/remote PR #3639 head remains `b890c9dd38413eaa79e2e8d6facb63904cdd6fa8`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`, PR OPEN/MERGEABLE/CLEAN. Only three T11 journals are staged; pre-existing `.scratch/` is preserved.
 - Mode: continuing the previously recorded validation-only `narrow_override` after the two documented mandatory-gate misroutes. No new source change, gate retry, or router change. Canonical anchors: `ops/scripts/wsl_staging.ps1`, `scripts/wsl_staging.py`, `ops/compose.staging.yml`, WSL session runbook, and this task-local harness/checkpoint.
@@ -137,7 +156,7 @@
 - Both prepared PowerShell scripts parse successfully. Native child stdout/stderr capture, actual exit code, fresh-report guard and zero-image query were validated in the previous checkpoint. One new canonical cycle is now authorized by this continuation; the previous turn's no-second-cycle constraint does not forbid this new run.
 - Validation target: one Preflight → Start → one Session with ordinary synthetic Admin 2FA and fresh browser results → exact-project teardown. Stop on canonical failure, unsafe ownership/data, runtime defect, or nonzero teardown resources. Do not apply the superseded 3 GiB Windows-RAM hold.
 
-## Current checkpoint — memory cause diagnosed; cycle recorded; harness prepared — 2026-10-12T16:11+05:00
+## Historical checkpoint — memory cause diagnosed; cycle recorded; harness prepared — 2026-10-12T16:11+05:00
 
 - Exact head/base remain `b890c9dd38413eaa79e2e8d6facb63904cdd6fa8` / `0b1281688eb74be71f07c1ed630905bfea089d6e`; CI attempt 2 SUCCESS. Tier-2 is still PARTIAL.
 - One authorized canonical cycle completed: Preflight PASS, Start PASS, backend health PASS, 254/254 served frontend byte matches PASS, synthetic Registrar provisioning PASS, ordinary Admin TOTP enrollment PASS. Browser child stopped at `session.ps1:135` with `NativeCommandError`; its private log is empty and no fresh browser verdict exists. Do not treat old Playwright reports as this run's results.
@@ -148,7 +167,7 @@
 - Fresh run evidence: `output/staging/t11-pr3639-tier2f-pw/session-report.json`, `frontend-attestation.json`, and independently observed `output/staging/t11-pr3639-tier2f-artifacts/canonical-cycle-20261012.json`. Old `canonical-run-report.json` and `playwright-report.json` remain stale and must not be used as fresh results.
 - Next exact action on validation resume: recheck PR head and owned project state, then one canonical cycle using the prepared harness. Browser/spec outcomes remain NOT_RUN until a new valid report; do not wait for the invented 3 GiB host threshold. Keep existing local journal changes and normal-hook commit limitation visible.
 
-## Current checkpoint — memory diagnosis; canonical policy correction — 2026-10-12T15:57+05:00
+## Historical checkpoint — memory diagnosis; canonical policy correction — 2026-10-12T15:57+05:00
 
 - Task `9af17c38-8235-4681-93e8-6a9864cbdb75` continues T11 Tier-2 validation. PR #3639 is OPEN/MERGEABLE/CLEAN at head `b890c9dd38413eaa79e2e8d6facb63904cdd6fa8`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`; Frontend E2E and PR Required Gate passed on CI attempt 2.
 - Correction superseding the previous RAM holds: the original 3 GiB value was explicitly a working retry target, not repository policy. Later checkpoints incorrectly treated it as a mandatory Start floor. Canonical `scripts/wsl_staging.py` checks WSL MemAvailable and warns below 1024 MiB; it contains no 3072 MiB Windows-RAM refusal. Do not continue the artificial 3 GiB wait loop. Real canonical failures, resource errors, ownership conflicts, and teardown failure still stop the cycle.
@@ -167,7 +186,7 @@
 - Exact-head GitHub run `38227043481` attempt 1 failed `Frontend e2e` and `PR Required Gate`. The failed Playwright case is `lab-dirty-guard.spec.ts:1654`, timing out while the Vite proxy reports `ECONNREFUSED` for `/api/v1/setup/status`; UX/visual E2E reported 134 passes and the later suite 60 passes / 1 failure. One `gh run rerun 38227043481 --failed` was started; attempt 2 is in progress on the same HEAD.
 - Next exact action: wait for that single CI retry. Separately wait until Windows free physical RAM is at least 3072 MiB, recheck exact PR HEAD and owned resource/port state, then run the canonical task wrapper once (Preflight → Start → one Session → teardown). If below threshold, do not start Compose. Retry committing/pushing staged T11 journals only through normal hooks; prior commit attempt was blocked by Windows App Control `WinError 4551`.
 
-## Current checkpoint — main synced; Preflight passed; staging held by RAM — 2026-10-12T14:02+05:00
+## Historical checkpoint — main synced; Preflight passed; staging held by RAM — 2026-10-12T14:02+05:00
 
 - Task `9af17c38-8235-4681-93e8-6a9864cbdb75`; PR #3639, T11 Tier-2 continuation. Status: `IN_PROGRESS` / Tier-2 `PARTIAL`.
 - Automatic task-memory checkpoint saved successfully (state only; no portable knowledge added).
@@ -190,7 +209,7 @@
 - The merge commit was pushed normally (no force) to the PR branch. GitHub now reports PR #3639 OPEN at head `b890c9dd38413eaa79e2e8d6facb63904cdd6fa8`, base `0b1281688eb74be71f07c1ed630905bfea089d6e` (the synced `origin/main`), MERGEABLE; merge state is BLOCKED pending required checks.
 - Canonical launcher and runbook were read. The owned synthetic env still identifies only project `clinic-aqs-pr3639-tier2f-20261011` and ports 18429/18430/55547; values containing secrets/URLs were not displayed. The subsequent canonical Preflight passed on the merge commit; Start/Session were held because Windows RAM stayed below 3072 MiB. See the current checkpoint and 2026-10-12 evidence entry.
 
-## Current checkpoint — retry stopped at host-memory guard — 2026-10-11T19:25+05:00
+## Historical checkpoint — retry stopped at host-memory guard — 2026-10-11T19:25+05:00
 
 - Task `9af17c38-8235-4681-93e8-6a9864cbdb75`; PR #3639 is OPEN at exact local/remote HEAD `74ad12be98424e2b76a134dc0b35e9dec0644ee4`, base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed` (BEHIND; staging code target unchanged).
 - Execution mode: `narrow_override`, validation-only, based on the user's explicit request to close remaining NOT_RUN with a safe harness. Normal gate stopped with `reviewed scope requires a known root cause`; the required retry with confirmed read-only root `frontend/src/stores/auth.ts` stopped with `reviewed scope contains an unsafe or out-of-repository path`. No gate/router changes. Report both gate stops and this bounded override; no source edit is allowed.
@@ -203,7 +222,7 @@
 - Validation target on resume: after Windows reports at least 3 GiB free RAM, recheck exact PR HEAD, run the canonical task wrapper once (Preflight → Start → one Session with normal Admin 2FA and synthetic browser cases → teardown). First stop: HEAD drift, Preflight failure, host RAM below 3 GiB, unexpected ownership/resource/port conflict, runtime failure, or teardown not zero; do not retry an unexplained failure.
 - Current status: Tier-2 remains PARTIAL; no deferral, review, PR update, or merge. Next exact action: free/close memory-consuming Windows processes, then re-run Preflight only. Do not start staging below the 3 GiB host-RAM floor.
 
-## Current checkpoint — safe Tier-2 retry stopped at Compose startup — 2026-10-11T18:52+05:00
+## Historical checkpoint — safe Tier-2 retry stopped at Compose startup — 2026-10-11T18:52+05:00
 
 - Exact PR/worktree HEAD under validation: `74ad12be98424e2b76a134dc0b35e9dec0644ee4`; base `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. Source/runtime and tracked tests were not changed. Only this plan journal is tracked-dirty; pre-existing `.scratch/` is preserved.
 - Manual frontend content check PASS on the exact frontend tree `6ed3414510aa3429320c2732882044ce7bd7b4f9`: all 254 files copied from the owned frontend image byte-matched HTTP, zero mismatches, image `sha256:d2719a6ca5988e26649d5d8f7b925a55f59ad180ba9eeb8dddf587e437271e55`. The staging helper still reports `served_revision_verified=false` and no embedded Git SHA, so commit-level served-revision attestation remains NOT_RUN/PARTIAL.
@@ -216,7 +235,7 @@
 - Valid authenticated browser-suite status: NOT_RUN. Keyboard/viewport, S-14/S-15, and the named legacy browser specs remain NOT_RUN in a valid per-test context; earlier unauthenticated 9/37 and 0/22 reports are retained as harness diagnostics only. Full `STAGING_VALIDATION.md` remains NOT_RUN. No Tier-2 deferral was accepted; merge remains HOLD.
 - Next exact action: do not retry Compose in this session. Keep the rejected cleanup pending for user-side cleanup or a later explicitly permitted file operation; verify tracked scope and `git diff --check`, then hand back the Compose-start and valid-browser-context blockers without changing PR status.
 
-## Current checkpoint — fix test-context auth propagation before final browser run — 2026-10-11T18:39+05:00
+## Historical checkpoint — fix test-context auth propagation before final browser run — 2026-10-11T18:39+05:00
 
 - Second canonical run on exact PR HEAD `74ad12be98424e2b76a134dc0b35e9dec0644ee4`: Preflight/Start/Session/TOTP setup and 254/254 served-byte match PASS; 22 selected browser cases gave 0 PASS, 18 FAIL, 4 SKIP; teardown verified zero containers/networks/volumes/project images.
 - Root cause for the UI timeout cluster is confirmed by canonical frontend source: staff auth token and profile are stored in `sessionStorage`, which Playwright `storageState` does not preserve. The Admin browser login itself uses ordinary password + TOTP; subsequent page contexts lacked that session. These failures are harness-auth propagation results and do not establish application behavior.
@@ -236,7 +255,7 @@
 - The child-log file was empty, so no underlying browser cause is claimed. Temporary Session helper now sets `$PSNativeCommandUseErrorActionPreference = $false` and handles the native exit code explicitly; a local controlled non-zero Node exit verified the wrapper returns `LASTEXITCODE` instead of throwing. This change is limited to ignored harness code.
 - Next exact action: run canonical Preflight → build-enabled Start → one full 37-case Session → teardown. Use the fresh safe reporter and inspect only the sanitized summary/failure codes; if the child still fails before reporter creation, keep browser cases `NOT_RUN` and stop rather than weakening assertions.
 
-## Current retry checkpoint — safe Tier-2 harness — 2026-10-11T18:13+05:00
+## Historical retry checkpoint — safe Tier-2 harness — 2026-10-11T18:13+05:00
 
 - Exact PR/worktree HEAD: `74ad12be98424e2b76a134dc0b35e9dec0644ee4`; tracked changes are limited to this journal. Existing untracked `.scratch/` is preserved.
 - First canonical Session stopped before tests because the harness health URL was wrong (`/health`); corrected to `/api/v1/health`. A local test-discovery probe then failed because Playwright was invoked with missing task-local environment values; fixed without touching tracked files. Discovery now reports 37 tests in 6 temporary spec files.
@@ -253,7 +272,7 @@
 - Current exact PR/worktree HEAD remains `74ad12be98424e2b76a134dc0b35e9dec0644ee4`; disk before rebuilding is C: 17.6 GiB, D: 12.3 GiB. Images are absent by design after teardown; canonical Preflight must reapprove the build reserve.
 - Next exact action: run the corrected 22-case subset through canonical Preflight → build-enabled Start → one Session → exact-project teardown. Use only sanitized category/status output; any genuine FAIL remains a blocker and no deferral or merge is implied.
 
-## Current pre-work checkpoint — PR #3639 remaining Tier-2 validation — 2026-10-11T17:08+05:00
+## Historical pre-work checkpoint — PR #3639 remaining Tier-2 validation — 2026-10-11T17:08+05:00
 
 - Chosen mode: `narrow_override`, validation-only. Exact gate entrypoint was `cd ai/langgraph; .\scripts\run_agent_gate.ps1 "Close remaining T11 Tier-2 NOT_RUN coverage for PR #3639 using only an isolated synthetic WSL staging project; verify frontend provenance, ordinary Admin 2FA/browser paths, keyboard/viewports and applicable runbook checks; do not edit runtime/tests/launcher/Compose/gate/router or touch production/foreign projects/merge" --scope .ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md --repo-root .. --format text`; it returned STOP because the reviewed validation scope requires a known root cause. The one retry added `--known-root-cause frontend/e2e/admin-navigation.spec.ts` but retained `--repo-root ..`, which resolved to `final/ai`; the spec therefore did not resolve. This is recorded as a gate misroute/retry path error, not a gate pass. No router or source change is justified. The user explicitly authorized closing the remaining `NOT_RUN` coverage with a safe harness; override is limited to owned synthetic staging, temporary ignored harness artifacts, and these T11 journals.
 - Risk/root-cause/scope: T11 is queue-bookability behavior. Known harness gaps are prior evidence tied to an older code commit and password-only legacy Admin browser setup. No runtime defect is being fixed in this validation pass.
@@ -268,6 +287,8 @@
 - Temporary harness checkpoint: prepared five isolated copies of the named browser specs plus 16 route/keyboard/viewport checks under ignored `output/staging/t11-pr3639-tier2f-pw`; no runtime or tracked test source changed. Node helpers and PowerShell session/runner parse successfully; Playwright discovery found 37 tests. The temporary copies use task-owned Admin/Registrar state, synthetic patient identifiers, no screenshots, no QR-token persistence, and a safe status-only reporter. No staging scenario has run yet.
 - First safe-harness attempt on exact PR HEAD `74ad12be98424e2b76a134dc0b35e9dec0644ee4`: canonical Preflight PASS; Start -NoBuild/runtime readiness PASS; Session stopped before browser work because the temporary health probe used `/health` and raised WebException. No named spec or viewport test ran. Canonical teardown PASS verified zero containers, networks, volumes and the three project-built images. The harness now uses `/api/v1/health`; retry requires a build because teardown correctly removed the owned local images.- Current resource snapshot: WSL has about 3.1 GiB available and the prior exact project images remain present. The local frontend source tree still equals the code-bearing HEAD tree. Remote PR branch and local HEAD both equal `74ad12be98424e2b76a134dc0b35e9dec0644ee4`.
 - Next exact action: execute the prepared canonical Preflight → Start -NoBuild → one Session runner now. It will run the full isolated harness, then force-teardown only `clinic-aqs-pr3639-tier2f-20261011` and verify its containers, network, volume, and three owned image IDs are absent.
+
+## Historical structured checkpoint — 2026-10-11
 
 Plan version: 3.89
 Current task: T11 — manual QueueProfile activity and parent-resolution policy.
@@ -286,9 +307,9 @@ Last updated: 2026-10-11T16:39+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | PR_OPEN | PR #3639 at `89569d1d`; bounded staging/browser PASS 22/22; Tier-2 partial (embedded provenance and full runbook NOT_RUN); no accepted deferral | | EVIDENCE.md (2026-10-14 T11 entry) |
+| T11 | PR_OPEN | PR #3639; latest facts are in the first authoritative checkpoint above | | EVIDENCE.md (2026-10-14 T11 entries) |
 
-## Current checkpoint — PR #3639 staging pass and exact-head CI green; Tier-2 still partial — 2026-10-11T16:39+05:00
+## Historical checkpoint — PR #3639 staging pass and exact-head CI green; Tier-2 still partial — 2026-10-11T16:39+05:00
 
 - Exact code HEAD tested in staging: 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3; runtime source: 6522e8c0046d824aaefa31960582ce26f7cef708. The three requested PostgreSQL cases passed 3/3 in owned synthetic Compose; teardown verified zero owned resources.
 - Journal-only checkpoint e2f5da0782c17152a34b9d4a9cd9956c10830173 passed exact-head CI: 27 success, 13 path-aware skipped, 0 failed/pending; required backend, frontend unit/E2E, parity and PR Required Gate passed. The skipped jobs remain skips.
@@ -370,7 +391,7 @@ Last updated: 2026-10-11T16:39+05:00
 - Tier-2 remains PARTIAL: staging on this code, current Admin 2FA, remaining named browser specs, served frontend provenance and full `STAGING_VALIDATION.md` are NOT_RUN. No deferral is accepted. PR description still references stale evidence and was not changed under this gate's scope.
 - Next exact action: inspect the complete staged diff, run final scope/diff checks, commit and push the existing PR branch without force, then inspect all applicable checks on that exact HEAD. After CI, handle Tier-2 staging in a separately gated validation slice; do not merge or publish a review.
 
-## Current checkpoint — PR #3639 second review findings; fail-first reproduced — 2026-10-10T12:59+05:00
+## Historical checkpoint — PR #3639 second review findings; fail-first reproduced — 2026-10-10T12:59+05:00
 
 - PR #3639 remote HEAD is `d2c7247fed43c8355c4f217ca40f9f7eac50ba7f`; reviewer reports base behind current main `3d60063c04beff7a3fa99aad6f5fd4a78251b3ed`. The local worktree has merged that main commit cleanly as `cfe6dfc89`; no runtime code has changed. The merge introduced only `frontend/package.json` and `frontend/package-lock.json`. Preserve pre-existing untracked `.scratch/`.
 - New P1: public specialist selector may display the first `display_order` alias while admission resolves a different exact-key QueueProfile. New P2: resource-owned legacy QR token validation and info omit the actual `daily_queue.queue_tag` when checking shared candidates, unlike the resource admission helper.
@@ -385,7 +406,7 @@ Last updated: 2026-10-11T16:39+05:00
 - Tier-2 remains PARTIAL and is still required separately after source fixes. No staging, deferral, review submission, PR-body edit, or merge has occurred.
 - Next exact action: use the resolver's actual selected `QueueProfile` to create the public card, and pass `DailyQueue.queue_tag` as resource route identity in both legacy-token validation and token-info.
 
-## Current checkpoint — PR #3639 exact-head CI green; Tier-2 still partial — 2026-10-10T00:08+05:00
+## Historical checkpoint — PR #3639 exact-head CI green; Tier-2 still partial — 2026-10-10T00:08+05:00
 
 - The latest validated code-bearing commit for PR #3639 is `6ea00b8fcfc67e201deed121a9201ef673410611`; GitHub reported PR OPEN/mergeable at that point. Base / `origin/main` is `a396ee505b6f53318b4360ca81827759125c79ca`. Unified CI run `37976219686` and applicable quality, security, review-quality, lifecycle, and regression workflows completed successfully on that code commit. Path-aware skips remain skips, not passes.
 - Execution boundary: the previously required gate returned a scoped `narrow_override` after a documented misroute. User authorized the narrow `_tokens.py` plus focused regression extension. That authorization did not include staging, PR-body edits, formal review, deferral acceptance, merge, or production. Gate/router remains untouched.
@@ -397,7 +418,7 @@ Last updated: 2026-10-11T16:39+05:00
 
 ## Previous checkpoint — PR #3639 review P1/P2 fixes — 2026-10-09T22:33+05:00
 
-## Current checkpoint — PR #3639 review P1/P2 fixes — 2026-10-09T22:33+05:00
+## Historical checkpoint — PR #3639 review P1/P2 fixes — 2026-10-09T22:33+05:00
 
 - Task ID `9af17c38-8235-4681-93e8-6a9864cbdb75`; continue T11 in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. PR #3639 remains OPEN at remote HEAD `1445e01f8a7c779e59f2dd109f0cab291570aef4`, base `8f3d325de18d3f8eede1b4b300926e6c2c65bebf`. Local code fix is commit `d38cc2b3f`; current local HEAD `01cb01f1` merges fresh `origin/main` `a396ee505b6f53318b4360ca81827759125c79ca`. GitHub review-thread and review-submission reads returned empty. Preserve pre-existing untracked `.scratch/` and do not stage it.
 - Chosen mode: mandatory `gate` because QR admission and queue target identity are changing. The canonical `run_agent_gate.ps1` command first returned `gate_ok/execute` but unrelated Docker/routing first-touch paths; required retry with `--known-root-cause backend/app/services/queue_svc/_operations.py` and exact `--scope` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. The generated execution prompt was read. Do not modify the gate/router. Existing T11 scope is the human/repo-approved boundary for this continuation.
@@ -462,7 +483,7 @@ Last updated: 2026-10-11T16:39+05:00
 - PR #3639 body records the fixture/projection corrections, local test results, and six-file Black formatting update. The body quality gate passed 19 checks, both documented samples, and the live PR body. Test-fix commit `66afece7` passed all applicable commit hooks; details are in the latest EVIDENCE section.
 - Next exact action: inspect the final diff, stage only the nine listed tests and T11 journals, commit/push to the existing branch, then inspect all applicable checks on the new exact PR HEAD. Preserve `.scratch/`; keep merge with the user. After this PR cycle, address the WSL launcher/keepalive recurrence and T10 remaining staging race evidence under their own bounded scopes.
 
-## Current checkpoint — T11 generated API type artifact prework (2026-10-09T10:01+05:00)
+## Historical checkpoint — T11 generated API type artifact prework (2026-10-09T10:01+05:00)
 
 - PR #3639 is OPEN/MERGEABLE at exact HEAD `bb55443fff0058754af117f3d3da91ffe0b21448`, base `6315c62edb888bb8864928a41dd70a4c00be6e3d`.
 - Latest exact-head CI run `37886046478`: OpenAPI spec freshness PASS; generated API TypeScript freshness FAIL; Frontend lint job failed on that step; Frontend build, Code Quality, docs generation, Context Boundary, PR Review Quality Gate, PR Lifecycle, CodeQL, and security/secret checks PASS. Backend and Frontend unit tests remained in progress at the latest query. Overall CI is not green.
@@ -475,7 +496,7 @@ Last updated: 2026-10-11T16:39+05:00
 - Validation target: generate from the current backend OpenAPI spec; inspect that the generated diff is limited to endpoint documentation and related generated comments; run the PR-body gate and `git diff --check`; hosted generated-type freshness, backend tests and required checks on the next exact PR head.
 - Stop condition: stop before committing if generation changes endpoint types, unrelated generated content, or runtime files; report the diff as a scope/contract issue. Do not manually edit generated output.
 - Next exact action: run the existing generator using the available OpenAPI TypeScript CLI from the local dependency cache, writing only `frontend/src/types/generated/api.ts`; inspect diff before staging.
-## Current checkpoint — T11 generated API artifact locally regenerated (2026-10-09T10:05+05:00)
+## Historical checkpoint — T11 generated API artifact locally regenerated (2026-10-09T10:05+05:00)
 
 - PR #3639 remains OPEN/MERGEABLE at remote HEAD `bb55443fff0058754af117f3d3da91ffe0b21448`, base `6315c62edb888bb8864928a41dd70a4c00be6e3d`.
 - Exact-head Unified CI run `37886046478` is still running. OpenAPI freshness passed; generated API types freshness failed. Frontend build, Frontend unit tests, Code Quality, Context Boundary, docs generation, PR quality/lifecycle, CodeQL, gitleaks, GitGuardian and security scan passed. Backend job was still in progress at the latest query; do not mark the full run green.
@@ -484,7 +505,7 @@ Last updated: 2026-10-11T16:39+05:00
 - PR body was updated before the generated edit to include only this generated artifact in the allowed scope and to report the observed CI failure. Body gate passed: 19 tests, both samples, and live body.
 - The initial diff check found a trailing blank line in `EVIDENCE.md`; it was removed, and `git diff --check` now passes. The OpenAPI contract test passed 40/40 against the final OpenAPI snapshot. The first commit attempt also exposed Gitleaks/ESLint environment limitations; see the newest EVIDENCE entry.
 - Next exact action: stage only `frontend/src/types/generated/api.ts` and T11 `PROGRESS.md`/`EVIDENCE.md`; verify generated output against the staged artifact and `git diff --check`; commit with only unavailable local hook `eslint` skipped, push, and inspect exact-head CI. Preserve `.scratch/` and keep merge with the user.
-## Current checkpoint — T11 PR #3639 OpenAPI freshness follow-up (2026-10-09T09:56+05:00)
+## Historical checkpoint — T11 PR #3639 OpenAPI freshness follow-up (2026-10-09T09:56+05:00)
 
 - PR #3633 is merged at `6315c62edb888bb8864928a41dd70a4c00be6e3d`; local `C:\final` was fast-forwarded to the same `origin/main`. Existing untracked `.gate_artifacts/` in `C:\final` was preserved.
 - T11 implementation remains in PR #3639: shared manual/effective QueueProfile availability policy; department off/on no longer overwrites manual profile activity; admin read metadata, QR selector, direct join, existing token, and permanent-address session paths use the shared policy. The runtime/test commit is `a47b327ab427daac75eb9e3778e59eb1b166ef45`; no runtime source change was made in this follow-up.
@@ -496,7 +517,7 @@ Last updated: 2026-10-11T16:39+05:00
 - Task-owned `.scratch/` contains the stopped T11 test PostgreSQL data directory and remains untracked; do not stage or remove it. Earlier results remain: 73 PostgreSQL integration tests, 7 availability unit tests, and 6 lock-order tests passed on T11 runtime code. Scoped Ruff suppressed only documented pre-existing findings; formatter hooks were previously skipped and are not reported as passing.
 - Pending at this checkpoint: commit this journal-only state update, push the local T11 commits to `codex/aqs-T11-manual-availability`, then inspect all checks on the resulting exact PR HEAD. Keep merge with the user. Next runtime step remains after PR #3639 is merged and base is synced.
 - Re-run after this update: `git diff --check`; the OpenAPI contract test already passed against the final snapshot. On the new remote HEAD, inspect backend tests, OpenAPI freshness, generated API type freshness, PR Required Gate, Code Quality and security checks. Treat path-aware skips as NOT_RUN, not PASS.
-## Current checkpoint — PR #3633 description, exact-head CI, and Tier-2 status (2026-10-08T22:35+05:00)
+## Historical checkpoint — PR #3633 description, exact-head CI, and Tier-2 status (2026-10-08T22:35+05:00)
 
 - Actual state checked: worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t093-cabinet-ui\final, branch codex/aqs-T10-profile-guards; local and PR remote HEAD are both cb73091c0d4a312153aca938014e94435239f118; base is 7bb02680e778ac56369503c4fd337ac9329da4b2. Tracked tree is clean; untracked scratch directories are preserved.
 - Review code changes pushed in 928642674 fix Doctor owner-config-before-row lock order with stale-specialty 409/no-write; block single/bulk department deletion when active Doctor/QueueResource mappings would be detached; publish typed stale-binding 409s for profile PUT, Doctor update, and public-address provision; and update OpenAPI/generated TypeScript plus focused regression tests. The previously open cross-writer P2 implementation and PostgreSQL concurrency tests are present on the branch. CI source fakes/scanners now match the real binding-snapshot query. Commit b2f99ab66 fixes the sole docs-freshness mismatch by writing the workflow-generated OpenAPI JSON trailing newline.
@@ -597,7 +618,7 @@ Last updated: 2026-10-08T21:45+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | IN_PROGRESS | PR #3620 | | EVIDENCE.md#t093-pr-3620-principal-refusal-retry-fix |
 
-## Current checkpoint
+## Historical checkpoint
 - Completed: source now retains the preview, locked draft and original idempotency key for every error on a retry after an unknown outcome. Added regression cases for CSRF 403, ordinary principal-refusal 403 and stale-state 409; a separate test verifies that a definitive first-apply 409 still allows correcting the draft. Focused tests 14/14, scoped ESLint, TypeScript and `git diff --check` passed.
 - Changed but not verified: the source/test fix is local and uncommitted; no CI run has covered it yet. The prior tested code commit ea51b067 does not validate this new change.
 - Remaining: commit and fast-forward push to the existing PR branch, then inspect all checks on the exact pushed HEAD. Obtain fresh independent review after checks.
@@ -624,7 +645,7 @@ Last updated: 2026-10-08T21:45+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | PR_OPEN | PR #3620 | | DECISIONS.md — accepted bounded Tier-2 deferral |
 
-## Current checkpoint
+## Historical checkpoint
 - Completed: the target T09.3 flow passed on task-owned synthetic staging (Admin password+TOTP, cabinet read, stale-preview rejection, focus handling, same-day apply); 253/253 served static files matched an independent Linux Node 20 rebuild and `50x.html` matched the nginx upstream artifact. Code-evidence HEAD `853b6c0` had 26 success, 13 skipped, 0 failed and 0 pending. The user-delegated bounded deferral for four residual live specs and runtime base-image equivalence is recorded in PR #3620 and `DECISIONS.md`; no Tier-2 coverage is credited for those items.
 - Changed but not verified: docs-only decision commit `5014354` is pushed. On its exact HEAD, PR Review Quality Gate, regression/lifecycle, docs generation, frontend build, security/secrets, CodeQL, role, locale and context checks passed; Backend tests, Frontend E2E and Code Quality were IN_PROGRESS on exact HEAD `5014354` at 13:03+05. Other applicable checks shown by `gh pr checks` had passed or were skipped. This progress-only commit will create a new exact HEAD; inspect its checks after push.
 - Remaining: finish exact-head checks on `501435405b27327710c8b6934f7905bf11527ed0`; obtain independent code review. Keep PR open until both are resolved. T18 must later run the deferred specs and base-image provenance through a safe synthetic harness; full `STAGING_VALIDATION.md` remains mandatory before rollout.
@@ -633,7 +654,7 @@ Last updated: 2026-10-08T21:45+05:00
 - Checks to rerun after the next PR change: all required exact-head checks. For resumed Tier-2 work, rerun each deferred live spec plus image/base provenance and retain per-spec evidence; before deployment run the full `STAGING_VALIDATION.md` checklist.
 
 
-## Current checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
+## Historical checkpoint — PR #3614 review fixes and exact-head validation (2026-10-06T16:26+05:00)
 
 Plan version: 3.84
 Current task/status: T09.2 review fixes / PR_OPEN — existing PR #3614.
@@ -650,7 +671,7 @@ Latest code/evidence HEAD: `3cd2bf1103cd5759c49d9ca73ad8fed4ac686a1f`
 - CI follow-up: `6803195e` exposed an optional-field compatibility regression in `test_doctor_calls_patient_by_linked_doctor_id_not_user_id`; corrected with `getattr` and pushed in `3cd2bf11`.
 - Stop: if fixing the reviewed call needs any additional runtime owner/path, ownership is ambiguous, a denied surface must change, or testing requires shared/production data.
 
-## Current checkpoint
+## Historical checkpoint
 - Completed: P1 and P2 fixes, compatibility correction, and regressions are committed and pushed in existing PR #3614. Latest code/evidence HEAD `3cd2bf11` passed exact-head checks: **30 success, 13 skipped, 0 failures, 0 pending**. PR body was refreshed and its review-quality/lifecycle checks passed.
 - Changed but not verified: no runtime/test edits remain. This documentation checkpoint must be pushed and its exact-head checks inspected.
 - Remaining: commit/push this final progress checkpoint, verify resulting documentation HEAD checks, then await independent review and a separate staging/deferral decision.
@@ -658,7 +679,7 @@ Latest code/evidence HEAD: `3cd2bf1103cd5759c49d9ca73ad8fed4ac686a1f`
 - First E2E attempt failed one unrelated lab dirty-guard locator wait while Vite proxy returned `ECONNREFUSED`; failed-job attempt 2 passed. Skipped checks (13) include staging/readiness, integration, Docker, load, metadata, selected release/security jobs and notifications; skipped jobs are NOT_RUN, not passes.
 - Checks passed locally: display and cabinet focused suites (27 passed, 1 existing provider warning); Ruff check and format check; `py_compile`; `git diff --check`; commit hooks. PR-body validator passed 19 tests and both documented samples. Staging/browser/full system-health remain NOT_RUN; no deferral accepted; merge remains HOLD.
 
-## Current authoritative checkpoint — T09.2 code-head CI passed (2026-10-06T13:39+05:00)
+## Historical authoritative checkpoint — T09.2 code-head CI passed (2026-10-06T13:39+05:00)
 
 Plan version: 3.84
 Current task/status: T09.2 / PR_OPEN — [PR #3614](https://github.com/drsapaev/final/pull/3614). Generated API freshness correction commit: `80e5ad8`; evidence checkpoint commit: `ca6a1ba8e34ab02cb8773ca38256c33b22516895`.
@@ -673,7 +694,7 @@ Last updated: 2026-10-08T21:45+05:00
 | T09.1 | MERGED | [PR #3612](https://github.com/drsapaev/final/pull/3612) | `89b4888a013978182e45f34ac2e07a9679c497c9` | `EVIDENCE.md#t091-pr-3612-merged` |
 | T09.2 | PR_OPEN | [PR #3614](https://github.com/drsapaev/final/pull/3614) | | `EVIDENCE.md#t092-generated-api-freshness-correction` |
 
-## Current checkpoint
+## Historical checkpoint
 - Completed: PR #3613 merged and `origin/main` synchronized; T09.2 apply behavior and post-sync validation remain recorded in EVIDENCE. Correction commit `80e5ad8` fixes generated API freshness; pinned generator output matches the complete artifact. Exact code/evidence HEAD `ca6a1ba8e34ab02cb8773ca38256c33b22516895` passed run `37435553039`: 26 success, 13 skipped, 0 failure, 0 pending. Backend, Frontend E2E/lint/type-check/unit/build, OpenAPI freshness, Code Quality, parity, context-boundary, security and required gate passed. Two duplicate lifecycle/review-quality runs were cancelled; their replacement runs passed.
 - Changed but not verified: PR body candidate and this journal now record the exact-head results; the body gate passed 19 tests and both samples. Remote description and journal checkpoint are not yet pushed. The resulting documentation-only head needs a fresh check snapshot. Commit-time ESLint was skipped because the local package is unavailable; hosted Frontend lint passed. Staging/browser/full system-health remain NOT_RUN; no deferral has been accepted.
 - Remaining: validate and push the evidence/PR-body checkpoint, verify resulting exact-head checks, then obtain independent review and a separate explicit Tier 2 staging/deferral decision.
@@ -683,7 +704,7 @@ Last updated: 2026-10-08T21:45+05:00
 
 ## Prior checkpoint — T09.1 continuation decision (superseded)
 
-## Current authoritative checkpoint — T09.1 continuation decision (2026-10-06T09:26+05:00)
+## Historical authoritative checkpoint — T09.1 continuation decision (2026-10-06T09:26+05:00)
 
 Plan version: 3.84
 Current task/status: T09.1 / PR_OPEN — draft [PR #3612](https://github.com/drsapaev/final/pull/3612). Reviewed PR HEAD `a8f7980b1d160726e169050a8bc8f8043294a36b`; code HEAD `390e14b40d6eafb462e05d07f777c1e063a36c14`; current CI **26 success, 13 skipped, 0 failed, 0 pending**. No outstanding source-review P0/P1/P2.
@@ -754,7 +775,7 @@ Next exact action: commit and push this current progress checkpoint, then verify
 
 > Previous checkpoints below are chronological evidence and are superseded by this active correction checkpoint.
 
-## Current authoritative checkpoint — T08.3.2 post-merge P2 follow-up (2026-10-05T17:38:38+05:00)
+## Historical authoritative checkpoint — T08.3.2 post-merge P2 follow-up (2026-10-05T17:38:38+05:00)
 
 Plan version: 3.84
 Execution permission: IMPLEMENTATION_ACTIVE — user asked “исправляй” for the confirmed P2 in the merged #3600 tests.
@@ -778,7 +799,7 @@ PR body quality gate passed (19 validator tests, samples and this body); PR #360
 
 > The checkpoint below is historical: it predates the merge of #3600 and the P2 follow-up recorded above.
 
-## Current authoritative checkpoint — T08.3.2 (2026-10-05T13:48:16+05:00)
+## Historical authoritative checkpoint — T08.3.2 (2026-10-05T13:48:16+05:00)
 
 Plan version: 3.84
 Execution permission: IMPLEMENTATION_ACTIVE — user said “продолжай” after T08.3.1 merged.
@@ -800,7 +821,7 @@ Next exact action: commit and push this CI-evidence checkpoint, inspect checks o
 | T08.3.2 | PR_OPEN | [PR #3600](https://github.com/drsapaev/final/pull/3600) | | `EVIDENCE.md#t08.3.2` |
 | T08.3.3 | PLANNED | | | |
 
-## Current authoritative checkpoint — T08.3.1 (2026-10-05T00:28:28+05:00)
+## Historical authoritative checkpoint — T08.3.1 (2026-10-05T00:28:28+05:00)
 
 Plan version: 3.84
 Execution permission: IMPLEMENTATION_ACTIVE — user authorized sequential plan implementation and explicitly said “GO merge, потом продолжай”.
@@ -855,7 +876,7 @@ Last updated: 2026-10-08T21:45+05:00
 | T17 | PLANNED | | | |
 | T18 | PLANNED | | | |
 
-## Current checkpoint
+## Historical checkpoint
 
 ### Authoritative continuation — five P2 fixes pushed, exact-head CI passed (2026-10-04)
 
