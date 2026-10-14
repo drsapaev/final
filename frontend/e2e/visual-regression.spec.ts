@@ -938,12 +938,82 @@ test.describe('Public-site SSR browser layout smoke', () => {
     expect(image.byteLength).toBeGreaterThan(1024);
   }
 
-  test('Vite static root retains the existing Clinic OS landing page', async ({ page }) => {
+  test('Vite static root renders clinic content and exposes mobile navigation', async ({ page }) => {
+    const publicService = {
+      slug: 'synthetic-service',
+      name: 'Sintetik sinov xizmati',
+      description: 'Saytni tekshirish uchun sintetik ma’lumot.',
+      price: null,
+      currency: null,
+      category: 'Sinov toifasi',
+    };
+
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith('/setup/status')) {
+        await route.fulfill(jsonResponse({ initialized: true }));
+        return;
+      }
+      if (url.pathname.endsWith('/api/v1/public-site/clinic')) {
+        await route.fulfill(jsonResponse({ name: 'SYNTHETIC QA CLINIC', address: null, phone: null, email: null }));
+        return;
+      }
+      if (url.pathname.endsWith('/api/v1/public-site/services')) {
+        await route.fulfill(jsonResponse([publicService]));
+        return;
+      }
+      if (url.pathname.endsWith('/api/v1/public-site/doctors')) {
+        await route.fulfill(jsonResponse([]));
+        return;
+      }
+      await route.fulfill(jsonResponse({ detail: 'synthetic test response' }));
+    });
+
     const response = await page.goto('http://localhost:5173/');
     expect(response?.status()).toBe(200);
-    await expect(page.locator('.landing-shell')).toBeVisible();
-    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
-    await expect(page.locator('.public-site__runtime-message')).toHaveCount(0);
+    await expect(page.locator('.public-site')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('SYNTHETIC QA CLINIC');
+    await expect(page.locator('.landing-shell')).toHaveCount(0);
+    await expect(page.locator('.public-site__footer').getByRole('link', { name: 'Xodimlar uchun kirish' })).toHaveAttribute('href', '/login');
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    const menu = page.locator('.public-site__mobile-menu summary');
+    await expect(menu).toBeVisible();
+    await menu.click();
+    const mobileNavigation = page.locator('.public-site__mobile-nav');
+    await expect(mobileNavigation.getByRole('link', { name: 'Xizmatlar' })).toBeVisible();
+    const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(documentWidth).toBeLessThanOrEqual(376);
+
+    await mobileNavigation.getByRole('link', { name: 'Xizmatlar' }).click();
+    await expect(page).toHaveURL('http://localhost:5173/services');
+    await expect(page.getByRole('heading', { name: 'Xizmatlar' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Sintetik sinov xizmati' })).toBeVisible();
+  });
+
+  test('Vite public route shows a localized error when published content is unavailable', async ({ page }) => {
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith('/setup/status')) {
+        await route.fulfill(jsonResponse({ initialized: true }));
+        return;
+      }
+      if (url.pathname.includes('/api/v1/public-site/')) {
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'private synthetic upstream failure' }),
+        });
+        return;
+      }
+      await route.fulfill(jsonResponse({ detail: 'synthetic test response' }));
+    });
+
+    const response = await page.goto('http://localhost:5173/ru/services');
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole('alert')).toContainText('Не удалось загрузить актуальную информацию клиники.');
+    await expect(page.locator('.public-site')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('private synthetic upstream failure');
   });
 
   test('Uzbek home is server-rendered with current synthetic clinic content', async ({ page }) => {

@@ -157,9 +157,7 @@ describe('route contract invariants', () => {
       expect(route?.group).toBe('public');
       expect(route?.auth).toBe('public');
       expect(route?.owner).toMatch(/^public-site\./);
-      expect(route?.component).toBe(
-        definition.id === 'landing' ? 'Landing' : 'PublicSiteFallback',
-      );
+      expect(route?.component).toBe('PublicSiteAppRoute');
     }
 
     expect(resolvePublicSiteRoute('/')).toMatchObject({ kind: 'home', locale: 'uz-Latn' });
