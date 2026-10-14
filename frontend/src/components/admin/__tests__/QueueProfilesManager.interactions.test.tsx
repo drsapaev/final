@@ -130,6 +130,55 @@ describe('QueueProfilesManager interactions', () => {
     ).toBeInTheDocument();
   });
 
+  it.each([
+    {
+      reason: 'profile_has_significant_links',
+      message: 'Профиль используется: архивируйте его (is_active=false) вместо удаления.',
+      links: { services: 1, daily_queues: 2 },
+    },
+    {
+      reason: 'profile_binding_changed',
+      message: 'Привязка направления изменилась во время удаления. Обновите страницу и повторите действие.',
+      stale_fields: ['department_key'],
+    },
+  ])('shows the structured delete refusal $reason and preserves the profile', async (detail) => {
+    const user = userEvent.setup();
+    apiMock.get.mockResolvedValueOnce({
+      data: {
+        profiles: [{
+          key: 'specialists',
+          title: 'SYNTHETIC profile deletion',
+          title_ru: 'Синтетический профиль для проверки удаления',
+          queue_tags: ['synthetic_specialists'],
+          is_active: true,
+          show_on_qr_page: true,
+          icon: 'Heart',
+          color: '#E53E3E',
+        }],
+      },
+    });
+    apiMock.delete.mockRejectedValueOnce({
+      response: { status: 409, data: { detail } },
+    });
+    render(<ThemeProvider><QueueProfilesManager /></ThemeProvider>);
+
+    const profile = await screen.findByText('Синтетический профиль для проверки удаления');
+    const row = profile.closest('tr')!;
+    expect(apiMock.get).toHaveBeenCalledWith('/queues/profiles?active_only=false');
+    expect(apiMock.delete).not.toHaveBeenCalled();
+    await user.click(within(row).getByTitle('Удалить'));
+    const confirmation = screen.getByRole('dialog', { name: 'Удаление вкладки очереди' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Удалить' }));
+
+    expect(await screen.findByText(detail.message)).toBeInTheDocument();
+    expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
+    expect(apiMock.delete).toHaveBeenCalledExactlyOnceWith('/queues/profiles/specialists');
+    expect(apiMock.put).not.toHaveBeenCalled();
+    expect(screen.getByText('Синтетический профиль для проверки удаления')).toBeInTheDocument();
+    expect(within(row).getByTitle('Скрыть')).toBeEnabled();
+    expect(apiMock.get.mock.calls.filter(([url]) => url.startsWith('/queues/profiles'))).toHaveLength(1);
+  });
+
   it('traps keyboard focus, closes on Escape, and restores focus to the opener', async () => {
     const user = userEvent.setup();
     await renderManager();
