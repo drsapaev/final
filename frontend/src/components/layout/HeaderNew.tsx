@@ -253,18 +253,6 @@ export default function HeaderNew() {
     theme === 'dark' ?
     '0 2px 10px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)' :
     'var(--mac-shadow-sm)',
-    display: 'grid',
-    gridTemplateColumns: 'auto 1fr auto',
-    alignItems: 'center',
-    columnGap: '12px',
-    overflow: 'visible',
-    borderRadius: 'var(--mac-radius-md)',
-    padding: '0 16px',
-    height: '54px',
-    // HDR-POLISH-2 (P3-2): the canonical typography token (--ui-font,
-    // theme.css) instead of a private -apple-system stack — the header now
-    // renders with the same face as the rest of the app on every platform.
-    fontFamily: 'var(--ui-font)',
     backgroundImage: isGlassTheme ?
     'none' :
     isGradientTheme || isVibrantTheme ?
@@ -460,7 +448,7 @@ export default function HeaderNew() {
 
 
   const controls =
-  <div className="hdr-controls" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
+    <div className="hdr-controls">
       {/* divider for clearer separation in dark mode */}
       <div
       aria-hidden
@@ -801,7 +789,7 @@ export default function HeaderNew() {
         {backButton}
         {brand}
       </div>
-      <div className="hdr-center" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-4)' }}>
+      <div className="hdr-center">
         {/* HDR-FX-1 (P1-1): the search bar is the designated shrivable item —
             it absorbs center-column squeeze first (basis = its own 400px
             maxWidth) so the roleNav cluster and the CTA never clip. Styles

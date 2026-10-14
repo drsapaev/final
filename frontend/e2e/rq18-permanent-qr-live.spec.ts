@@ -313,7 +313,8 @@ test('S-15 patient: /q/<code> in a SEPARATE browser context — ONE start-sessio
   await page.goto(`/q/${publicCode}`);
   // существующий QueueJoin state machine: info шаг (без выбора врачей —
   // завершение direction-сессии только typed profile choice)
-  await expect(page.getByText(/в очереди/i)).toBeVisible({ timeout: 20000 });
+  // Direction mode intentionally omits an empty-queue statistic; verify its real next action.
+  await expect(page.getByRole('button', { name: /продолжить/i })).toBeVisible({ timeout: 20000 });
   expect(counter.n).toBe(1); // РОВНО ОДИН start-session
 
   await page.getByRole('button', { name: /продолжить/i }).click();
@@ -326,7 +327,7 @@ test('S-15 patient: /q/<code> in a SEPARATE browser context — ONE start-sessio
 
   // повторное открытие той же ссылки — новая короткая сессия, снова можно
   await page.goto(`/q/${publicCode}`);
-  await expect(page.getByText(/в очереди/i)).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('button', { name: /продолжить/i })).toBeVisible({ timeout: 20000 });
   expect(counter.n).toBe(2);
 
   await page.screenshot({
@@ -370,6 +371,6 @@ test('S-15 archive: same /q/<code> refuses anonymously; reactivate — the SAME 
   await expect(ownRow2.getByTestId('qr-resource-badge-active')).toBeVisible({ timeout: 15000 });
 
   await page.goto(`/q/${publicCode}`);
-  await expect(page.getByText(/в очереди/i)).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('button', { name: /продолжить/i })).toBeVisible({ timeout: 20000 });
   await context.close();
 });
