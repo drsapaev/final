@@ -1,6 +1,26 @@
 # Progress
 
-## Current authoritative checkpoint — T11.1 DELETE formatter — 2026-10-14T14:33+05:00
+## Current authoritative checkpoint — T11.1 exact frontend provenance — 2026-10-14T18:45+05:00
+
+Plan version: 3.91
+Current task: T11 PR_OPEN / #3639; T11.1 IN_PROGRESS; T11.1a VALIDATED locally and on the recorded code-bearing CI head.
+Task ID: 9af17c38-8235-4681-93e8-6a9864cbdb75.
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final.
+Branch: codex/aqs-T11-manual-availability.
+Main included: b5af956756836405beaa025e38c9459c0d238d60 through merge f173b70a8; no overlapping source paths.
+Exact staged provenance commit: 63de0e66b001db4eafc347a35640bb9ca11e99d0. This checkpoint is a documentation-only successor; resolve actual current HEAD from Git/GitHub when resuming.
+PR state at the snapshot: OPEN; mergeable; mergeState BLOCKED; no review submissions; no Tier-2 deferral accepted.
+
+- User confirmed the reported 409 happens on profile deletion. The existing DELETE guard is intentional; the prior frontend converted structured error detail into [object Object]. Commit 8c8ea4805 reuses apiErrorMessage; the focused regression cases cover the two canonical refusal envelopes. No backend guard was weakened.
+- Local source validation: interaction/CSV suites 44/44 PASS, TypeScript PASS, scoped ESLint PASS (0 errors; 4 existing warnings), normal commit hooks PASS. Code-bearing HEAD 76d05767 passed its applicable CI; the source tree frontend/backend/ops is unchanged on 63de0e66.
+- Exact served frontend provenance on 63de0e66: canonical Preflight, Start, Session, and teardown PASS; embedded service-worker SHA matches; image-to-HTTP static files 254/254, zero mismatches; owned project resources 0; private env restored byte-for-byte. See the newest T11.1 entry in EVIDENCE.md.
+- The latest 63de0e66 snapshot had CodeQL/gitleaks and applicable static review/security/i18n checks PASS, path-aware skips, and Unified workflow 38573036057 pending with no jobs. Refresh once before the next decision.
+- Tier 2 remains PARTIAL: admin-navigation.spec.ts, queue-system.spec.ts, and panel-qa-admin-live.spec.ts remain NOT_RUN; the full pre-deployment STAGING_VALIDATION.md remains PARTIAL. No deferral or merge has been accepted/performed. The live production refusal reason and deployed revision remain unknown.
+- Preserve the existing .scratch/ contents. Do not deploy, inspect or mutate production, touch foreign staging, submit a GitHub review, accept a deferral, or merge without the user's explicit instruction.
+- Next exact action: refresh Unified CI; update the existing PR description with the exact provenance result and remaining limits; then obtain independent review and a separate disposition for the three outstanding live specs.
+
+
+## Historical checkpoint — T11.1 DELETE formatter — 2026-10-14T14:33+05:00
 
 Plan version: 3.91
 Current task: T11 PR_OPEN / #3639; T11.1 IN_PROGRESS; narrow T11.1a VALIDATED locally, not merged.
