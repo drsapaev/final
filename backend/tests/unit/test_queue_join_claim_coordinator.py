@@ -206,9 +206,12 @@ def test_exact_token_rejects_same_tag_claim_owned_by_another_doctor(
     )
     monkeypatch.setattr(_operations, "_lock_and_resolve_tag_claim", resolve_claim)
 
+    db = Mock()
+    db.query.return_value.all.return_value = []  # Legacy queue has no profiles.
+
     with pytest.raises(QueueConflictError, match="другую очередь"):
         service.join_queue_with_token(
-            Mock(),
+            db,
             token_str="TEST-token",
             patient_name="TEST Patient",
             phone="+998900000901",
@@ -253,6 +256,7 @@ def test_exact_token_returns_same_owner_claim_without_capacity_rejection(
     )
     monkeypatch.setattr(_operations, "_lock_and_resolve_tag_claim", resolve_claim)
     db = Mock()
+    db.query.return_value.all.return_value = []  # Legacy queue has no profiles.
     db.query.return_value.filter.return_value.scalar.return_value = 1
 
     result = service.join_queue_with_token(
