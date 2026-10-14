@@ -24,8 +24,7 @@ import { LabDirtyGuardProvider, useGuardedLabNavigate } from './components/labor
 import { CommandPalette, type CommandProfile } from './components/common/CommandPalette';
 import GlobalNotificationCenter from './components/notifications/GlobalNotificationCenter';
 import Health from './pages/Health';
-import Landing from './pages/Landing';
-import { PublicSiteFallback } from './publicSitePage';
+import PublicSiteAppRoute from './PublicSiteAppRoute';
 import LoginFormStyled from './components/auth/LoginFormStyled';
 import Setup from './pages/Setup';
 import { useSetupStatus } from './hooks/useSetupStatus';
@@ -102,8 +101,7 @@ const AllFreeApproval = lazy(() => import('./components/admin/AllFreeApproval'))
 const IntegrationDemo = lazy(() => import('./components/integration/IntegrationDemo'));
 
 const ROUTE_COMPONENTS = {
-  Landing,
-  PublicSiteFallback,
+  PublicSiteAppRoute,
   ResetPasswordPage,
   LoginFormStyled,
   ChangePasswordRequired,

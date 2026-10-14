@@ -6,6 +6,7 @@ import {
   type PublicSitePageKind,
   type PublicSiteRouteMatch,
 } from './routing/publicSiteRouteEntries';
+import type { PublicSitePageData } from './publicSiteData';
 import type {
   PublicSiteClinic,
   PublicSiteDoctor,
@@ -19,6 +20,11 @@ interface Copy {
   contacts: string;
   staffLogin: string;
   language: string;
+  navigation: string;
+  mobileMenu: string;
+  loading: string;
+  loadError: string;
+  retry: string;
   serviceDetails: string;
   doctorDetails: string;
   homeIntro: string;
@@ -51,6 +57,11 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     contacts: 'Контакты',
     staffLogin: 'Вход для персонала',
     language: 'Язык',
+    navigation: 'Навигация сайта',
+    mobileMenu: 'Меню',
+    loading: 'Загружаем актуальную информацию клиники…',
+    loadError: 'Не удалось загрузить актуальную информацию клиники.',
+    retry: 'Повторить',
     serviceDetails: 'Информация об услуге',
     doctorDetails: 'Информация о враче',
     homeIntro: 'Информация об услугах клиники и специалистах.',
@@ -81,6 +92,11 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     contacts: 'Kontaktlar',
     staffLogin: 'Xodimlar uchun kirish',
     language: 'Til',
+    navigation: 'Sayt navigatsiyasi',
+    mobileMenu: 'Menyu',
+    loading: 'Klinikaning dolzarb ma’lumotlari yuklanmoqda…',
+    loadError: 'Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi.',
+    retry: 'Qayta urinish',
     serviceDetails: 'Xizmat haqida',
     doctorDetails: 'Shifokor haqida',
     homeIntro: 'Klinika xizmatlari va mutaxassislari haqida ma’lumot.',
@@ -105,14 +121,6 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     reloadPage: 'Sahifani ochish',
   },
 };
-
-export interface PublicSitePageData {
-  clinic?: PublicSiteClinic;
-  services?: PublicSiteService[];
-  doctors?: PublicSiteDoctor[];
-  service?: PublicSiteService;
-  doctor?: PublicSiteDoctor;
-}
 
 interface PublicSitePageProps {
   route: PublicSiteRouteMatch;
@@ -170,17 +178,46 @@ function SiteHeader({ locale, route, copy }: {
         <span className="public-site__brand-mark" aria-hidden="true">K</span>
         <span>{copy.clinicName}</span>
       </a>
-      <nav className="public-site__nav" aria-label={copy.clinicName}>
-        <a href={localizePath('services', locale)}>{copy.services}</a>
-        <a href={localizePath('doctors', locale)}>{copy.doctors}</a>
-        <a href={localizePath('prices', locale)}>{copy.prices}</a>
-        <a href={localizePath('contacts', locale)}>{copy.contacts}</a>
-        <a href="/login">{copy.staffLogin}</a>
-      </nav>
+      <PublicSiteLinks className="public-site__nav" locale={locale} copy={copy} />
+      <details className="public-site__mobile-menu">
+        <summary>{copy.mobileMenu}</summary>
+        <PublicSiteLinks className="public-site__mobile-nav" locale={locale} copy={copy} />
+      </details>
       <a className="public-site__language" href={switchPath} aria-label={copy.language}>
         {otherLocale === 'ru' ? 'RU' : 'O‘Z'}
       </a>
     </header>
+  );
+}
+
+function PublicSiteLinks({ className, locale, copy }: {
+  className: string;
+  locale: PublicSiteLocale;
+  copy: Copy;
+}) {
+  return (
+    <nav className={className} aria-label={copy.navigation}>
+      <a href={localizePath('services', locale)}>{copy.services}</a>
+      <a href={localizePath('doctors', locale)}>{copy.doctors}</a>
+      <a href={localizePath('prices', locale)}>{copy.prices}</a>
+      <a href={localizePath('contacts', locale)}>{copy.contacts}</a>
+    </nav>
+  );
+}
+
+function SiteFooter({ clinicName, locale, copy }: {
+  clinicName?: string | null;
+  locale: PublicSiteLocale;
+  copy: Copy;
+}) {
+  return (
+    <footer className="public-site__footer">
+      <span>{clinicName || copy.clinicName}</span>
+      <div className="public-site__footer-links">
+        <a href={localizePath('contacts', locale)}>{copy.contacts}</a>
+        <a href="/login">{copy.staffLogin}</a>
+      </div>
+    </footer>
   );
 }
 
@@ -327,10 +364,30 @@ export function PublicSitePage({ route, data }: PublicSitePageProps) {
       <main className="public-site__main" id="main-content">
         <PageContent route={route} data={data} copy={copy} />
       </main>
-      <footer className="public-site__footer">
-        <span>{data.clinic?.name || copy.clinicName}</span>
-        <a href={localizePath('contacts', route.locale)}>{copy.contacts}</a>
-      </footer>
+      <SiteFooter clinicName={data.clinic?.name} locale={route.locale} copy={copy} />
+    </div>
+  );
+}
+
+export function PublicSiteRequestState({
+  route,
+  status,
+}: {
+  route: PublicSiteRouteMatch;
+  status: 'loading' | 'error';
+}) {
+  const copy = COPY[route.locale];
+  const isError = status === 'error';
+  return (
+    <div className="public-site">
+      <SiteHeader locale={route.locale} route={route} copy={copy} />
+      <main className="public-site__main" id="main-content" aria-busy={!isError}>
+        <section className="public-site__error" role={isError ? 'alert' : 'status'}>
+          <h1>{isError ? copy.loadError : copy.loading}</h1>
+          {isError && <a href={getPublicSitePath(route.kind, route.locale, route.slug)}>{copy.retry}</a>}
+        </section>
+      </main>
+      <SiteFooter locale={route.locale} copy={copy} />
     </div>
   );
 }

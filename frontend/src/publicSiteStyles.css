@@ -76,6 +76,10 @@
   gap: var(--public-site-nav-gap);
 }
 
+.public-site__mobile-menu {
+  display: none;
+}
+
 .public-site__nav a,
 .public-site__language {
   font-size: 0.94rem;
@@ -279,6 +283,12 @@
   color: var(--mac-link-ink, rgb(0, 102, 214));
 }
 
+.public-site__footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
 .public-site__runtime-message,
 .public-site__error {
   width: min(100% - 40px, 760px);
@@ -305,19 +315,60 @@
   }
 
   .public-site__nav {
-    order: 3;
-    width: 100%;
-    justify-content: flex-start;
-    gap: 18px;
-    overflow-x: auto;
-    padding-block: 6px;
+    display: none;
   }
 
-  .public-site__nav a {
-    min-height: 40px;
-    display: inline-flex;
+  .public-site__mobile-menu {
+    position: relative;
+    display: block;
+    order: 2;
+    margin-left: auto;
+  }
+
+  .public-site__mobile-menu summary {
+    display: flex;
+    min-height: 44px;
     align-items: center;
+    padding: 0 12px;
+    border: 1px solid var(--mac-border, rgb(184, 200, 218));
+    border-radius: 10px;
+    background: var(--mac-bg-content, rgb(244, 247, 251));
+    color: var(--mac-text-primary, rgb(0, 0, 0));
+    cursor: pointer;
+    font-weight: 600;
+    list-style: none;
+  }
+
+  .public-site__mobile-menu summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .public-site__mobile-nav {
+    position: absolute;
+    z-index: 2;
+    top: calc(100% + 8px);
+    right: 0;
+    display: grid;
+    min-width: 190px;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid var(--mac-border, rgb(184, 200, 218));
+    border-radius: 12px;
+    background: var(--mac-bg-content, rgb(244, 247, 251));
+    box-shadow: var(--mac-shadow-md, 0 4px 12px rgb(0 0 0 / 15%));
+  }
+
+  .public-site__mobile-nav a {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: 8px;
     white-space: nowrap;
+  }
+
+  .public-site__mobile-nav a:hover {
+    background: var(--mac-bg-secondary, rgb(227, 235, 245));
   }
 
   .public-site__main {
@@ -342,6 +393,10 @@
   .public-site__footer {
     flex-wrap: wrap;
     padding-block: 16px;
+  }
+
+  .public-site__footer-links {
+    width: 100%;
   }
 }
 

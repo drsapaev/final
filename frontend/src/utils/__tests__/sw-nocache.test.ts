@@ -78,6 +78,7 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
     '/api/v1/telegram/webhook',
     '/api/v1/print/visit/1',
     '/api/v1/auth/me',
+    '/api/v1/public-site/services',
   ])('does not cache a successful GET of %s', async (pathname) => {
     const { put, caches } = makeCacheStubs();
     const sw = compileSW(vi.fn(async () => okResponse()), caches);
@@ -123,13 +124,16 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
     ).rejects.toThrow('offline');
   });
 
-  it('does not replay a pre-existing auth/me cache entry through the outer offline handler', async () => {
+  it.each([
+    '/api/v1/auth/me',
+    '/api/v1/public-site/services?locale=ru',
+  ])('does not replay a pre-existing no-cache response through the outer offline handler: %s', async (path) => {
     const stubs = makeCacheStubs();
     stubs.caches.match = vi.fn(async () => new Response('private cached profile'));
     const sw = compileSW(vi.fn(async () => { throw new Error('offline'); }), stubs.caches);
 
     const response = await sw.handleRequest({
-      url: 'https://clinic.test/api/v1/auth/me',
+      url: `https://clinic.test${path}`,
       method: 'GET',
       mode: 'cors',
       headers: { get: () => null },
@@ -149,6 +153,8 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
     expect(sw.isNoCachePath('/api/v1/ai/chat')).toBe(true);
     expect(sw.isNoCachePath('/api/v1/telegram/send')).toBe(true);
     expect(sw.isNoCachePath('/api/v1/print/x')).toBe(true);
+    expect(sw.isNoCachePath('/api/v1/public-site/services')).toBe(true);
+    expect(sw.isNoCachePath('/api/v1/public-site/doctors/synthetic-profile')).toBe(true);
     expect(sw.isNoCachePath('/api/v1/patients')).toBe(false);
     expect(sw.isNoCachePath('/api/v1/queue')).toBe(false);
   });
