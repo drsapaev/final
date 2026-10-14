@@ -1,6 +1,16 @@
 # Resume
 
-## Current — T11 commits validated locally; push pending — 2026-10-14T09:30+05:00
+## Current — T11 owned Tier-2 cycle passes; exact evidence update and CI remain — 2026-10-14T10:12+05:00
+
+- Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Tested code and live PR #3639 HEAD are `89569d1d6a6170d6996c66e2f357e56e6c71125e`, base `6d69ced8afc093618a2bd155ec943679f8124611`. PR remains OPEN/CLEAN, no independent review decision.
+- The hard 3 GiB Windows RAM stop was not canonical and is superseded. The current exact owned Preflight → Start → one Session → teardown passed; memory was 3254 MiB WSL at Preflight and about 2622 MiB during Session, with no warnings or VM restart.
+- Second Session: ordinary synthetic Admin password→TOTP, synthetic Registrar, image-to-HTTP bytes 254/254, all 22 targeted browser cases PASS / 0 FAIL / 0 skipped (16 viewport, 3 RQ-17, 3 RQ-18). Current report files are in ignored `output/staging/t11-pr3639-tier2f-pw/`.
+- Prior PostgreSQL regression evidence is 10/10 at `1e505501`; current backend and backend-test tree is unchanged since that commit. It was not redundantly rerun. Exact embedded frontend commit provenance remains NOT_RUN (`served_revision_verified=false`); full `docs/runbooks/STAGING_VALIDATION.md` remains NOT_RUN. The three older named live specs are also NOT_RUN.
+- The first cycle failed only because the local harness referenced stale frontend tree `780cdc…`; teardown was PASS/zero resources. It is corrected to reference code commit `1be4f4ad3`, matching current frontend tree. No runtime or tracked test source changed.
+- Staging project `clinic-aqs-pr3639-tier2f-20261011` is fully removed; independent checks found zero project resources and no listeners on its ports. The 3 GiB gate must not be reintroduced.
+- Next exact action: finish/validate this checkpoint and PR body, make a normal-hook evidence commit, push normally, then inspect CI on the resulting exact HEAD. Do not merge or claim full Tier-2/provenance completion until its remaining gap is resolved or a separate #3639 deferral is explicitly accepted.
+
+## Historical checkpoint — T11 commits validated locally; push pending — 2026-10-14T09:30+05:00 (superseded by the staging result above)
 
 - Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Current local HEAD `1be4f4ad3c1878bf2f579d37f60cb8e8067c422b`; current `origin/main=6d69ced8afc093618a2bd155ec943679f8124611`. PR #3639 is OPEN at unchanged remote head `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`; no remote update has happened in this continuation.
 - User explicitly approved `.pre-commit-config.yaml` as a separate commit in #3639. `5802473d3` contains only that hook config change; `d936ebbbc` contains the T11 API/client, responsive HeaderNew, and RQ-18 selector fixes/tests. Both normal commits passed installed pre-commit hooks. Current branch is synced with latest main via merge commit `1be4f4ad3`.
