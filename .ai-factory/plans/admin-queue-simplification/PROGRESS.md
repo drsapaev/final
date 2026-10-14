@@ -1,5 +1,15 @@
 # Progress
 
+## Current authoritative continuation — commits local, main synced, push pending — 2026-10-14T09:30+05:00
+
+- Task `9af17c38-8235-4681-93e8-6a9864cbdb75`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Local HEAD `1be4f4ad3c1878bf2f579d37f60cb8e8067c422b`; it includes current `origin/main=6d69ced8afc093618a2bd155ec943679f8124611`. PR #3639 remains OPEN at remote HEAD `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`; remote PR head is unchanged and BEHIND. No PR write has yet been made in this continuation.
+- User approved placing `.pre-commit-config.yaml` in a separate commit within #3639. Commit `5802473d3` contains only the hook remap; commit `d936ebbbc` contains the T11 implementation and focused regression tests; ordinary hooks passed for each. Latest local main sync is merge commit `1be4f4ad3`.
+- T11 source includes request-scoped HTTP 429 cooldown handling and its 3 focused tests, the RQ-18 direction-page assertions, and the responsive HeaderNew ratchet repair. Six new `!important` rules were removed; baseline JSON was not modified. Existing `.scratch/` is preserved and untracked.
+- Post-sync local validation: targeted Vitest 21/21 PASS; TypeScript `npm run type-check` PASS; pre-commit PASS on config and T11 commits; Stylelint PASS; UI ratchet PASS on the T11 commit before the dependency-only main merge; `git diff --cached --check` PASS before commit. Production build, full application E2E, fresh staging, exact embedded revision provenance, and the complete `docs/runbooks/STAGING_VALIDATION.md` were not rerun on current HEAD.
+- Prior owned synthetic staging evidence remains historical: Admin TOTP, PostgreSQL regressions 10/10, RQ-18 3/3, earlier RQ-17 3/3, and exact-project teardown passed before the HeaderNew follow-up. Tier-2 remains PARTIAL and merge HOLD; exact frontend commit provenance and the full runbook remain NOT_RUN.
+- Current Git scope is the two feature commits plus two base-sync merge commits; no force-push or PR merge is intended. Only `.scratch/` is untracked. No staging was run in this continuation.
+- Next exact action: push `codex/aqs-T11-manual-availability` normally (remote ref is still the verified ancestor `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`), then inspect exact-head CI and PR body. Keep merge with the user and retain Tier-2 HOLD until remaining evidence or a separately explicit deferral decision.
+
 ## Current continuation — responsive-header ratchet repaired locally — 2026-10-14T09:19+05:00
 
 - Task `9af17c38-8235-4681-93e8-6a9864cbdb75`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`; local HEAD `1e5055014ea67f07958acda1127ccf9b7cccac62`. `origin/main` is now `6d69ced8afc093618a2bd155ec943679f8124611`; the local merge contains main only through `039b96403`. PR #3639 remains OPEN at remote HEAD `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`, BEHIND. No GitHub write was made.

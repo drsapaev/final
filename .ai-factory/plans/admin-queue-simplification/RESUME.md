@@ -1,5 +1,14 @@
 # Resume
 
+## Current — T11 commits validated locally; push pending — 2026-10-14T09:30+05:00
+
+- Continue task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Current local HEAD `1be4f4ad3c1878bf2f579d37f60cb8e8067c422b`; current `origin/main=6d69ced8afc093618a2bd155ec943679f8124611`. PR #3639 is OPEN at unchanged remote head `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`; no remote update has happened in this continuation.
+- User explicitly approved `.pre-commit-config.yaml` as a separate commit in #3639. `5802473d3` contains only that hook config change; `d936ebbbc` contains the T11 API/client, responsive HeaderNew, and RQ-18 selector fixes/tests. Both normal commits passed installed pre-commit hooks. Current branch is synced with latest main via merge commit `1be4f4ad3`.
+- Post-sync checks: targeted Vitest 21/21 PASS, TypeScript check PASS. Stylelint and UI ratchet passed on the T11 commit before the dependency-only main sync. Full build, full-app browser E2E and staging were NOT_RUN after sync.
+- Preserve untracked `.scratch/`; do not stage it. No runtime source outside the authorized T11 frontend changes and separately approved hook config was changed. No force push, PR merge, GitHub review or deferral decision.
+- Tier-2 remains PARTIAL / merge HOLD. Earlier synthetic Admin 2FA, PostgreSQL 10/10, RQ-18 3/3 and RQ-17 3/3 are recorded against prior code snapshots; exact embedded frontend SHA provenance and full `docs/runbooks/STAGING_VALIDATION.md` remain NOT_RUN and are not closed by local checks.
+- Next exact action: verify `.scratch/` is the only worktree residue, run `git diff --check`, and push the branch normally. Then check CI on the new exact PR HEAD and refresh PR evidence without claiming unrun staging. Do not merge; user performs merge.
+
 ## Current — local UI-ratchet fix validated; remote PR unchanged — 2026-10-14T09:19+05:00
 
 - Continue T11 task `9af17c38-8235-4681-93e8-6a9864cbdb75` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`, branch `codex/aqs-T11-manual-availability`. Local HEAD `1e5055014ea67f07958acda1127ccf9b7cccac62` includes `origin/main` only through `039b96403`; current `origin/main=6d69ced8afc093618a2bd155ec943679f8124611`. PR #3639 remains OPEN, remote HEAD `780cdc461f3750fcbf1f9cdb5e64ce1dedac322a`, base `0b1281688eb74be71f07c1ed630905bfea089d6e`, BEHIND. No PR update, review, deferral or merge.
