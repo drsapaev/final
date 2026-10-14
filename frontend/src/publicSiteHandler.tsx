@@ -15,7 +15,8 @@ import {
   type PublicSiteFetch,
   type PublicSiteService,
 } from './publicSiteApi';
-import { PublicSitePage, type PublicSitePageData } from './publicSitePage';
+import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
+import { PublicSitePage } from './publicSitePage';
 
 export interface PublicSiteRuntimeConfig {
   apiOrigin?: string;
@@ -188,33 +189,6 @@ function htmlResponse(
   return new Response(method === 'HEAD' ? null : body, { status, headers });
 }
 
-function localizedApi(
-  api: PublicSiteApi,
-  kind: PublicSitePageKind,
-  locale: PublicSiteLocale,
-  slug?: string,
-): Promise<PublicSitePageData> {
-  switch (kind) {
-    case 'home':
-      return Promise.all([api.getClinic(), api.listServices(locale), api.listDoctors(locale)]).then(
-        ([clinic, services, doctors]) => ({ clinic, services, doctors } satisfies PublicSitePageData),
-      );
-    case 'services':
-    case 'prices':
-      return api.listServices(locale).then((services) => ({ services }));
-    case 'service':
-      return api.getService(slug ?? '', locale).then((service) => ({ service: service ?? undefined }));
-    case 'doctors':
-      return api.listDoctors(locale).then((doctors) => ({ doctors }));
-    case 'doctor':
-      return api.getDoctor(slug ?? '', locale).then((doctor) => ({ doctor: doctor ?? undefined }));
-    case 'contacts':
-      return api.getClinic().then((clinic) => ({ clinic }));
-    default:
-      return Promise.resolve({});
-  }
-}
-
 function xmlEscape(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -369,7 +343,7 @@ export async function handlePublicSiteRequest(
   try {
     if (!config.apiOrigin) throw new PublicSiteApiError();
     const api = createPublicSiteApi(config.apiOrigin, fetchImpl);
-    const data = await localizedApi(api, route.kind, route.locale, route.slug);
+    const data = await loadPublicSitePageData(api, route);
     const missingDetail = (route.kind === 'service' && !data.service) ||
       (route.kind === 'doctor' && !data.doctor);
     const status = missingDetail ? 404 : 200;

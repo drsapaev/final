@@ -53,12 +53,13 @@ const API_CACHE_PATTERNS = [
 
 // API endpoints которые НЕ нужно кэшировать
 const NO_CACHE_PATTERNS = [
-  // Public-site HTML and sitemap reflect current publication state and must
+  // Public-site pages and API reflect current publication state and must
   // never be replayed from Cache Storage, including the offline fallback.
   /^\/$/,
   /^\/ru(?:\/|$)/,
   /^\/(?:services|doctors|prices|contacts)(?:\/|$)/,
   /^\/sitemap\.xml$/,
+  /\/api\/v1\/public-site(?:\/|$)/,
   /\/api\/v1\/auth\/login/,
   /\/api\/v1\/auth\/logout/,
   /\/api\/v1\/auth\/me/,
