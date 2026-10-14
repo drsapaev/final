@@ -1,6 +1,21 @@
 # Progress
 
-## Current authoritative checkpoint — plan 3.90 / T11 / reported 409 — 2026-10-14T13:53+05:00
+## Current authoritative checkpoint — T11.1 DELETE formatter — 2026-10-14T14:33+05:00
+
+Plan version: 3.91
+Current task: T11 PR_OPEN / #3639; T11.1 IN_PROGRESS; narrow T11.1a VALIDATED locally, not merged.
+Task ID: `9af17c38-8235-4681-93e8-6a9864cbdb75`.
+Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`; branch `codex/aqs-T11-manual-availability`.
+Current source base: local sync `e92602c81d3452692e70b834a0a9d593e89f26a1` includes fresh main `476013905c37ff471cb8dc843c8a70d05d45db13` (upstream docs only). Published predecessor is `723b62e8`, CI 26 PASS / 12 SKIPPED / 0 FAIL/PENDING. Use actual Git/PR HEAD after commit.
+
+- User confirmed the error occurs during deletion. `/queues/profiles/specialists` is DELETE for a profile key; the GET/missing-endpoint hypothesis is closed for this report. Exact production reason/revision is still unavailable.
+- Confirmed UI root: single-delete converts structured `detail` into `[object Object]`. T11.1a reuses existing `apiErrorMessage` in one line; backend guards remain untouched. Significant-links refusal recommends archive; stale-binding refusal explains refresh/retry. No automatic archive/delete retry is introduced.
+- Fail-first: both new canonical refusal cases failed before the fix. After fix: focused interaction/CSV suites 44/44 PASS, TypeScript PASS, scoped ESLint 0 errors / 4 existing warnings, diff check PASS. Existing Modal `closable` warning was seen in the fail-first run; unrelated UI was not edited. No new browser/PG/staging test ran.
+- This explicit narrow source slice follows the user's continuation of the deletion issue; it stays in the current PR and does not start bulk/CSV T17. Allowed authored paths: QueueProfilesManager, its interaction test, canonical plan/journals and the task learning patch. Mode direct_execute: known UI presentation root, no API/schema/auth/queue-policy change. Existing logging preserved; no extra payload logs.
+- Source/tests/learning patch committed at `8c8ea4805` with normal hooks PASS, including scoped ESLint and gitleaks, without bypass. Next: verify the journal commit and same-branch publication; reconcile PR body and inspect CI on actual live HEAD. If already clean/published, skip those completed steps. Preserve unrelated `.scratch/`; no production, foreign staging, backend guards, review/deferral/merge changes.
+- Original T11 is still open: independent review absent; three named legacy live specs NOT_RUN; full pre-deploy runbook PARTIAL; no accepted deferral. Provenance PASS on `35717fa` is historical for that image, not verification of this new UI source. After current CI, continue safe T11.1 reason/revision evidence and an explicit disposition for remaining Tier-2 gaps before merge; T12 does not start.
+
+## Historical checkpoint — plan 3.90 / T11 / reported 409 — 2026-10-14T13:53+05:00
 
 Plan version: 3.90
 Current task: T11 — PR #3639, PR_OPEN; T11.1 diagnostic PLANNED.

@@ -1,12 +1,12 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.90 — синхронизация T10/T11, подтверждённой frontend provenance и диагностического среза T11.1 для сообщения HTTP 409.
-**Создан:** 30 сентября 2026. **Обновлён:** 14 октября 2026, 2026-10-14T14:05+05:00 Asia/Tashkent.
+**Версия:** 3.91 — пользователь подтвердил DELETE профиля; узкий T11.1a исправляет отображение structured refusal, не меняя защиту удаления.
+**Создан:** 30 сентября 2026. **Обновлён:** 14 октября 2026, 2026-10-14T14:33+05:00 Asia/Tashkent.
 **Текущий этап:** T11 — `PR_OPEN`, [PR #3639](https://github.com/drsapaev/final/pull/3639). T10 / [PR #3633](https://github.com/drsapaev/final/pull/3633) подтверждённо MERGED 9 октября, merge `6315c62edb888bb8864928a41dd70a4c00be6e3d`.
 **Worktree / ветка:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`; `codex/aqs-T11-manual-availability`. Task memory ID: `9af17c38-8235-4681-93e8-6a9864cbdb75`.
-**Снимок перед этой документальной правкой:** PR HEAD `3e287ca853ad0150a546c929c15520e6f02f523c`; свежий `origin/main` / PR base `266182fe2a91df813d3e4830747d5b7a86f14230`. Main уже является предком ветки, отставание 0; дополнительный sync merge не нужен. После docs commit проверить новый фактический HEAD и его CI.
+**Снимок продолжения:** предшествующий PR HEAD `723b62e89a036219d5a54269774a2c23b7bafd34`; свежий `origin/main` `476013905c37ff471cb8dc843c8a70d05d45db13` включён merge `e92602c81d3452692e70b834a0a9d593e89f26a1` (только upstream public-site docs). T11.1a source commit `8c8ea4805` прошёл локальные проверки и normal hooks; публикацию ветки/новый CI сверить по фактическим Git/PR SHA после journal commit.
 **Tier-2:** PARTIAL. Exact-source frontend provenance **PASS на `35717fafa154baf9fb8b79cbe0910fb9dbbbcc6b`**: встроенный SHA совпал, 254/254 обслуживаемых static files совпали с image. Обычный synthetic Admin 2FA и целевые браузерные/PG проверки прошли на своих записанных SHA; эта сверка не запускает их заново на текущем HEAD.
-**Ограничения:** три legacy live-spec остаются NOT_RUN; полный pre-deploy runbook не завершён; независимый GitHub review отсутствует. К 14:05 CI указанного pre-edit HEAD завершён: 26 PASS / 12 SKIPPED / 0 FAIL / 0 PENDING; skips не являются PASS. Новый docs HEAD потребует свежей проверки CI. Reported 409 не воспроизведён и не объявлен регрессией T11. Deferral не принят; merge HOLD.
+**Ограничения:** три legacy live-spec NOT_RUN, полный pre-deploy runbook PARTIAL, independent review отсутствует. CI предшественника `723b62e8`: 26 PASS / 12 SKIPPED, без failures/pending; новый source HEAD потребует свежего CI. T11.1a локально: 44/44 UI/CSV, TypeScript и scoped lint PASS (4 прежних lint warnings). Новый UI patch в live staging/production не проверялся; точный production refusal reason неизвестен. Deferral не принят; merge HOLD.
 
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
@@ -30,7 +30,8 @@
 | T09 | MERGED | Preview/apply и UI, #3612/#3614/#3620 |
 | T10 | MERGED | Used-binding guards, #3633, merge `6315c62e` |
 | T11 | PR_OPEN | #3639; CI/review и остаточные Tier-2 требования не закрыты |
-| T11.1 | PLANNED | Установить метод/причину reported 409 и владельца исправления |
+| T11.1 | IN_PROGRESS | DELETE подтверждён пользователем; production reason/revision ещё неизвестны |
+| T11.1a | VALIDATED | Локальный formatter fix single-delete; публикация и CI проверяются по фактическому HEAD |
 | T12 | PLANNED | Явная публикация после завершения T11 |
 | T13 | PLANNED | Canonical Admin read contract |
 | T14 | PLANNED | Setup UI на backend facts |
@@ -43,9 +44,9 @@
 
 | ID | Факт / статус | Следующее доказательство и владелец |
 |---|---|---|
-| U1 | Сообщён URL `/api/v1/queues/profiles/specialists` и HTTP 409. Метод, действие, `detail.reason`, инициатор и deployed revisions неизвестны | T11.1: различить profile key `specialists` и предполагаемый отдельный GET; нельзя заранее объявлять endpoint отсутствующим, 409 штатным или T11 причиной |
-| U2 | Source-to-served frontend provenance PASS на `35717fa`; прежние mismatch/NOT_PROVIDED исторические | Не повторять старый unresolved вывод; после нового application source/image обеспечить provenance проверяемого артефакта |
-| U3 | CI/review меняются после push; текущий снимок не финальный | После docs push сверить реальный SHA, required checks и independent review; старый зелёный SHA не заменяет новый |
+| U1 | Пользователь подтвердил удаление: DELETE существующего profile key `specialists`. Точный `detail.reason` и deployed revisions неизвестны | T11.1a устраняет воспроизведённый UI дефект String(object); для production различить significant links и stale bindings. Не объявлять удаление разрешённым и не ослаблять guard |
+| U2 | Provenance PASS на `35717fa`; T11.1a меняет application frontend после этого evidence | Старый PASS сохраняется только для своего artifact; staging/provenance нового single-delete UI patch NOT_RUN |
+| U3 | CI/review меняются после push; текущий снимок не финальный | После каждого push сверить реальный SHA, required checks и independent review; старый зелёный SHA не заменяет новый |
 | U4 | `admin-navigation.spec.ts`, `queue-system.spec.ts`, `panel-qa-admin-live.spec.ts` NOT_RUN | T18 executor: обычный Admin TOTP, synthetic Registrar, явный origin, контролируемые записи/cleanup; либо отдельное явное PR-specific решение по ограниченному deferral. У #3639 такого решения нет |
 | U5 | Полный pre-deploy `STAGING_VALIDATION.md` PARTIAL, не blanket NOT_RUN и не PASS | Сохранять результаты каждой проверки с её SHA; Sentry, external AI-safety, Telegram, live PII telemetry и оставшиеся пункты требуют безопасного контура/решения applicability до rollout |
 
@@ -197,6 +198,7 @@ next exact action; checks to rerun after next change.
 | T09 | T03 | Безопасная смена сегодняшнего кабинета |
 | T11 | T04, T10 | Ручная активность/effective parent policy |
 | T11.1 | T10; сверка с текущим T11 | Диагностика reported profile 409; доказанную регрессию T11 исправлять в #3639 |
+| T11.1a | Подтверждённый UI root в T11.1 | Читаемый single-delete refusal; backend/bulk policy без изменений |
 | T12 | T10, T11 | Hidden-by-default/явная публикация |
 | T13 | T03, T11, T12 | Canonical Admin read contract |
 | T14 | T13 | UI на backend facts |
@@ -486,11 +488,11 @@ Old mutation tests менять с контрактом, history guards сохр
 **Stop:** automatic repair/historical intent inference/unknown parent policy.
 **Evidence/logs:** persisted vs effective before-after; WARN conflict/INFO department change; reads не пишут state/per-row logs.
 
-### T11.1. Разобрать reported 409 на вкладке профилей — PLANNED
+### T11.1. Разобрать reported 409 на вкладке профилей — IN_PROGRESS
 
-**Источник:** сообщение пользователя 14 октября о некорректной работе `/admin/services?servicesTab=queue-profiles` и HTTP 409 на `/api/v1/queues/profiles/specialists`. Это наблюдение пользователя; метод запроса, операция и тело ошибки не предоставлены. Live reproduction — NOT_RUN.
+**Источник:** пользователь сообщил HTTP 409 на `/api/v1/queues/profiles/specialists` и уточнил: отказ возникает при удалении. Canonical UI вызывает DELETE по ключу профиля; гипотеза об отдельном GET для этого сообщения закрыта. Точный production reason/deployed revision не предоставлены; production reproduction NOT_RUN.
 **Зависимости:** T10 MERGED; сравнение с текущим T11. Диагностика должна получить явный disposition перед закрытием T11; полный T12–T18 для установления причины не требуется.
-**Владелец диагностики:** исполнитель текущего T11/PR #3639. Если доказана регрессия этого PR — исправление в нём с узким scope/gate. Если дефект предшествует PR или относится к иной deployed версии — отдельный checkpoint/follow-up после текущего PR-цикла, без скрытого расширения T11. Этот документ авторизует планирование; runtime-патч сейчас не выполняется.
+**Владелец диагностики:** исполнитель T11/#3639. По продолжению пользователя выделен явный маленький T11.1a внутри текущего PR: только renderer single-delete error и его regression tests; он не меняет backend/HTTP semantics и не начинает T17. Другие прежние/deployment-дефекты получают отдельный follow-up по PR-cycle rules. Точная причина production отказа не объявляется установленной из результата UI-теста.
 **Canonical anchors:** `frontend/src/components/admin/QueueProfilesManager.tsx` (`loadProfiles`, `handleUpdate`, `handleDelete`, bulk/CSV handlers); `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py` (GET каталога, PUT/DELETE по `profile_key`, impact preview, guards); `backend/openapi.json`; T10 lifecycle tests и QueueProfilesManager interaction/CSV tests.
 **Reference-only:** shared API client, route registry, T11 availability policy и deployed asset metadata. Production writes/DB/config, auth bypass, новый endpoint, удаление guards и изменение ownership запрещены в диагностике.
 
@@ -499,21 +501,29 @@ Old mutation tests менять с контрактом, history guards сохр
 - Initial load использует `GET /queues/profiles?active_only=false`.
 - Save/delete строят `/queues/profiles/${profileKey}`. При `profileKey="specialists"` это в точности reported URL; PUT/DELETE зарегистрированы как `/queues/profiles/{profile_key}`. Отсутствие буквального `profiles/specialists` в поиске не доказывает отсутствия маршрута.
 - Сгенерированный OpenAPI содержит GET каталога/public и PUT/DELETE параметризованного профиля; отдельного GET `/queues/profiles/specialists` в этом snapshot нет. Это не доказательство версии deployed API.
-- Backend умеет возвращать `profile_binding_change_blocked`, `profile_binding_changed`, `profile_has_significant_links`. Какой из них был в пользовательском запросе — неизвестно.
-- Update использует `apiErrorMessage`; delete/bulk сейчас преобразуют `detail` через `String(...)`, что для structured object может дать `[object Object]`. Это source-backed UX-gap для T17, но связь с reported сбоем страницы не доказана.
+- Для DELETE backend возвращает `profile_binding_changed` либо `profile_has_significant_links`; `profile_binding_change_blocked` относится к PUT. Какой DELETE reason был в production — неизвестно.
+- До T11.1a single-delete и bulk преобразовывали object `detail` в `[object Object]`. T11.1a воспроизвёл оба documented DELETE refusal и переводит только single-delete на существующий `apiErrorMessage`. Bulk остаётся T17; production response body не получен.
 
 Порядок и развилки:
 
 1. Зафиксировать только безопасные факты: действие (вход/refresh/save/archive/delete/bulk/CSV), HTTP method/path/status, whitelisted `detail.reason`/blocked fields/агрегаты, Initiator module/asset hash и frontend/backend revisions. Не хранить auth headers, cookies, полный HAR/payload или пациентские данные. Read-only осмотр production допустим только в пределах доступного разрешённого доступа; воспроизведение mutations — исключительно synthetic staging.
 2. Если это PUT/DELETE ключа `specialists`, сначала проверить snapshot и usage через существующий impact preview. Used-binding или delete guard не обходить. Штатный отказ должен объяснять причину/разрешённое действие и сохранять введённое; title/archive при допустимом неизменённом binding не должен случайно блокироваться.
-3. Если это GET, найти фактический caller и зарегистрированный маршрут обслуживаемой версии. Проверить динамическую сборку URL, source/build mismatch и origin/cache. Не считать stale frontend причиной без provenance и не добавлять compatibility endpoint только по строке консоли.
+3. Для текущего сообщения GET-ветка закрыта уточнением пользователя. Не добавлять новый endpoint и не искать stale bundle без отдельного свидетельства. Вернуться к GET/caller/provenance анализу только при новом отличающемся наблюдении.
 4. Если response пришёл от иной middleware/proxy-поверхности, установить это по безопасным response metadata и зарегистрированному handler; не угадывать конфликт данных по одному статусу.
 5. Сравнить main и PR HEAD на synthetic fixture с ключом `specialists`, определить earliest failing revision и только затем объявить defect/expected refusal/deployment mismatch. Невоспроизводимость записать как UNRESOLVED с недостающими фактами.
 
 **Приёмка диагностики:** установлен method + action + handler/reason + revision либо явно перечислены отсутствующие доказательства; назначен владелец и следующий узкий шаг. Проблема не закрывается одним CI PASS, очисткой cache по предположению или подавлением 409.
 **Приёмка исправления, если оно требуется:** initial GET не запускает mutation; загрузка каталога/empty/error/retry правдивы; отказ save/delete сохраняет rows/draft и не даёт ложного success; structured reason читаем; used bindings/history/public address остаются неизменными; stale conflict перечитывает факты; archive и presentation updates проходят при допустимом контракте. Bulk/CSV post-error reconciliation и per-row outcomes остаются T17.
 **Проверки:** focused UI tests для initial load и single-operation 409 на ключе `specialists`; PG lifecycle regression только при подтверждённом backend-дефекте; OpenAPI/generated parity только при изменении контракта. Browser baseline и исправление — в одном собственном synthetic контуре с ordinary Admin 2FA и teardown. Фиксировать SHA и реальные PASS/FAIL/NOT_RUN.
-**Stop перед runtime-патчем:** неизвестны method/reason/revision, требуется production mutation, смена bindings/ownership или ослабление T10/T11 guards. Read-only сбор недостающих фактов продолжается в разрешённом контуре. Сохранить диагностический checkpoint; не превращать неизвестное в implementation approval. Если данные недоступны, закрыть merge-risk может только отдельное явное решение с зафиксированной областью неопределённости.
+**Stop перед изменением backend/guards:** неизвестен production reason/revision, требуется production mutation, смена bindings/ownership или ослабление T10/T11 policy. Renderer-only T11.1a имеет собственный воспроизведённый root cause и не требует угадывать production counts. Read-only сбор остальных фактов продолжается; неизвестное не превращается в разрешение удалить используемый профиль. Остаточный merge-risk получает явный disposition.
+
+### T11.1a. Понятный отказ одиночного удаления — VALIDATED (local)
+
+- **Срез:** одна строка `handleDelete` использует существующий `apiErrorMessage`; два UI regression cases на synthetic profile key `specialists`. Backend, DELETE payload/guard, bulk/CSV и автоматическое архивирование не меняются.
+- **Root cause:** `String(detail)` скрывал backend `message` для object envelope. Оба canonical DELETE reasons воспроизведены в UI и падали до исправления; отдельный GET endpoint не нужен.
+- **Приёмка:** видимый server message, строка сохранена, «Скрыть» остаётся доступно; нет implicit PUT, DELETE retry или reload после отказа. Initial load не вызывает mutation.
+- **Локальные проверки:** три focused interaction/CSV suites 44 PASS / 0 SKIP; TypeScript PASS; scoped ESLint 0 errors / 4 прежних warnings; diff check PASS. Новый browser/PG/staging run NOT_RUN; прежние доказательства не переносятся на новую frontend source revision.
+- **Публикация:** normal hooks, actual source commit и CI проверяются в текущем #3639. Это не MERGED, не production deploy и не закрытие T11.1 по точному production reason.
 
 ### T12. Явная публикация и обзор
 
