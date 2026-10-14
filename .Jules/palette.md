@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-10-12 - Missing Focus Indicators on Custom Wrappers
+**Learning:** For complex custom UI controls like `Checkbox` that use a wrapper `div` element (with `role="checkbox"` and `tabIndex={0}`) to receive keyboard focus, the default browser focus ring might be suppressed or misaligned. Keyboard users need a prominent focus indicator to know which element is active.
+**Action:** Always ensure that interactive custom wrappers implement a visible focus state, ideally matching the design system's conventions (e.g., using `:focus-visible` to apply a macOS-style focus ring).

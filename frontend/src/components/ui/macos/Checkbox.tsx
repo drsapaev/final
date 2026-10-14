@@ -137,7 +137,8 @@ const Checkbox = React.forwardRef<HTMLDivElement, CheckboxProps>(({
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <div
-        style={{ display: 'flex', alignItems: 'flex-start' }}
+        className="mac-checkbox-wrapper"
+        style={{ display: 'flex', alignItems: 'flex-start', outline: 'none' }}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         tabIndex={disabled ? -1 : 0}
@@ -153,7 +154,7 @@ const Checkbox = React.forwardRef<HTMLDivElement, CheckboxProps>(({
 
         <div
           ref={ref}
-          className={className}
+          className={`mac-checkbox-box ${className || ''}`}
           style={checkboxStyle}
           {...props}>
 
@@ -178,6 +179,15 @@ const Checkbox = React.forwardRef<HTMLDivElement, CheckboxProps>(({
           {description}
         </div>
       }
+      <style>{`
+        .mac-checkbox-wrapper:focus-visible {
+          outline: none;
+        }
+        .mac-checkbox-wrapper:focus-visible .mac-checkbox-box {
+          outline: 2px solid color-mix(in srgb, var(--mac-accent-blue-500, var(--mac-accent-blue, #007aff)), transparent 60%);
+          outline-offset: 2px;
+        }
+      `}</style>
     </div>);
 
 });
