@@ -11,6 +11,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -133,6 +134,9 @@ def session(staging, monkeypatch):
     monkeypatch.setattr(staging, "linux_storage", lambda **kwargs: None)
     monkeypatch.setattr(staging, "boot_id", lambda: "boot-1")
     monkeypatch.setattr(staging, "ready", lambda: None)
+    set_ephemeral_lifecycle(staging)
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    monkeypatch.setattr(staging, "teardown_project", lambda **kwargs: "PASS")
     return staging, keeper
 
 
@@ -147,6 +151,19 @@ def args(action="session", **changes):
     }
     result.update(changes)
     return argparse.Namespace(**result)
+
+
+def set_ephemeral_lifecycle(staging):
+    expiry = (datetime.now(UTC) + timedelta(hours=4)).isoformat()
+    staging.values.update(
+        {
+            "CLINIC_LIFECYCLE": "ephemeral",
+            "CLINIC_OWNER": "test-owner",
+            "CLINIC_EXPIRES_AT": expiry,
+        }
+    )
+    staging.ownership_verified = True
+    return expiry
 
 
 @pytest.fixture
@@ -321,7 +338,7 @@ def test_unmeasurable_backing_volume_does_not_boot_or_echo_path(staging, monkeyp
 @pytest.fixture
 def linux_storage_stub(staging, monkeypatch):
     options = {"/": "rw,relatime,errors=remount-ro", "/custom Docker data": "rw"}
-    space = {path: 20 * guard.GIB for path in options}
+    space = dict.fromkeys(options, 20 * guard.GIB)
     calls = []
 
     def docker(*command, **kwargs):
@@ -333,7 +350,9 @@ def linux_storage_stub(staging, monkeypatch):
         assert command[:2] == ("env", "-i") and "LC_ALL=C" in command
         if "findmnt" in command:
             path = command[command.index("--target") + 1]
-            return json.dumps({"filesystems": [{"target": path, "options": options[path]}]})
+            return json.dumps(
+                {"filesystems": [{"target": path, "options": options[path]}]}
+            )
         assert "df" in command and command[-2] == "--"
         return f"Avail\n {space[command[-1]]}"
 
@@ -1626,6 +1645,475 @@ def test_ready_rejects_native_windows_shadow_even_with_owned_healthy_docker(
     )
     with pytest.raises(guard.GuardError, match="WINDOWS_PORT_OWNER"):
         staging.ready()
+
+
+def test_lifecycle_context_accepts_explicit_owner_and_bounded_timezone_aware_lease():
+    expiry = (datetime.now(UTC) + timedelta(hours=4)).isoformat()
+
+    owner, original_expiry, parsed_expiry = guard.lifecycle_context(
+        {
+            "CLINIC_LIFECYCLE": "ephemeral",
+            "CLINIC_OWNER": "queue-validation",
+            "CLINIC_EXPIRES_AT": expiry,
+        }
+    )
+
+    assert owner == "queue-validation"
+    assert original_expiry == expiry
+    assert parsed_expiry == datetime.fromisoformat(expiry)
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"CLINIC_LIFECYCLE": "persistent"}, "LIFECYCLE_INVALID"),
+        ({"CLINIC_OWNER": "unknown"}, "LIFECYCLE_OWNER_REQUIRED"),
+        ({"CLINIC_OWNER": "  "}, "LIFECYCLE_OWNER_REQUIRED"),
+        ({"CLINIC_EXPIRES_AT": "2026-10-16T12:00:00"}, "LIFECYCLE_EXPIRY_REQUIRED"),
+        ({"CLINIC_EXPIRES_AT": "not-a-date"}, "LIFECYCLE_EXPIRY_REQUIRED"),
+        (
+            {"CLINIC_EXPIRES_AT": (datetime.now(UTC) + timedelta(days=8)).isoformat()},
+            "LIFECYCLE_EXPIRY_TOO_FAR",
+        ),
+    ],
+)
+def test_lifecycle_context_rejects_unowned_or_unbounded_lease(changes, message):
+    values = {
+        "CLINIC_LIFECYCLE": "ephemeral",
+        "CLINIC_OWNER": "queue-validation",
+        "CLINIC_EXPIRES_AT": (datetime.now(UTC) + timedelta(hours=4)).isoformat(),
+    }
+    values.update(changes)
+
+    with pytest.raises(guard.GuardError, match=message):
+        guard.lifecycle_context(values)
+
+
+def test_project_lifecycle_validation_checks_every_owned_resource_label(
+    staging, monkeypatch
+):
+    staging.linux_root = LINUX_ROOT
+    staging.linux_compose = LINUX_ROOT + "/ops/compose.staging.yml"
+    staging.ports = PORTS.copy()
+    staging.lifecycle_owner = "queue-validation"
+    staging.lifecycle_expires_at = "2026-10-15T12:00:00+00:00"
+    owned = container(
+        lifecycle="ephemeral",
+        owner=staging.lifecycle_owner,
+        expires_at=staging.lifecycle_expires_at,
+    )
+    labels = {
+        "com.docker.compose.project": staging.project,
+        "clinic.lifecycle": "ephemeral",
+        "clinic.owner": staging.lifecycle_owner,
+        "clinic.expires_at": staging.lifecycle_expires_at,
+    }
+    monkeypatch.setattr(guard, "validate_ownership", lambda *a, **k: [owned])
+    monkeypatch.setattr(staging, "containers", lambda: [owned])
+    monkeypatch.setattr(
+        staging,
+        "project_resource_ids",
+        lambda kind: {"volume": ["owned-volume"], "network": ["owned-network"]}[kind],
+    )
+    monkeypatch.setattr(staging, "resource_labels", lambda kind, resource_id: labels)
+
+    assert staging.validate_project_lifecycle_labels() == {
+        "container": 1,
+        "volume": 1,
+        "network": 1,
+    }
+
+    monkeypatch.setattr(
+        staging,
+        "resource_labels",
+        lambda kind, resource_id: {**labels, "clinic.owner": "another-owner"},
+    )
+    with pytest.raises(guard.GuardError, match="RESOURCE_LIFECYCLE_MISMATCH"):
+        staging.validate_project_lifecycle_labels()
+
+
+def test_teardown_removes_and_verifies_only_the_validated_compose_project(
+    staging, monkeypatch
+):
+    staging.ownership_verified = True
+    staging.lifecycle_owner = "queue-validation"
+    staging.lifecycle_expires_at = "2026-10-15T12:00:00+00:00"
+    commands = []
+    monkeypatch.setattr(
+        staging,
+        "validate_project_lifecycle_labels",
+        lambda: {"container": 2, "volume": 1, "network": 1},
+    )
+    monkeypatch.setattr(
+        staging,
+        "compose_command",
+        lambda *a, **k: commands.append((a, k)),
+    )
+    monkeypatch.setattr(staging, "project_resource_ids", lambda kind: [])
+
+    assert staging.teardown_project(allow_keep=False) == "PASS"
+
+    assert commands == [
+        (
+            ("down", "--volumes", "--remove-orphans", "--rmi", "local"),
+            {"timeout": 300},
+        )
+    ]
+    assert staging.summary["teardown"] == {
+        "status": "PASS",
+        "removed": {"container": 2, "volume": 1, "network": 1},
+        "remaining": {"container": 0, "volume": 0, "network": 0},
+        "local_images": "compose --rmi local",
+    }
+
+
+@pytest.mark.parametrize("keep_staging", [False, True])
+def test_failed_start_cleans_only_owned_project_unless_keep_requested(
+    session, monkeypatch, keep_staging
+):
+    staging, _ = session
+    set_ephemeral_lifecycle(staging)
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    teardowns = []
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda *, allow_keep: teardowns.append(allow_keep) or "PASS",
+    )
+    monkeypatch.setattr(
+        staging,
+        "compose_command",
+        lambda *a, **k: (_ for _ in ()).throw(guard.GuardError("COMPOSE_FAILED")),
+    )
+    if keep_staging:
+        monkeypatch.setenv("KEEP_STAGING", "1")
+    else:
+        monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError, match="COMPOSE_FAILED"):
+        staging.execute(args("start"))
+
+    assert teardowns == ([] if keep_staging else [True])
+
+
+@pytest.mark.parametrize("failure_point", ["public_origins", "linux_storage"])
+def test_failed_start_after_ownership_verification_cleans_project(
+    session, monkeypatch, failure_point
+):
+    staging, _ = session
+    teardowns = []
+
+    def cleanup(*, allow_keep):
+        teardowns.append(allow_keep)
+        staging.summary["teardown"] = "PASS"
+        return "PASS"
+
+    monkeypatch.setattr(staging, "teardown_project", cleanup)
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+    if failure_point == "public_origins":
+        monkeypatch.setattr(
+            guard,
+            "validate_public_origins",
+            lambda *a, **k: (_ for _ in ()).throw(
+                guard.GuardError("PUBLIC_ORIGINS_INVALID")
+            ),
+        )
+    else:
+        monkeypatch.setattr(
+            staging,
+            "linux_storage",
+            lambda **kwargs: (_ for _ in ()).throw(
+                guard.GuardError("LINUX_STORAGE_UNAVAILABLE")
+            ),
+        )
+
+    with pytest.raises(guard.GuardError, match="STAGING_TEARDOWN=PASS"):
+        staging.execute(args("start"))
+
+    assert teardowns == [True]
+    assert staging.summary["teardown"] == "PASS"
+
+
+def test_failed_start_with_lost_keeper_reports_not_run_without_deleting(
+    session, monkeypatch
+):
+    staging, _ = session
+    monkeypatch.setattr(
+        staging,
+        "assert_session",
+        lambda *a, **k: (_ for _ in ()).throw(
+            guard.GuardError("WSL_INTERRUPTED: keeper ended")
+        ),
+    )
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda **kwargs: pytest.fail("must not delete after keeper loss"),
+    )
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError, match="STAGING_TEARDOWN_NOT_RUN"):
+        staging.execute(args("start"))
+
+    assert staging.summary["teardown"] == "NOT_RUN_WSL_SESSION_INTERRUPTED"
+
+
+def test_failed_start_with_lifecycle_label_mismatch_does_not_delete(
+    session, monkeypatch
+):
+    staging, _ = session
+    teardowns = []
+    monkeypatch.setattr(
+        staging,
+        "validate_project_lifecycle_labels",
+        lambda: (_ for _ in ()).throw(
+            guard.GuardError("RESOURCE_LIFECYCLE_MISMATCH")
+        ),
+    )
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda **kwargs: teardowns.append(kwargs),
+    )
+
+    with pytest.raises(guard.GuardError, match="RESOURCE_LIFECYCLE_MISMATCH"):
+        staging.execute(args("start"))
+
+    assert staging.cleanup_policy is None
+    assert teardowns == []
+
+
+def test_successful_session_tears_down_even_when_keep_staging_is_inherited(
+    session, monkeypatch
+):
+    staging, _ = session
+    set_ephemeral_lifecycle(staging)
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=0),
+    )
+    teardowns = []
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda *, allow_keep: teardowns.append(allow_keep) or "PASS",
+    )
+    monkeypatch.setenv("KEEP_STAGING", "1")
+
+    result = staging.execute(args("session"))
+
+    assert result["result"] == "PASS"
+    assert teardowns == [False]
+
+
+@pytest.mark.parametrize("keep_staging", [False, True])
+def test_failed_session_cleans_owned_project_unless_keep_requested(
+    session, monkeypatch, keep_staging
+):
+    staging, _ = session
+    set_ephemeral_lifecycle(staging)
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=9),
+    )
+    teardowns = []
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda *, allow_keep: teardowns.append(allow_keep) or "PASS",
+    )
+    if keep_staging:
+        monkeypatch.setenv("KEEP_STAGING", "1")
+    else:
+        monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError, match="VALIDATION_FAILED"):
+        staging.execute(args("session"))
+
+    assert teardowns == ([] if keep_staging else [True])
+
+
+@pytest.mark.parametrize("action", ["start", "session"])
+def test_execution_without_verified_ownership_cannot_create_or_delete_resources(
+    session, monkeypatch, action
+):
+    staging, _ = session
+    staging.ownership_verified = False
+    monkeypatch.setattr(
+        staging, "compose_command", lambda *a, **k: pytest.fail("must not mutate")
+    )
+    monkeypatch.setattr(
+        staging, "teardown_project", lambda **k: pytest.fail("must not delete")
+    )
+
+    with pytest.raises(guard.GuardError, match="PROJECT_OWNERSHIP_UNVERIFIED"):
+        staging.execute(args(action))
+
+
+@pytest.mark.parametrize("key", ["CLINIC_OWNER", "CLINIC_EXPIRES_AT"])
+def test_missing_lifecycle_context_fails_before_compose_mutation(
+    session, monkeypatch, key
+):
+    staging, _ = session
+    staging.values.pop(key)
+    monkeypatch.setattr(
+        staging, "compose_command", lambda *a, **k: pytest.fail("must not mutate")
+    )
+    monkeypatch.setattr(
+        staging, "teardown_project", lambda **k: pytest.fail("must not delete")
+    )
+
+    with pytest.raises(guard.GuardError, match="LIFECYCLE_"):
+        staging.execute(args("start"))
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "com.docker.compose.project",
+        "clinic.lifecycle",
+        "clinic.owner",
+        "clinic.expires_at",
+    ],
+)
+def test_teardown_rejects_changed_resource_identity_before_any_delete(
+    staging, monkeypatch, key
+):
+    staging.ownership_verified = True
+    staging.lifecycle_owner = "test-owner"
+    staging.lifecycle_expires_at = "2026-10-16T12:00:00Z"
+    staging.linux_root = LINUX_ROOT
+    staging.linux_compose = LINUX_ROOT + "/ops/compose.staging.yml"
+    staging.ports = PORTS.copy()
+    labels = {
+        "com.docker.compose.project": staging.project,
+        "clinic.lifecycle": "ephemeral",
+        "clinic.owner": staging.lifecycle_owner,
+        "clinic.expires_at": staging.lifecycle_expires_at,
+    }
+    labels[key] = "different"
+    monkeypatch.setattr(staging, "containers", list)
+    monkeypatch.setattr(
+        staging,
+        "project_resource_ids",
+        lambda kind: ["remaining-volume"] if kind == "volume" else [],
+    )
+    monkeypatch.setattr(staging, "resource_labels", lambda *a: labels)
+    monkeypatch.setattr(
+        staging, "compose_command", lambda *a, **k: pytest.fail("must not delete")
+    )
+
+    with pytest.raises(guard.GuardError, match="RESOURCE_LIFECYCLE_MISMATCH"):
+        staging.teardown_project(allow_keep=False)
+
+
+def test_teardown_cannot_report_success_when_an_owned_volume_remains(
+    staging, monkeypatch
+):
+    staging.ownership_verified = True
+    staging.lifecycle_owner = "test-owner"
+    staging.lifecycle_expires_at = "2026-10-16T12:00:00Z"
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    monkeypatch.setattr(staging, "compose_command", lambda *a, **k: "")
+    monkeypatch.setattr(
+        staging,
+        "project_resource_ids",
+        lambda kind: ["busy-volume"] if kind == "volume" else [],
+    )
+
+    with pytest.raises(guard.GuardError, match="STAGING_TEARDOWN_INCOMPLETE"):
+        staging.teardown_project(allow_keep=False)
+    assert staging.summary.get("teardown") != "PASS"
+
+
+@pytest.mark.parametrize("action", ["start", "session"])
+def test_expired_owned_project_is_cleaned_without_starting_or_validating(
+    session, monkeypatch, action
+):
+    staging, _ = session
+    staging.values["CLINIC_EXPIRES_AT"] = (
+        datetime.now(UTC) - timedelta(hours=1)
+    ).isoformat()
+    teardowns = []
+    monkeypatch.setattr(
+        staging, "teardown_project", lambda **k: teardowns.append(k) or "PASS"
+    )
+    monkeypatch.setattr(
+        staging, "compose_command", lambda *a, **k: pytest.fail("must not start")
+    )
+    monkeypatch.setattr(
+        guard.subprocess, "run", lambda *a, **k: pytest.fail("must not validate")
+    )
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError, match="LIFECYCLE_EXPIRED"):
+        staging.execute(args(action))
+    assert teardowns == [{"allow_keep": True}]
+
+
+def test_keyboard_interrupt_still_cleans_and_releases_the_owned_session(
+    session, monkeypatch
+):
+    staging, keeper = session
+    teardowns = []
+
+    def interrupted(*a, **k):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(guard.subprocess, "run", interrupted)
+    monkeypatch.setattr(
+        staging, "teardown_project", lambda **k: teardowns.append(k) or "PASS"
+    )
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(KeyboardInterrupt):
+        staging.execute(args())
+    assert teardowns == [{"allow_keep": True}]
+    assert keeper.stdin.closed
+
+
+def test_lost_wsl_session_does_not_boot_again_to_attempt_cleanup(session, monkeypatch):
+    staging, keeper = session
+
+    def interrupted(*a, **k):
+        keeper.exit_code = 1
+        return SimpleNamespace(returncode=9)
+
+    monkeypatch.setattr(guard.subprocess, "run", interrupted)
+    monkeypatch.setattr(
+        staging, "teardown_project", lambda **k: pytest.fail("must not restart WSL")
+    )
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError, match="STAGING_TEARDOWN_NOT_RUN"):
+        staging.execute(args())
+    assert staging.summary["teardown"] == "NOT_RUN_WSL_SESSION_INTERRUPTED"
+
+
+def test_cleanup_failure_preserves_original_validation_failure_without_raw_details(
+    session, monkeypatch
+):
+    staging, _ = session
+    monkeypatch.setattr(
+        guard.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=9)
+    )
+
+    def failed_cleanup(**kwargs):
+        raise RuntimeError("sensitive native response")
+
+    monkeypatch.setattr(staging, "teardown_project", failed_cleanup)
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError) as exc:
+        staging.execute(args())
+    assert "VALIDATION_FAILED: child exit 9" in str(exc.value)
+    assert "STAGING_TEARDOWN_FAILED: RuntimeError" in str(exc.value)
+    assert "sensitive" not in str(exc.value)
+    assert staging.summary["teardown"] == "FAIL"
 
 
 def test_stop_only_targets_owned_project_and_does_not_delete_volumes(
