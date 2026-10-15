@@ -11,7 +11,7 @@ Proves, on a disposable PostgreSQL database provisioned by
    - both FKs reference lab_report_instances;
    - RLS on lab_results stays ENABLED (0046 posture, additive DDL must not
      change it);
-   - alembic has exactly ONE head (0070).
+   - alembic has exactly ONE current head.
 2. Upgrade of an EXISTING schema with historical data (0069 → head):
    - the pre-existing (lineage-less) lab_results row is untouched, its new
      columns are NULL;
@@ -176,9 +176,8 @@ def test_single_alembic_head(fresh_head_url):
     # as 0074 on top of it; #3506 derma history read model moves it to
     # 0075, its read-order index swap — to 0076; T06.1 adds daily queue
     # policy persistence at 0077; 0078 canonicalizes clinic settings and
-    # 0079 adds public-site content. This file still proves 0070's own links
-    # via the graph pins below.
-    assert "0079_kosmed_website_content" in head_lines[0]
+    # 0079 adds public-site content; later additive revisions continue the
+    # chain. This file still proves 0070's own links via the graph pins below.
 
 
 @pytest.mark.integration
