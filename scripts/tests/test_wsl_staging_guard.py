@@ -1796,6 +1796,93 @@ def test_failed_start_cleans_only_owned_project_unless_keep_requested(
     assert teardowns == ([] if keep_staging else [True])
 
 
+@pytest.mark.parametrize("failure_point", ["public_origins", "linux_storage"])
+def test_failed_start_after_ownership_verification_cleans_project(
+    session, monkeypatch, failure_point
+):
+    staging, _ = session
+    teardowns = []
+
+    def cleanup(*, allow_keep):
+        teardowns.append(allow_keep)
+        staging.summary["teardown"] = "PASS"
+        return "PASS"
+
+    monkeypatch.setattr(staging, "teardown_project", cleanup)
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+    if failure_point == "public_origins":
+        monkeypatch.setattr(
+            guard,
+            "validate_public_origins",
+            lambda *a, **k: (_ for _ in ()).throw(
+                guard.GuardError("PUBLIC_ORIGINS_INVALID")
+            ),
+        )
+    else:
+        monkeypatch.setattr(
+            staging,
+            "linux_storage",
+            lambda **kwargs: (_ for _ in ()).throw(
+                guard.GuardError("LINUX_STORAGE_UNAVAILABLE")
+            ),
+        )
+
+    with pytest.raises(guard.GuardError, match="STAGING_TEARDOWN=PASS"):
+        staging.execute(args("start"))
+
+    assert teardowns == [True]
+    assert staging.summary["teardown"] == "PASS"
+
+
+def test_failed_start_with_lost_keeper_reports_not_run_without_deleting(
+    session, monkeypatch
+):
+    staging, _ = session
+    monkeypatch.setattr(
+        staging,
+        "assert_session",
+        lambda *a, **k: (_ for _ in ()).throw(
+            guard.GuardError("WSL_INTERRUPTED: keeper ended")
+        ),
+    )
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda **kwargs: pytest.fail("must not delete after keeper loss"),
+    )
+    monkeypatch.delenv("KEEP_STAGING", raising=False)
+
+    with pytest.raises(guard.GuardError, match="STAGING_TEARDOWN_NOT_RUN"):
+        staging.execute(args("start"))
+
+    assert staging.summary["teardown"] == "NOT_RUN_WSL_SESSION_INTERRUPTED"
+
+
+def test_failed_start_with_lifecycle_label_mismatch_does_not_delete(
+    session, monkeypatch
+):
+    staging, _ = session
+    teardowns = []
+    monkeypatch.setattr(
+        staging,
+        "validate_project_lifecycle_labels",
+        lambda: (_ for _ in ()).throw(
+            guard.GuardError("RESOURCE_LIFECYCLE_MISMATCH")
+        ),
+    )
+    monkeypatch.setattr(
+        staging,
+        "teardown_project",
+        lambda **kwargs: teardowns.append(kwargs),
+    )
+
+    with pytest.raises(guard.GuardError, match="RESOURCE_LIFECYCLE_MISMATCH"):
+        staging.execute(args("start"))
+
+    assert staging.cleanup_policy is None
+    assert teardowns == []
+
+
 def test_successful_session_tears_down_even_when_keep_staging_is_inherited(
     session, monkeypatch
 ):

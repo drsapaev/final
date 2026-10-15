@@ -1030,10 +1030,13 @@ class WslStaging:
             self.lifecycle_owner = owner
             self.lifecycle_expires_at = expires_raw
             self.validate_project_lifecycle_labels()
+            # Arm cleanup as soon as this exact project and its lifecycle
+            # labels are verified. Start must also clean when later safety
+            # checks (public origins, Linux storage or keeper continuity) fail.
+            self.cleanup_policy = "always" if args.action == "session" else "failure"
             if args.action == "session":
                 # A Session owns teardown once its project and lifecycle labels
                 # have been verified, including readiness and child failures.
-                self.cleanup_policy = "always"
                 if expires_at <= datetime.now(UTC):
                     raise GuardError(
                         "LIFECYCLE_EXPIRED: staging lease expired; project will be torn down"
@@ -1041,7 +1044,6 @@ class WslStaging:
             elif expires_at <= datetime.now(UTC):
                 # A stale project name must not be reused. If it is still the
                 # exact project, remove it on this failed Start path.
-                self.cleanup_policy = "failure"
                 raise GuardError(
                     "LIFECYCLE_EXPIRED: staging lease expired; project will be torn down"
                 )
@@ -1055,8 +1057,6 @@ class WslStaging:
             command = ["up", "-d", "--wait", "--wait-timeout", str(args.timeout)]
             if not args.no_build:
                 command.append("--build")
-            if self.ownership_verified:
-                self.cleanup_policy = "failure"
             self.compose_command(
                 *command, timeout=args.timeout + (1800 if not args.no_build else 30)
             )

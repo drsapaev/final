@@ -61,9 +61,12 @@ the next validation session. The contract:
    project's containers, networks, volumes and local images automatically
    after successful validation, and verifies that no project-labeled
    containers, volumes or networks remain. Failed `Start`/`Session` attempts
-   also clean up unless `KEEP_STAGING=1` was explicitly requested for failure
-   diagnosis. A successful run is removed even if that variable was inherited.
-   Ownership conflicts or WSL session loss stop cleanup and must be reported.
+   also clean up once the exact project and its owner/expiry labels are
+   verified, unless `KEEP_STAGING=1` was explicitly requested for failure
+   diagnosis. Thus later public-origin or Linux-storage validation failures
+   do not leave verified resources behind. A successful run is removed even
+   if that variable was inherited. Ownership conflicts or WSL session loss
+   stop cleanup and must be reported as teardown `NOT_RUN`.
    A successful `Start` alone leaves teardown pending; continue with `Session`.
 
    For preserved failures or older launchers, confirm the exact project and

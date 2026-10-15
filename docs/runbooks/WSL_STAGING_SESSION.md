@@ -110,13 +110,19 @@ JSON result includes `teardown.status=PASS` only after those checks. An
 inherited `KEEP_STAGING=1` does not preserve a successful run.
 
 A failed `Start` or `Session` also attempts the same cleanup while its WSL
-session is still continuous. To preserve a failed environment for diagnosis,
-set `KEEP_STAGING=1` explicitly and record the project, expiry and reason in
-the task checkpoint. A changed owner/lifecycle label blocks deletion. A lost
-WSL keeper or boot identity reports teardown `NOT_RUN`; the helper does not
-reboot WSL to retry. Inspect the recorded failure once, resolve the cause,
-and clean only that project. A process forcibly killed by the OS cannot run
-its cleanup handler, so the expiry label and checkpoint remain necessary.
+session is still continuous. Cleanup eligibility begins immediately after
+the exact project and its owner/expiry labels are verified, so later failures
+in public-origin, Linux-storage or keeper-continuity checks do not leave that
+owned project behind. Before ownership and lifecycle verification succeeds,
+the helper does not delete resources. A changed owner/lifecycle label blocks
+deletion. A lost WSL keeper or boot identity reports teardown `NOT_RUN`; the
+helper does not reboot WSL to retry or delete resources after continuity is
+lost. To preserve a failed environment for
+diagnosis, set `KEEP_STAGING=1` explicitly and record the project, expiry and
+reason in the task checkpoint. Inspect the recorded failure once, resolve
+the cause, and clean only that project. A process forcibly killed by the OS
+cannot run its cleanup handler, so the expiry label and checkpoint remain
+necessary.
 
 A successful `Start` returns `teardown=PENDING_SESSION`; it is not a completed
 validation run. Continue with one `Session`, rather than leaving a stack
