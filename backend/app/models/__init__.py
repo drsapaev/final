@@ -48,7 +48,7 @@ from .department import (
     DepartmentService,
 )
 from .derma_examination import DermaExamination
-from .derma_history import DermaHistoryEntry
+from .derma_history import DermaHistoryEntry  # noqa: F401
 from .derma_procedure import DermaProcedure
 
 # Временно отключены из-за проблем с relationships
@@ -86,6 +86,7 @@ from .doctor_templates import (
     DoctorTreatmentTemplateResponse,
     DoctorTreatmentTemplatesListResponse,
 )
+from .emergency_access_token import EmergencyAccessToken  # M4-P2-1: emergency recovery
 from .emr import EMR, Prescription
 from .emr_template import EMRTemplate
 from .emr_v2 import (
@@ -98,10 +99,6 @@ from .emr_v2 import (
 from .emr_version import EMRVersion
 from .family_relation import FamilyRelation, RelationType
 from .feature_flags import FeatureFlag, FeatureFlagHistory
-from .patient_access_audit import PatientAccessAuditLog  # M4-P0-1: PHI audit trail
-from .patient_relationship import PatientRelationship, RelationshipType  # M4-P1-3: context roles
-from .passkey_credential import PasskeyCredential  # M4-P1-4: WebAuthn passkeys
-from .emergency_access_token import EmergencyAccessToken  # M4-P2-1: emergency recovery
 from .file_system import (
     File,
     FileAccessLog,
@@ -132,7 +129,7 @@ from .lab import (
     LabResult,
     LabTemplateServiceBinding,
 )
-from .medical_specialty import MedicalSpecialty
+from .medical_specialty import MedicalSpecialty  # noqa: F401
 from .message import Message
 from .notification import (
     NotificationDelivery,
@@ -140,6 +137,7 @@ from .notification import (
     NotificationHistory,
     NotificationTemplate,
 )
+
 # NURSE-V2 N2-2 (owner design-GO 2026-09-19): nurse workplace
 # assignments + per-service execution facts.
 from .nurse_workplace import NurseWorkplaceAssignment
@@ -150,16 +148,23 @@ from .online_queue import (  # noqa: F401  # manual-review: registry re-export
     QueueResource,
     QueueToken,
 )
+from .passkey_credential import PasskeyCredential  # M4-P1-4: WebAuthn passkeys
 from .patient import Patient
+from .patient_access_audit import PatientAccessAuditLog  # M4-P0-1: PHI audit trail
+from .patient_relationship import (  # M4-P1-3: context roles
+    PatientRelationship,
+    RelationshipType,  # noqa: F401
+)
 from .payment import Payment
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from .payment_webhook import PaymentProvider, PaymentTransaction, PaymentWebhook
 from .print_config import PrinterConfig, PrintJob, PrintTemplate
+from .public_site_media import PublicSiteMedia
 from .push_device import PushDevice  # noqa: F401  # PR-6: registry re-export
-from .queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
 from .queue_direction_public_address import (  # noqa: F401  # RQ-16.c: public-address registry re-export
     QueueDirectionPublicAddress,
 )
+from .queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
 from .refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
@@ -169,7 +174,7 @@ from .refund_deposit import (
     RefundType,
 )
 from .role_permission import Permission, Role, UserGroup, UserPermissionOverride
-from .salary_history import SalaryHistory, SalaryPayment
+from .salary_history import SalaryHistory, SalaryPayment  # noqa: F401
 
 # from .dermatology_photos import DermatologyPhoto
 # from .telegram import TelegramConfig, TelegramUser, TelegramMessage, TelegramTemplate
@@ -193,7 +198,7 @@ from .telegram_config import (
     TelegramTemplate,
     TelegramUser,
 )
-from .telegram_webhook_dedup import TelegramWebhookDedup
+from .telegram_webhook_dedup import TelegramWebhookDedup  # noqa: F401
 from .two_factor_auth import (
     TwoFactorAuth,
     TwoFactorBackupCode,
@@ -337,6 +342,7 @@ __all__ = [
     "DoctorTreatmentTemplatesListResponse",
     "PaymentInvoice",
     "PaymentInvoiceVisit",
+    "PublicSiteMedia",
     "Department",
     "DepartmentService",
     "DepartmentQueueSettings",
