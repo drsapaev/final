@@ -25,6 +25,14 @@ cd C:\final\_wt_<topic>
 .\ops\scripts\wsl_staging.ps1 -Action Preflight -EnvFile ops/staging.env
 ```
 
+Before `Start` or `Session`, the ignored env file also needs a specific
+`CLINIC_OWNER` and a timezone-aware `CLINIC_EXPIRES_AT` (for example, now plus
+four hours). The lifecycle must be `ephemeral` (the Compose default). The
+launcher rejects an unknown owner, a missing/invalid expiry, or a lease more
+than seven days in the future. Use a new project for a new run; do not change
+the owner/expiry of an existing project's env to bypass a mismatch. Existing
+resource labels must match the configured project, owner and exact expiry.
+
 Use the returned reason to resolve a failed prerequisite once. Do not repeat
 the build or test command while that prerequisite still fails. `Preflight`
 may boot the selected WSL distribution. It validates config, identity, ports,
@@ -95,6 +103,33 @@ the invocation and is released when the validation ends; it does not rely on
 a `sleep 1800` timer. Do not launch a short-lived keeper in one command and
 assume a later independent command is protected.
 
+`Session` now owns final teardown. After successful validation it runs
+`down --volumes --remove-orphans --rmi local` for the verified project, then
+checks that no project-labeled containers, volumes or networks remain. The
+JSON result includes `teardown.status=PASS` only after those checks. An
+inherited `KEEP_STAGING=1` does not preserve a successful run.
+
+A failed `Start` or `Session` also attempts the same cleanup while its WSL
+session is still continuous. Cleanup eligibility begins immediately after
+the exact project and its owner/expiry labels are verified, so later failures
+in public-origin, Linux-storage or keeper-continuity checks do not leave that
+owned project behind. Before ownership and lifecycle verification succeeds,
+the helper does not delete resources. A changed owner/lifecycle label blocks
+deletion. A lost WSL keeper or boot identity reports teardown `NOT_RUN`; the
+helper does not reboot WSL to retry or delete resources after continuity is
+lost. To preserve a failed environment for
+diagnosis, set `KEEP_STAGING=1` explicitly and record the project, expiry and
+reason in the task checkpoint. Inspect the recorded failure once, resolve
+the cause, and clean only that project. A process forcibly killed by the OS
+cannot run its cleanup handler, so the expiry label and checkpoint remain
+necessary.
+
+A successful `Start` returns `teardown=PENDING_SESSION`; it is not a completed
+validation run. Continue with one `Session`, rather than leaving a stack
+between tasks. An expired lease cannot be started or used for validation;
+an exactly matching owned project is cleaned on that failed invocation unless
+the explicit failure-preservation exception is set.
+
 For `Session`, `-NoBuild` is the caller's explicit promise that the child
 does not build container images. The helper does not inspect arbitrary child
 commands. Test/browser-only sessions may use this flag and the smaller
@@ -114,8 +149,11 @@ and built images:
 .\ops\scripts\wsl_staging.ps1 -Action Stop -EnvFile ops/staging.env
 ```
 
-`Stop` is not final teardown. Every completed staging run must remove its
-own containers, networks, named volumes and locally built images:
+`Stop` is not final teardown and keeps its recovery behavior, including low
+disk-space recovery. A successful `Session` already performs final teardown.
+For an older launcher or a preserved failed stack, explicit final teardown
+is still required after independently confirming the exact project and its
+ownership:
 
 ```powershell
 .\scripts\staging_down.ps1 -ProjectName clinic-your-task -EnvFile ops/staging.env
@@ -126,6 +164,14 @@ Use the exact project configured for this task. Final teardown runs
 are absent before removing its ignored env file. Preserve a failing stack
 only with the documented `KEEP_STAGING=1` checkpoint exception. Forgotten
 images and volumes consume the same backing volume used by the next build.
+
+Project teardown does not prune shared BuildKit cache or unrelated images.
+Use `docker system df` and a read-only resource inventory to distinguish
+project leftovers from shared cache; a reclaimable number alone does not
+establish ownership. Review shared-cache retention as a separate maintenance
+task, rather than inserting a daemon-wide prune into every validation run.
+Deleting Linux data also does not guarantee that the Windows VHDX file
+shrinks immediately; offline compaction is a separate operator action.
 
 Do not use `wsl --shutdown`, change global `.wslconfig`, stop another project,
 or invoke the legacy `start_staging_host.ps1`/`stop_staging_host.ps1` as a
