@@ -51,12 +51,23 @@ the next validation session. The contract:
 
 1. **Create** with a unique `COMPOSE_PROJECT_NAME` and the lifecycle
    labels (`CLINIC_OWNER`, `CLINIC_EXPIRES_AT`) from the compose file.
-   `CLINIC_EXPIRES_AT` is an ISO timestamp (e.g. now + 2 days) used by GC.
+   The canonical launcher requires a specific owner and a timezone-aware ISO
+   expiry (e.g. now + 4 hours, at most 7 days). Keep the same owner/expiry
+   until teardown; matching resource labels are checked before deletion.
 2. **Validate.** If a failure needs the live stack preserved, set
    `KEEP_STAGING=1` and record it in the task checkpoint; this is the
    ONLY accepted reason to leave a stack running.
-3. **Teardown is mandatory** at the end of every run — a normal
-   successful validation always ends with:
+3. **Teardown is mandatory.** The canonical `Session` now removes its verified
+   project's containers, networks, volumes and local images automatically
+   after successful validation, and verifies that no project-labeled
+   containers, volumes or networks remain. Failed `Start`/`Session` attempts
+   also clean up unless `KEEP_STAGING=1` was explicitly requested for failure
+   diagnosis. A successful run is removed even if that variable was inherited.
+   Ownership conflicts or WSL session loss stop cleanup and must be reported.
+   A successful `Start` alone leaves teardown pending; continue with `Session`.
+
+   For preserved failures or older launchers, confirm the exact project and
+   ownership before explicitly running:
 
    ```powershell
    powershell -File scripts/staging_down.ps1 -ProjectName <name> [-EnvFile ops/staging.env]
@@ -65,6 +76,9 @@ the next validation session. The contract:
    This runs `docker compose down -v --remove-orphans --rmi local`
    (containers, networks, named volumes, locally built images) and refuses
    to run while `KEEP_STAGING=1` is set unless `-Force` is passed.
+   `Stop` is only a temporary stop and retains data/images. Shared BuildKit
+   cache is outside project teardown; inspect and review its retention
+   separately. Linux deletion and Windows VHDX compaction are separate steps.
 4. **Disposable test containers** (scratch PostgreSQL for PG-backed tests)
    always run with `--rm`, or are removed in the test's own teardown.
 5. **Session-start/end GC** sweeps forgotten leftovers — it removes ONLY

@@ -18,6 +18,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
 from pathlib import Path, PureWindowsPath
 from urllib.parse import parse_qsl, urlsplit
 
@@ -43,6 +44,9 @@ LOOPBACK_BIND_IP = "127.0.0.1"
 INSPECT = (
     '{"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
     '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
+    '"lifecycle":{{json (index .Config.Labels "clinic.lifecycle")}},'
+    '"owner":{{json (index .Config.Labels "clinic.owner")}},'
+    '"expires_at":{{json (index .Config.Labels "clinic.expires_at")}},'
     '"root":{{json (index .Config.Labels "com.docker.compose.project.working_dir")}},'
     '"files":{{json (index .Config.Labels "com.docker.compose.project.config_files")}},'
     '"mounts":{{json .Mounts}},"ports":{{json .NetworkSettings.Ports}},'
@@ -73,14 +77,13 @@ def windows_distro_base_path(distribution: str) -> str:
                 ) as registered:
                     name = winreg.QueryValueEx(registered, "DistributionName")[0]
                     if not isinstance(name, str):
-                        raise ValueError
+                        raise TypeError
                     if name.casefold() == distribution.casefold():
                         matches.append(winreg.QueryValueEx(registered, "BasePath")[0])
         if len(matches) != 1 or not isinstance(matches[0], str):
             raise ValueError
         base_path = matches[0]
-        if base_path.startswith("\\\\?\\"):
-            base_path = base_path[4:]
+        base_path = base_path.removeprefix("\\\\?\\")
         path = PureWindowsPath(base_path)
         if (
             not path.is_absolute()
@@ -162,6 +165,9 @@ def context_values(path: Path) -> dict[str, str]:
         )
     keys = {
         "COMPOSE_PROJECT_NAME",
+        "CLINIC_LIFECYCLE",
+        "CLINIC_OWNER",
+        "CLINIC_EXPIRES_AT",
         *(v[0] for v in PORT_KEYS.values()),
         *PUBLIC_ORIGIN_KEYS,
     }
@@ -484,6 +490,38 @@ def validate_junit(path: Path) -> int:
     return len(cases)
 
 
+def lifecycle_context(values: dict[str, str]) -> tuple[str, str, datetime]:
+    """Require bounded ownership metadata before creating disposable resources."""
+    lifecycle = values.get("CLINIC_LIFECYCLE", "ephemeral").strip()
+    owner = values.get("CLINIC_OWNER", "").strip()
+    expires_raw = values.get("CLINIC_EXPIRES_AT", "").strip()
+    if lifecycle != "ephemeral":
+        raise GuardError("LIFECYCLE_INVALID: staging must be labeled ephemeral")
+    if (
+        not owner
+        or owner.casefold() in {"unknown", "none", "null"}
+        or len(owner) > 128
+        or any(ord(char) < 32 or ord(char) == 127 for char in owner)
+    ):
+        raise GuardError("LIFECYCLE_OWNER_REQUIRED: provide a specific staging owner")
+    try:
+        parsed = datetime.fromisoformat(
+            expires_raw[:-1] + "+00:00" if expires_raw.endswith("Z") else expires_raw
+        )
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError
+    except (TypeError, ValueError):
+        raise GuardError(
+            "LIFECYCLE_EXPIRY_REQUIRED: provide CLINIC_EXPIRES_AT as a timezone-aware ISO timestamp"
+        ) from None
+    expires_at = parsed.astimezone(UTC)
+    if expires_at > datetime.now(UTC) + timedelta(days=7):
+        raise GuardError(
+            "LIFECYCLE_EXPIRY_TOO_FAR: staging lease must expire within seven days"
+        )
+    return owner, expires_raw, expires_at
+
+
 class WslStaging:
     def __init__(self, root: Path, env_file: str, distribution: str):
         self.root = root.resolve()
@@ -492,6 +530,10 @@ class WslStaging:
         self.project = self.values["COMPOSE_PROJECT_NAME"]
         self.distribution = distribution
         self.compose = self.root / "ops/compose.staging.yml"
+        self.ownership_verified = False
+        self.cleanup_policy = None
+        self.lifecycle_owner = None
+        self.lifecycle_expires_at = None
         self.summary = {
             "project": self.project,
             "worktree": str(self.root),
@@ -588,6 +630,158 @@ class WslStaging:
             json.loads(line)
             for line in self.docker("inspect", "--format", INSPECT, *ids).splitlines()
         ]
+
+    def project_resource_ids(self, kind: str) -> list[str]:
+        selector = f"label=com.docker.compose.project={self.project}"
+        if kind == "container":
+            args = ("ps", "--all", "--quiet", "--filter", selector)
+        elif kind in {"volume", "network"}:
+            args = (kind, "ls", "--quiet", "--filter", selector)
+        else:
+            raise ValueError("unsupported Docker resource kind")
+        return self.docker(*args).split()
+
+    def resource_labels(self, kind: str, resource_id: str) -> dict:
+        if kind not in {"volume", "network"}:
+            raise ValueError("unsupported Docker resource kind")
+        raw = self.docker(
+            kind,
+            "inspect",
+            "--format",
+            "{{json .Labels}}",
+            resource_id,
+        )
+        try:
+            labels = json.loads(raw)
+        except (TypeError, ValueError):
+            labels = None
+        return labels if isinstance(labels, dict) else {}
+
+    def validate_disposable_labels(self, labels: dict) -> None:
+        if (
+            labels.get("com.docker.compose.project") != self.project
+            or labels.get("clinic.lifecycle") != "ephemeral"
+            or labels.get("clinic.owner") != self.lifecycle_owner
+            or labels.get("clinic.expires_at") != self.lifecycle_expires_at
+        ):
+            raise GuardError(
+                "RESOURCE_LIFECYCLE_MISMATCH: refusing cleanup without matching ephemeral owner and expiry labels"
+            )
+
+    def validate_project_lifecycle_labels(self) -> dict[str, int]:
+        owned = validate_ownership(
+            self.containers(),
+            self.project,
+            self.linux_root,
+            self.linux_compose,
+            self.ports,
+            enforce_port_bindings=False,
+        )
+        for container in owned:
+            self.validate_disposable_labels(
+                {
+                    "com.docker.compose.project": container.get("project"),
+                    "clinic.lifecycle": container.get("lifecycle"),
+                    "clinic.owner": container.get("owner"),
+                    "clinic.expires_at": container.get("expires_at"),
+                }
+            )
+
+        counts = {"container": len(owned), "volume": 0, "network": 0}
+        for kind in ("volume", "network"):
+            ids = self.project_resource_ids(kind)
+            counts[kind] = len(ids)
+            for resource_id in ids:
+                self.validate_disposable_labels(self.resource_labels(kind, resource_id))
+        return counts
+
+    def teardown_project(self, *, allow_keep: bool) -> str:
+        """Remove and verify only this already-validated Compose project."""
+        if not self.ownership_verified:
+            raise GuardError("PROJECT_OWNERSHIP_UNVERIFIED: refusing staging teardown")
+        if allow_keep and os.environ.get("KEEP_STAGING") == "1":
+            self.summary["teardown"] = "SKIPPED_KEEP_STAGING"
+            return "SKIPPED_KEEP_STAGING"
+        if not self.lifecycle_owner or not self.lifecycle_expires_at:
+            raise GuardError(
+                "LIFECYCLE_UNVERIFIED: refusing staging teardown without owner and expiry"
+            )
+
+        before = self.validate_project_lifecycle_labels()
+
+        self.compose_command(
+            "down",
+            "--volumes",
+            "--remove-orphans",
+            "--rmi",
+            "local",
+            timeout=300,
+        )
+
+        remaining = {
+            kind: len(self.project_resource_ids(kind))
+            for kind in ("container", "volume", "network")
+        }
+        if any(remaining.values()):
+            raise GuardError(
+                "STAGING_TEARDOWN_INCOMPLETE: project-scoped containers, volumes or networks remain"
+            )
+        self.summary["teardown"] = {
+            "status": "PASS",
+            "removed": before,
+            "remaining": remaining,
+            "local_images": "compose --rmi local",
+        }
+        return "PASS"
+
+    def finish_after_failure(self, primary: BaseException, keeper, boot: str) -> None:
+        if os.environ.get("KEEP_STAGING") == "1":
+            self.summary["teardown"] = "SKIPPED_KEEP_STAGING"
+            if isinstance(primary, GuardError):
+                primary.args = (f"{primary}; STAGING_PRESERVED_KEEP_STAGING=1",)
+                return
+            raise GuardError(
+                f"STAGING_FAILED: {type(primary).__name__}; STAGING_PRESERVED_KEEP_STAGING=1"
+            ) from None
+        try:
+            self.assert_session(keeper, boot)
+        except GuardError:
+            self.summary["teardown"] = "NOT_RUN_WSL_SESSION_INTERRUPTED"
+            if isinstance(primary, GuardError):
+                primary.args = (
+                    f"{primary}; STAGING_TEARDOWN_NOT_RUN: WSL session continuity was lost",
+                )
+                return
+            raise GuardError(
+                f"STAGING_FAILED: {type(primary).__name__}; STAGING_TEARDOWN_NOT_RUN: WSL session continuity was lost"
+            ) from None
+        try:
+            outcome = self.teardown_project(allow_keep=True)
+            self.assert_session(keeper, boot)
+        except Exception as cleanup_error:  # noqa: BLE001 - preserve the primary failure and redact unknown errors
+            self.summary["teardown"] = "FAIL"
+            safe_cleanup_error = (
+                str(cleanup_error)
+                if isinstance(cleanup_error, GuardError)
+                else f"STAGING_TEARDOWN_FAILED: {type(cleanup_error).__name__}"
+            )
+            if isinstance(primary, GuardError):
+                primary.args = (f"{primary}; {safe_cleanup_error}",)
+                return
+            raise GuardError(
+                f"STAGING_FAILED: {type(primary).__name__}; {safe_cleanup_error}"
+            ) from None
+        note = (
+            "STAGING_PRESERVED_KEEP_STAGING=1"
+            if outcome == "SKIPPED_KEEP_STAGING"
+            else "STAGING_TEARDOWN=PASS"
+        )
+        if isinstance(primary, GuardError):
+            primary.args = (f"{primary}; {note}",)
+        elif isinstance(primary, Exception):
+            raise GuardError(
+                f"STAGING_FAILED: {type(primary).__name__}; {note}"
+            ) from None
 
     def host_storage(self, *, build_possible: bool, recovery: bool = False) -> None:
         # The checkout and the sparse distro VHD can live on different volumes.
@@ -694,6 +888,7 @@ class WslStaging:
                 )
 
     def preflight(self, *, stop_recovery: bool = False) -> list[dict]:
+        self.ownership_verified = False
         main = Path(
             native(
                 [
@@ -792,6 +987,7 @@ class WslStaging:
             self.summary["warnings"].append(
                 "Low WSL available memory; build concurrency is limited to one"
             )
+        self.ownership_verified = True
         return owned
 
     def ready(self) -> None:
@@ -823,6 +1019,110 @@ class WslStaging:
             s: by_service[s].get("image") for s in ("backend", "frontend", "worker")
         }
 
+    def _execute_after_preflight(self, args, keeper) -> dict:
+        build_possible = args.action in {"start", "session"} and not args.no_build
+        if args.action in {"start", "session"}:
+            if not self.ownership_verified:
+                raise GuardError(
+                    "PROJECT_OWNERSHIP_UNVERIFIED: refusing staging execution"
+                )
+            owner, expires_raw, expires_at = lifecycle_context(self.values)
+            self.lifecycle_owner = owner
+            self.lifecycle_expires_at = expires_raw
+            self.validate_project_lifecycle_labels()
+            if args.action == "session":
+                # A Session owns teardown once its project and lifecycle labels
+                # have been verified, including readiness and child failures.
+                self.cleanup_policy = "always"
+                if expires_at <= datetime.now(UTC):
+                    raise GuardError(
+                        "LIFECYCLE_EXPIRED: staging lease expired; project will be torn down"
+                    )
+            elif expires_at <= datetime.now(UTC):
+                # A stale project name must not be reused. If it is still the
+                # exact project, remove it on this failed Start path.
+                self.cleanup_policy = "failure"
+                raise GuardError(
+                    "LIFECYCLE_EXPIRED: staging lease expired; project will be torn down"
+                )
+
+        if args.action != "stop":
+            validate_public_origins(self.values, self.ports["frontend"])
+            self.linux_storage(build_possible=build_possible)
+        boot = self.summary["boot_id"]
+        self.assert_session(keeper, boot)
+        if args.action == "start":
+            command = ["up", "-d", "--wait", "--wait-timeout", str(args.timeout)]
+            if not args.no_build:
+                command.append("--build")
+            if self.ownership_verified:
+                self.cleanup_policy = "failure"
+            self.compose_command(
+                *command, timeout=args.timeout + (1800 if not args.no_build else 30)
+            )
+        elif args.action == "stop":
+            # Preserve volumes and every foreign project. No distro shutdown/prune.
+            self.compose_command("down", timeout=args.timeout)
+        if args.action not in {"stop", "preflight"}:
+            self.ready()
+            self.summary["runtime_readiness"] = "PASS"
+        else:
+            self.summary["runtime_readiness"] = "NOT_RUN"
+        if args.action == "session":
+            if not args.command and not args.pg_admin_env:
+                raise GuardError(
+                    "SESSION_COMMAND_REQUIRED: wrap the complete validation script"
+                )
+            junit = local_file(self.root, args.junit) if args.junit else None
+            if junit and junit.exists():
+                raise GuardError(
+                    "STALE_REPORT: select a new JUnit path for this invocation"
+                )
+            if args.pg_admin_env:
+                # Other fixtures may have hardcoded fallback ports. Only this
+                # audited env-only scratch fixture belongs to the strict path.
+                if args.pg_admin_env != "RQ23A_PG_ADMIN_URL" or args.command:
+                    raise GuardError(
+                        "PG_SUITE_BOUNDARY: strict PG mode runs only the audited effective-settings suite; omit CommandArgs"
+                    )
+                if not junit:
+                    raise GuardError(
+                        "PG_REPORT_REQUIRED: PostgreSQL proof must reject skipped tests"
+                    )
+                validate_pg_env(self.root, args.pg_admin_env, self.ports["postgres"])
+                command = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-File",
+                    str(self.root / "scripts/run_backend_pytest.ps1"),
+                    "tests/integration/test_effective_queue_settings_report.py",
+                    "--junitxml=" + str(junit),
+                    "-q",
+                    "-rs",
+                ]
+            else:
+                command = args.command
+            child_env = (
+                pg_child_env(self.root, args.pg_admin_env)
+                if args.pg_admin_env
+                else None
+            )
+            try:
+                result = subprocess.run(
+                    command, cwd=self.root, env=child_env, check=False
+                )
+            except OSError:
+                raise GuardError(
+                    "SESSION_COMMAND_UNAVAILABLE: validation executable is missing"
+                ) from None
+            self.assert_session(keeper, boot)
+            if result.returncode:
+                raise GuardError(f"VALIDATION_FAILED: child exit {result.returncode}")
+            if junit:
+                self.summary["junit_passed_cases"] = validate_junit(junit)
+        self.assert_session(keeper, boot)
+        return self.summary
+
     def execute(self, args) -> dict:
         # Session commands are opaque and may build. NoBuild is the caller's
         # explicit promise to run without image builds, not an argv heuristic.
@@ -830,89 +1130,26 @@ class WslStaging:
         self.host_storage(build_possible=build_possible, recovery=args.action == "stop")
         with self.keeper() as keeper:
             self.preflight(stop_recovery=args.action == "stop")
-            if args.action != "stop":
-                validate_public_origins(self.values, self.ports["frontend"])
-            if args.action != "stop":
-                self.linux_storage(build_possible=build_possible)
-            boot = self.summary["boot_id"]
-            self.assert_session(keeper, boot)
-            if args.action == "start":
-                command = ["up", "-d", "--wait", "--wait-timeout", str(args.timeout)]
-                if not args.no_build:
-                    command.append("--build")
-                self.compose_command(
-                    *command, timeout=args.timeout + (1800 if not args.no_build else 30)
-                )
-            elif args.action == "stop":
-                # Preserve volumes and every foreign project. No distro shutdown/prune.
-                self.compose_command("down", timeout=args.timeout)
-            if args.action not in {"stop", "preflight"}:
-                self.ready()
-                self.summary["runtime_readiness"] = "PASS"
-            else:
-                self.summary["runtime_readiness"] = "NOT_RUN"
-            if args.action == "session":
-                if not args.command and not args.pg_admin_env:
-                    raise GuardError(
-                        "SESSION_COMMAND_REQUIRED: wrap the complete validation script"
-                    )
-                junit = local_file(self.root, args.junit) if args.junit else None
-                if junit and junit.exists():
-                    raise GuardError(
-                        "STALE_REPORT: select a new JUnit path for this invocation"
-                    )
-                if args.pg_admin_env:
-                    # Other fixtures may have hardcoded fallback ports. Only this
-                    # audited env-only scratch fixture belongs to the strict path.
-                    if args.pg_admin_env != "RQ23A_PG_ADMIN_URL" or args.command:
-                        raise GuardError(
-                            "PG_SUITE_BOUNDARY: strict PG mode runs only the audited effective-settings suite; omit CommandArgs"
-                        )
-                    if not junit:
-                        raise GuardError(
-                            "PG_REPORT_REQUIRED: PostgreSQL proof must reject skipped tests"
-                        )
-                    validate_pg_env(
-                        self.root, args.pg_admin_env, self.ports["postgres"]
-                    )
-                    command = [
-                        "powershell.exe",
-                        "-NoProfile",
-                        "-File",
-                        str(self.root / "scripts/run_backend_pytest.ps1"),
-                        "tests/integration/test_effective_queue_settings_report.py",
-                        "--junitxml=" + str(junit),
-                        "-q",
-                        "-rs",
-                    ]
-                else:
-                    command = args.command
-                child_env = (
-                    pg_child_env(self.root, args.pg_admin_env)
-                    if args.pg_admin_env
-                    else None
-                )
-                try:
-                    result = subprocess.run(
-                        command, cwd=self.root, env=child_env, check=False
-                    )
-                except OSError:
-                    raise GuardError(
-                        "SESSION_COMMAND_UNAVAILABLE: validation executable is missing"
-                    ) from None
-                self.assert_session(keeper, boot)
-                if result.returncode:
-                    raise GuardError(
-                        f"VALIDATION_FAILED: child exit {result.returncode}"
-                    )
-                if junit:
-                    self.summary["junit_passed_cases"] = validate_junit(junit)
-            self.assert_session(keeper, boot)
+            self.cleanup_policy = None
+            try:
+                self._execute_after_preflight(args, keeper)
+            except BaseException as primary:
+                if self.cleanup_policy in {"failure", "always"}:
+                    self.finish_after_failure(primary, keeper, self.summary["boot_id"])
+                raise
+            if self.cleanup_policy == "always":
+                # A passing validation is never retained, even if KEEP_STAGING
+                # was left in the process environment from an older failure.
+                self.assert_session(keeper, self.summary["boot_id"])
+                self.teardown_project(allow_keep=False)
+                self.assert_session(keeper, self.summary["boot_id"])
             self.summary.update(action=args.action, result="PASS")
             if args.action == "start":
                 self.summary["session_required"] = (
                     "Use Session for the full test/browser lifetime; Start alone releases the keeper"
                 )
+                if self.ownership_verified:
+                    self.summary["teardown"] = "PENDING_SESSION"
             return self.summary
 
 
