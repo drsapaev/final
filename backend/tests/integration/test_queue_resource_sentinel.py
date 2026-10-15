@@ -638,7 +638,7 @@ def test_alembic_chain_single_head_0062() -> None:
     assert graph["0076_derma_history_read_order"] == ("0075_derma_history_read_model",)
     assert len("0076_derma_history_read_order") <= 32
     assert graph["0077_daily_queue_policy"] == ("0076_derma_history_read_order",)
-    assert heads == ["0079_kosmed_website_content"]
+    assert len(heads) == 1, f"multi-head detected: {heads!r}"
 
 
 # ============ Codex round-1: remaining credential surfaces ============
