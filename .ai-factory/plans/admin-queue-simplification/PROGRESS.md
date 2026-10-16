@@ -1,26 +1,27 @@
-## Current checkpoint — T12.1 OpenAPI freshness fix pushed — 2026-10-16T17:59:51+05:00
+## Current checkpoint — T12.1 exact-head CI pass; Tier-2 pending authorization — 2026-10-16T22:04:00+05:00
 
-Plan version: 3.99
+Plan version: 4.00
 Current task: T12.1
 Current status: PR_OPEN
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t12-publish-overview\final
 Branch: codex/aqs-T12.1-hidden-profile-create
 Base commit: 7443b0e290b9143e877d5898a5589df52592d3b3 (= fetched origin/main at worktree creation)
-Current commit: 6539c1702b0ceda2f237af5d995968b9f1dde8e0
+Current code commit under test: ca04e20ad08a5e661ca9ddc9a0d4d8b27157092a
 Task memory: 9af17c38-8235-4681-93e8-6a9864cbdb75
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T11 | MERGED | #3639 | 7443b0e290b9143e877d5898a5589df52592d3b3 | T11 EVIDENCE entries through r8 |
-| T12.1 | PR_OPEN | #3690 DRAFT; OpenAPI fix 6539c17 pushed | | Unified CI on corrected head pending; PostgreSQL tests NOT_RUN locally; Tier 1 incomplete |
+| T12.1 | PR_OPEN | #3690 DRAFT; test correction ca04e20 pushed | | Exact-head Unified CI PASS; Tier-2 staging NOT_RUN; HOLD |
 | T12.1a | VALIDATED | codex/aqs-T12.1-hidden-profile-create | | OpenAPI/generated TS parity, type-check/build/diff PASS |
 
 ## Current checkpoint
-- Completed: confirmed #3639 merged and fetched fresh `origin/main` (`7443b0e`); implemented T12.1 hidden-by-default creation (source commit `9b7a1ec`). Opened draft PR #3690. Corrected the CI OpenAPI freshness failure at commit `6539c1702b0ceda2f237af5d995968b9f1dde8e0`: reproduced the workflow's `app.openapi()` serializer against the committed schema, confirmed JSON structure equality and that the only difference was the final LF, then added it; targeted EOF hook passes. Focused UI tests 17/17, type-check, lint:check (0 errors; 3,506 warnings), theme check, icon audit (409 files/0 findings), build, Python compilation, mocked backend unit, generated OpenAPI/TS checks, and initial PR body gate passed. T12.1a gate retry returned `narrow_override`, `gate_misroute=no`, `handoff_required=yes`; prompt read.
-- Changed but not verified: new Unified CI is pending after the OpenAPI EOF fix. Previous run on the old head reported OpenAPI freshness failure and was superseded. Full Vitest produced no final output after more than five minutes and was stopped; outcome incomplete. The documented six-spec Playwright selection contains 90 tests; on Windows, 46 ran before four visual snapshots failed because only Linux baselines exist. The run stopped without updating baselines; remaining cases NOT_RUN. Focused PostgreSQL lifecycle and Department atomicity tests did not collect because `DATABASE_URL` was unset; no database was contacted. CSV import still receives the deferred API result as generic success; explicit CSV publication-intent feedback remains T17 work.
-- Remaining: update the PR body with the OpenAPI fix and current validation state; wait for exact-head CI, especially backend PostgreSQL integration and Linux self-contained E2E; investigate any red check within this PR. Do not mark Tier 1 complete or accept Tier 2 deferral until its evidence/review acknowledgement is recorded. If CI does not exercise the PostgreSQL modules, arrange an owned disposable database run before merge.
-- Blocker: PR #3690 is DRAFT and merge HOLD; full local Tier 1 is incomplete, local PostgreSQL acceptance and Tier 2 are NOT_RUN, and no deferral is accepted. No production/staging/foreign DB was used. T11's three generic live-spec remain deferred to T18; full staging runbook remains incomplete.
-- Next exact action: update the PR body and inspect checks on #3690 after the latest push; fix any in-scope red check in the same PR. Keep merge blocked until required gates and explicit review disposition are satisfied.
+- Completed: T11 PR #3639 merged at `7443b0e`; T12.1 hidden-by-default profile creation and T12.1a OpenAPI/generated types are in PR #3690. Source `9b7a1ec`; OpenAPI final-LF fix `6539c17`; journal checkpoint `7f29d296`; exact-head CI found two tests that assumed auto-publication; test-only correction `ca04e20`. Exact-head Unified CI run `38934894724` passed, including backend/PostgreSQL, Frontend unit/E2E, build, OpenAPI freshness, quality, parity, and PR Required Gate. PR quality, lifecycle, regression, security, gitleaks and i18n gates passed. The two corrected tests and the hidden-default regression both appear as PASS in backend CI.
+- Local validation: focused UI Vitest 17/17; type-check, lint:check (0 errors; 3,506 warnings), theme check, icon audit (409 files/0 findings), build, Python compilation, mocked backend unit, OpenAPI/TS parity, Python Ruff, test py_compile, `git diff --check`, commit hooks and PR body gate passed. Local full Vitest ended without a result; local Windows Playwright stopped at missing Windows-specific visual baselines. No snapshot baselines were changed. PostgreSQL tests were not run locally; the exact-head GitHub backend job passed them using its disposable service database.
+- Changed but not verified: Tier-2 staging/Admin 2FA and other backend-dependent live E2E remain NOT_RUN. No Tier-2 deferral has been acknowledged for PR #3690; T11's prior deferral is specific to #3639 and does not carry forward. No production, deployment, v1 flag, or staging stack was used for T12.1.
+- Remaining: obtain formal code review and resolve Tier-2 disposition for #3690. The local task checkpoint denies staging without separate authorization; if the user authorizes one owned synthetic cycle, use canonical Preflight → Start → Session → owned teardown and do not include production. Otherwise retain NOT_RUN until a reviewer explicitly accepts a bounded deferral.
+- Blocker: PR #3690 is Draft and merge HOLD. GitHub required CI is green on exact HEAD `ca04e20`; `reviews=[]`; Tier-2 is NOT_RUN and no deferral is accepted. Full T18 staging remains a later plan task.
+- Next exact action: ask the user to choose a single synthetic T12.1 staging cycle or a bounded Tier-2 deferral path; do not start staging or change Ready/Draft state before that decision. Keep merge with the user.
 - Validation caveats: standard `npm run generate:api-types` used WSL Node 18 and failed with Redocly `Invalid string length`; direct pinned `openapi-typescript@7.13.0` on Windows Node 24.15.0 passed and was idempotent. Backend Ruff had only pre-existing I001/B023 outside edited lines; rerun ignoring only those codes passed.
 
 ### T12.1a prework boundary

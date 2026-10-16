@@ -1,12 +1,12 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.99 — T11 / PR #3639 MERGED; T12.1 draft PR #3690 open; OpenAPI freshness fix pushed; Tier 1 and PostgreSQL acceptance pending.
-**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-16T17:59:51+05:00, Asia/Tashkent.
-**Текущий этап:** T12.1 — PR_OPEN / DRAFT #3690, OpenAPI fix `6539c1702b0ceda2f237af5d995968b9f1dde8e0` pushed; branch codex/aqs-T12.1-hidden-profile-create; generated artifact sub-slice T12.1a is VALIDATED; Unified CI rerun pending.
+**Версия:** 4.00 — T11 / PR #3639 MERGED; T12.1 PR #3690 exact-head CI PASS; Tier-2 staging NOT_RUN.
+**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-16T22:04:00+05:00, Asia/Tashkent.
+**Текущий этап:** T12.1 — PR_OPEN / DRAFT #3690; tested code commit `ca04e20ad08a5e661ca9ddc9a0d4d8b27157092a` прошёл Unified CI `38934894724`; последующий checkpoint меняет только журналы; Tier-2 staging/Admin 2FA NOT_RUN; merge HOLD.
 **Рабочий каталог:** C:\Users\DrSapaev\.codex\worktrees\aqs-t12-publish-overview\final; база — merge 7443b0e290b9143e877d5898a5589df52592d3b3 (= origin/main при старте этого worktree).
 **Task memory ID:** 9af17c38-8235-4681-93e8-6a9864cbdb75.
 **T11 результат:** PR #3639 merged commit 7443b0e290b9143e877d5898a5589df52592d3b3. Ограниченный T11 Tier-2 прошёл на зафиксированном кодовом HEAD; три legacy live-spec остаются DEFERRED для T18 с 0% credit; полный STAGING_VALIDATION.md не завершён.
-**Ограничения:** пользователь мержит PR самостоятельно. Production, deployment, v1 flag и новые staging-циклы не разрешены этим continuation. Пять плановых документов остаются локальными до отдельного решения пользователя.
+**Ограничения:** пользователь мержит PR самостоятельно. Production, deployment, v1 flag и staging-цикл для T12.1 требуют отдельного решения; T11 deferral не наследуется. Пять плановых документов входят в PR #3690.
 
 
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
@@ -584,7 +584,7 @@ Old mutation tests менять с контрактом, history guards сохр
 **Stop:** требуется product target choice/rebind/owner merge.
 **Evidence/logs:** saved intent vs effective availability, safe INFO publish-hide-archive/WARN refusal; no runtime repair.
 
-### T12.1. Скрытое создание QueueProfile — IMPLEMENTED / VALIDATION INCOMPLETE
+### T12.1. Скрытое создание QueueProfile — IMPLEMENTED / EXACT-HEAD CI PASS / TIER-2 NOT RUN
 
 **Зависимости:** T11 merged; отдельный подэтап внутри T12.
 **Основание:** T12 требует, чтобы все новые профили были скрыты и публикация выполнялась отдельным действием. Для старых клиентов, которые присылают show_on_qr_page=true при создании, выбран backward-compatible defer: профиль сохраняется скрытым, а ответ явно сообщает об отложенной публикации. Проверка готовности и неоднозначных целей остаётся T12.2.
@@ -592,13 +592,15 @@ Old mutation tests менять с контрактом, history guards сохр
 **Разрешённые source/test paths:** backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py, backend/app/models/queue_profile.py, backend/app/api/v1/endpoints/admin_departments/_helpers.py, frontend/src/components/admin/QueueProfilesManager.tsx, backend/tests/integration/test_queue_profile_lifecycle.py, backend/tests/integration/test_admin_department_create_atomicity.py, frontend/src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx, frontend/src/components/admin/__tests__/QueueProfilesManager.csv.test.tsx.
 **Вне scope:** любые другие source/test/generated files, DB/Alembic, T12 publish eligibility/update policy, overview selection/admission, existing public profiles, QR tokens/addresses, production, deploy, staging, PR merge/review. При необходимости выхода за восемь файлов — остановиться и оформить отдельный slice. Generated OpenAPI/API types идут только через T12.1a.
 **Проверки:** API POST по умолчанию скрыт; входящий true не публикуется и получает `publication_deferred`; manual/department auto constructor hidden; existing profiles не изменяются; UI create sends false, а CSV create остаётся скрытым благодаря backend guard. Уведомление о намерении публикации в CSV и отдельное publish action относятся к T17/T12.2. Focused backend/frontend tests, OpenAPI/generated-types freshness, diff check.
+**Результат exact-head:** PR `#3690` на `ca04e20ad08a5e661ca9ddc9a0d4d8b27157092a`; Unified CI `38934894724` SUCCESS, включая backend/PostgreSQL, Frontend unit/E2E, build, OpenAPI freshness, quality, parity и PR Required Gate. Два outdated test assumptions о публичности auto-created Department profile были исправлены test-only; current backend CI подтвердил обе регрессии и hidden default.
+**Остаток:** Tier-2 staging/Admin 2FA и backend-dependent live E2E — NOT_RUN. PR остаётся DRAFT/HOLD без formal reviewer deferral; нужен отдельный выбор по staging или deferral. Production/staging не запускались.
 **Stop:** потребуется изменить файл вне gate scope, изменить активные bindings, разрешить публикацию при создании или выбрать неизвестную цель направления.
 
 ### T12.1a. Обновить OpenAPI и generated API types — VALIDATED
 
 **Зависимости:** T12.1 request default implementation. `QueueProfileCreate.show_on_qr_page` теперь default=false, но `backend/openapi.json` и generated TypeScript ещё отражают прежний default.
 **Execution boundary:** обязательный canonical gate; подтверждённый root — `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`. Разрешены только `backend/openapi.json` и `frontend/src/types/generated/api.ts`; generator scripts read-only.
-**Проверки:** каноническая OpenAPI generation/freshness, TypeScript generation/parity, exact scope и `git diff --check`. PostgreSQL integration остаётся NOT_RUN, пока нет безопасной disposable БД.
+**Проверки:** каноническая OpenAPI generation/freshness, TypeScript generation/parity, exact scope и `git diff --check`. PostgreSQL integration в локальном T12.1a срезе не запускалась; позже exact-head backend CI `38934894724` прошла на disposable PostgreSQL.
 **Stop:** generator требует DB, изменение source/test/generator или создаёт нерелевантный OpenAPI churn; зафиксировать блокер без расширения scope.
 
 ### T13. Canonical Admin directions GET
