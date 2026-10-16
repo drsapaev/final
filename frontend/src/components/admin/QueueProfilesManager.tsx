@@ -392,6 +392,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             let imported = 0;
             let updated = 0;
             let failed = 0;
+            let deferredPublication = 0;
 
             for (const row of rows) {
                 try {
@@ -401,8 +402,11 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                         await api.put(`/queues/profiles/${row.key}`, payload);
                         updated++;
                     } else {
-                        await api.post('/queues/profiles', payload);
+                        const response = await api.post('/queues/profiles', payload);
                         imported++;
+                        if (response.data?.publication_deferred === true) {
+                            deferredPublication++;
+                        }
                     }
                 } catch (err) {
                     failed++;
@@ -413,7 +417,16 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             await loadProfiles();
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
             setError(null);
-            notify.success(t('admin2.qp_import_success', { imported, updated }));
+            if (deferredPublication > 0) {
+                notify.warning(t('admin2.qp_import_publication_deferred', {
+                    imported,
+                    updated,
+                    failed,
+                    deferred: deferredPublication
+                }), { autoClose: 8000 });
+            } else {
+                notify.success(t('admin2.qp_import_success', { imported, updated }));
+            }
 
             const unknownDepartments = issues.filter((issue) => issue.code === 'unknown_department').length;
             if (failed > 0) {

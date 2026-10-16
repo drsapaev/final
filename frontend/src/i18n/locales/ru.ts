@@ -3337,6 +3337,7 @@ const ru = {
     qp_import_csv_invalid: 'CSV файл должен содержать заголовки и данные',
     qp_import_no_valid: 'Нет валидных профилей для импорта',
     qp_import_success: 'Импорт завершён: {imported} создано, {updated} обновлено',
+    qp_import_publication_deferred: 'CSV импорт обработан: создано {imported}, обновлено {updated}, не удалось создать {failed}. Новых профилей с запросом на показ в QR: {deferred}; они пока скрыты. Проверьте их и опубликуйте отдельно, чтобы они стали видны пациентам.',
     qp_import_error: 'Ошибка импорта CSV',
     qp_import_row_issues: 'Импорт отменён: найдено проблем в строках: {count} (строки: {rows}). Ничего не записано.',
     qp_import_failed_count: 'Не удалось импортировать профили: {count}',

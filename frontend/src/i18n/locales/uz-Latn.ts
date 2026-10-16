@@ -3212,6 +3212,7 @@ const uzLatn = {
     qp_import_csv_invalid: 'CSV faylda sarlavha va maʼlumotlar boʻlishi kerak',
     qp_import_no_valid: "Import uchun yaroqli profil yo'q",
     qp_import_success: 'Import tugadi: {imported} yaratildi, {updated} yangilandi',
+    qp_import_publication_deferred: 'CSV importi yakunlandi: {imported} ta profil yaratildi, {updated} ta yangilandi, {failed} tasini yaratib bo‘lmadi. QRda ko‘rsatish so‘ralgan {deferred} ta yangi profil yashirin qoldi. Ularni tekshiring va bemorlarga ko‘rinishi uchun har birini alohida e’lon qiling.',
     qp_import_error: 'CSV import xatosi',
     qp_import_row_issues: 'Import bekor qilindi: qatorlardagi xatolar: {count} (qatorlar: {rows}). Hech narsa yozilmadi.',
     qp_import_failed_count: 'Import qilinmagan profillar: {count}',

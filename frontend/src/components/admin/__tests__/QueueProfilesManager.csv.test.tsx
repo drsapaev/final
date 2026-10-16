@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import QueueProfilesManager from '../QueueProfilesManager';
 import { api } from '@/api/client';
+import { notify } from '../../../services/notify';
 
 // jsdom's File lacks .text(); real browsers have it. Polyfill via FileReader
 // so the import handler reaches the code under test (test-only shim, the
@@ -78,6 +79,13 @@ vi.mock('../../../api/client', () => {
     apiClient: apiMock
   };
 });
+
+vi.mock('../../../services/notify', () => ({
+  notify: {
+    success: vi.fn(),
+    warning: vi.fn()
+  }
+}));
 
 const newFormatCsv = [
   'key,title,title_ru,queue_tags,department_key,icon,color,display_order,is_active,show_on_qr_page',
@@ -261,6 +269,33 @@ describe('QueueProfilesManager CSV import (RQ-26.a)', () => {
     // The backend PUT uses exclude_unset=True: omitted keys keep stored values.
     expect(payload).not.toHaveProperty('department_key');
     expect(payload).not.toHaveProperty('show_on_qr_page');
+  });
+
+  it('warns when a CSV-created profile requested for QR remains hidden until explicit publication', async () => {
+    const requestedPublicProfileCsv = [
+      'key,title,title_ru,queue_tags,department_key,icon,color,display_order,is_active,show_on_qr_page',
+      '"synthetic-neurology","Синтетическая неврология","Синтетическая неврология","neuro",,,"#718096","1","true","true"'
+    ].join('\n');
+    (api.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      data: { success: true, publication_deferred: true }
+    });
+
+    await renderManager();
+    await uploadCsv(requestedPublicProfileCsv);
+
+    await waitFor(() => {
+      expect(notify.warning).toHaveBeenCalledTimes(1);
+    });
+    const warningMessage = (notify.warning as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(warningMessage).toContain('они пока скрыты');
+    expect(warningMessage).toContain('опубликуйте отдельно');
+    expect(warningMessage).toContain('создано 1');
+    expect(notify.warning).toHaveBeenCalledWith(warningMessage, { autoClose: 8000 });
+    expect(notify.success).not.toHaveBeenCalled();
+    expect(api.post).toHaveBeenCalledWith('/queues/profiles', expect.objectContaining({
+      key: 'synthetic-neurology',
+      show_on_qr_page: true
+    }));
   });
 
   it('aborts the whole import with a visible error when the file has duplicate keys', async () => {

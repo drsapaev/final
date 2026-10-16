@@ -3223,6 +3223,7 @@ const uzCyrl = {
     qp_import_csv_invalid: 'CSV файл должен содержать заголовки и данные',
     qp_import_no_valid: 'Нет валидных профилей для импорта',
     qp_import_success: 'Импорт завершён: {imported} создано, {updated} обновлено',
+    qp_import_publication_deferred: 'CSV импорти якунланди: {imported} та профиль яратилди, {updated} та янгиланди, {failed} тасини яратиб бўлмади. QRда кўрсатиш сўралган {deferred} та янги профиль яширин қолди. Уларни текширинг ва беморларга кўриниши учун ҳар бирини алоҳида эълон қилинг.',
     qp_import_error: 'Ошибка импорта CSV',
     qp_import_row_issues: 'Импорт отменён: найдено проблем в строках: {count} (строки: {rows}). Ничего не записано.',
     qp_import_failed_count: 'Не удалось импортировать профили: {count}',
