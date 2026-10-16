@@ -203,7 +203,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
         try {
             setSaving(true);
             setError(null);
-            await api.post('/queues/profiles', profileData);
+            await api.post('/queues/profiles', { ...profileData, show_on_qr_page: false });
             await loadProfiles();
             setShowCreateForm(false);
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
@@ -767,7 +767,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
         department_key: profile?.department_key || '',
         display_order: profile?.order || 0,
         is_active: profile?.is_active !== false,
-        show_on_qr_page: profile?.show_on_qr_page !== false, // ⭐ NEW: QR page visibility
+        show_on_qr_page: isEdit ? profile?.show_on_qr_page !== false : false, // New profiles remain hidden until a later explicit edit
         icon: profile?.icon || 'Package',
         color: profile?.color || '#718096',
     });
@@ -1022,7 +1022,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* ⭐ NEW: Show on QR Page */}
                     <div className="admin-qp-field">
                         <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
-                            <Checkbox aria-label={t('admin2.qp_qr_checkbox_aria')} checked={Boolean(formData.show_on_qr_page as boolean)} onChange={(checked: boolean) => setFormData({ ...formData, show_on_qr_page: checked })}
+                            <Checkbox aria-label={t('admin2.qp_qr_checkbox_aria')} checked={Boolean(formData.show_on_qr_page as boolean)} disabled={!isEdit} onChange={(checked: boolean) => setFormData({ ...formData, show_on_qr_page: checked })}
                             />
                             <span className="admin-qp-label">{t('admin2.qp_qr_label')}</span>
                         </label>

@@ -105,6 +105,33 @@ describe('QueueProfilesManager interactions', () => {
     expect(screen.getByRole('dialog', { name: 'Новая вкладка' })).toBeInTheDocument();
   });
 
+  it('creates new profiles hidden and keeps QR publication for the edit action', async () => {
+    const user = userEvent.setup();
+    await renderManager();
+    await openCreateDialog(user);
+
+    const dialog = screen.getByRole('dialog', { name: 'Новая вкладка' });
+    const qrCheckbox = screen.getByRole('checkbox', {
+      name: 'Показывать вкладку на QR-странице',
+    });
+    expect(qrCheckbox).not.toBeChecked();
+    expect(qrCheckbox).toHaveAttribute('aria-disabled', 'true');
+
+    await user.type(screen.getByLabelText('Уникальный ключ вкладки очереди'), 'synthetic_new');
+    await user.type(screen.getByLabelText('Название вкладки очереди на английском'), 'Synthetic new direction');
+    await user.type(screen.getByLabelText('Название вкладки очереди на русском'), 'Синтетическое новое направление');
+    await user.click(within(dialog).getByRole('button', { name: 'Создать вкладку очереди' }));
+
+    await waitFor(() => {
+      expect(apiMock.post).toHaveBeenCalledWith(
+        '/queues/profiles',
+        expect.objectContaining({
+          key: 'synthetic_new',
+          show_on_qr_page: false,
+        }),
+      );
+    });
+  });
   it('shows the typed binding conflict message and blocked fields', async () => {
     const user = userEvent.setup();
     apiMock.put.mockRejectedValueOnce({
