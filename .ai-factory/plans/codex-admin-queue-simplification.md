@@ -1,8 +1,8 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.96 — T11 / PR #3639 MERGED; T12.1 code and generated-contract slices implemented, PostgreSQL integration pending.
-**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-16T17:24:17+05:00, Asia/Tashkent.
-**Текущий этап:** T12.1 — IN_PROGRESS, ветка codex/aqs-T12.1-hidden-profile-create; generated artifact sub-slice T12.1a is VALIDATED.
+**Версия:** 3.97 — T11 / PR #3639 MERGED; T12.1 source and generated-contract changes committed, PostgreSQL integration pending.
+**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-16T17:29:18+05:00, Asia/Tashkent.
+**Текущий этап:** T12.1 — IN_PROGRESS at `9b7a1ec6dc2e09dee41c1be82ea0b7eb01502f25`, branch codex/aqs-T12.1-hidden-profile-create; generated artifact sub-slice T12.1a is VALIDATED; draft PR/hosted CI pending.
 **Рабочий каталог:** C:\Users\DrSapaev\.codex\worktrees\aqs-t12-publish-overview\final; база — merge 7443b0e290b9143e877d5898a5589df52592d3b3 (= origin/main при старте этого worktree).
 **Task memory ID:** 9af17c38-8235-4681-93e8-6a9864cbdb75.
 **T11 результат:** PR #3639 merged commit 7443b0e290b9143e877d5898a5589df52592d3b3. Ограниченный T11 Tier-2 прошёл на зафиксированном кодовом HEAD; три legacy live-spec остаются DEFERRED для T18 с 0% credit; полный STAGING_VALIDATION.md не завершён.

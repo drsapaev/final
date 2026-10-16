@@ -4045,3 +4045,16 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Validation: OpenAPI+TS contract assertion PASS; `npm.cmd run type-check` PASS; `npm.cmd run build` PASS; `git diff --check` PASS. Backend database integration remains NOT_RUN.
 - Scope: only `backend/openapi.json` and `frontend/src/types/generated/api.ts` changed in this slice; generator scripts, runtime source and tests were not edited. Fresh `origin/main` still equals base `7443b0e290b9143e877d5898a5589df52592d3b3`.
 - Result: T12.1a VALIDATED. Overall T12.1 remains IN_PROGRESS because PostgreSQL lifecycle and Department atomicity acceptance has not run. No PR/push/review/merge/staging action yet.
+
+## T12.1 commit and hook result — 2026-10-16T17:29:18+05:00
+
+- Commit under test: `9b7a1ec6dc2e09dee41c1be82ea0b7eb01502f25`, based on `7443b0e290b9143e877d5898a5589df52592d3b3`.
+- Environment: Windows managed T12 worktree; no PostgreSQL, application runtime, or staging stack used.
+- Execution mode: previously approved T12.1 narrow override and T12.1a generated-contract gate; this checkpoint only commits the verified scoped changes.
+- Allowed paths: the eight T12.1 source/test paths, two T12.1a generated-contract paths, and five plan journals. The CSV test was validation-only and unchanged; the commit contains 14 changed paths within that approved envelope.
+- Original hook result: first standard commit attempt failed. `end-of-file-fixer` added a terminal newline to canonical OpenAPI output; Ruff reported pre-existing `I001` and `B023` in `admin_departments/_helpers.py`; Ruff format/Black rewrote unrelated legacy formatting. All hook-generated unstaged edits were inspected and restored to the intended staged content.
+- Validation: focused frontend Vitest 17/17 PASS; type-check, build, scoped ESLint (0 errors / 4 existing warnings), targeted `py_compile`, mocked backend unit 1/1, OpenAPI/TypeScript parity, deterministic TypeScript regeneration, scoped Ruff with only baseline `I001,B023` ignored, and `git diff --check` PASS. Focused PostgreSQL lifecycle and Department atomicity tests remain NOT_RUN because `DATABASE_URL` was unset before test collection; no database was contacted.
+- Commit hooks: retry passed all applicable remaining hooks. Only `end-of-file-fixer`, `ruff`, `ruff-format`, and `black` were skipped: generated OpenAPI intentionally follows canonical generator output without a final newline, while the Python hooks surfaced pre-existing lint/format conditions and broad unrelated rewrites. Direct targeted checks are recorded above.
+- Scope check: exact 14 changed paths; no staging, production, deployment, migrations, queue identity, or existing profile rewrite.
+- Result: local source commit exists; PR push/creation and hosted CI are pending. Do not claim PostgreSQL acceptance until a disposable PostgreSQL run or exact-head CI result covers both integration modules.
+- PR: none yet. Merge commit: none.

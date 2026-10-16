@@ -1,26 +1,26 @@
-## Current checkpoint — T12.1 hidden-by-default creation — 2026-10-16T17:24:17+05:00
+## Current checkpoint — T12.1 committed, PostgreSQL acceptance pending — 2026-10-16T17:29:18+05:00
 
-Plan version: 3.95
+Plan version: 3.97
 Current task: T12.1
 Current status: IN_PROGRESS
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t12-publish-overview\final
 Branch: codex/aqs-T12.1-hidden-profile-create
 Base commit: 7443b0e290b9143e877d5898a5589df52592d3b3 (= fetched origin/main at worktree creation)
-Current commit: 7443b0e290b9143e877d5898a5589df52592d3b3
+Current commit: 9b7a1ec6dc2e09dee41c1be82ea0b7eb01502f25
 Task memory: 9af17c38-8235-4681-93e8-6a9864cbdb75
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T11 | MERGED | #3639 | 7443b0e290b9143e877d5898a5589df52592d3b3 | T11 EVIDENCE entries through r8 |
-| T12.1 | IN_PROGRESS | codex/aqs-T12.1-hidden-profile-create | | Source + frontend validations; PostgreSQL integration NOT_RUN |
+| T12.1 | IN_PROGRESS | codex/aqs-T12.1-hidden-profile-create | | Commit 9b7a1ec; PostgreSQL integration NOT_RUN; PR pending |
 | T12.1a | VALIDATED | codex/aqs-T12.1-hidden-profile-create | | OpenAPI/generated TS parity, type-check/build/diff PASS |
 
 ## Current checkpoint
-- Completed: confirmed #3639 merged and fetched fresh `origin/main` (still `7443b0e`); implemented T12.1 hidden-by-default creation in the approved source/test paths. Frontend focused tests 17/17, type-check, build, targeted lint and Python compilation passed. T12.1a gate retry returned `narrow_override`, `gate_misroute=no`, `handoff_required=yes`; prompt read. OpenAPI and generated TS now describe `show_on_qr_page=false`; generation is deterministic and only those field docs/defaults changed.
-- Changed but not verified: focused PostgreSQL lifecycle and Department atomicity tests have not executed; the runner first failed before collection because `DATABASE_URL` was unset. No database was contacted. Hosted CI has not run because there is no PR yet. CSV import still receives the deferred API result as generic success; explicit CSV publication-intent feedback remains T17 work.
-- Remaining: run normal repository hooks, commit the allowlisted source/artifact/journal changes, push and open a draft PR so hosted PostgreSQL integration tests can run; then review exact-head CI and prepare it for user merge. If CI cannot exercise the PostgreSQL tests, keep that acceptance NOT_RUN.
+- Completed: confirmed #3639 merged and fetched fresh `origin/main` (`7443b0e`); implemented T12.1 hidden-by-default creation and committed it as `9b7a1ec`. Frontend focused tests 17/17, type-check, build, targeted lint, Python compilation, mocked backend unit, and generated OpenAPI/TS checks passed. Commit hooks passed except four documented formatting hooks skipped after their incompatibilities were reproduced; all other hooks passed. T12.1a gate retry returned `narrow_override`, `gate_misroute=no`, `handoff_required=yes`; prompt read.
+- Changed but not verified: focused PostgreSQL lifecycle and Department atomicity tests have not executed; the runner stopped before collection because `DATABASE_URL` was unset. No database was contacted. Hosted CI has not run; no PR exists yet. CSV import still receives the deferred API result as generic success; explicit CSV publication-intent feedback remains T17 work.
+- Remaining: fetch and verify the latest `origin/main`, push the commit and open a draft PR so hosted PostgreSQL integration tests can run; then review exact-head CI and prepare it for user merge. If CI cannot exercise those tests, keep PostgreSQL acceptance NOT_RUN.
 - Blocker: no authorized disposable local PostgreSQL is configured; a previous local `initdb` attempt was blocked by App Control. No production/staging/foreign DB was used. T11 three generic live-spec remain deferred to T18; full staging runbook remains incomplete.
-- Next exact action: run `git diff --check`, verify exact paths and no borrowed node_modules/dist changes, then let pinned repository hooks gate the source commit. Keep PostgreSQL acceptance explicitly pending hosted CI.
+- Next exact action: fetch `origin/main` and verify the branch is still current; push `9b7a1ec` and open a draft PR. Keep PostgreSQL acceptance explicitly pending hosted CI.
 - Validation caveats: standard `npm run generate:api-types` used WSL Node 18 and failed with Redocly `Invalid string length`; direct pinned `openapi-typescript@7.13.0` on Windows Node 24.15.0 passed and was idempotent. Backend Ruff had only pre-existing I001/B023 outside edited lines; rerun ignoring only those codes passed.
 
 ### T12.1a prework boundary
