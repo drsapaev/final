@@ -492,7 +492,11 @@ def test_new_profiles_are_hidden_and_create_time_publish_intent_is_deferred(
     default_response = _post_profile(
         pg_client,
         pg_admin_user,
-        {"key": default_key, "title": "RQ-12.b default hidden", "queue_tags": [default_key]},
+        {
+            "key": default_key,
+            "title": "RQ-12.b default hidden",
+            "queue_tags": [default_key],
+        },
     )
     assert default_response.status_code == 200, default_response.text
     default_payload = default_response.json()
@@ -2640,6 +2644,13 @@ def test_department_deactivation_preserves_manual_state_and_blocks_new_qr(
 
     # A manually linked second profile with its own title.
     from app.models.queue_profile import QueueProfile
+
+    parent_profile = pg_session.query(QueueProfile).filter_by(key=dept_key).one()
+    assert parent_profile.show_on_qr_page is False
+    # This regression starts from an existing, explicitly published profile;
+    # department provisioning now intentionally creates new profiles hidden.
+    parent_profile.show_on_qr_page = True
+    pg_session.commit()
 
     sub = QueueProfile(
         key="rq13ahide-sub",
