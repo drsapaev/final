@@ -1577,6 +1577,20 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Safety/scope: no production or staging request/data/process was touched; `QUEUE_POLICY_V2_CREATION_ENABLED` remains off. No migration, ownership, quota counter, queue numbering or clinical lifecycle change was made.
 - PR: none yet. Merge commit: none.
 
+## T12.1 OpenAPI freshness CI fix — 2026-10-16T17:59:51+05:00
+
+- Commit under test: `6539c1702b0ceda2f237af5d995968b9f1dde8e0`, pushed to PR #3690; base remains `7443b0e290b9143e877d5898a5589df52592d3b3`.
+- Environment: Windows managed worktree; no database connection, staging, or production used.
+- Execution mode: within the already-approved T12.1a generated-contract scope; only the existing generated OpenAPI artifact changed.
+- Allowed paths: `backend/openapi.json` and plan evidence/checkpoint documents. Denied: app source, generator source, models, tests, database, staging, production, merge.
+- Original failure: Unified CI run 38902940895 on prior PR head reported failure in “OpenAPI spec freshness (app code → backend/openapi.json)”.
+- Root-cause reproduction: imported `app.main`, serialized `app.openapi()` with the same `json.dump(..., indent=2, ensure_ascii=False)` and final LF used by the CI workflow, using only an unreachable loopback DSN. Parsed schema objects were equal; after normalizing Windows CRLF, the only remaining byte difference was that the committed snapshot lacked the final LF.
+- Fix: appended the required final LF to `backend/openapi.json`; JSON content was not altered. `git diff` showed only the EOF marker. The targeted `end-of-file-fixer` hook first reported its expected modification; the subsequent source commit passed EOF, JSON, security and all other applicable hooks.
+- Validation: CI-style OpenAPI parity reproduction PASS (JSON object equality and final-LF match after line-ending normalization); targeted EOF hook PASS after fix; source commit hooks PASS; `git diff --check` PASS. A new exact-head Unified CI run is pending; the old failure is not yet cleared by a successful rerun.
+- Scope check: one generated JSON artifact changed; no OpenAPI schema values changed. No database/staging/production access, snapshot update, review submission or merge.
+- Result: fix pushed as `6539c170`; PR body needs this result and the latest head. Keep merge HOLD pending exact-head CI, Tier 1, PostgreSQL tests, and Tier 2 disposition.
+- Next exact action: update the PR body, inspect the new CI run on the latest head, and fix any same-scope failure.
+
 ## T12.1 Tier 1 attempt and PR #3690 — 2026-10-16T17:47:15+05:00
 
 - Commit under test: PR head `5bef00538532ebf05d28da7656061d5e9816f068`; source behavior is commit `9b7a1ec6dc2e09dee41c1be82ea0b7eb01502f25`; base `7443b0e290b9143e877d5898a5589df52592d3b3`.

@@ -1,8 +1,8 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.98 — T11 / PR #3639 MERGED; T12.1 draft PR #3690 open; Tier 1 and PostgreSQL acceptance pending.
-**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-16T17:47:15+05:00, Asia/Tashkent.
-**Текущий этап:** T12.1 — PR_OPEN / DRAFT #3690, head `5bef00538532ebf05d28da7656061d5e9816f068`, branch codex/aqs-T12.1-hidden-profile-create; generated artifact sub-slice T12.1a is VALIDATED; required CI pending.
+**Версия:** 3.99 — T11 / PR #3639 MERGED; T12.1 draft PR #3690 open; OpenAPI freshness fix pushed; Tier 1 and PostgreSQL acceptance pending.
+**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-16T17:59:51+05:00, Asia/Tashkent.
+**Текущий этап:** T12.1 — PR_OPEN / DRAFT #3690, OpenAPI fix `6539c1702b0ceda2f237af5d995968b9f1dde8e0` pushed; branch codex/aqs-T12.1-hidden-profile-create; generated artifact sub-slice T12.1a is VALIDATED; Unified CI rerun pending.
 **Рабочий каталог:** C:\Users\DrSapaev\.codex\worktrees\aqs-t12-publish-overview\final; база — merge 7443b0e290b9143e877d5898a5589df52592d3b3 (= origin/main при старте этого worktree).
 **Task memory ID:** 9af17c38-8235-4681-93e8-6a9864cbdb75.
 **T11 результат:** PR #3639 merged commit 7443b0e290b9143e877d5898a5589df52592d3b3. Ограниченный T11 Tier-2 прошёл на зафиксированном кодовом HEAD; три legacy live-spec остаются DEFERRED для T18 с 0% credit; полный STAGING_VALIDATION.md не завершён.

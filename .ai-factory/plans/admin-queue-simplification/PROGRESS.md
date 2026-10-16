@@ -1,26 +1,26 @@
-## Current checkpoint — T12.1 draft PR open, gates pending — 2026-10-16T17:47:15+05:00
+## Current checkpoint — T12.1 OpenAPI freshness fix pushed — 2026-10-16T17:59:51+05:00
 
-Plan version: 3.98
+Plan version: 3.99
 Current task: T12.1
 Current status: PR_OPEN
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t12-publish-overview\final
 Branch: codex/aqs-T12.1-hidden-profile-create
 Base commit: 7443b0e290b9143e877d5898a5589df52592d3b3 (= fetched origin/main at worktree creation)
-Current commit: 9b7a1ec6dc2e09dee41c1be82ea0b7eb01502f25
+Current commit: 6539c1702b0ceda2f237af5d995968b9f1dde8e0
 Task memory: 9af17c38-8235-4681-93e8-6a9864cbdb75
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T11 | MERGED | #3639 | 7443b0e290b9143e877d5898a5589df52592d3b3 | T11 EVIDENCE entries through r8 |
-| T12.1 | PR_OPEN | #3690 DRAFT, head 5bef005 | | Required CI pending; PostgreSQL tests NOT_RUN locally; Tier 1 incomplete |
+| T12.1 | PR_OPEN | #3690 DRAFT; OpenAPI fix 6539c17 pushed | | Unified CI on corrected head pending; PostgreSQL tests NOT_RUN locally; Tier 1 incomplete |
 | T12.1a | VALIDATED | codex/aqs-T12.1-hidden-profile-create | | OpenAPI/generated TS parity, type-check/build/diff PASS |
 
 ## Current checkpoint
-- Completed: confirmed #3639 merged and fetched fresh `origin/main` (`7443b0e`); implemented T12.1 hidden-by-default creation and committed source at `9b7a1ec`, with progress checkpoint at `5bef005`. Opened draft PR #3690; exact head `5bef00538532ebf05d28da7656061d5e9816f068`, base/main still `7443b0e`. Focused UI tests 17/17, type-check, lint:check (0 errors; 3,506 warnings), theme check, icon audit (409 files/0 findings), build, Python compilation, mocked backend unit, generated OpenAPI/TS checks, and PR body gate passed. T12.1a gate retry returned `narrow_override`, `gate_misroute=no`, `handoff_required=yes`; prompt read.
-- Changed but not verified: hosted CI is pending on #3690. Full Vitest produced no final output after more than five minutes and was stopped; outcome incomplete. The documented six-spec Playwright selection contains 90 tests in the current tree; on Windows, 46 ran before four visual snapshots failed because only Linux baselines exist. The run was stopped without updating baselines; remaining cases NOT_RUN. Focused PostgreSQL lifecycle and Department atomicity tests did not collect because `DATABASE_URL` was unset; no database was contacted. CSV import still receives the deferred API result as generic success; explicit CSV publication-intent feedback remains T17 work.
-- Remaining: wait for exact-head CI, especially backend PostgreSQL integration and Linux self-contained E2E; investigate any red check within this PR. Do not mark Tier 1 complete or accept Tier 2 deferral until its evidence/review acknowledgement is recorded. If CI does not exercise the PostgreSQL modules, arrange an owned disposable database run before merge.
+- Completed: confirmed #3639 merged and fetched fresh `origin/main` (`7443b0e`); implemented T12.1 hidden-by-default creation (source commit `9b7a1ec`). Opened draft PR #3690. Corrected the CI OpenAPI freshness failure at commit `6539c1702b0ceda2f237af5d995968b9f1dde8e0`: reproduced the workflow's `app.openapi()` serializer against the committed schema, confirmed JSON structure equality and that the only difference was the final LF, then added it; targeted EOF hook passes. Focused UI tests 17/17, type-check, lint:check (0 errors; 3,506 warnings), theme check, icon audit (409 files/0 findings), build, Python compilation, mocked backend unit, generated OpenAPI/TS checks, and initial PR body gate passed. T12.1a gate retry returned `narrow_override`, `gate_misroute=no`, `handoff_required=yes`; prompt read.
+- Changed but not verified: new Unified CI is pending after the OpenAPI EOF fix. Previous run on the old head reported OpenAPI freshness failure and was superseded. Full Vitest produced no final output after more than five minutes and was stopped; outcome incomplete. The documented six-spec Playwright selection contains 90 tests; on Windows, 46 ran before four visual snapshots failed because only Linux baselines exist. The run stopped without updating baselines; remaining cases NOT_RUN. Focused PostgreSQL lifecycle and Department atomicity tests did not collect because `DATABASE_URL` was unset; no database was contacted. CSV import still receives the deferred API result as generic success; explicit CSV publication-intent feedback remains T17 work.
+- Remaining: update the PR body with the OpenAPI fix and current validation state; wait for exact-head CI, especially backend PostgreSQL integration and Linux self-contained E2E; investigate any red check within this PR. Do not mark Tier 1 complete or accept Tier 2 deferral until its evidence/review acknowledgement is recorded. If CI does not exercise the PostgreSQL modules, arrange an owned disposable database run before merge.
 - Blocker: PR #3690 is DRAFT and merge HOLD; full local Tier 1 is incomplete, local PostgreSQL acceptance and Tier 2 are NOT_RUN, and no deferral is accepted. No production/staging/foreign DB was used. T11's three generic live-spec remain deferred to T18; full staging runbook remains incomplete.
-- Next exact action: inspect live checks for #3690 at head `5bef00538532ebf05d28da7656061d5e9816f068`; fix any in-scope red check in the same PR and push a new exact head. Keep merge blocked until required gates and explicit review disposition are satisfied.
+- Next exact action: update the PR body and inspect checks on #3690 after the latest push; fix any in-scope red check in the same PR. Keep merge blocked until required gates and explicit review disposition are satisfied.
 - Validation caveats: standard `npm run generate:api-types` used WSL Node 18 and failed with Redocly `Invalid string length`; direct pinned `openapi-typescript@7.13.0` on Windows Node 24.15.0 passed and was idempotent. Backend Ruff had only pre-existing I001/B023 outside edited lines; rerun ignoring only those codes passed.
 
 ### T12.1a prework boundary
