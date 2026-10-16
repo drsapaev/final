@@ -31,12 +31,70 @@ const CSRF_BOOTSTRAP_ENABLED = import.meta.env.VITE_CSRF_BOOTSTRAP !== '0';
 // backend is confirmed to serve the endpoint reliably.
 const CSRF_STRICT_MODE = import.meta.env.VITE_CSRF_STRICT === '1';
 const GLOBAL_RATE_LIMIT_COOLDOWN_MS = 60_000;
+// The legacy key mixed route-specific and shared 429s, so it is intentionally ignored.
+const GLOBAL_RATE_LIMIT_STORAGE_KEY = 'clinic_api_global_rate_limit_until';
 let globalRateLimitUntil = 0;
 let globalRateLimitLogAt = 0;
+const requestRateLimitUntil = new Map<string, number>();
+
+function getRateLimitRequestKey(config: Pick<AxiosRequestConfig, 'url' | 'baseURL' | 'method'>): string | null {
+  if (!config.url) return null;
+
+  try {
+    const baseURL = config.baseURL || API_BASE || window.location.origin;
+    const requestUrl = new URL(config.url, baseURL);
+    return `${requestUrl.origin}:${String(config.method || 'get').toUpperCase()}:${requestUrl.pathname}`;
+  } catch {
+    const path = config.url.split(/[?#]/, 1)[0];
+    return path ? `${String(config.method || 'get').toUpperCase()}:${path}` : null;
+  }
+}
+
+function isAuthenticationRateLimitedRequest(url?: string): boolean {
+  if (!url) return false;
+
+  try {
+    const requestUrl = new URL(url, API_BASE || window.location.origin);
+    return /\/(?:auth|authentication|2fa)(?:\/|$)/i.test(requestUrl.pathname);
+  } catch {
+    return /\/(?:auth|authentication|2fa)(?:\/|$)/i.test(url.split(/[?#]/, 1)[0]);
+  }
+}
+
+function getRetryAfterMs(error: AxiosError): number | null {
+  const headers = error.response?.headers;
+  const getHeader = (headers as { get?: (name: string) => unknown } | undefined)?.get;
+  const retryAfter = getHeader?.call(headers, 'Retry-After')
+    ?? headers?.['retry-after']
+    ?? headers?.['Retry-After'];
+  if (typeof retryAfter !== 'string' && typeof retryAfter !== 'number') return null;
+
+  const value = String(retryAfter).trim();
+  const seconds = Number(value);
+  if (value && Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+
+  const retryAt = Date.parse(value);
+  return Number.isFinite(retryAt) ? Math.max(0, retryAt - Date.now()) : null;
+}
+
+function rememberRequestRateLimit(key: string, until: number): void {
+  const now = Date.now();
+  for (const [existingKey, existingUntil] of requestRateLimitUntil) {
+    if (existingUntil <= now) requestRateLimitUntil.delete(existingKey);
+  }
+
+  requestRateLimitUntil.delete(key);
+  requestRateLimitUntil.set(key, until);
+  while (requestRateLimitUntil.size > 128) {
+    const oldestKey = requestRateLimitUntil.keys().next().value;
+    if (oldestKey === undefined) break;
+    requestRateLimitUntil.delete(oldestKey);
+  }
+}
 
 function readPersistedRateLimitUntil() {
   try {
-    const raw = window.localStorage.getItem('clinic_api_rate_limit_until');
+    const raw = window.localStorage.getItem(GLOBAL_RATE_LIMIT_STORAGE_KEY);
     const parsed = Number(raw || 0);
     return Number.isFinite(parsed) ? parsed : 0;
   } catch {
@@ -46,7 +104,7 @@ function readPersistedRateLimitUntil() {
 
 function persistRateLimitUntil(until: number): void {
   try {
-    window.localStorage.setItem('clinic_api_rate_limit_until', String(until || 0));
+    window.localStorage.setItem(GLOBAL_RATE_LIMIT_STORAGE_KEY, String(until || 0));
   } catch {
     // ignore storage failures
   }
@@ -272,16 +330,25 @@ async function ensureCSRFToken(): Promise<string | null> {
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const now = Date.now();
   const requestUrl = String(config.url || '');
-  if (now < globalRateLimitUntil && !requestUrl.includes('/auth/')) {
+  const rateLimitKey = getRateLimitRequestKey(config);
+  const requestCooldownUntil = rateLimitKey ? requestRateLimitUntil.get(rateLimitKey) || 0 : 0;
+  if (now < requestCooldownUntil) {
+    logger.warn('[FIX:429] Request-specific cooldown active', {
+      cooldownUntil: new Date(requestCooldownUntil).toISOString(),
+      method: String(config.method || 'get').toUpperCase()
+    });
+    return Promise.reject(createLocalRateLimitError(config, requestCooldownUntil - now, 'request'));
+  }
+
+  if (now < globalRateLimitUntil && !isAuthenticationRateLimitedRequest(requestUrl)) {
     if (now - globalRateLimitLogAt > 10_000) {
       logger.warn('[API] Global 429 cooldown active', {
-        cooldownUntil: new Date(globalRateLimitUntil).toISOString(),
-        url: requestUrl
+        cooldownUntil: new Date(globalRateLimitUntil).toISOString()
       });
       globalRateLimitLogAt = now;
     }
     persistRateLimitUntil(globalRateLimitUntil);
-    return Promise.reject(createLocalRateLimitError(config));
+    return Promise.reject(createLocalRateLimitError(config, globalRateLimitUntil - now, 'global'));
   }
 
   // Try to refresh token if expiring soon (except for auth endpoints)
@@ -480,14 +547,28 @@ api.interceptors.response.use(
       // NOTE: Token clearing removed to prevent race condition during login.
       // User will be redirected to login by RoleGuard or route protection instead.
     }
-    if (error.response?.status === 429) {
-      globalRateLimitUntil = Date.now() + GLOBAL_RATE_LIMIT_COOLDOWN_MS;
-      globalRateLimitLogAt = 0;
-      persistRateLimitUntil(globalRateLimitUntil);
-      logger.warn('[API] HTTP 429 received, enabling global cooldown', {
-        url: error.config?.url,
-        cooldownMs: GLOBAL_RATE_LIMIT_COOLDOWN_MS
-      });
+    if (error.response?.status === 429 && (error as AxiosError & { clientRateLimit?: boolean }).clientRateLimit !== true) {
+      const failedConfig = error.config || error.response.config;
+      const requestKey = getRateLimitRequestKey(failedConfig);
+      const retryAfterMs = getRetryAfterMs(error);
+      const requestScoped = retryAfterMs !== null || isAuthenticationRateLimitedRequest(failedConfig?.url);
+
+      if (requestScoped && requestKey) {
+        const cooldownMs = retryAfterMs ?? GLOBAL_RATE_LIMIT_COOLDOWN_MS;
+        const cooldownUntil = Date.now() + cooldownMs;
+        rememberRequestRateLimit(requestKey, cooldownUntil);
+        logger.warn('[FIX:429] HTTP 429 received, limiting cooldown to the request', {
+          method: String(failedConfig.method || 'get').toUpperCase(),
+          cooldownMs
+        });
+      } else {
+        globalRateLimitUntil = Date.now() + GLOBAL_RATE_LIMIT_COOLDOWN_MS;
+        globalRateLimitLogAt = 0;
+        persistRateLimitUntil(globalRateLimitUntil);
+        logger.warn('[FIX:429] HTTP 429 received, enabling shared API cooldown', {
+          cooldownMs: GLOBAL_RATE_LIMIT_COOLDOWN_MS
+        });
+      }
     }
 
     // #05 Tier 1: CSRF 403 recovery — refresh token and retry exactly once.
@@ -569,6 +650,7 @@ interface LocalRateLimitError {
   message: string;
   config: InternalAxiosRequestConfig;
   isAxiosError: boolean;
+  clientRateLimit: true;
   response: {
     status: number;
     statusText: string;
@@ -577,17 +659,25 @@ interface LocalRateLimitError {
   };
 }
 
-function createLocalRateLimitError(config: InternalAxiosRequestConfig): LocalRateLimitError {
+function createLocalRateLimitError(
+  config: InternalAxiosRequestConfig,
+  cooldownMs: number,
+  scope: 'global' | 'request',
+): LocalRateLimitError {
   const error = new Error('Client-side cooldown active after HTTP 429') as unknown as LocalRateLimitError;
   error.name = 'AxiosError';
   error.config = config;
   error.isAxiosError = true;
+  error.clientRateLimit = true;
   error.response = {
     status: 429,
     statusText: 'Too Many Requests',
     data: {
-      detail: 'Превышен лимит запросов. Клиент временно поставил запросы на паузу после 429.',
-      cooldownMs: GLOBAL_RATE_LIMIT_COOLDOWN_MS
+      detail: scope === 'global'
+        ? 'Превышен общий лимит запросов. Клиент временно приостановил API-запросы после 429.'
+        : 'Превышен лимит запросов к этому адресу. Клиент временно приостановил повтор.',
+      cooldownMs,
+      scope
     },
     config
   };

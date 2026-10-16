@@ -15,12 +15,11 @@ Covers:
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
-
-import asyncio
 
 import pytest
 import sqlalchemy as sa
@@ -33,11 +32,11 @@ from app.core.specialties import (
 )
 from app.crud import clinic as crud_clinic
 from app.models.clinic import ClinicSettings, Doctor
+from app.models.department import Department
 from app.models.online_queue import QueueToken
 from app.models.queue_profile import QueueProfile
 from app.schemas.clinic import DoctorCreate, DoctorUpdate
 from app.services.queue_service import QueueBusinessService
-
 
 # ===================== A. Unit level =====================
 
@@ -166,6 +165,13 @@ def test_clinic_wide_join_finds_canonical_dentistry_doctor(
     doctor = Doctor(user_id=test_doctor_user.id, specialty="dentistry", active=True)
     db_session.add(doctor)
     db_session.flush()
+    db_session.add(
+        Department(
+            key="stomatology",
+            name_ru="SYNTHETIC-Стоматология",
+            active=True,
+        )
+    )
     profile = QueueProfile(
         key="stomatology",
         title="Dental",

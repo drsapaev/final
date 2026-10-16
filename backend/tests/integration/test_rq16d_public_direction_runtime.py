@@ -552,6 +552,66 @@ def test_public_start_happy_path_continues_existing_join_flow(
     )
 
 
+def test_permanent_address_refuses_after_explicit_parent_is_disabled(
+    pg_session, pg_client, pg_admin_user, direction_world
+):
+    """A durable URL never bypasses the current Department availability."""
+    from app.models.department import Department
+    from app.models.online_queue import QueueToken
+    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
+    from app.models.queue_profile import QueueProfile
+
+    profile = direction_world["cardio"]
+    profile_key = profile.key
+    department = pg_session.query(Department).filter_by(key="cardiology").one()
+    original_department_key = profile.department_key
+    original_department_active = department.active
+    headers = _auth_headers(pg_admin_user)
+
+    provisioned = _provision(pg_client, headers, profile_key)
+    assert provisioned.status_code == 200, provisioned.text
+    code = provisioned.json()["public_code"]
+    queue_token_count_before = (
+        pg_session.query(QueueToken)
+        .filter(QueueToken.department == f"qdir:{profile_key}")
+        .count()
+    )
+
+    profile.department_key = department.key
+    department.active = False
+    pg_session.commit()
+
+    try:
+        start = _start(pg_client, code)
+        assert start.status_code == 404, start.text
+        assert start.json()["detail"] == REFUSAL_DETAIL
+
+        methods = pg_client.get(METHODS_PATH.replace("{profile_key}", profile_key))
+        assert methods.status_code == 404, methods.text
+        assert methods.json()["detail"] == REFUSAL_DETAIL
+
+        address = (
+            pg_session.query(QueueDirectionPublicAddress)
+            .filter_by(public_code=code)
+            .one()
+        )
+        assert address.retired_at is None, "unavailability must not rotate/retire the URL"
+        assert profile.is_active is True, "parent state must not rewrite manual intent"
+        assert (
+            pg_session.query(QueueToken)
+            .filter(QueueToken.department == f"qdir:{profile_key}")
+            .count()
+            == queue_token_count_before
+        ), "a refused address start must not mint a session token"
+    finally:
+        pg_session.rollback()
+        profile = pg_session.query(QueueProfile).filter_by(key=profile_key).one()
+        department = pg_session.query(Department).filter_by(key="cardiology").one()
+        profile.department_key = original_department_key
+        department.active = original_department_active
+        pg_session.commit()
+
+
 def test_public_start_refusal_matrix_byte_identical(
     pg_session, pg_client, pg_admin_user, direction_world
 ):

@@ -234,7 +234,7 @@ def get_direction_entry_methods(
     profile = (
         db.query(QueueProfile).filter(QueueProfile.key == normalized).first()
     )
-    if profile is None or not QueueBusinessService._is_qr_visible_profile(profile):
+    if profile is None or not QueueBusinessService._is_qr_visible_profile(profile, db):
         raise _anonymous_refusal()
 
     # RQ-16.d (E-055 §8): honest per-direction flag — provisioned active
@@ -399,7 +399,7 @@ def start_public_direction_session(
         raise _anonymous_refusal()
 
     profile = address.queue_profile
-    if profile is None or not QueueBusinessService._is_qr_visible_profile(profile):
+    if profile is None or not QueueBusinessService._is_qr_visible_profile(profile, db):
         # Tombstoned (hard-deleted), archived or hidden directions refuse
         # with the SAME anonymous response (S-15).
         raise _anonymous_refusal()

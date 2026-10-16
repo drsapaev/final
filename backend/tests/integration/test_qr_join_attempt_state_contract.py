@@ -34,6 +34,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.models.clinic import Doctor
+from app.models.department import Department
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.queue_profile import QueueProfile
 from app.models.user import User
@@ -245,6 +246,13 @@ def _make_direction_surface(db_session, suffix: str) -> dict:
     db_session.add(doctor)
 
     profile_key = f"cardio-key-{suffix}"
+    db_session.add(
+        Department(
+            key=profile_key,
+            name_ru="SYNTHETIC-Кардиология",
+            active=True,
+        )
+    )
     profile = QueueProfile(
         key=profile_key,
         title="Кардиология (replay pin)",
@@ -275,9 +283,7 @@ def _make_direction_surface(db_session, suffix: str) -> dict:
 
 
 @pytest.mark.queue
-def test_direction_session_retry_replays_saved_ticket(
-    client, db_session, monkeypatch
-):
+def test_direction_session_retry_replays_saved_ticket(client, db_session, monkeypatch):
     """PIN B4 (round-4 P1-2): the /q/<code> direction flow completes via
     the multi surface (one profile). After a lost response the retry with
     the SAME session token replays the saved ticket — the review's
@@ -345,6 +351,13 @@ def test_legacy_clinic_wide_joined_retry_replays_exact_snapshot(
     db_session.refresh(user)
     doctor = Doctor(user_id=user.id, specialty="Кардиология", active=True)
     db_session.add(doctor)
+    db_session.add(
+        Department(
+            key="used-reason-key",
+            name_ru="SYNTHETIC-Кардиология",
+            active=True,
+        )
+    )
     profile = QueueProfile(
         key="used-reason-key",
         title="Used reason profile",
@@ -417,7 +430,9 @@ def test_legacy_clinic_wide_joined_retry_replays_exact_snapshot(
 
 
 @pytest.mark.queue
-def test_replay_matches_despite_name_formatting(client, db_session, test_doctor, monkeypatch):
+def test_replay_matches_despite_name_formatting(
+    client, db_session, test_doctor, monkeypatch
+):
     """PIN B6 (round-5 P1-3): the payload binding is NORMALIZATION-aware —
     the same person re-typing their identity with different case/whitespace
     (or a reformatted phone) still replays the saved ticket; only a real

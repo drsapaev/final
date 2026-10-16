@@ -547,6 +547,7 @@ def test_admin_shown_ecg_direction_is_selectable_and_joinable(
     """S-07 (RQ-09): admin-controlled visibility — an explicitly shown
     profile must surface on the public page and the advertised doctor must
     survive the join (visible selection == allowed join)."""
+    from app.models.online_queue import DailyQueue
     from app.services.queue_service import QueueBusinessService
 
     monkeypatch.setattr(
@@ -595,6 +596,512 @@ def test_admin_shown_ecg_direction_is_selectable_and_joinable(
     assert len(payload["entries"]) == 1
     assert payload["entries"][0]["queue_number"] >= 1
     assert payload["entries"][0]["specialist_id"] == doctor.id
+    daily_queue = (
+        pg_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == _clinic_day(),
+            DailyQueue.specialist_id == doctor.id,
+        )
+        .one()
+    )
+    assert daily_queue.queue_tag == entry["specialty"] == "echokg"
+
+
+@pytest.mark.queue
+def test_clinic_wide_specialist_card_uses_the_profile_selected_for_admission(
+    pg_client, pg_session, monkeypatch
+):
+    """The public label and doctor join must resolve the same profile key."""
+    from app.models.online_queue import DailyQueue
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import QueueBusinessService
+
+    monkeypatch.setattr(
+        QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0)
+    )
+    specialty = "rq09canon"
+    _user, doctor = _doctor_with_user(
+        pg_session,
+        specialty=specialty,
+        label="canon",
+        role="Doctor",
+    )
+    exact_profile = QueueProfile(
+        key=specialty,
+        title="Exact profile title",
+        title_ru="Exact profile display",
+        queue_tags=[specialty],
+        is_active=True,
+        show_on_qr_page=True,
+        display_order=10,
+    )
+    alias_profile = QueueProfile(
+        key="rq09canonicalalias",
+        title="Alias profile title",
+        title_ru="Alias profile display",
+        queue_tags=[specialty],
+        is_active=True,
+        show_on_qr_page=True,
+        display_order=1,
+    )
+    pg_session.add_all([exact_profile, alias_profile])
+    pg_session.commit()
+    _clinic_wide_token(pg_session, "rq09-token-canonical-profile")
+    pg_session.expire_all()
+
+    selectable = _selectable(pg_client, "rq09-token-canonical-profile")
+    entry = next((item for item in selectable if item["id"] == doctor.id), None)
+    assert entry is not None, selectable
+    assert entry["specialty"] == specialty
+    assert entry["specialty_display"] == exact_profile.title_ru
+
+    start_resp = pg_client.post(
+        "/api/v1/queue/join/start",
+        json={"token": "rq09-token-canonical-profile"},
+    )
+    assert start_resp.status_code == 200, start_resp.text
+    complete_resp = pg_client.post(
+        "/api/v1/queue/join/complete",
+        json={
+            "session_token": start_resp.json()["session_token"],
+            "patient_name": "RQ09 Synthetic Canonical Patient",
+            "phone": "+998900000902",
+            "specialist_ids": [doctor.id],
+        },
+    )
+    assert complete_resp.status_code == 200, complete_resp.text
+    assert complete_resp.json()["success"] is True
+
+    daily_queue = (
+        pg_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == _clinic_day(),
+            DailyQueue.specialist_id == doctor.id,
+        )
+        .one()
+    )
+    assert daily_queue.queue_tag == entry["specialty"] == specialty
+
+
+@pytest.mark.queue
+def test_same_parent_shared_tag_with_distinct_profile_keys_fails_closed(
+    pg_client, pg_session, monkeypatch
+):
+    """A shared doctor specialty cannot select between distinct queue keys."""
+    from app.models.department import Department
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import QueueValidationError, queue_service
+
+    monkeypatch.setattr(queue_service, "ONLINE_QUEUE_START_TIME", time(0, 0))
+    tag = "rq09distinct"
+    parent = Department(
+        key="rq09-ecg-distinct-parent",
+        name_ru="RQ-09 Synthetic shared parent",
+        active=True,
+    )
+    pg_session.add(parent)
+    _user, doctor = _doctor_with_user(
+        pg_session,
+        specialty=tag,
+        label="distinct_tag",
+        role="Doctor",
+        doctor_id=9292,
+    )
+    token = _clinic_wide_token(pg_session, "rq09-token-distinct-target-keys")
+    profile_a = QueueProfile(
+        key="rq09-ecg-target-a",
+        title="RQ-09 Synthetic ECG target A",
+        title_ru="RQ-09 Synthetic ECG target A",
+        queue_tags=[tag],
+        department_key=parent.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    profile_b = QueueProfile(
+        key="rq09-ecg-target-b",
+        title="RQ-09 Synthetic ECG target B",
+        title_ru="RQ-09 Synthetic ECG target B",
+        queue_tags=[tag],
+        department_key=parent.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    pg_session.add_all([profile_a, profile_b])
+    pg_session.commit()
+
+    try:
+        selectable = _selectable(pg_client, token.token)
+        assert all(item["id"] != doctor.id for item in selectable)
+        with pytest.raises(QueueValidationError):
+            queue_service.join_queue_with_token(
+                pg_session,
+                token_str=token.token,
+                patient_name="RQ09 Synthetic Ambiguous Target",
+                phone="+998900000929",
+                specialist_id_override=doctor.id,
+                specialist_type="doctor",
+            )
+    finally:
+        pg_session.rollback()
+
+
+@pytest.mark.queue
+def test_parent_off_removes_selection_and_blocks_direct_qr_join(
+    pg_client, pg_session, monkeypatch
+):
+    """Shared tags fail closed when any published target parent is off."""
+    from app.models.department import Department
+    from app.models.online_queue import QueueToken
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+    from app.services.queue_service import QueueValidationError, queue_service
+
+    monkeypatch.setattr(queue_service, "ONLINE_QUEUE_START_TIME", time(0, 0))
+    _user, doctor = _doctor_with_user(
+        pg_session,
+        specialty="ecg",
+        label="ecg_parent_off",
+        role="Doctor",
+        doctor_id=9291,
+    )
+    token = _clinic_wide_token(pg_session, "rq09-token-ecg-parent-off")
+    department = pg_session.query(Department).filter_by(key="echokg").one()
+    original_active = department.active
+    alternate_parent = Department(
+        key="rq09sharedparent",
+        name_ru="RQ-09 Synthetic Active Parent",
+        active=True,
+    )
+    pg_session.add(alternate_parent)
+    pg_session.flush()
+    sibling_profile = QueueProfile(
+        key="rq09-ecg-active-sibling",
+        title="RQ-09 Synthetic Active ECG sibling",
+        queue_tags=["ecg"],
+        department_key=alternate_parent.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    pg_session.add(sibling_profile)
+    pg_session.flush()
+    department.active = False
+    pg_session.commit()
+
+    try:
+        selectable = _selectable(pg_client, token.token)
+        assert all(item["id"] != doctor.id for item in selectable)
+
+        available = pg_client.get("/api/v1/queue/available-specialists")
+        assert available.status_code == 200, available.text
+        assert all(
+            item["id"] != doctor.id
+            for item in available.json().get("specialists", [])
+        ), "legacy public selector must match the clinic-wide join eligibility"
+
+        with pytest.raises(QueueValidationError):
+            queue_service.join_queue_with_token(
+                pg_session,
+                token_str=token.token,
+                patient_name="RQ09 Synthetic Parent-Off Patient",
+                phone="+998900000929",
+                specialist_id_override=doctor.id,
+                specialist_type="doctor",
+            )
+    finally:
+        pg_session.rollback()
+        department = pg_session.query(Department).filter_by(key="echokg").one()
+        department.active = original_active
+        sibling_profile = (
+            pg_session.query(QueueProfile)
+            .filter_by(key="rq09-ecg-active-sibling")
+            .one_or_none()
+        )
+        if sibling_profile is not None:
+            pg_session.delete(sibling_profile)
+        alternate_parent = (
+            pg_session.query(Department).filter_by(key="rq09sharedparent").one_or_none()
+        )
+        if alternate_parent is not None:
+            pg_session.delete(alternate_parent)
+        pg_session.query(QueueToken).filter_by(token=token.token).delete()
+        pg_session.query(type(doctor)).filter_by(id=doctor.id).delete()
+        pg_session.query(User).filter_by(id=_user.id).delete()
+        pg_session.commit()
+
+
+@pytest.mark.queue
+def test_doctor_and_profile_joins_reject_unavailable_shared_resource_target(
+    pg_session, monkeypatch
+):
+    """Doctor and profile-ID admission share one resource-target policy."""
+    from app.models.department import Department
+    from app.models.online_queue import DailyQueue, QueueResource
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import QueueValidationError, queue_service
+
+    monkeypatch.setattr(queue_service, "ONLINE_QUEUE_START_TIME", time(0, 0))
+    inactive_parent = Department(
+        key="rq09-profile-target-off",
+        name_ru="RQ-09 Synthetic inactive parent",
+        active=False,
+    )
+    active_parent = Department(
+        key="rq09-profile-target-on",
+        name_ru="RQ-09 Synthetic active parent",
+        active=True,
+    )
+    resource = QueueResource(
+        code="rq09-profile-shared-resource",
+        queue_tag="rq09rsrc",
+        display_name="RQ-09 Synthetic shared resource",
+        active=True,
+    )
+    selected = QueueProfile(
+        key="rq09-profile-selected-resource",
+        title="RQ-09 Synthetic selected resource",
+        queue_tags=[resource.queue_tag],
+        department_key=active_parent.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    unavailable = QueueProfile(
+        key="rq09-profile-unavailable-resource",
+        title="RQ-09 Synthetic unavailable resource",
+        queue_tags=[resource.queue_tag],
+        department_key=inactive_parent.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    pg_session.add_all(
+        [inactive_parent, active_parent, resource, selected, unavailable]
+    )
+    _user, doctor = _doctor_with_user(
+        pg_session,
+        specialty=resource.queue_tag,
+        label="rsrc",
+        role="Doctor",
+        doctor_id=9331,
+    )
+    pg_session.commit()
+    token = _clinic_wide_token(pg_session, "rq09-token-direct-profile-target")
+
+    with pytest.raises(QueueValidationError):
+        queue_service.join_queue_with_token(
+            pg_session,
+            token_str=token.token,
+            patient_name="RQ09 Synthetic Shared Resource Doctor",
+            phone="+998900000932",
+            specialist_id_override=doctor.id,
+            specialist_type="doctor",
+        )
+    with pytest.raises(QueueValidationError):
+        queue_service.join_queue_with_token(
+            pg_session,
+            token_str=token.token,
+            patient_name="RQ09 Synthetic Direct Profile Target",
+            phone="+998900000931",
+            specialist_id_override=selected.id,
+            specialist_type="profile",
+        )
+    assert (
+        pg_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == _clinic_day(),
+            DailyQueue.queue_tag == resource.queue_tag,
+        )
+        .count()
+        == 0
+    )
+
+
+@pytest.mark.queue
+def test_available_profiles_with_different_parents_share_one_resource_target(
+    pg_session, monkeypatch
+):
+    """An explicit resource tag stays one target when every parent is available."""
+    from app.models.department import Department
+    from app.models.online_queue import DailyQueue, QueueResource
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import queue_service
+
+    monkeypatch.setattr(queue_service, "ONLINE_QUEUE_START_TIME", time(0, 0))
+    parent_a = Department(
+        key="rq09-profile-available-parent-a",
+        name_ru="RQ-09 Synthetic available parent A",
+        active=True,
+    )
+    parent_b = Department(
+        key="rq09-profile-available-parent-b",
+        name_ru="RQ-09 Synthetic available parent B",
+        active=True,
+    )
+    resource = QueueResource(
+        code="rq09-profile-available-resource",
+        queue_tag="rq09rsrcavailable",
+        display_name="RQ-09 Synthetic available resource",
+        active=True,
+    )
+    selected = QueueProfile(
+        key="rq09-profile-available-selected",
+        title="RQ-09 Synthetic available selected profile",
+        queue_tags=[resource.queue_tag],
+        department_key=parent_a.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    sibling = QueueProfile(
+        key="rq09-profile-available-sibling",
+        title="RQ-09 Synthetic available sibling profile",
+        queue_tags=[resource.queue_tag],
+        department_key=parent_b.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    pg_session.add_all([parent_a, parent_b, resource, selected, sibling])
+    pg_session.commit()
+    token = _clinic_wide_token(pg_session, "rq09-token-shared-available-resource")
+
+    result = queue_service.join_queue_with_token(
+        pg_session,
+        token_str=token.token,
+        patient_name="RQ09 Synthetic Shared Available Resource",
+        phone="+998900000934",
+        specialist_id_override=selected.id,
+        specialist_type="profile",
+    )
+
+    assert result.get("entry") is not None, result
+    daily_queue = (
+        pg_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == _clinic_day(),
+            DailyQueue.queue_tag == resource.queue_tag,
+        )
+        .one()
+    )
+    assert daily_queue.queue_resource_id == resource.id
+    assert daily_queue.specialist_id is None
+
+
+@pytest.mark.queue
+def test_available_specialists_excludes_ineligible_doctor_owners(
+    pg_client, pg_session
+):
+    """The legacy public selector matches QR join owner eligibility."""
+    from app.models.clinic import Doctor
+    from app.models.queue_profile import QueueProfile
+
+    specialty = "rq09owners"
+    pg_session.add(
+        QueueProfile(
+            key=specialty,
+            title="RQ-09 Synthetic owner eligibility",
+            title_ru="RQ-09 Synthetic owner eligibility",
+            queue_tags=[specialty],
+            is_active=True,
+            show_on_qr_page=True,
+        )
+    )
+    _active_user, active_doctor = _doctor_with_user(
+        pg_session,
+        specialty=specialty,
+        label="owner_ok",
+        role="Doctor",
+        doctor_id=9321,
+    )
+    _inactive_user, inactive_doctor = _doctor_with_user(
+        pg_session,
+        specialty=specialty,
+        label="owner_off",
+        user_active=False,
+        role="Doctor",
+        doctor_id=9322,
+    )
+    _staff_user, staff_doctor = _doctor_with_user(
+        pg_session,
+        specialty=specialty,
+        label="owner_staff",
+        role="Registrar",
+        doctor_id=9323,
+    )
+    _resource_user, resource_doctor = _doctor_with_user(
+        pg_session,
+        specialty=specialty,
+        label="owner_lab",
+        role="Lab",
+        doctor_id=9324,
+    )
+    userless_doctor = Doctor(
+        id=9325,
+        user_id=None,
+        specialty=specialty,
+        cabinet="RQ09-userless",
+        active=True,
+    )
+    pg_session.add(userless_doctor)
+    pg_session.commit()
+    pg_session.expire_all()
+
+    response = pg_client.get("/api/v1/queue/available-specialists")
+    assert response.status_code == 200, response.text
+    ids = {item["id"] for item in response.json().get("specialists", [])}
+
+    assert active_doctor.id in ids
+    assert inactive_doctor.id not in ids
+    assert staff_doctor.id not in ids
+    assert resource_doctor.id not in ids
+    assert userless_doctor.id not in ids
+
+
+@pytest.mark.queue
+def test_batch_doctor_target_resolution_reads_parent_departments_once(pg_session):
+    """A multi-doctor QR batch resolves profile parents with one read."""
+    from sqlalchemy import event
+
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import queue_service
+
+    _user1, cardiologist = _doctor_with_user(
+        pg_session, specialty="cardiology", label="batch_cardio"
+    )
+    _user2, ecg_doctor = _doctor_with_user(
+        pg_session, specialty="ecg", label="batch_ecg"
+    )
+    ecg_profile = pg_session.query(QueueProfile).filter_by(key="echokg").one()
+    original_show_on_qr = ecg_profile.show_on_qr_page
+    ecg_profile.show_on_qr_page = True
+    token = _clinic_wide_token(pg_session, "rq09-token-batch-parent-policy")
+    pg_session.commit()
+
+    department_selects: list[str] = []
+    engine = pg_session.get_bind()
+
+    def record_department_select(_conn, _cursor, statement, _parameters, _context, _many):
+        normalized = " ".join(statement.lower().replace('"', "").split())
+        table_tokens = {token.rstrip(",;") for token in normalized.split()}
+        if "select" in normalized and any(
+            token == "departments" or token.endswith(".departments")
+            for token in table_tokens
+        ):
+            department_selects.append(statement)
+
+    event.listen(engine, "before_cursor_execute", record_department_select)
+    try:
+        targets = queue_service.resolve_join_batch_tag_targets(
+            pg_session,
+            token_str=token.token,
+            specialist_ids=[cardiologist.id, ecg_doctor.id],
+            specialist_entity_types=["doctor", "doctor"],
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", record_department_select)
+        pg_session.rollback()
+        profile = pg_session.query(QueueProfile).filter_by(key="echokg").one()
+        profile.show_on_qr_page = original_show_on_qr
+        pg_session.commit()
+
+    assert set(targets) == {0, 1}
+    assert len(department_selects) == 1
 
 
 # ---------------------------------------------------------------------------

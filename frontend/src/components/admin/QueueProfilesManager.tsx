@@ -255,7 +255,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error deleting profile:', err);
-            setError(String((err as Record<string, unknown> & { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.qp_delete_error')));
+            setError(apiErrorMessage(err, t('admin2.qp_delete_error')));
         } finally {
             setSaving(false);
         }

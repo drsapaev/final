@@ -18126,7 +18126,7 @@
           "registrar"
         ],
         "summary": "Get Queue Profiles Public",
-        "description": "⭐ PUBLIC ENDPOINT: Получить список профилей для QR-страницы регистрации.\n\nНе требует авторизации - используется пациентами при самостоятельной регистрации.\nВозвращает только профили с is_active=True И show_on_qr_page=True.\n\nИспользуется на странице /queue/join для выбора специальности.",
+        "description": "⭐ PUBLIC ENDPOINT: Получить список профилей для QR-страницы регистрации.\n\nНе требует авторизации - используется пациентами при самостоятельной регистрации.\nВозвращает только профили с ручным is_active=True, show_on_qr_page=True\nи доступным однозначно разрешённым Department parent (если он назначен).\n\nИспользуется на странице /queue/join для выбора специальности.",
         "operationId": "get_queue_profiles_public_api_v1_queues_profiles_public_get",
         "responses": {
           "200": {

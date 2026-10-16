@@ -146,3 +146,16 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - **User decision:** in response to the T10 scope clarification, the user explicitly approved adding OpenAPI and generated API types.
 - **Included artifacts:** `backend/openapi.json`, focused OpenAPI contract tests, and `frontend/src/types/generated/api.ts`; no frontend runtime UI or adapter behavior is included.
 - **Technical choice:** remove the hard-coded schema/path totals from `frontend/scripts/generate-api-types.sh`'s generated-file header. Those totals would become inaccurate as soon as this OpenAPI change adds schemas; the generic source label stays correct across future regeneration. This changes metadata only, not the generation command or API behavior.
+
+## T11 plan synchronization and reported profile 409 — 2026-10-14
+
+- **User instruction:** synchronize/update the existing plan and clarify its uncertainties. This is a documentation-only side action in the same T11 task, not authorization to modify runtime, accept a Tier-2 deferral, merge, deploy or change the v1 flag.
+- **Source-backed clarification:** `specialists` can be `profile_key` in the existing PUT/DELETE `/queues/profiles/{profile_key}` route. The console URL and HTTP 409 do not establish the request method or prove a missing specialists-list endpoint. Initial profile loading uses a different GET path. Live method/reason/deployed revision are unknown.
+- **Technical planning choice:** add T11.1 with explicit diagnostic branches and acceptance criteria. Preserve existing used-binding/delete/availability guards. A proven T11 regression is fixed in #3639; an older/deployment issue receives a separate owned follow-up under the PR-cycle rules. Missing evidence stays UNRESOLVED, never an implicit deferral or a PASS.
+- **Evidence interpretation:** frontend source provenance PASS on `35717fa` supersedes the older unresolved artifact finding only for that image/source. It does not complete legacy named specs, all Tier-2, T18, or the pre-deploy runbook. Existing D1–D5 product decisions are unchanged.
+
+## T11.1 user clarification and narrow renderer follow-up — 2026-10-14
+
+- **User clarification:** the 409 occurs when deleting the profile. This establishes the action/path mapping to DELETE with profile key `specialists`; it does not establish the production usage counts or precise refusal reason.
+- **Technical scope refinement under the user's continuation:** keep a tiny T11.1a renderer-only fix in the active #3639 rather than starting another PR cycle: reuse the existing error formatter in single-delete and add two regressions. This explicitly narrows the prior generic follow-up rule and does not advance T17 bulk/CSV work or authorize backend changes.
+- **Preserved contract:** used profiles are archived through the existing explicit action; deletion guards remain authoritative. No auto-archive, retry or request change is introduced. The UI defect is reproduced independently of the still-unknown production refusal reason.
