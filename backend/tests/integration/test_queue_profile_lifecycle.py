@@ -2326,6 +2326,182 @@ def test_department_toggle_waits_for_qr_admission_using_parent(
     assert joined["entry"].id == entry.id
 
 
+@pytest.mark.queue
+@pytest.mark.usefixtures("queue_admission_open")
+@pytest.mark.parametrize(
+    "queue_tag", [None, "synthetic-unmatched"], ids=["null", "unmatched"]
+)
+def test_legacy_doctor_token_locks_fallback_parent_before_admission(
+    pg_engine, pg_session, monkeypatch, queue_tag
+):
+    """NULL/unmatched queue tags still serialize specialty-parent toggles."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from app.crud.clinic import clinic_today
+    from app.crud.daily_queue_creation_policy import ONLINE_ISSUANCES_V1_POLICY_VERSION
+    from app.models.clinic import Doctor
+    from app.models.department import Department
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+    from app.services.queue_service import QueueValidationError, queue_service
+
+    suffix = uuid.uuid4().hex[:10]
+    parent = Department(
+        key=f"rq3639-legacy-parent-{suffix}", name_ru="SYNTHETIC parent", active=True
+    )
+    profile = QueueProfile(
+        key=f"rq3639-legacy-profile-{suffix}",
+        title="SYNTHETIC legacy specialty",
+        queue_tags=[f"rq3639-legacy-tag-{suffix}"],
+        department_key=parent.key,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    user = User(
+        username=f"synthetic_legacy_{suffix}",
+        full_name="SYNTHETIC Doctor",
+        hashed_password="!disabled:test",
+        role="Doctor",
+        is_active=True,
+    )
+    pg_session.add_all([parent, profile, user])
+    pg_session.flush()
+    doctor = Doctor(
+        user_id=user.id, specialty=profile.key, active=True, cabinet="SYNTHETIC"
+    )
+    pg_session.add(doctor)
+    pg_session.flush()
+    day = clinic_today(pg_session)
+    queue = DailyQueue(
+        day=day,
+        specialist_id=doctor.id,
+        queue_tag=queue_tag,
+        active=True,
+        policy_version=ONLINE_ISSUANCES_V1_POLICY_VERSION,
+        online_issued_count=0,
+        max_online_entries=20,
+        online_start_time="00:00",
+        online_end_time="23:59",
+        opened_at=None,
+    )
+    token = QueueToken(
+        token=f"rq3639-legacy-{suffix}",
+        day=day,
+        specialist_id=doctor.id,
+        is_clinic_wide=False,
+        expires_at=datetime.now(ZoneInfo("Asia/Tashkent")) + timedelta(hours=2),
+        active=True,
+    )
+    pg_session.add_all([queue, token])
+    pg_session.flush()
+    parent_id, queue_id, doctor_id = parent.id, queue.id, doctor.id
+    token_value = token.token
+    pg_session.commit()
+
+    sessions = sessionmaker(bind=pg_engine, future=True)
+    parent_checked = threading.Event()
+    release_join = threading.Event()
+    toggle_started = threading.Event()
+    pids = {}
+    original_recheck = queue_service._queue_profiles_are_bookable_under_parent_locks
+
+    def pause_after_parent_lock(db, daily_queue):
+        allowed = original_recheck(db, daily_queue)
+        assert allowed
+        parent_checked.set()
+        if not release_join.wait(timeout=15):
+            raise TimeoutError("test did not release the legacy admission")
+        return allowed
+
+    monkeypatch.setattr(
+        queue_service,
+        "_queue_profiles_are_bookable_under_parent_locks",
+        pause_after_parent_lock,
+    )
+
+    def admit():
+        with sessions() as db:
+            pids["join"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            result = queue_service.join_queue_with_token(
+                db,
+                token_str=token_value,
+                patient_name=f"SYNTHETIC-{suffix}",
+                phone="+998900000001",
+            )
+            return result["entry"].id
+
+    def disable_parent():
+        with sessions() as db:
+            pids["toggle"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            toggle_started.set()
+            db.execute(
+                text("UPDATE departments SET active = FALSE WHERE id = :id"),
+                {"id": parent_id},
+            )
+            db.commit()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        join_future = executor.submit(admit)
+        toggle_future = None
+        try:
+            assert parent_checked.wait(timeout=10)
+            toggle_future = executor.submit(disable_parent)
+            assert toggle_started.wait(timeout=5)
+            deadline = time.monotonic() + 5
+            blocked = False
+            while time.monotonic() < deadline:
+                with pg_engine.connect() as connection:
+                    blockers = connection.execute(
+                        text("SELECT pg_blocking_pids(:pid)"), {"pid": pids["toggle"]}
+                    ).scalar_one()
+                if pids["join"] in blockers:
+                    blocked = True
+                    break
+                if toggle_future.done():
+                    break
+                time.sleep(0.02)
+            assert blocked, "Department toggle must wait on the fallback parent lock"
+        finally:
+            release_join.set()
+        entry_id = join_future.result(timeout=15)
+        assert toggle_future is not None
+        toggle_future.result(timeout=10)
+
+    monkeypatch.setattr(
+        queue_service,
+        "_queue_profiles_are_bookable_under_parent_locks",
+        original_recheck,
+    )
+    pg_session.expire_all()
+    saved_queue = pg_session.get(DailyQueue, queue_id)
+    entry = pg_session.get(OnlineQueueEntry, entry_id)
+    assert pg_session.get(Department, parent_id).active is False
+    assert saved_queue.specialist_id == doctor_id
+    assert saved_queue.queue_tag == queue_tag
+    assert saved_queue.online_issued_count == 1
+    assert entry.queue_id == queue_id
+    preserved = (entry.number, entry.status, entry.queue_time)
+    with sessions() as db:
+        with pytest.raises(QueueValidationError):
+            queue_service.join_queue_with_token(
+                db,
+                token_str=token_value,
+                patient_name=f"SYNTHETIC-rejected-{suffix}",
+                phone="+998900000002",
+            )
+        db.rollback()
+    pg_session.expire_all()
+    assert pg_session.get(DailyQueue, queue_id).online_issued_count == 1
+    assert pg_session.query(OnlineQueueEntry).filter_by(queue_id=queue_id).count() == 1
+    entry = pg_session.get(OnlineQueueEntry, entry_id)
+    assert (entry.number, entry.status, entry.queue_time) == preserved
+
+
 def _seed_waiting_entry_for_department(pg_session, dept_key: str, suffix: str) -> dict:
     """One active DailyQueue + one waiting entry under a tag owned by the
     department's 1:1 profile (expand_queue_tags guarantees the bare key

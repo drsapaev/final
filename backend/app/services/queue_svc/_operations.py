@@ -467,6 +467,20 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             daily_queue.queue_tag,
             prefer_exact_key=daily_queue.queue_resource_id is None,
         )
+        if (
+            not profile_candidates
+            and daily_queue.queue_resource_id is None
+            and daily_queue.specialist_id is not None
+        ):
+            # Legacy doctor queues may have no configured tag. Mirror token
+            # validation's specialty fallback before taking the parent locks.
+            doctor = (
+                db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
+            )
+            if doctor is not None:
+                profile_candidates = cls._get_qr_profile_candidates_for_doctor(
+                    db, doctor
+                )
         if not profile_candidates:
             return True
         availability_by_profile = load_queue_profile_availability(
