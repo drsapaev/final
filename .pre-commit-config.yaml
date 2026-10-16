@@ -3,18 +3,27 @@ repos:
     rev: v4.6.0
     hooks:
       - id: check-added-large-files
+        entry: python -m pre_commit_hooks.check_added_large_files
         args: ['--maxkb=300']
         exclude: '^\.agents/skills/archify/(assets/template\.html|renderers/shared/generated-validators\.mjs)$'
       - id: check-merge-conflict
+        entry: python -m pre_commit_hooks.check_merge_conflict
       - id: detect-private-key
+        entry: python -m pre_commit_hooks.detect_private_key
       - id: check-yaml
+        entry: python -m pre_commit_hooks.check_yaml
       - id: check-json
+        entry: python -m pre_commit_hooks.check_json
       - id: check-toml
+        entry: python -m pre_commit_hooks.check_toml
       - id: end-of-file-fixer
+        entry: python -m pre_commit_hooks.end_of_file_fixer
         exclude: ^(\.agents/skills/|frontend/public/|backend/app/services/ai/.*\.json$)
       - id: trailing-whitespace
+        entry: python -m pre_commit_hooks.trailing_whitespace_fixer
         exclude: ^(\.agents/skills/|frontend/public/)
       - id: no-commit-to-branch
+        entry: python -m pre_commit_hooks.no_commit_to_branch
         args: ['--branch', 'main']
 
   # ---------------------------------------------------------------------------
@@ -58,7 +67,7 @@ repos:
         entry: >-
           node -e 'process.chdir("frontend"); const files = process.argv.slice(1).map((path) => path.startsWith("frontend/") ? path.slice("frontend/".length) : path); process.argv = [process.argv[0], "eslint", "--fix", ...files]; require(process.cwd() + "/node_modules/eslint/bin/eslint.js");' --
         language: system
-        files: ^frontend/.*\.(js|jsx|ts|tsx)$
+        files: ^frontend/src/.*\.(js|jsx|ts|tsx)$
         pass_filenames: true
         types: [file]
 

@@ -2,6 +2,7 @@
 
 Split from qr_queue_service.py.
 """
+
 from __future__ import annotations
 
 from app.crud.queue_resource_routing import (
@@ -51,7 +52,7 @@ class TokensMixin(QRQueueServiceMixinBase):
         else:
             # Если после 09:00 - создаем на завтра, иначе на сегодня
             # TEMPORARY: Disable 09:00 check for testing
-            if False: # current_time > "09:00":
+            if False:  # current_time > "09:00":
                 target_date = today + timedelta(days=1)
                 logger.debug(
                     f"[QRQueueService] Текущее время {current_time} > 09:00, создаем QR на завтра: {target_date}"
@@ -94,7 +95,6 @@ class TokensMixin(QRQueueServiceMixinBase):
             ),
             "active": True,
         }
-
 
     def get_qr_token_info(self, token: str) -> dict[str, Any] | None:
         """
@@ -233,6 +233,51 @@ class TokensMixin(QRQueueServiceMixinBase):
                     self.db, daily_queue, target_date, qr_token.specialist_id
                 )
 
+                if (
+                    specialist is not None
+                    and not qr_token.is_clinic_wide
+                    and daily_queue is not None
+                ):
+                    # Evaluate the queue actually named by this token first.
+                    # A visible sibling profile for the same doctor's
+                    # specialty must not make an unavailable target usable.
+                    # Unprofiled legacy resource tokens retain their old path.
+                    profile_candidates = (
+                        queue_service._get_qr_profile_candidates_for_tag(
+                            self.db,
+                            daily_queue.queue_tag,
+                            prefer_exact_key=(
+                                getattr(daily_queue, "queue_resource_id", None)
+                                is None
+                            ),
+                        )
+                    )
+                    if not profile_candidates:
+                        profile_candidates = (
+                            queue_service._get_qr_profile_candidates_for_doctor(
+                                self.db, specialist
+                            )
+                        )
+                    if profile_candidates:
+                        from app.services.queue_profile_availability import (
+                            load_queue_profile_availability,
+                        )
+
+                        availability_by_profile = load_queue_profile_availability(
+                            self.db, profile_candidates
+                        )
+                        if not queue_service._qr_profile_candidates_are_unambiguous(
+                            profile_candidates,
+                            self.db,
+                            availability_by_profile,
+                            route_queue_tag=(
+                                daily_queue.queue_tag
+                                if daily_queue.queue_resource_id is not None
+                                else None
+                            ),
+                        ):
+                            return None
+
             logger.debug(
                 f"[QRQueueService.get_qr_token_info] DailyQueue найдена: {daily_queue is not None}"
             )
@@ -260,17 +305,17 @@ class TokensMixin(QRQueueServiceMixinBase):
 
         # Маппинг специальностей на русские названия
         specialty_mapping = {
-            'cardiology': 'Кардиолог',
-            'cardio': 'Кардиолог',
-            'dermatology': 'Дерматолог-косметолог',
-            'derma': 'Дерматолог-косметолог',
-            'stomatology': 'Стоматолог',
-            'dentist': 'Стоматолог',
-            'dentistry': 'Стоматолог',
-            'laboratory': 'Лаборатория',
-            'lab': 'Лаборатория',
-            'general': 'Общая практика',
-            'clinic': 'Клиника',
+            "cardiology": "Кардиолог",
+            "cardio": "Кардиолог",
+            "dermatology": "Дерматолог-косметолог",
+            "derma": "Дерматолог-косметолог",
+            "stomatology": "Стоматолог",
+            "dentist": "Стоматолог",
+            "dentistry": "Стоматолог",
+            "laboratory": "Лаборатория",
+            "lab": "Лаборатория",
+            "general": "Общая практика",
+            "clinic": "Клиника",
         }
 
         try:
@@ -282,12 +327,12 @@ class TokensMixin(QRQueueServiceMixinBase):
             elif specialist:
                 # Получаем имя врача из связанного User
                 try:
-                    if hasattr(specialist, 'user') and specialist.user:
+                    if hasattr(specialist, "user") and specialist.user:
                         specialist_name = (
                             specialist.user.full_name
                             or f"Врач ID {qr_token.specialist_id}"
                         )
-                    elif hasattr(specialist, 'user_id') and specialist.user_id:
+                    elif hasattr(specialist, "user_id") and specialist.user_id:
                         # Пытаемся загрузить user явно
                         user = (
                             self.db.query(User)
@@ -317,7 +362,7 @@ class TokensMixin(QRQueueServiceMixinBase):
 
                 # Используем специальность врача из базы, если есть
                 try:
-                    if hasattr(specialist, 'specialty') and specialist.specialty:
+                    if hasattr(specialist, "specialty") and specialist.specialty:
                         specialty_label = specialty_mapping.get(
                             specialist.specialty, specialist.specialty
                         )
@@ -347,7 +392,7 @@ class TokensMixin(QRQueueServiceMixinBase):
                         self.db.query(DailyQueue)
                         .filter(
                             DailyQueue.specialist_id == specialist.id,
-                            DailyQueue.day == target_date
+                            DailyQueue.day == target_date,
                         )
                         .first()
                     )
@@ -371,10 +416,13 @@ class TokensMixin(QRQueueServiceMixinBase):
                     else:
                         queue_length = 0
 
-                    logger.debug(f"[QRQueueService] online_queue_length: {queue_length}")
+                    logger.debug(
+                        f"[QRQueueService] online_queue_length: {queue_length}"
+                    )
                 except Exception as e:
                     logger.debug(f"[QRQueueService] Ошибка подсчета очереди: {e}")
                     import traceback
+
                     traceback.print_exc()
                     queue_length = 0
         except Exception as e:
@@ -506,7 +554,6 @@ class TokensMixin(QRQueueServiceMixinBase):
             traceback.print_exc()
             return None
 
-
     def get_active_qr_tokens(self, user_id: int) -> list[dict[str, Any]]:
         """
         Получает активные QR токены пользователя
@@ -553,9 +600,7 @@ class TokensMixin(QRQueueServiceMixinBase):
                     QueueJoinSession.qr_token == token.token,
                     # Round-6 (P1-1): joined rows now carry the versioned
                     # ``joined_v2`` marker; legacy ``joined`` rows count too.
-                    QueueJoinSession.status.in_(
-                        ("joined", "joined_v2")
-                    ),
+                    QueueJoinSession.status.in_(("joined", "joined_v2")),
                 )
                 .count()
             )
@@ -575,7 +620,6 @@ class TokensMixin(QRQueueServiceMixinBase):
             )
 
         return result
-
 
     def deactivate_qr_token(self, token: str, user_id: int) -> bool:
         """

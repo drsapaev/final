@@ -13,8 +13,10 @@ from app.core.specialties import (
     canonical_specialty,
     expand_queue_tags,
 )
+from app.crud.clinic import clinic_today
 from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
 from app.schemas.queue_profile_conflicts import QueueProfileBindingChangedResponse
+from app.services.queue_service import queue_service
 
 
 def _canonical_profile_tags(tags: list[str] | None, profile_key: str) -> list[str]:
@@ -91,6 +93,11 @@ def get_queue_profiles(
             query = query.filter(QueueProfile.is_active == True)
 
         profiles = query.order_by(QueueProfile.display_order).all()
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+        )
+
+        availability_by_profile = load_queue_profile_availability(db, profiles)
 
         return {
             "success": True,
@@ -105,6 +112,10 @@ def get_queue_profiles(
                     "color": p.color,
                     "order": p.display_order,  # API returns as 'order' for frontend compatibility
                     "is_active": p.is_active,
+                    # ``is_active`` is persisted manual intent. The nested
+                    # fact explains whether new QR/admission is currently
+                    # available after resolving the optional Department.
+                    "effective_availability": availability_by_profile[p].as_dict(),
                     "show_on_qr_page": getattr(
                         p, "show_on_qr_page", True
                     ),  # Handle missing column
@@ -132,21 +143,34 @@ def get_queue_profiles_public(
     ⭐ PUBLIC ENDPOINT: Получить список профилей для QR-страницы регистрации.
 
     Не требует авторизации - используется пациентами при самостоятельной регистрации.
-    Возвращает только профили с is_active=True И show_on_qr_page=True.
+    Возвращает только профили с ручным is_active=True, show_on_qr_page=True
+    и доступным однозначно разрешённым Department parent (если он назначен).
 
     Используется на странице /queue/join для выбора специальности.
     """
     try:
         from app.models.queue_profile import QueueProfile
 
-        # Получаем только активные профили, которые видны на QR странице
+        # Load every published profile once, including manually archived
+        # siblings. The shared-target guard must see those unavailable rows;
+        # the service filters them from the public result afterward.
         profiles = (
             db.query(QueueProfile)
-            .filter(
-                QueueProfile.is_active == True, QueueProfile.show_on_qr_page == True
-            )
+            .filter(QueueProfile.show_on_qr_page.is_(True))
             .order_by(QueueProfile.display_order)
             .all()
+        )
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+        )
+
+        availability_by_profile = load_queue_profile_availability(db, profiles)
+        catalog_day = clinic_today(db)
+        profiles = queue_service.public_qr_catalog_bookable_profiles(
+            db,
+            profiles,
+            day=catalog_day,
+            availability_by_profile=availability_by_profile,
         )
 
         return {

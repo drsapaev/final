@@ -31,6 +31,19 @@ from app.services.queue_svc import QueueBusinessService
 
 # ===================== helpers =====================
 
+
+def _ensure_active_department(db_session, key: str) -> None:
+    """Seed the explicit QueueProfile parent required by T11 eligibility."""
+    from app.models.department import Department
+
+    department = db_session.query(Department).filter(Department.key == key).first()
+    if department is None:
+        db_session.add(Department(key=key, name_ru=f"SYNTHETIC-{key}", active=True))
+    else:
+        department.active = True
+    db_session.flush()
+
+
 # One argon2 hash for every helper user (hashing per doctor would add
 # ~0.1s x N to the suite).
 _D2_HASHED_PASSWORD = get_password_hash("d2load123")
@@ -211,6 +224,7 @@ def test_clinic_wide_join_routes_to_least_loaded(db_session, monkeypatch) -> Non
     """Two stomatology-profile doctors: the doctor already carrying today's
     ACTIVE queue does not take the new QR patient."""
     fixed_now, day = _freeze_online_window(monkeypatch)
+    _ensure_active_department(db_session, "stomatology")
     loaded = _make_doctor(db_session, "dentistry")
     fresh = _make_doctor(db_session, "dentistry")
 
@@ -426,6 +440,7 @@ def test_clinic_wide_join_routes_around_limit_reached_doctor(
     on the bookable doctor even though the least-loaded-by-id candidate's
     queue already hit the cap."""
     fixed_now, today = _freeze_online_window(monkeypatch)
+    _ensure_active_department(db_session, "stomatology")
     full = _make_doctor(db_session, "dentistry")
     fresh = _make_doctor(db_session, "dentistry")
 
@@ -748,6 +763,7 @@ def test_clinic_wide_join_skips_owner_ineligible_ghosts(
     doctors (load 0 + lowest id would always win). The join applies the
     same owner-eligibility contract as the appointment writers."""
     fixed_now, today = _freeze_online_window(monkeypatch)
+    _ensure_active_department(db_session, "stomatology")
 
     # healthy doctor with a HIGHER id (created after the ghost)
     ghost_owner = User(
@@ -872,6 +888,7 @@ def test_clinic_wide_join_retry_returns_original_entry(db_session, monkeypatch) 
     patient under another doctor (per-queue check_uniqueness saw a fresh
     queue)."""
     fixed_now, today = _freeze_online_window(monkeypatch)
+    _ensure_active_department(db_session, "stomatology")
     first = _make_doctor(db_session, "dentistry")
     second = _make_doctor(db_session, "dentistry")
 

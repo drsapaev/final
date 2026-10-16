@@ -122,6 +122,7 @@ services:
         VITE_WS_HOST: ${STAGING_PUBLIC_WS_HOST}
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
         VITE_SENTRY_ENV: staging
+        VERCEL_GIT_COMMIT_SHA: ${VERCEL_GIT_COMMIT_SHA:-}
     ports:
       - "127.0.0.1:${STAGING_FRONTEND_PORT:-18080}:80"
     depends_on:

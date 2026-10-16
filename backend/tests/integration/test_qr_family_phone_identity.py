@@ -523,6 +523,7 @@ def _seed_clinic_wide_world(session, suffix: str) -> dict:
     """Clinic-wide token + a QR-visible profile routed to the doctor."""
     from app.core.security import get_password_hash
     from app.models.clinic import Doctor
+    from app.models.department import Department
     from app.models.online_queue import DailyQueue, QueueToken
     from app.models.queue_profile import QueueProfile
     from app.models.user import User
@@ -546,6 +547,21 @@ def _seed_clinic_wide_world(session, suffix: str) -> dict:
     session.add(doctor)
     session.commit()
     session.refresh(doctor)
+
+    department = (
+        session.query(Department).filter(Department.key == "cardiology").first()
+    )
+    if department is None:
+        session.add(
+            Department(
+                key="cardiology",
+                name_ru="SYNTHETIC-Кардиология",
+                active=True,
+            )
+        )
+    else:
+        department.active = True
+    session.flush()
 
     profile = QueueProfile(
         key=f"rq25a1-{suffix}",
@@ -729,6 +745,7 @@ def _seed_multi_v1_world(
     """Seed two directly selectable, synthetic v1 queues and a clinic QR token."""
     from app.core.security import get_password_hash
     from app.models.clinic import Doctor
+    from app.models.department import Department
     from app.models.online_queue import DailyQueue, QueueToken
     from app.models.queue_profile import QueueProfile
     from app.models.user import User
@@ -738,6 +755,13 @@ def _seed_multi_v1_world(
     owners: dict[str, dict] = {}
     for label, cap in (("blocked", 0), ("accepted", 3)):
         specialty = f"rq0832{label}_{suffix}"
+        session.add(
+            Department(
+                key=specialty,
+                name_ru=f"SYNTHETIC-T08.3.2 {label}",
+                active=True,
+            )
+        )
         username = f"t0832_{suffix}_{label}"
         user = User(
             username=username,

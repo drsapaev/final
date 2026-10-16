@@ -99,9 +99,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 pytestmark = pytest.mark.integration
 
 PROFILES_PATH = "/api/v1/queues/profiles"
-PROVISION_PATH = (
-    "/api/v1/queue/admin/directions/{profile_key}/public-address/provision"
-)
+PROVISION_PATH = "/api/v1/queue/admin/directions/{profile_key}/public-address/provision"
 START_PATH = "/api/v1/queue/public/{public_code}/start-session"
 METHODS_PATH = "/api/v1/queue/directions/{profile_key}/entry-methods"
 REFUSAL_DETAIL = "Направление недоступно"
@@ -123,6 +121,27 @@ CSV_SOURCE_PROFILE_KEYS = {
     "show_on_qr_page",
     "settings_key",
 }
+ADMIN_PROFILE_READ_METADATA_KEYS = {"effective_availability"}
+
+
+def _assert_admin_profile_csv_projection(profile: dict, *, key: str) -> dict:
+    """Keep T11's admin-only metadata separate from the CSV field projection."""
+    assert set(profile) == CSV_SOURCE_PROFILE_KEYS | ADMIN_PROFILE_READ_METADATA_KEYS, (
+        f"{key}: admin profile DTO should contain CSV fields plus the typed "
+        "effective-availability metadata"
+    )
+    availability = profile["effective_availability"]
+    assert set(availability) == {
+        "state",
+        "is_available",
+        "reason_codes",
+        "parent_department_key",
+        "parent_active",
+    }
+    assert availability["state"] in {"available", "unavailable", "conflict"}
+    assert isinstance(availability["is_available"], bool)
+    assert isinstance(availability["reason_codes"], list)
+    return {field: profile[field] for field in CSV_SOURCE_PROFILE_KEYS}
 
 
 # ------------------------------------------------------------------
@@ -202,9 +221,7 @@ def _candidate_admin_urls() -> list[str]:
         def _host_elem_local(h: str) -> bool:
             # An empty element is libpq's "default unix-socket directory".
             return (
-                h == ""
-                or h.startswith("/")
-                or h in {"localhost", "127.0.0.1", "::1"}
+                h == "" or h.startswith("/") or h in {"localhost", "127.0.0.1", "::1"}
             )
 
         # Normalize query params once: libpq matches conninfo parameter
@@ -397,9 +414,7 @@ def pg_engine():
             ).scalar()
             dialect = conn.execute(text("select version()")).scalar()
         assert version, "alembic_version must be present after upgrade"
-        assert "PostgreSQL" in (dialect or ""), (
-            "RQ-26.b proof requires real PostgreSQL"
-        )
+        assert "PostgreSQL" in (dialect or ""), "RQ-26.b proof requires real PostgreSQL"
 
         yield engine
     finally:
@@ -539,6 +554,7 @@ def csv_world(pg_session):
     """SYNTHETIC CSV-contract world: one active QR-visible profile with a
     doctor-eligible owner (for the address round-trip leg), one archived,
     one hidden, one bare. Idempotent across the module-scoped scratch DB."""
+    from app.models.department import Department
     from app.models.queue_profile import QueueProfile
 
     keys = [
@@ -552,6 +568,19 @@ def csv_world(pg_session):
         for profile in stale:
             pg_session.delete(profile)
         pg_session.commit()
+
+    parent = pg_session.query(Department).filter(Department.key == "rq26b-dep").first()
+    if parent is None:
+        pg_session.add(
+            Department(
+                key="rq26b-dep",
+                name_ru="SYNTHETIC RQ-26.b department",
+                active=True,
+            )
+        )
+    else:
+        parent.active = True
+    pg_session.flush()
 
     direction = _make_profile(
         pg_session,
@@ -598,7 +627,9 @@ def test_admin_list_active_only_false_includes_archived(
     them, while the default active view hides them."""
     headers = _auth_headers(pg_admin_user)
 
-    full = pg_client.get(PROFILES_PATH, params={"active_only": "false"}, headers=headers)
+    full = pg_client.get(
+        PROFILES_PATH, params={"active_only": "false"}, headers=headers
+    )
     assert full.status_code == 200, full.text
     keys_full = {p["key"] for p in full.json()["profiles"]}
     assert "rq26b-archived" in keys_full, (
@@ -614,15 +645,15 @@ def test_admin_list_active_only_false_includes_archived(
     assert "rq26b-dir" in keys_active
 
 
-def test_admin_list_profile_dict_matches_csv_source_contract(
+def test_admin_list_profile_dict_exposes_csv_fields_and_admin_metadata(
     pg_client, pg_admin_user, csv_world
 ):
-    """Every admin-list profile dict carries exactly the CSV source fields
-    (plus the derived settings_key) — and never leaks registry internals:
-    public_code stays in the registry table (E-055), never on profile
-    surfaces the CSV reads."""
+    """Admin-only effective availability stays additive to the CSV fields,
+    and registry internals never leak to either profile surface."""
     headers = _auth_headers(pg_admin_user)
-    response = pg_client.get(PROFILES_PATH, params={"active_only": "false"}, headers=headers)
+    response = pg_client.get(
+        PROFILES_PATH, params={"active_only": "false"}, headers=headers
+    )
     assert response.status_code == 200
     profiles = response.json()["profiles"]
     assert profiles, "synthetic world must be visible"
@@ -631,11 +662,9 @@ def test_admin_list_profile_dict_matches_csv_source_contract(
     for key in ("rq26b-dir", "rq26b-archived", "rq26b-hidden", "rq26b-bare"):
         assert key in by_key, f"synthetic profile {key} missing from admin list"
         profile = by_key[key]
-        assert set(profile.keys()) == CSV_SOURCE_PROFILE_KEYS, (
-            f"{key}: admin-list dict drifted from the CSV source contract — "
-            f"extra={set(profile.keys()) - CSV_SOURCE_PROFILE_KEYS}, "
-            f"missing={CSV_SOURCE_PROFILE_KEYS - set(profile.keys())}"
-        )
+        csv_projection = _assert_admin_profile_csv_projection(profile, key=key)
+        assert set(csv_projection) == CSV_SOURCE_PROFILE_KEYS
+        assert "public_code" not in profile
 
     # The archived flag round-trips through the source contract (D-02).
     assert by_key["rq26b-archived"]["is_active"] is False
@@ -668,8 +697,14 @@ def test_csv_archive_payload_preserves_address_and_reactivation_restores_it(
     code = provisioned.json()["public_code"]
 
     # CSV import payload for an archived row (empty optional cells → omit).
-    archive_payload = {"key": key, "title": csv_world["direction"].title, "is_active": False}
-    archived = pg_client.put(f"{PROFILES_PATH}/{key}", json=archive_payload, headers=headers)
+    archive_payload = {
+        "key": key,
+        "title": csv_world["direction"].title,
+        "is_active": False,
+    }
+    archived = pg_client.put(
+        f"{PROFILES_PATH}/{key}", json=archive_payload, headers=headers
+    )
     assert archived.status_code == 200, archived.text
     assert archived.json()["profile"]["is_active"] is False
 
@@ -692,7 +727,11 @@ def test_csv_archive_payload_preserves_address_and_reactivation_restores_it(
     assert refused_methods.json()["detail"] == REFUSAL_DETAIL
 
     # CSV import payload for reactivation (is_active=true).
-    reactivate_payload = {"key": key, "title": csv_world["direction"].title, "is_active": True}
+    reactivate_payload = {
+        "key": key,
+        "title": csv_world["direction"].title,
+        "is_active": True,
+    }
     reactivated = pg_client.put(
         f"{PROFILES_PATH}/{key}", json=reactivate_payload, headers=headers
     )
@@ -702,16 +741,17 @@ def test_csv_archive_payload_preserves_address_and_reactivation_restores_it(
     methods = pg_client.get(METHODS_PATH.replace("{profile_key}", key))
     assert methods.status_code == 200, methods.text
     flags = {
-        item["method"]: item["supported"]
-        for item in methods.json()["entry_methods"]
+        item["method"]: item["supported"] for item in methods.json()["entry_methods"]
     }
-    assert flags["permanent_address"] is True, (
-        "reactivation must restore the permanent-address entry method"
-    )
+    assert (
+        flags["permanent_address"] is True
+    ), "reactivation must restore the permanent-address entry method"
 
     rows_after = (
         pg_session.query(QueueDirectionPublicAddress)
-        .filter(QueueDirectionPublicAddress.queue_profile_id == csv_world["direction"].id)
+        .filter(
+            QueueDirectionPublicAddress.queue_profile_id == csv_world["direction"].id
+        )
         .all()
     )
     assert len(rows_after) == 1, "no second address row may appear"
@@ -729,7 +769,9 @@ def test_csv_archive_payload_preserves_address_and_reactivation_restores_it(
 # ------------------------------------------------------------------
 
 
-def test_put_drops_hand_edited_public_code(pg_client, pg_admin_user, csv_world, pg_session):
+def test_put_drops_hand_edited_public_code(
+    pg_client, pg_admin_user, csv_world, pg_session
+):
     """E-055 §3/§6: the address is server-SSOT (generated ONCE, never
     admin-typed). A hand-edited CSV file may carry a public_code column —
     the frontend parser warns unknown_column and the payload builder never
@@ -757,13 +799,15 @@ def test_put_drops_hand_edited_public_code(pg_client, pg_admin_user, csv_world, 
 
     row = (
         pg_session.query(QueueDirectionPublicAddress)
-        .filter(QueueDirectionPublicAddress.queue_profile_id == csv_world["direction"].id)
+        .filter(
+            QueueDirectionPublicAddress.queue_profile_id == csv_world["direction"].id
+        )
         .first()
     )
     assert row is not None
-    assert row.public_code == real_code, (
-        "the registry code must be immutable through the profile PUT (E-055)"
-    )
+    assert (
+        row.public_code == real_code
+    ), "the registry code must be immutable through the profile PUT (E-055)"
     body = response.json()["profile"]
     assert "public_code" not in body, "profile surfaces must not echo registry fields"
 
@@ -781,7 +825,9 @@ def test_partial_put_keeps_omitted_fields(pg_client, pg_admin_user, csv_world):
     headers = _auth_headers(pg_admin_user)
     key = "rq26b-dir"
 
-    before = pg_client.get(PROFILES_PATH, params={"active_only": "false"}, headers=headers)
+    before = pg_client.get(
+        PROFILES_PATH, params={"active_only": "false"}, headers=headers
+    )
     source = {p["key"]: p for p in before.json()["profiles"]}[key]
 
     response = pg_client.put(
@@ -793,7 +839,9 @@ def test_partial_put_keeps_omitted_fields(pg_client, pg_admin_user, csv_world):
     updated = response.json()["profile"]
     assert updated["is_active"] is False
 
-    after = pg_client.get(PROFILES_PATH, params={"active_only": "false"}, headers=headers)
+    after = pg_client.get(
+        PROFILES_PATH, params={"active_only": "false"}, headers=headers
+    )
     target = {p["key"]: p for p in after.json()["profiles"]}[key]
     assert target["queue_tags"] == source["queue_tags"]
     assert target["department_key"] == source["department_key"]
@@ -835,10 +883,12 @@ def test_csv_create_payload_round_trips_all_contract_fields(
     body = created.json()["profile"]
     assert body["order"] == 7, "display_order must surface under the order alias"
 
-    listing = pg_client.get(PROFILES_PATH, params={"active_only": "false"}, headers=headers)
+    listing = pg_client.get(
+        PROFILES_PATH, params={"active_only": "false"}, headers=headers
+    )
     assert listing.status_code == 200
     stored = {p["key"]: p for p in listing.json()["profiles"]}["rq26b_created"]
-    assert set(stored.keys()) == CSV_SOURCE_PROFILE_KEYS
+    _assert_admin_profile_csv_projection(stored, key="rq26b_created")
     assert stored["title"] == payload["title"]
     assert stored["title_ru"] == payload["title_ru"]
     assert stored["queue_tags"] == payload["queue_tags"]
@@ -852,7 +902,9 @@ def test_csv_create_payload_round_trips_all_contract_fields(
     # Re-importing the round-tripped values is idempotent (the canonical
     # tag normalization must not drift non-dental tags).
     again = dict(payload)
-    updated = pg_client.put(f"{PROFILES_PATH}/rq26b_created", json=again, headers=headers)
+    updated = pg_client.put(
+        f"{PROFILES_PATH}/rq26b_created", json=again, headers=headers
+    )
     assert updated.status_code == 200, updated.text
     assert updated.json()["profile"]["queue_tags"] == payload["queue_tags"]
 
@@ -878,7 +930,9 @@ def test_csv_create_refuses_keys_outside_backend_pattern(
     )
     assert refused.status_code == 422, refused.text
 
-    listing = pg_client.get(PROFILES_PATH, params={"active_only": "false"}, headers=headers)
+    listing = pg_client.get(
+        PROFILES_PATH, params={"active_only": "false"}, headers=headers
+    )
     assert listing.status_code == 200
     assert all(
         p["key"] != "rq26b-invalid-key" for p in listing.json()["profiles"]
@@ -938,30 +992,30 @@ def test_admin_department_create_key_enters_csv_round_trip(
         headers=headers,
     )
     assert created.status_code == 201, created.text
-    assert created.json()["integration"]["queue_profile_created"] is True, (
-        "the auto-provisioned registrar tab (PR-16) is the export source"
-    )
+    assert (
+        created.json()["integration"]["queue_profile_created"] is True
+    ), "the auto-provisioned registrar tab (PR-16) is the export source"
 
     export = pg_client.get(
         PROFILES_PATH, params={"active_only": "false"}, headers=headers
     )
     assert export.status_code == 200
     source = {p["key"]: p for p in export.json()["profiles"]}["rq26b_rt"]
-    assert set(source.keys()) == CSV_SOURCE_PROFILE_KEYS
+    csv_source = _assert_admin_profile_csv_projection(source, key="rq26b_rt")
 
     # CSV payload shape: typed values, `order` → display_order, omitted
     # empty cells — exactly what queueProfilesCsv.ts builds for import.
     payload = {
-        "key": source["key"],
-        "title": source["title"],
-        "title_ru": source["title_ru"],
-        "queue_tags": source["queue_tags"],
-        "department_key": source["department_key"],
-        "icon": source["icon"],
-        "color": source["color"],
-        "display_order": source["order"],
-        "is_active": source["is_active"],
-        "show_on_qr_page": source["show_on_qr_page"],
+        "key": csv_source["key"],
+        "title": csv_source["title"],
+        "title_ru": csv_source["title_ru"],
+        "queue_tags": csv_source["queue_tags"],
+        "department_key": csv_source["department_key"],
+        "icon": csv_source["icon"],
+        "color": csv_source["color"],
+        "display_order": csv_source["order"],
+        "is_active": csv_source["is_active"],
+        "show_on_qr_page": csv_source["show_on_qr_page"],
     }
 
     # Fresh-install simulation: remove the auto-created row, then import.
@@ -1143,8 +1197,7 @@ def test_env_dsn_with_all_local_fallback_hosts_is_accepted(monkeypatch):
         "postgresql://u:p@/postgres?host=/var/run/postgresql,/var/run/postgresql",
     )
     expected = (
-        "postgresql://u:p@/postgres?host=/var/run/postgresql,"
-        "/var/run/postgresql"
+        "postgresql://u:p@/postgres?host=/var/run/postgresql," "/var/run/postgresql"
     )
     assert _candidate_admin_urls() == [expected]
 
