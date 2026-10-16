@@ -28,6 +28,16 @@ const { apiMock } = vi.hoisted(() => {
       icon: 'Package',
       color: '#718096',
     },
+    {
+      key: 'synthetic-unpublished',
+      title: 'Unpublished Queue',
+      title_ru: 'Синтетическое неопубликованное направление',
+      queue_tags: ['synthetic_unpublished'],
+      is_active: true,
+      show_on_qr_page: false,
+      icon: 'Package',
+      color: '#718096',
+    },
   ];
 
   const apiMock = {
@@ -87,7 +97,7 @@ describe('QueueProfilesManager interactions', () => {
     await renderManager();
 
     await user.click(screen.getByRole('button', { name: 'Все' }));
-    await user.click(screen.getByRole('option', { name: 'Скрытые' }));
+    await user.click(screen.getByRole('option', { name: 'Профили в архиве' }));
 
     expect(screen.getByText('Синтетическая скрытая очередь')).toBeInTheDocument();
     expect(screen.queryByText('Синтетическая активная очередь')).not.toBeInTheDocument();
@@ -112,10 +122,11 @@ describe('QueueProfilesManager interactions', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Новая вкладка' });
     const qrCheckbox = screen.getByRole('checkbox', {
-      name: 'Показывать вкладку на QR-странице',
+      name: 'Показывать профиль на QR-странице',
     });
     expect(qrCheckbox).not.toBeChecked();
     expect(qrCheckbox).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Новые профили создаются без публикации на QR. После создания откройте «Редактировать», включите показ на QR и сохраните профиль.')).toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Уникальный ключ вкладки очереди'), 'synthetic_new');
     await user.type(screen.getByLabelText('Название вкладки очереди на английском'), 'Synthetic new direction');
@@ -132,6 +143,55 @@ describe('QueueProfilesManager interactions', () => {
       );
     });
   });
+
+  it('shows archive and QR publication as separate states and archives without changing QR publication', async () => {
+    const user = userEvent.setup();
+    await renderManager();
+
+    const profileName = screen.getByText('Синтетическое неопубликованное направление');
+    const row = profileName.closest('tr')!;
+
+    expect(within(row).getByText('Активен в регистратуре')).toBeInTheDocument();
+    expect(within(row).getByText('Не опубликован на QR')).toBeInTheDocument();
+
+    await user.click(within(row).getByRole('button', {
+      name: 'Архивировать профиль Синтетическое неопубликованное направление',
+    }));
+
+    expect(apiMock.put).toHaveBeenCalledExactlyOnceWith(
+      '/queues/profiles/synthetic-unpublished',
+      { is_active: false },
+    );
+  });
+
+  it('opens edit from an unpublished profile and publishes only after the QR option is saved', async () => {
+    const user = userEvent.setup();
+    await renderManager();
+
+    const row = screen.getByText('Синтетическое неопубликованное направление').closest('tr')!;
+    const editButton = within(row).getByRole('button', {
+      name: 'Редактировать профиль Синтетическое неопубликованное направление для настройки QR-публикации',
+    });
+    expect(editButton).toHaveAttribute('title', 'Редактировать для настройки QR');
+
+    await user.click(editButton);
+    const qrCheckbox = screen.getByRole('checkbox', {
+      name: 'Показывать профиль на QR-странице',
+    });
+    expect(qrCheckbox).not.toBeChecked();
+    expect(qrCheckbox).toBeEnabled();
+
+    await user.click(qrCheckbox);
+    await user.click(screen.getByRole('button', { name: 'Сохранить вкладку очереди' }));
+
+    await waitFor(() => {
+      expect(apiMock.put).toHaveBeenCalledWith(
+        '/queues/profiles/synthetic-unpublished',
+        expect.objectContaining({ show_on_qr_page: true }),
+      );
+    });
+  });
+
   it('shows the typed binding conflict message and blocked fields', async () => {
     const user = userEvent.setup();
     apiMock.put.mockRejectedValueOnce({
@@ -202,7 +262,7 @@ describe('QueueProfilesManager interactions', () => {
     expect(apiMock.delete).toHaveBeenCalledExactlyOnceWith('/queues/profiles/specialists');
     expect(apiMock.put).not.toHaveBeenCalled();
     expect(screen.getByText('Синтетический профиль для проверки удаления')).toBeInTheDocument();
-    expect(within(row).getByTitle('Скрыть')).toBeEnabled();
+    expect(within(row).getByTitle('Архивировать профиль')).toBeEnabled();
     expect(apiMock.get.mock.calls.filter(([url]) => url.startsWith('/queues/profiles'))).toHaveLength(1);
   });
 

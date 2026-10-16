@@ -19,8 +19,8 @@ import {
     Edit2,
     Trash2,
     X,
-    Eye,
-    EyeOff,
+    Archive,
+    ArchiveRestore,
     Heart,
     Activity,
     Sparkles,
@@ -117,6 +117,9 @@ const apiErrorMessage = (error: unknown, fallback: string): string => {
     }
     return parts.filter(Boolean).join(' ') || fallback;
 };
+
+const getQueueProfileDisplayName = (profile: QueueProfileDto): string =>
+    profile.name?.trim() || profile.title_ru?.trim() || profile.title?.trim() || profile.key;
 
 const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' }) => {
     const { t: rawT } = useTranslation();
@@ -575,7 +578,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                             onClick={() => handleBulkActivate(true)}
                             disabled={saving}
                         >
-                            <Eye size={16} />
+                            <ArchiveRestore size={16} />
                             {t('admin2.qp_bulk_activate_btn')}
                         </button>
                         <button
@@ -583,8 +586,8 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                             onClick={() => handleBulkActivate(false)}
                             disabled={saving}
                         >
-                            <EyeOff size={16} />
-                            {t('admin2.qp_hide_btn')}
+                            <Archive size={16} />
+                            {t('admin2.qp_bulk_archive_btn')}
                         </button>
                         <button
                             className="admin-qp-danger-button"
@@ -642,7 +645,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                             profile.key,
                                             !selectedProfiles.includes(profile.key)
                                         )}
-                                        aria-label={selectedProfiles.includes(profile.key) ? t('admin2.qp_deselect_row_aria', { name: profile.name }) : t('admin2.qp_select_row_aria', { name: profile.name })}
+                                        aria-label={selectedProfiles.includes(profile.key) ? t('admin2.qp_deselect_row_aria', { name: getQueueProfileDisplayName(profile) }) : t('admin2.qp_select_row_aria', { name: getQueueProfileDisplayName(profile) })}
                                     >
                                         {selectedProfiles.includes(profile.key)
                                             ? <CheckSquare size={18} className="admin-blue" />
@@ -689,18 +692,29 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                 <td className="admin-qp-td">
                                     <div
                                         role="img"
-                                        aria-label={t('admin2.qp_color_aria', { name: profile.name, color: profile.color || t('admin2.qp_color_not_set') })}
+                                        aria-label={t('admin2.qp_color_aria', { name: getQueueProfileDisplayName(profile), color: profile.color || t('admin2.qp_color_not_set') })}
                                         className="admin-w-16-h-16-radius-50pct-bd-2px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': profile.color || '#718096' } as CSSProperties}
                                         title={profile.color}
                                     />
                                 </td>
                                 <td className="admin-qp-td">
                                     <span
-                                        className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-dyn-col-dyn" style={{ '--admin-bgc0': profile.is_active !== false
+                                        className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-dyn-col-dyn"
+                                        style={{ '--admin-bgc0': profile.is_active !== false
                                                 ? 'rgba(16, 185, 129, 0.1)'
                                                 : 'var(--mac-error-bg)', '--admin-col1': profile.is_active !== false ? 'var(--mac-success)' : 'var(--mac-error)' } as CSSProperties}
                                     >
                                         {profile.is_active !== false ? t('admin2.qp_status_active') : t('admin2.qp_status_hidden')}
+                                    </span>{' '}
+                                    <span
+                                        className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-dyn-col-dyn"
+                                        style={{ '--admin-bgc0': profile.show_on_qr_page === true
+                                            ? 'var(--mac-info-bg)'
+                                            : 'var(--mac-bg-tertiary)', '--admin-col1': profile.show_on_qr_page === true ? 'var(--mac-info)' : 'var(--mac-text-secondary)' } as CSSProperties}
+                                    >
+                                        {profile.show_on_qr_page === true
+                                            ? t('admin2.qp_status_qr_published')
+                                            : t('admin2.qp_status_qr_unpublished')}
                                     </span>
                                 </td>
                                 <td className="admin-qp-td">
@@ -708,17 +722,21 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                         <button
                                             className="admin-qp-icon-button"
                                             onClick={() => handleToggleActive(profile)}
-                                            aria-label={profile.is_active !== false ? t('admin2.qp_hide_row_aria', { name: profile.name }) : t('admin2.qp_show_row_aria', { name: profile.name })}
-                                            title={profile.is_active !== false ? t('admin2.qp_hide_btn') : t('admin2.qp_show_btn')}
+                                            aria-label={profile.is_active !== false ? t('admin2.qp_archive_row_aria', { name: getQueueProfileDisplayName(profile) }) : t('admin2.qp_restore_row_aria', { name: getQueueProfileDisplayName(profile) })}
+                                            title={profile.is_active !== false ? t('admin2.qp_archive_profile_btn') : t('admin2.qp_restore_profile_btn')}
                                             disabled={saving}
                                         >
-                                            {profile.is_active !== false ? <EyeOff size={16} /> : <Eye size={16} />}
+                                            {profile.is_active !== false ? <Archive size={16} /> : <ArchiveRestore size={16} />}
                                         </button>
                                         <button
                                             className="admin-qp-icon-button"
                                             onClick={() => setEditingProfile(profile)}
-                                            aria-label={t('admin2.qp_edit_row_aria', { name: profile.name })}
-                                            title={t('admin2.qp_edit_btn')}
+                                            aria-label={profile.show_on_qr_page === true
+                                                ? t('admin2.qp_edit_row_aria', { name: getQueueProfileDisplayName(profile) })
+                                                : t('admin2.qp_edit_publish_row_aria', { name: getQueueProfileDisplayName(profile) })}
+                                            title={profile.show_on_qr_page === true
+                                                ? t('admin2.qp_edit_btn')
+                                                : t('admin2.qp_edit_publish_btn')}
                                             disabled={saving}
                                         >
                                             <Edit2 size={16} />
@@ -726,7 +744,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                         <button
                                             className="admin-p-6-bd-none-radius-6-bgc-transparent-cur-pointer-secondary-d-inline-flex-ai-center-jc-center-EF4444"
                                             onClick={() => handleDelete(profile.key)}
-                                            aria-label={t('admin2.qp_delete_row_aria', { name: profile.name })}
+                                            aria-label={t('admin2.qp_delete_row_aria', { name: getQueueProfileDisplayName(profile) })}
                                             title={t('admin2.qp_delete_btn')}
                                             disabled={saving}
                                         >
@@ -1040,7 +1058,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             <span className="admin-qp-label">{t('admin2.qp_qr_label')}</span>
                         </label>
                         <div className="admin-fs-12-secondary-mt-4-ml-24">
-                            {t('admin2.qp_qr_hint')}
+                            {t(isEdit ? 'admin2.qp_qr_hint' : 'admin2.qp_qr_create_hint')}
                         </div>
                     </div>
 
