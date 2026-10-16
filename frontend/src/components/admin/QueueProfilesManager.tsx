@@ -709,8 +709,8 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                     <span
                                         className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-dyn-col-dyn"
                                         style={{ '--admin-bgc0': profile.show_on_qr_page === true
-                                            ? 'var(--mac-info-bg)'
-                                            : 'var(--mac-bg-tertiary)', '--admin-col1': profile.show_on_qr_page === true ? 'var(--mac-info)' : 'var(--mac-text-secondary)' } as CSSProperties}
+                                            ? 'var(--mac-info-bg, transparent)'
+                                            : 'var(--mac-bg-tertiary, transparent)', '--admin-col1': profile.show_on_qr_page === true ? 'var(--mac-info, currentColor)' : 'var(--mac-text-secondary, currentColor)' } as CSSProperties}
                                     >
                                         {profile.show_on_qr_page === true
                                             ? t('admin2.qp_status_qr_published')
