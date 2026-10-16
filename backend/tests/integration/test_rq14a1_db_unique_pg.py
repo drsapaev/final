@@ -33,8 +33,8 @@ PROGRESS E-037 before the edits):
   a rolled-back violation leaves numbers untouched; completed/cancelled
   rows are not part of the reorder surface.
 - PG-bind honesty: every PG test re-asserts dialect=postgresql and
-  alembic head=0065 before proving anything; SQLite conftest results
-  are NOT counted as PG evidence.
+  that the database stamp matches the sole current Alembic head before
+  proving anything; SQLite conftest results are NOT counted as PG evidence.
 
 Disposable local PostgreSQL only; production/staging/Supabase are never
 touched. SYNTHETIC data only.
@@ -143,23 +143,21 @@ def _upgrade(db_url: str, revision: str = "head") -> subprocess.CompletedProcess
     )
 
 
+def _current_alembic_heads() -> list[str]:
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    config = Config(str(BACKEND_DIR / "alembic.ini"))
+    return ScriptDirectory.from_config(config).get_heads()
+
+
 def _assert_pg_head(engine) -> None:
     assert engine.dialect.name == "postgresql"
     with engine.connect() as conn:
         version = conn.execute(text("select version_num from alembic_version")).scalar()
-    # QD-2E chain reconciliation + RQ-13.b + RQ-15.d: the populated head
-    # assert advances with the chain (0065 -> 0066 cutover -> 0067
-    # snapshot -> 0068 direction public-address registry, RQ-16.c /
-    # E-055 -> 0069 sentinel pair retirement).
-    # 0070 extends the chain; the 0065 objects are the invariant here.
-    # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved
-    # to 0072 (nurse workplace assignments 0071 + service executions 0072);
-    # main's corrective follow-up moved it to 0073 (routing snapshot);
-    # RQ-18 follow-up round-8 re-parents the payload binding as 0074;
-    # #3506 derma history read model moves the head to 0075; its
-    # read-order index swap moves it to 0076; T06.1 adds 0077; the
-    # site-plan settings canonicalization adds 0078; public-site schema adds 0079.
-    assert version == "0079_kosmed_website_content", version
+    heads = _current_alembic_heads()
+    assert len(heads) == 1, f"expected one Alembic head, got {heads!r}"
+    assert version == heads[0], f"database revision {version!r} != {heads[0]!r}"
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:

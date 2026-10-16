@@ -1040,8 +1040,7 @@ def test_pair_vocabulary_matches_the_0055_seed() -> None:
 @pytest.mark.integration
 @pytest.mark.migration
 def test_alembic_chain_single_head_0069() -> None:
-    """The chain stays single-headed with the retirement as the head
-    (the sentinel-suite graph pattern)."""
+    """The 0069 retirement stays linked correctly in a single-headed chain."""
     module = _module()
     versions = MIGRATION_0069.parent
     graph: dict[str, tuple[str, ...]] = {}
@@ -1076,7 +1075,7 @@ def test_alembic_chain_single_head_0069() -> None:
     assert graph["0075_derma_history_read_model"] == ("0074_join_payload_binding",)
     assert graph["0076_derma_history_read_order"] == ("0075_derma_history_read_model",)
     assert graph["0077_daily_queue_policy"] == ("0076_derma_history_read_order",)
-    assert heads == ["0079_kosmed_website_content"]
+    assert len(heads) == 1, f"multi-head detected: {heads!r}"
 
 
 # ===================== C. PostgreSQL FK introspection =====================
@@ -1566,6 +1565,22 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
             result.returncode == 0
         ), f"alembic upgrade head failed:\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}"
 
+        head_result = subprocess.run(
+            [sys.executable, "-m", "alembic", "-c", "alembic.ini", "heads"],
+            capture_output=True,
+            text=True,
+            cwd=str(BACKEND_ROOT),
+            env=env,
+            timeout=60,
+        )
+        assert head_result.returncode == 0, head_result.stderr[-800:]
+        heads = [
+            line.split()[0]
+            for line in head_result.stdout.splitlines()
+            if "(head)" in line
+        ]
+        assert len(heads) == 1, f"expected one Alembic head, got {heads!r}"
+
         engine = create_engine(sa_url, future=True)
         try:
             with engine.connect() as conn:
@@ -1577,11 +1592,13 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
                 # round-8 0074 payload binding, the #3506 0075 derma
                 # history read model and its 0076 read-order index swap,
                 # 0077 daily queue policy persistence, the 0078
-                # clinic settings key canonicalization, and the 0079
-                # public-site content schema;
+                # clinic settings key canonicalization and subsequent
+                # public-site content/media schemas;
                 # the retirement end-state (no synthetic usernames/doctors)
                 # is a head-agnostic invariant.
-                assert version == "0079_kosmed_website_content"
+                assert (
+                    version == heads[0]
+                ), f"database revision {version!r} != Alembic head {heads[0]!r}"
 
                 usernames = {
                     row[0]
