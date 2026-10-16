@@ -26,6 +26,7 @@ export interface PublicSiteApi {
 }
 
 const REQUEST_TIMEOUT_MS = 8_000;
+const PUBLIC_MEDIA_PATH = /^\/api\/v1\/public-site\/media\/[0-9a-f]{64}$/;
 
 function normalizeApiOrigin(value: string): string {
   const url = new URL(value);
@@ -77,11 +78,25 @@ export function createPublicSiteApi(
   const localized = (path: string, locale: PublicSiteLocale) =>
     `${path}?locale=${encodeURIComponent(locale)}`;
 
+  function resolvePublicMediaUrl(value: string | null | undefined): string | null {
+    if (value == null) return null;
+    if (!PUBLIC_MEDIA_PATH.test(value)) throw new PublicSiteApiError();
+    return new URL(value, `${origin}/`).toString();
+  }
+
+  function withClinicMedia(clinic: PublicSiteClinic): PublicSiteClinic {
+    return { ...clinic, logo_url: resolvePublicMediaUrl(clinic.logo_url) };
+  }
+
+  function withDoctorMedia(doctor: PublicSiteDoctor): PublicSiteDoctor {
+    return { ...doctor, portrait_url: resolvePublicMediaUrl(doctor.portrait_url) };
+  }
+
   return {
     async getClinic() {
       const result = await request<PublicSiteClinic>('clinic');
       if (!result || typeof result !== 'object') throw new PublicSiteApiError();
-      return result;
+      return withClinicMedia(result);
     },
     listServices(locale) {
       return requestList<PublicSiteService>(localized('services', locale));
@@ -93,13 +108,15 @@ export function createPublicSiteApi(
       );
     },
     listDoctors(locale) {
-      return requestList<PublicSiteDoctor>(localized('doctors', locale));
+      return requestList<PublicSiteDoctor>(localized('doctors', locale))
+        .then((doctors) => doctors.map(withDoctorMedia));
     },
     async getDoctor(slug, locale) {
-      return request<PublicSiteDoctor>(
+      const doctor = await request<PublicSiteDoctor>(
         localized(`doctors/${encodeURIComponent(slug)}`, locale),
         true,
       );
+      return doctor ? withDoctorMedia(doctor) : null;
     },
   };
 }

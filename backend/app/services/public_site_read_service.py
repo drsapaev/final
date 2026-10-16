@@ -44,12 +44,18 @@ class PublicSiteReadService:
         def value(key: str) -> str | None:
             return _clean_text(settings.get(key))
 
+        logo = self.repository.get_published_clinic_logo()
         return PublicSiteClinicOut(
             name=value("clinic_name"),
             address=value("clinic_address"),
             phone=value("clinic_phone"),
             email=value("clinic_email"),
+            logo_url=(self._media_url(logo.storage_key) if logo is not None else None),
         )
+
+    @staticmethod
+    def _media_url(storage_key: str) -> str:
+        return f"/api/v1/public-site/media/{storage_key}"
 
     @staticmethod
     def _category_name(category, locale: PublicSiteLocale) -> str | None:
@@ -167,6 +173,7 @@ class PublicSiteReadService:
         doctor: Doctor,
         locale: PublicSiteLocale,
         specialties: dict[str, object],
+        portrait_url: str | None = None,
     ) -> PublicSiteDoctorOut | None:
         if not PublicSiteReadService._doctor_content_is_complete(doctor):
             return None
@@ -186,6 +193,7 @@ class PublicSiteReadService:
             name=name,
             bio=bio,
             specialty=specialty_title,
+            portrait_url=portrait_url,
         )
 
     def list_doctors(self, locale: PublicSiteLocale) -> list[PublicSiteDoctorOut]:
@@ -193,9 +201,18 @@ class PublicSiteReadService:
         specialties = self.repository.list_specialties_by_code(
             {doctor.specialty for doctor in doctors if doctor.specialty}
         )
+        media_keys = self.repository.list_published_doctor_media_keys(
+            {doctor.id for doctor in doctors}
+        )
         result = []
         for doctor in doctors:
-            card = self._doctor_out(doctor, locale, specialties)
+            storage_key = media_keys.get(doctor.id)
+            card = self._doctor_out(
+                doctor,
+                locale,
+                specialties,
+                self._media_url(storage_key) if storage_key else None,
+            )
             if card is not None:
                 result.append(card)
         return result
@@ -209,4 +226,15 @@ class PublicSiteReadService:
         specialties = self.repository.list_specialties_by_code(
             {doctor.specialty} if doctor.specialty else set()
         )
-        return self._doctor_out(doctor, locale, specialties)
+        media_keys = self.repository.list_published_doctor_media_keys({doctor.id})
+        storage_key = media_keys.get(doctor.id)
+        return self._doctor_out(
+            doctor,
+            locale,
+            specialties,
+            self._media_url(storage_key) if storage_key else None,
+        )
+
+    def is_public_doctor_media_owner(self, doctor_id: int) -> bool:
+        doctor = self.repository.get_public_doctor_by_id(doctor_id)
+        return doctor is not None and self._doctor_content_is_complete(doctor)

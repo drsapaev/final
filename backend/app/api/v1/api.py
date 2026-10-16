@@ -17,6 +17,7 @@ from app.api.v1.endpoints import (
     admin_doctors,
     admin_finance,
     admin_providers,
+    admin_public_site_media,
     admin_stats,
     admin_telegram,
     advanced_analytics,
@@ -346,6 +347,11 @@ api_router.include_router(
 )
 api_router.include_router(admin_display.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_doctors.router, prefix="/admin", tags=["admin"])
+api_router.include_router(
+    admin_public_site_media.router,
+    prefix="/admin",
+    tags=["admin-public-site-media"],
+)
 api_router.include_router(admin_providers.router, tags=["admin"])
 api_router.include_router(admin_telegram.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_stats.router, prefix="/admin", tags=["admin"])

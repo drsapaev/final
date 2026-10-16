@@ -21,6 +21,7 @@ class PublicSiteClinicOut(BaseModel):
     address: str | None = None
     phone: str | None = None
     email: str | None = None
+    logo_url: str | None = None
 
 
 class PublicSiteNotFoundDetail(BaseModel):
@@ -61,3 +62,4 @@ class PublicSiteDoctorOut(BaseModel):
     name: str
     bio: str
     specialty: str | None = None
+    portrait_url: str | None = None

@@ -1004,6 +1004,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public-site/media/{storage_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Получить явно опубликованное изображение сайта */
+        get: operations["public_site_get_media"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public-site/clinic": {
         parameters: {
             query?: never;
@@ -11066,6 +11083,58 @@ export type paths = {
          */
         get: operations["get_specialties_api_v1_admin_specialties_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/public-site/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Получить список логотипов и фотографий для сайта */
+        get: operations["admin_list_public_site_media"];
+        put?: never;
+        /** Загрузить логотип или фотографию врача */
+        post: operations["admin_upload_public_site_media"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/public-site/media/{media_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Опубликовать изображение на сайте */
+        put: operations["admin_publish_public_site_media"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/public-site/media/{media_id}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Снять изображение с сайта */
+        put: operations["admin_unpublish_public_site_media"];
         post?: never;
         delete?: never;
         options?: never;
@@ -25026,6 +25095,18 @@ export type components = {
             /** Company Website */
             company_website?: string | null;
         };
+        /** Body_admin_upload_public_site_media */
+        Body_admin_upload_public_site_media: {
+            /** File */
+            file: string;
+            /**
+             * Asset Kind
+             * @enum {string}
+             */
+            asset_kind: "clinic_logo" | "doctor_portrait";
+            /** Doctor Id */
+            doctor_id?: number | null;
+        };
         /** Body_analyze_skin_api_v1_ai_skin_analyze_post */
         Body_analyze_skin_api_v1_ai_skin_analyze_post: {
             /** Image */
@@ -35876,6 +35957,8 @@ export type components = {
             phone?: string | null;
             /** Email */
             email?: string | null;
+            /** Logo Url */
+            logo_url?: string | null;
         };
         /** PublicSiteDoctorOut */
         PublicSiteDoctorOut: {
@@ -35887,6 +35970,44 @@ export type components = {
             bio: string;
             /** Specialty */
             specialty?: string | null;
+            /** Portrait Url */
+            portrait_url?: string | null;
+        };
+        /** PublicSiteMediaAdminOut */
+        PublicSiteMediaAdminOut: {
+            /** Id */
+            id: number;
+            /**
+             * Asset Kind
+             * @enum {string}
+             */
+            asset_kind: "clinic_logo" | "doctor_portrait";
+            /** Doctor Id */
+            doctor_id: number | null;
+            /** Mime Type */
+            mime_type: string;
+            /** Byte Size */
+            byte_size: number;
+            /** Is Published */
+            is_published: boolean;
+            /** Published At */
+            published_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Media Url */
+            media_url: string;
+        };
+        /** PublicSiteMediaErrorDetail */
+        PublicSiteMediaErrorDetail: {
+            /** Code */
+            code: string;
+        };
+        /** PublicSiteMediaErrorOut */
+        PublicSiteMediaErrorOut: {
+            detail: components["schemas"]["PublicSiteMediaErrorDetail"];
         };
         /** PublicSiteNotFoundDetail */
         PublicSiteNotFoundDetail: {
@@ -44554,6 +44675,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServiceCodeMappingsResponse"];
+                };
+            };
+        };
+    };
+    public_site_get_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storage_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Published JPEG, PNG, or WebP image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+            /** @description Published media was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteNotFoundOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Public media storage is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
                 };
             };
         };
@@ -62702,6 +62874,283 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    admin_list_public_site_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaAdminOut"][];
+                };
+            };
+        };
+    };
+    admin_upload_public_site_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_admin_upload_public_site_media"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaAdminOut"];
+                };
+            };
+            /** @description Invalid image or media ownership. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Media or doctor was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Media state conflicts with the requested operation. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Image is too large. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The media operation failed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Media storage is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+        };
+    };
+    admin_publish_public_site_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaAdminOut"];
+                };
+            };
+            /** @description Invalid image or media ownership. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Media or doctor was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Media state conflicts with the requested operation. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Image is too large. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The media operation failed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Media storage is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+        };
+    };
+    admin_unpublish_public_site_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaAdminOut"];
+                };
+            };
+            /** @description Invalid image or media ownership. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Media or doctor was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Media state conflicts with the requested operation. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Image is too large. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The media operation failed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Media storage is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
                 };
             };
         };

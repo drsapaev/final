@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -14,6 +14,11 @@ from app.schemas.public_site import (
     PublicSiteLocale,
     PublicSiteNotFoundOut,
     PublicSiteServiceOut,
+)
+from app.schemas.public_site_media import PublicSiteMediaErrorOut
+from app.services.public_site_media_service import (
+    PublicSiteMediaError,
+    PublicSiteMediaService,
 )
 from app.services.public_site_read_service import PublicSiteReadService
 
@@ -28,6 +33,51 @@ def _public_not_found() -> HTTPException:
     return HTTPException(
         status_code=404,
         detail={"code": "public_content_not_found"},
+    )
+
+
+@router.get(
+    "/media/{storage_key}",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Published JPEG, PNG, or WebP image.",
+            "content": {
+                media_type: {"schema": {"type": "string", "format": "binary"}}
+                for media_type in ("image/jpeg", "image/png", "image/webp")
+            },
+        },
+        404: {
+            "model": PublicSiteNotFoundOut,
+            "description": "Published media was not found.",
+        },
+        503: {
+            "model": PublicSiteMediaErrorOut,
+            "description": "Public media storage is unavailable.",
+        },
+    },
+    operation_id="public_site_get_media",
+    summary="Получить явно опубликованное изображение сайта",
+)
+def get_public_media(storage_key: str, db: Session = Depends(get_db)) -> Response:
+    try:
+        payload = PublicSiteMediaService(db).get_public_asset(storage_key)
+    except PublicSiteMediaError as exc:
+        if exc.status_code == 404:
+            raise _public_not_found() from exc
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "public_media_unavailable"},
+        ) from exc
+    if payload is None:
+        raise _public_not_found()
+    return Response(
+        content=payload.body,
+        media_type=payload.mime_type,
+        headers={
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 
