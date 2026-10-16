@@ -1576,6 +1576,23 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PostgreSQL/staging availability: `127.0.0.1:55432` refused the connection; staging ports `18001` and `18080` were not listening; Docker CLI was unavailable. WSL listed `Ubuntu-24.04`, but no isolated staging service was listening. PostgreSQL integration beyond CI, browser/staging scenarios, visual QA and first-screen timing remain **NOT_RUN**. These facts are not a T07 staging pass or an accepted T07 deferral.
 - Safety/scope: no production or staging request/data/process was touched; `QUEUE_POLICY_V2_CREATION_ENABLED` remains off. No migration, ownership, quota counter, queue numbering or clinical lifecycle change was made.
 - PR: none yet. Merge commit: none.
+
+## T12.1 Tier 1 attempt and PR #3690 — 2026-10-16T17:47:15+05:00
+
+- Commit under test: PR head `5bef00538532ebf05d28da7656061d5e9816f068`; source behavior is commit `9b7a1ec6dc2e09dee41c1be82ea0b7eb01502f25`; base `7443b0e290b9143e877d5898a5589df52592d3b3`.
+- Environment: Windows managed worktree; focused UI tests and self-contained Playwright only. No backend, database, staging, production, or credentials used.
+- Execution mode: continue the T12.1 approved source/generation scope. PR opened as DRAFT because required local acceptance is incomplete.
+- Allowed paths: existing T12.1 source/test paths, OpenAPI/generated TS, five plan journals, temporary PR-body file outside the repository. Denied: production, staging, database writes, merge, snapshot baseline updates, scope expansion.
+- Actual changed paths: none in this validation checkpoint beyond the plan journals; all code and PR-body changes are already recorded in PR #3690.
+- Validation: focused QueueProfilesManager Vitest 17/17 PASS; type-check PASS; `npm run lint:check` PASS with 0 errors / 3,506 warnings; `check-theme` PASS; `audit:icon-controls` PASS (409 files, 0 findings); build PASS from the prior exact source commit; Python compilation and targeted Ruff PASS from the source checkpoint; PR body gate PASS (19 tests).
+- Full Vitest: started, produced no final output after more than five minutes, and was stopped. Result INCOMPLETE; no PASS claim.
+- Self-contained Playwright: `--list` found 90 tests across the six documented specs. Local Windows run reached test 51 after the first 46 cases; four visual cases failed because expected `*-chromium-win32.png` baselines are absent (the repository tracks Linux snapshots). Run stopped without updating baselines; remaining tests NOT_RUN. GitHub Linux CI is pending.
+- PostgreSQL: focused lifecycle and Department atomicity modules remain NOT_RUN; local runner did not collect tests because `DATABASE_URL` was unset. No DB was contacted.
+- Tier 2: backend-dependent specs NOT_RUN; no staging run occurred. PR body records proposed T18 ownership and resume condition; reviewer acknowledgement is unchecked. This is not accepted deferral.
+- PR: [#3690](https://github.com/drsapaev/final/pull/3690), DRAFT, head `5bef00538532ebf05d28da7656061d5e9816f068`; latest read showed required checks pending, `mergeable=true`, merge state BLOCKED. PR body quality gate is pending in GitHub; local body gate passed.
+- Scope check: no tracked source/test/generator change from this check; no production, staging, DB, migration, snapshot baseline, review submission, or merge action.
+- Result: T12.1 remains PR_OPEN but merge HOLD until exact-head CI, required Tier 1 gates, PostgreSQL tests, and the Tier 2 disposition are resolved.
+- Next exact action: inspect #3690 checks on exact head; investigate/fix in-scope failures in the same PR. Do not start T12.2 before this PR is green, resolved, and merged by the user.
 - Next exact action: commit the local checkpoint, rebase this worktree branch onto `origin/main` `3a776133bd8c22529422d3a555a589eedfce5063`, rerun focused checks, then push/open the PR and wait for CI on its exact head.
 
 ## T07 mixed-policy clinic-wide QR follow-up — 2026-10-02T01:12:00+05:00
