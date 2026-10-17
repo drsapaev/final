@@ -38,23 +38,21 @@ describe('public site media API adapter', () => {
     api.put.mockResolvedValue({ data: { ...media, is_published: true } });
   });
 
-  it('lists media and only projects active doctor names for the selector', async () => {
+  it('lists media and projects only compact doctor-option fields', async () => {
     api.get.mockResolvedValueOnce({ data: [media] });
     expect(await listPublicSiteMedia()).toEqual([media]);
     expect(api.get).toHaveBeenNthCalledWith(1, '/admin/public-site/media');
 
     api.get.mockResolvedValueOnce({ data: [
-      { id: 42, active: true, user: { full_name: 'SYNTHETIC Doctor' }, phone: 'not projected' },
-      { id: 44, active: true, user: { full_name: 'SYNTHETIC Doctor' }, phone: 'not projected' },
-      { id: 43, active: false, user: { full_name: '  ' }, email: 'not projected' },
+      { id: 42, active: true, specialty: 'Cardiology', cabinet: '2' },
+      { id: 44, active: true, specialty: 'Dermatology', cabinet: null },
     ] });
     expect(await listPublicSiteDoctors()).toEqual([
-      { id: 42, displayName: 'SYNTHETIC Doctor (#42)', active: true },
-      { id: 44, displayName: 'SYNTHETIC Doctor (#44)', active: true },
-      { id: 43, displayName: '#43', active: false },
+      { id: 42, displayName: 'Cardiology · 2 (#42)', active: true },
+      { id: 44, displayName: 'Dermatology (#44)', active: true },
     ]);
-    expect(api.get).toHaveBeenNthCalledWith(2, '/admin/doctors', {
-      params: { active_only: false, limit: 25, skip: 0 },
+    expect(api.get).toHaveBeenNthCalledWith(2, '/services/admin/doctors', {
+      params: { limit: 25, offset: 0 },
     });
   });
 

@@ -27,18 +27,18 @@ export interface PublicSiteDoctorWebsiteContent {
   id: number;
   active: boolean;
   owner_active: boolean | null;
+  display_name?: string | null;
   show_on_website: boolean;
   missing_fields: string[];
 }
 
 export const PUBLIC_SITE_DOCTOR_PAGE_SIZE = 25;
 
-interface AdminDoctorResponse {
+interface AdminDoctorOptionResponse {
   id: number;
   active: boolean;
-  name?: string | null;
-  full_name?: string | null;
-  user?: { full_name?: string | null } | null;
+  specialty?: string | null;
+  cabinet?: string | null;
 }
 
 export async function listPublicSiteMedia(): Promise<PublicSiteMedia[]> {
@@ -50,22 +50,18 @@ export async function listPublicSiteDoctors(
   skip = 0,
   limit = PUBLIC_SITE_DOCTOR_PAGE_SIZE,
 ): Promise<PublicSiteDoctorOption[]> {
-  const response = await apiClient.get<AdminDoctorResponse[]>('/admin/doctors', {
-    params: { active_only: false, limit, skip },
+  const response = await apiClient.get<AdminDoctorOptionResponse[]>('/services/admin/doctors', {
+    params: { limit, offset: skip },
   });
 
-  const doctors = response.data
-    .map((doctor) => ({
+  return response.data.map((doctor) => {
+    const descriptor = [doctor.specialty, doctor.cabinet].filter(Boolean).join(' · ');
+    return {
       id: doctor.id,
-      displayName: (doctor.user?.full_name || doctor.full_name || doctor.name || '').trim() || `#${doctor.id}`,
+      displayName: descriptor ? `${descriptor} (#${doctor.id})` : `#${doctor.id}`,
       active: doctor.active,
-    }));
-
-  const nameCounts = new Map<string, number>();
-  doctors.forEach((doctor) => nameCounts.set(doctor.displayName, (nameCounts.get(doctor.displayName) ?? 0) + 1));
-  return doctors.map((doctor) => nameCounts.get(doctor.displayName)! > 1
-    ? { ...doctor, displayName: `${doctor.displayName} (#${doctor.id})` }
-    : doctor);
+    };
+  });
 }
 
 export async function getPublicSiteDoctorWebsiteContent(

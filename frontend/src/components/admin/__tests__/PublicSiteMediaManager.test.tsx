@@ -220,7 +220,7 @@ describe('PublicSiteMediaManager', () => {
   });
 
   it('keeps inactive doctors manageable for unpublishing but blocks new portrait publication', async () => {
-    mocks.listDoctors.mockResolvedValue([{ id: 42, displayName: 'SYNTHETIC Former Doctor', active: false }]);
+    mocks.listDoctors.mockResolvedValue([]);
     mocks.listMedia.mockResolvedValue([
       { ...draftMedia, id: 7, is_published: true },
       { ...draftMedia, id: 8, is_published: false },
@@ -230,6 +230,7 @@ describe('PublicSiteMediaManager', () => {
     await screen.findByText('publicSiteMedia.noMedia');
 
     fireEvent.change(screen.getByLabelText('publicSiteMedia.assetKind'), { target: { value: 'doctor_portrait' } });
+    expect(await screen.findByRole('option', { name: /#42/ })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('publicSiteMedia.doctor'), { target: { value: '42' } });
     expect(await screen.findByText('publicSiteMedia.inactiveDoctorUpload')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'publicSiteMedia.uploadDraft' })).toBeDisabled();

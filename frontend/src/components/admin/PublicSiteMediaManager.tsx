@@ -121,7 +121,15 @@ export default function PublicSiteMediaManager() {
   };
 
   const selectedDoctorId = doctorId ? Number(doctorId) : null;
-  const selectedDoctor = doctors.find((doctor) => doctor.id === selectedDoctorId);
+  const activeDoctorIds = new Set(doctors.map((doctor) => doctor.id));
+  const inactiveMediaDoctorOptions = [...new Set(media
+    .filter((item) => item.asset_kind === 'doctor_portrait' && item.doctor_id !== null)
+    .map((item) => item.doctor_id!))]
+    .filter((id) => !activeDoctorIds.has(id))
+    .map((id) => ({ id, displayName: `#${id}`, active: false }));
+  const doctorOptions = [...doctors, ...inactiveMediaDoctorOptions];
+  const selectedDoctor = doctorOptions.find((doctor) => doctor.id === selectedDoctorId);
+  const selectedDoctorActive = selectedDoctor?.active;
   const selectedDoctorPubliclyEligible = doctorWebsiteContentDoctorId === selectedDoctorId
     && doctorWebsiteContent !== null
     && isPublicSiteDoctorEligible(doctorWebsiteContent);
@@ -129,7 +137,12 @@ export default function PublicSiteMediaManager() {
     && doctorWebsiteContent !== null;
 
   useEffect(() => {
-    if (assetKind !== 'doctor_portrait' || selectedDoctorId === null || doctorLoadFailed) {
+    if (
+      assetKind !== 'doctor_portrait'
+      || selectedDoctorId === null
+      || doctorLoadFailed
+      || selectedDoctorActive === false
+    ) {
       setDoctorWebsiteContent(null);
       setDoctorWebsiteContentDoctorId(null);
       setDoctorWebsiteContentErrorKey(null);
@@ -147,6 +160,12 @@ export default function PublicSiteMediaManager() {
         if (cancelled) return;
         setDoctorWebsiteContent(content);
         setDoctorWebsiteContentDoctorId(selectedDoctorId);
+        const currentDisplayName = content.display_name?.trim();
+        if (currentDisplayName) {
+          setDoctors((current) => current.map((doctor) => doctor.id === selectedDoctorId
+            ? { ...doctor, displayName: currentDisplayName }
+            : doctor));
+        }
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -159,7 +178,7 @@ export default function PublicSiteMediaManager() {
     return () => {
       cancelled = true;
     };
-  }, [assetKind, doctorLoadFailed, selectedDoctorId]);
+  }, [assetKind, doctorLoadFailed, selectedDoctorActive, selectedDoctorId]);
 
   const storageUnavailable = storageRecoveryRequired || loadErrorKey === STORAGE_UNAVAILABLE_KEY;
   const mutationsDisabled = isLoading || Boolean(loadErrorKey) || storageUnavailable;
@@ -393,10 +412,10 @@ export default function PublicSiteMediaManager() {
                   <select
                     value={doctorId}
                     onChange={handleDoctorChange}
-                    disabled={isBusy || doctorLoadFailed || doctors.length === 0}
+                    disabled={isBusy || doctorLoadFailed || doctorOptions.length === 0}
                   >
                     <option value="">{t('publicSiteMedia.selectDoctor')}</option>
-                    {doctors.map((doctor) => (
+                    {doctorOptions.map((doctor) => (
                       <option key={doctor.id} value={doctor.id}>
                         {doctor.active ? doctor.displayName : `${doctor.displayName} · ${t('publicSiteMedia.inactiveDoctor')}`}
                       </option>
@@ -404,7 +423,7 @@ export default function PublicSiteMediaManager() {
                   </select>
                   {doctorLoadFailed && <span className="public-site-media__inline-error">{t('publicSiteMedia.doctorsLoadError')}</span>}
                   {doctorPageErrorKey && <span className="public-site-media__inline-error">{t(doctorPageErrorKey)}</span>}
-                  {!doctorLoadFailed && doctors.length === 0 && <span className="public-site-media__hint">{t('publicSiteMedia.noDoctors')}</span>}
+                {!doctorLoadFailed && doctorOptions.length === 0 && <span className="public-site-media__hint">{t('publicSiteMedia.noDoctors')}</span>}
                   {doctorId && !doctorLoadFailed && !selectedDoctor && <span className="public-site-media__inline-error">{t('publicSiteMedia.doctorUnavailable')}</span>}
                   {selectedDoctor?.active === false && <span className="public-site-media__inline-error">{t('publicSiteMedia.inactiveDoctorUpload')}</span>}
                   {assetKind === 'doctor_portrait' && selectedDoctor && isLoadingDoctorWebsiteContent && (
