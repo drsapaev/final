@@ -17,3 +17,22 @@ class QueueProfileBindingChangedDetail(BaseModel):
 
 class QueueProfileBindingChangedResponse(BaseModel):
     detail: QueueProfileBindingChangedDetail
+
+
+class QueueProfilePublicationConflictDetail(BaseModel):
+    """A profile cannot be published as one bookable QR direction yet."""
+
+    reason: Literal["profile_publication_blocked"]
+    code: Literal[
+        "profile_inactive",
+        "profile_unpublished",
+        "profile_unavailable",
+        "mixed_direction_targets",
+        "ambiguous_profile_target",
+        "no_bookable_owner",
+    ]
+    message: str
+
+
+class QueueProfilePublicationConflictResponse(BaseModel):
+    detail: QueueProfilePublicationConflictDetail

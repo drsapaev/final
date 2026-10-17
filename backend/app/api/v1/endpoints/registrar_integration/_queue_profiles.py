@@ -15,7 +15,10 @@ from app.core.specialties import (
 )
 from app.crud.clinic import clinic_today
 from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
-from app.schemas.queue_profile_conflicts import QueueProfileBindingChangedResponse
+from app.schemas.queue_profile_conflicts import (
+    QueueProfileBindingChangedResponse,
+    QueueProfilePublicationConflictResponse,
+)
 from app.services.queue_service import queue_service
 
 
@@ -650,10 +653,12 @@ def create_queue_profile(
     responses={
         409: {
             "model": QueueProfileBindingConflictResponse
-            | QueueProfileBindingChangedResponse,
+            | QueueProfileBindingChangedResponse
+            | QueueProfilePublicationConflictResponse,
             "description": (
-                "Binding changes are blocked while the profile is in use, or "
-                "the submitted binding snapshot became stale."
+                "Binding changes are blocked while the profile is in use, the "
+                "submitted binding snapshot became stale, or the profile does "
+                "not resolve to one available QR booking target."
             ),
         }
     },
@@ -730,7 +735,10 @@ def update_queue_profile(
             ):
                 update_data.pop(field)
 
-        if changed_binding_fields:
+        availability_fields_requested = bool(
+            {"is_active", "show_on_qr_page"}.intersection(update_data)
+        )
+        if changed_binding_fields or availability_fields_requested:
             from app.crud.queue_owner_invariant import lock_profile_binding_scopes
 
             proposed_tags = update_data.get("queue_tags", candidate.queue_tags or [])
@@ -819,9 +827,63 @@ def update_queue_profile(
                     },
                 )
 
+        proposed_is_active = update_data.get("is_active", profile.is_active)
+        proposed_show_on_qr_page = update_data.get(
+            "show_on_qr_page", profile.show_on_qr_page
+        )
+        should_validate_publication = bool(
+            proposed_show_on_qr_page
+            and (
+                not profile.show_on_qr_page
+                or (proposed_is_active and not profile.is_active)
+                or bool(changed_binding_fields)
+            )
+        )
         for field, value in update_data.items():
             if hasattr(profile, field):
                 setattr(profile, field, value)
+
+        if should_validate_publication:
+            with db.no_autoflush:
+                publication_conflict = queue_service.qr_profile_publication_conflict(
+                    db,
+                    profile,
+                    day=clinic_today(db),
+                    lock_parent_rows=True,
+                )
+            if publication_conflict:
+                messages = {
+                    "profile_inactive": "Сначала включите направление в регистратуре.",
+                    "profile_unpublished": "Профиль должен быть опубликован отдельным действием.",
+                    "profile_unavailable": (
+                        "Профиль недоступен: проверьте состояние связанного отделения."
+                    ),
+                    "mixed_direction_targets": (
+                        "Разделите независимые направления или ресурсные очереди "
+                        "на отдельные профили."
+                    ),
+                    "ambiguous_profile_target": (
+                        "Для этого направления найден неоднозначный QR-маршрут. "
+                        "Сначала устраните конфликт профилей или владельцев."
+                    ),
+                    "no_bookable_owner": (
+                        "Не найден активный врач или ресурс очереди для записи."
+                    ),
+                }
+                db.rollback()
+                logger.warning(
+                    "QueueProfile publication blocked: key=%s reason=%s",
+                    profile_key,
+                    publication_conflict,
+                )
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "reason": "profile_publication_blocked",
+                        "code": publication_conflict,
+                        "message": messages[publication_conflict],
+                    },
+                )
 
         db.commit()
         db.refresh(profile)

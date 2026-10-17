@@ -194,8 +194,15 @@ def pg_engine():
             import subprocess  # noqa: E402
 
             r = subprocess.run(
-                [sys.executable, "-m", "alembic", "-c", "alembic.ini",
-                 "upgrade", "head"],
+                [
+                    sys.executable,
+                    "-m",
+                    "alembic",
+                    "-c",
+                    "alembic.ini",
+                    "upgrade",
+                    "head",
+                ],
                 capture_output=True,
                 text=True,
                 cwd=str(BACKEND_DIR),
@@ -300,8 +307,7 @@ def _rq09_cleanup(pg_session):
     pg_session.rollback()
 
     rq09_user_ids = [
-        u.id
-        for u in pg_session.query(User).filter(User.username.like("rq09_%")).all()
+        u.id for u in pg_session.query(User).filter(User.username.like("rq09_%")).all()
     ]
     rq09_doctor_ids = (
         [
@@ -331,25 +337,25 @@ def _rq09_cleanup(pg_session):
         pg_session.query(OnlineQueueEntry).filter(
             OnlineQueueEntry.queue_id.in_(queue_ids)
         ).delete(synchronize_session=False)
-        pg_session.query(DailyQueue).filter(
-            DailyQueue.id.in_(queue_ids)
-        ).delete(synchronize_session=False)
+        pg_session.query(DailyQueue).filter(DailyQueue.id.in_(queue_ids)).delete(
+            synchronize_session=False
+        )
     pg_session.query(QueueJoinSession).filter(
         QueueJoinSession.qr_token.like("rq09-%")
     ).delete(synchronize_session=False)
-    pg_session.query(QueueToken).filter(
-        QueueToken.token.like("rq09-%")
-    ).delete(synchronize_session=False)
-    pg_session.query(Patient).filter(
-        Patient.phone == "+998900000901"
-    ).delete(synchronize_session=False)
-    pg_session.query(QueueProfile).filter(
-        QueueProfile.key.like("rq09_%")
-    ).delete(synchronize_session=False)
+    pg_session.query(QueueToken).filter(QueueToken.token.like("rq09-%")).delete(
+        synchronize_session=False
+    )
+    pg_session.query(Patient).filter(Patient.phone == "+998900000901").delete(
+        synchronize_session=False
+    )
+    pg_session.query(QueueProfile).filter(QueueProfile.key.like("rq09_%")).delete(
+        synchronize_session=False
+    )
     if rq09_doctor_ids:
-        pg_session.query(Doctor).filter(
-            Doctor.id.in_(rq09_doctor_ids)
-        ).delete(synchronize_session=False)
+        pg_session.query(Doctor).filter(Doctor.id.in_(rq09_doctor_ids)).delete(
+            synchronize_session=False
+        )
     if rq09_user_ids:
         pg_session.query(User).filter(User.id.in_(rq09_user_ids)).delete(
             synchronize_session=False
@@ -368,9 +374,7 @@ def _rq09_cleanup(pg_session):
         "general": False,
         "dermatology": False,
     }.items():
-        pg_session.query(_QP).filter(_QP.key == key).update(
-            {_QP.show_on_qr_page: show}
-        )
+        pg_session.query(_QP).filter(_QP.key == key).update({_QP.show_on_qr_page: show})
     pg_session.commit()
 
 
@@ -460,12 +464,7 @@ def _visible_profile_keys(pg_session) -> dict[str, bool]:
     """key -> show_on_qr_page for every seeded profile row."""
     from app.models.queue_profile import QueueProfile
 
-    return {
-        key: show
-        for key, show in pg_session.query(
-            QueueProfile.key, QueueProfile.show_on_qr_page
-        ).all()
-    }
+    return dict(pg_session.query(QueueProfile.key, QueueProfile.show_on_qr_page).all())
 
 
 def _set_all_profiles_hidden(pg_session) -> dict[str, bool]:
@@ -499,16 +498,12 @@ def _selectable(pg_client: TestClient, token_value: str) -> list[dict]:
 
 
 @pytest.mark.queue
-def test_all_profiles_hidden_yields_empty_selection(
-    pg_client, pg_session, monkeypatch
-):
+def test_all_profiles_hidden_yields_empty_selection(pg_client, pg_session, monkeypatch):
     """S-07 (RQ-09): «выключение всех направлений дает корректное пустое
     состояние, а не дефолтные предложения»."""
     from app.services.queue_service import QueueBusinessService
 
-    monkeypatch.setattr(
-        QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0)
-    )
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
 
     original = _set_all_profiles_hidden(pg_session)
     try:
@@ -520,8 +515,7 @@ def test_all_profiles_hidden_yields_empty_selection(
 
         selectable = _selectable(pg_client, "rq09-token-all-hidden")
         assert selectable == [], (
-            "hidden-everything must return an EMPTY selection, got "
-            f"{selectable!r}"
+            "hidden-everything must return an EMPTY selection, got " f"{selectable!r}"
         )
 
         # and the start payload (the one QueueJoin actually renders) too
@@ -550,9 +544,7 @@ def test_admin_shown_ecg_direction_is_selectable_and_joinable(
     from app.models.online_queue import DailyQueue
     from app.services.queue_service import QueueBusinessService
 
-    monkeypatch.setattr(
-        QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0)
-    )
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
 
     # Seeded 0055 echokg profile (show_on_qr_page=true, queue_tags=["ecg"]).
     _user, doctor = _doctor_with_user(
@@ -616,9 +608,7 @@ def test_clinic_wide_specialist_card_uses_the_profile_selected_for_admission(
     from app.models.queue_profile import QueueProfile
     from app.services.queue_service import QueueBusinessService
 
-    monkeypatch.setattr(
-        QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0)
-    )
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
     specialty = "rq09canon"
     _user, doctor = _doctor_with_user(
         pg_session,
@@ -681,6 +671,114 @@ def test_clinic_wide_specialist_card_uses_the_profile_selected_for_admission(
         .one()
     )
     assert daily_queue.queue_tag == entry["specialty"] == specialty
+
+
+@pytest.mark.queue
+def test_hidden_exact_profile_suppresses_published_alias_in_catalog_and_join(
+    pg_client, pg_session
+):
+    """Catalog and admission must use the same exact-key candidate precedence."""
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import QueueValidationError, queue_service
+
+    suffix = uuid.uuid4().hex[:8]
+    specialty = f"rqeh{suffix}"
+    alias_key = f"rq09exactalias{suffix}"
+    _user, doctor = _doctor_with_user(
+        pg_session,
+        specialty=specialty,
+        label=f"eh{suffix}",
+        role="Doctor",
+    )
+    hidden_exact = QueueProfile(
+        key=specialty,
+        title="RQ-09 Synthetic hidden exact profile",
+        queue_tags=[specialty],
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    published_alias = QueueProfile(
+        key=alias_key,
+        title="RQ-09 Synthetic published alias profile",
+        queue_tags=[specialty],
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    pg_session.add_all([hidden_exact, published_alias])
+    pg_session.commit()
+    token = _clinic_wide_token(pg_session, f"rq09-token-hidden-exact-{suffix}")
+
+    public_catalog = pg_client.get("/api/v1/queues/profiles/public")
+    assert public_catalog.status_code == 200, public_catalog.text
+    assert all(
+        item["specialty"] != alias_key for item in public_catalog.json()["specialists"]
+    )
+    assert all(item["id"] != doctor.id for item in _selectable(pg_client, token.token))
+
+    with pytest.raises(QueueValidationError):
+        queue_service.join_queue_with_token(
+            pg_session,
+            token_str=token.token,
+            patient_name=f"RQ-09 Synthetic exact hidden {suffix}",
+            phone=f"+99890009{suffix[:4]}99",
+            specialist_id_override=published_alias.id,
+            specialist_type="profile",
+        )
+
+
+@pytest.mark.queue
+def test_mixed_direction_profile_is_not_publicly_selectable_or_admissible(
+    pg_client, pg_session
+):
+    """An old published overview cannot route patients through its first tag."""
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import QueueValidationError, queue_service
+
+    suffix = uuid.uuid4().hex[:8]
+    first_tag = f"rqov1{suffix}"
+    second_tag = f"rqov2{suffix}"
+    profile = QueueProfile(
+        key=f"rq09overview{suffix}",
+        title="RQ-09 Synthetic internal overview",
+        queue_tags=[first_tag, second_tag],
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    pg_session.add(profile)
+    pg_session.flush()
+    _user_a, doctor_a = _doctor_with_user(
+        pg_session, specialty=first_tag, label=f"ova{suffix}"
+    )
+    _user_b, doctor_b = _doctor_with_user(
+        pg_session, specialty=second_tag, label=f"ovb{suffix}"
+    )
+    token = _clinic_wide_token(pg_session, f"rq09-token-overview-{suffix}")
+    pg_session.commit()
+
+    public_catalog = pg_client.get("/api/v1/queues/profiles/public")
+    assert public_catalog.status_code == 200, public_catalog.text
+    assert all(
+        item["specialty"] != profile.key
+        for item in public_catalog.json()["specialists"]
+    )
+    selectable = _selectable(pg_client, token.token)
+    assert all(item["id"] not in {doctor_a.id, doctor_b.id} for item in selectable)
+
+    for specialist_id, specialist_type in (
+        (profile.id, "profile"),
+        (doctor_a.id, "doctor"),
+        (doctor_b.id, "doctor"),
+    ):
+        with pytest.raises(QueueValidationError):
+            queue_service.join_queue_with_token(
+                pg_session,
+                token_str=token.token,
+                patient_name=f"RQ09 Synthetic overview {suffix}",
+                phone=f"+99890009{suffix[:4]}{len(specialist_type)}",
+                specialist_id_override=specialist_id,
+                specialist_type=specialist_type,
+            )
+        pg_session.rollback()
 
 
 @pytest.mark.queue
@@ -794,8 +892,7 @@ def test_parent_off_removes_selection_and_blocks_direct_qr_join(
         available = pg_client.get("/api/v1/queue/available-specialists")
         assert available.status_code == 200, available.text
         assert all(
-            item["id"] != doctor.id
-            for item in available.json().get("specialists", [])
+            item["id"] != doctor.id for item in available.json().get("specialists", [])
         ), "legacy public selector must match the clinic-wide join eligibility"
 
         with pytest.raises(QueueValidationError):
@@ -984,9 +1081,7 @@ def test_available_profiles_with_different_parents_share_one_resource_target(
 
 
 @pytest.mark.queue
-def test_available_specialists_excludes_ineligible_doctor_owners(
-    pg_client, pg_session
-):
+def test_available_specialists_excludes_ineligible_doctor_owners(pg_client, pg_session):
     """The legacy public selector matches QR join owner eligibility."""
     from app.models.clinic import Doctor
     from app.models.queue_profile import QueueProfile
@@ -1076,7 +1171,9 @@ def test_batch_doctor_target_resolution_reads_parent_departments_once(pg_session
     department_selects: list[str] = []
     engine = pg_session.get_bind()
 
-    def record_department_select(_conn, _cursor, statement, _parameters, _context, _many):
+    def record_department_select(
+        _conn, _cursor, statement, _parameters, _context, _many
+    ):
         normalized = " ".join(statement.lower().replace('"', "").split())
         table_tokens = {token.rstrip(",;") for token in normalized.split()}
         if "select" in normalized and any(
@@ -1120,9 +1217,7 @@ def test_ghost_incomplete_and_resource_owners_not_selectable(
     from app.models.queue_profile import QueueProfile
     from app.services.queue_service import QueueBusinessService
 
-    monkeypatch.setattr(
-        QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0)
-    )
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
 
     # (a) owner-deactivated ghost: Doctor row active, owner account off.
     _user, ghost = _doctor_with_user(
@@ -1180,13 +1275,12 @@ def test_ghost_incomplete_and_resource_owners_not_selectable(
     selectable = _selectable(pg_client, "rq09-token-ghosts")
     ids = {s["id"] for s in selectable}
 
-    assert ghost.id not in ids, (
-        "owner-deactivated doctor must not be advertised on the public page"
-    )
-    assert incomplete.id not in ids, (
-        "incomplete «general» placeholder must not be advertised"
-    )
+    assert (
+        ghost.id not in ids
+    ), "owner-deactivated doctor must not be advertised on the public page"
+    assert (
+        incomplete.id not in ids
+    ), "incomplete «general» placeholder must not be advertised"
     assert lab_resource.id not in ids, (
-        "resource synthetic (owner role Lab) must not be advertised as a "
-        "doctor card"
+        "resource synthetic (owner role Lab) must not be advertised as a " "doctor card"
     )

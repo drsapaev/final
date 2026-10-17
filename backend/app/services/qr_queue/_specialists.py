@@ -2,6 +2,7 @@
 
 Split from qr_queue_service.py.
 """
+
 from __future__ import annotations
 
 from app.services.qr_queue._base import *  # noqa: F401, F403
@@ -38,7 +39,6 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
         }
         return emoji_map.get(key, configured_icon or "👨‍⚕️")
 
-
     def _get_clinic_wide_selectable_specialists(self) -> list[dict[str, Any]]:
         """RQ-09: the PUBLIC clinic-wide selection mirrors the JOIN contract.
 
@@ -65,19 +65,24 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
         from app.models.queue_profile import QueueProfile
 
         try:
-            published_profiles = (
-                self.db.query(QueueProfile)
-                .filter(QueueProfile.show_on_qr_page == True)
-                .order_by(QueueProfile.display_order)
-                .all()
+            # Candidate precedence must use the complete configured catalog:
+            # admission lets an exact-key profile suppress a published alias
+            # even when that exact profile is currently hidden. Keep the
+            # display/catalog set published below, but resolve doctors against
+            # all rows so selectable cards match the join contract.
+            candidate_profiles = (
+                self.db.query(QueueProfile).order_by(QueueProfile.display_order).all()
             )
+            published_profiles = [
+                profile for profile in candidate_profiles if profile.show_on_qr_page
+            ]
             from app.services.queue_profile_availability import (
                 load_queue_profile_availability,
                 queue_profile_is_qr_selectable,
             )
 
             availability_by_profile = load_queue_profile_availability(
-                self.db, published_profiles
+                self.db, candidate_profiles
             )
             profiles = [
                 profile
@@ -92,6 +97,7 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
                 exc_info=True,
             )
             published_profiles = []
+            candidate_profiles = []
             availability_by_profile = {}
             profiles = []
 
@@ -111,8 +117,7 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             }
             keys = {profile_key}
             keys.update(
-                self._normalize_specialty_key(tag)
-                for tag in (profile.queue_tags or [])
+                self._normalize_specialty_key(tag) for tag in (profile.queue_tags or [])
             )
             for key in keys:
                 if key and key not in profile_by_specialty:
@@ -150,7 +155,7 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             qr_profile = queue_service._get_qr_visible_profile_for_doctor(
                 self.db,
                 doctor,
-                profiles=published_profiles,
+                profiles=candidate_profiles,
                 availability_by_profile=availability_by_profile,
             )
             if not qr_profile:
@@ -178,16 +183,12 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
                     "entity_type": "doctor",
                     "specialty": profile_key,
                     "specialty_display": (
-                        profile.get("title_ru")
-                        or profile.get("title")
-                        or profile_key
+                        profile.get("title_ru") or profile.get("title") or profile_key
                     ),
                     "icon": self._queue_profile_icon(profile_key, profile.get("icon")),
                     "color": profile.get("color") or "#6b7280",
                     "doctor_name": (
-                        owner.full_name
-                        if owner
-                        else f"Doctor #{doctor.id}"
+                        owner.full_name if owner else f"Doctor #{doctor.id}"
                     ),
                     "cabinet": doctor.cabinet,
                 }
