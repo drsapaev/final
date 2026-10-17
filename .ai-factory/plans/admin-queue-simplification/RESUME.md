@@ -1,16 +1,16 @@
-## Current checkpoint — T12.2 #3693 CI green; review and acceptance remain open — 2026-10-17T12:54:40+05:00
+## Current checkpoint — T12.2 #3693 CI green; review and acceptance remain open — 2026-10-17T13:15:31+05:00
 
-Continue task 431e8e5b-7c74-459e-8038-26f0f17adf1d in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t122-publish-policy\final`, branch `codex/aqs-T12.2-publish-readiness`. PR #3693 is OPEN/DRAFT, base `db91cc0ef87c8a51eb4b4e816d25077c8ce397d6`, last verified pushed HEAD `b087f6e23ffc1b562df68bf906529a3012b87991`. User performs merge.
+Continue task 431e8e5b-7c74-459e-8038-26f0f17adf1d in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t122-publish-policy\final`, branch `codex/aqs-T12.2-publish-readiness`. PR #3693 is OPEN/READY FOR REVIEW, base `db91cc0ef87c8a51eb4b4e816d25077c8ce397d6`, last verified pushed HEAD `cd6b30676474ff63a475ba72f96d5d4c75ebc915`. User performs merge.
 
 PR #3690 / T12.1 is merged at `0a3304f5ec7d3702d0fbe3642fdec078eb3edaea`; do not resume it. Do not begin T13 until PR #3693 is merged and the cyclic-workflow conditions are met.
 
-Source/runtime implementation for T12.2 is at `58b10b3102e1f6d68fefee257fc22194da4f2de2`. Source/test HEAD `b3d2fdc22928634750bef4c5210e887bff3129db` passed Unified CI run `39013024601`. Journal-only HEAD `b087f6e` passed Unified CI run `39014232119` with 26 pass, 12 path-aware skips, zero failures. Check current GitHub checks before any merge decision if another commit has since changed HEAD; the evidence record is historical and must not be treated as a live status.
+Source/runtime implementation for T12.2 is at `58b10b3102e1f6d68fefee257fc22194da4f2de2`. Source/test HEAD `b3d2fdc22928634750bef4c5210e887bff3129db` passed Unified CI run `39013024601`. Journal-only HEAD `cd6b3067` passed Unified CI run `39015442022` with 26 pass, 12 path-aware skips, zero failures. Check current GitHub checks before any merge decision if another commit has since changed HEAD; the evidence record is historical and must not be treated as a live status.
 
 Focused Tier-2 staging on owned synthetic Compose project `clinic-aqs-pr3693-20261017-c9` passed canonical Preflight/Start/Session and all 10 focused publication/readiness browser checks, including ordinary Admin password+TOTP. Teardown passed and verified zero owned containers, volumes, networks. Browser script matched runtime-source SHA `58b10b3102e1f6d68fefee257fc22194da4f2de2` in `sw.js`; canonical launcher field `served_revision_verified` stayed false and is unverified.
 
 Full `docs/runbooks/STAGING_VALIDATION.md`, negative-role proof, named legacy browser specs, full T18 scenario, and canonical launcher revision attestation remain NOT_RUN/unverified. No deferral has been accepted. No independent GitHub review submission or inline thread is present. Read-only code review has no confirmed P0/P1/P2 findings; this does not substitute for independent approval.
 
-No more staging is needed for docs-only updates. Keep the PR in Draft/HOLD pending a supported resolution of remaining acceptance and review items. Do not merge, deploy, change runtime, or start T13. The user's merge remains theirs.
+No more staging is needed for docs-only updates. Keep the PR Ready for Review but on merge HOLD pending a supported resolution of remaining acceptance and review items. Do not merge, deploy, change runtime, or start T13. The user's merge remains theirs.
 
 Next exact action: check the live PR head and CI, secure an independent review, and resolve the outstanding Tier-2 acceptance scope. After the user merges, confirm the actual merge commit, sync clean main and start T13 in a fresh worktree.
 

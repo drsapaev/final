@@ -4160,3 +4160,12 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Tier-2 remains focused PASS / overall PARTIAL: 10 focused staging/browser checks passed on owned synthetic project, normal Admin password+TOTP included, canonical teardown removed all owned resources. Full staging runbook, negative-role proof, named legacy specs, full T18, and canonical launcher `served_revision_verified` remain NOT_RUN/unverified; no deferral accepted.
 - Result: current verified evidence supports the source/test HEAD and journal HEAD above. If this checkpoint is committed as a new journal-only HEAD, read the live status of that newer PR SHA before considering readiness. Do not rerun staging for documentation-only changes.
 - PR: https://github.com/drsapaev/final/pull/3693. No merge/deployment. User performs merge.
+
+## T12.2 PR lifecycle moved to Ready for Review — 2026-10-17T13:15:31+05:00
+
+- Execution mode: `direct_execute`, documentation and PR metadata only; the author-confirmed T12.2 scope has completed source/test CI and focused acceptance, so the draft was made available for independent review. This transition does not approve merge.
+- Allowed paths: the three plan journals; PR #3693 description/lifecycle metadata. Denied: runtime, tests, migration, staging/Compose, production, merge/deploy, and submitting a review on behalf of an independent reviewer. Stop if the current PR head/base changes or a relevant gate fails.
+- PR #3693 remains on exact HEAD `cd6b30676474ff63a475ba72f96d5d4c75ebc915`, base `db91cc0ef87c8a51eb4b4e816d25077c8ce397d6`, OPEN, Ready for Review, and mergeable. Unified CI `39015442022` on this exact HEAD completed SUCCESS: 26 passed, 12 path-aware skipped, 0 failed. The body validator and lifecycle recommendation after the status/body update passed; confirm live status before later merge.
+- Review state: no GitHub review submissions, no review requests and no inline threads. Read-only code review found no confirmed P0/P1/P2 but is not independent approval.
+- Tier-2: focused 10/10 synthetic staging checks PASS; canonical teardown PASS with zero owned resources remaining. Overall acceptance remains PARTIAL: full STAGING_VALIDATION.md, negative-role proof, named legacy specs, full T18 and launcher `served_revision_verified` remain NOT_RUN/unverified. No deferral is accepted.
+- Result: PR is open for independent review; merge remains HOLD until review and an explicit supported disposition of the remaining acceptance gaps. User performs merge.
