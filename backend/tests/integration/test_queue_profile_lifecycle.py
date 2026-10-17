@@ -448,6 +448,13 @@ def _put_profile(pg_client, pg_admin_user, key: str, payload: dict):
     )
 
 
+def _post_profile(pg_client, pg_admin_user, payload: dict):
+    from tests.conftest import mint_access_token
+
+    headers = {"Authorization": f"Bearer {mint_access_token(pg_admin_user)}"}
+    return pg_client.post("/api/v1/queues/profiles", json=payload, headers=headers)
+
+
 def _preview_profile(pg_client, pg_admin_user, key: str):
     from tests.conftest import mint_access_token
 
@@ -455,6 +462,65 @@ def _preview_profile(pg_client, pg_admin_user, key: str):
     return pg_client.get(
         f"/api/v1/queues/profiles/{key}/impact-preview", headers=headers
     )
+
+
+def test_new_profiles_are_hidden_and_create_time_publish_intent_is_deferred(
+    pg_client, pg_session, pg_admin_user
+):
+    from app.models.queue_profile import QueueProfile
+
+    suffix = uuid.uuid4().hex[:8]
+    existing_key = f"rq12b_t12_existing_{suffix}"
+    existing_public = QueueProfile(
+        key=existing_key,
+        title="RQ-12.b existing public profile",
+        queue_tags=[existing_key],
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    model_default = QueueProfile(
+        key=f"rq12b_t12_model_{suffix}",
+        title="RQ-12.b model default",
+        queue_tags=[],
+    )
+    pg_session.add_all([existing_public, model_default])
+    pg_session.commit()
+    pg_session.refresh(model_default)
+    assert model_default.show_on_qr_page is False
+
+    default_key = f"rq12b_t12_default_{suffix}"
+    default_response = _post_profile(
+        pg_client,
+        pg_admin_user,
+        {
+            "key": default_key,
+            "title": "RQ-12.b default hidden",
+            "queue_tags": [default_key],
+        },
+    )
+    assert default_response.status_code == 200, default_response.text
+    default_payload = default_response.json()
+    assert default_payload["profile"]["show_on_qr_page"] is False
+    assert default_payload["publication_deferred"] is False
+
+    requested_key = f"rq12b_t12_requested_{suffix}"
+    requested_response = _post_profile(
+        pg_client,
+        pg_admin_user,
+        {
+            "key": requested_key,
+            "title": "RQ-12.b deferred publication",
+            "queue_tags": [requested_key],
+            "show_on_qr_page": True,
+        },
+    )
+    assert requested_response.status_code == 200, requested_response.text
+    requested_payload = requested_response.json()
+    assert requested_payload["profile"]["show_on_qr_page"] is False
+    assert requested_payload["publication_deferred"] is True
+
+    pg_session.refresh(existing_public)
+    assert existing_public.show_on_qr_page is True
 
 
 def _preview_profile_update(pg_client, pg_admin_user, key: str, payload: dict):
@@ -2578,6 +2644,13 @@ def test_department_deactivation_preserves_manual_state_and_blocks_new_qr(
 
     # A manually linked second profile with its own title.
     from app.models.queue_profile import QueueProfile
+
+    parent_profile = pg_session.query(QueueProfile).filter_by(key=dept_key).one()
+    assert parent_profile.show_on_qr_page is False
+    # This regression starts from an existing, explicitly published profile;
+    # department provisioning now intentionally creates new profiles hidden.
+    parent_profile.show_on_qr_page = True
+    pg_session.commit()
 
     sub = QueueProfile(
         key="rq13ahide-sub",

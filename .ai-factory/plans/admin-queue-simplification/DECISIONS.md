@@ -159,3 +159,40 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - **User clarification:** the 409 occurs when deleting the profile. This establishes the action/path mapping to DELETE with profile key `specialists`; it does not establish the production usage counts or precise refusal reason.
 - **Technical scope refinement under the user's continuation:** keep a tiny T11.1a renderer-only fix in the active #3639 rather than starting another PR cycle: reuse the existing error formatter in single-delete and add two regressions. This explicitly narrows the prior generic follow-up rule and does not advance T17 bulk/CSV work or authorize backend changes.
 - **Preserved contract:** used profiles are archived through the existing explicit action; deletion guards remain authoritative. No auto-archive, retry or request change is introduced. The UI defect is reproduced independently of the still-unknown production refusal reason.
+
+## T11 / PR #3639 — ограниченное закрытие и условный legacy-spec deferral — 2026-10-16
+
+- Источник: пользователь ответил «делай» на конкретную рекомендацию заморозить scope кроме подтверждённых blockers, один раз синхронизировать main, закрыть матрицу T11 и оформить ограниченный deferral общих legacy live-spec. Это delegated technical disposition; независимый human GitHub APPROVE и merge не имитируются.
+- Scope: один подтверждённый legacy Doctor token fallback P2 исправляется в existing PR с unit/PG regression. Никаких новых функций, схем, queue identity, auth или UI redesign.
+- Условно разрешённый deferral касается только полных admin-navigation.spec.ts, queue-system.spec.ts, panel-qa-admin-live.spec.ts. Он вступает в силу после PASS обязательной матрицы C01–C09 и закрытия source review/CI. Неисполненное поведение T11 не откладывается.
+- Original requirement: полностью выполнить три перечисленных backend-dependent live suite.
+- Reason: общая auth/origin/control несовместимость legacy harness и неразобранные общие UI assertions; полные suites ещё не адаптированы надёжно. Они не помечаются obsolete, fixed или PASS.
+- Evidence: final targeted T11 unit/PG/browser/environment evidence с точным source SHA плюс все прежние FAIL/NOT_RUN. r2/r4 passes сохраняют свои SHA и не сертифицируют автоматически новый source patch.
+- Owner/workstream: T18 synthetic Admin/Registrar QA.
+- Resume condition: до production rollout, v1 flag activation или закрытия T18, на совместимом нормальному2FA/configurable-origin/controlled-writes harness. Доказанный regression в изменённом коде становится текущим blocker, а не deferral.
+- Headline impact: 0% completed coverage credit; 0/3 полных deferred suite закрыто этим решением. T18 и полный pre-deploy runbook остаются незавершёнными.
+- Production diagnostic: точный live409 reason/revision остаётся неизвестным; T11.1/оператор собирает минимальные безопасные read-only факты после разрешённого deployment. C06 отдельно доказывает renderer и сохранение backend guard; production mutation не разрешена.
+- Не отменены: required CI на итоговом HEAD, реальная матрица доступности/locking, normal Admin2FA, source review, собственный teardown, полный STAGING_VALIDATION.md до production. Мержит пользователь.
+## T11 final deferral disposition — 2026-10-16T15:23:19.3429781+05:00
+- Status: EFFECTIVE LIMITED DEFERRAL for PR3639/codeacb509c36a9583f917bc86d601120bef95eddc1e after C01–C09 PASS and exact-headCI28PASS/12SKIPPED/0failure/0pending.
+- Authority: user explicitly approved the bounded closure recommendation and separately authorized final r8 after the reproduced harness correction. This is delegated technical acceptance; no human identity/independent GitHub APPROVE is asserted.
+- Original requirement: complete whole admin-navigation.spec.ts, queue-system.spec.ts and panel-qa-admin-live.spec.ts.
+- Reason: existing general live harness requires auth/origin/control adaptations and includes unresolved general workflow failures beyond the changed T11 acceptance. Unchanged generic suites are not declared obsolete/fixed. A dedicated real T11 harness plus PG contracts verifies the changed behavior.
+- Evidence: acb509c36, selected21PG+7unit+4browser PASS; normalAdmin2FA/Registrar, exactSW marker/0080/teardown PASS; r7 FAIL retained; three whole named suites NOT_RUN,0/3 completed.
+- Owner/workstream: T18 synthetic Admin/Registrar QA.
+- Resume condition: before production rollout, v1 activation or T18 closure; compatible ordinary2FA, verified synthetic users, configurable origin and controlled synthetic writes/cleanup. A proven regression in changed behavior immediately becomes current blocker, not deferred.
+- Headline impact:0% completion credit from deferred suites,0/3 complete. Do not report all Tier2/system/predeploy validation complete.
+- Full pre-production runbook and live409 method/reason/deployed revision diagnosis remain separate unmet obligations. No production, merge or deployment authorized by this disposition. User performs merge.
+
+## T12.1a generated API contract — 2026-10-16T17:09:33+05:00
+
+- **Technical finding:** T12.1 changed `QueueProfileCreate.show_on_qr_page` from visible-by-default to hidden-by-default. The committed OpenAPI snapshot and generated TypeScript still describe the old default.
+- **Scope decision:** refresh only `backend/openapi.json` and `frontend/src/types/generated/api.ts` after a separate canonical gate. Generator scripts remain read-only; no response schema redesign or runtime/test change is included.
+- **Validation boundary:** if generation requires a live DB, additional source/test files, or unrelated schema changes, stop. Backend PostgreSQL tests remain NOT_RUN until a safe disposable DB is available.
+
+## T11 merge and T12.1 create-time publication contract — 2026-10-16T16:50:51+05:00
+
+- User instruction: “Мержил. Продолжай.” GitHub merge for #3639 was already confirmed; verified merge commit is 7443b0e290b9143e877d5898a5589df52592d3b3. Continue the existing implementation plan in a fresh worktree from that main commit.
+- Plan/policy basis: T12 requires all new profiles hidden, publication through a separate explicit action, and explicitly allows a backward-compatible reject/defer behavior for old clients posting show_on_qr_page=true.
+- Technical choice for T12.1: defer such create-time publication. The new profile is persisted with show_on_qr_page=false; response/UI must state that publication was deferred. No existing profile is mass-hidden. No readiness/ambiguity decision is added to the create path here; that is T12.2.
+- Scope boundary: eight gate-approved source/test paths only. The discovered generated-file drift is handled as separately gated T12.1a; do not silently expand T12.1.

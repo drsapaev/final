@@ -1,6 +1,285 @@
+## Current checkpoint — T12.1 exact-head CI pass; Tier-2 pending authorization — 2026-10-16T22:04:00+05:00
+
+Plan version: 4.00
+Current task: T12.1
+Current status: PR_OPEN
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t12-publish-overview\final
+Branch: codex/aqs-T12.1-hidden-profile-create
+Base commit: 7443b0e290b9143e877d5898a5589df52592d3b3 (= fetched origin/main at worktree creation)
+Current code commit under test: ca04e20ad08a5e661ca9ddc9a0d4d8b27157092a
+Task memory: 9af17c38-8235-4681-93e8-6a9864cbdb75
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T11 | MERGED | #3639 | 7443b0e290b9143e877d5898a5589df52592d3b3 | T11 EVIDENCE entries through r8 |
+| T12.1 | PR_OPEN | #3690 DRAFT; test correction ca04e20 pushed | | Exact-head Unified CI PASS; Tier-2 staging NOT_RUN; HOLD |
+| T12.1a | VALIDATED | codex/aqs-T12.1-hidden-profile-create | | OpenAPI/generated TS parity, type-check/build/diff PASS |
+
+## Current checkpoint
+- Completed: T11 PR #3639 merged at `7443b0e`; T12.1 hidden-by-default profile creation and T12.1a OpenAPI/generated types are in PR #3690. Source `9b7a1ec`; OpenAPI final-LF fix `6539c17`; journal checkpoint `7f29d296`; exact-head CI found two tests that assumed auto-publication; test-only correction `ca04e20`. Exact-head Unified CI run `38934894724` passed, including backend/PostgreSQL, Frontend unit/E2E, build, OpenAPI freshness, quality, parity, and PR Required Gate. PR quality, lifecycle, regression, security, gitleaks and i18n gates passed. The two corrected tests and the hidden-default regression both appear as PASS in backend CI.
+- Local validation: focused UI Vitest 17/17; type-check, lint:check (0 errors; 3,506 warnings), theme check, icon audit (409 files/0 findings), build, Python compilation, mocked backend unit, OpenAPI/TS parity, Python Ruff, test py_compile, `git diff --check`, commit hooks and PR body gate passed. Local full Vitest ended without a result; local Windows Playwright stopped at missing Windows-specific visual baselines. No snapshot baselines were changed. PostgreSQL tests were not run locally; the exact-head GitHub backend job passed them using its disposable service database.
+- Changed but not verified: Tier-2 staging/Admin 2FA and other backend-dependent live E2E remain NOT_RUN. No Tier-2 deferral has been acknowledged for PR #3690; T11's prior deferral is specific to #3639 and does not carry forward. No production, deployment, v1 flag, or staging stack was used for T12.1.
+- Remaining: obtain formal code review and resolve Tier-2 disposition for #3690. The local task checkpoint denies staging without separate authorization; if the user authorizes one owned synthetic cycle, use canonical Preflight → Start → Session → owned teardown and do not include production. Otherwise retain NOT_RUN until a reviewer explicitly accepts a bounded deferral.
+- Blocker: PR #3690 is Draft and merge HOLD. GitHub required CI is green on exact HEAD `ca04e20`; `reviews=[]`; Tier-2 is NOT_RUN and no deferral is accepted. Full T18 staging remains a later plan task.
+- Next exact action: ask the user to choose a single synthetic T12.1 staging cycle or a bounded Tier-2 deferral path; do not start staging or change Ready/Draft state before that decision. Keep merge with the user.
+- Validation caveats: standard `npm run generate:api-types` used WSL Node 18 and failed with Redocly `Invalid string length`; direct pinned `openapi-typescript@7.13.0` on Windows Node 24.15.0 passed and was idempotent. Backend Ruff had only pre-existing I001/B023 outside edited lines; rerun ignoring only those codes passed.
+
+### T12.1a prework boundary
+- Execution mode: mandatory `gate`; use one `--known-root-cause` retry only if normal gate misroutes. Confirmed root cause is generated-schema drift from T12.1's QueueProfileCreate default change; this slice refreshes contract artifacts only.
+- Risk/root cause/scope: API contract freshness; backend request default is now false while OpenAPI and TypeScript still describe the previous contract. No runtime behavior or application source change is included.
+- Gate command: canonical `ai/langgraph/scripts/run_agent_gate.ps1` from `ai/langgraph`; root `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`; exact scopes `backend/openapi.json` and `frontend/src/types/generated/api.ts`. Do not modify the router.
+- Canonical anchors: T12.1 in this plan; `QueueProfileCreate` in `_queue_profiles.py`; model default; `scripts/legacy_scripts/backend/generate_openapi.py`; `frontend/scripts/generate-api-types.sh`; T10 OpenAPI/generated-types decision.
+- Reference-only: merged T11 evidence and public queue consumers.
+- First-touch files: `backend/openapi.json`, `frontend/src/types/generated/api.ts`; generator scripts are read-only.
+- Validation target: canonical OpenAPI snapshot generation, generated TypeScript parity, exact artifact scope and `git diff --check`.
+- Allowed: the two generated artifacts plus five local plan journals. Denied: runtime/model/endpoint/test/generator edits, DB/Alembic, production, staging, PR/review/merge.
+- First stop condition: generation requires a live DB, any source/test/generator edit, broader contract redesign or unrelated OpenAPI churn.
+
+### T12.1 prework boundary (source scope; validation incomplete)
+- Execution mode: narrow_override following one mandatory-gate misroute and one --known-root-cause retry. Repo-approved basis: T12 explicitly requires hidden new profiles and permits reject/defer of legacy create-time publication; the scoped retry selected _queue_profiles.py as root and eight first-touch paths.
+- Risk/root cause/scope: queue/profile public visibility; current POST, model default, department auto-provision, and create form default to visible. Existing rows must stay untouched.
+- Gate command: canonical ai/langgraph/scripts/run_agent_gate.ps1 from the T12 worktree's ai/langgraph; first broad run stopped with “no first-touch files”; second run set known root backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py, exact scopes recorded in T12.1 EVIDENCE. Gate result narrow_override / execute; handoff prompt read.
+- Canonical anchors: T12 in this plan; _queue_profiles.py; models/queue_profile.py; admin_departments/_helpers.py; QueueProfilesManager and focused lifecycle/atomicity/UI tests.
+- Reference-only: merged T11 PR/evidence and existing queue ownership contract.
+- First-touch files: exactly the eight paths listed in the T12.1 plan subsection.
+- Validation target: hidden-by-default POST and constructors, no mass update of existing profiles, UI create/CSV messaging, targeted backend/frontend tests.
+- First stop condition: implementation requires any file outside the eight gate-approved paths or changes existing public bindings/readiness decisions. Generated contract work is separately bounded above.
+
+
+## Historical checkpoint — T11 PR #3639 ready for user merge — 2026-10-16T15:47+05:00
+
+- Plan3.93; task9af17c38-8235-4681-93e8-6a9864cbdb75; branch codex/aqs-T11-manual-availability; source acb509c36a9583f917bc86d601120bef95eddc1e, main4eb6ee2cc included once. T11 PR_OPEN, T11.2 VALIDATED; no merge or T12 execution.
+- Confirmed legacy Doctor-token fallback P2 fixed/pushed; fail-first4FAIL/6PASS then17local unitPASS; normal pinned hooks PASS. Final independent AI source review found no confirmed P0/P1/P2; this is not human APPROVE.
+- r8 canonical Preflight/Start/Session/teardown PASS on exactHEAD. PostgreSQL21/21 plus policyunit7/7 PASS, browser4/4 PASS, zero failures/errors/skips. Both legacy NULL/unmatched tag interleavings PASS. Real specialists DELETE409 readable/row preserved/no implicit mutation; parent/manual archive/public/permanent and waiting queue/staff tabs PASS.
+- Normal Admin password/TOTP enrollment AND UI challenge PASS; Registrar UI PASS. SW embeds exactHEAD; owned non-maintenance DB/migrated UUID DB at0080; scratch DB removed. Post-run harness hashes match. This is bounded T11 acceptance, not the full system/predeploy runbook.
+- Owned r8 project clinic-aqs-pr3639-final-20261016-r8 removed5containers/3volumes/1network+local images, remaining0 resources/listeners. Private auth/TOTP/log/JUnit/browser artifacts removed. One boot stable/no OOM/restarts. No running executor remains.
+- r7 FAIL is retained honestly. Its short pytest -o had a deterministic PowerShell AmbiguousParameter barrier, reproduced offline; long --override-ini forms collected28 cases and passed actual r8. Ignored harness now persists sanitized phase/exit/error summary; r7 original source copies hash-match frozen run. No extra infrastructure PR.
+- Source CI snapshot: 28 SUCCESS / 12 SKIPPED / 0 source-check failures or pending at acb509c36; merge state was CLEAN. After the corrected PR body, latest PR Review Quality Gate run 38887438838 and PR Lifecycle Recommendation run 38887438971 both succeeded. The earlier same-HEAD formatting attempt 38887163937 failed on omitted required labels and remains historical; corrected body now passes the exact required labels. PR is OPEN/Ready/mergeable on exact HEAD/base. Existing GitHub review is an older COMMENT; no independent human APPROVE is asserted.
+- EFFECTIVE LIMITED DEFERRAL: whole admin-navigation.spec.ts, queue-system.spec.ts, panel-qa-admin-live.spec.ts remain NOT_RUN/DEFERRED,0/3 complete,0% credit. Six fields in plan/DECISIONS/EVIDENCE. OwnerT18; resume before production/v1 activation/T18 closure. User-authorized technical disposition, not human identity.
+- Full STAGING_VALIDATION.md still PARTIAL; exact production409 reason/counts/deployed revision unknown and assigned to operator/T11.1 after approved rollout. Existing guard is not weakened. No production/deploy/flag/global-WSL/foreign-resource changes.
+- Safe evidence: output/staging/t11-pr3639-final-20261016-r8/{cycle-report,session-report,pg-outcome,pg-observed-cases,playwright-session-sanitized-report,ci-snapshot}.json; PREWORK and frozen harness manifest. Journal entries preserve both cycles.
+- Next exact action: user performs merge of PR #3639. After confirming the actual merge commit, preserve the five local plan documents and sanitized r8 evidence before any worktree cleanup; close this PR cycle, synchronize clean main, then start T12 in a fresh worktree. No further staging run, PR mutation, or T12 before merge.
+- Five plan documents remain intentionally LOCAL/UNCOMMITTED by user choice. Preserve unrelated .scratch/. Runtime source is committed and matches testedHEAD.
+- DevBrain checkpoint saved at revision 94. Its one-time input payload remains at .scratch/task-memory-t11-final-20261016.json because the exact-file removal command was blocked by tool policy. It contains only task/evidence metadata, no credentials or patient data; remove only this exact owned payload when normal cleanup is available. No alternate deletion method was used.
+## Current checkpoint — r6 Session stopped at readiness; owned project removed — 2026-10-16T10:01+05:00
+
+- Continue task 9af17c38-8235-4681-93e8-6a9864cbdb75, T11 / PR #3639, in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final. Code HEAD: df31e54b03d054126e58a723a03415a04bc32709; base: e98b69b8f4cd2c4661595bab26ebd587914cfaaf. PR was OPEN/Ready/MERGEABLE at the matching HEAD immediately before this cycle; no GitHub mutation occurred.
+- One-cycle authorization covered only corrected copied browser tests in owned synthetic Compose. Gate output was gate_ok / execute, handoff_required=yes, gate_misroute=no; the generated execution prompt was read. No source, launcher, Compose, PR, review, deferral, or merge change was made.
+- r6 project: clinic-aqs-pr3639-tier2-20261016-r6; ports 18597/18598/25597. Pre-work and manifest are under output/staging/t11-pr3639-tier2-20261016-r6/. Private synthetic env values were rotated and not printed.
+- Prechecks PASS: exact local HEAD; tracked edits confined to the three local journals; quiet Compose config; PowerShell/Node syntax; Playwright list-only selected four copied cases across three specs. Canonical Preflight PASS on the exact HEAD with no warnings; WSL available memory was 3252 MiB.
+- Canonical Start PASS on the exact HEAD, runtime_readiness=PASS. The backend, frontend, and PostgreSQL host ports were observed listening. This was readiness evidence at Start only.
+- The single canonical Session exited 1 with FAIL: STAGING_NOT_READY, “missing, stopped or unhealthy service; do not run dependent tests.” The error did not identify a service or port. The runner did not start its dependent validation command.
+- NOT_RUN in r6: served frontend SHA attestation, normal Admin password+TOTP, Registrar login, and all four browser cases. The PostgreSQL regression set was not rerun; same-HEAD r2 evidence remains 3/3 PASS as carry-forward only. Full STAGING_VALIDATION remains NOT_RUN.
+- Session failure cleanup reported STAGING_TEARDOWN=PASS. The canonical helper removes and verifies the exact project containers, volumes, and networks; a post-run Windows check found no listeners on 18597/18598/25597 and no active owned Start/Session launcher.
+- The exact r6 private synthetic.env remains on disk: an exact-file cleanup command was rejected by policy, and no alternate deletion method was used. Do not print or reuse its values.
+- Scope: three tracked local journals plus ignored r6 harness/evidence only; runtime code, tracked tests, migrations, Compose/gate files, production, foreign staging, PR, review, deferral, merge, and deployment were untouched. Unrelated .scratch/ was preserved.
+- Result: T11 Tier-2 remains PARTIAL/FAIL; PR #3639 merge HOLD; no deferral accepted. The one-cycle authorization is consumed.
+- Next exact action: read-only diagnosis of the readiness discrepancy using canonical source and existing sanitized r6 evidence only. Do not launch staging again or start T12; if the cause cannot be established from retained evidence, keep the check NOT_RUN and request a separately scoped decision before any new live cycle.
+## Current checkpoint — r5 staging stopped before Session; owned project removed — 2026-10-16T01:01:39+05:00
+
+- Continue task 9af17c38-8235-4681-93e8-6a9864cbdb75, T11 / PR #3639, exact code HEAD df31e54b03d054126e58a723a03415a04bc32709, base e98b69b8f4cd2c4661595bab26ebd587914cfaaf. PR was refreshed before the run: OPEN/Ready with exact HEAD/base. No GitHub mutation.
+- One newly authorized targeted r5 cycle used only synthetic project clinic-aqs-pr3639-tier2-20261016-r5 on ports 18497/18498/25497. Canonical Preflight PASS. Start was launched, but the wrapper lost its nested session ID and did not capture the command's final result; do not count Start as PASS. The subsequent canonical Check returned FAIL: STAGING_NOT_READY, missing/stopped/unhealthy service.
+- Stop condition hit before tests. No canonical Session ran. Served frontend revision, Admin 2FA, Registrar login, and the four selected browser cases are NOT_RUN in r5. Playwright list-only collection found the intended four cases in three copied specs: PASS, but this is not a browser run. PostgreSQL regressions were not rerun; same-HEAD r2 evidence remains 3/3 PASS as carry-forward only.
+- Canonical Stop PASS, then documented owned-project teardown PASS removed this project's containers, networks, volumes, and local images. Post-teardown verification found zero owned containers/volumes/networks/images and zero Windows or WSL listeners on the selected ports. No other project was targeted.
+- Scope: ignored r5 synthetic env/harness/captures and the local plan journals only. No runtime source, tracked tests, migrations, Compose/gate files, production, PR, review, deferral, or merge changed. Existing unrelated .scratch/ was preserved.
+- Tier-2 remains PARTIAL/FAIL; merge HOLD; no deferral accepted. Full staging runbook remains NOT_RUN. The one-cycle authorization is consumed; do not retry or start another cycle without fresh explicit authorization.
+- Read-only diagnosis: canonical Check requires backend/frontend/postgres/redis healthy, worker running, and Windows reachability on the configured ports (scripts/wsl_staging.py:993-1020). The captured error is generic and identifies no failing service/port; after owned teardown the exact cause cannot be reconstructed. Any new live diagnostics require separately bounded scope and fresh authorization.
+
+## Current checkpoint — r4 Tier-2 cycle complete; browser specs failed — 2026-10-16T00:00:55+05:00
+
+- T11 / PR #3639 exact code HEAD: `df31e54b03d054126e58a723a03415a04bc32709`; remote PR was OPEN, Ready, MERGEABLE on the same HEAD immediately before the run. No review, PR, or merge action was taken.
+- One explicitly authorized r4 cycle ran on `clinic-aqs-pr3639-tier2-20261015-r4` (backend/frontend/PostgreSQL ports 18495/18496/25495). Canonical Preflight PASS; Start PASS; one Session FAIL; canonical teardown PASS.
+- Served frontend revision exact SHA PASS. Backend health, PostgreSQL routing, synthetic seed, normal Admin password+TOTP enrollment/login, and Registrar login PASS. Focused PostgreSQL regressions were NOT_RUN in r4; same exact HEAD carries 3/3 PASS from r2.
+- Adapted ignored browser copies: 15 cases, 3 passed, 3 failed, 9 skipped. The patient-form failure is a confirmed harness mismatch: copied `panel-qa-admin-live.spec.ts` uses native `selectOption` but current `PatientModal` uses shared `Select`, which renders a button. The analytics marker expectation is present in `App.tsx` and `routeRegistry.ts`, but its timeout remains unexplained. The queue label matches `ru.ts`; why no Registrar button was found remains unclassified.
+- Teardown verified zero owned containers, networks, volumes, and port listeners; WSL boot stable. C: free 14.25 GiB after (14 before run), D: 28.89 GiB, Ubuntu VHDX remained 52.27 GiB. No OOM was reported.
+- Tier-2 remains PARTIAL/FAIL; merge HOLD; no deferral accepted. The one-cycle authorization is consumed; no retry.
+- Scope: ignored r4 harness/reports and this local checkpoint only. No application/runtime source, tracked tests, migrations, gate/router, production, or PR state changed. Unrelated `.scratch/` preserved.
+- Task-memory checkpoint saved at revision 91. Its 1,089-byte input remains in the owned r4 folder because the execution policy rejected targeted cleanup; no alternate deletion attempt was made.
+- Next exact action: investigate the Admin analytics marker and Registrar control expectations; correct only ignored harness assumptions where source proves them stale. Any source fix or additional staging cycle needs a separately bounded scope; do not repeat r4.
+
+- Next exact action: investigate the Admin analytics marker and Registrar control expectations; correct only ignored harness assumptions where source proves them stale. Any source fix or additional staging cycle needs a separately bounded scope; do not repeat r4.## Current checkpoint — r3 cycle ended; confirmed harness port mismatch — 2026-10-15T23:32+05:00
+
+- Same task 9af17c38-8235-4681-93e8-6a9864cbdb75, T11 / PR #3639, exact HEAD df31e54b03d054126e58a723a03415a04bc32709. PR OPEN/MERGEABLE at pre-run refresh; no GitHub mutation.
+- The user-authorized single r3 cycle ran on project clinic-aqs-pr3639-tier2-20261015-r3, ports 18493/18494/25493, six-hour lease. Preflight PASS; Start PASS; Session FAIL; canonical teardown PASS.
+- Served frontend revision PASS: service worker embedded exact HEAD df31e54b03d054126e58a723a03415a04bc32709.
+- Session stopped at postgresql_routing: the r3 verifier copy still hard-coded port 25491 while new synthetic Postgres was correctly bound at 25493. This is a confirmed validation-harness defect. It blocked seed, normal Admin TOTP, Registrar login and all three browser suites; those are NOT_RUN, not FAIL/PASS.
+- r3 focused PostgreSQL regressions were NOT_RUN by design; existing r2 result is 3/3 PASS on this identical code HEAD. The r3 cycle preserved that as carry-forward evidence.
+- Teardown PASS: no project containers/networks/volumes/listeners remained; WSL boot stable. Exact sanitized reports and source cause in output/staging/t11-pr3639-tier2-20261015-r3/cycle-report.json, session-report.json and HARNESS_REPAIR.md. Executed r3 files and hashes remain immutable.
+- Stop condition hit: first canonical Session failure. Do not retry or start another staging cycle under the consumed one-cycle authorization. Tier-2 remains PARTIAL and merge HOLD; no deferral accepted. Full staging runbook remains NOT_RUN.
+- Next exact action: prepare a separate corrected verifier copy using the env-provided Postgres host port, verify positive and negative identity cases offline, then request a new one-cycle staging authorization. No runtime or tracked test patch is indicated by this failure.
+- Checks: Playwright list 15/3 PASS; Python syntax PASS; PowerShell syntax PASS; candidate-port exclusive binds PASS; git diff --check to be recorded after journal update.
+
+
+## Current checkpoint — r3 harness prepared; local prechecks pass — 2026-10-15T23:25+05:00
+
+- T11 / PR #3639 unchanged: exact local and remote HEAD df31e54b03d054126e58a723a03415a04bc32709, base e98b69b8f4cd2c4661595bab26ebd587914cfaaf; PR OPEN/MERGEABLE at last read. No source/runtime/tracked test edits.
+- New ignored harness r3 exists under output/staging/t11-pr3639-tier2-20261015-r3. Private synthetic env uses project clinic-aqs-pr3639-tier2-20261015-r3, candidate ports 18493/18494/25493, exact SHA pin, preserved synthetic owner and a fresh six-hour expiry. Secret values were not printed.
+- Harness repairs are source-backed copies only: dashboard route heading; Admin buttons/routes and route-shell assertions; panel URLs /admin/patients and /admin/services; queue spec route /registrar/queue and heading Онлайн-очередь. Session uses Windows PowerShell UseBasicParsing and direct Node Playwright CLI; reporter stores only test file/line/column, not messages or page data.
+- PostgreSQL regression tests are intentionally not rerun: previous r2 evidence for this exact code HEAD records 3/3 PASS. New session marks them NOT_RUN and r3 cycle has a separate same-HEAD carry-forward reference; this run targets served frontend SHA, ordinary Admin TOTP, Registrar login and the three copied browser suites.
+- Prechecks PASS: Python syntax, PowerShell parser, exclusive bind on all candidate ports, Playwright collection 15 tests across 3 files. Local disk snapshot remains C: 14.28 GiB, D: 28.89 GiB. No WSL staging lifecycle has run yet.
+- A compound local-check command was rejected before execution; no staging command or cleanup ran as part of it. Split checks completed safely afterward. No alternate cleanup path used.
+- Current result remains Tier-2 PARTIAL / merge HOLD. No PR metadata, review, deferral, merge, or deployment change.
+- Next exact action: refresh PR/local HEAD and owned-environment identity; run the r3 canonical runner exactly once (Preflight -> Start -> Session -> owned teardown). Stop on the first canonical failure or any safety mismatch; no retry.
+- Changed but not live-verified: ignored r3 harness copies and local journal checkpoint only.
+- Stop conditions hit: none.
+
+## Current checkpoint — r3 ignored harness repair and bounded browser/provenance cycle — 2026-10-15T23:20+05:00
+
+- Same task 9af17c38-8235-4681-93e8-6a9864cbdb75, T11 / PR #3639. Exact local and PR HEAD df31e54b03d054126e58a723a03415a04bc32709; base e98b69b8f4cd2c4661595bab26ebd587914cfaaf. PR OPEN, not Draft, MERGEABLE at this checkpoint; CI last reported 26 success / 12 skipped.
+- Mode is the previously authorized validation-only narrow_override; the user replied “давай” to a fresh ignored-harness repair and one staging cycle. No runtime or tracked-test change is authorized.
+- Allowed writer scope: new ignored output/staging/t11-pr3639-tier2-20261015-r3/** plus local T11 journals. Denied: runtime/schema/tracked tests, canonical staging/gate/router/global host settings, production/foreign projects, prior blocked artifacts, .scratch, PR metadata/review/deferral/merge/deployment.
+- Source-backed harness findings: Admin routes /admin/patients, /admin/services; Admin dashboard route /admin has page title Обзор; sidebar items are buttons and current route metadata maps Users/Analytics to /admin/users and /admin/analytics; registrar queue route is /registrar/queue with heading Онлайн-очередь. Prior copies assumed old URLs/text. Other timeout causes remain undetermined.
+- Previous r2 on the same code HEAD: 3 PostgreSQL regressions PASS, ordinary Admin TOTP and Registrar logins PASS; browser copies 0/5 passed, 5 failed, 10 serial skips; served frontend SHA NOT_RUN. No already-passed PostgreSQL cases will be rerun in this browser/provenance-only slice.
+- Current action: create new owned project clinic-aqs-pr3639-tier2-20261015-r3 on candidate ports 18493/18494/25493, explicit six-hour lease and exact SHA pin, after exclusive port checks. Repair only copied browser specs/reporter and Windows PowerShell HTTP parsing in r3. Run Playwright collection, then canonical Preflight -> Start -> one Session -> owned teardown. Stop on first failed lifecycle phase or scope/safety mismatch; never retry in this authorization.
+- Result/status now: harness and port prechecks not yet run; new r3 project has not been created or started. Tier-2 remains PARTIAL; merge remains HOLD. Full staging runbook remains NOT_RUN.
+- Next exact action: create the r3 ignored harness from approved r2 support scripts plus source-checked copied spec edits, validate syntax/collection, then run the canonical lifecycle once.
+- Changed but not verified: r3 PREWORK and checkpoint text only; ignored harness repair not yet performed.
+- Validation already run for this checkpoint: GitHub PR #3639 identity/state read; local exact HEAD/status read; source route/UI inspection; no new staging run yet.
+- Stop conditions hit: none.
 # Progress
 
-## Current authoritative checkpoint — T11.1 code-bearing CI green; Tier 2 partial — 2026-10-14T20:05+05:00
+## Current authoritative checkpoint — forwarding resolved; T11 live-browser failures remain — 2026-10-15T22:50+05:00
+
+- Same task ID `9af17c38-8235-4681-93e8-6a9864cbdb75`, T11 / PR #3639. Exact PR/local HEAD `df31e54b03d054126e58a723a03415a04bc32709`; base `e98b69b8f4cd2c4661595bab26ebd587914cfaaf`. PR OPEN, 26 SUCCESS / 12 SKIPPED CI at pre-run verification. T11 is not complete; T12 stays pending.
+- User renewed the instruction to resolve the blocker. Same validation-only `narrow_override`; only the new ignored r2 harness and these local journals changed. No runtime/schema/tracked-test/launcher/Compose/gate/router/global setting, PR review/deferral/merge/deployment change. Journals stay local/uncommitted; unrelated .scratch is preserved.
+- Root environment conflict reproduced: Windows excludes TCP 55514-55613, including old PG port 55581; exclusive bind FAILS AccessDenied / 10013. New 18491/18492/25491 pass. The ignored runner now checks exclusive loopback bind before WSL/build. No new dependency junction/install. Canonical Start subsequently PASS, including all Windows port checks: the network blocker is resolved for this run.
+- Owned project `clinic-aqs-pr3639-tier2-20261015-r2` had a six-hour owner/expiry lease. Preflight PASS; Start PASS; Session FAIL from actual child validation outcomes; canonical owned teardown PASS with zero containers/networks/volumes/listeners and stable WSL boot. A later independent Docker recheck was NOT_RUN because the distro was already stopped; it was not rebooted for that check. C/D free after cycle: 14.41/28.89 GiB.
+- PASS: backend health, migrated own app-DB routing, three focused PostgreSQL regressions (3/3, zero skips), synthetic seed, normal Admin password/TOTP enrollment, ordinary Admin UI TOTP login, Registrar UI login.
+- Browser result: 15 collected, 0 passed, 5 failed, 10 skipped by serial dependencies. Admin navigation 3 failures; patient/service spec 1 failure + 1 skipped; queue spec 1 failure + 9 skipped. These are real FAIL/SKIP outcomes, not NOT_RUN or successful replacement coverage.
+- Served frontend SHA remains NOT_RUN. The PowerShell HTTP request variant used by the harness also fails on a local synthetic response; adding UseBasicParsing passes that diagnostic. A syntax-checked corrected session copy is prepared in r2/next-run; live attestation is still absent. Executed harness files remain unchanged.
+- Source confirms stale dashboard text and old patient/service query-entry assumptions in copied tests. Exact causes of Users/Analytics/Registrar timeouts are not established by the sanitized reporter. No new runtime defect is confirmed; do not dismiss all failures as obsolete tests.
+- Artifacts: r2/cycle-report.json, session-report.json, playwright-sanitized-report.json, windows-port-diagnosis.json, http-parser-diagnosis.json and HARNESS_REPAIR.md under output/staging/t11-pr3639-tier2-20261015-r2.
+- Stop condition: failed Session; no second staging cycle was run. Full STAGING_VALIDATION.md remains NOT_RUN; Tier-2 PARTIAL and merge HOLD, with no deferral accepted.
+- Cleanup limitation: policy rejected deletion of the new r2 private synthetic env before process launch. It remains alongside the previously blocked r1 env/junction. No alternate removal route was used. Session-owned authentication state/raw logs were removed by its existing cleanup; sanitized reports remain.
+- Next exact action: repair only the ignored UI harness from canonical routes/current controls and add safe failure-location/selector diagnostics, then validate browser/provenance in a fresh bounded owned slice. Do not rerun the three passed PG tests without source change/new concern; do not start T12 or merge from this partial result.
+- State-only task-memory checkpoint saved successfully at revision 89; its task-owned payload was removed. Final git diff --check PASS; independent Windows listener recheck: zero on all selected ports.
+
+## Superseded checkpoint — T11 #3639 fresh staging cycle stopped on Windows forwarding — 2026-10-15T22:15:12+05:00
+
+Plan: admin queue simplification v3.91. Current task T11 / PR #3639; T11 remains IN_PROGRESS and Tier-2 PARTIAL. Task ID: `9af17c38-8235-4681-93e8-6a9864cbdb75`.
+Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`; branch `codex/aqs-T11-manual-availability`; exact local/PR HEAD `df31e54b03d054126e58a723a03415a04bc32709`; base `origin/main` `e98b69b8f4cd2c4661595bab26ebd587914cfaaf`.
+
+- The user authorized exactly one corrected validation-only cycle with a new synthetic Compose project, explicit lease, and unique ports. Existing `narrow_override` applies after the previously recorded gate misroute. No runtime code, tracked test, launcher, Compose, gate/router, production, PR metadata, review, deferral, merge, or deployment changed.
+- Immediately before execution, PR #3639 was OPEN and MERGEABLE, with local/PR HEAD identical. C: 14.42 GiB free; WSL backing D: 28.89 GiB free; selected ports 18481/18482/55581 were free. Windows available RAM was 1.61 GiB; no 3 GiB hard gate was applied.
+- Canonical owned cycle used project `clinic-aqs-pr3639-tier2-20261015-r1`, owner preserved from the existing private synthetic env, lifecycle `ephemeral`, bounded six-hour lease, exact frontend SHA pin, and ports 18481/18482/55581. The source private env and old harness were not modified.
+- Canonical Preflight PASS on exact HEAD `df31e54b03d054126e58a723a03415a04bc32709`: host reserve passed (14 GiB), WSL backing reserve passed (28 GiB), Linux `/` and Docker root each reported 914 GiB free, WSL available memory 3185 MiB, zero warnings, boot ID stable.
+- Canonical Start FAIL: `FORWARDING_UNAVAILABLE`. The `ready()` path checks required containers running/healthy before testing Windows TCP reachability; at least one project port was not reachable from Windows. The helper did not record which port, so the specific forwarding failure and its cause remain unknown. Do not infer this was caused by RAM; no evidence establishes that.
+- Canonical Session NOT_RUN. PostgreSQL regressions, normal Admin 2FA enrollment/login, Registrar login, `admin-navigation.spec.ts`, `queue-system.spec.ts`, `panel-qa-admin-live.spec.ts`, and served frontend SHA attestation are all NOT_RUN. Full `STAGING_VALIDATION.md` remains NOT_RUN.
+- Canonical teardown PASS for the owned project. Sanitized report confirms 0 project containers, 0 networks, 0 volumes, and no selected-port listeners; WSL boot remained stable. Image/cache counts were not independently recorded; no shared Docker prune was run.
+- Sanitized run report: `output/staging/t11-pr3639-tier2-20261015-r1/cycle-report.json`. Harness source hashes and phase/status summary are in that report.
+- The new ignored harness keeps sanitized reports and PREWORK. User authorized removing only its private synthetic env copy and temporary `node_modules` junction, but the exact cleanup command was again rejected by execution policy before process launch. Both remain in the ignored harness. The old private env and shared `node_modules` target remain intact; no alternate deletion mechanism was used.
+- Read-only post-teardown diagnostics: `.wslconfig` specifies `networkingMode=NAT` and `localhostForwarding=true`; the WSL virtual Ethernet adapter was Up; Ubuntu-24.04 was Stopped; no Windows portproxy entries existed. Selected ports had no listeners after teardown, as expected. No obvious forwarding toggle or active listener explains the failure; the failing port was not recorded. No WSL distro was started during these follow-up diagnostics and no host/WSL setting changed.
+- No application finding was produced and no deferral or merge decision was made. T12 must wait until T11 is resolved and PR #3639 closes.
+
+## Current checkpoint
+- Completed: one user-authorized fresh canonical cycle; Preflight PASS; Start failure captured; canonical owned teardown PASS; status and limitations recorded locally.
+- Changed but not verified: local plan journals only; new ignored harness/evidence files. No tracked runtime/test change.
+- Remaining: diagnose Windows/WSL forwarding using read-only evidence; resolve current PR review/CI state and obtain required review; all dependent live checks remain NOT_RUN.
+- Blocker: canonical Start reports `FORWARDING_UNAVAILABLE`; exact host/port cause is not known. The authorized one-cycle limit is exhausted; do not retry without renewed user authorization.
+- Next exact action: keep T11 open and Tier-2 PARTIAL. Read-only diagnosis found NAT with localhost forwarding enabled and no obvious host setting error. This one-cycle staging authorization is exhausted; do not repeat staging without renewed user authorization, and do not start T12 or merge #3639 from this evidence. The two ignored task-owned cleanup artifacts remain because the authorized removal command was blocked before execution; do not bypass the command-policy block.
+- Checks to rerun after any source change: focused queue/profile tests, staging lifecycle tests, required CI, and `git diff --check`; staging would require a separately authorized fresh cycle.
+
+## Superseded checkpoint — #3639 synced to main; Tier-2 stopped at Start precondition — 2026-10-15T21:27+05:00
+
+- Task ID `9af17c38-8235-4681-93e8-6a9864cbdb75`; current plan stage T11 / PR #3639. T10 / PR #3633 is MERGED at `6315c62e`; PR #3684 is MERGED at `e98b69b8`.
+- Synced the PR worktree from base `f8fcc944` through current `origin/main` `e98b69b8` in merge commit `df31e54b03d054126e58a723a03415a04bc32709`; pushed only that merge commit. Remote PR HEAD matches; base is `e98b69b8`. PR remains OPEN, MERGEABLE/CLEAN, with no unresolved review threads. Exact-head CI: 26 SUCCESS, 12 SKIPPED, 0 failed/pending. No independent formal approval is recorded.
+- Validation of the imported staging-cleanup changes: `scripts/tests/test_wsl_staging_guard.py` — 274 passed; `git diff --check` passed. The first wrapper invocation was malformed and selected a test path as a required module; it ran no tests. The corrected invocation passed.
+- One authorized synthetic cycle reached Preflight PASS (host free 14 GiB; WSL backing-volume free 28 GiB; WSL available 3221 MiB), then Start FAIL `LIFECYCLE_EXPIRY_REQUIRED`. No Compose service was created. Session/tests and served revision are NOT_RUN. Canonical teardown PASS: 0 owned containers, networks, volumes, or port listeners. The `VERCEL_GIT_COMMIT_SHA` pin was restored byte-for-byte. Old owned cycle report was archived as `cycle-report.stale-20261015-211240.json`.
+- Cause is a missing required `CLINIC_EXPIRES_AT` in the private synthetic env after #3684 introduced bounded lifecycle labels. `CLINIC_OWNER` is present. No runtime, tracked test, launcher, Compose, gate/router, production, PR description/review, deferral, merge of #3639, or deployment change was made. Three plan journals remain local/uncommitted; unrelated `.scratch/` is preserved.
+- Tier-2 remains PARTIAL; no deferral is accepted. The prior task scope allowed one canonical cycle and says not to retry after a phase failure. A corrected fresh run also needs a new project identity per the current staging runbook. Do not rerun or start T12 without renewed user authorization for that bounded fresh cycle. User said to work with available memory; pre-run host RAM was 1.17 GiB, while WSL reported 3221 MiB. RAM was not the Start blocker.
+
+## Superseded prior checkpoint actions
+- Completed: confirmed T10 merge; synchronized/pushed the staging-cleanup merge into #3639; exact-head CI completed; 274 focused staging-guard tests passed; one owned Preflight/Start/teardown attempt was recorded.
+- Changed but not verified: no source/runtime edits; only the local merge commit plus uncommitted plan journals.
+- Remaining: Tier-2 PostgreSQL/browser/Admin 2FA/Registrar/provenance checks; formal independent review; close #3639; only then proceed to T12.
+- Blocker: the single authorized run stopped at missing lifecycle expiry metadata; the saved one-cycle scope forbids a retry. The private env is restored and the owned project is empty.
+- Next exact action: request authorization for one fresh synthetic project with an explicit owner/expiry lease and unique project/ports, then execute canonical Preflight → Start → Session → teardown once. If not authorized, leave T11 PARTIAL and do not proceed to T12.
+- Checks to rerun after next source change: focused backend queue/profile tests, staging guard unit tests, exact-head CI as applicable, and `git diff --check`; a staging run must record every PASS/FAIL/NOT_RUN separately.
+
+## Historical checkpoint — T11 staging held on low host RAM — 2026-10-15T09:25+05:00
+
+- Original task 9af17c38-8235-4681-93e8-6a9864cbdb75 remains T11 / PR #3639. PR is OPEN, mergeable, not merged; exact base f8fcc944c2284c825ebd315810a86481ca419cf8, head 30d5cf85302493b193cfd51b9a1266e22532db00. The main sync changed only three documentation files; queue/runtime sources are unchanged. User requires these journals to remain local/uncommitted.
+- WSL storage maintenance is complete: D:\WSL\Ubuntu-24.04\ext4.vhdx is detached and 52.24 GiB; C: has 14.00 GiB free and D: 28.93 GiB free. The previous offline compaction returned 18.83 GiB. This clears the disk-space blocker.
+- Exact-head CI on 30d5cf85302493b193cfd51b9a1266e22532db00: Unified CI, Frontend unit/E2E/build/lint, Backend tests, code quality, metadata, context-boundary, parity, PR Required Gate, regression audit, PR review quality, security scan, gitleaks, i18n, lifecycle recommendation all SUCCESS. Path-aware jobs remain SKIPPED: nightly DAST, Telegram release gate, Docker build, integration tests, k6, production/staging readiness reports, plus the security job inside Unified; skips are not passes.
+- Host memory is the active blocker. Read-only Windows snapshots during this turn showed only 1.06–1.24 GiB available; latest 1.16 GiB. Earlier low-memory staging attempts had Docker timeouts at comparable/lower availability. The 3 GiB value is a practical retry target from those attempts, not a repository policy limit. Ubuntu was not started; no new Preflight, Start, Session or teardown ran.
+- Current-cycle outcomes: Preflight NOT_RUN; Start NOT_RUN; Session NOT_RUN; teardown NOT_RUN. The three remaining adapted browser specs (admin-navigation.spec.ts, queue-system.spec.ts, panel-qa-admin-live.spec.ts), normal Admin 2FA, Registrar login, PostgreSQL cases and served-frontend attestation are NOT_RUN for this exact head. Tier-2 remains PARTIAL; no deferral accepted.
+- Harness readiness: its private synthetic.env still pins an older frontend SHA (observed prefix 46edbf6f); it must be changed only for the one authorized run and restored in finally. An old owned cycle-report.json is stale from the earlier pre-compaction failure and must be archived before a fresh run. No secret values were printed.
+- Mode remains the user-approved validation-only narrow_override; the gate misroute/override is already recorded in this task. Allowed: existing owned project clinic-aqs-pr3639-recovery-20261014, its ignored helper/report files, the one build-SHA pin temporarily, and these three journals. Denied: runtime/tests, launcher/Compose/gate/router, production, foreign staging, .scratch/ other than a task-owned memory payload, PR-body/review/deferral/merge/deploy.
+- Next exact action: after Windows available RAM is stably at least 3 GiB, verify these exact PR/base/head facts, archive only the stale owned report, temporarily pin the existing synthetic env to 30d5cf85302493b193cfd51b9a1266e22532db00, run exactly one canonical Preflight → Start → Session → teardown through run-owned-cycle.py, restore the original env pin, then record every PASS/FAIL/NOT_RUN and teardown counts. If Preflight fails, do not retry.
+
+## Historical checkpoint — target offline; administrator compaction pending — 2026-10-15T08:56:15.4835952+05:00
+
+- Same task9af17c38-8235-4681-93e8-6a9864cbdb75. Measured cache cleanup and Docker retention installation remain PASS; no staging/app-source/PR action.
+- Initial trim guards refused an unclassified shell, then exact raw-login argument padding. Both stopped before mutation and reports are preserved. Official WSL source plus init-owned PTY master identified this as our bootstrap. Revised exact boot/PID/start-tick/UID/parent/argv/PTY/no-child guard and NUL normalization received independent GO; every other shell still blocks.
+- Final trim-quiesce report PASS: sync/fstrim of target / completed; Docker and containerd stopped gracefully; no containerd tasks or running containers. Large fstrim byte count is discardable guest capacity, NOT Windows space reclaimed.
+- Owned keeper ended after exact identity check; target-only Ubuntu termination PASS. Full WSL list shows only stopped Ubuntu24.04; exact image Attached=false. After automatic VM idle exit, known disk consumers=0. No global shutdown or forced foreign process close.
+- Native exact-image compact helper hash6bfb124bd0509ae0ed56e6b12592fd7c1289728aedba9aea09e7505b7144b78d received independent GO. Standard Windows RunAs launch is pending the real OS administrator prompt; compaction is NOT_RUN until actual numeric-success report. Do not start Ubuntu/Docker while pending or while compact is running.
+- Next read compaction-launch-report.json and timestamped compaction report; require PASS and independent file-size/D-free measurement. Then normal boot plus reviewed verify-retention.py must verify new daemon, config and inherited log defaults with own never-started probe, followed by exact probe cleanup and resource-set preservation. No repeated UAC request after cancellation; use prepared operator step if needed. Journals remain local/uncommitted.
+
+## Historical checkpoint — cache cleaned; offline compaction next — 2026-10-15T08:39:46+05:00
+
+- Same T11 task `9af17c38-8235-4681-93e8-6a9864cbdb75`; user performed reviewed exact detach, actual report and independent query PASS. Ordinary WSL launch now PASS; prior VHD sharing violation resolved. No Compose stack started.
+- Read-only inventory verified root ext4/local Docker. Builder cache was31.79GB with26.34GB reclaimable. Age-filtered prune PASS reclaimed1.231GB; budget pass PASS reclaimed21.17GB. Measured remaining cache9.385GB; 4GB is retention target, not a hard total-size guarantee. Images52, container1(stopped), volumes66 unchanged; no unknown/user data deleted.
+- Root filesystem used fell from about72.82GB decimal to49.81GB. Host VHD has not yet been compacted; D free ~10.12GiB. Do not claim the reclaimed cache bytes already returned to Windows.
+- Merged and validated actual /etc/docker/daemon.json retention: builder GC target4GB; json-file max-size10m/max-file3. Original root-only backup preserved; atomic replacement/hash checks PASS; activation still pending planned quiescent restart. No raw original configuration exported.
+- Next: reviewed trim-quiesce.py (GO) syncs/trims only target / and gracefully stops idle Docker/containerd after no-consumer checks. Require PASS before target-only WSL termination and guarded offline exact-VHD compaction. Then boot/probe and verify config activation plus a disposable owned log-default probe. No global shutdown, foreign resource deletion, app-source/PR/production action. Journals stay local/uncommitted.
+
+## Historical checkpoint — storage maintenance blocked at Windows elevation — 2026-10-15T07:31:59+05:00
+
+- Same original task `9af17c38-8235-4681-93e8-6a9864cbdb75`. User explicitly authorized the proposed host storage maintenance. Mandatory worktree gate returned gate_ok; execution prompt and independent exact-helper safety review read.
+- Confirmed single registered Ubuntu-24.04 at the exact target path, Stopped, no known Docker/VM/diskpart consumer. Prepared guarded exact-image detach helper and standard Windows UAC launch. Current token is non-admin.
+- Windows returned cancellation during RunAs, before the child/helper started. The outer shell's zero exit is not a successful operation: no detach-report exists. Image remains Attached=true; file length and modification time are unchanged. No automatic UAC retry.
+- Linux/Docker inventory, cleanup, trim, compaction, retention configuration and staging are all NOT_RUN. Original T11 remains incomplete; no new PR action or application source change.
+- Exact operator step: open PowerShell as administrator under the same Windows account and run `output/staging/t11-vhd-maintenance-20261015/detach-exact-vhd.ps1` by absolute path. See OPERATOR_STEP.md there. Agent must then read detach-report.json and independently require Attached=false before ordinary WSL inventory. Any helper guard/elevation failure stops the step; no forced shutdown/handle close/cleanup.
+- Prework, reviewed helper, launch-report.json and operator step remain ignored/local. Only three T11 journals modified, kept uncommitted; memory checkpoint records the boundary. Next after successful exact detach: ordinary WSL access and aggregate disk/Docker inventory, then scoped cleanup and separate compaction. Do not build staging first.
+
+## Historical checkpoint — read-only VHD/storage diagnosis — 2026-10-15T07:16:11+05:00
+
+- Original task remains T11 / PR #3639; task ID `9af17c38-8235-4681-93e8-6a9864cbdb75`. This is a related advisory diagnostic, not a new implementation phase.
+- Host observations: `D:\WSL\Ubuntu-24.04\ext4.vhdx` is 71.02 GiB; D is 81.46 GiB total / 10.15 GiB free; C is 14.00 GiB free. `fsutil sparse queryflag` says the file is NOT sparse. Virtual capacity is 1024 GiB, not host allocation.
+- Ubuntu reports Stopped and no Docker/vmmem process was listed, but `Get-DiskImage` reports `Attached=true`, device `PhysicalDrive1`. `Get-Disk` reports an online, writable file-backed virtual disk. This is a concrete attachment state consistent with the sharing violation; its creator and final causal confirmation remain unknown. No detach was attempted.
+- Source audit: canonical Start normally builds with cache; final `staging_down.ps1` removes owned project resources with `down -v --remove-orphans --rmi local`, but does not reclaim BuildKit cache or compact the VHD. Launcher Stop alone is plain `down`. Current Linux/Docker usage and reclaimable bytes remain unmeasured.
+- No new WSL probe, Preflight, staging build, cleanup, compaction, source/config edit, PR action or system change ran. Only the three local journals are updated; they remain uncommitted.
+- Next: ground a controlled maintenance scope for the unused Windows VHD attachment, then obtain normal WSL access and measure `df`/directory/Docker usage before deleting anything. Cleanup inside Linux and reclaiming host VHD space are separate steps. Do not repeat staging builds while this storage problem is unresolved. Previous CI/readiness observations below are historical, not refreshed in this advisory slice.
+
+## Historical checkpoint — CI green; Tier-2 still blocked by WSL VHD — 2026-10-14T23:51:33+05:00
+
+Plan version: 3.91
+Current task: T11 PR_OPEN / #3639; T11.1 IN_PROGRESS; Tier-2 PARTIAL.
+Task ID: 9af17c38-8235-4681-93e8-6a9864cbdb75.
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final.
+Branch: codex/aqs-T11-manual-availability.
+Exact PR HEAD: 06f48364307881e19e848c5930227a1567db0231. Base/origin/main: 725a8f7e7e1154246d78bcbf94ee51ed894a8f93 (synchronized and pushed by merge commit 06f483643).
+
+- The user authorized completing #3639 blockers, approved validation-only `narrow_override`, earlier requested main synchronization, and chose to keep all three journals local. Journals remain uncommitted; no review, deferral, PR-body edit, runtime code change, merge of the PR, or deployment is authorized/performed.
+- The test-only mock repair remains published. On prior HEAD 46edbf6, Unified run 38608807859 attempt 3 completed successfully, including Backend and PR Required Gate; its earlier one-off PostgreSQL concurrency failure did not recur, and its root cause remains unconfirmed. Local unit module passed 13/13; Ruff, py_compile, diff check and normal hooks passed. This prior CI result does not certify the newly synchronized HEAD.
+- Synced `origin/main` 725a8f7e7 into the PR branch by merge commit 06f483643 and pushed. The main commit changed 14 frontend public-site files; path comparison showed no overlap with PR changes before the merge. PR remains OPEN and GitHub reports `mergeable=MERGEABLE`, `mergeStateStatus=CLEAN`; the existing COMMENT review from the repo owner on an older HEAD records two P2 and HOLD. No current approval is recorded.
+- New exact-head Unified run 38616280147 completed SUCCESS on 06f483643; Backend, Frontend E2E, frontend unit/build/lint, quality, docs, parity, metadata, Context Boundary, security, CodeQL, i18n and PR Required Gate passed. Path-aware/nightly and unrelated release jobs were skipped, not counted as passes.
+- The existing ignored harness is `output/staging/t11-pr3639-recovery-20261014/run-owned-cycle.py`; no staging-dependent check has passed in this recovery attempt. Latest storage snapshot: C free 14.11 GiB and D (registered VHD volume) free 10.15 GiB; reserve is 10 GiB. A direct read-only `wsl.exe -d Ubuntu-24.04 -e /bin/true` again failed with `Wsl/Service/CreateInstance/MountDisk/HCS/ERROR_SHARING_VIOLATION`; distro reports Stopped. No canonical Preflight was retried after this probe, no Compose Start occurred, and the lock owner/cause was not changed or established.
+- Start, Session, PostgreSQL regressions, ordinary Admin 2FA, served frontend provenance, Registrar login, and all three adapted browser specs remain NOT_RUN. Teardown is NOT_NEEDED_NO_START; resource absence was not independently asserted. No shared WSL shutdown, foreign-project action, cleanup, or system configuration change was performed.
+- Private synthetic env and harness remain ignored under `output/staging/t11-pr3639-recovery-20261014`; source env, foreign staging projects, and pre-existing `.scratch/` are preserved. Full `STAGING_VALIDATION.md` and Tier-2 remain PARTIAL; no deferral accepted.
+- Next exact action: the existing review findings and incomplete Tier-2 still require disposition. When the host can attach the Ubuntu VHD and a read-only WSL probe succeeds, run the existing canonical Preflight, then the one owned continuous staging cycle. Until then keep Tier-2 PARTIAL; do not retry Preflight. No new review, deferral, PR merge, or deployment was performed; green CI/mergeability is not merge approval.
+
+## Historical checkpoint — #3639 Session stopped before tests; predecessor CI failing — 2026-10-14T22:20:21+05:00
+
+Plan version: 3.91
+Current task: T11 PR_OPEN / #3639; T11.1 IN_PROGRESS; Tier-2 PARTIAL; validation cycle stopped at canonical Session readiness.
+Task ID: 9af17c38-8235-4681-93e8-6a9864cbdb75.
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final.
+Branch: codex/aqs-T11-manual-availability.
+Exact PR HEAD: 1225b67d8cf7d8394528ec9645f29590034ca248. Base and origin/main: 3de2f1b660fd6bb58a28a866af5828a5cfe77c31.
+GitHub: PR OPEN, mergeable=true, mergeStateStatus=BLOCKED. Unified CI run 38601279640 failed on this exact HEAD; PR Required Gate failed.
+
+- The user authorized a validation-only narrow_override after the gate misrouted this code-free scope. No runtime, tracked test, schema, launcher, Compose, gate/router, production, or foreign staging changes were made.
+- Preflight attempt 1 failed before build with PUBLIC_ORIGIN_CONTEXT_MISMATCH; only the task-private CORS_ORIGINS was corrected. The one retry passed. Canonical Start passed with runtime_readiness=PASS, host free space 14 GiB, WSL backing free space 10 GiB, WSL available memory 3239 MiB, zero warnings, exact source HEAD, and the owned ports 18461/18462/55561.
+- Canonical Session failed before launching the child command with STAGING_NOT_READY. PostgreSQL regressions, normal Admin password/TOTP flow, Registrar login, served frontend revision verification, admin-navigation.spec.ts, queue-system.spec.ts, and panel-qa-admin-live.spec.ts are all NOT_RUN. Start had served_revision_verified=false.
+- After that refusal, the owned Compose services were stopped; worker exit code 1 logged Redis connection reset, OOMKilled=false. Root cause is not established. No test or login was run.
+- Canonical teardown passed; independently verified zero owned containers, networks, volumes, images, and listeners on all three selected ports. The task-owned synthetic env copy was removed; the source env and unrelated .scratch/ were preserved.
+- Exact-head CI: backend reported 5475 passed, 2 failed, 66 skipped, 25 deselected, 3 xfailed. Both failures are in test_queue_join_claim_coordinator.py and raise TypeError: Mock object is not iterable at queue_svc/_core.py:119. The two failures were not patched under the validation-only scope.
+- No Tier-2 deferral, review submission, PR-body update, merge, or deployment occurred. The full STAGING_VALIDATION.md remains PARTIAL.
+- Next exact action: resolve the two backend CI failures in a separately authorized code/test scope, diagnose why canonical Session reports STAGING_NOT_READY after Start, then request/execute a fresh bounded validation cycle. Do not retry Session within the stopped cycle.
+
+## Historical checkpoint — pre-staging snapshot — 2026-10-14T20:05+05:00
 
 Plan version: 3.91
 Current task: T11 PR_OPEN / #3639; T11.1 IN_PROGRESS; T11.1a VALIDATED.
@@ -353,7 +632,7 @@ PR base / `origin/main`: 3d60063c04beff7a3fa99aad6f5fd4a78251b3ed (local sync co
 Latest validated runtime source commit: 6522e8c0046d824aaefa31960582ce26f7cef708. The three target nodes ran against exact code HEAD 0b6dcdf6937c0e6684ea6fd7893405cd40b148b3; journal-only CI was green on e2f5da0782c17152a34b9d4a9cd9956c10830173.
 Implementation paths for the new P2: `backend/app/services/queue_svc/_operations.py`, `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, and `backend/tests/integration/test_queue_profile_lifecycle.py`. Preserve pre-existing untracked `.scratch/` and do not stage it.
 Latest owned staging run clinic-aqs-pr3639-tier2e-20261011 passed canonical Preflight, Start, Session and all three target PostgreSQL nodes. Teardown verified zero owned containers, volumes, networks and images; the private env was removed. Sanitized JUnit and ignored helper/logs remain under output/staging/.
-Last updated: 2026-10-11T16:39+05:00
+Last updated: 2026-10-16T10:01+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -361,7 +640,7 @@ Last updated: 2026-10-11T16:39+05:00
 | T09.2 | MERGED | PR #3614 | c2ccde2e46bbc115e816d4c383df93b1c8665ab1 | EVIDENCE.md#t092-pr-3614-merged |
 | T09.3 | MERGED | PR #3620 | 19c35ec62481dde45c9ea49146ecc4999aaf599f | EVIDENCE.md#t093-pr-3620-merged |
 | T10 | MERGED | PR #3633 | 6315c62edb888bb8864928a41dd70a4c00be6e3d | EVIDENCE.md#t10-pr-3633-merged-and-tier2-follow-up-2026-10-09 |
-| T11 | PR_OPEN | PR #3639; latest facts are in the first authoritative checkpoint above | | EVIDENCE.md (2026-10-14 T11 entries) |
+| T11 | PR_OPEN | [PR #3639](https://github.com/drsapaev/final/pull/3639); exact HEAD df31e54b; r6 Session FAIL: STAGING_NOT_READY, teardown PASS | | EVIDENCE.md#t11-pr3639-r6-readiness-failure-2026-10-16 |
 
 ## Historical checkpoint — PR #3639 staging pass and exact-head CI green; Tier-2 still partial — 2026-10-11T16:39+05:00
 
@@ -918,10 +1197,10 @@ Last updated: 2026-10-08T21:45+05:00
 | T06.1 | MERGED | `codex/aqs-T06-policy-schema` / [PR #3545](https://github.com/drsapaev/final/pull/3545) | `e8f585ab0a51e256fa638fe56c0582eff0bbafc6` | `EVIDENCE.md#t06.1-merge-checkpoint` |
 | T06.2 | MERGED | `codex/aqs-T06.2-creation-policy` / [PR #3546](https://github.com/drsapaev/final/pull/3546) | `b804a71a6bad22400324e2236a3221317eac3158` | `EVIDENCE.md#t06.2-merge-checkpoint` |
 | T07 | MERGED | codex/aqs-T07-admission-window / PR #3557 | 425df11c7a84f0d1e7954df0d00415927212669a | EVIDENCE.md#t07-merge-and-t08-gate-source-audit |
-| T08 | IN_PROGRESS | T08.1a/#3571, T08.1b/#3572, T08.2a/#3576, T08.2b/#3581 MERGED; T08.2c / PR #3596 OPEN at `068fdbed`; exact-head CI: 31 success, 12 skipped, 0 failures. Awaiting the user's review/merge decision. | | EVIDENCE.md (latest T08.2c entry) |
+| T08 | MERGED | [PR #3596](https://github.com/drsapaev/final/pull/3596) | `7f3b751241eaa1f9a0ffdf07fff09cbdec32eba7` | `EVIDENCE.md#t08-merge-checkpoint` |
 | T09 | PLANNED | | | |
-| T10 | PLANNED | | | |
-| T11 | PLANNED | | | |
+| T10 | MERGED | [PR #3633](https://github.com/drsapaev/final/pull/3633) | `6315c62edb888bb8864928a41dd70a4c00be6e3d` | `EVIDENCE.md#t10-merge-checkpoint` |
+| T11 | IN_PROGRESS | [PR #3639](https://github.com/drsapaev/final/pull/3639) — r6 Session FAIL: STAGING_NOT_READY, teardown PASS | | EVIDENCE.md#t11-pr3639-r6-readiness-failure-2026-10-16 |
 | T12 | PLANNED | | | |
 | T13 | PLANNED | | | |
 | T14 | PLANNED | | | |
@@ -992,3 +1271,20 @@ Last updated: 2026-10-08T21:45+05:00
 
 - Latest review/fix checkpoint (2026-10-03): deterministic baseline reproduction confirmed a new token entry could be created at 09:00:01 after passing the 09:00 gate at 08:59:59 and waiting for the numbering row lock. Fix commit `4595d67a6e484bab8a9a59277bdaf2775e143d56` locks and refreshes the queue before the gate. Regression now rejects both tagged and untagged queues without entry or usage increment. See `EVIDENCE.md#t07-token-cutoff-lock-review-fix`.
 - Next exact action: update PR body with this Admin staging result and exact-head CI, commit and push the evidence checkpoint, then inspect checks for the actual pushed HEAD. Keep merge on hold pending independent human review and remaining Tier 2 or an explicit #3557-specific deferral. Do not begin T08.
+## Final closure checkpoint — 2026-10-16T14:59:44.8663163+05:00
+- Frozen code under test: acb509c36a9583f917bc86d601120bef95eddc1e; reviewed main 4eb6ee2cc162237a5182dd68fff506db5de3a0dd included once.
+- Confirmed legacy Doctor token fallback P2 fixed in acb509c36. Pure unit fail-first: 4 FAIL / 6 PASS; after fix: 17 PASS (10 fallback + 7 policy). Pinned normal commit hooks PASS, including Ruff/Black/gitleaks. Independent AI source review: no confirmed P0/P1/P2 in the three-file follow-up; this is not human approval.
+- Offline harness syntax/reference/PG-route/Windows-port negative controls PASS; browser collection 4 cases, new PG regression collection 2 variants. Runtime evidence has not started.
+- One authorized r7 cycle is next: 21 PostgreSQL + 7 policy unit + 4 T11 browser cases, ordinary Admin 2FA, exact served source SHA and owned teardown. No identical retry authorized after a failure.
+- Limited legacy-spec deferral remains conditional, not applied. Full pre-production runbook remains incomplete. No production or merge.
+## r7 outcome and r8 authorization — 2026-10-16T15:11:49.2980428+05:00
+- r7 code acb509c36: Preflight/Start PASS; served frontend SHA PASS; owned PostgreSQL DB routing/Alembic0080 PASS; PG stage FAIL FRESH_PG_REPORT_MISSING; selected21PG+7unit runtime results NOT_RUN, Admin2FA/browser NOT_RUN. Boot stable, services healthy/no OOM/restarts. Teardown PASS:0 containers/volumes/networks,0 listeners. Host reserve C14/D28GiB, WSL3190/3253MiB available; this was not a memory failure.
+- Offline exact child argv reproduced exit1 AmbiguousParameter caused by pytest short -o crossing PowerShell launcher. Long --override-ini options: exit0,28 collected, no DB/network. This is a confirmed command barrier; original r7 private stage log was removed, so no recovered earlier-stage trace is claimed.
+- Original r7 script copies hash-match its frozen manifest. Post-run ignored harness now persists allowlisted phase/exit/error codes before cleanup;5 negative+1success offline controls PASS.
+- User explicitly authorized one NEW r8 cycle after this concrete correction. Root prepares new project/ports/private lease in output/staging/t11-pr3639-final-20261016-r8; source unchanged. r8 NOT_STARTED. No merge/deploy; limited deferral not effective.
+
+## Final packet publication and metadata correction — 2026-10-16
+- Final acceptance packet AI review confirmed C01–C09 and six-field limited deferral at their stated scope; no concrete acceptance/deferral blocker. C07 is same waiting entry/queue/resource/status and staff access, not full row-byte or clinical-serving verification.
+- PR3639 description replaced with final source/evidence/disposition; existing GitHub review remains COMMENT, no human APPROVE submitted.
+- The first body rewrite omitted the repository template's exact required field labels, so the body-triggered PR Review Quality Gate failed. No code/staging test regressed. Corrected labels and validated the exact body locally with scripts/check_pr_review_template.py --body-file output/staging/t11-pr3639-final-20261016-r8/pr-body-final.md: PASS (one expected not-applicable reason warning). Hosted metadata recheck triggered; wait for its real result before final readiness claim. No gate/router/test/workflow source changed.
+- Preserve all five local plan documents and sanitized r8 evidence packet in the next worktree before cleaning/archiving this one. Do not transfer private env/auth data. Current source remains committed acb509c36; journals intentionally uncommitted.

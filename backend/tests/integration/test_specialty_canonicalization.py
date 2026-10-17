@@ -981,6 +981,13 @@ def test_department_integration_profile_tags_cover_family(db_session) -> None:
     assert profile is not None
     assert "dentistry" in (profile.queue_tags or [])
     assert "dental" in (profile.queue_tags or [])
+    assert profile.show_on_qr_page is False
+
+    # Keep this regression focused on specialty/tag matching by modeling the
+    # explicit publish step required before a newly provisioned profile is
+    # available to QR selection.
+    profile.show_on_qr_page = True
+    db_session.commit()
 
     # and the QR clinic-wide matcher now sees canonical dentistry doctors
     # (RQ-09: the public selection applies the canonical owner-eligibility

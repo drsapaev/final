@@ -19,7 +19,7 @@ For architectural details, see [ADR-001: Queue Ownership & Specialty Architectur
 
 ---
 
-## Quick Start (5 Steps)
+## Quick Start (6 Steps)
 
 ### Step 1: Create a Department
 
@@ -41,12 +41,14 @@ For architectural details, see [ADR-001: Queue Ownership & Specialty Architectur
 - `ServiceCategory` created for this department
 - Default `Service` created ("Консультация (Неврология)")
 - `DepartmentService` link created
-- **`QueueProfile` auto-created** with:
+- **`QueueProfile` auto-created hidden by default** with:
   - `key = "neurology"`
   - `title_ru = "Неврология"`
   - `queue_tags = ["neurology"]`
-  - `show_on_qr_page = true`
+  - `show_on_qr_page = false`
   - `is_active = true`
+
+The profile is available for administration but is **not visible to patients** on the QR page yet. Review its name, queue tags, department and booking targets, then explicitly publish it from **Admin → Services → Queue profiles** (`/admin/services?servicesTab=queue-profiles`) when it is ready. Creating the Department never publishes the profile automatically. A CSV import that requests QR visibility also leaves a new profile hidden and must be followed by this separate review-and-publish action.
 
 ⚠️ **Registered limitation (services `service_code` VARCHAR(10), backlog E-069):** the default
 auto-service code is derived as `{key}_consult` (normalized + uppercased, NOT truncated), and
@@ -121,7 +123,17 @@ database before demonstrating it to staff.
 > consultation service is also created with `requires_doctor = false` — enable the flag
 > manually when the consultation must be doctor-owned.
 
-### Step 5: Verify End-to-End
+### Step 5: Review and Publish the Queue Profile
+
+**Admin Panel → Services → Queue profiles** (`/admin/services?servicesTab=queue-profiles`)
+
+1. Confirm the new profile is active and linked to the intended Department, tags and booking targets.
+2. Enable **Show on QR page (patient self-booking)** and save to publish it explicitly.
+3. Confirm the profile appears in the public QR catalog before directing patients to it.
+
+Until this action is completed, the profile remains hidden even though its Department and services exist.
+
+### Step 6: Verify End-to-End
 
 1. **Doctor logs in:**
    - `GET /auth/me` returns `{specialty: "neurology"}`

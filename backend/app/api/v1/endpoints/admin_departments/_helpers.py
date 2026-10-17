@@ -404,7 +404,7 @@ def _ensure_department_integrations(
             # profile has no manual archive intent, even if its parent starts
             # inactive.
             is_active=True,
-            show_on_qr_page=True,
+            show_on_qr_page=False,
             icon=department.icon or "Layers",
             color=department.color or "#3b82f6",
         )

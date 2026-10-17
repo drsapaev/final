@@ -1,18 +1,60 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 3.91 — пользователь подтвердил DELETE профиля; узкий T11.1a исправляет отображение structured refusal, не меняя защиту удаления.
-**Создан:** 30 сентября 2026. **Обновлён:** 14 октября 2026, 2026-10-14T14:33+05:00 Asia/Tashkent.
-**Текущий этап:** T11 — `PR_OPEN`, [PR #3639](https://github.com/drsapaev/final/pull/3639). T10 / [PR #3633](https://github.com/drsapaev/final/pull/3633) подтверждённо MERGED 9 октября, merge `6315c62edb888bb8864928a41dd70a4c00be6e3d`.
-**Worktree / ветка:** `C:\Users\DrSapaev\.codex\worktrees\aqs-t11-parent-policy\final`; `codex/aqs-T11-manual-availability`. Task memory ID: `9af17c38-8235-4681-93e8-6a9864cbdb75`.
-**Снимок продолжения:** предшествующий PR HEAD `723b62e89a036219d5a54269774a2c23b7bafd34`; свежий `origin/main` `476013905c37ff471cb8dc843c8a70d05d45db13` включён merge `e92602c81d3452692e70b834a0a9d593e89f26a1` (только upstream public-site docs). T11.1a source commit `8c8ea4805` прошёл локальные проверки и normal hooks; публикацию ветки/новый CI сверить по фактическим Git/PR SHA после journal commit.
-**Tier-2:** PARTIAL. Exact-source frontend provenance **PASS на `35717fafa154baf9fb8b79cbe0910fb9dbbbcc6b`**: встроенный SHA совпал, 254/254 обслуживаемых static files совпали с image. Обычный synthetic Admin 2FA и целевые браузерные/PG проверки прошли на своих записанных SHA; эта сверка не запускает их заново на текущем HEAD.
-**Ограничения:** три legacy live-spec NOT_RUN, полный pre-deploy runbook PARTIAL, independent review отсутствует. CI предшественника `723b62e8`: 26 PASS / 12 SKIPPED, без failures/pending; новый source HEAD потребует свежего CI. T11.1a локально: 44/44 UI/CSV, TypeScript и scoped lint PASS (4 прежних lint warnings). Новый UI patch в live staging/production не проверялся; точный production refusal reason неизвестен. Deferral не принят; merge HOLD.
+**Версия:** 4.00 — T11 / PR #3639 MERGED; T12.1 PR #3690 exact-head CI PASS; Tier-2 staging NOT_RUN.
+**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-16T22:04:00+05:00, Asia/Tashkent.
+**Текущий этап:** T12.1 — PR_OPEN / DRAFT #3690; tested code commit `ca04e20ad08a5e661ca9ddc9a0d4d8b27157092a` прошёл Unified CI `38934894724`; последующий checkpoint меняет только журналы; Tier-2 staging/Admin 2FA NOT_RUN; merge HOLD.
+**Рабочий каталог:** C:\Users\DrSapaev\.codex\worktrees\aqs-t12-publish-overview\final; база — merge 7443b0e290b9143e877d5898a5589df52592d3b3 (= origin/main при старте этого worktree).
+**Task memory ID:** 9af17c38-8235-4681-93e8-6a9864cbdb75.
+**T11 результат:** PR #3639 merged commit 7443b0e290b9143e877d5898a5589df52592d3b3. Ограниченный T11 Tier-2 прошёл на зафиксированном кодовом HEAD; три legacy live-spec остаются DEFERRED для T18 с 0% credit; полный STAGING_VALIDATION.md не завершён.
+**Ограничения:** пользователь мержит PR самостоятельно. Production, deployment, v1 flag и staging-цикл для T12.1 требуют отдельного решения; T11 deferral не наследуется. Пять плановых документов входят в PR #3690.
+
 
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
 **Историческая база T00:** `8bb1bdff5ce68627fe29eb227c03bb7ea0f9d1be`.
 **Обязательный вход:** [RESUME.md](admin-queue-simplification/RESUME.md), затем [PROGRESS.md](admin-queue-simplification/PROGRESS.md), [DECISIONS.md](admin-queue-simplification/DECISIONS.md), [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
 
 История промежуточных отказов, PR, merges и проверок сохранена в карточках этапов и append-only EVIDENCE. Прежний snapshot T10/3.82–3.89 не является текущей точкой исполнения. Значение production feature flag этой сверкой не проверялось; deployment и изменение флага не разрешены. Deferral предыдущих PR не наследуется и не превращает NOT_RUN в PASS.
+
+### T11.2. Окончательное закрытие PR #3639 — VALIDATED / PR_OPEN
+
+**Основание:** пользователь поручил выполнить предложенный ограниченный путь закрытия 16 октября 2026. Это продолжение T11 в существующем PR, без нового onboarding, UI-проекта или инфраструктурного PR.
+
+**Scope freeze:** не добавлять новые функции и соседние улучшения. Разрешены только подтверждённые blockers, тесты к ним, final validation и постоянная память. Единственный подтверждённый остаточный blocker закрыт в acb509c36: final Department lock теперь использует тот же Doctor-profile fallback, что validator для поддерживаемых NULL/unmatched legacy queue tags; обе PG interleaving regression PASS. Не менять queue identity, stored tags, номера, source semantics, auth или схемы.
+
+**Финальная матрица:** C01–C09 PASS на acb509c36 в r8; точные команды/артефакты и границы — EVIDENCE. 21 PG + 7 unit и 4 browser без skips/errors; CI28SUCCESS/12SKIPPED, ordinary Admin2FA и teardown PASS.
+
+| ID | Обязательная проверка | Доказательство / правило зачёта |
+|---|---|---|
+| C01 | Ручной is_active, single/bulk Department off/on, preexisting false | Unit policy module и выбранные реальные PostgreSQL lifecycle cases; история прежних passes сохраняется отдельно |
+| C02 | Standalone/missing/conflicting/own-key parent | Семь unit cases; не подключать неизвестный parent автоматически |
+| C03 | Selector, direct Doctor/profile join и shared-resource parity | Выбранные PostgreSQL selector/lifecycle cases; unavailable sibling не обходится |
+| C04 | Старые Doctor/resource QR-токены и permanent address | Положительные/отрицательные PostgreSQL cases; отдельная regression legacy NULL/unmatched Doctor tag |
+| C05 | Department toggle сериализован с admission; public catalog bounded queries | Race/catalog PostgreSQL cases, независимые DB sessions; новый legacy-token lock case обязателен |
+| C06 | Реальный DELETE409 профиля specialists понятен и сохраняет строку | Собственный synthetic Admin browser, настоящий backend refusal; нет implicit PUT/archive/retry/reload |
+| C07 | Существующая непустая очередь и staff tabs сохраняются при parent off/on | Тот же waiting entry, queue/resource, status и staff tab access; не полный byte snapshot и не клиническая команда обслуживания |
+| C08 | Среда соответствует итоговому SHA и новой Alembic head | Normal Admin password+TOTP, exact frontend marker, migrated owned non-maintenance DB, ровно одна Alembic head |
+| C09 | Нет остатков своего проекта | Canonical teardown PASS, нулевые project containers/volumes/networks, выделенные порты освобождены |
+
+**Точный цикл:** source fix → fail-first/post-fix unit evidence → независимый AI source re-review → commit итогового кода → обновление единого SHA pin → offline completeness/fixtures/collection checks → один Preflight/Start/Session/teardown. Один внешний canonical keeper и boot identity охватывают весь цикл. Не заменять это независимыми командами с разрывом WSL lifetime.
+
+**Диагностика ошибки:** только allowlisted service/status/health/exit/OOM/restart snapshot до удаления. KEEP_STAGING=1 допустим лишь в дочернем failing Start/Session этой задачи; причина/owner/lease зафиксированы в PREWORK. Внешний keeper немедленно проверяет continuity/labels, снимает безопасный snapshot и удаляет точный проект без KEEP_STAGING. При потере continuity не удалять неподтверждённые ресурсы и честно отметить NOT_RUN.
+
+**Deferral общих legacy live-spec — отдельное условное решение:**
+
+1. Original requirement: полные admin-navigation.spec.ts, queue-system.spec.ts и panel-qa-admin-live.spec.ts.
+2. Reason: текущие общие live-spec/harness содержат несовместимые auth/origin/контролы и ранее давали неразобранные общие UI failures; их полное исполнение не является доказательством отдельных правил T11. Они не объявлены устаревшими или исправленными.
+3. Evidence: точные результаты CI, targeted T11/PG/browser и прежние failed/NOT_RUN исполнения записываются с SHA. Ни один fail не превращается в PASS.
+4. Owner/workstream: T18 synthetic Admin/Registrar QA; исполнитель T18 доводит совместимый harness и каждый полный spec.
+5. Resume condition: до production rollout/v1 activation/закрытия T18; normal Admin2FA, verified synthetic Registrar, configurable origin, контролируемые synthetic writes/cleanup. Новая информация о regression в изменённом коде немедленно возвращает связанный пункт в обязательный scope.
+6. Headline impact: deferred три suite получают 0% completed coverage, 0/3 полных suite закрыто этим решением. Общий процент плана не вычисляется; T18 остаётся PLANNED.
+
+**Текущий disposition:** EFFECTIVE LIMITED DEFERRAL для #3639/acb509c36; условия ниже выполнены, все шесть полей сохранены. Это делегированная техническая оценка; независимый human APPROVE не выдумывается.
+
+**Условие вступления deferral в силу:** C01–C09 PASS на указанном итоговом коде/доказанно неизменившихся owners; текущий source review без нерешённых P0/P1/P2 и required CI PASS. Делегированный пользователем technical disposition не выдавать за human GitHub review.
+
+**T11.1 production diagnostic disposition:** факт действия DELETE/profile key specialists подтверждён пользователем; источник и shape обоих structured409 воспроизведены в source tests. Точные live detail.reason/counts/deployed revisions не установлены и не выдумываются. Владелец T11.1/оператор после согласованного deployment собирает минимальное read-only method/reason/revision evidence без patient/token payload. Доказанный renderer fix и сохранение guard проверяются C06; неизвестный production reason не разрешает удаление/архивирование и не объявляется исправленным backend-дефектом.
+
+**Закрытие PR:** итоговое описание содержит актуальные SHA, матрицу PASS/FAIL/NOT_RUN/DEFERRED, scope/rollback и reviewer disposition. Пользователь выполняет merge после финальных проверок. Локальные журналы остаются локально по ранее принятому решению; их результаты переносить в PR body без секретов. T12 не начинается до закрытия текущего PR-цикла. Полный STAGING_VALIDATION.md нужен до production и не подменяется этой матрицей.
 
 ### Реестр текущих статусов
 
@@ -29,10 +71,12 @@
 | T08 | MERGED | Quota/adapters/PG-proof подэтапы; rollout отдельно |
 | T09 | MERGED | Preview/apply и UI, #3612/#3614/#3620 |
 | T10 | MERGED | Used-binding guards, #3633, merge `6315c62e` |
-| T11 | PR_OPEN | #3639; CI/review и остаточные Tier-2 требования не закрыты |
+| T11 | MERGED | #3639; merge 7443b0e290b9143e877d5898a5589df52592d3b3; C01–C09 PASS с ограниченным deferral трёх общих suite для T18 |
 | T11.1 | IN_PROGRESS | DELETE подтверждён пользователем; production reason/revision ещё неизвестны |
-| T11.1a | VALIDATED | Локальный formatter fix single-delete; публикация и CI проверяются по фактическому HEAD |
-| T12 | PLANNED | Явная публикация после завершения T11 |
+| T11.1a | MERGED | Single-delete formatter и preservation regression включены в #3639 / 7443b0e2 |
+| T11.2 | MERGED | r8 C01–C09 PASS; scoped deferral применён до T18; #3639 merged |
+| T12 | IN_PROGRESS | Явная публикация и внутренний обзор; база начинается с merge T11 |
+| T12.1 | IN_PROGRESS | Создание новых QueueProfile скрыто по умолчанию; старый запрос публикации откладывается явно |
 | T13 | PLANNED | Canonical Admin read contract |
 | T14 | PLANNED | Setup UI на backend facts |
 | T15 | PLANNED | Восстанавливаемый URL-контекст |
@@ -45,12 +89,12 @@
 | ID | Факт / статус | Следующее доказательство и владелец |
 |---|---|---|
 | U1 | Пользователь подтвердил удаление: DELETE существующего profile key `specialists`. Точный `detail.reason` и deployed revisions неизвестны | T11.1a устраняет воспроизведённый UI дефект String(object); для production различить significant links и stale bindings. Не объявлять удаление разрешённым и не ослаблять guard |
-| U2 | Provenance PASS на `35717fa`; T11.1a меняет application frontend после этого evidence | Старый PASS сохраняется только для своего artifact; staging/provenance нового single-delete UI patch NOT_RUN |
-| U3 | CI/review меняются после push; текущий снимок не финальный | После каждого push сверить реальный SHA, required checks и independent review; старый зелёный SHA не заменяет новый |
-| U4 | `admin-navigation.spec.ts`, `queue-system.spec.ts`, `panel-qa-admin-live.spec.ts` NOT_RUN | T18 executor: обычный Admin TOTP, synthetic Registrar, явный origin, контролируемые записи/cleanup; либо отдельное явное PR-specific решение по ограниченному deferral. У #3639 такого решения нет |
+| U2 | CLOSED для текущего C08: SW marker совпал с acb509c36 в r8, owned DB на0080 | Полный hash всех served assets здесь не повторялся; прежний такой artifact остаётся привязан к своему SHA |
+| U3 | Текущий acb509c36: CI28SUCCESS/12SKIPPED/0FAIL/PENDING, AI source re-review без подтверждённых P0/P1/P2 | Повторно сверить SHA/required checks непосредственно перед merge; независимый human GitHub APPROVE не заявлен |
+| U4 | Три полных legacy live-spec NOT_RUN / DEFERRED именно для #3639/acb509c36 | Явный technical disposition: шесть полей ниже и в DECISIONS/EVIDENCE; owner T18, resume до production/v1 activation/T18 closure, 0% credit и0/3 complete |
 | U5 | Полный pre-deploy `STAGING_VALIDATION.md` PARTIAL, не blanket NOT_RUN и не PASS | Сохранять результаты каждой проверки с её SHA; Sentry, external AI-safety, Telegram, live PII telemetry и оставшиеся пункты требуют безопасного контура/решения applicability до rollout |
 
-Верхняя сводка плана и первый checkpoint PROGRESS/RESUME — текущие. Более ранние checkpoints — история. Документальная синхронизация не принимает deferral и не закрывает T11/T18.
+Верхняя сводка плана и первый checkpoint PROGRESS/RESUME — текущие. Более ранние checkpoints — история. T11 MERGED в 7443b0e290b9143e877d5898a5589df52592d3b3; его ограниченный deferral остаётся только до T18 и не делает T18 закрытым.
 
 ## 1. Цель и границы
 
@@ -196,9 +240,9 @@ next exact action; checks to rerun after next change.
 | T07 | T05, T06 | Единое окно v1 |
 | T08 | T06, T07 | Атомарная квота, покрытие writers |
 | T09 | T03 | Безопасная смена сегодняшнего кабинета |
-| T11 | T04, T10 | Ручная активность/effective parent policy |
+| T11 | MERGED | #3639; merge 7443b0e290b9143e877d5898a5589df52592d3b3; C01–C09 PASS с ограниченным deferral трёх общих suite для T18 |
 | T11.1 | T10; сверка с текущим T11 | Диагностика reported profile 409; доказанную регрессию T11 исправлять в #3639 |
-| T11.1a | Подтверждённый UI root в T11.1 | Читаемый single-delete refusal; backend/bulk policy без изменений |
+| T11.1a | MERGED | Single-delete formatter и preservation regression включены в #3639 / 7443b0e2 |
 | T12 | T10, T11 | Hidden-by-default/явная публикация |
 | T13 | T03, T11, T12 | Canonical Admin read contract |
 | T14 | T13 | UI на backend facts |
@@ -539,6 +583,25 @@ Old mutation tests менять с контрактом, history guards сохр
 **Validation:** both hidden constructors/POST с incoming publication=true/publish/reactivation atomic refusals/same-direction doctors/mixed overview/token/address parity. Department create atomicity, QR visibility/rq16b-c-d/resource suites; old addresses unchanged.
 **Stop:** требуется product target choice/rebind/owner merge.
 **Evidence/logs:** saved intent vs effective availability, safe INFO publish-hide-archive/WARN refusal; no runtime repair.
+
+### T12.1. Скрытое создание QueueProfile — IMPLEMENTED / EXACT-HEAD CI PASS / TIER-2 NOT RUN
+
+**Зависимости:** T11 merged; отдельный подэтап внутри T12.
+**Основание:** T12 требует, чтобы все новые профили были скрыты и публикация выполнялась отдельным действием. Для старых клиентов, которые присылают show_on_qr_page=true при создании, выбран backward-compatible defer: профиль сохраняется скрытым, а ответ явно сообщает об отложенной публикации. Проверка готовности и неоднозначных целей остаётся T12.2.
+**Gate:** первоначальный mandatory gate остановился на отсутствии first-touch. Повтор с подтверждённым root file _queue_profiles.py дал narrow_override / execute и зафиксировал восемь source/test paths ниже; основание — утверждённая T12-политика плана. Handoff prompt прочитан.
+**Разрешённые source/test paths:** backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py, backend/app/models/queue_profile.py, backend/app/api/v1/endpoints/admin_departments/_helpers.py, frontend/src/components/admin/QueueProfilesManager.tsx, backend/tests/integration/test_queue_profile_lifecycle.py, backend/tests/integration/test_admin_department_create_atomicity.py, frontend/src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx, frontend/src/components/admin/__tests__/QueueProfilesManager.csv.test.tsx.
+**Вне scope:** любые другие source/test/generated files, DB/Alembic, T12 publish eligibility/update policy, overview selection/admission, existing public profiles, QR tokens/addresses, production, deploy, staging, PR merge/review. При необходимости выхода за восемь файлов — остановиться и оформить отдельный slice. Generated OpenAPI/API types идут только через T12.1a.
+**Проверки:** API POST по умолчанию скрыт; входящий true не публикуется и получает `publication_deferred`; manual/department auto constructor hidden; existing profiles не изменяются; UI create sends false, а CSV create остаётся скрытым благодаря backend guard. Уведомление о намерении публикации в CSV и отдельное publish action относятся к T17/T12.2. Focused backend/frontend tests, OpenAPI/generated-types freshness, diff check.
+**Результат exact-head:** PR `#3690` на `ca04e20ad08a5e661ca9ddc9a0d4d8b27157092a`; Unified CI `38934894724` SUCCESS, включая backend/PostgreSQL, Frontend unit/E2E, build, OpenAPI freshness, quality, parity и PR Required Gate. Два outdated test assumptions о публичности auto-created Department profile были исправлены test-only; current backend CI подтвердил обе регрессии и hidden default.
+**Остаток:** Tier-2 staging/Admin 2FA и backend-dependent live E2E — NOT_RUN. PR остаётся DRAFT/HOLD без formal reviewer deferral; нужен отдельный выбор по staging или deferral. Production/staging не запускались.
+**Stop:** потребуется изменить файл вне gate scope, изменить активные bindings, разрешить публикацию при создании или выбрать неизвестную цель направления.
+
+### T12.1a. Обновить OpenAPI и generated API types — VALIDATED
+
+**Зависимости:** T12.1 request default implementation. `QueueProfileCreate.show_on_qr_page` теперь default=false, но `backend/openapi.json` и generated TypeScript ещё отражают прежний default.
+**Execution boundary:** обязательный canonical gate; подтверждённый root — `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`. Разрешены только `backend/openapi.json` и `frontend/src/types/generated/api.ts`; generator scripts read-only.
+**Проверки:** каноническая OpenAPI generation/freshness, TypeScript generation/parity, exact scope и `git diff --check`. PostgreSQL integration в локальном T12.1a срезе не запускалась; позже exact-head backend CI `38934894724` прошла на disposable PostgreSQL.
+**Stop:** generator требует DB, изменение source/test/generator или создаёт нерелевантный OpenAPI churn; зафиксировать блокер без расширения scope.
 
 ### T13. Canonical Admin directions GET
 

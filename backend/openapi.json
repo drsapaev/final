@@ -104840,8 +104840,8 @@
           "show_on_qr_page": {
             "type": "boolean",
             "title": "Show On Qr Page",
-            "description": "Show this profile on QR join page",
-            "default": true
+            "description": "New profiles stay hidden; true is deferred to a separate publish action",
+            "default": false
           },
           "icon": {
             "anyOf": [
