@@ -1,34 +1,31 @@
-## Current checkpoint — T12.2 PR #3693 Ready for Review; merge hold — 2026-10-17T13:15:31+05:00
+## Current checkpoint — T12.2 #3693 focused synthetic staging PASS; overall acceptance PARTIAL / merge hold — 2026-10-17T16:38:21+05:00
 
-Plan version: 4.00
+Plan version: 4.01
 Current task: T12.2
-Current status: PR_OPEN
+Current status: PR_OPEN / focused Tier-2 PARTIAL
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t122-publish-policy\final
 Branch: codex/aqs-T12.2-publish-readiness
 Base commit: db91cc0ef87c8a51eb4b4e816d25077c8ce397d6 (= PR base and origin/main at last sync)
-Last source/test commit validated: b3d2fdc22928634750bef4c5210e887bff3129db
-Last journal commit with verified exact-head CI: cd6b30676474ff63a475ba72f96d5d4c75ebc915; run 39015442022 SUCCESS
+Current source/test HEAD validated: dde8f799a804bd0e71eed9802c879b03d01effb1
+Exact-head Unified CI: run 39025238384 SUCCESS; applicable checks passed, path-aware jobs remain SKIPPED
 Task memory: 431e8e5b-7c74-459e-8038-26f0f17adf1d
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T00–T11 | MERGED | prior task cycles | see earlier evidence | current base includes T11 |
 | T12.1 | MERGED | PR #3690 | 0a3304f5ec7d3702d0fbe3642fdec078eb3edaea | GitHub confirms merged 2026-10-17 |
-| T12.2 | PR_OPEN | PR #3693 READY | | source/test CI 39013024601 PASS; journal HEAD cd6b3067 CI 39015442022 PASS |
+| T12.2 | PR_OPEN / HOLD | PR #3693 READY | | exact-head CI 39025238384 PASS; synthetic staging cycle11 PASS for scoped PG/API checks |
 | T13–T18 | PLANNED | | | |
 
 ## Current checkpoint
-- PR #3690 is merged at 0a3304f5ec7d3702d0fbe3642fdec078eb3edaea. PR #3693 is OPEN/READY FOR REVIEW at last verified pushed HEAD cd6b3067, based on db91cc0; user owns merge.
-- T12.2 requires one effective, bookable owner before publication/reactivation; public catalog, selector and admission agree; unready publication returns typed 409. Runtime implementation is in source HEAD 58b10b3; b3d2fdc contains only test fixture/assertion corrections.
-- Unified CI run 39013024601 passed on exact source/test HEAD b3d2fdc. Documentation-only PR HEAD cd6b3067 also passed Unified CI run 39015442022: 26 checks passed, 12 path-aware checks skipped, zero failures. Skipped jobs remain SKIPPED, not PASS. Later journal-only commits require checking their current PR-head checks live.
-- Focused Tier-2 on owned synthetic Compose project clinic-aqs-pr3693-20261017-c9 passed canonical Preflight, Start, Session and all 10 browser checks, including ordinary Admin password+TOTP; teardown removed 5 containers, 3 volumes and 1 network, leaving zero owned resources.
-- Provenance limit: browser validation matched runtime-source SHA 58b10b3102e1f6d68fefee257fc22194da4f2de2 in sw.js. The canonical launcher still reported served_revision_verified=false; do not claim launcher attestation.
-- Local follow-up tests 2/2 passed (1 warning); py_compile, scoped Ruff, diff check and applicable hooks passed. Hosted CI covered PostgreSQL; no local PG DSN was used.
-- No GitHub reviews or inline review threads are submitted. No confirmed code blocker was found in the read-only review, but an independent review is still outstanding.
-- Remaining NOT_RUN/unverified: full STAGING_VALIDATION.md, negative-role proof, named legacy browser specs, complete T18 workflow, canonical served_revision_verified attestation. No deferral is accepted; the focused staging PASS does not satisfy those broader items.
-- Status: HOLD. Do not mark fully accepted, merge or deploy until the remaining acceptance/review conditions receive a supported decision. Keep later tasks T13–T18 PLANNED until #3693 is merged.
-- Next exact action: inspect live checks for the current PR HEAD, obtain independent review, and resolve the outstanding Tier-2 disposition without representing skipped checks as passes. After user merge, verify the merge commit, sync fresh origin/main, then start T13 in a new worktree.
-- Checks after any journal/body change: diff check and applicable hooks for journal edits; PR Review Quality Gate for body edits; inspect current exact-head GitHub checks. Do not rerun staging for documentation-only changes.
+- PR #3690 is merged at 0a3304f5ec7d3702d0fbe3642fdec078eb3edaea. PR #3693 is OPEN/READY FOR REVIEW and mergeable at exact HEAD dde8f799a804bd0e71eed9802c879b03d01effb1, based on db91cc0ef87c8a51eb4b4e816d25077c8ce397d6; the user owns merge.
+- T12.2 gates publication/reactivation on one effective, bookable owner and aligns public catalog, QR selectors and admission. Exact-head Unified CI 39025238384 completed SUCCESS; Backend tests, frontend unit/E2E/lint/build, OpenAPI freshness, quality, parity, security/gitleaks, i18n and PR Required Gate passed. DAST nightly, metadata, Docker, standalone security/integration/load, staging-readiness and production-readiness jobs were SKIPPED, not PASS.
+- Focused synthetic staging cycle11 on project clinic-aqs-t122-c8-20261017 passed canonical Preflight, Start, Session; 20 PostgreSQL tests passed with 0 skips/failures/errors; DEV-DEMO queue owner fixture was seeded without patient or clinical records; ordinary Admin password+TOTP and profile endpoint passed; existing canonical cardiology profile was hidden and disappeared from public catalog, then explicitly published and returned consistently from public catalog and available-specialists with one synthetic bookable owner. Teardown removed 5 containers, 3 volumes and 1 network; zero owned resources remained.
+- Current-head staging limitations: launcher `served_revision_verified=false`; no current-head browser/visual scenario was run. The earlier cycle c9 browser result belongs to older backend source SHA 58b10b3 and is not credit for the current backend changes. Full STAGING_VALIDATION.md, negative-role proof, named legacy browser specs, full T18, and current frontend provenance remain NOT_RUN/unverified.
+- Live review state at the last check: three Codex COMMENTED submissions on earlier commits; three inline threads remain unresolved (two not marked outdated, one outdated); no APPROVE on the current HEAD. Do not describe this as independent approval or as zero open comments.
+- Status remains HOLD; no Tier-2 deferral has been accepted. Do not merge, deploy, or start T13 until acceptance/review has a supported disposition and the user merges #3693.
+- Next exact action: complete the four-file plan/evidence checkpoint, run `git diff --check` and the PR-body quality gate, commit/push only documentation, then inspect checks on the new exact PR HEAD. Keep all browser/provenance/full-runbook gaps explicitly NOT_RUN.
+- After any journal/body change, rerun the applicable diff/hook and PR Review Quality Gate, then inspect current exact-head GitHub checks. Do not rerun staging for documentation-only changes.
 
 ## Historical checkpoint — T12.1 exact-head CI pass; Tier-2 pending authorization — 2026-10-16T22:04:00+05:00
 
