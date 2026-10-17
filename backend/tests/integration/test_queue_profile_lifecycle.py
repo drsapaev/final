@@ -577,6 +577,27 @@ def test_qr_owner_scope_accepts_legacy_service_tags_with_one_owner():
     assert scope == ("resource", "ecg")
     assert conflict is None
 
+    # ADR-001: an active registry tag owns the routing surface before doctor
+    # selection, even when an eligible doctor has the same specialty spelling.
+    lab = SimpleNamespace(key="lab", queue_tags=["lab"])
+    scope, conflict = queue_service._qr_profile_owner_scope_from_targets(
+        lab,
+        resource_route_tags={"lab"},
+        eligible_doctor_specialties={"lab"},
+    )
+    assert scope == ("resource", "lab")
+    assert conflict is None
+
+    # A different doctor-owned tag remains a distinct target and fails closed.
+    mixed = SimpleNamespace(key="lab", queue_tags=["lab", "cardiology"])
+    scope, conflict = queue_service._qr_profile_owner_scope_from_targets(
+        mixed,
+        resource_route_tags={"lab"},
+        eligible_doctor_specialties={"lab", "cardiology"},
+    )
+    assert scope is None
+    assert conflict == "mixed_direction_targets"
+
     overview = SimpleNamespace(key="overview", queue_tags=["alpha", "beta"])
     scope, conflict = queue_service._qr_profile_owner_scope_from_targets(
         overview,
@@ -643,8 +664,10 @@ def test_explicit_publish_allows_multiple_doctors_for_one_direction(
 def test_explicit_publish_allows_one_resource_owned_direction(
     pg_client, pg_session, pg_admin_user
 ):
+    from app.models.clinic import Doctor
     from app.models.online_queue import QueueResource
     from app.models.queue_profile import QueueProfile
+    from app.models.user import User
 
     suffix = uuid.uuid4().hex[:8]
     queue_tag = f"rq12b_t122_resource_{suffix}"
@@ -661,7 +684,18 @@ def test_explicit_publish_allows_one_resource_owned_direction(
         display_name="Synthetic queue resource",
         active=True,
     )
-    pg_session.add_all([profile, resource])
+    doctor_user = User(
+        username=f"rq12b_t122_resource_doc_{suffix}",
+        email=f"rq12b-t122-resource-doc-{suffix}@example.test",
+        full_name="Synthetic resource-tag doctor",
+        hashed_password="!disabled:test",
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+    )
+    pg_session.add_all([profile, resource, doctor_user])
+    pg_session.flush()
+    pg_session.add(Doctor(user_id=doctor_user.id, specialty=queue_tag, active=True))
     pg_session.commit()
 
     response = _put_profile(

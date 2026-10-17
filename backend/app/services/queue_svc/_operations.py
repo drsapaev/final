@@ -233,7 +233,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             )
         )
         resources = sorted(queue_tags & resource_route_tags)
-        doctor_specialties = sorted(queue_tags & eligible_doctor_specialties)
+        # ADR-001 QD-2C resolves an active registry surface before doctor selection.
+        # A doctor with the same specialty spelling is not a second routing
+        # target for that tag; doctors on other configured tags remain
+        # independent targets and still make the profile an internal overview.
+        doctor_specialties = sorted(
+            (queue_tags & eligible_doctor_specialties) - set(resources)
+        )
 
         if len(resources) > 1 or (resources and doctor_specialties):
             return None, "mixed_direction_targets"

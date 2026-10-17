@@ -1081,6 +1081,66 @@ def test_available_profiles_with_different_parents_share_one_resource_target(
 
 
 @pytest.mark.queue
+def test_resource_tag_with_matching_doctor_stays_one_public_qr_route(
+    pg_client, pg_session, monkeypatch
+):
+    """A registry-owned tag stays resource-routed when a doctor shares it."""
+    from app.models.online_queue import DailyQueue, QueueResource
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import queue_service
+
+    monkeypatch.setattr(queue_service, "ONLINE_QUEUE_START_TIME", time(0, 0))
+    suffix = uuid.uuid4().hex[:8]
+    queue_tag = f"rq09rd{suffix}"
+    profile = QueueProfile(
+        key=f"rq09-profile-resource-doctor-{suffix}",
+        title="RQ-09 Synthetic resource and matching doctor",
+        queue_tags=[queue_tag],
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    resource = QueueResource(
+        code=f"rq09-resource-doctor-{suffix}",
+        queue_tag=queue_tag,
+        display_name="RQ-09 Synthetic shared registry route",
+        active=True,
+    )
+    _user, doctor = _doctor_with_user(
+        pg_session,
+        specialty=queue_tag,
+        label=f"resource_owner_{suffix}",
+    )
+    pg_session.add_all([profile, resource])
+    pg_session.commit()
+    token = _clinic_wide_token(pg_session, f"rq09-token-rd-{suffix}")
+
+    selectable = _selectable(pg_client, token.token)
+    assert any(item["specialty"] == profile.key for item in selectable), selectable
+
+    result = queue_service.join_queue_with_token(
+        pg_session,
+        token_str=token.token,
+        patient_name="RQ-09 Synthetic Resource Route Patient",
+        phone="+998900000941",
+        specialist_id_override=profile.id,
+        specialist_type="profile",
+    )
+
+    assert result.get("entry") is not None, result
+    daily_queue = (
+        pg_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == _clinic_day(),
+            DailyQueue.queue_tag == queue_tag,
+        )
+        .one()
+    )
+    assert daily_queue.queue_resource_id == resource.id
+    assert daily_queue.specialist_id is None
+    assert doctor.specialty == daily_queue.queue_tag
+
+
+@pytest.mark.queue
 def test_available_specialists_excludes_ineligible_doctor_owners(pg_client, pg_session):
     """The legacy public selector matches QR join owner eligibility."""
     from app.models.clinic import Doctor
