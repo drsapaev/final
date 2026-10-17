@@ -94,6 +94,7 @@ BATCH_ENTRIES = "/api/v1/registrar-integration/queue/entries/batch"
 DOCTOR_SPECIALTY = "rq24b-cardio"
 LAB_TAG = "lab"
 DIRECTION_KEY = "rq24b-synthetic"
+RESOURCE_DIRECTION_KEY = f"{DIRECTION_KEY}-lab"
 PHONE_A = "998501000001"  # SYNTHETIC walk-in (doctor leg)
 PHONE_C = "998501000002"  # SYNTHETIC walk-in (resource leg)
 PHONE_D = "998501000003"  # SYNTHETIC walk-in (cashier leg)
@@ -175,9 +176,7 @@ def _candidate_admin_urls() -> list[str]:
         def _host_elem_local(h: str) -> bool:
             # An empty element is libpq's "default unix-socket directory".
             return (
-                h == ""
-                or h.startswith("/")
-                or h in {"localhost", "127.0.0.1", "::1"}
+                h == "" or h.startswith("/") or h in {"localhost", "127.0.0.1", "::1"}
             )
 
         # Normalize query params once: libpq matches conninfo parameter
@@ -370,9 +369,7 @@ def pg_engine():
             ).scalar()
             dialect = conn.execute(text("select version()")).scalar()
         assert version, "alembic_version must be present after upgrade"
-        assert "PostgreSQL" in (dialect or ""), (
-            "RQ-24.b proof requires real PostgreSQL"
-        )
+        assert "PostgreSQL" in (dialect or ""), "RQ-24.b proof requires real PostgreSQL"
 
         yield engine
     finally:
@@ -433,8 +430,12 @@ def _deterministic_clinic_day(monkeypatch):
         "start_numbers": {},
         "max_per_day": {},
     }
-    monkeypatch.setattr(clinic_crud, "get_queue_settings", lambda db: dict(deterministic_settings))
-    monkeypatch.setattr(queue_core, "get_queue_settings", lambda db: dict(deterministic_settings))
+    monkeypatch.setattr(
+        clinic_crud, "get_queue_settings", lambda db: dict(deterministic_settings)
+    )
+    monkeypatch.setattr(
+        queue_core, "get_queue_settings", lambda db: dict(deterministic_settings)
+    )
 
     # The display board has its own name-format cache (RQ-24.a.1): an
     # earlier suite test that connected to the display WS would pin
@@ -471,9 +472,7 @@ def pg_client(pg_session, monkeypatch):
     # their own SessionLocal() (get_db is not involved there) — patch
     # BOTH module namespaces onto the scratch database.
     monkeypatch.setattr(display_ws_module, "SessionLocal", scratch_sessionmaker)
-    monkeypatch.setattr(
-        display_ws_service_module, "SessionLocal", scratch_sessionmaker
-    )
+    monkeypatch.setattr(display_ws_service_module, "SessionLocal", scratch_sessionmaker)
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -528,9 +527,7 @@ def _get_or_create_doctor(session, user_id: int, specialty: str, cabinet: str):
     )
     if doctor:
         return doctor
-    doctor = Doctor(
-        user_id=user_id, specialty=specialty, cabinet=cabinet, active=True
-    )
+    doctor = Doctor(user_id=user_id, specialty=specialty, cabinet=cabinet, active=True)
     session.add(doctor)
     session.commit()
     session.refresh(doctor)
@@ -609,11 +606,7 @@ def world(pg_session, pg_client):
     ]
     for spec in service_specs:
         tag = spec["queue_tag"]
-        row = (
-            pg_session.query(Service)
-            .filter(Service.code == spec["code"])
-            .first()
-        )
+        row = pg_session.query(Service).filter(Service.code == spec["code"]).first()
         if not row:
             row = Service(
                 code=spec["code"],
@@ -650,9 +643,7 @@ def world(pg_session, pg_client):
         rows = listing.json()
         if isinstance(rows, dict):
             rows = rows.get("items") or rows.get("resources") or []
-        resource = next(
-            r for r in rows if r.get("code") == "SYNTHETIC-rq24b-lab-cab"
-        )
+        resource = next(r for r in rows if r.get("code") == "SYNTHETIC-rq24b-lab-cab")
     else:
         assert resp.status_code == 201, resp.text
         resource = resp.json()
@@ -670,41 +661,61 @@ def world(pg_session, pg_client):
 
     stale = (
         pg_session.query(QueueProfile)
-        .filter(QueueProfile.key == DIRECTION_KEY)
+        .filter(QueueProfile.key.in_([DIRECTION_KEY, RESOURCE_DIRECTION_KEY]))
         .all()
     )
     for profile in stale:
         pg_session.delete(profile)
     pg_session.commit()
-    profile = QueueProfile(
-        key=DIRECTION_KEY,
-        title="RQ-24.b synthetic direction",
-        title_ru="RQ-24.b синтетическое направление",
-        queue_tags=[DOCTOR_SPECIALTY, LAB_TAG],
-        display_order=9,
-        is_active=True,
-        show_on_qr_page=True,
-    )
-    pg_session.add(profile)
+
+    # A public direction is one concrete owner scope. The consultation and
+    # laboratory resource therefore have separate published profiles and
+    # permanent addresses instead of one mixed-owner overview.
+    profiles = {
+        DIRECTION_KEY: QueueProfile(
+            key=DIRECTION_KEY,
+            title="RQ-24.b synthetic doctor direction",
+            title_ru="RQ-24.b синтетическое направление врача",
+            queue_tags=[DOCTOR_SPECIALTY],
+            display_order=9,
+            is_active=True,
+            show_on_qr_page=True,
+        ),
+        RESOURCE_DIRECTION_KEY: QueueProfile(
+            key=RESOURCE_DIRECTION_KEY,
+            title="RQ-24.b synthetic laboratory direction",
+            title_ru="RQ-24.b синтетическое направление лаборатории",
+            queue_tags=[LAB_TAG],
+            display_order=10,
+            is_active=True,
+            show_on_qr_page=True,
+        ),
+    }
+    pg_session.add_all(profiles.values())
     pg_session.commit()
-    pg_session.refresh(profile)
+    for profile in profiles.values():
+        pg_session.refresh(profile)
 
-    resp = pg_client.get(ENTRY_METHODS.replace("{profile_key}", DIRECTION_KEY))
-    assert resp.status_code == 200, resp.text
-    methods = resp.json()
-    permanent = next(
-        m
-        for m in methods["entry_methods"]
-        if m["method"] == "permanent_address"
-    )
+    public_codes: dict[str, str] = {}
+    permanent_supported_before_provision: bool | None = None
+    for profile_key in profiles:
+        resp = pg_client.get(ENTRY_METHODS.replace("{profile_key}", profile_key))
+        assert resp.status_code == 200, resp.text
+        methods = resp.json()
+        permanent = next(
+            m for m in methods["entry_methods"] if m["method"] == "permanent_address"
+        )
+        if profile_key == DIRECTION_KEY:
+            permanent_supported_before_provision = permanent["supported"]
 
-    resp = pg_client.post(
-        PROVISION.replace("{profile_key}", DIRECTION_KEY), headers=admin_h
-    )
-    assert resp.status_code == 200, resp.text
-    provisioned = resp.json()
-    assert provisioned["created"] is True
-    assert provisioned["url_path"] == f"/q/{provisioned['public_code']}"
+        resp = pg_client.post(
+            PROVISION.replace("{profile_key}", profile_key), headers=admin_h
+        )
+        assert resp.status_code == 200, resp.text
+        provisioned = resp.json()
+        assert provisioned["created"] is True
+        assert provisioned["url_path"] == f"/q/{provisioned['public_code']}"
+        public_codes[profile_key] = provisioned["public_code"]
 
     return {
         "admin": admin,
@@ -717,9 +728,11 @@ def world(pg_session, pg_client):
         "patient": patient,
         "service_ids": service_ids,
         "resource": resource,
-        "profile": profile,
-        "public_code": provisioned["public_code"],
-        "permanent_supported_before_provision": permanent["supported"],
+        "profile": profiles[DIRECTION_KEY],
+        "resource_profile": profiles[RESOURCE_DIRECTION_KEY],
+        "public_code": public_codes[DIRECTION_KEY],
+        "resource_public_code": public_codes[RESOURCE_DIRECTION_KEY],
+        "permanent_supported_before_provision": permanent_supported_before_provision,
         "admin_h": admin_h,
         "registrar_h": registrar_h,
     }
@@ -765,21 +778,27 @@ def _ws_state(pg_client, user, board_id: str = "main_board") -> dict:
 def test_new_target_and_resource_are_reachable_through_integrated_flow(
     pg_client, world
 ):
-    """The NEW direction (doctor tag + resource tag) is bookable through
-    the integrated surface: the anonymous start resolves the direction
-    with its owners (RQ-18 queue_info) — after provisioning (RQ-16.d)."""
-    resp = pg_client.post(
-        PUBLIC_START.replace("{public_code}", world["public_code"])
-    )
+    """New doctor and resource directions each resolve their own public
+    address and concrete selectable owner (RQ-18/RQ-16.d)."""
+    resp = pg_client.post(PUBLIC_START.replace("{public_code}", world["public_code"]))
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["direction"]["key"] == DIRECTION_KEY
     assert body["permanent_address"] is True
     selectable = body["queue_info"]["selectable_specialists"]
     assert selectable, "direction owners must be offered to the anonymous client"
-    assert all(
-        s.get("entity_type") in ("doctor", "profile") for s in selectable
+    assert all(s.get("entity_type") in ("doctor", "profile") for s in selectable)
+
+    resource_resp = pg_client.post(
+        PUBLIC_START.replace("{public_code}", world["resource_public_code"])
     )
+    assert resource_resp.status_code == 200, resource_resp.text
+    resource_body = resource_resp.json()
+    assert resource_body["direction"]["key"] == RESOURCE_DIRECTION_KEY
+    assert resource_body["permanent_address"] is True
+    resource_selectable = resource_body["queue_info"]["selectable_specialists"]
+    assert resource_selectable
+    assert any(item.get("entity_type") == "profile" for item in resource_selectable)
 
 
 def test_doctor_target_qr_join_reaches_doctor_panel(pg_client, world):
@@ -802,9 +821,7 @@ def test_doctor_target_qr_join_reaches_doctor_panel(pg_client, world):
     assert info.status_code == 200, info.text
     assert info.json()["allowed"] is True
 
-    joined = _anonym_join(
-        pg_client, token, "RQ24B-SYNTHETIC А", PHONE_A
-    )
+    joined = _anonym_join(pg_client, token, "RQ24B-SYNTHETIC А", PHONE_A)
     result = joined["result"]
     assert result["success"] is True
     assert result["specialist_name"], "doctor name must be in the join result"
@@ -845,25 +862,22 @@ def test_doctor_target_qr_join_reaches_doctor_panel(pg_client, world):
     world["doctor_entry_id"] = entry["id"]
 
 
-def test_new_resource_target_join_lands_on_resource_axis(
-    pg_client, pg_session, world
-):
-    """Leg 2 — NEW resource target through the permanent direction
+def test_new_resource_target_join_lands_on_resource_axis(pg_client, pg_session, world):
+    """Leg 2 — NEW resource target through its permanent direction
     address: anonymous start-session -> profile join -> the ticket lands
     on the RQ-15 resource axis (specialist_id NULL + queue_resource set,
     cabinet from the registry) with matching start number."""
     resp = pg_client.post(
-        PUBLIC_START.replace("{public_code}", world["public_code"])
+        PUBLIC_START.replace("{public_code}", world["resource_public_code"])
     )
     assert resp.status_code == 200, resp.text
     start_body = resp.json()
+    assert start_body["direction"]["key"] == RESOURCE_DIRECTION_KEY
     session_token = start_body["session_token"]
-    selectable = start_body["queue_info"]["selectable_specialists"]
-    # The canonical anonymous direction join targets the DIRECTION
-    # itself (entity 'profile', direction.profile_id) — the allocator
-    # routes a profile selection onto the FIRST tag with a registry
-    # resource surface before any doctor selection (QD-2C).
+    # This concrete direction resolves only the laboratory QueueResource;
+    # its profile selection must allocate on that resource axis.
     profile_id = start_body["direction"]["profile_id"]
+    assert profile_id == world["resource_profile"].id
 
     complete_payload: dict = {
         "session_token": session_token,
@@ -911,9 +925,9 @@ def test_new_resource_target_join_lands_on_resource_axis(
     # id) in the entry payload — the resource landing is proven below by
     # the resource-owned DailyQueue row on real PostgreSQL.
     resource_entry = entries[0]
-    assert resource_entry["queue_number"] == 1, (
-        "start_number_online=1 must be honored on the resource axis"
-    )
+    assert (
+        resource_entry["queue_number"] == 1
+    ), "start_number_online=1 must be honored on the resource axis"
 
     world["resource_ticket"] = resource_entry["queue_number"]
     world["resource_queue_id"] = row.id
@@ -927,13 +941,9 @@ def test_board_matching_numbers_distinguishable_and_phi_honest(
     live WS payload (RQ-24.a.1) — asserted on the REAL initial_state."""
     # Privacy BEFORE the first connect: the name-format cache is set on
     # the first connect for the process lifetime (documented behavior).
-    boards = pg_client.get(
-        "/api/v1/admin/display/boards", headers=world["admin_h"]
-    )
+    boards = pg_client.get("/api/v1/admin/display/boards", headers=world["admin_h"])
     assert boards.status_code == 200, boards.text
-    board = next(
-        b for b in boards.json() if b.get("name") == "main_board"
-    )
+    board = next(b for b in boards.json() if b.get("name") == "main_board")
     resp = pg_client.put(
         f"/api/v1/admin/display/boards/{board['id']}",
         json={"show_patient_names": "none"},
@@ -957,18 +967,16 @@ def test_board_matching_numbers_distinguishable_and_phi_honest(
     rest_body = rest.json()
     assert rest_body["show_patient_names"] == "none"
     for phi_key in ("patient_name", "phone", "entries"):
-        assert phi_key not in rest_body, (
-            f"stats-only board contract leaked {phi_key}"
-        )
+        assert phi_key not in rest_body, f"stats-only board contract leaked {phi_key}"
 
     entries = state.get("queue_entries") or []
     assert entries, "the board initial_state must contain today's tickets"
 
     # PHI: privacy 'none' -> no real names anywhere in the WS payload.
     serialized = str(state)
-    assert "RQ24B-SYNTHETIC" not in serialized, (
-        "board leaked patient identity with show_patient_names=none"
-    )
+    assert (
+        "RQ24B-SYNTHETIC" not in serialized
+    ), "board leaked patient identity with show_patient_names=none"
 
     # Matching numbers: the doctor queue and the resource queue both
     # start at 1 — identical numbers must be distinguishable by
@@ -982,14 +990,12 @@ def test_board_matching_numbers_distinguishable_and_phi_honest(
         by_number.setdefault(e.get("number"), set()).add(key)
     ones = by_number.get(1) or by_number.get("1")
     assert ones is not None, "expected the first tickets of both queues"
-    assert len(ones) >= 2, (
-        f"matching number 1 across cabinets must be distinguishable, got {ones}"
-    )
+    assert (
+        len(ones) >= 2
+    ), f"matching number 1 across cabinets must be distinguishable, got {ones}"
 
 
-def test_registrar_worklist_and_lab_panel_see_the_work(
-    pg_client, pg_session, world
-):
+def test_registrar_worklist_and_lab_panel_see_the_work(pg_client, pg_session, world):
     """Registrar worklist (RQ-21 surface) and the lab panel see the
     active work on BOTH axes: the doctor-tag queue and the resource
     queue with its registry owner (waiting tickets are the live work;
@@ -1004,21 +1010,17 @@ def test_registrar_worklist_and_lab_panel_see_the_work(
     body = resp.json()
     assert body["queues"], "registrar must see today's queues"
 
-    buckets_by_tag = {
-        (q.get("specialty") or "").lower(): q for q in body["queues"]
-    }
+    buckets_by_tag = {(q.get("specialty") or "").lower(): q for q in body["queues"]}
     doctor_bucket = buckets_by_tag.get(DOCTOR_SPECIALTY)
     # The worklist groups the resource tag under its canonical display
     # spelling ('lab' -> 'laboratory' via the endpoint's specialty map).
-    lab_bucket = buckets_by_tag.get(LAB_TAG) or buckets_by_tag.get(
-        "laboratory"
-    )
-    assert doctor_bucket, (
-        f"registrar must see the doctor-axis queue; got {list(buckets_by_tag)}"
-    )
-    assert lab_bucket, (
-        f"registrar must see the resource queue; got {list(buckets_by_tag)}"
-    )
+    lab_bucket = buckets_by_tag.get(LAB_TAG) or buckets_by_tag.get("laboratory")
+    assert (
+        doctor_bucket
+    ), f"registrar must see the doctor-axis queue; got {list(buckets_by_tag)}"
+    assert (
+        lab_bucket
+    ), f"registrar must see the resource queue; got {list(buckets_by_tag)}"
     # The worklist response carries the resource owner axis as
     # specialist_name (registry display_name) + queue_resource_id +
     # cabinet from the registry (QD-2C contract).
@@ -1028,9 +1030,7 @@ def test_registrar_worklist_and_lab_panel_see_the_work(
 
     # The lab panel: own department work only (the RQ-24.b core question:
     # delivery of the resource walk-in to the lab participant).
-    lab = pg_client.get(
-        LAB_QUEUE_TODAY, headers=_auth_headers(world["lab_user"])
-    )
+    lab = pg_client.get(LAB_QUEUE_TODAY, headers=_auth_headers(world["lab_user"]))
     assert lab.status_code == 200, lab.text
     lab_body = lab.json()
     assert {"entries", "total", "date", "timezone"} <= set(lab_body)
@@ -1045,18 +1045,14 @@ def test_registrar_worklist_and_lab_panel_see_the_work(
     )
     assert resource_queue is not None
     resource_patient_id = resource_queue.entries[0].patient_id
-    lab_patient_ids = [
-        e.get("patient_id") for e in lab_body["entries"]
-    ]
+    lab_patient_ids = [e.get("patient_id") for e in lab_body["entries"]]
     assert resource_patient_id in lab_patient_ids, (
         "lab panel must show the resource-queue walk-in in the lab "
         f"department; got patient_ids={lab_patient_ids}"
     )
 
 
-def test_serving_creates_visits_for_downstream_panels(
-    pg_client, pg_session, world
-):
+def test_serving_creates_visits_for_downstream_panels(pg_client, pg_session, world):
     """Leg 3 — serving: the doctor serves the doctor-axis walk-in; the
     resource-axis ticket is admin-only (QD-2C policy) and its visit is
     created in the resource department. After serving, the visit-driven
@@ -1078,9 +1074,9 @@ def test_serving_creates_visits_for_downstream_panels(
             .first()
         )
         assert q is not None, f"no daily queue for tag {tag}"
-        assert (q.queue_resource_id is not None) is resource_owned, (
-            f"queue owner axis mismatch for tag {tag}"
-        )
+        assert (
+            q.queue_resource_id is not None
+        ) is resource_owned, f"queue owner axis mismatch for tag {tag}"
         entry = (
             pg_session.query(OnlineQueueEntry)
             .filter(
@@ -1118,9 +1114,9 @@ def test_serving_creates_visits_for_downstream_panels(
         f"/api/v1/doctor/queue/{resource_entry.id}/call",
         headers=doctor_h,
     )
-    assert resp.status_code == 403, (
-        f"resource serving must be admin-only, got {resp.status_code}"
-    )
+    assert (
+        resp.status_code == 403
+    ), f"resource serving must be admin-only, got {resp.status_code}"
     resp = pg_client.post(
         f"/api/v1/doctor/queue/{resource_entry.id}/call",
         headers=admin_h,
@@ -1171,9 +1167,7 @@ def test_patient_portal_sees_only_own_data(pg_client, world):
     # scope check is that the portal list never contains them.
 
 
-def test_cashier_sees_and_collects_the_payment(
-    pg_client, pg_session, world
-):
+def test_cashier_sees_and_collects_the_payment(pg_client, pg_session, world):
     """S-21 cashier leg: registrar attaches the priced service to a
     walk-in (full-update -> priced visit), the cashier surface shows the
     payable, the grouped payment allocates server-side, and the other
@@ -1193,9 +1187,7 @@ def test_cashier_sees_and_collects_the_payment(
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["token"]
-    joined = _anonym_join(
-        pg_client, token, "RQ24B-SYNTHETIC Г", PHONE_D
-    )
+    joined = _anonym_join(pg_client, token, "RQ24B-SYNTHETIC Г", PHONE_D)
     assert joined["result"]["success"] is True
 
     entry = (
@@ -1232,18 +1224,14 @@ def test_cashier_sees_and_collects_the_payment(
     assert resp.status_code == 200, resp.text
 
     # Cashier surface: the payable card for the walk-in.
-    pending = pg_client.get(
-        CASHIER_PENDING, headers=_auth_headers(world["cashier"])
-    )
+    pending = pg_client.get(CASHIER_PENDING, headers=_auth_headers(world["cashier"]))
     assert pending.status_code == 200, pending.text
     rows = pending.json().get("items") or pending.json().get("payments") or []
     target = next(
         (r for r in rows if r.get("patient_id") == entry.patient_id),
         None,
     )
-    assert target is not None, (
-        f"cashier must see the walk-in bill; got {rows}"
-    )
+    assert target is not None, f"cashier must see the walk-in bill; got {rows}"
     visit_ids = target["visit_ids"]
     assert visit_ids, "pending payment must reference payable visits"
 
@@ -1264,13 +1252,9 @@ def test_cashier_sees_and_collects_the_payment(
 
     # The payment landed exactly on the walk-in's visit — no leakage.
     other_payments = (
-        pg_session.query(Payment)
-        .filter(Payment.visit_id.notin_(visit_ids))
-        .all()
+        pg_session.query(Payment).filter(Payment.visit_id.notin_(visit_ids)).all()
     )
-    assert other_payments == [], (
-        "the grouped payment must not leak onto other visits"
-    )
+    assert other_payments == [], "the grouped payment must not leak onto other visits"
 
 
 # ------------------------------------------------------------------
@@ -1431,8 +1415,7 @@ def test_env_dsn_with_all_local_fallback_hosts_is_accepted(monkeypatch):
         "postgresql://u:p@/postgres?host=/var/run/postgresql,/var/run/postgresql",
     )
     expected = (
-        "postgresql://u:p@/postgres?host=/var/run/postgresql,"
-        "/var/run/postgresql"
+        "postgresql://u:p@/postgres?host=/var/run/postgresql," "/var/run/postgresql"
     )
     assert _candidate_admin_urls() == [expected]
 

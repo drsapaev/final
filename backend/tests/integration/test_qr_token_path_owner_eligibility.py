@@ -607,6 +607,11 @@ def test_existing_doctor_token_prefers_exact_profile_key_over_shared_tag_alias(
     user = _make_user(session, "rq09c_token_exact", "Doctor", active=True)
     doctor = _make_doctor(session, user.id)
     queue_tag = f"rq09c-token-exact-{doctor.id}"
+    # The profile token must resolve to a real eligible doctor for its
+    # canonical queue tag; the alias profiles below then exercise only the
+    # exact-key disambiguation rule.
+    doctor.specialty = queue_tag
+    session.commit()
     world = _seed_doctor_token(session, "exact-key", doctor.id, queue_tag=queue_tag)
     session.add_all(
         [

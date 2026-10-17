@@ -2018,6 +2018,7 @@ def _seed_profile_with_queue(pg_session, suffix: str) -> dict[str, Any]:
     from app.models.clinic import Doctor
     from app.models.online_queue import DailyQueue, OnlineQueueEntry
     from app.models.queue_profile import QueueProfile
+    from app.models.user import User
 
     tag = f"rq12b-{suffix}-tag"
     key = f"rq12b-{suffix}-profile"
@@ -2039,9 +2040,21 @@ def _seed_profile_with_queue(pg_session, suffix: str) -> dict[str, Any]:
     pg_session.commit()
     pg_session.refresh(profile)
 
+    owner = User(
+        username=f"rq12b_{suffix}_doctor",
+        email=None,
+        full_name=f"RQ-12.b {suffix} synthetic doctor",
+        hashed_password="!disabled:test",
+        role="Doctor",
+        is_active=True,
+    )
+    pg_session.add(owner)
+    pg_session.flush()
     doctor = Doctor(
-        specialty="rq12b-synthetic",
+        user_id=owner.id,
+        specialty=tag,
         active=True,
+        cabinet="SYNTHETIC",
         start_number_online=1,
         max_online_per_day=15,
     )
@@ -2054,8 +2067,8 @@ def _seed_profile_with_queue(pg_session, suffix: str) -> dict[str, Any]:
         specialist_id=doctor.id,
         queue_tag=tag,
         active=True,
-        online_start_time="07:00",
-        online_end_time="09:00",
+        online_start_time="00:00",
+        online_end_time="23:59",
         max_online_entries=15,
     )
     pg_session.add(queue)
@@ -2975,9 +2988,31 @@ def test_department_deactivation_preserves_manual_state_and_blocks_new_qr(
     dept_key = dept["key"]
 
     # A manually linked second profile with its own title.
+    from app.models.clinic import Doctor
     from app.models.queue_profile import QueueProfile
+    from app.models.user import User
 
     parent_profile = pg_session.query(QueueProfile).filter_by(key=dept_key).one()
+    owner = User(
+        username=f"rq13a_hide_owner_{dept['id']}",
+        email=None,
+        full_name="RQ-13.a synthetic doctor owner",
+        hashed_password="!disabled:test",
+        role="Doctor",
+        is_active=True,
+    )
+    pg_session.add(owner)
+    pg_session.flush()
+    pg_session.add(
+        Doctor(
+            user_id=owner.id,
+            specialty=dept_key,
+            cabinet="SYNTHETIC",
+            active=True,
+        )
+    )
+    pg_session.commit()
+
     assert parent_profile.show_on_qr_page is False
     # This regression starts from an existing, explicitly published profile;
     # department provisioning now intentionally creates new profiles hidden.
