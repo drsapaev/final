@@ -1,4 +1,21 @@
-## Current checkpoint — T12.1 exact-head CI pass; Tier-2 not run — 2026-10-16T22:04:00+05:00
+## Current checkpoint — T12.2 PR #3693 source/test CI passed — 2026-10-17T12:35:00+05:00
+
+Continue task 431e8e5b-7c74-459e-8038-26f0f17adf1d, T12.2, in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t122-publish-policy\final, branch codex/aqs-T12.2-publish-readiness. Base/current origin/main is db91cc0ef87c8a51eb4b4e816d25077c8ce397d6. Last source/test commit validated is b3d2fdc22928634750bef4c5210e887bff3129db. PR #3693 is OPEN/DRAFT. User merges PRs.
+
+PR #3690/T12.1 is MERGED at 0a3304f5ec7d3702d0fbe3642fdec078eb3edaea. Do not resume #3690.
+
+Focused staging on owned synthetic project clinic-aqs-pr3693-20261017-c9 passed canonical Preflight/Start/Session and all 10 focused publication/readiness checks, including normal Admin password+TOTP. Canonical teardown passed: removed 5 containers, 3 volumes and 1 network; zero owned resources remained. Browser validation matched runtime-source SHA 58b10b3102e1f6d68fefee257fc22194da4f2de2 in sw.js. The launcher field served_revision_verified remains false and must not be promoted to verified.
+
+The exact source/test HEAD b3d2fdc passed Unified CI run 39013024601: backend/PostgreSQL, PG concurrency probe, critical smoke, frontend unit/build/lint, all named Frontend E2E groups, quality, Telegram release gate, OpenAPI/docs, parity, Context Boundary Integrity, security, gitleaks and PR Required Gate passed. The review body gate 39013402443 and lifecycle recommendation 39013402453 also passed. Path-aware skipped jobs remain SKIPPED, not PASS.
+
+The five test-only corrections in b3d2fdc resolved the six backend failures from run 39011277082. Local targeted tests 2/2 passed with one warning; py_compile, scoped Ruff, git diff check and applicable commit hooks passed. Local PostgreSQL integration was NOT_RUN; hosted exact-head backend/PostgreSQL job passed.
+
+Three plan journals are updated locally for inclusion in this PR. Their documentation-only commit will create a new exact HEAD and require applicable checks; no runtime or test staging rerun is needed. PR body must identify run 39013024601 as PASS on source/test HEAD b3d2fdc, not on a later journal-only HEAD.
+
+Keep #3693 Draft/HOLD until the journal commit checks and independent review are complete. Full STAGING_VALIDATION.md, negative-role proof, named legacy specs, full T18 workflow and canonical launcher provenance attestation remain NOT_RUN/unverified. No deferral is accepted. Do not merge or deploy.
+
+Next exact action: run git diff --check, commit only PROGRESS.md, RESUME.md and EVIDENCE.md, push, refresh PR body with precise run-SHA provenance, and inspect the resulting exact-head gates. The user performs merge. After merge, verify its commit and start T13 from fresh origin/main.
+## Historical checkpoint — T12.1 exact-head CI pass; Tier-2 not run — 2026-10-16T22:04:00+05:00
 
 PR #3639 merged at `7443b0e290b9143e877d5898a5589df52592d3b3`. T12.1 worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t12-publish-overview\final`; branch `codex/aqs-T12.1-hidden-profile-create`; base `7443b0e`; tested code commit `ca04e20ad08a5e661ca9ddc9a0d4d8b27157092a`. A plan-only evidence checkpoint was added after that exact-head CI; it changes no tested source or tests. Main checkout was not switched or modified.
 

@@ -1,4 +1,37 @@
-## Current checkpoint — T12.1 exact-head CI pass; Tier-2 pending authorization — 2026-10-16T22:04:00+05:00
+## Current checkpoint — T12.2 PR #3693 CI pass; plan checkpoint follow-up pending — 2026-10-17T12:35:00+05:00
+
+Plan version: 4.00
+Current task: T12.2
+Current status: PR_OPEN
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t122-publish-policy\final
+Branch: codex/aqs-T12.2-publish-readiness
+Base commit: db91cc0ef87c8a51eb4b4e816d25077c8ce397d6 (= current origin/main and PR base)
+Last source/test commit validated: b3d2fdc22928634750bef4c5210e887bff3129db
+Task memory: 431e8e5b-7c74-459e-8038-26f0f17adf1d
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T00–T11 | MERGED | prior task cycles | see earlier evidence | current base includes T11 |
+| T12.1 | MERGED | PR #3690 | 0a3304f5ec7d3702d0fbe3642fdec078eb3edaea | GitHub confirms merged 2026-10-17 |
+| T12.2 | IN_PROGRESS | PR #3693 DRAFT | | source/test HEAD b3d2fdc Unified CI 39013024601 SUCCESS; journal-only checkpoint pending push |
+| T13–T18 | PLANNED | | | |
+
+## Current checkpoint
+- Completed: user merged PR #3690; GitHub confirms merge commit 0a3304f5ec7d3702d0fbe3642fdec078eb3edaea. PR #3693 is OPEN/DRAFT, base db91cc0.
+- T12.2 implementation: publication/reactivation requires one effective, bookable owner; public catalog, selector and admission remain aligned; unready publication returns typed 409. Commit b3d2fdc contains five test fixture/assertion corrections only; runtime behavior did not change.
+- Focused Tier-2 on owned synthetic Compose project clinic-aqs-pr3693-20261017-c9 passed canonical Preflight, Start, Session and all 10 browser checks. Canonical teardown passed: 5 containers, 3 volumes and 1 network removed; zero owned resources remained.
+- Provenance limit: browser validation matched expected runtime source SHA 58b10b3102e1f6d68fefee257fc22194da4f2de2 in sw.js. Commit b3d2fdc is test-only. The canonical launcher still reports served_revision_verified=false; that attestation field remains unverified.
+- Exact-head Unified CI run 39013024601 on b3d2fdc completed SUCCESS. Backend tests including PostgreSQL, Reminder + QR-join PG concurrency probe, Critical E2E Smoke, Frontend unit/build/lint, full Frontend E2E (Registrar, UX/visual, Lab dirty-guard, Lab full-path, Business/Security/Concurrency, Load/Chaos), quality, Telegram Mini App Release Gate, OpenAPI generation, Frontend-Backend Parity, Context Boundary Integrity, security, gitleaks, PR Required Gate and body quality gate passed.
+- Path-aware SKIPPED checks: nightly DAST, Docker build, separate security job, metadata, Supabase Preview, standalone integration/k6/staging/production readiness reports. Skipped checks are not recorded as PASS.
+- PR body required-field validator passed in PR Review Quality Gate run 39013402443; lifecycle recommendation run 39013402453 passed.
+- Local follow-up validation: two targeted tests PASS (2 passed, 1 warning); Python compilation, scoped Ruff, git diff --check and applicable commit hooks passed. No local PostgreSQL was used.
+- The three plan journals have a local checkpoint update intended for this PR. After they are committed, the new journal-only exact HEAD still needs the relevant CI/body gates; runtime and test code will not have changed.
+- Changed but not verified: post-journal exact-head checks; independent code review; full STAGING_VALIDATION.md; negative-role proof; named legacy browser specs; full T18 scenario.
+- Blocker: #3693 remains Draft/HOLD pending post-journal exact-head CI and independent review. No merge or deployment was performed.
+- Next exact action: validate and commit only the three plan journals, update PR body to say run 39013024601 passed on source/test HEAD b3d2fdc and that journal-only HEAD checks are pending, then verify the latest exact-head CI/body gates. Do not repeat staging unless runtime source changes. Leave merge to the user.
+- Checks to rerun after any change: relevant journal/diff checks, applicable hooks, PR-body gate after body updates, and exact-head CI. Runtime staging is not needed for journal-only changes.
+
+## Historical checkpoint — T12.1 exact-head CI pass; Tier-2 pending authorization — 2026-10-16T22:04:00+05:00
 
 Plan version: 4.00
 Current task: T12.1
@@ -15,7 +48,7 @@ Task memory: 9af17c38-8235-4681-93e8-6a9864cbdb75
 | T12.1 | PR_OPEN | #3690 DRAFT; test correction ca04e20 pushed | | Exact-head Unified CI PASS; Tier-2 staging NOT_RUN; HOLD |
 | T12.1a | VALIDATED | codex/aqs-T12.1-hidden-profile-create | | OpenAPI/generated TS parity, type-check/build/diff PASS |
 
-## Current checkpoint
+## Historical checkpoint
 - Completed: T11 PR #3639 merged at `7443b0e`; T12.1 hidden-by-default profile creation and T12.1a OpenAPI/generated types are in PR #3690. Source `9b7a1ec`; OpenAPI final-LF fix `6539c17`; journal checkpoint `7f29d296`; exact-head CI found two tests that assumed auto-publication; test-only correction `ca04e20`. Exact-head Unified CI run `38934894724` passed, including backend/PostgreSQL, Frontend unit/E2E, build, OpenAPI freshness, quality, parity, and PR Required Gate. PR quality, lifecycle, regression, security, gitleaks and i18n gates passed. The two corrected tests and the hidden-default regression both appear as PASS in backend CI.
 - Local validation: focused UI Vitest 17/17; type-check, lint:check (0 errors; 3,506 warnings), theme check, icon audit (409 files/0 findings), build, Python compilation, mocked backend unit, OpenAPI/TS parity, Python Ruff, test py_compile, `git diff --check`, commit hooks and PR body gate passed. Local full Vitest ended without a result; local Windows Playwright stopped at missing Windows-specific visual baselines. No snapshot baselines were changed. PostgreSQL tests were not run locally; the exact-head GitHub backend job passed them using its disposable service database.
 - Changed but not verified: Tier-2 staging/Admin 2FA and other backend-dependent live E2E remain NOT_RUN. No Tier-2 deferral has been acknowledged for PR #3690; T11's prior deferral is specific to #3639 and does not carry forward. No production, deployment, v1 flag, or staging stack was used for T12.1.
@@ -24,7 +57,7 @@ Task memory: 9af17c38-8235-4681-93e8-6a9864cbdb75
 - Next exact action: ask the user to choose a single synthetic T12.1 staging cycle or a bounded Tier-2 deferral path; do not start staging or change Ready/Draft state before that decision. Keep merge with the user.
 - Validation caveats: standard `npm run generate:api-types` used WSL Node 18 and failed with Redocly `Invalid string length`; direct pinned `openapi-typescript@7.13.0` on Windows Node 24.15.0 passed and was idempotent. Backend Ruff had only pre-existing I001/B023 outside edited lines; rerun ignoring only those codes passed.
 
-### T12.1a prework boundary
+### Historical T12.1a prework boundary
 - Execution mode: mandatory `gate`; use one `--known-root-cause` retry only if normal gate misroutes. Confirmed root cause is generated-schema drift from T12.1's QueueProfileCreate default change; this slice refreshes contract artifacts only.
 - Risk/root cause/scope: API contract freshness; backend request default is now false while OpenAPI and TypeScript still describe the previous contract. No runtime behavior or application source change is included.
 - Gate command: canonical `ai/langgraph/scripts/run_agent_gate.ps1` from `ai/langgraph`; root `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`; exact scopes `backend/openapi.json` and `frontend/src/types/generated/api.ts`. Do not modify the router.
