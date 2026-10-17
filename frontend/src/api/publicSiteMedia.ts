@@ -122,7 +122,7 @@ export function getPublicSiteMediaErrorKey(error: unknown): string {
   const status = error.response?.status;
   const code = (error.response?.data as { detail?: { code?: string } } | undefined)?.detail?.code;
 
-  if (status === 503 || code === 'public_media_storage_unavailable') {
+  if (code === 'public_media_storage_unavailable') {
     return 'publicSiteMedia.storageUnavailable';
   }
   if (status === 413 || code === 'public_media_file_too_large') {

@@ -116,7 +116,12 @@ describe('public site media API adapter', () => {
       isAxiosError: true,
       code: 'ERR_CANCELED',
     });
+    const genericServiceUnavailable = Object.assign(new Error('service unavailable'), {
+      isAxiosError: true,
+      response: { status: 503, data: { detail: 'temporarily unavailable' } },
+    });
     expect(getPublicSiteMediaErrorKey(storageError)).toBe('publicSiteMedia.storageUnavailable');
+    expect(getPublicSiteMediaErrorKey(genericServiceUnavailable)).toBe('publicSiteMedia.genericError');
     expect(getPublicSiteMediaErrorKey(fileError)).toBe('publicSiteMedia.fileTooLarge');
     expect(getPublicSiteMediaErrorKey(networkError)).toBe('publicSiteMedia.networkError');
     expect(getPublicSiteMediaErrorKey(cancelledError)).toBe('publicSiteMedia.genericError');

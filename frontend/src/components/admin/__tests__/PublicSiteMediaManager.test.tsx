@@ -212,6 +212,37 @@ describe('PublicSiteMediaManager', () => {
     expect(await screen.findByRole('option', { name: 'SYNTHETIC Doctor 26' })).toBeInTheDocument();
   });
 
+  it('disambiguates duplicate doctor names across loaded pages', async () => {
+    mocks.listDoctors.mockResolvedValueOnce([
+      { ...doctor, id: 42, displayName: 'SYNTHETIC Shared Doctor' },
+      ...Array.from({ length: 24 }, (_, index) => ({
+        ...doctor,
+        id: index + 100,
+        displayName: `SYNTHETIC Doctor ${index + 100}`,
+      })),
+    ]);
+    mocks.listDoctors.mockResolvedValueOnce([{ ...doctor, id: 26, displayName: 'SYNTHETIC Shared Doctor' }]);
+    render(<PublicSiteMediaManager />);
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.assetKind'), { target: { value: 'doctor_portrait' } });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'publicSiteMedia.loadMoreDoctors' }));
+
+    expect(await screen.findByRole('option', { name: 'SYNTHETIC Shared Doctor (#42)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'SYNTHETIC Shared Doctor (#26)' })).toBeInTheDocument();
+  });
+
+  it('refreshes the selected doctor public-readiness record', async () => {
+    render(<PublicSiteMediaManager />);
+    await screen.findByText('publicSiteMedia.noMedia');
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.assetKind'), { target: { value: 'doctor_portrait' } });
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.doctor'), { target: { value: '42' } });
+    await waitFor(() => expect(mocks.doctorWebsiteContent).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.refresh' }));
+
+    await waitFor(() => expect(mocks.doctorWebsiteContent).toHaveBeenCalledTimes(2));
+  });
+
   it('uses a section root because the Clinic OS shell already provides the main landmark', async () => {
     const { container } = render(<PublicSiteMediaManager />);
     await screen.findByText('publicSiteMedia.noMedia');

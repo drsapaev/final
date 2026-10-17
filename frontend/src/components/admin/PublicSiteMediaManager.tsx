@@ -54,6 +54,7 @@ export default function PublicSiteMediaManager() {
   const [doctorPageErrorKey, setDoctorPageErrorKey] = useState<string | null>(null);
   const [doctorWebsiteContent, setDoctorWebsiteContent] = useState<PublicSiteDoctorWebsiteContent | null>(null);
   const [doctorWebsiteContentDoctorId, setDoctorWebsiteContentDoctorId] = useState<number | null>(null);
+  const [doctorWebsiteContentRefreshVersion, setDoctorWebsiteContentRefreshVersion] = useState(0);
   const [isLoadingDoctorWebsiteContent, setIsLoadingDoctorWebsiteContent] = useState(false);
   const [doctorWebsiteContentErrorKey, setDoctorWebsiteContentErrorKey] = useState<string | null>(null);
   const [assetKind, setAssetKind] = useState<PublicSiteMediaKind>('clinic_logo');
@@ -95,6 +96,7 @@ export default function PublicSiteMediaManager() {
       setDoctorLoadFailed(true);
     }
     setIsLoading(false);
+    setDoctorWebsiteContentRefreshVersion((current) => current + 1);
   }, []);
 
   useEffect(() => {
@@ -128,6 +130,16 @@ export default function PublicSiteMediaManager() {
     .filter((id) => !activeDoctorIds.has(id))
     .map((id) => ({ id, displayName: `#${id}`, active: false }));
   const doctorOptions = [...doctors, ...inactiveMediaDoctorOptions];
+  const doctorDisplayNameCounts = doctorOptions.reduce((counts, doctor) => {
+    const normalizedName = doctor.displayName.trim().toLocaleLowerCase();
+    counts.set(normalizedName, (counts.get(normalizedName) ?? 0) + 1);
+    return counts;
+  }, new Map<string, number>());
+  const doctorOptionLabels = new Map(doctorOptions.map((doctor) => {
+    const displayName = doctor.displayName.trim() || `#${doctor.id}`;
+    const duplicateName = (doctorDisplayNameCounts.get(displayName.toLocaleLowerCase()) ?? 0) > 1;
+    return [doctor.id, duplicateName ? `${displayName} (#${doctor.id})` : displayName];
+  }));
   const selectedDoctor = doctorOptions.find((doctor) => doctor.id === selectedDoctorId);
   const selectedDoctorActive = selectedDoctor?.active;
   const selectedDoctorPubliclyEligible = doctorWebsiteContentDoctorId === selectedDoctorId
@@ -178,7 +190,7 @@ export default function PublicSiteMediaManager() {
     return () => {
       cancelled = true;
     };
-  }, [assetKind, doctorLoadFailed, selectedDoctorActive, selectedDoctorId]);
+  }, [assetKind, doctorLoadFailed, doctorWebsiteContentRefreshVersion, selectedDoctorActive, selectedDoctorId]);
 
   const storageUnavailable = storageRecoveryRequired || loadErrorKey === STORAGE_UNAVAILABLE_KEY;
   const mutationsDisabled = isLoading || Boolean(loadErrorKey) || storageUnavailable;
@@ -417,7 +429,9 @@ export default function PublicSiteMediaManager() {
                     <option value="">{t('publicSiteMedia.selectDoctor')}</option>
                     {doctorOptions.map((doctor) => (
                       <option key={doctor.id} value={doctor.id}>
-                        {doctor.active ? doctor.displayName : `${doctor.displayName} · ${t('publicSiteMedia.inactiveDoctor')}`}
+                        {doctor.active
+                          ? doctorOptionLabels.get(doctor.id)
+                          : `${doctorOptionLabels.get(doctor.id)} · ${t('publicSiteMedia.inactiveDoctor')}`}
                       </option>
                     ))}
                   </select>
