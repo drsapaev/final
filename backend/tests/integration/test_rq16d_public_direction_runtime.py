@@ -72,9 +72,7 @@ from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
 
 pytestmark = pytest.mark.integration
 
-PROVISION_PATH = (
-    "/api/v1/queue/admin/directions/{profile_key}/public-address/provision"
-)
+PROVISION_PATH = "/api/v1/queue/admin/directions/{profile_key}/public-address/provision"
 START_PATH = "/api/v1/queue/public/{public_code}/start-session"
 METHODS_PATH = "/api/v1/queue/directions/{profile_key}/entry-methods"
 REFUSAL_DETAIL = "Направление недоступно"
@@ -181,7 +179,9 @@ def pg_engine():
 
         engine = create_engine(sa_url, future=True)
         with engine.connect() as conn:
-            version = conn.execute(text("select version_num from alembic_version")).scalar()
+            version = conn.execute(
+                text("select version_num from alembic_version")
+            ).scalar()
             dialect = conn.execute(text("select version()")).scalar()
         assert version, "alembic_version must be present after upgrade"
         assert "PostgreSQL" in (dialect or ""), "RQ-16.d proof requires real PostgreSQL"
@@ -333,9 +333,7 @@ def direction_world(pg_session):
         pg_session, "rq16d-hidden", "rq16d-hidden", show_on_qr_page=False
     )
     cardio_user = _get_or_create_user(pg_session, "rq16d_doc_cardio", "Doctor")
-    cardio_doctor = _get_or_create_doctor(
-        pg_session, cardio_user.id, "rq16d-cardio"
-    )
+    cardio_doctor = _get_or_create_doctor(pg_session, cardio_user.id, "rq16d-cardio")
     derma_user = _get_or_create_user(pg_session, "rq16d_doc_derma", "Doctor")
     derma_doctor = _get_or_create_doctor(pg_session, derma_user.id, "rq16d-derma")
     return {
@@ -383,34 +381,36 @@ def test_openapi_schema_contains_public_direction_runtime_contract(pg_client):
     provision_template = (
         "/api/v1/queue/admin/directions/{profile_key}/public-address/provision"
     )
-    assert provision_template in spec["paths"], (
-        "RQ-16.d provision route missing from OpenAPI"
-    )
+    assert (
+        provision_template in spec["paths"]
+    ), "RQ-16.d provision route missing from OpenAPI"
     start_template = "/api/v1/queue/public/{public_code}/start-session"
-    assert start_template in spec["paths"], (
-        "RQ-16.d public start route missing from OpenAPI"
-    )
+    assert (
+        start_template in spec["paths"]
+    ), "RQ-16.d public start route missing from OpenAPI"
     start_op = spec["paths"][start_template]["post"]
     assert start_op.get("responses"), "start-session must declare responses"
-    assert "404" in start_op["responses"], (
-        "the anonymous refusal must be a declared response (S-15)"
-    )
+    assert (
+        "404" in start_op["responses"]
+    ), "the anonymous refusal must be a declared response (S-15)"
     provision_op = spec["paths"][provision_template]["post"]
-    assert "401" in provision_op["responses"] or "403" in provision_op["responses"], (
-        "provision must declare its auth refusal"
-    )
+    assert (
+        "401" in provision_op["responses"] or "403" in provision_op["responses"]
+    ), "provision must declare its auth refusal"
 
 
-def test_provision_generates_opaque_code_once(pg_client, pg_admin_user, direction_world):
+def test_provision_generates_opaque_code_once(
+    pg_client, pg_admin_user, direction_world
+):
     response = _provision(pg_client, _auth_headers(pg_admin_user), "rq16d-cardio")
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["direction_key"] == "rq16d-cardio"
     assert body["profile_id"] == direction_world["cardio"].id
     assert body["created"] is True
-    assert CODE_RE.match(body["public_code"]), (
-        "public_code must be 12 lowercase Crockford/Base32-like chars (E-055 §2)"
-    )
+    assert CODE_RE.match(
+        body["public_code"]
+    ), "public_code must be 12 lowercase Crockford/Base32-like chars (E-055 §2)"
     assert body["url_path"] == f"/q/{body['public_code']}"
 
 
@@ -431,13 +431,13 @@ def test_provision_is_idempotent_never_regenerates(
     assert body["public_code"] == code
 
 
-def test_provision_requires_admin(pg_session, pg_client, pg_admin_user, direction_world):
+def test_provision_requires_admin(
+    pg_session, pg_client, pg_admin_user, direction_world
+):
     registrar = _get_or_create_user(pg_session, "rq16d_registrar", "Registrar")
     no_auth = _provision(pg_client, {}, "rq16d-cardio")
     assert no_auth.status_code in (401, 403), "provision must never be anonymous"
-    registrar_response = _provision(
-        pg_client, _auth_headers(registrar), "rq16d-cardio"
-    )
+    registrar_response = _provision(pg_client, _auth_headers(registrar), "rq16d-cardio")
     assert registrar_response.status_code == 403, registrar_response.text
 
 
@@ -496,9 +496,7 @@ def test_collision_retry_generates_fresh_code(
 def test_public_start_happy_path_continues_existing_join_flow(
     pg_client, pg_admin_user, direction_world
 ):
-    provisioned = _provision(
-        pg_client, _auth_headers(pg_admin_user), "rq16d-cardio"
-    )
+    provisioned = _provision(pg_client, _auth_headers(pg_admin_user), "rq16d-cardio")
     assert provisioned.status_code == 200
     code = provisioned.json()["public_code"]
 
@@ -595,7 +593,9 @@ def test_permanent_address_refuses_after_explicit_parent_is_disabled(
             .filter_by(public_code=code)
             .one()
         )
-        assert address.retired_at is None, "unavailability must not rotate/retire the URL"
+        assert (
+            address.retired_at is None
+        ), "unavailability must not rotate/retire the URL"
         assert profile.is_active is True, "parent state must not rewrite manual intent"
         assert (
             pg_session.query(QueueToken)
@@ -609,6 +609,55 @@ def test_permanent_address_refuses_after_explicit_parent_is_disabled(
         department = pg_session.query(Department).filter_by(key="cardiology").one()
         profile.department_key = original_department_key
         department.active = original_department_active
+        pg_session.commit()
+
+
+def test_permanent_address_does_not_route_a_mixed_direction_profile(
+    pg_session, pg_client, pg_admin_user, direction_world
+):
+    """An existing durable URL stays unchanged but refuses an overview route."""
+    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
+    from app.models.queue_profile import QueueProfile
+
+    profile = direction_world["cardio"]
+    original_tags = list(profile.queue_tags or [])
+    headers = _auth_headers(pg_admin_user)
+    provisioned = _provision(pg_client, headers, profile.key)
+    assert provisioned.status_code == 200, provisioned.text
+    code = provisioned.json()["public_code"]
+    independent_tag = f"rq16dm{uuid.uuid4().hex[:8]}"
+    independent_user = _get_or_create_user(
+        pg_session, f"rq16d_mix_{independent_tag[-8:]}", "Doctor"
+    )
+    _get_or_create_doctor(pg_session, independent_user.id, independent_tag)
+    try:
+        profile.queue_tags = [*original_tags, independent_tag]
+        pg_session.commit()
+
+        start = _start(pg_client, code)
+        assert start.status_code == 404, start.text
+        assert start.json()["detail"] == REFUSAL_DETAIL
+
+        methods = pg_client.get(METHODS_PATH.replace("{profile_key}", profile.key))
+        assert methods.status_code == 200, methods.text
+        flags = {
+            item["method"]: item["supported"]
+            for item in methods.json()["entry_methods"]
+        }
+        assert flags["permanent_address"] is False
+
+        address = (
+            pg_session.query(QueueDirectionPublicAddress)
+            .filter_by(public_code=code)
+            .one()
+        )
+        assert address.retired_at is None
+        pg_session.refresh(profile)
+        assert profile.queue_tags == [*original_tags, independent_tag]
+    finally:
+        pg_session.rollback()
+        profile = pg_session.query(QueueProfile).filter_by(key=profile.key).one()
+        profile.queue_tags = original_tags
         pg_session.commit()
 
 
@@ -684,17 +733,13 @@ def test_rename_keeps_the_same_address(
     assert _start(pg_client, code).status_code == 200
 
     profile = (
-        pg_session.query(QueueProfile)
-        .filter(QueueProfile.key == "rq16d-derma")
-        .first()
+        pg_session.query(QueueProfile).filter(QueueProfile.key == "rq16d-derma").first()
     )
     profile.title_ru = "RQ-16.d дерма ПЕРЕИМЕНОВАН"
     pg_session.commit()
 
     response = _start(pg_client, code)
-    assert response.status_code == 200, (
-        "E-055 §7: rename must never change the address"
-    )
+    assert response.status_code == 200, "E-055 §7: rename must never change the address"
 
 
 def test_reactivate_restores_the_same_address(
@@ -717,16 +762,16 @@ def test_reactivate_restores_the_same_address(
     )
     profile.is_active = False
     pg_session.commit()
-    assert _start(pg_client, code).status_code == 404, (
-        "archive must block the join by the old address (E-055 §7)"
-    )
+    assert (
+        _start(pg_client, code).status_code == 404
+    ), "archive must block the join by the old address (E-055 §7)"
 
     profile.is_active = True
     pg_session.commit()
     response = _start(pg_client, code)
-    assert response.status_code == 200, (
-        "reactivating the SAME profile restores the SAME address (E-055 §7)"
-    )
+    assert (
+        response.status_code == 200
+    ), "reactivating the SAME profile restores the SAME address (E-055 §7)"
 
 
 def test_unprovisioned_direction_refuses_start(
@@ -778,9 +823,9 @@ def test_session_binding_scopes_the_direction(
         )
         .count()
     )
-    assert entries_after_cross == 0, (
-        "a cross-direction completion must not create a queue entry"
-    )
+    assert (
+        entries_after_cross == 0
+    ), "a cross-direction completion must not create a queue entry"
 
     untyped_doctor = pg_client.post(
         "/api/v1/queue/join/complete",
@@ -813,9 +858,9 @@ def test_entry_methods_permanent_address_flag_is_dynamic(
 
     assert _flag("rq16d-cardio") is False, "not provisioned yet — must not claim"
     _provision(pg_client, headers, "rq16d-cardio")
-    assert _flag("rq16d-cardio") is True, (
-        "provisioned + visible + eligible — the flag must flip honestly"
-    )
+    assert (
+        _flag("rq16d-cardio") is True
+    ), "provisioned + visible + eligible — the flag must flip honestly"
     assert _flag("rq16d-plain") is False, "unprovisioned — no backfill (E-055 §3)"
 
 
@@ -841,9 +886,7 @@ def test_public_start_rate_limit_enforced_when_enabled(
     # slowapi reads the plain ``enabled`` attribute at request time (the
     # constructor sets it from TESTING); monkeypatch restores it after.
     monkeypatch.setattr(limiter, "enabled", True)
-    pg_client.app.add_exception_handler(
-        RateLimitExceeded, _rate_limit_exceeded_handler
-    )
+    pg_client.app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     try:
         codes = [_start(pg_client, "2eeeeeeeeeee").status_code for _ in range(12)]
         assert 429 in codes, f"the anonymous surface must rate-limit (got {codes})"

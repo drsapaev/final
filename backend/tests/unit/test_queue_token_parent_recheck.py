@@ -1,5 +1,6 @@
 """Pure unit coverage for the final parent-lock check of issued QR tokens."""
 
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -7,7 +8,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue
+from app.models.online_queue import DailyQueue, QueueResource
 from app.models.queue_profile import QueueProfile
 from app.services import queue_profile_availability
 from app.services.queue_profile_availability import resolve_queue_profile_availability
@@ -21,13 +22,33 @@ def _session(profiles, doctor):
     profile_query.all.return_value = profiles
     doctor_query = Mock()
     doctor_query.filter.return_value.first.return_value = doctor
+    doctor_specialty_query = Mock()
+    doctor_specialty_query.join.return_value.filter.return_value.distinct.return_value.all.return_value = (
+        [(doctor.specialty,)] if doctor is not None else []
+    )
+    resource_tag_query = Mock()
+    resource_tag_query.filter.return_value.all.return_value = []
+    queue_tag_query = Mock()
+    queue_tag_query.filter.return_value.order_by.return_value.all.return_value = []
+    active_queue_query = Mock()
+    active_queue_query.filter.return_value.filter.return_value.order_by.return_value.all.return_value = (
+        []
+    )
 
-    def query(model):
-        if model is QueueProfile:
+    def query(*models):
+        if len(models) == 1 and models[0] is QueueProfile:
             return profile_query
-        if model is Doctor:
+        if len(models) == 1 and models[0] is Doctor:
             return doctor_query
-        raise AssertionError(f"Unexpected query model: {model}")
+        if len(models) == 1 and models[0] is Doctor.specialty:
+            return doctor_specialty_query
+        if len(models) == 1 and models[0] is QueueResource.queue_tag:
+            return resource_tag_query
+        if len(models) == 2 and models[0] is DailyQueue.queue_tag:
+            return queue_tag_query
+        if len(models) == 1 and models[0] is DailyQueue:
+            return active_queue_query
+        raise AssertionError(f"Unexpected query model: {models}")
 
     db.query.side_effect = query
     return db
@@ -69,7 +90,10 @@ def test_doctor_token_without_tag_profile_rechecks_doctor_parent_under_lock(
     profile = _profile()
     doctor = Doctor(id=73, specialty=profile.key)
     queue = DailyQueue(
-        specialist_id=doctor.id, queue_resource_id=None, queue_tag=queue_tag
+        day=date.today(),
+        specialist_id=doctor.id,
+        queue_resource_id=None,
+        queue_tag=queue_tag,
     )
     db = _session([profile], doctor)
     loader = _availability_loader(monkeypatch, parent_active=parent_active)

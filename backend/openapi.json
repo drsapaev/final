@@ -18403,7 +18403,7 @@
             }
           },
           "409": {
-            "description": "Binding changes are blocked while the profile is in use, or the submitted binding snapshot became stale.",
+            "description": "Binding changes are blocked while the profile is in use, the submitted binding snapshot became stale, or the profile does not resolve to one available QR booking target.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18413,6 +18413,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QueueProfileBindingChangedResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QueueProfilePublicationConflictResponse"
                     }
                   ],
                   "title": "Response 409 Update Queue Profile Api V1 Queues Profiles  Profile Key  Put"
@@ -104952,6 +104955,51 @@
           "active_public_addresses"
         ],
         "title": "QueueProfileLinkCounts"
+      },
+      "QueueProfilePublicationConflictDetail": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "const": "profile_publication_blocked",
+            "title": "Reason"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "profile_inactive",
+              "profile_unpublished",
+              "profile_unavailable",
+              "mixed_direction_targets",
+              "ambiguous_profile_target",
+              "no_bookable_owner"
+            ],
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "code",
+          "message"
+        ],
+        "title": "QueueProfilePublicationConflictDetail",
+        "description": "A profile cannot be published as one bookable QR direction yet."
+      },
+      "QueueProfilePublicationConflictResponse": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/QueueProfilePublicationConflictDetail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "QueueProfilePublicationConflictResponse"
       },
       "QueueProfileUpdate": {
         "properties": {

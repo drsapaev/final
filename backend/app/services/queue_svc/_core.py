@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextvars import ContextVar
+from datetime import date
 from functools import wraps
 from typing import Any, TypeVar, cast
 
@@ -159,6 +160,8 @@ class CoreMixin(QueueBusinessServiceMixinBase):
         *,
         profiles: list[Any] | None = None,
         availability_by_profile: dict[Any, Any] | None = None,
+        day: date | None = None,
+        owner_scope_by_profile: dict[Any, tuple[str, str] | None] | None = None,
         lock_parent_rows: bool = False,
     ):
         from app.services.queue_profile_availability import (
@@ -177,6 +180,8 @@ class CoreMixin(QueueBusinessServiceMixinBase):
             profile_candidates,
             db,
             resolved_availability,
+            day=day,
+            owner_scope_by_profile=owner_scope_by_profile,
         ):
             return None
         for profile in profile_candidates:

@@ -50,19 +50,19 @@ def get_available_specialists(
         # (was hardcoded — new specialties like 'neurology' got default icon/name)
         from app.models.queue_profile import QueueProfile
 
-        published_profiles = (
-            db.query(QueueProfile)
-            .filter(QueueProfile.show_on_qr_page == True)
-            .order_by(QueueProfile.display_order)
-            .all()
+        candidate_profiles = (
+            db.query(QueueProfile).order_by(QueueProfile.display_order).all()
         )
+        published_profiles = [
+            profile for profile in candidate_profiles if profile.show_on_qr_page
+        ]
         from app.services.queue_profile_availability import (
             load_queue_profile_availability,
             queue_profile_is_qr_selectable,
         )
 
         availability_by_profile = load_queue_profile_availability(
-            db, published_profiles
+            db, candidate_profiles
         )
         profiles = [
             profile
@@ -70,19 +70,41 @@ def get_available_specialists(
             if queue_profile_is_qr_selectable(profile, availability_by_profile[profile])
         ]
 
-        # Build mapping from profile keys + queue_tags
+        from app.crud.clinic import clinic_today
+        from app.services.queue_service import queue_service
+
+        resolved_day = clinic_today(db) if candidate_profiles else None
+        owner_scope_by_profile = {}
+        eligible_doctor_specialties: set[str] = set()
+        if resolved_day is not None:
+            owner_scope_by_profile, eligible_doctor_specialties = (
+                queue_service._qr_profile_owner_scopes_for_catalog(
+                    db, candidate_profiles, day=resolved_day
+                )
+            )
+            profiles = queue_service.public_qr_catalog_bookable_profiles(
+                db,
+                profiles,
+                day=resolved_day,
+                availability_by_profile=availability_by_profile,
+                candidate_profiles=candidate_profiles,
+                owner_scope_by_profile=owner_scope_by_profile,
+                eligible_doctor_specialties=eligible_doctor_specialties,
+            )
+        bookable_profile_keys = {profile.key for profile in profiles}
+
+        # Build the display map only from profiles the canonical public catalog
+        # can actually offer as targets.
         specialty_mapping = {}
         for profile in profiles:
             display_name = profile.title_ru or profile.title or profile.key
             icon = profile.icon or "👨‍⚕️"
             color = profile.color or "#8E8E93"
-            # Map profile.key
             specialty_mapping[profile.key] = {
                 "name": display_name,
                 "icon": icon,
                 "color": color,
             }
-            # Map each queue_tag too
             for tag in profile.queue_tags or []:
                 if tag not in specialty_mapping:
                     specialty_mapping[tag] = {
@@ -90,8 +112,6 @@ def get_available_specialists(
                         "icon": icon,
                         "color": color,
                     }
-
-        from app.services.queue_service import queue_service
 
         specialists_list = []
         for doctor in doctors:
@@ -101,12 +121,15 @@ def get_available_specialists(
 
             # Match the clinic-wide QR selector and admission: every published
             # profile sharing this tag must resolve to one available target.
-            if not queue_service._get_qr_visible_profile_for_doctor(
+            qr_profile = queue_service._get_qr_visible_profile_for_doctor(
                 db,
                 doctor,
-                profiles=published_profiles,
+                profiles=candidate_profiles,
                 availability_by_profile=availability_by_profile,
-            ):
+                day=resolved_day,
+                owner_scope_by_profile=owner_scope_by_profile,
+            )
+            if not qr_profile or qr_profile.key not in bookable_profile_keys:
                 continue
 
             # PR-28: look up in dynamic mapping, fallback to raw specialty

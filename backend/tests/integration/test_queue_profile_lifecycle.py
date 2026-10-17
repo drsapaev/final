@@ -455,6 +455,15 @@ def _post_profile(pg_client, pg_admin_user, payload: dict):
     return pg_client.post("/api/v1/queues/profiles", json=payload, headers=headers)
 
 
+def _put_profile(pg_client, pg_admin_user, key: str, payload: dict):
+    from tests.conftest import mint_access_token
+
+    headers = {"Authorization": f"Bearer {mint_access_token(pg_admin_user)}"}
+    return pg_client.put(
+        f"/api/v1/queues/profiles/{key}", json=payload, headers=headers
+    )
+
+
 def _preview_profile(pg_client, pg_admin_user, key: str):
     from tests.conftest import mint_access_token
 
@@ -521,6 +530,344 @@ def test_new_profiles_are_hidden_and_create_time_publish_intent_is_deferred(
 
     pg_session.refresh(existing_public)
     assert existing_public.show_on_qr_page is True
+
+
+def test_openapi_profile_update_documents_publication_conflict(pg_client):
+    spec = pg_client.get("/openapi.json").json()
+    operation = spec["paths"]["/api/v1/queues/profiles/{profile_key}"]["put"]
+    conflict = operation["responses"]["409"]["content"]["application/json"]["schema"]
+    assert "QueueProfilePublicationConflictResponse" in json.dumps(conflict)
+    detail = spec["components"]["schemas"]["QueueProfilePublicationConflictDetail"]
+    assert sorted(detail["properties"]["code"]["enum"]) == sorted(
+        [
+            "profile_inactive",
+            "profile_unpublished",
+            "profile_unavailable",
+            "mixed_direction_targets",
+            "ambiguous_profile_target",
+            "no_bookable_owner",
+        ]
+    )
+
+
+def test_qr_owner_scope_accepts_legacy_service_tags_with_one_owner():
+    """Service aliases do not turn one actual booking owner into an overview."""
+    from types import SimpleNamespace
+
+    from app.services.queue_service import queue_service
+
+    cardiology = SimpleNamespace(
+        key="cardiology",
+        queue_tags=["cardio", "cardiology", "cardiology_common"],
+    )
+    scope, conflict = queue_service._qr_profile_owner_scope_from_targets(
+        cardiology,
+        resource_route_tags=set(),
+        eligible_doctor_specialties={"cardiology", "cardiology_common"},
+    )
+    assert scope is not None and scope[0] == "doctor"
+    assert conflict is None
+
+    ecg = SimpleNamespace(key="ecg", queue_tags=["ecg", "echokg"])
+    scope, conflict = queue_service._qr_profile_owner_scope_from_targets(
+        ecg,
+        resource_route_tags={"ecg"},
+        eligible_doctor_specialties=set(),
+    )
+    assert scope == ("resource", "ecg")
+    assert conflict is None
+
+    # ADR-001: an active registry tag owns the routing surface before doctor
+    # selection, even when an eligible doctor has the same specialty spelling.
+    lab = SimpleNamespace(key="lab", queue_tags=["lab"])
+    scope, conflict = queue_service._qr_profile_owner_scope_from_targets(
+        lab,
+        resource_route_tags={"lab"},
+        eligible_doctor_specialties={"lab"},
+    )
+    assert scope == ("resource", "lab")
+    assert conflict is None
+
+    # A different doctor-owned tag remains a distinct target and fails closed.
+    mixed = SimpleNamespace(key="lab", queue_tags=["lab", "cardiology"])
+    scope, conflict = queue_service._qr_profile_owner_scope_from_targets(
+        mixed,
+        resource_route_tags={"lab"},
+        eligible_doctor_specialties={"lab", "cardiology"},
+    )
+    assert scope is None
+    assert conflict == "mixed_direction_targets"
+
+    overview = SimpleNamespace(key="overview", queue_tags=["alpha", "beta"])
+    scope, conflict = queue_service._qr_profile_owner_scope_from_targets(
+        overview,
+        resource_route_tags=set(),
+        eligible_doctor_specialties={"alpha", "beta"},
+    )
+    assert scope is None
+    assert conflict == "mixed_direction_targets"
+
+
+@pytest.mark.queue
+def test_explicit_publish_allows_multiple_doctors_for_one_direction(
+    pg_client, pg_session, pg_admin_user
+):
+    """A direction with several eligible doctors remains one valid target."""
+    from app.crud.clinic import clinic_today
+    from app.models.clinic import Doctor
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+    from app.services.queue_service import queue_service
+
+    suffix = uuid.uuid4().hex[:8]
+    specialty = f"rq12b_t122_one_{suffix}"
+    profile = QueueProfile(
+        key=specialty,
+        title="Synthetic one-direction profile",
+        queue_tags=[specialty],
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    doctors = []
+    for index in range(2):
+        user = User(
+            username=f"rq12b_t122_doc_{suffix}_{index}",
+            email=f"rq12b-t122-doc-{suffix}-{index}@example.com",
+            full_name=f"Synthetic doctor {index}",
+            hashed_password="!disabled:test",
+            role="Doctor",
+            is_active=True,
+            is_superuser=False,
+        )
+        pg_session.add(user)
+        pg_session.flush()
+        doctors.append(Doctor(user_id=user.id, specialty=specialty, active=True))
+    pg_session.add_all([profile, *doctors])
+    pg_session.commit()
+
+    response = _put_profile(
+        pg_client, pg_admin_user, specialty, {"show_on_qr_page": True}
+    )
+
+    assert response.status_code == 200, response.text
+    pg_session.refresh(profile)
+    assert profile.show_on_qr_page is True
+    assert (
+        queue_service.qr_profile_publication_conflict(
+            pg_session, profile, day=clinic_today(pg_session)
+        )
+        is None
+    )
+
+
+@pytest.mark.queue
+def test_explicit_publish_allows_one_resource_owned_direction(
+    pg_client, pg_session, pg_admin_user
+):
+    from app.models.clinic import Doctor
+    from app.models.online_queue import QueueResource
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+
+    suffix = uuid.uuid4().hex[:8]
+    queue_tag = f"rq12b_t122_resource_{suffix}"
+    profile = QueueProfile(
+        key=queue_tag,
+        title="Synthetic resource direction",
+        queue_tags=[queue_tag],
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    resource = QueueResource(
+        code=f"rq12b_t122_resource_{suffix}",
+        queue_tag=queue_tag,
+        display_name="Synthetic queue resource",
+        active=True,
+    )
+    doctor_user = User(
+        username=f"rq12b_t122_resource_doc_{suffix}",
+        email=f"rq12b-t122-resource-doc-{suffix}@example.test",
+        full_name="Synthetic resource-tag doctor",
+        hashed_password="!disabled:test",
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+    )
+    pg_session.add_all([profile, resource, doctor_user])
+    pg_session.flush()
+    pg_session.add(Doctor(user_id=doctor_user.id, specialty=queue_tag, active=True))
+    pg_session.commit()
+
+    response = _put_profile(
+        pg_client, pg_admin_user, profile.key, {"show_on_qr_page": True}
+    )
+
+    assert response.status_code == 200, response.text
+    catalog = pg_client.get("/api/v1/queues/profiles/public")
+    assert catalog.status_code == 200, catalog.text
+    assert any(
+        item["specialty"] == profile.key for item in catalog.json()["specialists"]
+    )
+
+
+@pytest.mark.queue
+def test_explicit_publish_rejects_unavailable_department_parent(
+    pg_client, pg_session, pg_admin_user
+):
+    from app.models.clinic import Doctor
+    from app.models.department import Department
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+
+    suffix = uuid.uuid4().hex[:8]
+    specialty = f"rq12b_t122_parent_{suffix}"
+    department = Department(
+        key=specialty,
+        name_ru="Synthetic inactive parent",
+        active=False,
+    )
+    profile = QueueProfile(
+        key=specialty,
+        title="Synthetic unavailable direction",
+        queue_tags=[specialty],
+        department_key=department.key,
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    user = User(
+        username=f"rq12b_t122_parent_doc_{suffix}",
+        email=f"rq12b-t122-parent-doc-{suffix}@example.com",
+        full_name="Synthetic doctor",
+        hashed_password="!disabled:test",
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+    )
+    pg_session.add_all([department, profile, user])
+    pg_session.flush()
+    pg_session.add(Doctor(user_id=user.id, specialty=specialty, active=True))
+    pg_session.commit()
+
+    response = _put_profile(
+        pg_client, pg_admin_user, profile.key, {"show_on_qr_page": True}
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "profile_unavailable"
+    pg_session.refresh(profile)
+    assert profile.show_on_qr_page is False
+
+
+@pytest.mark.queue
+def test_publish_and_reactivation_reject_mixed_direction_overview_atomically(
+    pg_client, pg_session, pg_admin_user
+):
+    """Independent tags stay internal and failed publishes do not save fields."""
+    from app.models.clinic import Doctor
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+
+    suffix = uuid.uuid4().hex[:8]
+    key = f"rq12b_t122_overview_{suffix}"
+    profile = QueueProfile(
+        key=key,
+        title="Synthetic overview",
+        queue_tags=[f"rq12b_t122_alpha_{suffix}", f"rq12b_t122_beta_{suffix}"],
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    pg_session.add(profile)
+    for index, specialty in enumerate(profile.queue_tags):
+        user = User(
+            username=f"rq12b_t122_overview_doc_{suffix}_{index}",
+            email=f"rq12b-t122-overview-doc-{suffix}-{index}@example.com",
+            full_name=f"Synthetic overview doctor {index}",
+            hashed_password="!disabled:test",
+            role="Doctor",
+            is_active=True,
+            is_superuser=False,
+        )
+        pg_session.add(user)
+        pg_session.flush()
+        pg_session.add(Doctor(user_id=user.id, specialty=specialty, active=True))
+    pg_session.commit()
+
+    publish = _put_profile(
+        pg_client,
+        pg_admin_user,
+        key,
+        {"title": "Must remain unchanged", "show_on_qr_page": True},
+    )
+    assert publish.status_code == 409, publish.text
+    assert publish.json()["detail"] == {
+        "reason": "profile_publication_blocked",
+        "code": "mixed_direction_targets",
+        "message": "Разделите независимые направления или ресурсные очереди на отдельные профили.",
+    }
+    pg_session.refresh(profile)
+    assert profile.title == "Synthetic overview"
+    assert profile.show_on_qr_page is False
+
+    # A legacy saved publication intent is revalidated when an archived
+    # profile is restored. The command remains all-or-nothing.
+    profile.show_on_qr_page = True
+    profile.is_active = False
+    pg_session.commit()
+    reactivate = _put_profile(pg_client, pg_admin_user, key, {"is_active": True})
+    assert reactivate.status_code == 409, reactivate.text
+    assert reactivate.json()["detail"]["code"] == "mixed_direction_targets"
+    pg_session.refresh(profile)
+    assert profile.is_active is False
+    assert profile.show_on_qr_page is True
+
+
+@pytest.mark.queue
+def test_published_profile_binding_change_revalidates_new_owner_scope_atomically(
+    pg_client, pg_session, pg_admin_user
+):
+    from app.models.clinic import Doctor
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+
+    suffix = uuid.uuid4().hex[:8]
+    old_tag = f"rq12b_t122_old_{suffix}"
+    first_tag = f"rq12b_t122_first_{suffix}"
+    second_tag = f"rq12b_t122_second_{suffix}"
+    profile = QueueProfile(
+        key=f"rq12b_t122_rebind_{suffix}",
+        title="Synthetic published profile",
+        queue_tags=[old_tag],
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    pg_session.add(profile)
+    for index, specialty in enumerate((first_tag, second_tag)):
+        user = User(
+            username=f"rq12b_t122_rebind_doc_{suffix}_{index}",
+            email=f"rq12b-t122-rebind-doc-{suffix}-{index}@example.com",
+            full_name=f"Synthetic rebind doctor {index}",
+            hashed_password="!disabled:test",
+            role="Doctor",
+            is_active=True,
+            is_superuser=False,
+        )
+        pg_session.add(user)
+        pg_session.flush()
+        pg_session.add(Doctor(user_id=user.id, specialty=specialty, active=True))
+    pg_session.commit()
+
+    response = _put_profile(
+        pg_client,
+        pg_admin_user,
+        profile.key,
+        {"queue_tags": [first_tag, second_tag]},
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "mixed_direction_targets"
+    pg_session.refresh(profile)
+    assert profile.queue_tags == [old_tag]
+    assert profile.show_on_qr_page is True
 
 
 def _preview_profile_update(pg_client, pg_admin_user, key: str, payload: dict):
@@ -1705,6 +2052,7 @@ def _seed_profile_with_queue(pg_session, suffix: str) -> dict[str, Any]:
     from app.models.clinic import Doctor
     from app.models.online_queue import DailyQueue, OnlineQueueEntry
     from app.models.queue_profile import QueueProfile
+    from app.models.user import User
 
     tag = f"rq12b-{suffix}-tag"
     key = f"rq12b-{suffix}-profile"
@@ -1726,9 +2074,21 @@ def _seed_profile_with_queue(pg_session, suffix: str) -> dict[str, Any]:
     pg_session.commit()
     pg_session.refresh(profile)
 
+    owner = User(
+        username=f"rq12b_{suffix}_doctor",
+        email=None,
+        full_name=f"RQ-12.b {suffix} synthetic doctor",
+        hashed_password="!disabled:test",
+        role="Doctor",
+        is_active=True,
+    )
+    pg_session.add(owner)
+    pg_session.flush()
     doctor = Doctor(
-        specialty="rq12b-synthetic",
+        user_id=owner.id,
+        specialty=tag,
         active=True,
+        cabinet="SYNTHETIC",
         start_number_online=1,
         max_online_per_day=15,
     )
@@ -1741,8 +2101,8 @@ def _seed_profile_with_queue(pg_session, suffix: str) -> dict[str, Any]:
         specialist_id=doctor.id,
         queue_tag=tag,
         active=True,
-        online_start_time="07:00",
-        online_end_time="09:00",
+        online_start_time="00:00",
+        online_end_time="23:59",
         max_online_entries=15,
     )
     pg_session.add(queue)
@@ -2176,21 +2536,40 @@ def test_public_profile_catalog_uses_bounded_query_count(
     """Public profile query work stays bounded as the catalog grows."""
     from sqlalchemy import event
 
+    from app.models.clinic import Doctor
     from app.models.queue_profile import QueueProfile
+    from app.models.user import User
 
     suffix = uuid.uuid4().hex[:10]
-    profiles = [
-        QueueProfile(
-            key=f"rq3639-batch-{suffix}-{index}",
-            title=f"Synthetic batch profile {index}",
-            queue_tags=[f"rq3639-batch-{suffix}-{index}"],
-            department_key=None,
-            is_active=True,
-            show_on_qr_page=True,
-            display_order=index,
+    profiles = []
+    for index in range(16):
+        # The public catalog contains actionable directions, so each profile
+        # must resolve to a real eligible owner. Keep the doctor's specialty
+        # within the deployed column width while making every route unique.
+        queue_tag = f"b{suffix[:8]}{index:02d}"
+        profiles.append(
+            QueueProfile(
+                key=f"rq3639-batch-{suffix}-{index}",
+                title=f"Synthetic batch profile {index}",
+                queue_tags=[queue_tag],
+                department_key=None,
+                is_active=True,
+                show_on_qr_page=True,
+                display_order=index,
+            )
         )
-        for index in range(16)
-    ]
+        user = User(
+            username=f"rq3639_batch_{suffix}_{index}",
+            email=f"rq3639-batch-{suffix}-{index}@example.com",
+            full_name=f"Synthetic batch doctor {index}",
+            hashed_password="!disabled:test",
+            role="Doctor",
+            is_active=True,
+            is_superuser=False,
+        )
+        pg_session.add(user)
+        pg_session.flush()
+        pg_session.add(Doctor(user_id=user.id, specialty=queue_tag, active=True))
     pg_session.add_all(profiles)
     pg_session.commit()
 
@@ -2423,7 +2802,12 @@ def test_legacy_doctor_token_locks_fallback_parent_before_admission(
     profile = QueueProfile(
         key=f"rq3639-legacy-profile-{suffix}",
         title="SYNTHETIC legacy specialty",
-        queue_tags=[f"rq3639-legacy-tag-{suffix}"],
+        # The Doctor specialty must belong to the profile's configured
+        # tags so the new bookability check reaches the parent-lock path.
+        queue_tags=[
+            f"rq3639-legacy-profile-{suffix}",
+            f"rq3639-legacy-tag-{suffix}",
+        ],
         department_key=parent.key,
         is_active=True,
         show_on_qr_page=True,
@@ -2643,9 +3027,31 @@ def test_department_deactivation_preserves_manual_state_and_blocks_new_qr(
     dept_key = dept["key"]
 
     # A manually linked second profile with its own title.
+    from app.models.clinic import Doctor
     from app.models.queue_profile import QueueProfile
+    from app.models.user import User
 
     parent_profile = pg_session.query(QueueProfile).filter_by(key=dept_key).one()
+    owner = User(
+        username=f"rq13a_hide_owner_{dept['id']}",
+        email=None,
+        full_name="RQ-13.a synthetic doctor owner",
+        hashed_password="!disabled:test",
+        role="Doctor",
+        is_active=True,
+    )
+    pg_session.add(owner)
+    pg_session.flush()
+    pg_session.add(
+        Doctor(
+            user_id=owner.id,
+            specialty=dept_key,
+            cabinet="SYNTHETIC",
+            active=True,
+        )
+    )
+    pg_session.commit()
+
     assert parent_profile.show_on_qr_page is False
     # This regression starts from an existing, explicitly published profile;
     # department provisioning now intentionally creates new profiles hidden.

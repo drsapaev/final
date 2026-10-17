@@ -1,12 +1,12 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 4.00 — T11 / PR #3639 MERGED; T12.1 PR #3690 exact-head CI PASS; Tier-2 staging NOT_RUN.
-**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-16T22:04:00+05:00, Asia/Tashkent.
-**Текущий этап:** T12.1 — PR_OPEN / DRAFT #3690; tested code commit `ca04e20ad08a5e661ca9ddc9a0d4d8b27157092a` прошёл Unified CI `38934894724`; последующий checkpoint меняет только журналы; Tier-2 staging/Admin 2FA NOT_RUN; merge HOLD.
-**Рабочий каталог:** C:\Users\DrSapaev\.codex\worktrees\aqs-t12-publish-overview\final; база — merge 7443b0e290b9143e877d5898a5589df52592d3b3 (= origin/main при старте этого worktree).
-**Task memory ID:** 9af17c38-8235-4681-93e8-6a9864cbdb75.
+**Версия:** 4.01 — T11 / PR #3639 MERGED; T12.1 / PR #3690 MERGED; T12.2 / PR #3693 OPEN, точный CI и узкая синтетическая staging-проверка PASS; полная приёмка остаётся частичной.
+**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-17T16:38:21+05:00, Asia/Tashkent.
+**Текущий этап:** T12.2 — PR_OPEN / Ready for Review #3693, HEAD `dde8f799a804bd0e71eed9802c879b03d01effb1`, base `db91cc0ef87c8a51eb4b4e816d25077c8ce397d6`; Unified CI `39025238384` SUCCESS; focused synthetic PostgreSQL/API staging PASS; browser/provenance и более широкие acceptance checks остаются NOT_RUN; merge HOLD.
+**Рабочий каталог:** C:\Users\DrSapaev\.codex\worktrees\aqs-t122-publish-policy\final; база — `db91cc0ef87c8a51eb4b4e816d25077c8ce397d6` (= текущая PR base/origin/main).
+**Task memory ID:** 431e8e5b-7c74-459e-8038-26f0f17adf1d.
 **T11 результат:** PR #3639 merged commit 7443b0e290b9143e877d5898a5589df52592d3b3. Ограниченный T11 Tier-2 прошёл на зафиксированном кодовом HEAD; три legacy live-spec остаются DEFERRED для T18 с 0% credit; полный STAGING_VALIDATION.md не завершён.
-**Ограничения:** пользователь мержит PR самостоятельно. Production, deployment, v1 flag и staging-цикл для T12.1 требуют отдельного решения; T11 deferral не наследуется. Пять плановых документов входят в PR #3690.
+**Ограничения:** пользователь мержит PR самостоятельно. Production, deployment и активация v1-флага не разрешены. Для T12.2 разрешена только отдельная synthetic staging-проверка; production не затрагивается. Deferral T11 не наследуется. T12.1 плановые документы вошли в PR #3690; актуальные журналы T12.2 обновляются в PR #3693.
 
 
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
@@ -584,7 +584,7 @@ Old mutation tests менять с контрактом, history guards сохр
 **Stop:** требуется product target choice/rebind/owner merge.
 **Evidence/logs:** saved intent vs effective availability, safe INFO publish-hide-archive/WARN refusal; no runtime repair.
 
-### T12.1. Скрытое создание QueueProfile — IMPLEMENTED / EXACT-HEAD CI PASS / TIER-2 NOT RUN
+### T12.1. Скрытое создание QueueProfile — MERGED / EXACT-HEAD CI PASS / TIER-2 NOT RUN
 
 **Зависимости:** T11 merged; отдельный подэтап внутри T12.
 **Основание:** T12 требует, чтобы все новые профили были скрыты и публикация выполнялась отдельным действием. Для старых клиентов, которые присылают show_on_qr_page=true при создании, выбран backward-compatible defer: профиль сохраняется скрытым, а ответ явно сообщает об отложенной публикации. Проверка готовности и неоднозначных целей остаётся T12.2.
@@ -593,7 +593,8 @@ Old mutation tests менять с контрактом, history guards сохр
 **Вне scope:** любые другие source/test/generated files, DB/Alembic, T12 publish eligibility/update policy, overview selection/admission, existing public profiles, QR tokens/addresses, production, deploy, staging, PR merge/review. При необходимости выхода за восемь файлов — остановиться и оформить отдельный slice. Generated OpenAPI/API types идут только через T12.1a.
 **Проверки:** API POST по умолчанию скрыт; входящий true не публикуется и получает `publication_deferred`; manual/department auto constructor hidden; existing profiles не изменяются; UI create sends false, а CSV create остаётся скрытым благодаря backend guard. Уведомление о намерении публикации в CSV и отдельное publish action относятся к T17/T12.2. Focused backend/frontend tests, OpenAPI/generated-types freshness, diff check.
 **Результат exact-head:** PR `#3690` на `ca04e20ad08a5e661ca9ddc9a0d4d8b27157092a`; Unified CI `38934894724` SUCCESS, включая backend/PostgreSQL, Frontend unit/E2E, build, OpenAPI freshness, quality, parity и PR Required Gate. Два outdated test assumptions о публичности auto-created Department profile были исправлены test-only; current backend CI подтвердил обе регрессии и hidden default.
-**Остаток:** Tier-2 staging/Admin 2FA и backend-dependent live E2E — NOT_RUN. PR остаётся DRAFT/HOLD без formal reviewer deferral; нужен отдельный выбор по staging или deferral. Production/staging не запускались.
+**Closure:** пользователь мёржил PR `#3690` 2026-10-17; подтверждённый merge commit — `0a3304f5ec7d3702d0fbe3642fdec078eb3edaea`.
+**Остаток при merge:** Tier-2 staging/Admin 2FA и backend-dependent live E2E оставались NOT_RUN; отдельный reviewer deferral не был зафиксирован. Merge не превращает эти проверки в PASS; полно-системные проверки остаются в `STAGING_VALIDATION.md`/T18.
 **Stop:** потребуется изменить файл вне gate scope, изменить активные bindings, разрешить публикацию при создании или выбрать неизвестную цель направления.
 
 ### T12.1a. Обновить OpenAPI и generated API types — VALIDATED
@@ -602,6 +603,17 @@ Old mutation tests менять с контрактом, history guards сохр
 **Execution boundary:** обязательный canonical gate; подтверждённый root — `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`. Разрешены только `backend/openapi.json` и `frontend/src/types/generated/api.ts`; generator scripts read-only.
 **Проверки:** каноническая OpenAPI generation/freshness, TypeScript generation/parity, exact scope и `git diff --check`. PostgreSQL integration в локальном T12.1a срезе не запускалась; позже exact-head backend CI `38934894724` прошла на disposable PostgreSQL.
 **Stop:** generator требует DB, изменение source/test/generator или создаёт нерелевантный OpenAPI churn; зафиксировать блокер без расширения scope.
+
+### T12.2. Проверка публикации QueueProfile и согласованности QR-селекторов — IMPLEMENTED / PR_OPEN / ACCEPTANCE PARTIAL
+
+**Зависимости:** T12.1 и T10–T11. Цель: публиковать или повторно активировать профиль только при однозначной эффективной доступности для записи; публичный каталог, QR-селекторы врачей и фактическое admission должны применять одну и ту же backend-политику.
+**Область реализации:** существующий QueueProfile update/publish contract, effective owner-scope resolution, публичный каталог и QR specialist selectors. Не вводить новую сущность направления, не переназначать владельцев, не объединять очереди и не менять историю/номера.
+**PR:** #3693, `dde8f799a804bd0e71eed9802c879b03d01effb1`, base `db91cc0ef87c8a51eb4b4e816d25077c8ce397d6`; OPEN / Ready for Review / mergeable. Пользователь выполняет merge.
+**Exact-head CI:** Unified CI `39025238384` SUCCESS. Backend/PostgreSQL, Frontend unit/E2E, lint/type-check/build, OpenAPI freshness, quality, parity, security/gitleaks, i18n и PR Required Gate прошли; path-aware DAST, metadata, Docker, standalone security/integration/load, staging-readiness и production-readiness jobs остались SKIPPED, а не PASS.
+**Focused Tier-2 cycle 11:** собственный synthetic Compose `clinic-aqs-t122-c8-20261017`; canonical Preflight/Start/Session PASS; 20 PostgreSQL регрессий PASS, 0 skipped/failures/errors; DEV-DEMO owner seed без пациентов/клинических записей; обычный Admin password+TOTP и authenticated profile endpoint PASS; существующий canonical `cardiology` профиль проверен скрытым (нет в public catalog), затем явно опубликован; public catalog и `/queue/available-specialists` согласованно показали профиль и одного synthetic bookable owner. Teardown PASS: удалены 5 контейнеров, 3 тома и 1 сеть; owned resources остались 0.
+**Ограничение provenance:** launcher сообщил `served_revision_verified=false`. На текущем HEAD отдельный браузерный сценарий не запускался; ранее выполненный browser cycle был на более раннем backend source SHA и не засчитывается как current-head browser evidence.
+**Остаток:** full `docs/runbooks/STAGING_VALIDATION.md`, negative-role proof, named legacy browser specs, current-head browser/manual Admin UI, full T18 и launcher served-revision attestation остаются NOT_RUN/unverified. GitHub показывает три старых Codex COMMENTED submissions и три незакрытых inline threads (два current, один outdated); независимого APPROVE на текущем HEAD нет. Tier-2 — focused PASS / overall PARTIAL; merge HOLD, deferral не принято.
+**Дальше:** синхронизировать четыре плановых документа и PR body; выполнить local diff/body quality checks, commit/push только документационный checkpoint и проверить gates на новом точном PR HEAD. Получить независимую review/разрешить оставшиеся acceptance gaps; T13 начинать только после user merge и clean sync с main.
 
 ### T13. Canonical Admin directions GET
 
