@@ -101,6 +101,18 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             availability_by_profile = {}
             profiles = []
 
+        from app.crud.clinic import clinic_today
+        from app.services.queue_service import queue_service
+
+        resolved_day = clinic_today(self.db) if candidate_profiles else None
+        owner_scope_by_profile = (
+            queue_service._qr_profile_owner_scopes_for_catalog(
+                self.db, candidate_profiles, day=resolved_day
+            )
+            if resolved_day is not None
+            else {}
+        )
+
         profile_by_specialty: dict[str, dict[str, Any]] = {}
         for profile in profiles:
             profile_key = self._normalize_specialty_key(profile.key)
@@ -157,6 +169,8 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
                 doctor,
                 profiles=candidate_profiles,
                 availability_by_profile=availability_by_profile,
+                day=resolved_day,
+                owner_scope_by_profile=owner_scope_by_profile,
             )
             if not qr_profile:
                 continue

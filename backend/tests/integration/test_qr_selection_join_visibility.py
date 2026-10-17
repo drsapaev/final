@@ -1340,6 +1340,104 @@ def test_batch_doctor_target_resolution_reads_parent_departments_once(pg_session
     assert len(department_selects) == 1
 
 
+@pytest.mark.queue
+def test_public_doctor_selectors_batch_owner_scope_queries(pg_client, pg_session):
+    """Adding same-specialty doctors must not add per-doctor owner queries."""
+    from sqlalchemy import event
+
+    from app.models.queue_profile import QueueProfile
+    from app.services.qr_queue import QRQueueService
+
+    suffix = uuid.uuid4().hex[:8]
+    specialty = f"rq09_qb{suffix}"
+    profile = QueueProfile(
+        key=specialty,
+        title="Synthetic query batch",
+        title_ru="Synthetic query batch",
+        queue_tags=[specialty],
+        display_order=999,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    pg_session.add(profile)
+    pg_session.commit()
+
+    _user, first_doctor = _doctor_with_user(
+        pg_session,
+        specialty=specialty,
+        label=f"qb{suffix}a",
+    )
+    extra_doctors = [
+        _doctor_with_user(
+            pg_session,
+            specialty=specialty,
+            label=f"qb{suffix}{index}",
+        )[1]
+        for index in range(1, 7)
+    ]
+
+    engine = pg_session.get_bind()
+
+    def count_selects(call):
+        statements: list[str] = []
+
+        def record_select(
+            _connection, _cursor, statement, _parameters, _context, _many
+        ):
+            if statement.lstrip().lower().startswith("select"):
+                statements.append(statement)
+
+        event.listen(engine, "before_cursor_execute", record_select)
+        try:
+            result = call()
+        finally:
+            event.remove(engine, "before_cursor_execute", record_select)
+        return len(statements), result
+
+    for doctor in extra_doctors:
+        doctor.active = False
+    pg_session.commit()
+    one_api_queries, one_api_response = count_selects(
+        lambda: pg_client.get("/api/v1/queue/available-specialists")
+    )
+    assert one_api_response.status_code == 200, one_api_response.text
+    assert first_doctor.id in {
+        item["id"] for item in one_api_response.json().get("specialists", [])
+    }
+
+    for doctor in extra_doctors:
+        doctor.active = True
+    pg_session.commit()
+    many_api_queries, many_api_response = count_selects(
+        lambda: pg_client.get("/api/v1/queue/available-specialists")
+    )
+    assert many_api_response.status_code == 200, many_api_response.text
+    assert {first_doctor.id, *(doctor.id for doctor in extra_doctors)} <= {
+        item["id"] for item in many_api_response.json().get("specialists", [])
+    }
+    assert many_api_queries <= one_api_queries + 2
+
+    qr_service = QRQueueService(pg_session)
+    for doctor in extra_doctors:
+        doctor.active = False
+    pg_session.commit()
+    one_session_queries, one_session_result = count_selects(
+        qr_service._get_clinic_wide_selectable_specialists
+    )
+    assert first_doctor.id in {item["id"] for item in one_session_result}
+
+    for doctor in extra_doctors:
+        doctor.active = True
+    pg_session.commit()
+    many_session_queries, many_session_result = count_selects(
+        qr_service._get_clinic_wide_selectable_specialists
+    )
+    assert {first_doctor.id, *(doctor.id for doctor in extra_doctors)} <= {
+        item["id"] for item in many_session_result
+    }
+    assert many_session_queries <= one_session_queries + 2
+
+
 # ---------------------------------------------------------------------------
 # 3. Ghost / incomplete / resource-synthetic owners are NOT advertised
 # ---------------------------------------------------------------------------

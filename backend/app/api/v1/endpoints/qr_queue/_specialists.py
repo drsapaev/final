@@ -50,19 +50,19 @@ def get_available_specialists(
         # (was hardcoded — new specialties like 'neurology' got default icon/name)
         from app.models.queue_profile import QueueProfile
 
-        published_profiles = (
-            db.query(QueueProfile)
-            .filter(QueueProfile.show_on_qr_page == True)
-            .order_by(QueueProfile.display_order)
-            .all()
+        candidate_profiles = (
+            db.query(QueueProfile).order_by(QueueProfile.display_order).all()
         )
+        published_profiles = [
+            profile for profile in candidate_profiles if profile.show_on_qr_page
+        ]
         from app.services.queue_profile_availability import (
             load_queue_profile_availability,
             queue_profile_is_qr_selectable,
         )
 
         availability_by_profile = load_queue_profile_availability(
-            db, published_profiles
+            db, candidate_profiles
         )
         profiles = [
             profile
@@ -91,7 +91,17 @@ def get_available_specialists(
                         "color": color,
                     }
 
+        from app.crud.clinic import clinic_today
         from app.services.queue_service import queue_service
+
+        resolved_day = clinic_today(db) if candidate_profiles else None
+        owner_scope_by_profile = (
+            queue_service._qr_profile_owner_scopes_for_catalog(
+                db, candidate_profiles, day=resolved_day
+            )
+            if resolved_day is not None
+            else {}
+        )
 
         specialists_list = []
         for doctor in doctors:
@@ -104,8 +114,10 @@ def get_available_specialists(
             if not queue_service._get_qr_visible_profile_for_doctor(
                 db,
                 doctor,
-                profiles=published_profiles,
+                profiles=candidate_profiles,
                 availability_by_profile=availability_by_profile,
+                day=resolved_day,
+                owner_scope_by_profile=owner_scope_by_profile,
             ):
                 continue
 

@@ -58,6 +58,8 @@ def _doctor(doctor_id: int, name: str, specialty: str):
 def test_available_specialists_filters_before_pagination_and_reports_full_total(
     monkeypatch,
 ):
+    from datetime import date
+
     from app.services import queue_profile_availability
     from app.services.queue_service import queue_service
 
@@ -96,8 +98,24 @@ def test_available_specialists_filters_before_pagination_and_reports_full_total(
         "load_queue_profile_availability",
         lambda _db, rows: {profile: availability[profile] for profile in rows},
     )
+    from app.crud import clinic as clinic_crud
 
-    def resolve_visible_profile(_db, doctor, *, profiles, availability_by_profile):
+    monkeypatch.setattr(clinic_crud, "clinic_today", lambda _db: date(2026, 1, 1))
+    monkeypatch.setattr(
+        queue_service,
+        "_qr_profile_owner_scopes_for_catalog",
+        lambda _db, rows, *, day: {},
+    )
+
+    def resolve_visible_profile(
+        _db,
+        doctor,
+        *,
+        profiles,
+        availability_by_profile,
+        day=None,
+        owner_scope_by_profile=None,
+    ):
         """Keep this pagination test independent of ORM owner-scope queries."""
         for profile in profiles:
             profile_availability = availability_by_profile.get(profile)

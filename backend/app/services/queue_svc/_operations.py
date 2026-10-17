@@ -297,6 +297,96 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         return scope, conflict, resource_tags, doctor_specialties
 
     @classmethod
+    def _qr_profile_owner_scopes_for_catalog(
+        cls,
+        db: Session,
+        profiles: list[Any],
+        *,
+        day: date,
+    ) -> dict[Any, tuple[str, str] | None]:
+        """Resolve owner scopes for a catalog with bounded database reads."""
+        if not profiles:
+            return {}
+
+        queue_tags: set[str] = set()
+        for profile in profiles:
+            profile_key = getattr(profile, "key", None)
+            route_tags = expand_queue_tags(
+                list(
+                    getattr(profile, "queue_tags", None)
+                    or ([profile_key] if profile_key else [])
+                )
+            )
+            queue_tags.update(tag for tag in route_tags if tag)
+
+        resource_route_tags: set[str] = set()
+        eligible_doctor_specialties: set[str] = set()
+        if queue_tags:
+            sorted_queue_tags = sorted(queue_tags)
+            active_registry_tags = {
+                row[0]
+                for row in db.query(QueueResource.queue_tag)
+                .filter(
+                    QueueResource.active.is_(True),
+                    QueueResource.queue_tag.in_(sorted_queue_tags),
+                )
+                .all()
+            }
+            first_active_queue_owner_by_tag: dict[str, int | None] = {}
+            active_queue_rows = (
+                db.query(DailyQueue.queue_tag, DailyQueue.queue_resource_id)
+                .filter(
+                    DailyQueue.day == day,
+                    DailyQueue.active.is_(True),
+                    DailyQueue.queue_tag.in_(sorted_queue_tags),
+                )
+                .order_by(DailyQueue.id.asc())
+                .all()
+            )
+            for tag, resource_id in active_queue_rows:
+                first_active_queue_owner_by_tag.setdefault(tag, resource_id)
+            resource_route_tags = active_registry_tags | {
+                tag
+                for tag, resource_id in first_active_queue_owner_by_tag.items()
+                if resource_id is not None
+            }
+            eligible_doctor_specialties = {
+                row[0]
+                for row in (
+                    db.query(Doctor.specialty)
+                    .join(User, Doctor.user_id == User.id)
+                    .filter(
+                        Doctor.active.is_(True),
+                        Doctor.specialty.in_(sorted_queue_tags),
+                        Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+                        *qr_doctor_owner_eligibility_filters(),
+                    )
+                    .distinct()
+                    .all()
+                )
+                if row[0]
+            }
+
+        owner_scope_by_profile: dict[Any, tuple[str, str] | None] = {}
+        for profile in profiles:
+            profile_key = getattr(profile, "key", None)
+            if not profile_key:
+                owner_scope_by_profile[profile] = None
+                continue
+            route_tags = expand_queue_tags(
+                list(getattr(profile, "queue_tags", None) or [profile_key])
+            )
+            owner_scope, owner_conflict = cls._qr_profile_owner_scope_from_targets(
+                profile,
+                resource_route_tags=resource_route_tags,
+                eligible_doctor_specialties=eligible_doctor_specialties,
+            )
+            owner_scope_by_profile[profile] = (
+                None if owner_conflict or not route_tags else owner_scope
+            )
+        return owner_scope_by_profile
+
+    @classmethod
     def _qr_profile_candidates_are_unambiguous(
         cls,
         profiles: list[Any],
@@ -642,7 +732,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         from app.models.queue_profile import QueueProfile
 
         candidate_profiles = db.query(QueueProfile).all()
-        queue_tags: set[str] = set()
         profiles_by_tag: dict[str, list[Any]] = {}
         for profile in candidate_profiles:
             profile_key = getattr(profile, "key", None)
@@ -661,70 +750,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 if normalized_tag:
                     profiles_by_tag.setdefault(normalized_tag, []).append(profile)
 
-        resource_route_tags: set[str] = set()
-        eligible_doctor_specialties: set[str] = set()
-        if queue_tags:
-            active_registry_tags = {
-                row[0]
-                for row in db.query(QueueResource.queue_tag)
-                .filter(
-                    QueueResource.active.is_(True),
-                    QueueResource.queue_tag.in_(sorted(queue_tags)),
-                )
-                .all()
-            }
-            first_active_queue_owner_by_tag: dict[str, int | None] = {}
-            active_queue_rows = (
-                db.query(DailyQueue.queue_tag, DailyQueue.queue_resource_id)
-                .filter(
-                    DailyQueue.day == day,
-                    DailyQueue.active.is_(True),
-                    DailyQueue.queue_tag.in_(sorted(queue_tags)),
-                )
-                .order_by(DailyQueue.id.asc())
-                .all()
-            )
-            for tag, resource_id in active_queue_rows:
-                first_active_queue_owner_by_tag.setdefault(tag, resource_id)
-            resource_route_tags = active_registry_tags | {
-                tag
-                for tag, resource_id in first_active_queue_owner_by_tag.items()
-                if resource_id is not None
-            }
-            eligible_doctor_specialties = {
-                row[0]
-                for row in (
-                    db.query(Doctor.specialty)
-                    .join(User, Doctor.user_id == User.id)
-                    .filter(
-                        Doctor.active.is_(True),
-                        Doctor.specialty.in_(sorted(queue_tags)),
-                        Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
-                        *qr_doctor_owner_eligibility_filters(),
-                    )
-                    .distinct()
-                    .all()
-                )
-                if row[0]
-            }
-
-        owner_scope_by_profile: dict[Any, tuple[str, str] | None] = {}
-        for profile in candidate_profiles:
-            profile_key = getattr(profile, "key", None)
-            if not profile_key:
-                owner_scope_by_profile[profile] = None
-                continue
-            route_tags = expand_queue_tags(
-                list(getattr(profile, "queue_tags", None) or [profile_key])
-            )
-            owner_scope, owner_conflict = cls._qr_profile_owner_scope_from_targets(
-                profile,
-                resource_route_tags=resource_route_tags,
-                eligible_doctor_specialties=eligible_doctor_specialties,
-            )
-            owner_scope_by_profile[profile] = (
-                None if owner_conflict or not route_tags else owner_scope
-            )
+        owner_scope_by_profile = cls._qr_profile_owner_scopes_for_catalog(
+            db, candidate_profiles, day=day
+        )
 
         bookable: list[Any] = []
         for profile in profiles:
