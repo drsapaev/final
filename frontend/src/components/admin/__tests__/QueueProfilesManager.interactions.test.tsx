@@ -15,6 +15,7 @@ const { apiMock } = vi.hoisted(() => {
       queue_tags: ['synthetic_active'],
       is_active: true,
       show_on_qr_page: true,
+      effective_availability: { state: 'available', is_available: true, reason_codes: [] },
       icon: 'Heart',
       color: '#E53E3E',
     },
@@ -25,6 +26,23 @@ const { apiMock } = vi.hoisted(() => {
       queue_tags: ['synthetic_hidden'],
       is_active: false,
       show_on_qr_page: false,
+      icon: 'Package',
+      color: '#718096',
+    },
+    {
+      key: 'synthetic-archived-published',
+      title: 'Archived QR-configured Queue',
+      title_ru: 'Синтетическая архивная очередь с настройкой QR',
+      queue_tags: ['synthetic_archived_published'],
+      is_active: false,
+      show_on_qr_page: true,
+      effective_availability: {
+        state: 'unavailable',
+        is_available: false,
+        reason_codes: ['manual_archived'],
+        parent_department_key: null,
+        parent_active: null,
+      },
       icon: 'Package',
       color: '#718096',
     },
@@ -162,6 +180,19 @@ describe('QueueProfilesManager interactions', () => {
       '/queues/profiles/synthetic-unpublished',
       { is_active: false },
     );
+  });
+
+  it('shows the saved QR setting separately from effective availability for an archived profile', async () => {
+    await renderManager();
+
+    const row = screen
+      .getByText('Синтетическая архивная очередь с настройкой QR')
+      .closest('tr')!;
+
+    expect(within(row).getByText('В архиве регистратуры')).toBeInTheDocument();
+    expect(within(row).getByText('Настроен для QR')).toBeInTheDocument();
+    expect(within(row).getByText('Доступность профиля: недоступна')).toBeInTheDocument();
+    expect(within(row).queryByText('Опубликован на QR')).not.toBeInTheDocument();
   });
 
   it('opens edit from an unpublished profile and publishes only after the QR option is saved', async () => {

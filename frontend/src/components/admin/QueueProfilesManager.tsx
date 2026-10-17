@@ -68,6 +68,13 @@ interface QueueProfileDto {
     display_order?: number | string;
     is_active?: boolean;
     show_on_qr_page?: boolean;
+    effective_availability?: {
+        is_available?: boolean;
+        state?: 'available' | 'unavailable' | 'conflict';
+        reason_codes?: string[];
+        parent_department_key?: string | null;
+        parent_active?: boolean | null;
+    };
     name?: string;
     [key: string]: unknown;
 }
@@ -713,9 +720,32 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                             : 'var(--mac-bg-tertiary, transparent)', '--admin-col1': profile.show_on_qr_page === true ? 'var(--mac-info, currentColor)' : 'var(--mac-text-secondary, currentColor)' } as CSSProperties}
                                     >
                                         {profile.show_on_qr_page === true
-                                            ? t('admin2.qp_status_qr_published')
+                                            ? t('admin2.qp_status_qr_configured')
                                             : t('admin2.qp_status_qr_unpublished')}
                                     </span>
+                                    {profile.show_on_qr_page === true && (() => {
+                                        const isAvailable = profile.effective_availability?.is_available;
+                                        const availabilityLabel = isAvailable === true
+                                            ? t('admin2.qp_status_effective_available')
+                                            : isAvailable === false
+                                                ? t('admin2.qp_status_effective_unavailable')
+                                                : t('admin2.qp_status_effective_unknown');
+                                        const availabilityStyle = isAvailable === true
+                                            ? { '--admin-bgc0': 'var(--mac-success-bg, transparent)', '--admin-col1': 'var(--mac-success, currentColor)' }
+                                            : isAvailable === false
+                                                ? { '--admin-bgc0': 'var(--mac-error-bg, transparent)', '--admin-col1': 'var(--mac-error, currentColor)' }
+                                                : { '--admin-bgc0': 'var(--mac-bg-tertiary, transparent)', '--admin-col1': 'var(--mac-text-secondary, currentColor)' };
+
+                                        return (
+                                            <span
+                                                className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-dyn-col-dyn"
+                                                style={availabilityStyle as CSSProperties}
+                                                title={t('admin2.qp_status_effective_availability_help')}
+                                            >
+                                                {availabilityLabel}
+                                            </span>
+                                        );
+                                    })()}
                                 </td>
                                 <td className="admin-qp-td">
                                     <div className="admin-d-flex-gap-4">
