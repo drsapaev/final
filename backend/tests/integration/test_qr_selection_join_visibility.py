@@ -784,6 +784,12 @@ def test_public_alias_requires_every_doctor_specialty_to_resolve(pg_client, pg_s
             for item in public_catalog.json()["specialists"]
         )
 
+        available_specialists = pg_client.get("/api/v1/queue/available-specialists")
+        assert available_specialists.status_code == 200, available_specialists.text
+        assert {doctor_a.id, doctor_b.id}.isdisjoint(
+            item["id"] for item in available_specialists.json().get("specialists", [])
+        )
+
         selectable_ids = {item["id"] for item in _selectable(pg_client, token.token)}
         assert doctor_a.id not in selectable_ids
         assert doctor_b.id not in selectable_ids

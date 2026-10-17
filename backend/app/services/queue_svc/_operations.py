@@ -714,6 +714,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         *,
         day: date,
         availability_by_profile: dict[Any, Any],
+        candidate_profiles: list[Any] | None = None,
+        owner_scope_by_profile: dict[Any, tuple[str, str] | None] | None = None,
+        eligible_doctor_specialties: set[str] | None = None,
     ) -> list[Any]:
         """Filter a loaded profile catalog using bounded batch reads.
 
@@ -731,9 +734,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         # keeping the returned rows limited to the caller's published set.
         from app.models.queue_profile import QueueProfile
 
-        candidate_profiles = db.query(QueueProfile).all()
+        all_candidate_profiles = (
+            candidate_profiles
+            if candidate_profiles is not None
+            else db.query(QueueProfile).all()
+        )
         profiles_by_tag: dict[str, list[Any]] = {}
-        for profile in candidate_profiles:
+        for profile in all_candidate_profiles:
             profile_key = getattr(profile, "key", None)
             raw_profile_tags = getattr(profile, "queue_tags", None)
             route_tags = expand_queue_tags(
@@ -749,9 +756,16 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 if normalized_tag:
                     profiles_by_tag.setdefault(normalized_tag, []).append(profile)
 
-        owner_scope_by_profile, eligible_doctor_specialties = (
-            cls._qr_profile_owner_scopes_for_catalog(db, candidate_profiles, day=day)
-        )
+        if owner_scope_by_profile is None or eligible_doctor_specialties is None:
+            resolved_owner_scopes, resolved_doctor_specialties = (
+                cls._qr_profile_owner_scopes_for_catalog(
+                    db, all_candidate_profiles, day=day
+                )
+            )
+            if owner_scope_by_profile is None:
+                owner_scope_by_profile = resolved_owner_scopes
+            if eligible_doctor_specialties is None:
+                eligible_doctor_specialties = resolved_doctor_specialties
 
         bookable: list[Any] = []
         for profile in profiles:
@@ -805,7 +819,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     doctor_candidates = cls._get_qr_profile_candidates_for_tag(
                         db,
                         specialty,
-                        profiles=candidate_profiles,
+                        profiles=all_candidate_profiles,
                         prefer_exact_key=True,
                     )
                     selected_for_doctor = any(

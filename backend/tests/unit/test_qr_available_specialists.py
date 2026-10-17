@@ -106,6 +106,11 @@ def test_available_specialists_filters_before_pagination_and_reports_full_total(
         "_qr_profile_owner_scopes_for_catalog",
         lambda _db, rows, *, day: ({}, set()),
     )
+    monkeypatch.setattr(
+        queue_service,
+        "public_qr_catalog_bookable_profiles",
+        lambda _db, rows, **_kwargs: rows,
+    )
 
     def resolve_visible_profile(
         _db,

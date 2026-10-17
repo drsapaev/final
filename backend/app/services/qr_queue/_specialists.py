@@ -106,12 +106,23 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
 
         resolved_day = clinic_today(self.db) if candidate_profiles else None
         owner_scope_by_profile = {}
+        eligible_doctor_specialties: set[str] = set()
         if resolved_day is not None:
-            owner_scope_by_profile, _ = (
+            owner_scope_by_profile, eligible_doctor_specialties = (
                 queue_service._qr_profile_owner_scopes_for_catalog(
                     self.db, candidate_profiles, day=resolved_day
                 )
             )
+            profiles = queue_service.public_qr_catalog_bookable_profiles(
+                self.db,
+                profiles,
+                day=resolved_day,
+                availability_by_profile=availability_by_profile,
+                candidate_profiles=candidate_profiles,
+                owner_scope_by_profile=owner_scope_by_profile,
+                eligible_doctor_specialties=eligible_doctor_specialties,
+            )
+        bookable_profile_keys = {profile.key for profile in profiles}
 
         profile_by_specialty: dict[str, dict[str, Any]] = {}
         for profile in profiles:
@@ -172,7 +183,7 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
                 day=resolved_day,
                 owner_scope_by_profile=owner_scope_by_profile,
             )
-            if not qr_profile:
+            if not qr_profile or qr_profile.key not in bookable_profile_keys:
                 continue
             profile = {
                 "key": qr_profile.key,
