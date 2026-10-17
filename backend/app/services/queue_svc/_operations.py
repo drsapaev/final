@@ -303,10 +303,10 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         profiles: list[Any],
         *,
         day: date,
-    ) -> dict[Any, tuple[str, str] | None]:
-        """Resolve owner scopes for a catalog with bounded database reads."""
+    ) -> tuple[dict[Any, tuple[str, str] | None], set[str]]:
+        """Resolve owner scopes and eligible doctor tags with bounded reads."""
         if not profiles:
-            return {}
+            return {}, set()
 
         queue_tags: set[str] = set()
         for profile in profiles:
@@ -384,7 +384,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             owner_scope_by_profile[profile] = (
                 None if owner_conflict or not route_tags else owner_scope
             )
-        return owner_scope_by_profile
+        return owner_scope_by_profile, eligible_doctor_specialties
 
     @classmethod
     def _qr_profile_candidates_are_unambiguous(
@@ -749,8 +749,8 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 if normalized_tag:
                     profiles_by_tag.setdefault(normalized_tag, []).append(profile)
 
-        owner_scope_by_profile = cls._qr_profile_owner_scopes_for_catalog(
-            db, candidate_profiles, day=day
+        owner_scope_by_profile, eligible_doctor_specialties = (
+            cls._qr_profile_owner_scopes_for_catalog(db, candidate_profiles, day=day)
         )
 
         bookable: list[Any] = []
