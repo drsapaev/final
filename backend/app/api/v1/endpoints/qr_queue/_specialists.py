@@ -95,13 +95,13 @@ def get_available_specialists(
         from app.services.queue_service import queue_service
 
         resolved_day = clinic_today(db) if candidate_profiles else None
-        owner_scope_by_profile = (
-            queue_service._qr_profile_owner_scopes_for_catalog(
-                db, candidate_profiles, day=resolved_day
+        owner_scope_by_profile = {}
+        if resolved_day is not None:
+            owner_scope_by_profile, _ = (
+                queue_service._qr_profile_owner_scopes_for_catalog(
+                    db, candidate_profiles, day=resolved_day
+                )
             )
-            if resolved_day is not None
-            else {}
-        )
 
         specialists_list = []
         for doctor in doctors:
