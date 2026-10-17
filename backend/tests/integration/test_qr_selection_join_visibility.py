@@ -1108,11 +1108,11 @@ def test_resource_tag_with_matching_doctor_stays_one_public_qr_route(
     _user, doctor = _doctor_with_user(
         pg_session,
         specialty=queue_tag,
-        label=f"resource_owner_{suffix}",
+        label=f"rd{suffix[:6]}",
     )
     pg_session.add_all([profile, resource])
     pg_session.commit()
-    token = _clinic_wide_token(pg_session, f"rq09-token-rd-{suffix}")
+    token = _clinic_wide_token(pg_session, f"rq09rdtok{suffix}")
 
     selectable = _selectable(pg_client, token.token)
     assert any(item["specialty"] == profile.key for item in selectable), selectable
