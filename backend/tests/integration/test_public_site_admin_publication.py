@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from hashlib import sha256
+from io import BytesIO
 
+from PIL import Image
+
+from app.core.config import settings
 from app.models.clinic import Doctor
+from app.models.public_site_media import PublicSiteMedia
 from app.models.service import Service
 from app.models.service_audit import ServiceAuditLog
 from app.models.user import User
@@ -52,6 +58,115 @@ def test_website_content_api_is_admin_only(client, db_session):
     response = client.get(f"/api/v1/services/admin/website-content/{service.id}")
 
     assert response.status_code in {401, 403}
+
+
+def _png_bytes() -> bytes:
+    output = BytesIO()
+    Image.new("RGB", (1, 1), color="white").save(output, format="PNG")
+    return output.getvalue()
+
+
+def test_admin_can_preview_persisted_draft_while_public_route_hides_it(
+    client, db_session, auth_headers, tmp_path, monkeypatch
+):
+    media_root = tmp_path / "media"
+    backup_root = tmp_path / "backup"
+    media_root.mkdir()
+    backup_root.mkdir()
+    monkeypatch.setattr(settings, "PUBLIC_SITE_MEDIA_ROOT", media_root)
+    monkeypatch.setattr(settings, "PUBLIC_SITE_MEDIA_BACKUP_ROOT", backup_root)
+
+    image = _png_bytes()
+    storage_key = sha256(image).hexdigest()
+    (media_root / storage_key).write_bytes(image)
+    media = PublicSiteMedia(
+        asset_kind="clinic_logo",
+        doctor_id=None,
+        storage_key=storage_key,
+        mime_type="image/png",
+        byte_size=len(image),
+        sha256=storage_key,
+        is_published=False,
+        published_at=None,
+    )
+    db_session.add(media)
+    db_session.commit()
+    db_session.refresh(media)
+
+    public_response = client.get(f"/api/v1/public-site/media/{storage_key}")
+    preview = client.get(
+        f"/api/v1/admin/public-site/media/{media.id}/preview",
+        headers=auth_headers,
+    )
+
+    assert public_response.status_code == 404
+    assert preview.status_code == 200
+    assert preview.content == image
+    assert preview.headers["content-type"].startswith("image/png")
+    assert preview.headers["cache-control"] == "private, no-store"
+    assert preview.headers["x-content-type-options"] == "nosniff"
+
+
+def test_media_preview_and_storage_check_are_admin_only(
+    client, patient_token, tmp_path, monkeypatch
+):
+    media_root = tmp_path / "media"
+    backup_root = tmp_path / "backup"
+    media_root.mkdir()
+    backup_root.mkdir()
+    monkeypatch.setattr(settings, "PUBLIC_SITE_MEDIA_ROOT", media_root)
+    monkeypatch.setattr(settings, "PUBLIC_SITE_MEDIA_BACKUP_ROOT", backup_root)
+    patient_headers = {"Authorization": f"Bearer {patient_token}"}
+
+    for method, url in (
+        ("get", "/api/v1/admin/public-site/media/1/preview"),
+        ("post", "/api/v1/admin/public-site/media/storage-check"),
+    ):
+        anonymous = getattr(client, method)(url)
+        non_admin = getattr(client, method)(url, headers=patient_headers)
+        assert anonymous.status_code == 401
+        assert non_admin.status_code == 403
+
+
+def test_admin_storage_check_round_trips_and_removes_probe_files(
+    client, auth_headers, tmp_path, monkeypatch
+):
+    media_root = tmp_path / "media"
+    backup_root = tmp_path / "backup"
+    media_root.mkdir()
+    backup_root.mkdir()
+    monkeypatch.setattr(settings, "PUBLIC_SITE_MEDIA_ROOT", media_root)
+    monkeypatch.setattr(settings, "PUBLIC_SITE_MEDIA_BACKUP_ROOT", backup_root)
+
+    response = client.post(
+        "/api/v1/admin/public-site/media/storage-check",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"ready": True}
+    assert list(media_root.iterdir()) == []
+    assert list(backup_root.iterdir()) == []
+
+
+def test_admin_storage_check_fails_closed_for_unavailable_backup_root(
+    client, auth_headers, tmp_path, monkeypatch
+):
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    backup_root = tmp_path / "backup-file"
+    backup_root.write_text("synthetic", encoding="utf-8")
+    monkeypatch.setattr(settings, "PUBLIC_SITE_MEDIA_ROOT", media_root)
+    monkeypatch.setattr(settings, "PUBLIC_SITE_MEDIA_BACKUP_ROOT", backup_root)
+
+    response = client.post(
+        "/api/v1/admin/public-site/media/storage-check",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "public_media_storage_unavailable"
+    assert list(media_root.iterdir()) == []
 
 
 def test_service_publication_lifecycle_locks_slug_and_preserves_first_timestamp(

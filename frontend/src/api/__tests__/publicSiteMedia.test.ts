@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getPublicSiteDoctorWebsiteContent,
+  getPublicSiteMediaPreview,
   getPublicSiteMediaErrorKey,
   isPublicSiteDoctorEligible,
   listPublicSiteDoctors,
@@ -8,6 +9,7 @@ import {
   publishPublicSiteMedia,
   unpublishPublicSiteMedia,
   uploadPublicSiteMedia,
+  verifyPublicSiteMediaStorage,
 } from '../publicSiteMedia';
 
 const api = vi.hoisted(() => ({
@@ -44,11 +46,11 @@ describe('public site media API adapter', () => {
     expect(api.get).toHaveBeenNthCalledWith(1, '/admin/public-site/media');
 
     api.get.mockResolvedValueOnce({ data: [
-      { id: 42, active: true, specialty: 'Cardiology', cabinet: '2' },
+      { id: 42, active: true, display_name: 'SYNTHETIC Doctor', specialty: 'Cardiology', cabinet: '2' },
       { id: 44, active: true, specialty: 'Dermatology', cabinet: null },
     ] });
     expect(await listPublicSiteDoctors()).toEqual([
-      { id: 42, displayName: 'Cardiology · 2 (#42)', active: true },
+      { id: 42, displayName: 'SYNTHETIC Doctor · Cardiology · 2 (#42)', active: true },
       { id: 44, displayName: 'Dermatology (#44)', active: true },
     ]);
     expect(api.get).toHaveBeenNthCalledWith(2, '/services/admin/doctors', {
@@ -97,6 +99,19 @@ describe('public site media API adapter', () => {
     expect(api.put).toHaveBeenNthCalledWith(1, '/admin/public-site/media/8/publish');
     await unpublishPublicSiteMedia(8);
     expect(api.put).toHaveBeenNthCalledWith(2, '/admin/public-site/media/8/unpublish');
+  });
+
+  it('loads persisted previews through the authenticated API and checks storage explicitly', async () => {
+    const image = new Blob(['synthetic image'], { type: 'image/png' });
+    api.get.mockResolvedValueOnce({ data: image });
+    expect(await getPublicSiteMediaPreview(8)).toBe(image);
+    expect(api.get).toHaveBeenCalledWith('/admin/public-site/media/8/preview', {
+      responseType: 'blob',
+    });
+
+    api.post.mockResolvedValueOnce({ data: { ready: true } });
+    await verifyPublicSiteMediaStorage();
+    expect(api.post).toHaveBeenCalledWith('/admin/public-site/media/storage-check');
   });
 
   it('maps storage and image validation failures to localized UI messages', () => {

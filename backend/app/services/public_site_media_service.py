@@ -133,6 +133,48 @@ class PublicSiteMediaService:
         return media_root, backup_root
 
     @staticmethod
+    def _probe_storage_root(root: Path) -> None:
+        probe_path: Path | None = None
+        descriptor: int | None = None
+        try:
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=".public-site-media-probe-", dir=root
+            )
+            probe_path = Path(temporary_name)
+            payload = secrets.token_bytes(32)
+            with os.fdopen(descriptor, "wb") as handle:
+                descriptor = None
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            if probe_path.read_bytes() != payload:
+                raise OSError("storage probe did not round-trip")
+        except OSError as exc:
+            raise PublicSiteMediaError(503, "public_media_storage_unavailable") from exc
+        finally:
+            if descriptor is not None:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+            if probe_path is not None:
+                try:
+                    probe_path.unlink(missing_ok=True)
+                except OSError as exc:
+                    logger.warning("public_site_media.storage_probe_cleanup_failed")
+                    raise PublicSiteMediaError(
+                        503, "public_media_storage_unavailable"
+                    ) from exc
+
+    def verify_storage_ready(self) -> None:
+        """Round-trip and remove a temporary file in both configured roots."""
+        media_root, backup_root = self._configured_roots()
+        for root in (media_root, backup_root):
+            if not root.is_dir():
+                raise PublicSiteMediaError(503, "public_media_storage_unavailable")
+            self._probe_storage_root(root)
+
+    @staticmethod
     def _normalize_image(
         raw: bytes, *, max_upload_bytes: int, max_pixels: int
     ) -> tuple[bytes, str]:
@@ -289,6 +331,16 @@ class PublicSiteMediaService:
             "created_at": row.created_at,
             "media_url": self._public_media_url(row.storage_key),
         }
+
+    def get_admin_preview(self, media_id: int) -> PublicSiteMediaPayload:
+        """Read and verify a published or draft image for an authenticated Admin."""
+        media = self.db.get(PublicSiteMedia, media_id)
+        if media is None:
+            raise PublicSiteMediaError(404, "public_media_not_found")
+        return PublicSiteMediaPayload(
+            body=self._verified_file(media),
+            mime_type=media.mime_type,
+        )
 
     @staticmethod
     def _public_media_url(storage_key: str) -> str:

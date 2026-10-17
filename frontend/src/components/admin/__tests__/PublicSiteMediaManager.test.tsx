@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   upload: vi.fn(),
   publish: vi.fn(),
   unpublish: vi.fn(),
+  preview: vi.fn(),
+  checkStorage: vi.fn(),
   confirm: vi.fn(),
 }));
 
@@ -21,6 +23,8 @@ vi.mock('../../../api/publicSiteMedia', () => ({
   listPublicSiteMedia: mocks.listMedia,
   listPublicSiteDoctors: mocks.listDoctors,
   getPublicSiteDoctorWebsiteContent: mocks.doctorWebsiteContent,
+  getPublicSiteMediaPreview: mocks.preview,
+  verifyPublicSiteMediaStorage: mocks.checkStorage,
   isPublicSiteDoctorEligible: (content: { active: boolean; owner_active: boolean | null; show_on_website: boolean; missing_fields: string[] }) =>
     content.active && content.owner_active === true && content.show_on_website && content.missing_fields.length === 0,
   uploadPublicSiteMedia: mocks.upload,
@@ -65,6 +69,8 @@ const draftMedia = {
   media_url: '/api/v1/public-site/media/synthetic-key',
 };
 const logoMedia = { ...draftMedia, asset_kind: 'clinic_logo' as const, doctor_id: null };
+const originalCreateObjectURL = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+const originalRevokeObjectURL = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
 
 describe('PublicSiteMediaManager', () => {
   beforeEach(() => {
@@ -75,10 +81,54 @@ describe('PublicSiteMediaManager', () => {
     mocks.upload.mockResolvedValue(draftMedia);
     mocks.publish.mockResolvedValue({ ...draftMedia, is_published: true });
     mocks.unpublish.mockResolvedValue({ ...draftMedia, is_published: false });
+    mocks.preview.mockResolvedValue(new Blob(['synthetic image'], { type: 'image/png' }));
+    mocks.checkStorage.mockResolvedValue(undefined);
     mocks.confirm.mockResolvedValue(true);
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:synthetic-preview'),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    });
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    if (originalCreateObjectURL) {
+      Object.defineProperty(URL, 'createObjectURL', originalCreateObjectURL);
+    } else {
+      Reflect.deleteProperty(URL, 'createObjectURL');
+    }
+    if (originalRevokeObjectURL) {
+      Object.defineProperty(URL, 'revokeObjectURL', originalRevokeObjectURL);
+    } else {
+      Reflect.deleteProperty(URL, 'revokeObjectURL');
+    }
+  });
+
+  it('shows a saved draft preview through the protected media API', async () => {
+    mocks.listMedia.mockResolvedValue([logoMedia]);
+    render(<PublicSiteMediaManager />);
+
+    const preview = await screen.findByRole('img', { name: 'publicSiteMedia.clinicLogo' });
+    expect(preview).toHaveAttribute('src', 'blob:synthetic-preview');
+    expect(mocks.preview).toHaveBeenCalledWith(8);
+  });
+
+  it('clears the storage-unavailable lock only after a successful storage check', async () => {
+    mocks.listMedia.mockResolvedValue([{ ...logoMedia, is_published: true }]);
+    mocks.unpublish.mockRejectedValueOnce(new Error('storage'));
+    render(<PublicSiteMediaManager />);
+    fireEvent.click(await screen.findByRole('button', { name: 'publicSiteMedia.unpublish' }));
+    await waitFor(() => expect(mocks.unpublish).toHaveBeenCalledWith(8));
+
+    const verifyButton = await screen.findByRole('button', { name: 'publicSiteMedia.retry' });
+    fireEvent.click(verifyButton);
+    await waitFor(() => expect(mocks.checkStorage).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByText('publicSiteMedia.storageUnavailable')).not.toBeInTheDocument());
+  });
 
   it('shows the selected filename and uploads a supported image as an unpublished clinic-logo draft', async () => {
     mocks.upload.mockResolvedValue(logoMedia);
@@ -308,8 +358,9 @@ describe('PublicSiteMediaManager', () => {
     expect(screen.getByRole('button', { name: 'publicSiteMedia.uploadDraft' })).toBeDisabled();
   });
 
-  it('keeps storage unavailable visible and mutations disabled after a retry succeeds', async () => {
+  it('keeps mutations disabled after a failed storage check and clears the lock only after success', async () => {
     mocks.listMedia.mockRejectedValueOnce(new Error('storage')).mockResolvedValueOnce([]);
+    mocks.checkStorage.mockRejectedValueOnce(new Error('storage')).mockResolvedValueOnce(undefined);
     render(<PublicSiteMediaManager />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('publicSiteMedia.storageUnavailable');
@@ -318,9 +369,20 @@ describe('PublicSiteMediaManager', () => {
     expect(document.querySelector('input[type="file"]')).toBeDisabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'publicSiteMedia.retry' }));
-    await waitFor(() => expect(mocks.listMedia).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocks.checkStorage).toHaveBeenCalledTimes(1));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('publicSiteMedia.storageUnavailable');
     expect(document.querySelector('input[type="file"]')).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.assetKind'), { target: { value: 'clinic_logo' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('publicSiteMedia.storageUnavailable');
+    expect(document.querySelector('input[type="file"]')).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'publicSiteMedia.retry' }));
+    await waitFor(() => expect(mocks.checkStorage).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocks.listMedia).toHaveBeenCalledTimes(2));
+
+    expect(screen.queryByText('publicSiteMedia.storageUnavailable')).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="file"]')).toBeEnabled();
   });
 });

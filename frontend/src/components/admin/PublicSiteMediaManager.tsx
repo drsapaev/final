@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { ImagePlus, RefreshCw, Upload } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 import { buildApiUrl } from '../../api/runtime';
 import {
   getPublicSiteMediaErrorKey,
+  getPublicSiteMediaPreview,
   getPublicSiteDoctorWebsiteContent,
   isPublicSiteDoctorEligible,
   listPublicSiteDoctors,
@@ -11,6 +12,7 @@ import {
   publishPublicSiteMedia,
   unpublishPublicSiteMedia,
   uploadPublicSiteMedia,
+  verifyPublicSiteMediaStorage,
   type PublicSiteDoctorOption,
   type PublicSiteDoctorWebsiteContent,
   type PublicSiteMedia,
@@ -27,6 +29,53 @@ const STORAGE_UNAVAILABLE_KEY = 'publicSiteMedia.storageUnavailable';
 const DOCTOR_PAGE_SIZE = 25;
 
 type DoctorSelectOption = PublicSiteDoctorOption & { statusUnknown?: boolean };
+
+function DraftMediaPreview({ mediaId, alt }: { mediaId: number; alt: string }) {
+  const { t } = useTranslation();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getPublicSiteMediaPreview(mediaId)
+      .then((blob) => {
+        const objectUrl = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        objectUrlRef.current = objectUrl;
+        setPreviewUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, [mediaId]);
+
+  if (previewFailed) {
+    return <p className="public-site-media__hint" role="status">{t('publicSiteMedia.genericError')}</p>;
+  }
+  if (!previewUrl) {
+    return <p className="public-site-media__hint" role="status">{t('publicSiteMedia.loading')}</p>;
+  }
+  return (
+    <img
+      className="public-site-media__published-image"
+      src={previewUrl}
+      alt={alt}
+      loading="lazy"
+    />
+  );
+}
 
 function upsertMedia(current: PublicSiteMedia[], updated: PublicSiteMedia): PublicSiteMedia[] {
   const sameOwner = (item: PublicSiteMedia) =>
@@ -67,6 +116,7 @@ export default function PublicSiteMediaManager() {
   const [loadErrorKey, setLoadErrorKey] = useState<string | null>(null);
   const [actionErrorKey, setActionErrorKey] = useState<string | null>(null);
   const [storageRecoveryRequired, setStorageRecoveryRequired] = useState(false);
+  const [isCheckingStorage, setIsCheckingStorage] = useState(false);
   const [noticeKey, setNoticeKey] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -200,7 +250,7 @@ export default function PublicSiteMediaManager() {
   }, [assetKind, doctorLoadFailed, doctorWebsiteContentRefreshVersion, selectedDoctorActive, selectedDoctorId]);
 
   const storageUnavailable = storageRecoveryRequired || loadErrorKey === STORAGE_UNAVAILABLE_KEY;
-  const mutationsDisabled = isLoading || Boolean(loadErrorKey) || storageUnavailable;
+  const mutationsDisabled = isLoading || Boolean(loadErrorKey) || storageUnavailable || isCheckingStorage;
   const visibleActionErrorKey = loadErrorKey === STORAGE_UNAVAILABLE_KEY
     ? null
     : actionErrorKey ?? (storageRecoveryRequired ? STORAGE_UNAVAILABLE_KEY : null);
@@ -227,6 +277,23 @@ export default function PublicSiteMediaManager() {
     const errorKey = getPublicSiteMediaErrorKey(error);
     setActionErrorKey(errorKey);
     if (errorKey === STORAGE_UNAVAILABLE_KEY) setStorageRecoveryRequired(true);
+  };
+
+  const handleStorageCheck = async () => {
+    if (isCheckingStorage) return;
+    setIsCheckingStorage(true);
+    setActionErrorKey(null);
+    try {
+      await verifyPublicSiteMediaStorage();
+      setStorageRecoveryRequired(false);
+      setLoadErrorKey(null);
+      setNoticeKey(null);
+      await refresh();
+    } catch (error) {
+      reportActionError(error);
+    } finally {
+      setIsCheckingStorage(false);
+    }
   };
 
   const handleAssetKindChange = (event: ChangeEvent<HTMLSelectElement>) => {
@@ -385,7 +452,7 @@ export default function PublicSiteMediaManager() {
           variant="outline"
           startIcon={<RefreshCw aria-hidden="true" size={16} />}
           onClick={() => void refresh()}
-          disabled={isLoading || isBusy}
+          disabled={isLoading || isBusy || isCheckingStorage}
         >
           {t('common.refresh')}
         </Button>
@@ -397,13 +464,23 @@ export default function PublicSiteMediaManager() {
         <div className="public-site-media__message public-site-media__message--error" role="alert">
           <span>{t(loadErrorKey)}</span>
           <Button type="button" variant="outline" onClick={() => void refresh()} disabled={isLoading}>
-            {t('publicSiteMedia.retry')}
+            {t('common.refresh')}
           </Button>
+          {storageUnavailable && (
+            <Button type="button" variant="outline" onClick={() => void handleStorageCheck()} loading={isCheckingStorage} disabled={isCheckingStorage}>
+              {t('publicSiteMedia.retry')}
+            </Button>
+          )}
         </div>
       )}
       {visibleActionErrorKey && (
         <div className="public-site-media__message public-site-media__message--error" role="alert">
-          {t(visibleActionErrorKey)}
+          <span>{t(visibleActionErrorKey)}</span>
+          {storageUnavailable && (
+            <Button type="button" variant="outline" onClick={() => void handleStorageCheck()} loading={isCheckingStorage} disabled={isCheckingStorage}>
+              {t('publicSiteMedia.retry')}
+            </Button>
+          )}
         </div>
       )}
       {noticeKey && (
@@ -528,6 +605,7 @@ export default function PublicSiteMediaManager() {
                   && !itemDoctorEligible
                   && (!itemDoctorIsSelected || !selectedDoctorPublicStatusKnown || doctorWebsiteContentErrorKey !== null);
                 const showPublishedPreview = item.is_published && itemDoctorEligible;
+                const showDraftPreview = !item.is_published;
                 const publishedStatusKey = item.is_published
                   ? itemDoctorEligible
                     ? 'publicSiteMedia.published'
@@ -538,13 +616,19 @@ export default function PublicSiteMediaManager() {
 
                 return (
                   <li key={item.id}>
-                    <article className={`public-site-media__item${showPublishedPreview ? '' : ' public-site-media__item--without-preview'}`}>
+                    <article className={`public-site-media__item${showPublishedPreview || showDraftPreview ? '' : ' public-site-media__item--without-preview'}`}>
                       {showPublishedPreview && (
                         <img
                           className="public-site-media__published-image"
                           src={buildApiUrl(item.media_url)}
                           alt={assetKind === 'clinic_logo' ? t('publicSiteMedia.clinicLogo') : itemDoctor?.displayName || `#${item.doctor_id}`}
                           loading="lazy"
+                        />
+                      )}
+                      {showDraftPreview && (
+                        <DraftMediaPreview
+                          mediaId={item.id}
+                          alt={assetKind === 'clinic_logo' ? t('publicSiteMedia.clinicLogo') : itemDoctor?.displayName || `#${item.doctor_id}`}
                         />
                       )}
                       <div className="public-site-media__item-body">

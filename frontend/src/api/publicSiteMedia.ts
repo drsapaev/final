@@ -37,6 +37,7 @@ export const PUBLIC_SITE_DOCTOR_PAGE_SIZE = 25;
 interface AdminDoctorOptionResponse {
   id: number;
   active: boolean;
+  display_name?: string | null;
   specialty?: string | null;
   cabinet?: string | null;
 }
@@ -55,13 +56,27 @@ export async function listPublicSiteDoctors(
   });
 
   return response.data.map((doctor) => {
-    const descriptor = [doctor.specialty, doctor.cabinet].filter(Boolean).join(' · ');
+    const descriptor = [doctor.display_name?.trim(), doctor.specialty, doctor.cabinet]
+      .filter((part): part is string => Boolean(part))
+      .join(' · ');
     return {
       id: doctor.id,
       displayName: descriptor ? `${descriptor} (#${doctor.id})` : `#${doctor.id}`,
       active: doctor.active,
     };
   });
+}
+
+export async function getPublicSiteMediaPreview(mediaId: number): Promise<Blob> {
+  const response = await apiClient.get<Blob>(
+    `/admin/public-site/media/${mediaId}/preview`,
+    { responseType: 'blob' },
+  );
+  return response.data;
+}
+
+export async function verifyPublicSiteMediaStorage(): Promise<void> {
+  await apiClient.post<{ ready: true }>('/admin/public-site/media/storage-check');
 }
 
 export async function getPublicSiteDoctorWebsiteContent(
