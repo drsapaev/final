@@ -1161,7 +1161,10 @@ def test_queue_profile_update_expands_family_tags(db_session) -> None:
             queue_tags=["dental"],
             display_order=9,
             is_active=True,
-            show_on_qr_page=True,
+            # This regression covers tag canonicalization only. The profile
+            # has no configured owner, so keep it unpublished and out of the
+            # explicit-publish readiness contract.
+            show_on_qr_page=False,
         )
     )
     db_session.commit()
@@ -1195,7 +1198,7 @@ def test_queue_profile_update_expands_family_tags(db_session) -> None:
             queue_tags=["ortho"],
             display_order=10,
             is_active=True,
-            show_on_qr_page=True,
+            show_on_qr_page=False,
         )
     )
     db_session.commit()

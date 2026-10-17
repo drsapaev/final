@@ -471,7 +471,10 @@ def test_repeat_of_claimed_session_creates_nothing(pg_session, pg_engine):
 def test_clinic_wide_duplicate_scoped_to_identity(pg_session, pg_engine):
     """(d) the clinic-wide dedup must not hand the first member's ticket to
     the second: same phone + different name → own entry (final binding)."""
-    world = _seed_clinic_wide_world(pg_session, "cw")
+    # Use a unique, internally consistent direction so this identity test
+    # cannot inherit unrelated canonical cardiology profiles from other
+    # PostgreSQL integration tests and trip the public-target ambiguity guard.
+    world = _seed_clinic_wide_world(pg_session, uuid.uuid4().hex[:10])
     from app.services.qr_queue import QRQueueService
 
     svc = QRQueueService(pg_session)
@@ -543,18 +546,21 @@ def _seed_clinic_wide_world(session, suffix: str) -> dict:
         session.commit()
         session.refresh(user)
 
-    doctor = Doctor(user_id=user.id, specialty="cardiology", cabinet="102", active=True)
+    direction_tag = f"rq25a1-cw-{suffix}"
+    doctor = Doctor(
+        user_id=user.id, specialty=direction_tag, cabinet="102", active=True
+    )
     session.add(doctor)
     session.commit()
     session.refresh(doctor)
 
     department = (
-        session.query(Department).filter(Department.key == "cardiology").first()
+        session.query(Department).filter(Department.key == direction_tag).first()
     )
     if department is None:
         session.add(
             Department(
-                key="cardiology",
+                key=direction_tag,
                 name_ru="SYNTHETIC-Кардиология",
                 active=True,
             )
@@ -564,10 +570,10 @@ def _seed_clinic_wide_world(session, suffix: str) -> dict:
     session.flush()
 
     profile = QueueProfile(
-        key=f"rq25a1-{suffix}",
+        key=direction_tag,
         title=f"RQ-25.a.1 {suffix}",
-        queue_tags=["cardiology"],
-        department_key="cardiology",
+        queue_tags=[direction_tag],
+        department_key=direction_tag,
         display_order=1,
         is_active=True,
         show_on_qr_page=True,
@@ -580,7 +586,7 @@ def _seed_clinic_wide_world(session, suffix: str) -> dict:
     daily_queue = DailyQueue(
         day=day,
         specialist_id=doctor.id,
-        queue_tag="cardiology",
+        queue_tag=direction_tag,
         active=True,
     )
     session.add(daily_queue)
@@ -591,7 +597,7 @@ def _seed_clinic_wide_world(session, suffix: str) -> dict:
         token=f"rq25a1-cw-token-{suffix}",
         day=day,
         is_clinic_wide=True,
-        department="cardiology",
+        department=direction_tag,
         expires_at=local_now + timedelta(hours=2),
         active=True,
     )

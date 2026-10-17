@@ -795,10 +795,10 @@ def test_new_target_and_resource_are_reachable_through_integrated_flow(
     assert resource_resp.status_code == 200, resource_resp.text
     resource_body = resource_resp.json()
     assert resource_body["direction"]["key"] == RESOURCE_DIRECTION_KEY
+    assert resource_body["direction"]["profile_id"] == world["resource_profile"].id
     assert resource_body["permanent_address"] is True
-    resource_selectable = resource_body["queue_info"]["selectable_specialists"]
-    assert resource_selectable
-    assert any(item.get("entity_type") == "profile" for item in resource_selectable)
+    # A permanent direction is already pinned to its typed QueueProfile;
+    # QueueJoin does not use the clinic-wide specialist selector in this mode.
 
 
 def test_doctor_target_qr_join_reaches_doctor_panel(pg_client, world):

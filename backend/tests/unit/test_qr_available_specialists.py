@@ -59,6 +59,7 @@ def test_available_specialists_filters_before_pagination_and_reports_full_total(
     monkeypatch,
 ):
     from app.services import queue_profile_availability
+    from app.services.queue_service import queue_service
 
     profiles = [
         QueueProfile(
@@ -94,6 +95,26 @@ def test_available_specialists_filters_before_pagination_and_reports_full_total(
         queue_profile_availability,
         "load_queue_profile_availability",
         lambda _db, rows: {profile: availability[profile] for profile in rows},
+    )
+
+    def resolve_visible_profile(_db, doctor, *, profiles, availability_by_profile):
+        """Keep this pagination test independent of ORM owner-scope queries."""
+        for profile in profiles:
+            profile_availability = availability_by_profile.get(profile)
+            if (
+                doctor.specialty in (profile.queue_tags or [])
+                and profile.is_active
+                and profile.show_on_qr_page
+                and profile_availability is not None
+                and profile_availability.is_available
+            ):
+                return profile
+        return None
+
+    monkeypatch.setattr(
+        queue_service,
+        "_get_qr_visible_profile_for_doctor",
+        resolve_visible_profile,
     )
     db = _Database(
         doctors=[

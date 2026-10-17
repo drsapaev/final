@@ -2768,7 +2768,12 @@ def test_legacy_doctor_token_locks_fallback_parent_before_admission(
     profile = QueueProfile(
         key=f"rq3639-legacy-profile-{suffix}",
         title="SYNTHETIC legacy specialty",
-        queue_tags=[f"rq3639-legacy-tag-{suffix}"],
+        # The Doctor specialty must belong to the profile's configured
+        # tags so the new bookability check reaches the parent-lock path.
+        queue_tags=[
+            f"rq3639-legacy-profile-{suffix}",
+            f"rq3639-legacy-tag-{suffix}",
+        ],
         department_key=parent.key,
         is_active=True,
         show_on_qr_page=True,
