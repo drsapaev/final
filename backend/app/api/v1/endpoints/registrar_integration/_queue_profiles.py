@@ -387,7 +387,8 @@ class QueueProfileCreate(BaseModel):
     display_order: int = Field(default=0, ge=0)
     is_active: bool = Field(default=True)
     show_on_qr_page: bool = Field(
-        default=True, description="Show this profile on QR join page"
+        default=False,
+        description="New profiles stay hidden; true is deferred to a separate publish action",
     )
     icon: str | None = Field(
         None, max_length=50, description="Lucide icon name (e.g., 'Heart')"
@@ -586,7 +587,10 @@ def create_queue_profile(
                 detail=f"Profile with key '{profile_data.key}' already exists",
             )
 
-        # Create new profile
+        # Creating and publishing are separate actions (T12/D5). Older clients
+        # may still send show_on_qr_page=true; preserve that intent in the
+        # response but never expose a profile directly from this command.
+        publication_deferred = profile_data.show_on_qr_page
         new_profile = QueueProfile(
             key=profile_data.key,
             title=profile_data.title,
@@ -598,7 +602,7 @@ def create_queue_profile(
             department_key=profile_data.department_key,
             display_order=profile_data.display_order,
             is_active=profile_data.is_active,
-            show_on_qr_page=profile_data.show_on_qr_page,
+            show_on_qr_page=False,
             icon=profile_data.icon,
             color=profile_data.color,
         )
@@ -608,9 +612,15 @@ def create_queue_profile(
         db.refresh(new_profile)
 
         logger.info(f"Created QueueProfile: {new_profile.key}")
+        if publication_deferred:
+            logger.warning(
+                "QueueProfile publication deferred until explicit publish action: %s",
+                new_profile.key,
+            )
 
         return {
             "success": True,
+            "publication_deferred": publication_deferred,
             "profile": {
                 "id": new_profile.id,
                 "key": new_profile.key,

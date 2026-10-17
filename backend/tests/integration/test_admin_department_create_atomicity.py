@@ -296,6 +296,11 @@ def test_create_builds_exactly_one_settings_row(db_session):
     assert counts["queue_settings"] == 1, counts
     assert counts["registration_settings"] == 1, counts
     assert counts["departments"] == 1
+    profile_visible = db_session.execute(
+        text("select show_on_qr_page from queue_profiles where key = :key"),
+        {"key": "rq04a_ok"},
+    ).scalar_one()
+    assert profile_visible is False
     _cleanup(db_session, "rq04a_ok")
 
 

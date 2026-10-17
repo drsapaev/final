@@ -36533,8 +36533,8 @@ export type components = {
             is_active: boolean;
             /**
              * Show On Qr Page
-             * @description Show this profile on QR join page
-             * @default true
+             * @description New profiles stay hidden; true is deferred to a separate publish action
+             * @default false
              */
             show_on_qr_page: boolean;
             /**
