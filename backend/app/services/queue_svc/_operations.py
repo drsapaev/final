@@ -742,7 +742,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             candidate_tags = set(route_tags)
             if profile_key:
                 candidate_tags.add(profile_key)
-            queue_tags.update(tag for tag in route_tags if tag)
             for tag in candidate_tags:
                 if not tag:
                     continue
