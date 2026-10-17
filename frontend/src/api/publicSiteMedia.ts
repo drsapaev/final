@@ -23,6 +23,16 @@ export interface PublicSiteDoctorOption {
   active: boolean;
 }
 
+export interface PublicSiteDoctorWebsiteContent {
+  id: number;
+  active: boolean;
+  owner_active: boolean | null;
+  show_on_website: boolean;
+  missing_fields: string[];
+}
+
+export const PUBLIC_SITE_DOCTOR_PAGE_SIZE = 25;
+
 interface AdminDoctorResponse {
   id: number;
   active: boolean;
@@ -36,9 +46,12 @@ export async function listPublicSiteMedia(): Promise<PublicSiteMedia[]> {
   return response.data;
 }
 
-export async function listPublicSiteDoctors(): Promise<PublicSiteDoctorOption[]> {
+export async function listPublicSiteDoctors(
+  skip = 0,
+  limit = PUBLIC_SITE_DOCTOR_PAGE_SIZE,
+): Promise<PublicSiteDoctorOption[]> {
   const response = await apiClient.get<AdminDoctorResponse[]>('/admin/doctors', {
-    params: { active_only: false, limit: 500 },
+    params: { active_only: false, limit, skip },
   });
 
   const doctors = response.data
@@ -53,6 +66,24 @@ export async function listPublicSiteDoctors(): Promise<PublicSiteDoctorOption[]>
   return doctors.map((doctor) => nameCounts.get(doctor.displayName)! > 1
     ? { ...doctor, displayName: `${doctor.displayName} (#${doctor.id})` }
     : doctor);
+}
+
+export async function getPublicSiteDoctorWebsiteContent(
+  doctorId: number,
+): Promise<PublicSiteDoctorWebsiteContent> {
+  const response = await apiClient.get<PublicSiteDoctorWebsiteContent>(
+    `/admin/doctors/${doctorId}/website-content`,
+  );
+  return response.data;
+}
+
+export function isPublicSiteDoctorEligible(
+  content: PublicSiteDoctorWebsiteContent,
+): boolean {
+  return content.active
+    && content.owner_active === true
+    && content.show_on_website
+    && content.missing_fields.length === 0;
 }
 
 export async function uploadPublicSiteMedia(
@@ -85,6 +116,12 @@ export async function unpublishPublicSiteMedia(mediaId: number): Promise<PublicS
 
 export function getPublicSiteMediaErrorKey(error: unknown): string {
   if (!isAxiosError(error)) return 'publicSiteMedia.genericError';
+
+  if (!error.response) {
+    return error.code === 'ERR_CANCELED'
+      ? 'publicSiteMedia.genericError'
+      : 'publicSiteMedia.networkError';
+  }
 
   const status = error.response?.status;
   const code = (error.response?.data as { detail?: { code?: string } } | undefined)?.detail?.code;

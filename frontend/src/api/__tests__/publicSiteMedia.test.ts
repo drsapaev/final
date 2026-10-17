@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  getPublicSiteDoctorWebsiteContent,
   getPublicSiteMediaErrorKey,
+  isPublicSiteDoctorEligible,
   listPublicSiteDoctors,
   listPublicSiteMedia,
   publishPublicSiteMedia,
@@ -52,8 +54,26 @@ describe('public site media API adapter', () => {
       { id: 43, displayName: '#43', active: false },
     ]);
     expect(api.get).toHaveBeenNthCalledWith(2, '/admin/doctors', {
-      params: { active_only: false, limit: 500 },
+      params: { active_only: false, limit: 25, skip: 0 },
     });
+  });
+
+  it('loads one doctor public-readiness record without fetching every doctor detail', async () => {
+    const content = {
+      id: 42,
+      active: true,
+      owner_active: true,
+      show_on_website: true,
+      missing_fields: [],
+    };
+    api.get.mockResolvedValueOnce({ data: content });
+
+    expect(await getPublicSiteDoctorWebsiteContent(42)).toEqual(content);
+    expect(api.get).toHaveBeenCalledWith('/admin/doctors/42/website-content');
+    expect(isPublicSiteDoctorEligible(content)).toBe(true);
+    expect(isPublicSiteDoctorEligible({ ...content, owner_active: false })).toBe(false);
+    expect(isPublicSiteDoctorEligible({ ...content, show_on_website: false })).toBe(false);
+    expect(isPublicSiteDoctorEligible({ ...content, missing_fields: ['bio_uz'] })).toBe(false);
   });
 
   it('uploads only as a draft through authenticated multipart API', async () => {
@@ -90,8 +110,18 @@ describe('public site media API adapter', () => {
       isAxiosError: true,
       response: { status: 413, data: { detail: { code: 'public_media_file_too_large' } } },
     });
+    const networkError = Object.assign(new Error('offline'), {
+      isAxiosError: true,
+      code: 'ECONNABORTED',
+    });
+    const cancelledError = Object.assign(new Error('cancelled'), {
+      isAxiosError: true,
+      code: 'ERR_CANCELED',
+    });
     expect(getPublicSiteMediaErrorKey(storageError)).toBe('publicSiteMedia.storageUnavailable');
     expect(getPublicSiteMediaErrorKey(fileError)).toBe('publicSiteMedia.fileTooLarge');
+    expect(getPublicSiteMediaErrorKey(networkError)).toBe('publicSiteMedia.networkError');
+    expect(getPublicSiteMediaErrorKey(cancelledError)).toBe('publicSiteMedia.genericError');
     expect(getPublicSiteMediaErrorKey(new Error('unexpected'))).toBe('publicSiteMedia.genericError');
   });
 });

@@ -6,6 +6,7 @@ import PublicSiteMediaManager from '../PublicSiteMediaManager';
 const mocks = vi.hoisted(() => ({
   listMedia: vi.fn(),
   listDoctors: vi.fn(),
+  doctorWebsiteContent: vi.fn(),
   upload: vi.fn(),
   publish: vi.fn(),
   unpublish: vi.fn(),
@@ -19,6 +20,9 @@ vi.mock('../../../i18n/useTranslation', () => ({
 vi.mock('../../../api/publicSiteMedia', () => ({
   listPublicSiteMedia: mocks.listMedia,
   listPublicSiteDoctors: mocks.listDoctors,
+  getPublicSiteDoctorWebsiteContent: mocks.doctorWebsiteContent,
+  isPublicSiteDoctorEligible: (content: { active: boolean; owner_active: boolean | null; show_on_website: boolean; missing_fields: string[] }) =>
+    content.active && content.owner_active === true && content.show_on_website && content.missing_fields.length === 0,
   uploadPublicSiteMedia: mocks.upload,
   publishPublicSiteMedia: mocks.publish,
   unpublishPublicSiteMedia: mocks.unpublish,
@@ -42,6 +46,13 @@ vi.mock('../../ui/macos', () => ({
 }));
 
 const doctor = { id: 42, displayName: 'SYNTHETIC Doctor', active: true };
+const doctorWebsiteContent = {
+  id: 42,
+  active: true,
+  owner_active: true,
+  show_on_website: true,
+  missing_fields: [],
+};
 const draftMedia = {
   id: 8,
   asset_kind: 'doctor_portrait' as const,
@@ -60,6 +71,7 @@ describe('PublicSiteMediaManager', () => {
     vi.clearAllMocks();
     mocks.listMedia.mockResolvedValue([]);
     mocks.listDoctors.mockResolvedValue([doctor]);
+    mocks.doctorWebsiteContent.mockResolvedValue(doctorWebsiteContent);
     mocks.upload.mockResolvedValue(draftMedia);
     mocks.publish.mockResolvedValue({ ...draftMedia, is_published: true });
     mocks.unpublish.mockResolvedValue({ ...draftMedia, is_published: false });
@@ -139,6 +151,74 @@ describe('PublicSiteMediaManager', () => {
     expect(await screen.findByText('publicSiteMedia.unpublishSuccess')).toBeInTheDocument();
   });
 
+  it('blocks portrait publication when the doctor is not currently eligible for the public site', async () => {
+    mocks.listMedia.mockResolvedValue([draftMedia]);
+    mocks.doctorWebsiteContent.mockResolvedValue({ ...doctorWebsiteContent, owner_active: false });
+    render(<PublicSiteMediaManager />);
+    await screen.findByText('publicSiteMedia.noMedia');
+
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.assetKind'), { target: { value: 'doctor_portrait' } });
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.doctor'), { target: { value: '42' } });
+
+    expect(await screen.findByText('publicSiteMedia.doctorNotPublicReady')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'publicSiteMedia.publish' })).toBeDisabled();
+    expect(mocks.publish).not.toHaveBeenCalled();
+  });
+
+  it('does not label an ineligible published portrait as publicly available', async () => {
+    mocks.listMedia.mockResolvedValue([{ ...draftMedia, is_published: true }]);
+    mocks.doctorWebsiteContent.mockResolvedValue({ ...doctorWebsiteContent, show_on_website: false });
+    const { container } = render(<PublicSiteMediaManager />);
+    await screen.findByText('publicSiteMedia.noMedia');
+
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.assetKind'), { target: { value: 'doctor_portrait' } });
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.doctor'), { target: { value: '42' } });
+
+    expect(await screen.findByText('publicSiteMedia.publishedNotVisible')).toBeInTheDocument();
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByRole('button', { name: 'publicSiteMedia.unpublish' })).toBeEnabled();
+  });
+
+  it('keeps published portraits visible for takedown when the doctor list fails', async () => {
+    mocks.listMedia.mockResolvedValue([{ ...draftMedia, is_published: true }]);
+    mocks.listDoctors.mockRejectedValue(new Error('offline'));
+    render(<PublicSiteMediaManager />);
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.assetKind'), { target: { value: 'doctor_portrait' } });
+    await screen.findByText('publicSiteMedia.doctorsLoadError');
+
+    const unpublishButton = await screen.findByRole('button', { name: 'publicSiteMedia.unpublish' });
+    expect(unpublishButton).toBeEnabled();
+    expect(screen.getByText('#42')).toBeInTheDocument();
+    expect(screen.getByText('publicSiteMedia.publishedVisibilityUnknown')).toBeInTheDocument();
+    fireEvent.click(unpublishButton);
+    await waitFor(() => expect(mocks.unpublish).toHaveBeenCalledWith(8));
+  });
+
+  it('loads doctor options in bounded pages instead of requesting hundreds at once', async () => {
+    mocks.listDoctors.mockResolvedValueOnce(
+      Array.from({ length: 25 }, (_, index) => ({
+        ...doctor,
+        id: index + 1,
+        displayName: `SYNTHETIC Doctor ${index + 1}`,
+      })),
+    );
+    mocks.listDoctors.mockResolvedValueOnce([{ ...doctor, id: 26, displayName: 'SYNTHETIC Doctor 26' }]);
+    render(<PublicSiteMediaManager />);
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.assetKind'), { target: { value: 'doctor_portrait' } });
+
+    const loadMore = await screen.findByRole('button', { name: 'publicSiteMedia.loadMoreDoctors' });
+    fireEvent.click(loadMore);
+    await waitFor(() => expect(mocks.listDoctors).toHaveBeenLastCalledWith(25, 25));
+    expect(await screen.findByRole('option', { name: 'SYNTHETIC Doctor 26' })).toBeInTheDocument();
+  });
+
+  it('uses a section root because the Clinic OS shell already provides the main landmark', async () => {
+    const { container } = render(<PublicSiteMediaManager />);
+    await screen.findByText('publicSiteMedia.noMedia');
+    expect(container.querySelector('main')).toBeNull();
+    expect(container.querySelector('section.public-site-media')).toBeInTheDocument();
+  });
+
   it('keeps inactive doctors manageable for unpublishing but blocks new portrait publication', async () => {
     mocks.listDoctors.mockResolvedValue([{ id: 42, displayName: 'SYNTHETIC Former Doctor', active: false }]);
     mocks.listMedia.mockResolvedValue([
@@ -166,5 +246,21 @@ describe('PublicSiteMediaManager', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('publicSiteMedia.storageUnavailable');
     expect(screen.getByRole('button', { name: 'publicSiteMedia.uploadDraft' })).toBeDisabled();
+  });
+
+  it('keeps storage unavailable visible and mutations disabled after a retry succeeds', async () => {
+    mocks.listMedia.mockRejectedValueOnce(new Error('storage')).mockResolvedValueOnce([]);
+    render(<PublicSiteMediaManager />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('publicSiteMedia.storageUnavailable');
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.assetKind'), { target: { value: 'doctor_portrait' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('publicSiteMedia.storageUnavailable');
+    expect(document.querySelector('input[type="file"]')).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'publicSiteMedia.retry' }));
+    await waitFor(() => expect(mocks.listMedia).toHaveBeenCalledTimes(2));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('publicSiteMedia.storageUnavailable');
+    expect(document.querySelector('input[type="file"]')).toBeDisabled();
   });
 });

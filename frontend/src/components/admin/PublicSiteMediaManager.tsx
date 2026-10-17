@@ -4,12 +4,15 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { buildApiUrl } from '../../api/runtime';
 import {
   getPublicSiteMediaErrorKey,
+  getPublicSiteDoctorWebsiteContent,
+  isPublicSiteDoctorEligible,
   listPublicSiteDoctors,
   listPublicSiteMedia,
   publishPublicSiteMedia,
   unpublishPublicSiteMedia,
   uploadPublicSiteMedia,
   type PublicSiteDoctorOption,
+  type PublicSiteDoctorWebsiteContent,
   type PublicSiteMedia,
   type PublicSiteMediaKind,
 } from '../../api/publicSiteMedia';
@@ -21,6 +24,7 @@ const ACCEPTED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const ACCEPTED_FILE_NAME = /\.(jpe?g|png|webp)$/i;
 const FILE_ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
 const STORAGE_UNAVAILABLE_KEY = 'publicSiteMedia.storageUnavailable';
+const DOCTOR_PAGE_SIZE = 25;
 
 function upsertMedia(current: PublicSiteMedia[], updated: PublicSiteMedia): PublicSiteMedia[] {
   const sameOwner = (item: PublicSiteMedia) =>
@@ -44,6 +48,14 @@ export default function PublicSiteMediaManager() {
   const [media, setMedia] = useState<PublicSiteMedia[]>([]);
   const [doctors, setDoctors] = useState<PublicSiteDoctorOption[]>([]);
   const [doctorLoadFailed, setDoctorLoadFailed] = useState(false);
+  const [doctorPageOffset, setDoctorPageOffset] = useState(0);
+  const [hasMoreDoctors, setHasMoreDoctors] = useState(false);
+  const [isLoadingMoreDoctors, setIsLoadingMoreDoctors] = useState(false);
+  const [doctorPageErrorKey, setDoctorPageErrorKey] = useState<string | null>(null);
+  const [doctorWebsiteContent, setDoctorWebsiteContent] = useState<PublicSiteDoctorWebsiteContent | null>(null);
+  const [doctorWebsiteContentDoctorId, setDoctorWebsiteContentDoctorId] = useState<number | null>(null);
+  const [isLoadingDoctorWebsiteContent, setIsLoadingDoctorWebsiteContent] = useState(false);
+  const [doctorWebsiteContentErrorKey, setDoctorWebsiteContentErrorKey] = useState<string | null>(null);
   const [assetKind, setAssetKind] = useState<PublicSiteMediaKind>('clinic_logo');
   const [doctorId, setDoctorId] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -51,6 +63,7 @@ export default function PublicSiteMediaManager() {
   const [isBusy, setIsBusy] = useState(false);
   const [loadErrorKey, setLoadErrorKey] = useState<string | null>(null);
   const [actionErrorKey, setActionErrorKey] = useState<string | null>(null);
+  const [storageRecoveryRequired, setStorageRecoveryRequired] = useState(false);
   const [noticeKey, setNoticeKey] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -63,16 +76,22 @@ export default function PublicSiteMediaManager() {
     if (mediaResult.status === 'fulfilled') {
       setMedia(mediaResult.value);
       setLoadErrorKey(null);
-      setActionErrorKey((current) => current === STORAGE_UNAVAILABLE_KEY ? null : current);
     } else {
-      setLoadErrorKey(getPublicSiteMediaErrorKey(mediaResult.reason));
+      const errorKey = getPublicSiteMediaErrorKey(mediaResult.reason);
+      setLoadErrorKey(errorKey);
+      if (errorKey === STORAGE_UNAVAILABLE_KEY) setStorageRecoveryRequired(true);
     }
 
     if (doctorsResult.status === 'fulfilled') {
       setDoctors(doctorsResult.value);
+      setDoctorPageOffset(doctorsResult.value.length);
+      setHasMoreDoctors(doctorsResult.value.length === DOCTOR_PAGE_SIZE);
+      setDoctorPageErrorKey(null);
       setDoctorLoadFailed(false);
     } else {
       setDoctors([]);
+      setDoctorPageOffset(0);
+      setHasMoreDoctors(false);
       setDoctorLoadFailed(true);
     }
     setIsLoading(false);
@@ -82,22 +101,94 @@ export default function PublicSiteMediaManager() {
     void refresh();
   }, [refresh]);
 
+  const loadMoreDoctors = async () => {
+    if (isLoadingMoreDoctors || !hasMoreDoctors || doctorLoadFailed) return;
+    setIsLoadingMoreDoctors(true);
+    setDoctorPageErrorKey(null);
+    try {
+      const nextPage = await listPublicSiteDoctors(doctorPageOffset, DOCTOR_PAGE_SIZE);
+      setDoctors((current) => {
+        const knownIds = new Set(current.map((doctor) => doctor.id));
+        return [...current, ...nextPage.filter((doctor) => !knownIds.has(doctor.id))];
+      });
+      setDoctorPageOffset((current) => current + nextPage.length);
+      setHasMoreDoctors(nextPage.length === DOCTOR_PAGE_SIZE);
+    } catch (error) {
+      setDoctorPageErrorKey(getPublicSiteMediaErrorKey(error));
+    } finally {
+      setIsLoadingMoreDoctors(false);
+    }
+  };
+
   const selectedDoctorId = doctorId ? Number(doctorId) : null;
   const selectedDoctor = doctors.find((doctor) => doctor.id === selectedDoctorId);
-  const storageUnavailable = loadErrorKey === STORAGE_UNAVAILABLE_KEY
-    || actionErrorKey === STORAGE_UNAVAILABLE_KEY;
+  const selectedDoctorPubliclyEligible = doctorWebsiteContentDoctorId === selectedDoctorId
+    && doctorWebsiteContent !== null
+    && isPublicSiteDoctorEligible(doctorWebsiteContent);
+  const selectedDoctorPublicStatusKnown = doctorWebsiteContentDoctorId === selectedDoctorId
+    && doctorWebsiteContent !== null;
+
+  useEffect(() => {
+    if (assetKind !== 'doctor_portrait' || selectedDoctorId === null || doctorLoadFailed) {
+      setDoctorWebsiteContent(null);
+      setDoctorWebsiteContentDoctorId(null);
+      setDoctorWebsiteContentErrorKey(null);
+      setIsLoadingDoctorWebsiteContent(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setDoctorWebsiteContent(null);
+    setDoctorWebsiteContentDoctorId(null);
+    setDoctorWebsiteContentErrorKey(null);
+    setIsLoadingDoctorWebsiteContent(true);
+    getPublicSiteDoctorWebsiteContent(selectedDoctorId)
+      .then((content) => {
+        if (cancelled) return;
+        setDoctorWebsiteContent(content);
+        setDoctorWebsiteContentDoctorId(selectedDoctorId);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setDoctorWebsiteContentErrorKey(getPublicSiteMediaErrorKey(error));
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingDoctorWebsiteContent(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assetKind, doctorLoadFailed, selectedDoctorId]);
+
+  const storageUnavailable = storageRecoveryRequired || loadErrorKey === STORAGE_UNAVAILABLE_KEY;
   const mutationsDisabled = isLoading || Boolean(loadErrorKey) || storageUnavailable;
+  const visibleActionErrorKey = loadErrorKey === STORAGE_UNAVAILABLE_KEY
+    ? null
+    : actionErrorKey ?? (storageRecoveryRequired ? STORAGE_UNAVAILABLE_KEY : null);
   const scopedMedia = media
     .filter((item) => {
       if (item.asset_kind !== assetKind) return false;
       if (assetKind === 'clinic_logo') return item.doctor_id === null;
+      if (doctorLoadFailed) return true;
+      if (selectedDoctorId === null && doctors.length === 0) return true;
       return selectedDoctorId !== null && item.doctor_id === selectedDoctorId;
     })
     .sort((left, right) => right.created_at.localeCompare(left.created_at));
 
   const clearFeedback = () => {
-    setActionErrorKey(null);
+    setActionErrorKey((current) => (
+      current === STORAGE_UNAVAILABLE_KEY || storageRecoveryRequired
+        ? STORAGE_UNAVAILABLE_KEY
+        : null
+    ));
     setNoticeKey(null);
+  };
+
+  const reportActionError = (error: unknown) => {
+    const errorKey = getPublicSiteMediaErrorKey(error);
+    setActionErrorKey(errorKey);
+    if (errorKey === STORAGE_UNAVAILABLE_KEY) setStorageRecoveryRequired(true);
   };
 
   const handleAssetKindChange = (event: ChangeEvent<HTMLSelectElement>) => {
@@ -163,7 +254,7 @@ export default function PublicSiteMediaManager() {
       setMedia((current) => upsertMedia(current, uploaded));
       setNoticeKey('publicSiteMedia.uploadSuccess');
     } catch (error) {
-      setActionErrorKey(getPublicSiteMediaErrorKey(error));
+      reportActionError(error);
     } finally {
       setIsBusy(false);
     }
@@ -184,6 +275,18 @@ export default function PublicSiteMediaManager() {
         setActionErrorKey('publicSiteMedia.inactiveDoctorUpload');
         return;
       }
+      try {
+        const currentContent = await getPublicSiteDoctorWebsiteContent(selectedDoctor.id);
+        setDoctorWebsiteContent(currentContent);
+        setDoctorWebsiteContentDoctorId(selectedDoctor.id);
+        if (!isPublicSiteDoctorEligible(currentContent)) {
+          setActionErrorKey('publicSiteMedia.doctorNotPublicReady');
+          return;
+        }
+      } catch (error) {
+        setActionErrorKey(getPublicSiteMediaErrorKey(error));
+        return;
+      }
     }
     const approved = await confirm({
       title: t('publicSiteMedia.confirmPublishTitle'),
@@ -200,7 +303,7 @@ export default function PublicSiteMediaManager() {
       setMedia((current) => upsertMedia(current, published));
       setNoticeKey('publicSiteMedia.publishSuccess');
     } catch (error) {
-      setActionErrorKey(getPublicSiteMediaErrorKey(error));
+      reportActionError(error);
     } finally {
       setIsBusy(false);
     }
@@ -223,7 +326,7 @@ export default function PublicSiteMediaManager() {
       setMedia((current) => upsertMedia(current, unpublished));
       setNoticeKey('publicSiteMedia.unpublishSuccess');
     } catch (error) {
-      setActionErrorKey(getPublicSiteMediaErrorKey(error));
+      reportActionError(error);
     } finally {
       setIsBusy(false);
     }
@@ -232,7 +335,7 @@ export default function PublicSiteMediaManager() {
   const formatSize = (bytes: number) => `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
   return (
-    <main className="public-site-media" aria-labelledby="public-site-media-title">
+    <section className="public-site-media" aria-labelledby="public-site-media-title">
       {confirmDialog}
       <header className="public-site-media__header">
         <div>
@@ -260,9 +363,9 @@ export default function PublicSiteMediaManager() {
           </Button>
         </div>
       )}
-      {actionErrorKey && (
+      {visibleActionErrorKey && (
         <div className="public-site-media__message public-site-media__message--error" role="alert">
-          {t(actionErrorKey)}
+          {t(visibleActionErrorKey)}
         </div>
       )}
       {noticeKey && (
@@ -284,25 +387,47 @@ export default function PublicSiteMediaManager() {
             </label>
 
             {assetKind === 'doctor_portrait' && (
-              <label className="public-site-media__field">
-                <span>{t('publicSiteMedia.doctor')}</span>
-                <select
-                  value={doctorId}
-                  onChange={handleDoctorChange}
-                  disabled={isBusy || doctorLoadFailed || doctors.length === 0}
-                >
-                  <option value="">{t('publicSiteMedia.selectDoctor')}</option>
-                  {doctors.map((doctor) => (
-                    <option key={doctor.id} value={doctor.id}>
-                      {doctor.active ? doctor.displayName : `${doctor.displayName} · ${t('publicSiteMedia.inactiveDoctor')}`}
-                    </option>
-                  ))}
-                </select>
-                {doctorLoadFailed && <span className="public-site-media__inline-error">{t('publicSiteMedia.doctorsLoadError')}</span>}
-                {!doctorLoadFailed && doctors.length === 0 && <span className="public-site-media__hint">{t('publicSiteMedia.noDoctors')}</span>}
-                {doctorId && !doctorLoadFailed && !selectedDoctor && <span className="public-site-media__inline-error">{t('publicSiteMedia.doctorUnavailable')}</span>}
-                {selectedDoctor?.active === false && <span className="public-site-media__inline-error">{t('publicSiteMedia.inactiveDoctorUpload')}</span>}
-              </label>
+              <>
+                <label className="public-site-media__field">
+                  <span>{t('publicSiteMedia.doctor')}</span>
+                  <select
+                    value={doctorId}
+                    onChange={handleDoctorChange}
+                    disabled={isBusy || doctorLoadFailed || doctors.length === 0}
+                  >
+                    <option value="">{t('publicSiteMedia.selectDoctor')}</option>
+                    {doctors.map((doctor) => (
+                      <option key={doctor.id} value={doctor.id}>
+                        {doctor.active ? doctor.displayName : `${doctor.displayName} · ${t('publicSiteMedia.inactiveDoctor')}`}
+                      </option>
+                    ))}
+                  </select>
+                  {doctorLoadFailed && <span className="public-site-media__inline-error">{t('publicSiteMedia.doctorsLoadError')}</span>}
+                  {doctorPageErrorKey && <span className="public-site-media__inline-error">{t(doctorPageErrorKey)}</span>}
+                  {!doctorLoadFailed && doctors.length === 0 && <span className="public-site-media__hint">{t('publicSiteMedia.noDoctors')}</span>}
+                  {doctorId && !doctorLoadFailed && !selectedDoctor && <span className="public-site-media__inline-error">{t('publicSiteMedia.doctorUnavailable')}</span>}
+                  {selectedDoctor?.active === false && <span className="public-site-media__inline-error">{t('publicSiteMedia.inactiveDoctorUpload')}</span>}
+                  {assetKind === 'doctor_portrait' && selectedDoctor && isLoadingDoctorWebsiteContent && (
+                    <span className="public-site-media__hint" role="status">{t('publicSiteMedia.loadingDoctorStatus')}</span>
+                  )}
+                  {assetKind === 'doctor_portrait' && selectedDoctor && doctorWebsiteContentErrorKey && (
+                    <span className="public-site-media__inline-error">{t(doctorWebsiteContentErrorKey)}</span>
+                  )}
+                  {assetKind === 'doctor_portrait' && selectedDoctor && selectedDoctorPublicStatusKnown && !selectedDoctorPubliclyEligible && (
+                    <span className="public-site-media__inline-error">{t('publicSiteMedia.doctorNotPublicReady')}</span>
+                  )}
+                </label>
+                {hasMoreDoctors && !doctorLoadFailed && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void loadMoreDoctors()}
+                    disabled={isLoadingMoreDoctors || isLoading || isBusy}
+                  >
+                    {t(isLoadingMoreDoctors ? 'publicSiteMedia.loadingDoctors' : 'publicSiteMedia.loadMoreDoctors')}
+                  </Button>
+                )}
+              </>
             )}
 
             <label className="public-site-media__field">
@@ -351,41 +476,61 @@ export default function PublicSiteMediaManager() {
             </div>
           ) : (
             <ul className="public-site-media__list">
-              {scopedMedia.map((item) => (
-                <li key={item.id}>
-                  <article className="public-site-media__item">
-                    {item.is_published && (
-                      <img
-                        className="public-site-media__published-image"
-                        src={buildApiUrl(item.media_url)}
-                        alt={assetKind === 'clinic_logo' ? t('publicSiteMedia.clinicLogo') : selectedDoctor?.displayName || t('publicSiteMedia.doctorPortrait')}
-                        loading="lazy"
-                      />
-                    )}
-                    <div className="public-site-media__item-body">
-                      <span className={`public-site-media__status${item.is_published ? ' public-site-media__status--published' : ''}`}>
-                        {t(item.is_published ? 'publicSiteMedia.published' : 'publicSiteMedia.draft')}
-                      </span>
-                      <p>{item.mime_type} · {t('publicSiteMedia.size')}: {formatSize(item.byte_size)}</p>
-                      <div className="public-site-media__actions">
-                        {item.is_published ? (
-                          <Button type="button" variant="outline" color="warning" onClick={() => void handleUnpublish(item)} disabled={mutationsDisabled || isBusy}>
-                            {t('publicSiteMedia.unpublish')}
-                          </Button>
-                        ) : (
-                          <Button type="button" variant="primary" onClick={() => void handlePublish(item)} disabled={mutationsDisabled || isBusy || (assetKind === 'doctor_portrait' && (!selectedDoctor || !selectedDoctor.active || doctorLoadFailed))}>
-                            {t('publicSiteMedia.publish')}
-                          </Button>
+              {scopedMedia.map((item) => {
+                const itemDoctor = doctors.find((doctor) => doctor.id === item.doctor_id);
+                const itemDoctorIsSelected = item.doctor_id === selectedDoctorId;
+                const itemDoctorEligible = assetKind === 'clinic_logo'
+                  || (itemDoctorIsSelected && selectedDoctorPubliclyEligible);
+                const itemVisibilityUnknown = assetKind === 'doctor_portrait'
+                  && !itemDoctorEligible
+                  && (!itemDoctorIsSelected || !selectedDoctorPublicStatusKnown || doctorWebsiteContentErrorKey !== null);
+                const publishedStatusKey = item.is_published
+                  ? itemDoctorEligible
+                    ? 'publicSiteMedia.published'
+                    : itemVisibilityUnknown
+                      ? 'publicSiteMedia.publishedVisibilityUnknown'
+                      : 'publicSiteMedia.publishedNotVisible'
+                  : 'publicSiteMedia.draft';
+
+                return (
+                  <li key={item.id}>
+                    <article className="public-site-media__item">
+                      {item.is_published && itemDoctorEligible && (
+                        <img
+                          className="public-site-media__published-image"
+                          src={buildApiUrl(item.media_url)}
+                          alt={assetKind === 'clinic_logo' ? t('publicSiteMedia.clinicLogo') : itemDoctor?.displayName || `#${item.doctor_id}`}
+                          loading="lazy"
+                        />
+                      )}
+                      <div className="public-site-media__item-body">
+                        <span className={`public-site-media__status${item.is_published && itemDoctorEligible ? ' public-site-media__status--published' : ''}`}>
+                          {t(publishedStatusKey)}
+                        </span>
+                        {assetKind === 'doctor_portrait' && (
+                          <p>{itemDoctor?.displayName || `#${item.doctor_id}`}</p>
                         )}
+                        <p>{item.mime_type} · {t('publicSiteMedia.size')}: {formatSize(item.byte_size)}</p>
+                        <div className="public-site-media__actions">
+                          {item.is_published ? (
+                            <Button type="button" variant="outline" color="warning" onClick={() => void handleUnpublish(item)} disabled={mutationsDisabled || isBusy}>
+                              {t('publicSiteMedia.unpublish')}
+                            </Button>
+                          ) : (
+                            <Button type="button" variant="primary" onClick={() => void handlePublish(item)} disabled={mutationsDisabled || isBusy || (assetKind === 'doctor_portrait' && (!selectedDoctor || !selectedDoctor.active || !selectedDoctorPubliclyEligible || isLoadingDoctorWebsiteContent || Boolean(doctorWebsiteContentErrorKey) || doctorLoadFailed))}>
+                              {t('publicSiteMedia.publish')}
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                </li>
-              ))}
+                    </article>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>
       </div>
-    </main>
+    </section>
   );
 }
