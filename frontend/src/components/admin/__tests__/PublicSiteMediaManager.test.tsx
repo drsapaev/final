@@ -64,25 +64,34 @@ describe('PublicSiteMediaManager', () => {
     mocks.publish.mockResolvedValue({ ...draftMedia, is_published: true });
     mocks.unpublish.mockResolvedValue({ ...draftMedia, is_published: false });
     mocks.confirm.mockResolvedValue(true);
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:synthetic-preview') });
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
   });
 
   afterEach(() => cleanup());
 
-  it('previews a local image and uploads it as an unpublished clinic-logo draft', async () => {
+  it('shows the selected filename and uploads a supported image as an unpublished clinic-logo draft', async () => {
     mocks.upload.mockResolvedValue(logoMedia);
     render(<PublicSiteMediaManager />);
     await screen.findByText('publicSiteMedia.noMedia');
 
     const file = new File(['synthetic image'], 'clinic-logo.png', { type: 'image/png' });
     fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
-    expect(await screen.findByRole('img', { name: 'publicSiteMedia.previewAlt' })).toHaveAttribute('src', 'blob:synthetic-preview');
+    expect(screen.getByText('publicSiteMedia.selectedFile: clinic-logo.png')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'publicSiteMedia.uploadDraft' }));
     await waitFor(() => expect(mocks.upload).toHaveBeenCalledWith(file, 'clinic_logo', undefined));
     expect(await screen.findByText('publicSiteMedia.uploadSuccess')).toBeInTheDocument();
     expect(screen.getByText('publicSiteMedia.draft')).toBeInTheDocument();
+  });
+
+  it('rejects an unsupported MIME type even when the filename looks like a supported image', async () => {
+    render(<PublicSiteMediaManager />);
+    await screen.findByText('publicSiteMedia.noMedia');
+
+    const file = new File(['synthetic svg'], 'clinic-logo.png', { type: 'image/svg+xml' });
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('publicSiteMedia.invalidFileType');
+    expect(mocks.upload).not.toHaveBeenCalled();
   });
 
   it('requires an active doctor selection for a portrait and uploads only that doctor association', async () => {

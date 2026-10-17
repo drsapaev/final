@@ -47,7 +47,6 @@ export default function PublicSiteMediaManager() {
   const [assetKind, setAssetKind] = useState<PublicSiteMediaKind>('clinic_logo');
   const [doctorId, setDoctorId] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
   const [loadErrorKey, setLoadErrorKey] = useState<string | null>(null);
@@ -83,17 +82,6 @@ export default function PublicSiteMediaManager() {
     void refresh();
   }, [refresh]);
 
-  useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return undefined;
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [file]);
-
   const selectedDoctorId = doctorId ? Number(doctorId) : null;
   const selectedDoctor = doctors.find((doctor) => doctor.id === selectedDoctorId);
   const storageUnavailable = loadErrorKey === STORAGE_UNAVAILABLE_KEY
@@ -127,7 +115,10 @@ export default function PublicSiteMediaManager() {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] ?? null;
     clearFeedback();
-    if (nextFile && !ACCEPTED_MIME_TYPES.has(nextFile.type) && !ACCEPTED_FILE_NAME.test(nextFile.name)) {
+    const hasSupportedExtension = nextFile ? ACCEPTED_FILE_NAME.test(nextFile.name) : false;
+    const hasSupportedMime = nextFile ? ACCEPTED_MIME_TYPES.has(nextFile.type) : false;
+    const hasUnknownMime = nextFile ? !nextFile.type : false;
+    if (nextFile && (!hasSupportedExtension || (!hasSupportedMime && !hasUnknownMime))) {
       setFile(null);
       setActionErrorKey('publicSiteMedia.invalidFileType');
       event.target.value = '';
@@ -324,14 +315,12 @@ export default function PublicSiteMediaManager() {
                 disabled={isBusy || storageUnavailable || (assetKind === 'doctor_portrait' && (!selectedDoctor || !selectedDoctor.active || doctorLoadFailed))}
               />
               <span className="public-site-media__hint">{t('publicSiteMedia.supportedFormats')}</span>
+              {file && (
+                <span className="public-site-media__hint">
+                  {t('publicSiteMedia.selectedFile')}: {file.name}
+                </span>
+              )}
             </label>
-
-            {previewUrl && (
-              <div className="public-site-media__preview">
-                <p>{t('publicSiteMedia.localPreview')}</p>
-                <img src={previewUrl} alt={t('publicSiteMedia.previewAlt')} />
-              </div>
-            )}
 
             <Button
               type="submit"

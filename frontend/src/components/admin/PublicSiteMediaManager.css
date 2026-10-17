@@ -113,18 +113,6 @@
   color: var(--mac-error, currentColor);
 }
 
-.public-site-media__preview {
-  display: grid;
-  gap: 8px;
-}
-
-.public-site-media__preview p {
-  margin: 0;
-  color: var(--mac-text-secondary, currentColor);
-  font-size: 0.88rem;
-}
-
-.public-site-media__preview img,
 .public-site-media__published-image {
   display: block;
   max-width: 100%;
@@ -132,10 +120,6 @@
   border: 1px solid var(--mac-border, currentColor);
   border-radius: var(--mac-radius-md, 8px);
   background: var(--mac-bg-secondary, transparent);
-}
-
-.public-site-media__preview img {
-  max-height: 260px;
 }
 
 .public-site-media__message {
