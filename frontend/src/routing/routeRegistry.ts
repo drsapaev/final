@@ -1,7 +1,7 @@
 import {
   AlertTriangle, BarChart3, Bell, Brain, Building2, Calendar, Camera,
   CircleDollarSign, Compass, CreditCard, FileText, Heart, KeyRound, List, ListOrdered,
-  Lock, Monitor, Percent, Phone, Puzzle, Search, Send, Settings, Smile,
+  Image as ImageIcon, Lock, Monitor, Percent, Phone, Puzzle, Search, Send, Settings, Smile,
   SquareStack, Stethoscope, TestTube2, UserPlus, Users, Wand2,
 } from 'lucide-react';
 import { matchPath } from 'react-router-dom';
@@ -999,6 +999,23 @@ export const ROUTE_REGISTRY = [
     component: 'ActivationSystem',
     legacyRedirectFrom: ['/activation'],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-activation', pageTitle: 'Admin Activation' }),
+  },
+  {
+    id: 'admin-public-site-media',
+    path: '/admin/public-site/media',
+    group: 'admin',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'app-shell',
+    auth: 'role-scoped',
+    roles: ['Admin'],
+    entry: 'menu',
+    nav: nav({ labelKey: 'nav.public_site_media', icon: ImageIcon, sectionKey: 'nav.system', order: 50, sidebar: true }),
+    title: 'Admin Public Site Media',
+    owner: 'admin.public_site',
+    component: 'PublicSiteMediaManager',
+    legacyRedirectFrom: [],
+    layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-public-site-media', pageTitle: 'Admin Public Site Media' }),
   },
   {
     id: 'admin-finance',

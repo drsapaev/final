@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -15,6 +24,7 @@ from app.schemas.public_site_media import (
     PublicSiteMediaAdminOut,
     PublicSiteMediaErrorOut,
     PublicSiteMediaKind,
+    PublicSiteMediaStorageReadyOut,
 )
 from app.services.public_site_media_service import (
     PublicSiteMediaError,
@@ -66,6 +76,62 @@ def list_public_site_media(
     _current_user: User = Depends(require_roles("Admin")),
 ) -> list[dict[str, object]]:
     return PublicSiteMediaService(db).list_admin_media()
+
+
+@router.get(
+    "/public-site/media/{media_id}/preview",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Verified JPEG, PNG, or WebP image for Admin preview.",
+            "content": {
+                media_type: {"schema": {"type": "string", "format": "binary"}}
+                for media_type in ("image/jpeg", "image/png", "image/webp")
+            },
+        },
+        404: _MEDIA_ERROR_RESPONSES[404],
+        503: _MEDIA_ERROR_RESPONSES[503],
+    },
+    operation_id="admin_preview_public_site_media",
+    summary="Просмотреть черновик или опубликованное изображение",
+)
+def preview_public_site_media(
+    media_id: int,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_roles("Admin")),
+) -> Response:
+    try:
+        payload = PublicSiteMediaService(db).get_admin_preview(media_id)
+    except PublicSiteMediaError as exc:
+        _raise_media_error(exc)
+    return Response(
+        content=payload.body,
+        media_type=payload.mime_type,
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.post(
+    "/public-site/media/storage-check",
+    response_model=PublicSiteMediaStorageReadyOut,
+    responses={
+        503: _MEDIA_ERROR_RESPONSES[503],
+    },
+    operation_id="admin_check_public_site_media_storage",
+    summary="Проверить доступность хранилищ публичных изображений",
+)
+def check_public_site_media_storage(
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_roles("Admin")),
+) -> PublicSiteMediaStorageReadyOut:
+    try:
+        PublicSiteMediaService(db).verify_storage_ready()
+    except PublicSiteMediaError as exc:
+        _raise_media_error(exc)
+    return PublicSiteMediaStorageReadyOut(ready=True)
 
 
 @router.post(

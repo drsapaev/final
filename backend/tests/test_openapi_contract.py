@@ -132,6 +132,33 @@ def test_openapi_documents_public_site_detail_not_found_contract(
     assert detail["properties"]["code"]["const"] == "public_content_not_found"
 
 
+def test_openapi_documents_admin_media_preview_storage_and_doctor_options(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    paths = schema["paths"]
+
+    preview = paths["/api/v1/admin/public-site/media/{media_id}/preview"]["get"]
+    preview_content = preview["responses"]["200"]["content"]
+    assert {"image/jpeg", "image/png", "image/webp"}.issubset(preview_content)
+    assert "404" in preview["responses"]
+    assert "503" in preview["responses"]
+
+    storage_check = paths["/api/v1/admin/public-site/media/storage-check"]["post"]
+    ready_ref = storage_check["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["$ref"]
+    assert ready_ref.endswith("/PublicSiteMediaStorageReadyOut")
+    assert "503" in storage_check["responses"]
+
+    doctor_options = paths["/api/v1/services/admin/doctors"]["get"]
+    doctor_ref = doctor_options["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["items"]["$ref"]
+    doctor_schema = schema["components"]["schemas"][doctor_ref.rsplit("/", 1)[1]]
+    assert "display_name" in doctor_schema["properties"]
+
+
 def test_openapi_queue_join_contract_has_request_and_responses(
     client: TestClient,
 ) -> None:
