@@ -3285,6 +3285,81 @@
         }
       }
     },
+    "/api/v1/public-site/media/{storage_key}": {
+      "get": {
+        "tags": [
+          "public-site"
+        ],
+        "summary": "Получить явно опубликованное изображение сайта",
+        "operationId": "public_site_get_media",
+        "parameters": [
+          {
+            "name": "storage_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Storage Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Published JPEG, PNG, or WebP image.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published media was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteNotFoundOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Public media storage is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public-site/clinic": {
       "get": {
         "tags": [
@@ -33062,6 +33137,354 @@
             "OAuth2PasswordBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/admin/public-site/media": {
+      "get": {
+        "tags": [
+          "admin-public-site-media"
+        ],
+        "summary": "Получить список логотипов и фотографий для сайта",
+        "operationId": "admin_list_public_site_media",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicSiteMediaAdminOut"
+                  },
+                  "type": "array",
+                  "title": "Response Admin List Public Site Media"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin-public-site-media"
+        ],
+        "summary": "Загрузить логотип или фотографию врача",
+        "operationId": "admin_upload_public_site_media",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_admin_upload_public_site_media"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaAdminOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid image or media ownership.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Media or doctor was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Media state conflicts with the requested operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Image is too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The media operation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Media storage is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/public-site/media/{media_id}/publish": {
+      "put": {
+        "tags": [
+          "admin-public-site-media"
+        ],
+        "summary": "Опубликовать изображение на сайте",
+        "operationId": "admin_publish_public_site_media",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaAdminOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid image or media ownership.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Media or doctor was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Media state conflicts with the requested operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Image is too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The media operation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Media storage is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/public-site/media/{media_id}/unpublish": {
+      "put": {
+        "tags": [
+          "admin-public-site-media"
+        ],
+        "summary": "Снять изображение с сайта",
+        "operationId": "admin_unpublish_public_site_media",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaAdminOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid image or media ownership.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Media or doctor was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Media state conflicts with the requested operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Image is too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The media operation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Media storage is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/admin/providers": {
@@ -73434,6 +73857,40 @@
         "type": "object",
         "title": "BillingSettingsUpdate"
       },
+      "Body_admin_upload_public_site_media": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "asset_kind": {
+            "type": "string",
+            "enum": [
+              "clinic_logo",
+              "doctor_portrait"
+            ],
+            "title": "Asset Kind"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "asset_kind"
+        ],
+        "title": "Body_admin_upload_public_site_media"
+      },
       "Body_analyze_skin_api_v1_ai_skin_analyze_post": {
         "properties": {
           "image": {
@@ -102562,6 +103019,17 @@
               }
             ],
             "title": "Email"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
           }
         },
         "additionalProperties": false,
@@ -102592,6 +103060,17 @@
               }
             ],
             "title": "Specialty"
+          },
+          "portrait_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portrait Url"
           }
         },
         "additionalProperties": false,
@@ -102602,6 +103081,107 @@
           "bio"
         ],
         "title": "PublicSiteDoctorOut"
+      },
+      "PublicSiteMediaAdminOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "asset_kind": {
+            "type": "string",
+            "enum": [
+              "clinic_logo",
+              "doctor_portrait"
+            ],
+            "title": "Asset Kind"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "byte_size": {
+            "type": "integer",
+            "title": "Byte Size"
+          },
+          "is_published": {
+            "type": "boolean",
+            "title": "Is Published"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "media_url": {
+            "type": "string",
+            "title": "Media Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "asset_kind",
+          "doctor_id",
+          "mime_type",
+          "byte_size",
+          "is_published",
+          "published_at",
+          "created_at",
+          "media_url"
+        ],
+        "title": "PublicSiteMediaAdminOut"
+      },
+      "PublicSiteMediaErrorDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "PublicSiteMediaErrorDetail"
+      },
+      "PublicSiteMediaErrorOut": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/PublicSiteMediaErrorDetail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicSiteMediaErrorOut"
       },
       "PublicSiteNotFoundDetail": {
         "properties": {

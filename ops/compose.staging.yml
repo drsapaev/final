@@ -75,6 +75,9 @@ services:
       AUTO_BACKUP_ENABLED: 0
       BACKUP_HOUR: 2
       BACKUP_MINUTE: 0
+      PUBLIC_SITE_MEDIA_ROOT: /data/public-site-media
+      PUBLIC_SITE_MEDIA_BACKUP_ROOT: /data/backups/public-site-media
+      PUBLIC_SITE_MEDIA_BACKUP_RETENTION_DAYS: 30
       WS_DEV_ALLOW: 0
       ENABLE_DEV_AUTH: false
       LOG_LEVEL: INFO

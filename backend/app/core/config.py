@@ -19,7 +19,9 @@ from pydantic_settings import (
 logger = logging.getLogger(__name__)
 
 # Resolve the backend root so config can load backend/.env consistently.
-_BACKEND_DIR = Path(__file__).resolve().parent.parent.parent  # app/core/config.py -> backend/
+_BACKEND_DIR = (
+    Path(__file__).resolve().parent.parent.parent
+)  # app/core/config.py -> backend/
 _DEFAULT_ENV_FILE = _BACKEND_DIR / ".env"
 _DEFAULT_DATABASE_URL = ""
 
@@ -60,7 +62,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(
         ...,
         min_length=32,
-        description="JWT secret key - MUST be set via environment variable in production (min 32 chars)"
+        description="JWT secret key - MUST be set via environment variable in production (min 32 chars)",
     )  # ⚠️ REQUIRED: No default value for security
     ALGORITHM: str = "HS256"
     AUTH_SECRET: str | None = Field(
@@ -68,11 +70,13 @@ class Settings(BaseSettings):
         description="Legacy JWT helper secret. Defaults to SECRET_KEY when unset.",
     )
     AUTH_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # 30 minutes — use refresh tokens for longer sessions
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = (
+        30  # 30 minutes — use refresh tokens for longer sessions
+    )
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     REFRESH_TOKEN_SECRET: str | None = Field(
         default=None,
-        description="Secret key for JWT refresh token. Defaults to SECRET_KEY when unset."
+        description="Secret key for JWT refresh token. Defaults to SECRET_KEY when unset.",
     )
     TESTING: bool = False
     ENABLE_FALLBACK_AUTH: bool = Field(
@@ -118,8 +122,11 @@ class Settings(BaseSettings):
             _CompatibleCorsDotEnvSettingsSource(settings_cls),
             file_secret_settings,
         )
+
     CORS_DISABLE: bool = False
-    CORS_ALLOW_ALL: bool = Field(default=False, description="Allow all CORS origins (dev only)")
+    CORS_ALLOW_ALL: bool = Field(
+        default=False, description="Allow all CORS origins (dev only)"
+    )
 
     # --- Frontend URL для QR кодов и ссылок ---
     # Для локальной сети (WiFi): оставьте значение по умолчанию или локальный IP
@@ -223,53 +230,85 @@ class Settings(BaseSettings):
     # Сгенерируйте ключ: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     MESSAGE_ENCRYPTION_KEY: str | None = Field(
         default=None,
-        description="Fernet encryption key for message at-rest encryption. Required in production."
+        description="Fernet encryption key for message at-rest encryption. Required in production.",
     )
 
     # --- Backup Settings ---
-    AUTO_BACKUP_ENABLED: bool = Field(default=False, description="Enable automated daily backups")
-    BACKUP_RETENTION_DAYS: int = Field(default=30, ge=1, le=365, description="Number of days to retain backups")
+    AUTO_BACKUP_ENABLED: bool = Field(
+        default=False, description="Enable automated daily backups"
+    )
+    BACKUP_RETENTION_DAYS: int = Field(
+        default=30, ge=1, le=365, description="Number of days to retain backups"
+    )
+
+    # --- Public website media ---
+    # Explicitly configured only. Leaving both roots unset keeps uploads
+    # unavailable until deployment has provisioned the dedicated folders.
+    PUBLIC_SITE_MEDIA_ROOT: Path | None = Field(
+        default=None,
+        description="Dedicated storage root for explicitly published public-site images.",
+    )
+    PUBLIC_SITE_MEDIA_BACKUP_ROOT: Path | None = Field(
+        default=None,
+        description="Separate backup root for public-site image versions.",
+    )
+    PUBLIC_SITE_MEDIA_BACKUP_RETENTION_DAYS: int = Field(
+        default=30,
+        ge=1,
+        le=365,
+        description="Retention period for public-site media version copies.",
+    )
+    PUBLIC_SITE_MEDIA_MAX_UPLOAD_BYTES: int = Field(
+        default=5 * 1024 * 1024,
+        ge=1024,
+        le=20 * 1024 * 1024,
+        description="Maximum accepted source and normalized image size.",
+    )
+    PUBLIC_SITE_MEDIA_MAX_PIXELS: int = Field(
+        default=25_000_000,
+        ge=1_000_000,
+        le=100_000_000,
+        description="Maximum decoded pixel count for public-site uploads.",
+    )
 
     # --- Clinical Security Maturity ---
     PHI_RETENTION_DAYS: int = Field(
         default=365 * 7,
         ge=30,
         le=365 * 30,
-        description="Retention period for PHI-bearing records (days)"
+        description="Retention period for PHI-bearing records (days)",
     )
     BREAK_GLASS_ENABLED: bool = Field(
-        default=False,
-        description="Enable emergency break-glass access mode"
+        default=False, description="Enable emergency break-glass access mode"
     )
     BREAK_GLASS_MAX_MINUTES: int = Field(
         default=60,
         ge=1,
         le=720,
-        description="Maximum break-glass session duration in minutes"
+        description="Maximum break-glass session duration in minutes",
     )
     BREAK_GLASS_REASON_MIN_LENGTH: int = Field(
         default=20,
         ge=5,
         le=500,
-        description="Minimum justification length for break-glass reason"
+        description="Minimum justification length for break-glass reason",
     )
     BREAK_GLASS_REQUIRE_TICKET: bool = Field(
         default=True,
-        description="Require incident/ticket reference for break-glass sessions"
+        description="Require incident/ticket reference for break-glass sessions",
     )
     BREAK_GLASS_ALLOWED_ROLES: str = Field(
         default="Admin,ChiefDoctor",
-        description="Comma-separated list of roles allowed to use break-glass"
+        description="Comma-separated list of roles allowed to use break-glass",
     )
 
     # --- Tenant Scope Enforcement (multi-clinic rollout) ---
     TENANT_SCOPE_ENFORCE_WRITES: bool = Field(
-        default=False,
-        description="Require branch scope for high-risk write endpoints"
+        default=False, description="Require branch scope for high-risk write endpoints"
     )
     TENANT_SCOPE_WRITE_PREFIXES: str = Field(
         default="/api/v1/billing,/api/v1/queue,/api/v1/emr,/api/v1/v2/emr,/api/v1/clinic/equipment",
-        description="Comma-separated URL prefixes protected by tenant write-scope enforcement"
+        description="Comma-separated URL prefixes protected by tenant write-scope enforcement",
     )
 
     # --- MCP Settings ---
@@ -287,13 +326,13 @@ class Settings(BaseSettings):
         default=180,  # секунды - ОБЯЗАТЕЛЬНО >= AI_PROVIDER_TIMEOUT!
         ge=30,
         le=600,
-        description="Global MCP orchestrator timeout. Must be >= AI_PROVIDER_TIMEOUT!"
+        description="Global MCP orchestrator timeout. Must be >= AI_PROVIDER_TIMEOUT!",
     )
     AI_PROVIDER_TIMEOUT: int = Field(
         default=180,  # секунды - таймаут HTTP-запросов к AI провайдерам
         ge=30,
         le=600,
-        description="HTTP timeout for AI provider API calls (DeepSeek, OpenAI, Gemini)"
+        description="HTTP timeout for AI provider API calls (DeepSeek, OpenAI, Gemini)",
     )
 
     MCP_HEALTH_CHECK_INTERVAL: int = 60  # seconds
@@ -303,40 +342,37 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None
     DEEPSEEK_API_KEY: str | None = None
-    XAI_API_KEY: str | None = Field(default=None, description="xAI (Grok) API key for AI features")
+    XAI_API_KEY: str | None = Field(
+        default=None, description="xAI (Grok) API key for AI features"
+    )
 
     # --- AI Security & Encryption ---
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     ENCRYPTION_KEY: str | None = Field(
         default=None,
-        description="Fernet encryption key for encrypting API keys in database"
+        description="Fernet encryption key for encrypting API keys in database",
     )
 
     # --- AI Rate Limiting ---
     AI_RATE_LIMIT_PER_USER_HOUR: int = Field(
-        default=60,
-        ge=1,
-        le=1000,
-        description="Max AI requests per user per hour"
+        default=60, ge=1, le=1000, description="Max AI requests per user per hour"
     )
     AI_RATE_LIMIT_PER_PROVIDER_MINUTE: int = Field(
         default=100,
         ge=1,
         le=500,
-        description="Max requests to each AI provider per minute (protects against provider rate limits)"
+        description="Max requests to each AI provider per minute (protects against provider rate limits)",
     )
 
     # --- AI Cost Control ---
     AI_MONTHLY_BUDGET_USD: float = Field(
-        default=500.0,
-        ge=0.0,
-        description="Monthly budget for AI API calls in USD"
+        default=500.0, ge=0.0, description="Monthly budget for AI API calls in USD"
     )
     AI_BUDGET_ALERT_THRESHOLD_PCT: int = Field(
         default=80,
         ge=0,
         le=100,
-        description="Alert when budget usage exceeds this percentage"
+        description="Alert when budget usage exceeds this percentage",
     )
 
     # --- AI Caching ---
@@ -344,11 +380,10 @@ class Settings(BaseSettings):
         default=24,
         ge=1,
         le=168,  # Max 1 week
-        description="Time-to-live for AI response cache in hours"
+        description="Time-to-live for AI response cache in hours",
     )
     AI_CACHE_ENABLED: bool = Field(
-        default=True,
-        description="Enable caching of AI responses"
+        default=True, description="Enable caching of AI responses"
     )
 
     # --- Printing / PDF ---
@@ -376,7 +411,9 @@ class Settings(BaseSettings):
     # authenticates with a service account (GOOGLE_APPLICATION_CREDENTIALS),
     # and FCM topics/iid are not used (topic endpoints removed in PR-5).
     FCM_PROJECT_ID: str | None = Field(default=None, description="FCM Project ID")
-    FCM_ENABLED: bool = Field(default=False, description="Enable FCM push notifications")
+    FCM_ENABLED: bool = Field(
+        default=False, description="Enable FCM push notifications"
+    )
 
     # --- Email Settings ---
     SMTP_SERVER: str | None = None
@@ -384,11 +421,18 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str | None = None
     SMTP_PASSWORD: str | None = None
     SMTP_USE_TLS: bool = True
-    SMTP_FROM: str | None = Field(default=None, description="Envelope/From address for outgoing mail; falls back to SMTP_USERNAME when unset")
+    SMTP_FROM: str | None = Field(
+        default=None,
+        description="Envelope/From address for outgoing mail; falls back to SMTP_USERNAME when unset",
+    )
 
     # --- Telegram Settings ---
-    TELEGRAM_BOT_TOKEN: str | None = Field(default=None, description="Telegram Bot API token for notifications")
-    TELEGRAM_CHAT_ID: str | None = Field(default=None, description="Default Telegram chat ID for system alerts")
+    TELEGRAM_BOT_TOKEN: str | None = Field(
+        default=None, description="Telegram Bot API token for notifications"
+    )
+    TELEGRAM_CHAT_ID: str | None = Field(
+        default=None, description="Default Telegram chat ID for system alerts"
+    )
 
     # --- Cloud Printing Settings ---
     # Microsoft Universal Print
@@ -420,6 +464,15 @@ class Settings(BaseSettings):
             return None
         return v
 
+    @field_validator(
+        "PUBLIC_SITE_MEDIA_ROOT", "PUBLIC_SITE_MEDIA_BACKUP_ROOT", mode="before"
+    )
+    @classmethod
+    def _empty_media_path_to_none(cls, value):  # type: ignore[no-untyped-def]
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def _parse_cors_origins(cls, value):  # type: ignore[no-untyped-def]
@@ -428,10 +481,15 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             if value.strip().startswith("["):
                 origins = json.loads(value)
-                logger.info("[FIX:CORS] Parsed %d CORS origins from JSON env string", len(origins))
+                logger.info(
+                    "[FIX:CORS] Parsed %d CORS origins from JSON env string",
+                    len(origins),
+                )
                 return origins
             origins = [origin.strip() for origin in value.split(",") if origin.strip()]
-            logger.info("[FIX:CORS] Parsed %d CORS origins from env string", len(origins))
+            logger.info(
+                "[FIX:CORS] Parsed %d CORS origins from env string", len(origins)
+            )
             return origins
         return value
 
@@ -454,6 +512,45 @@ class Settings(BaseSettings):
                 "TESTING=1 is forbidden when ENV=prod/production: "
                 "SecurityMiddleware would be silently disabled."
             )
+        if (self.PUBLIC_SITE_MEDIA_ROOT is None) != (
+            self.PUBLIC_SITE_MEDIA_BACKUP_ROOT is None
+        ):
+            raise ValueError(
+                "PUBLIC_SITE_MEDIA_ROOT and PUBLIC_SITE_MEDIA_BACKUP_ROOT "
+                "must be configured together."
+            )
+        if self.PUBLIC_SITE_MEDIA_ROOT is not None:
+            if (
+                not self.PUBLIC_SITE_MEDIA_ROOT.is_absolute()
+                or not self.PUBLIC_SITE_MEDIA_BACKUP_ROOT.is_absolute()
+            ):
+                raise ValueError(
+                    "Public-site media storage roots must be absolute paths."
+                )
+            media = os.path.normcase(
+                os.path.abspath(os.fspath(self.PUBLIC_SITE_MEDIA_ROOT))
+            )
+            backup = os.path.normcase(
+                os.path.abspath(os.fspath(self.PUBLIC_SITE_MEDIA_BACKUP_ROOT))
+            )
+            try:
+                common = os.path.commonpath((media, backup))
+            except ValueError as exc:
+                raise ValueError(
+                    "Public-site media storage roots must be on a compatible path."
+                ) from exc
+            if common in (media, backup):
+                raise ValueError(
+                    "Public-site media and backup roots must be separate folders."
+                )
+            if (self.ENV or "").strip().lower() in (
+                "prod",
+                "production",
+            ) and not self.AUTO_BACKUP_ENABLED:
+                raise ValueError(
+                    "AUTO_BACKUP_ENABLED must be enabled when public-site media "
+                    "backup retention is configured in production."
+                )
         return self
 
     @property
@@ -517,15 +614,21 @@ def get_settings() -> Settings:
                     persistent_key = secret_key_file.read_text(encoding="utf-8").strip()
                     if len(persistent_key) >= 32:
                         s.SECRET_KEY = persistent_key
-                        logger.info("Loaded persistent SECRET_KEY from .secret_key file (dev mode)")
+                        logger.info(
+                            "Loaded persistent SECRET_KEY from .secret_key file (dev mode)"
+                        )
                     else:
                         # Invalid key in file, regenerate
                         persistent_key = secrets.token_urlsafe(32)
                         secret_key_file.write_text(persistent_key, encoding="utf-8")
                         s.SECRET_KEY = persistent_key
-                        logger.warning("Regenerated SECRET_KEY in .secret_key file (was too short)")
+                        logger.warning(
+                            "Regenerated SECRET_KEY in .secret_key file (was too short)"
+                        )
                 except Exception as e:
-                    logger.warning(f"Error reading .secret_key file: {e}, generating new key")
+                    logger.warning(
+                        f"Error reading .secret_key file: {e}, generating new key"
+                    )
                     persistent_key = secrets.token_urlsafe(32)
                     try:
                         secret_key_file.write_text(persistent_key, encoding="utf-8")
@@ -546,7 +649,9 @@ def get_settings() -> Settings:
                 try:
                     secret_key_file.write_text(persistent_key, encoding="utf-8")
                     s.SECRET_KEY = persistent_key
-                    logger.info("Generated and saved persistent SECRET_KEY to .secret_key file (dev mode)")
+                    logger.info(
+                        "Generated and saved persistent SECRET_KEY to .secret_key file (dev mode)"
+                    )
                     warnings.warn(
                         "Generated SECRET_KEY for development. Set SECRET_KEY env var for production!",
                         UserWarning,
@@ -577,7 +682,9 @@ def get_settings() -> Settings:
         )
 
     if os.getenv("CORS_ORIGINS") and not os.getenv("BACKEND_CORS_ORIGINS"):
-        logger.info("[FIX:CORS] Using legacy CORS_ORIGINS env variable for backend CORS config")
+        logger.info(
+            "[FIX:CORS] Using legacy CORS_ORIGINS env variable for backend CORS config"
+        )
 
     # ✅ SECURITY: Production-specific validations
     if env in ("prod", "production"):
@@ -597,7 +704,7 @@ def get_settings() -> Settings:
         if "change_me" in s.SECRET_KEY.lower() or s.SECRET_KEY == _DEFAULT_SECRET_KEY:
             errors.append(
                 "SECRET_KEY must be set to a unique, secure value in production. "
-                "Generate with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+                'Generate with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
             )
 
         # 3. DATABASE_URL должен быть явно настроен и использовать PostgreSQL
@@ -613,9 +720,9 @@ def get_settings() -> Settings:
 
         # 4. FRONTEND_URL должен быть HTTPS или localhost
         if s.FRONTEND_URL and not (
-            s.FRONTEND_URL.startswith("https://") or
-            "localhost" in s.FRONTEND_URL or
-            "127.0.0.1" in s.FRONTEND_URL
+            s.FRONTEND_URL.startswith("https://")
+            or "localhost" in s.FRONTEND_URL
+            or "127.0.0.1" in s.FRONTEND_URL
         ):
             warnings_list.append(
                 f"FRONTEND_URL ({s.FRONTEND_URL}) should use HTTPS in production."
@@ -623,7 +730,11 @@ def get_settings() -> Settings:
 
         # 5. BACKEND_CORS_ORIGINS должен содержать только HTTPS origins
         for origin in s.BACKEND_CORS_ORIGINS:
-            if not origin.startswith("https://") and "localhost" not in origin and "127.0.0.1" not in origin:
+            if (
+                not origin.startswith("https://")
+                and "localhost" not in origin
+                and "127.0.0.1" not in origin
+            ):
                 warnings_list.append(
                     f"CORS origin '{origin}' should use HTTPS in production."
                 )
@@ -653,7 +764,11 @@ def get_settings() -> Settings:
             )
 
         # NOTIF-REAUDIT-28 P0-4: SMS provider check — skipped in test environments.
-        if not os.environ.get("TESTING") and not s.ESKIZ_EMAIL and not s.PLAYMOBILE_API_KEY:
+        if (
+            not os.environ.get("TESTING")
+            and not s.ESKIZ_EMAIL
+            and not s.PLAYMOBILE_API_KEY
+        ):
             errors.append(
                 "At least one real SMS provider must be configured in production "
                 "(ESKIZ_EMAIL or PLAYMOBILE_API_KEY). MockSMSProvider is not allowed."
@@ -665,7 +780,9 @@ def get_settings() -> Settings:
 
         # === RAISE ERRORS ===
         if errors:
-            error_msg = "Production configuration errors:\n" + "\n".join(f"  - {e}" for e in errors)
+            error_msg = "Production configuration errors:\n" + "\n".join(
+                f"  - {e}" for e in errors
+            )
             raise ValueError(error_msg)
 
     return s

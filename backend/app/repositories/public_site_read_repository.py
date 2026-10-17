@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.clinic import ClinicSettings, Doctor
 from app.models.medical_specialty import MedicalSpecialty
+from app.models.public_site_media import PublicSiteMedia
 from app.models.service import Service
 from app.models.user import User
 
@@ -74,6 +75,36 @@ class PublicSiteReadRepository:
             .where(*self._public_doctor_filters(), Doctor.slug == slug)
         )
         return self.db.scalars(statement).first()
+
+    def get_public_doctor_by_id(self, doctor_id: int) -> Doctor | None:
+        statement = (
+            select(Doctor)
+            .join(User, Doctor.user_id == User.id)
+            .options(joinedload(Doctor.user))
+            .where(*self._public_doctor_filters(), Doctor.id == doctor_id)
+        )
+        return self.db.scalars(statement).first()
+
+    def get_published_clinic_logo(self) -> PublicSiteMedia | None:
+        statement = select(PublicSiteMedia).where(
+            PublicSiteMedia.asset_kind == "clinic_logo",
+            PublicSiteMedia.is_published.is_(True),
+        )
+        return self.db.scalars(statement).first()
+
+    def list_published_doctor_media_keys(self, doctor_ids: set[int]) -> dict[int, str]:
+        if not doctor_ids:
+            return {}
+        statement = select(PublicSiteMedia).where(
+            PublicSiteMedia.asset_kind == "doctor_portrait",
+            PublicSiteMedia.doctor_id.in_(doctor_ids),
+            PublicSiteMedia.is_published.is_(True),
+        )
+        return {
+            row.doctor_id: row.storage_key
+            for row in self.db.scalars(statement).all()
+            if row.doctor_id is not None
+        }
 
     def list_specialties_by_code(self, codes: set[str]) -> dict[str, MedicalSpecialty]:
         if not codes:

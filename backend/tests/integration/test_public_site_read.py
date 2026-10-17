@@ -145,6 +145,7 @@ def test_public_catalog_filters_and_allowlists(client, db_session):
         "address": "SYNTHETIC address",
         "phone": "SYNTHETIC clinic phone",
         "email": "synthetic@example.test",
+        "logo_url": None,
     }
 
     response = client.get(
@@ -316,7 +317,14 @@ def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
     assert uzbek.status_code == 200, uzbek.text
     uzbek_body = uzbek.json()
     assert uzbek_body["specialty"] is None
-    assert set(uzbek_body) == {"slug", "name", "bio", "specialty"}
+    assert uzbek_body["portrait_url"] is None
+    assert set(uzbek_body) == {
+        "slug",
+        "name",
+        "bio",
+        "specialty",
+        "portrait_url",
+    }
     assert "synthetic-public-specialty" not in uzbek.text
     assert "cabinet" not in uzbek.text
     assert "price_default" not in uzbek.text
@@ -391,6 +399,7 @@ def test_public_site_openapi_contract_is_allowlisted(client):
         "/api/v1/public-site/categories": "public_site_list_categories",
         "/api/v1/public-site/doctors": "public_site_list_doctors",
         "/api/v1/public-site/doctors/{slug}": "public_site_get_doctor",
+        "/api/v1/public-site/media/{storage_key}": "public_site_get_media",
     }
     for path, operation_id in expected_paths.items():
         operation = paths[path]["get"]
@@ -407,6 +416,7 @@ def test_public_site_openapi_contract_is_allowlisted(client):
         "address",
         "phone",
         "email",
+        "logo_url",
     }
     assert set(components["PublicSiteServiceOut"]["properties"]) == {
         "slug",
@@ -421,5 +431,6 @@ def test_public_site_openapi_contract_is_allowlisted(client):
         "name",
         "bio",
         "specialty",
+        "portrait_url",
     }
     assert set(components["PublicSiteCategoryOut"]["properties"]) == {"name"}
