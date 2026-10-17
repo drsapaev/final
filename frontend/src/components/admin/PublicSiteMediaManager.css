@@ -187,6 +187,10 @@
   background: var(--mac-bg-primary, transparent);
 }
 
+.public-site-media__item--without-preview {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .public-site-media__published-image {
   width: 100%;
   height: 110px;

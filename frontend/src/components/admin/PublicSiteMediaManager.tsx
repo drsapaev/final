@@ -26,6 +26,8 @@ const FILE_ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
 const STORAGE_UNAVAILABLE_KEY = 'publicSiteMedia.storageUnavailable';
 const DOCTOR_PAGE_SIZE = 25;
 
+type DoctorSelectOption = PublicSiteDoctorOption & { statusUnknown?: boolean };
+
 function upsertMedia(current: PublicSiteMedia[], updated: PublicSiteMedia): PublicSiteMedia[] {
   const sameOwner = (item: PublicSiteMedia) =>
     item.asset_kind === updated.asset_kind && item.doctor_id === updated.doctor_id;
@@ -128,8 +130,13 @@ export default function PublicSiteMediaManager() {
     .filter((item) => item.asset_kind === 'doctor_portrait' && item.doctor_id !== null)
     .map((item) => item.doctor_id!))]
     .filter((id) => !activeDoctorIds.has(id))
-    .map((id) => ({ id, displayName: `#${id}`, active: false }));
-  const doctorOptions = [...doctors, ...inactiveMediaDoctorOptions];
+    .map((id): DoctorSelectOption => ({
+      id,
+      displayName: `#${id}`,
+      active: false,
+      statusUnknown: doctorLoadFailed || hasMoreDoctors,
+    }));
+  const doctorOptions: DoctorSelectOption[] = [...doctors, ...inactiveMediaDoctorOptions];
   const doctorDisplayNameCounts = doctorOptions.reduce((counts, doctor) => {
     const normalizedName = doctor.displayName.trim().toLocaleLowerCase();
     counts.set(normalizedName, (counts.get(normalizedName) ?? 0) + 1);
@@ -429,9 +436,11 @@ export default function PublicSiteMediaManager() {
                     <option value="">{t('publicSiteMedia.selectDoctor')}</option>
                     {doctorOptions.map((doctor) => (
                       <option key={doctor.id} value={doctor.id}>
-                        {doctor.active
-                          ? doctorOptionLabels.get(doctor.id)
-                          : `${doctorOptionLabels.get(doctor.id)} · ${t('publicSiteMedia.inactiveDoctor')}`}
+                        {doctor.statusUnknown
+                          ? `${doctorOptionLabels.get(doctor.id)} · ${t('publicSiteMedia.doctorStatusUnverified')}`
+                          : doctor.active
+                            ? doctorOptionLabels.get(doctor.id)
+                            : `${doctorOptionLabels.get(doctor.id)} · ${t('publicSiteMedia.inactiveDoctor')}`}
                       </option>
                     ))}
                   </select>
@@ -439,7 +448,8 @@ export default function PublicSiteMediaManager() {
                   {doctorPageErrorKey && <span className="public-site-media__inline-error">{t(doctorPageErrorKey)}</span>}
                 {!doctorLoadFailed && doctorOptions.length === 0 && <span className="public-site-media__hint">{t('publicSiteMedia.noDoctors')}</span>}
                   {doctorId && !doctorLoadFailed && !selectedDoctor && <span className="public-site-media__inline-error">{t('publicSiteMedia.doctorUnavailable')}</span>}
-                  {selectedDoctor?.active === false && <span className="public-site-media__inline-error">{t('publicSiteMedia.inactiveDoctorUpload')}</span>}
+                  {selectedDoctor?.statusUnknown && <span className="public-site-media__hint">{t('publicSiteMedia.doctorStatusUnverified')}</span>}
+                  {selectedDoctor?.active === false && !selectedDoctor.statusUnknown && <span className="public-site-media__inline-error">{t('publicSiteMedia.inactiveDoctorUpload')}</span>}
                   {assetKind === 'doctor_portrait' && selectedDoctor && isLoadingDoctorWebsiteContent && (
                     <span className="public-site-media__hint" role="status">{t('publicSiteMedia.loadingDoctorStatus')}</span>
                   )}
@@ -517,6 +527,7 @@ export default function PublicSiteMediaManager() {
                 const itemVisibilityUnknown = assetKind === 'doctor_portrait'
                   && !itemDoctorEligible
                   && (!itemDoctorIsSelected || !selectedDoctorPublicStatusKnown || doctorWebsiteContentErrorKey !== null);
+                const showPublishedPreview = item.is_published && itemDoctorEligible;
                 const publishedStatusKey = item.is_published
                   ? itemDoctorEligible
                     ? 'publicSiteMedia.published'
@@ -527,8 +538,8 @@ export default function PublicSiteMediaManager() {
 
                 return (
                   <li key={item.id}>
-                    <article className="public-site-media__item">
-                      {item.is_published && itemDoctorEligible && (
+                    <article className={`public-site-media__item${showPublishedPreview ? '' : ' public-site-media__item--without-preview'}`}>
+                      {showPublishedPreview && (
                         <img
                           className="public-site-media__published-image"
                           src={buildApiUrl(item.media_url)}

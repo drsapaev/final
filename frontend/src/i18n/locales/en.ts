@@ -79,6 +79,7 @@ const en = {
     noDoctors: 'The doctor list is empty.',
     doctorUnavailable: 'This doctor is no longer available. Refresh the list and select a doctor again.',
     inactiveDoctor: 'inactive',
+    doctorStatusUnverified: 'status not verified',
     inactiveDoctorUpload: 'This doctor is inactive. You can remove an existing image, but uploading or publishing a portrait is disabled.',
     chooseFile: 'Choose an image',
     supportedFormats: 'JPG, PNG, and WebP are supported.',

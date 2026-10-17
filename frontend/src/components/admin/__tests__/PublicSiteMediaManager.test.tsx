@@ -176,6 +176,7 @@ describe('PublicSiteMediaManager', () => {
 
     expect(await screen.findByText('publicSiteMedia.publishedNotVisible')).toBeInTheDocument();
     expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('.public-site-media__item--without-preview')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'publicSiteMedia.unpublish' })).toBeEnabled();
   });
 
@@ -210,6 +211,33 @@ describe('PublicSiteMediaManager', () => {
     fireEvent.click(loadMore);
     await waitFor(() => expect(mocks.listDoctors).toHaveBeenLastCalledWith(25, 25));
     expect(await screen.findByRole('option', { name: 'SYNTHETIC Doctor 26' })).toBeInTheDocument();
+  });
+
+  it('marks owners absent from an incomplete doctor list as unverified, not inactive', async () => {
+    mocks.listDoctors.mockResolvedValueOnce(
+      Array.from({ length: 25 }, (_, index) => ({
+        ...doctor,
+        id: index + 1,
+        displayName: `SYNTHETIC Doctor ${index + 1}`,
+      })),
+    );
+    mocks.listDoctors.mockResolvedValueOnce([{ ...doctor, id: 42, displayName: 'SYNTHETIC Doctor 42' }]);
+    mocks.listMedia.mockResolvedValue([{ ...draftMedia, is_published: true }]);
+    render(<PublicSiteMediaManager />);
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.assetKind'), { target: { value: 'doctor_portrait' } });
+
+    const doctorOption = await screen.findByRole('option', {
+      name: '#42 · publicSiteMedia.doctorStatusUnverified',
+    });
+    expect(doctorOption).toBeInTheDocument();
+    expect(doctorOption).not.toHaveTextContent('publicSiteMedia.inactiveDoctor');
+
+    fireEvent.change(screen.getByLabelText('publicSiteMedia.doctor'), { target: { value: '42' } });
+    expect(await screen.findByText('publicSiteMedia.doctorStatusUnverified')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'publicSiteMedia.loadMoreDoctors' }));
+    expect(await screen.findByRole('option', { name: 'SYNTHETIC Doctor 42' })).toBeInTheDocument();
+    expect(screen.queryByText('publicSiteMedia.doctorStatusUnverified')).toBeNull();
+    expect(screen.getByRole('button', { name: 'publicSiteMedia.unpublish' })).toBeEnabled();
   });
 
   it('disambiguates duplicate doctor names across loaded pages', async () => {

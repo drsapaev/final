@@ -116,6 +116,7 @@ const ru = {
     noDoctors: 'Список врачей пуст.',
     doctorUnavailable: 'Выбранный врач больше недоступен. Обновите список и выберите врача снова.',
     inactiveDoctor: 'неактивен',
+    doctorStatusUnverified: 'статус не проверен',
     inactiveDoctorUpload: 'Врач неактивен. Можно снять ранее опубликованное изображение, но загрузка и публикация портрета недоступны.',
     chooseFile: 'Выбрать изображение',
     supportedFormats: 'Поддерживаются JPG, PNG и WebP.',

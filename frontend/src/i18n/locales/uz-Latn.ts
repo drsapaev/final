@@ -79,6 +79,7 @@ const uzLatn = {
     noDoctors: 'Shifokorlar ro‘yxati bo‘sh.',
     doctorUnavailable: 'Tanlangan shifokor endi mavjud emas. Ro‘yxatni yangilab, shifokorni qayta tanlang.',
     inactiveDoctor: 'faol emas',
+    doctorStatusUnverified: 'holati tekshirilmagan',
     inactiveDoctorUpload: 'Shifokor faol emas. Avval chop etilgan rasmni saytdan olish mumkin, ammo yangi portretni yuklab yoki chop etib bo‘lmaydi.',
     chooseFile: 'Rasm tanlash',
     supportedFormats: 'JPG, PNG va WebP formatlari qo‘llab-quvvatlanadi.',
