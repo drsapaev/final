@@ -727,6 +727,85 @@ def test_hidden_exact_profile_suppresses_published_alias_in_catalog_and_join(
 
 
 @pytest.mark.queue
+def test_public_alias_requires_every_doctor_specialty_to_resolve(pg_client, pg_session):
+    """A public card must not survive one shadowed owner-specialty alias."""
+    from app.models.queue_profile import QueueProfile
+    from app.services.queue_service import QueueValidationError, queue_service
+
+    suffix = uuid.uuid4().hex[:8]
+    alias_key = f"rq09aliasmulti{suffix}"
+    hidden_specialty = "Cardiologist"
+    other_specialty = "Кардиология"
+    hidden_exact_key = "".join(
+        char.upper() if int(suffix[index % len(suffix)], 16) % 2 else char.lower()
+        for index, char in enumerate(hidden_specialty)
+    )
+    assert (
+        pg_session.query(QueueProfile).filter_by(key=hidden_exact_key).first() is None
+    ), "the case-sensitive synthetic exact key must be absent before this test"
+
+    _user_a, doctor_a = _doctor_with_user(
+        pg_session,
+        specialty=hidden_specialty,
+        label=f"ma{suffix}",
+        role="Doctor",
+    )
+    _user_b, doctor_b = _doctor_with_user(
+        pg_session,
+        specialty=other_specialty,
+        label=f"mb{suffix}",
+        role="Doctor",
+    )
+    hidden_exact = QueueProfile(
+        key=hidden_exact_key,
+        title="RQ-09 Synthetic hidden specialty alias",
+        queue_tags=[hidden_specialty],
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    published_alias = QueueProfile(
+        key=alias_key,
+        title="RQ-09 Synthetic multi-alias direction",
+        queue_tags=[hidden_specialty, other_specialty],
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    token_value = f"rq09-token-multi-alias-{suffix}"
+
+    try:
+        pg_session.add_all([hidden_exact, published_alias])
+        pg_session.commit()
+        token = _clinic_wide_token(pg_session, token_value)
+
+        public_catalog = pg_client.get("/api/v1/queues/profiles/public")
+        assert public_catalog.status_code == 200, public_catalog.text
+        assert all(
+            item["specialty"] != alias_key
+            for item in public_catalog.json()["specialists"]
+        )
+
+        selectable_ids = {item["id"] for item in _selectable(pg_client, token.token)}
+        assert doctor_a.id not in selectable_ids
+        assert doctor_b.id not in selectable_ids
+
+        with pytest.raises(QueueValidationError):
+            queue_service.join_queue_with_token(
+                pg_session,
+                token_str=token.token,
+                patient_name=f"RQ-09 Synthetic alias conflict {suffix}",
+                phone=f"+99890009{suffix[:4]}88",
+                specialist_id_override=published_alias.id,
+                specialist_type="profile",
+            )
+    finally:
+        pg_session.rollback()
+        pg_session.query(QueueProfile).filter_by(key=hidden_exact_key).delete(
+            synchronize_session=False
+        )
+        pg_session.commit()
+
+
+@pytest.mark.queue
 def test_mixed_direction_profile_is_not_publicly_selectable_or_admissible(
     pg_client, pg_session
 ):

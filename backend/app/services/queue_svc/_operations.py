@@ -771,7 +771,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 ]
                 if not doctor_targets:
                     continue
-                selected_for_doctor = False
+                # Admission checks every owner specialty, so the catalog must reject
+                # the card when even one alias resolves to another profile.
+                selected_for_all_doctors = bool(doctor_targets)
                 for specialty in sorted(doctor_targets):
                     doctor_candidates = cls._get_qr_profile_candidates_for_tag(
                         db,
@@ -779,7 +781,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                         profiles=candidate_profiles,
                         prefer_exact_key=True,
                     )
-                    if any(
+                    selected_for_doctor = any(
                         getattr(candidate, "key", None) == profile_key
                         for candidate in doctor_candidates
                     ) and cls._qr_profile_candidates_are_unambiguous(
@@ -788,10 +790,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                         availability_by_profile,
                         day=day,
                         owner_scope_by_profile=owner_scope_by_profile,
-                    ):
-                        selected_for_doctor = True
+                    )
+                    if not selected_for_doctor:
+                        selected_for_all_doctors = False
                         break
-                if not selected_for_doctor:
+                if not selected_for_all_doctors:
                     continue
 
             bookable.append(profile)
