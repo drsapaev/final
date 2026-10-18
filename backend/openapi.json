@@ -2936,7 +2936,7 @@
           "services"
         ],
         "summary": "Список врачей (временный)",
-        "description": "Delegate temporary doctor listing to the service layer.",
+        "description": "Return a bounded Admin doctor-option page with a safe display name.",
         "operationId": "list_doctors_temp_api_v1_services_admin_doctors_get",
         "security": [
           {
@@ -33264,6 +33264,122 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/public-site/media/{media_id}/preview": {
+      "get": {
+        "tags": [
+          "admin-public-site-media"
+        ],
+        "summary": "Просмотреть черновик или опубликованное изображение",
+        "operationId": "admin_preview_public_site_media",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified JPEG, PNG, or WebP image for Admin preview.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Media or doctor was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Media storage is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/public-site/media/storage-check": {
+      "post": {
+        "tags": [
+          "admin-public-site-media"
+        ],
+        "summary": "Проверить доступность хранилищ публичных изображений",
+        "operationId": "admin_check_public_site_media_storage",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaStorageReadyOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Media storage is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteMediaErrorOut"
                 }
               }
             }
@@ -103186,6 +103302,21 @@
         ],
         "title": "PublicSiteMediaErrorOut"
       },
+      "PublicSiteMediaStorageReadyOut": {
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "const": true,
+            "title": "Ready"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ready"
+        ],
+        "title": "PublicSiteMediaStorageReadyOut"
+      },
       "PublicSiteNotFoundDetail": {
         "properties": {
           "code": {
@@ -120491,6 +120622,17 @@
             "type": "boolean",
             "title": "Active",
             "default": true
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
           }
         },
         "type": "object",

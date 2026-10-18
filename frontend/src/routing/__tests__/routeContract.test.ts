@@ -295,6 +295,26 @@ describe('NURSE-V2 N2-5 nurse tablet home', () => {
     expect(hasRouteAccess(nurse, '/lab')).toBe(false);
   });
 
+  it('exposes public-site media management only to Admin through the admin shell', () => {
+    const route = getEffectiveRouteByPath('/admin/public-site/media');
+    expect(route).toMatchObject({
+      id: 'admin-public-site-media',
+      group: 'admin',
+      component: 'PublicSiteMediaManager',
+      auth: 'role-scoped',
+      roles: ['Admin'],
+      shell: 'app-shell',
+    });
+    expect(isRouteAccessibleToProfile(route, { role: 'Admin' })).toBe(true);
+    expect(isRouteAccessibleToProfile(route, { role: 'Doctor' })).toBe(false);
+    expect(isRouteAccessibleToProfile(route, { role: 'Registrar' })).toBe(false);
+    const adminItems = getAdminNavSections({ role: 'Admin' }).flatMap((section) => section.items);
+    expect(adminItems.find((item) => item.id === 'admin-public-site-media')).toMatchObject({
+      to: '/admin/public-site/media',
+      labelKey: 'nav.public_site_media',
+    });
+  });
+
   it('grants /nurse to Nurse and ONLY Nurse (N2-5 §2)', () => {
     // every other role — including Admin — is denied on the tablet.
     expect(hasRouteAccess({ role: 'Nurse' }, '/nurse')).toBe(true);

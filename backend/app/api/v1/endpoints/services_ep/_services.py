@@ -366,6 +366,7 @@ class DoctorOut(BaseModel):
     specialty: str
     cabinet: str | None = None
     active: bool = True
+    display_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -381,9 +382,8 @@ async def list_doctors_temp(
     limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
     offset: int = Query(default=0, ge=0, description="Смещение"),
 ):
-    """Delegate temporary doctor listing to the service layer."""
-    # P1 FIX: cap results to prevent unbounded response
-    return ServicesApiService(db).list_doctors_temp()[offset : offset + limit]
+    """Return a bounded Admin doctor-option page with a safe display name."""
+    return ServicesApiService(db).list_doctors_temp(limit=limit, offset=offset)
 
 
 # ==================== ИСТОРИЯ ИЗМЕНЕНИЙ УСЛУГ (AUDIT LOG) ====================

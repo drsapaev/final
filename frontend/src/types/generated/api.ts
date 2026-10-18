@@ -869,7 +869,7 @@ export type paths = {
         };
         /**
          * Список врачей (временный)
-         * @description Delegate temporary doctor listing to the service layer.
+         * @description Return a bounded Admin doctor-option page with a safe display name.
          */
         get: operations["list_doctors_temp_api_v1_services_admin_doctors_get"];
         put?: never;
@@ -11102,6 +11102,40 @@ export type paths = {
         put?: never;
         /** Загрузить логотип или фотографию врача */
         post: operations["admin_upload_public_site_media"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/public-site/media/{media_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Просмотреть черновик или опубликованное изображение */
+        get: operations["admin_preview_public_site_media"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/public-site/media/storage-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Проверить доступность хранилищ публичных изображений */
+        post: operations["admin_check_public_site_media_storage"];
         delete?: never;
         options?: never;
         head?: never;
@@ -36009,6 +36043,14 @@ export type components = {
         PublicSiteMediaErrorOut: {
             detail: components["schemas"]["PublicSiteMediaErrorDetail"];
         };
+        /** PublicSiteMediaStorageReadyOut */
+        PublicSiteMediaStorageReadyOut: {
+            /**
+             * Ready
+             * @constant
+             */
+            ready: true;
+        };
         /** PublicSiteNotFoundDetail */
         PublicSiteNotFoundDetail: {
             /**
@@ -42315,6 +42357,8 @@ export type components = {
              * @default true
              */
             active: boolean;
+            /** Display Name */
+            display_name?: string | null;
         };
         /**
          * TelemetryResponse
@@ -62994,6 +63038,86 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Media storage is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+        };
+    };
+    admin_preview_public_site_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verified JPEG, PNG, or WebP image for Admin preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+            /** @description Media or doctor was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Media storage is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaErrorOut"];
+                };
+            };
+        };
+    };
+    admin_check_public_site_media_storage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteMediaStorageReadyOut"];
                 };
             };
             /** @description Media storage is unavailable. */

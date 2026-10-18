@@ -34,3 +34,9 @@ class PublicSiteMediaErrorOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     detail: PublicSiteMediaErrorDetail
+
+
+class PublicSiteMediaStorageReadyOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ready: Literal[True]

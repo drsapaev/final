@@ -80,6 +80,7 @@ const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
 const ClinicManagement = lazy(() => import('./components/admin/ClinicManagement'));
 const QueueCabinetManagement = lazy(() => import('./components/admin/QueueCabinetManagement'));
 const AdminDoctors = lazy(() => import('./components/admin/AdminDoctors'));
+const PublicSiteMediaManager = lazy(() => import('./components/admin/PublicSiteMediaManager'));
 const AdminPatients = lazy(() => import('./components/admin/AdminPatients'));
 const AdminAppointments = lazy(() => import('./components/admin/AdminAppointments'));
 const AdminServices = lazy(() => import('./components/admin/AdminServices'));
@@ -151,6 +152,7 @@ const ROUTE_COMPONENTS = {
   ClinicManagement,
   QueueCabinetManagement,
   AdminDoctors,
+  PublicSiteMediaManager,
   AdminPatients,
   AdminAppointments,
   AdminServices,
