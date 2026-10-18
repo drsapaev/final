@@ -72,6 +72,37 @@ Evidence strings in `tools/uvicorn_restart.log`:
 to R2 `daily/`). A missing ⏰ line after any restart means the scheduler did
 NOT arm — check `AUTO_BACKUP_ENABLED` first.
 
+### External task attempt diagnostics
+
+The separate Windows task `Final Supabase Backup` runs
+`backups/backup_supabase.py`, whose host wrapper must delegate to the tracked
+`ops/scripts/backup_local_to_r2.py`. The external task has its own schedule,
+independent of `AUTO_BACKUP_ENABLED`. That runner writes
+`last_backup_attempt.json` inside its selected `--backup-dir` (default
+`C:\final\backups`). The record contains only UTC timestamps, a generated run
+identifier, fixed stage/state names, an exit code and a fixed failure category.
+It never contains command arguments, connection strings, raw output, exception
+messages or patient data. Keep this directory private to the backup account,
+SYSTEM and administrators; do not serve it over HTTP.
+
+The latest attempt replaces the previous record atomically. `failed` identifies
+the last stage reached; for example, `success_manifest` can fail after a verified
+cloud upload. `succeeded` with exit code `0` records runner completion.
+A `running` record without a finish timestamp can indicate a still-running or
+terminated process; compare its timestamp with Task Scheduler before deciding.
+The report does not prove that Task Scheduler launched or finished the process:
+startup/import/argument-parsing failures and forced termination can prevent a
+final record. Concurrent manual runs can replace each other's latest record.
+
+Attempt-report I/O failure prints only `BACKUP ATTEMPT REPORT UNAVAILABLE` and
+preserves the backup's own exit status. A missing or stale record therefore
+requires checking the task result and storage permissions. The health endpoint
+continues to use only `last_backup_report.json`, written after successful R2
+verification; an attempt record never replaces that success evidence.
+No task settings change is required, but diagnostics become active only after
+the tracked runner reaches the Windows host. This does not explain historical
+task errors that were not recorded.
+
 ## 4. Morning-after checklist
 
 1. `curl https://api.finalclinic.fyi/api/v1/health` → `{"ok":true,"db":"ok"}`.

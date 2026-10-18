@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import binascii
 import ipaddress
+import json
 import os
 import re
 import subprocess
@@ -25,6 +26,7 @@ import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 from cryptography.fernet import Fernet
 from dotenv import dotenv_values
@@ -35,6 +37,70 @@ ROOT = Path(r"C:\final")
 PG_DUMP = r"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe"
 PG_RESTORE = r"C:\Program Files\PostgreSQL\17\bin\pg_restore.exe"
 KEEP = 14
+ATTEMPT_FILENAME = "last_backup_attempt.json"
+
+
+class _AttemptReport:
+    """Bounded diagnostic state; never store runtime inputs or exception text."""
+
+    def __init__(self, directory: Path):
+        self.path = directory / ATTEMPT_FILENAME
+        self.run_id = uuid4().hex
+        self.started_at = datetime.now(timezone.utc).isoformat()
+        self.stage = "preflight"
+        self.warned = False
+        self._publish("running", None)
+
+    def mark(self, stage: str) -> None:
+        self.stage = stage
+        self._publish("running", None)
+
+    def finish(self, exit_code: int, failure_kind: str | None = None) -> None:
+        if exit_code == 0:
+            self.stage = "completed"
+        self._publish("succeeded" if exit_code == 0 else "failed", exit_code, failure_kind)
+
+    def _publish(
+        self, state: str, exit_code: int | None, failure_kind: str | None = None
+    ) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        record = {
+            "version": 1,
+            "run_id": self.run_id,
+            "started_at_utc": self.started_at,
+            "updated_at_utc": now,
+            "finished_at_utc": None if state == "running" else now,
+            "state": state,
+            "stage": self.stage,
+            "exit_code": exit_code,
+            "failure_kind": failure_kind,
+        }
+        temporary: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", prefix=".backup-attempt-", suffix=".tmp",
+                dir=self.path.parent, delete=False,
+            ) as output:
+                temporary = Path(output.name)
+                json.dump(record, output, sort_keys=True)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, self.path)
+            temporary = None
+        except OSError:
+            # Observability must not change the backup's own exit status.
+            if not self.warned:
+                self.warned = True
+                try:
+                    print("BACKUP ATTEMPT REPORT UNAVAILABLE")
+                except OSError:
+                    pass
+        finally:
+            if temporary is not None:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
 
 def _ssl_mode(host: str) -> str:
@@ -82,6 +148,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--offsite-r2", action="store_true")
     args = parser.parse_args(argv)
 
+    attempt = _AttemptReport(args.backup_dir)
+    exit_code = 1
+    failure_kind = "stage_failure"
+    try:
+        exit_code = _run_backup(args, attempt)
+    except KeyboardInterrupt:
+        exit_code = 130
+        failure_kind = "interrupted"
+        print("BACKUP FAILED: interrupted")
+    except Exception:  # noqa: BLE001 - CLI boundary must not expose exception details.
+        failure_kind = "unexpected_exception"
+        print("BACKUP FAILED: unexpected runner failure")
+    finally:
+        attempt.finish(exit_code, None if exit_code == 0 else failure_kind)
+    return exit_code
+
+
+def _run_backup(args: argparse.Namespace, attempt: _AttemptReport) -> int:
     if not args.backup_dir.is_dir():
         print("BACKUP FAILED: backup directory does not exist")
         return 1
@@ -92,6 +176,7 @@ def main(argv: list[str] | None = None) -> int:
         print("BACKUP FAILED: offsite upload requires the local public schema")
         return 1
 
+    attempt.mark("configuration")
     try:
         env = dotenv_values(args.env_file)
         url = make_url(env["DATABASE_URL"])
@@ -135,6 +220,7 @@ def main(argv: list[str] | None = None) -> int:
     ]
     if args.schema is not None:
         dump_command.append(f"--schema={args.schema}")
+    attempt.mark("database_dump")
     try:
         result = subprocess.run(
             dump_command,
@@ -158,6 +244,7 @@ def main(argv: list[str] | None = None) -> int:
     del result
     dump_secs = time.monotonic() - t0
 
+    attempt.mark("archive_validation")
     try:
         check = subprocess.run(
             [PG_RESTORE, "--list"],
@@ -173,6 +260,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"BACKUP FAILED: archive verification rc={check.returncode}")
         return 1
 
+    attempt.mark("encryption")
     encrypted = fernet.encrypt(archive)
     del archive
     ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -186,6 +274,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     enc = args.backup_dir / f"{backup_prefix}_{ts}.dump.enc"
     temporary: Path | None = None
+    attempt.mark("archive_publish")
     try:
         with tempfile.NamedTemporaryFile(
             mode="wb",
@@ -210,6 +299,7 @@ def main(argv: list[str] | None = None) -> int:
             except OSError:
                 pass
 
+    attempt.mark("local_retention")
     try:
         older = sorted(
             (
@@ -226,6 +316,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.offsite_r2:
+        attempt.mark("offsite_verification")
         try:
             sys.path.insert(0, str(ROOT / "backend"))
             from app.services import r2_uploader
@@ -254,6 +345,7 @@ def main(argv: list[str] | None = None) -> int:
         import hashlib as _hashlib
         import json as _json
 
+        attempt.mark("success_manifest")
         manifest = {
             "completed_at_utc": datetime.now(timezone.utc).isoformat(),
             "source": args.source,
@@ -272,9 +364,10 @@ def main(argv: list[str] | None = None) -> int:
             )
             os.replace(tmp_manifest, manifest_path)
         except OSError as exc:
-            print(f"backup ok: {enc.name}; manifest write failed ({type(exc).__name__}: {exc})")
+            print(f"backup ok: {enc.name}; manifest write failed ({type(exc).__name__})")
             return 1
 
+    attempt.mark("completion_output")
     print(
         f"backup ok: {enc.name} | {enc.stat().st_size} bytes | "
         f"dump {dump_secs:.0f}s | total kept {kept}"
