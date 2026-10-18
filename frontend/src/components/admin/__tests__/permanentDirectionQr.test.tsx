@@ -458,6 +458,39 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
         await waitFor(() => {
             expect(row()).toHaveTextContent('Да');
         });
+        await waitFor(() => {
+            expect(screen.getByTestId('setup-qr-expand-lab')).toHaveTextContent('Проверить постоянный QR');
+        });
+        expect(screen.queryByText('Создать постоянный адрес QR')).toBeNull();
+    });
+
+    it('keeps an existing permanent QR inspectable when the direction is unavailable', async () => {
+        directionMocks.fetchAdminQueueDirections.mockResolvedValue({
+            as_of_day: '2026-10-18',
+            directions: [{
+                ...ADMIN_DIRECTION,
+                profile: { ...ADMIN_DIRECTION.profile, is_active: false },
+                public_availability: false,
+                permanent_address_exists: true,
+                allowed_next_actions: [],
+            }],
+            unattached: { queue_tags: [], services: [], resources: [] },
+        });
+        directionMocks.fetchDirectionEntryMethods.mockResolvedValue(methodsPayload(false));
+        directionMocks.provisionPublicAddress.mockResolvedValue({
+            ...PROVISION_RESPONSE,
+            created: false,
+        });
+
+        await renderScreen({ expandQr: false });
+        const inspectButton = await screen.findByTestId('setup-qr-expand-lab');
+        expect(inspectButton).toHaveTextContent('Проверить постоянный QR');
+        await userEvent.setup().click(inspectButton);
+
+        expect(await screen.findByTestId('setup-qr-block-lab')).toBeTruthy();
+        await userEvent.setup().click(await screen.findByTestId('setup-qr-provision-lab'));
+        expect(await screen.findByTestId('setup-qr-image-lab')).toBeTruthy();
+        expect(await screen.findByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
     });
 
     it('drops a stale per-profile QR response after a newer full read', async () => {

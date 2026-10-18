@@ -4314,3 +4314,27 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Skipped, not passed: backend tests, integration tests, staging readiness, load-tests (standalone), Docker build, full production-readiness and nightly DAST; CI scope classified this as frontend-only.
 - PR-body update: all Tier 1 requirements marked PASS using exact-hosted evidence; local full type-check environment diagnostics retained as a transparent note. Re-ran `scripts/run_pr_review_gate_checks.py --body-file .scratch/t14-pr-body-final.md`: PASS, all 19 validator tests and documented samples; scratch body removed after update. Tier 2 remains NOT RUN; no deferral acknowledgement or merge permission is inferred.
 - Current scope: no runtime code changes after source commit `44b166f0a`; only this plan checkpoint follows the checked PR head. PR remains Draft pending reviewer disposition of the backend-dependent Tier-2 omission. User owns merge.
+
+## T14 PR #3702 — pre-edit checkpoint for review #5564122058 — 2026-10-18T22:49:40+05:00
+
+- Commit under test: local clean PR HEAD `e952521a62dc077ad2a71410aa641c6b5a7342c0`; base `baae35932e341ceaac163145d933639f735cb35c`.
+- Execution mode: `direct_execute`; narrow, known-root-cause frontend behavior correction. No execution gate required because no API, route, database, queue-write, auth, production, or staging behavior is involved.
+- First-touch / allowed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/__tests__/permanentDirectionQr.test.tsx`, and T14 plan journals only.
+- Denied paths/actions: backend/API/OpenAPI/generated contracts, routes, queue commands/ownership, DB, staging, production, PR metadata, merge and deployment.
+- Anchors: review #5564122058; T14 scope and existing RQ-18 parent/QR tests; `AdminSetupDirections.tsx` around `handleAddressProvisioned` and `canOpenQr`.
+- Original findings: QR disclosure couples `permanent_address_exists` to current `public_availability`, hiding an existing saved permanent QR for an archived/unavailable profile; successful provision sets only the existence fact and leaves stale `provision_permanent_address` in `allowed_next_actions`.
+- Validation target: focused parent-composition Vitest, scoped type check/lint, `git diff --check`.
+- Stop condition: if correction requires backend facts/contracts or any denied path, stop and report; Tier-2 NOT RUN remains a separate merge gate.
+- Pre-edit result: source and focused tests inspected; working branch clean at stated commit; implementation and regression checks not yet run.
+
+## T14 PR #3702 — review #5564122058 P2 fixes — 2026-10-18T22:53:30+05:00
+
+- Commit under test: local working tree based on exact remote PR HEAD `e952521a62dc077ad2a71410aa641c6b5a7342c0`; base `baae35932e341ceaac163145d933639f735cb35c`.
+- Actual paths changed: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/__tests__/permanentDirectionQr.test.tsx`, plus `PROGRESS.md`, `RESUME.md`, and this evidence journal. No other paths.
+- Fix: inspection remains available when `permanent_address_exists=true`, even if current QR booking is unavailable; provisioning remains gated by current public availability plus the backend `provision_permanent_address` action. On confirmed provisioning, update the existence fact and remove that stale action for the matching profile. Existing generation guard remains unchanged.
+- Regression proof: before implementation, the two new test cases failed (existing QR disclosure missing; stale create label persisted). After correction, `npm run test:run -- src/components/admin/__tests__/permanentDirectionQr.test.tsx src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx --reporter=dot` — 2 files / 26 tests PASS.
+- Scoped lint: from `frontend/`, `npx eslint src/components/admin/AdminSetupDirections.tsx src/components/admin/__tests__/permanentDirectionQr.test.tsx` — PASS. One earlier invocation from repository root failed to resolve `frontend/tsconfig.json`; corrected working directory rerun passed.
+- Full TypeScript: `npx tsc --noEmit --pretty false` — FAILS on the same three previously recorded unrelated workspace diagnostics: missing `nitro`, missing `nitro/runtime-config`, and implicit `route` in `src/publicSiteHandler.test.tsx`. No diagnostic points to changed files.
+- `git diff --check` — PASS.
+- Browser/staging/Tier-2: NOT_RUN. No PR metadata, review thread, merge, or deployment mutation.
+- Result: both P2 findings fixed locally; change awaits commit/push and exact-head CI. PR remains Draft/HOLD due separate Tier-2 disposition; no deferral is accepted.

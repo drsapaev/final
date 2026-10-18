@@ -265,7 +265,13 @@ const AdminSetupDirections = () => {
             ...previous,
             directions: (previous.directions || []).map((direction) =>
                 direction.profile.key === profileKey
-                    ? { ...direction, permanent_address_exists: true }
+                    ? {
+                        ...direction,
+                        permanent_address_exists: true,
+                        allowed_next_actions: (direction.allowed_next_actions || []).filter(
+                            (action) => action.kind !== 'provision_permanent_address',
+                        ),
+                    }
                     : direction,
             ),
         } : previous);
@@ -704,8 +710,9 @@ const AdminSetupDirections = () => {
                                         const provisionAction = (direction.allowed_next_actions || []).some(
                                             (action) => action.kind === 'provision_permanent_address',
                                         );
-                                        const canOpenQr = direction.public_availability &&
-                                            (direction.permanent_address_exists || provisionAction);
+                                        const canProvisionQr = direction.public_availability &&
+                                            !direction.permanent_address_exists && provisionAction;
+                                        const canOpenQr = direction.permanent_address_exists || canProvisionQr;
                                         const firstTag = profile.queue_tags?.[0] || String(profile.id);
                                         const reasons = direction.configuration_reasons || [];
                                         const targets = direction.booking_targets || [];
@@ -797,7 +804,7 @@ const AdminSetupDirections = () => {
                                                                 onClick={() => toggleQr(qrKey)}
                                                                 data-testid={'setup-qr-expand-' + firstTag}
                                                             >
-                                                                {t(provisionAction ? actionLabelKeys.provision_permanent_address : 'admin2.sdx_qr_open')}
+                                                                {t(canProvisionQr ? actionLabelKeys.provision_permanent_address : 'admin2.sdx_qr_open')}
                                                             </Button>
                                                             {expandedQrProfileKey === qrKey && (
                                                                 <div className="admin-sdx-qr-load-state">
