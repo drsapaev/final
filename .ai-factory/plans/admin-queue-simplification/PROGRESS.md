@@ -1,19 +1,19 @@
-## Latest checkpoint — T13 merged; T14 commit pushed, Draft PR creation next — 2026-10-18T21:49:00+05:00
+## Latest checkpoint — T14 PR #3702, Tier 1 PASS, Tier 2 NOT RUN — 2026-10-18T22:15:00+05:00
 
 Plan version: 4.02
 Current task: T14 — setup UI consumes backend facts
-Current status: VALIDATED (local checks; PR body gate passed; PR not yet created)
+Current status: PR_OPEN / Draft / HOLD for Tier-2 disposition
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final
 Branch: codex/aqs-T14-admin-facts
 Base commit: baae35932e341ceaac163145d933639f735cb35c (T13 merge; synced origin/main)
-Current commit: 44b166f0a7e83a0125e46a4c5eddfcbc22b198fd (T14 implementation + journals, pushed)
-Task memory: cb71d205-e655-482a-a72b-38c66d3d2011 (revision 6)
+Current commit: 44b166f0a7e83a0125e46a4c5eddfcbc22b198fd (T14 source implementation; PR HEAD before this journal update: 8b2b2a77d68ed707f88b99581077a5a49316499f)
+Task memory: cb71d205-e655-482a-a72b-38c66d3d2011 (revision 7)
 
 | Task | Status | PR / commit | Evidence |
 |------|--------|-------------|----------|
 | T12.2 | MERGED | PR #3693, merge 7f923f14a347a26b7f80da0fb40a0cff8858ef27 | Focused PostgreSQL 3/3 PASS; broader Tier-2 remains PARTIAL |
 | T13 | MERGED | PR #3697, merge baae35932e341ceaac163145d933639f735cb35c | Exact-head CI PASS; T13 review fixes included |
-| T14 | VALIDATED | codex/aqs-T14-admin-facts, commit 44b166f0a | Focused UI tests 26/26; scoped TS, full ESLint, theme/a11y/locales, body gate PASS; full project TS has 3 unrelated baseline errors; PR creation next |
+| T14 | PR_OPEN / HOLD | PR #3702 Draft; head 8b2b2a77 (pre-checkpoint); source commit 44b166f0a | Tier 1 PASS exact-head Unified CI; Tier 2 NOT RUN, no reviewer deferral; see T14 evidence |
 | T15-T18 | PLANNED | | |
 
 ## Current checkpoint
@@ -26,8 +26,9 @@ Task memory: cb71d205-e655-482a-a72b-38c66d3d2011 (revision 6)
 - Completed: UI consumes the T13 admin facts through a domain mapper; configuration, effective availability, public entry/address facts, typed booking targets, selected-day queues, separate precreate facts, backend next actions and unattached catalog are presented without local eligibility inference. Core facts render before QR reads; QR details load on disclosure, resource-editor inputs load only on entry, stale day/QR responses are ignored, and successful provision updates the displayed address-exists fact. The QR component comment now documents lazy mounting.
 - Validation: focused Vitest 3 files / 26 tests PASS; scoped TypeScript 10 changed source/test files plus test setup PASS; full ESLint PASS (0 errors, 1,848 existing warnings); `check-theme` PASS; icon-control accessibility audit PASS (410 files, 0 findings); strict locale parity PASS for all five locales (10,510 keys each); `git diff --check` PASS. Full `npm run type-check` reports only three existing out-of-scope errors: missing `nitro`, missing `nitro/runtime-config`, and implicit `route` in `src/publicSiteHandler.test.tsx`. Stylelint NOT_RUN (binary absent); full unit suite, build/browser/waterfall NOT_RUN due low host memory (about 1.6 GiB free at check time). React test warnings occurred but tests passed.
 - Dependency cleanup: the worktree's temporary `frontend/node_modules` junction points to `C:\final\frontend\node_modules`. Removal was blocked by the command policy; it remains and must be treated as a link, never recursively deleted. No target files were changed by this check.
-- The T14 commit was created with the repository pre-commit hooks passing and pushed to `origin/codex/aqs-T14-admin-facts`. PR-body quality gate passed its 19 validator tests and the prepared Draft body. No PR exists yet.
-- Next exact action: create a Draft PR using the prepared body; attach it to this task; inspect exact-head CI. Do not merge; user owns merge.
+- PR #3702 is open as Draft at exact HEAD `8b2b2a77d68ed707f88b99581077a5a49316499f`, base `baae35932e341ceaac163145d933639f735cb35c`, mergeable. Tier 1 exact-head Unified CI run 39147315550 passed; security scan 39147315557, PR Review Quality Gate 39147315613, Regression Audit Gate 39147315545, i18n Quality Gate 39147315571, PR Lifecycle Recommendation 39147315544 and Gitleaks 39147315567 passed. Backend tests, staging-readiness, load and production-readiness jobs were skipped due scope; they are not PASS evidence.
+- Tier-2/backend staging was not run; no reviewer deferral is acknowledged. The updated PR body marks all Tier 1 checks passed and accurately leaves Tier 2 NOT RUN. PR body gate passed its 19 validator tests after this update.
+- Next exact action: finish this journal-only checkpoint, push it, inspect checks on the resulting exact PR HEAD, then leave PR #3702 Draft until a reviewer decides the Tier-2 disposition. Do not merge or deploy; user owns merge.
 - Full Tier-2/T18 remain PARTIAL/NOT_RUN from prior plan stages; this T14 UI task does not claim those checks. No staging, production, browser, visual viewport or deployment verification was performed.
 ## Historical checkpoint — T13 before PR review corrections
 

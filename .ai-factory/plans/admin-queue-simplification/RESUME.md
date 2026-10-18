@@ -1,18 +1,18 @@
-## Latest checkpoint — T14 commit pushed; Draft PR creation next — 2026-10-18T21:49:00+05:00
+## Latest checkpoint — T14 PR #3702 Draft; exact-head Tier 1 PASS — 2026-10-18T22:15:00+05:00
 
-Continue task `cb71d205-e655-482a-a72b-38c66d3d2011` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final`, branch `codex/aqs-T14-admin-facts`. Base and `origin/main` both equal T13 merge `baae35932e341ceaac163145d933639f735cb35c`; PR #3697 is merged. T14 implementation commit `44b166f0a7e83a0125e46a4c5eddfcbc22b198fd` is pushed. Do not modify/rebase `C:\final`.
+Continue task `cb71d205-e655-482a-a72b-38c66d3d2011` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final`, branch `codex/aqs-T14-admin-facts`. Base and `origin/main` both equal T13 merge `baae35932e341ceaac163145d933639f735cb35c`; PR #3697 is merged. PR #3702 is open as Draft, base `baae35932e341ceaac163145d933639f735cb35c`, checked HEAD `8b2b2a77d68ed707f88b99581077a5a49316499f`; source commit `44b166f0a7e83a0125e46a4c5eddfcbc22b198fd`. Do not modify/rebase `C:\final`.
 
-Task memory exact ID: `cb71d205-e655-482a-a72b-38c66d3d2011`, revision 6.
+Task memory exact ID: `cb71d205-e655-482a-a72b-38c66d3d2011`, revision 7.
 
 T14 UI now consumes the existing T13 Admin directions read model through `fetchAdminQueueDirections` and a typed frontend domain mapper. The page displays backend-owned configuration/effective/public availability facts, typed targets, selected-day queues, separate precreate facts, next actions and unattached catalog. Per-profile QR details load only when expanded; resource editor reads happen only on entry; stale day/QR responses are dropped; successful address provisioning updates the displayed address-exists fact. No backend, route, generated API, DB, queue command or ownership changes were made.
 
-Local evidence: 3 focused Vitest files / 26 tests PASS; scoped TypeScript PASS using a temporary `tsconfig.t14.json` that has been removed; scoped ESLint PASS; full ESLint PASS (0 errors, 1,848 repo-wide warnings); `check-theme` PASS; icon-control accessibility audit PASS (410 files, 0 findings); strict five-locale parity PASS (10,510 keys each); `git diff --check` PASS. Full `npm run type-check` reports only three existing, out-of-scope errors: missing `nitro`, missing `nitro/runtime-config`, and implicit `route` typing in `src/publicSiteHandler.test.tsx`. Stylelint unavailable; full Vitest suite, build/browser/viewport/waterfall NOT_RUN with about 1.6 GiB free RAM. Full Tier-2/T18 remains PARTIAL/NOT_RUN; do not claim it.
+Local evidence: 3 focused Vitest files / 26 tests PASS; scoped TypeScript PASS; scoped/full ESLint PASS (0 errors, 1,848 repo-wide warnings); theme and icon-control audits PASS; strict five-locale parity PASS (10,510 keys each); pre-commit hooks and `git diff --check` PASS. Local full type-check has three environment-specific diagnostics while hosted exact-head Phase-0 type-check passes. Hosted Tier 1 Unified CI `39147315550` PASS, including full unit tests, build, lint/type-check and Chromium E2E. Auxiliary security, PR quality, regression, i18n and gitleaks checks PASS. Backend/integration/staging jobs were skipped, not passed. Tier 2 remains NOT RUN; no reviewer deferral is acknowledged.
 
 Allowed files remain in the latest T14 PROGRESS/EVIDENCE block. `setupDirectionsReadiness.ts` was preserved. Do not expand into backend/API contract, routes, queue writes/admission/ownership, DB/migrations, production or staging. The temporary worktree `frontend/node_modules` junction still points to `C:\final\frontend\node_modules`; its removal was blocked by command policy, and the target was untouched. Handle only as a junction if cleanup becomes allowed.
 
-The repository pre-commit hooks passed on the implementation commit. PR review quality gate passed all 19 validator tests and the prepared body. The branch has not yet been opened as a PR.
+PR body records exact-head hosted evidence and leaves Tier 2 NOT RUN. Its quality gate passed all 19 validator tests. PR #3702 remains Draft/HOLD pending reviewer disposition of Tier 2.
 
-Next exact action: create a Draft PR with `.scratch/t14-pr-body.md`, attach it to this task, inspect exact-head GitHub checks, and fix any in-scope failure. Do not merge; the user owns merge.
+Next exact action: commit/push this plan-journal checkpoint, inspect checks on the resulting exact PR HEAD, and keep the PR Draft until a reviewer resolves Tier-2 disposition. Do not merge or deploy; the user owns merge.
 
 ## Previous checkpoint — T13 merged; T14 frontend implementation active — 2026-10-18T21:35:00+05:00
 

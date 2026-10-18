@@ -4304,4 +4304,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR quality gate: `scripts/run_pr_review_gate_checks.py --body-file .scratch/t14-pr-body.md` passed all 19 validator tests, documented sample checks, and the completed Draft PR body. First attempt found missing required summary fields; body was corrected before the passing run.
 - Remaining limitation: full project type-check is not green due the three unrelated diagnostics above; stylelint/build/browser evidence remains absent. Overall Tier-2/T18 remains PARTIAL/NOT_RUN and is not claimed by this UI slice.
 - PR / merge: branch is pushed; Draft PR not yet created; no merge or deployment.
-- Next exact action: create/attach Draft PR, then inspect CI on the exact PR head. User retains merge authority.
+- Next exact action at that checkpoint: create/attach Draft PR and inspect exact-head CI; completed in the next T14 evidence entry below.
+
+## T14 — PR #3702 exact-head Tier 1 result — 2026-10-18T22:15:00+05:00
+
+- PR: [#3702](https://github.com/drsapaev/final/pull/3702), title `feat(queue): use admin facts in directions setup`; open, Draft, mergeable. Base `baae35932e341ceaac163145d933639f735cb35c`; checked PR HEAD `8b2b2a77d68ed707f88b99581077a5a49316499f` (implementation commit `44b166f0a7e83a0125e46a4c5eddfcbc22b198fd` plus plan-journal checkpoint).
+- Exact-head Unified CI run `39147315550`: SUCCESS. Frontend unit tests, frontend build + Nitro, frontend lint + Phase-0 type-check + generated-type freshness + config type-check + type-debt + icon audit, frontend Chromium E2E, frontend/backend parity and PR Required Gate passed. The E2E job completed registrar, UX/visual, lab dirty-guard, lab full-path, business/security/concurrency, load/chaos and workflow invariants.
+- Exact-head auxiliary checks: security scan `39147315557` SUCCESS; PR Review Quality Gate `39147315613` SUCCESS; Regression Audit Gate `39147315545` SUCCESS; i18n Quality Gate `39147315571` SUCCESS; PR Lifecycle Recommendation `39147315544` SUCCESS; Gitleaks `39147315567` SUCCESS.
+- Skipped, not passed: backend tests, integration tests, staging readiness, load-tests (standalone), Docker build, full production-readiness and nightly DAST; CI scope classified this as frontend-only.
+- PR-body update: all Tier 1 requirements marked PASS using exact-hosted evidence; local full type-check environment diagnostics retained as a transparent note. Re-ran `scripts/run_pr_review_gate_checks.py --body-file .scratch/t14-pr-body-final.md`: PASS, all 19 validator tests and documented samples; scratch body removed after update. Tier 2 remains NOT RUN; no deferral acknowledgement or merge permission is inferred.
+- Current scope: no runtime code changes after source commit `44b166f0a`; only this plan checkpoint follows the checked PR head. PR remains Draft pending reviewer disposition of the backend-dependent Tier-2 omission. User owns merge.
