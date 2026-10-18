@@ -1,29 +1,33 @@
-## Latest checkpoint — T13 PR #3697 review fixes validated; journal amendment CI pending — 2026-10-18T09:01:36+05:00
+## Latest checkpoint — T13 merged; T14 locally validated, PR prep next — 2026-10-18T21:47:00+05:00
 
 Plan version: 4.02
-Current task: T13 — canonical Admin directions read contract
-Current status: PR_OPEN
-Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t13-admin-directions\final
-Branch: codex/aqs-T13-admin-directions
-Base commit: 7f923f14a347a26b7f80da0fb40a0cff8858ef27
-Code commit with exact-head CI PASS: ca6416d0ee5ac8d4ce988fe70338413e753d557f
-Task memory: 6419e86d-e56a-41c3-bd01-2463a5bfd661
+Current task: T14 — setup UI consumes backend facts
+Current status: VALIDATED (local checks; no PR yet)
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final
+Branch: codex/aqs-T14-admin-facts
+Base commit: baae35932e341ceaac163145d933639f735cb35c (T13 merge; synced origin/main)
+Current commit: baae35932e341ceaac163145d933639f735cb35c (source changes uncommitted)
+Task memory: cb71d205-e655-482a-a72b-38c66d3d2011 (revision 4; capture after checkpoint)
 
 | Task | Status | PR / commit | Evidence |
 |------|--------|-------------|----------|
 | T12.2 | MERGED | PR #3693, merge 7f923f14a347a26b7f80da0fb40a0cff8858ef27 | Focused PostgreSQL 3/3 PASS; broader Tier-2 remains PARTIAL |
-| T13 | PR_OPEN | PR #3697, code commit ca6416d0ee5ac8d4ce988fe70338413e753d557f | Both P2 regressions fixed; exact-head Unified CI PASS; journal-only amendment will trigger final check rerun |
-| T14-T18 | PLANNED | | |
+| T13 | MERGED | PR #3697, merge baae35932e341ceaac163145d933639f735cb35c | Exact-head CI PASS; T13 review fixes included |
+| T14 | VALIDATED | codex/aqs-T14-admin-facts | Focused UI tests 26/26; scoped TS, ESLint, locales, diff check PASS; full project TS has 3 unrelated baseline errors; see T14 evidence |
+| T15-T18 | PLANNED | | |
 
 ## Current checkpoint
-- Both P2 findings from Review #5561104585 were reproduced before the fixes and are now covered by passing regressions: hidden same-specialty profiles are assessed independently for publication; existing queues are matched by typed owner plus queue tag.
-- Exact-head Unified CI run 39094679700 on code commit ca6416d0ee5ac8d4ce988fe70338413e753d557f completed successfully: Backend tests, Frontend E2E, PR Required Gate, build, unit tests, lint, quality, security, documentation, parity, and applicable checks PASS. Docker build, integration tests, staging readiness, load tests, DAST, metadata and production-readiness jobs were SKIPPED by workflow scope/conditions; skipped is not PASS.
-- Local validation: 59 passed, 1 warning across characterization concurrency, Admin directions integration, and OpenAPI contract tests; focused regression pair 2 passed; Ruff check/format, Python compilation and git diff --check PASS. Commit hooks PASS.
-- The previous exact-head failure on 63f03267 was a test-isolation issue: an earlier characterization test left a synthetic Service in a session-scoped SQLite database. The empty-catalog regression now uses an explicit empty read snapshot; the failing sequence was reproduced and passes locally.
-- A journal-only amendment is being prepared to keep this single T13 commit and preserve plan evidence. Hosted checks on the resulting amended SHA will be the final verification. Full Tier-2/T18 remain NOT_RUN; no staging, production, deployment, review reply/thread resolution, merge or T14 work occurred.
-- Allowed source paths: backend/app/services/queue_admin_directions_read_service.py and backend/tests/integration/test_queue_admin_directions_read_model.py; plan journals are allowed for checkpoint/evidence. No API schema/OpenAPI/generated/frontend/model/migration/admission paths changed.
-- Next exact action: amend the user-approved single T13 commit with this evidence, verify the remote head immediately before force-with-lease, push, and confirm checks on the final SHA. User retains merge authority.
-- Stop if the final check requires an out-of-scope source change or any branch/base divergence.
+- Verified PR #3697 is merged and synced to `origin/main`; T14 base and `origin/main` are both `baae35932e341ceaac163145d933639f735cb35c`. The production-surface checkout was only fast-forwarded, preserving its pre-existing untracked `.gate_artifacts/` and `.scratch/`.
+- T14 mode: `advisory_gate` (UI/API consumption of an existing read contract; no DB, auth, route, queue ownership/fairness, write behavior, or backend contract changes). The canonical launcher was attempted from `ai/langgraph` with exact UI/API/test/i18n scopes and returned `stop: reviewed scope requires a known root cause`. Under the plan’s explicitly selected advisory mode this is recorded as a non-blocking gate misroute; no gate/router edit and no source edit followed it.
+- Shape brief: Admin configures a clinic direction; primary task is understand configuration/public entry/current-day queues and act on backend-provided next actions. Queue correctness risk is controlled by keeping workflow facts server-owned. Current surface is an existing Admin screen with local readiness heuristics and eager QR requests. Keep quiet clinical hierarchy, accessible loading/error/retry states, and five-locale coverage. Out of scope: route/wizard changes, queue writes/admission, T13 API changes, ownership policy, Resource Manager behavior.
+- Allowed source paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/PermanentDirectionQr.tsx` only for reporting successful provision to the parent read-model state, `frontend/src/components/admin/setupDirectionsReadiness.ts` only if required to remove this screen’s policy dependency without breaking shared consumers, `frontend/src/api/queueDirections.ts`, `frontend/src/types/api.ts` for aliases of already-generated T13 DTOs only, `frontend/src/types/domain/adminQueueDirections.ts`, `frontend/src/api/mappers/adminQueueDirections.ts`, and `frontend/src/api/mappers/index.ts` to satisfy the repository’s no-DTO-in-components guard, `frontend/src/components/admin/admin.css`, focused setup/QR tests, and the five locale files. Plan journals may be updated for evidence. No generated API/contract/backend files.
+- Validation target: targeted Vitest (`adminSetupDirections.textPin`, `permanentDirectionQr`), TypeScript type-check, scoped lint/stylelint, locale parity, relevant frontend build if memory permits, request sequencing and stale-response regressions, plus available local browser/waterfall evidence. Synthetic screenshots only; no patient data.
+- Stop if T13 facts cannot represent a UI state/action truthfully; do not restore React-owned eligibility or extend the backend contract within T14. Also stop on changed route/write/ownership semantics or unexpected paths.
+- Completed: UI consumes the T13 admin facts through a domain mapper; configuration, effective availability, public entry/address facts, typed booking targets, selected-day queues, separate precreate facts, backend next actions and unattached catalog are presented without local eligibility inference. Core facts render before QR reads; QR details load on disclosure, resource-editor inputs load only on entry, stale day/QR responses are ignored, and successful provision updates the displayed address-exists fact. The QR component comment now documents lazy mounting.
+- Validation: focused Vitest 3 files / 26 tests PASS; scoped TypeScript 10 changed source/test files plus test setup PASS; full ESLint PASS (0 errors, 1,848 existing warnings); `check-theme` PASS; icon-control accessibility audit PASS (410 files, 0 findings); strict locale parity PASS for all five locales (10,510 keys each); `git diff --check` PASS. Full `npm run type-check` reports only three existing out-of-scope errors: missing `nitro`, missing `nitro/runtime-config`, and implicit `route` in `src/publicSiteHandler.test.tsx`. Stylelint NOT_RUN (binary absent); full unit suite, build/browser/waterfall NOT_RUN due low host memory (about 1.6 GiB free at check time). React test warnings occurred but tests passed.
+- Dependency cleanup: the worktree's temporary `frontend/node_modules` junction points to `C:\final\frontend\node_modules`. Removal was blocked by the command policy; it remains and must be treated as a link, never recursively deleted. No target files were changed by this check.
+- Next exact action: run final status/diff review and applicable commit hooks, commit T14, push the branch and open a single-purpose PR with these local validation results and the known unrelated full-type-check failures. Do not merge; user owns merge. Check exact-head CI after PR creation.
+- Full Tier-2/T18 remain PARTIAL/NOT_RUN from prior plan stages; this T14 UI task does not claim those checks. No staging, production, browser, visual viewport or deployment verification was performed.
 ## Historical checkpoint — T13 before PR review corrections
 
 Plan version: 4.02

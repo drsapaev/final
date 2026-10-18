@@ -4259,3 +4259,47 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Changes remain limited to the approved read-service, focused integration tests and task evidence journals. No OpenAPI/generated types, schema/model/migration, admission, frontend, staging or production paths changed.
 - Full Tier-2/T18 was not run. No review reply/thread resolution, merge or deployment performed. User retains merge authority.
 - Next action: confirm checks for the final amended PR SHA; then hand PR back for user review/merge decision.
+
+## T14 — 2026-10-18T21:07:00+05:00 — pre-edit checkpoint
+
+- Commit under test: `baae35932e341ceaac163145d933639f735cb35c` (T13 merge; fresh `origin/main`).
+- Environment: dedicated managed worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final`; branch `codex/aqs-T14-admin-facts`.
+- Execution mode: `advisory_gate`, as specified by T14. UI/API adapter only; existing T13 read contract, no schema/write/queue-policy change.
+- Canonical gate: `ai/langgraph/scripts/run_agent_gate.ps1` invoked from `ai/langgraph` with scoped T14 screen, existing adapter, focused tests, stylesheet and five locales. Result: `stop`, reason `reviewed scope requires a known root cause`. Recorded as advisory gate misroute under the explicit T14 advisory mode; no source/gate/router edit followed.
+- Allowed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`; `frontend/src/components/admin/setupDirectionsReadiness.ts` only if required while preserving shared consumers; `frontend/src/api/queueDirections.ts`; `frontend/src/components/admin/admin.css`; focused setup/QR/readiness tests; `frontend/src/i18n/locales/{en,ru,kk,uz-Latn,uz-Cyrl}.ts`; plan journals.
+- Denied paths: backend, API schema/OpenAPI/generated types, route registry, queue write/admission/ownership/fairness, DB/migrations, production/deployment and staging.
+- Shape brief: Admin staff need one readable direction context showing configuration facts, public entry state, and selected-day queues separately. Backend owns readiness and action eligibility. Keep existing clinic UI primitives, accessible loading/error/retry and responsive/i18n behavior. Core rows must not wait for optional QR calls; QR loads on expand with bounded/deduplicated requests and stale-response protection.
+- Actual changed paths: plan journals only. No application source edits yet.
+- Original behavior: source inspection found screen-local readiness/owner-axis calculation and eager `Promise.all` entry-method reads before core rows are committed.
+- Validation command/result: pre-edit source/DTO/skill inspection PASS; targeted runtime tests/type/lint/build NOT_RUN (no source changes yet).
+- Scope check: clean T14 branch at merge commit before journal update; no changes to `C:\final` after its T13 fast-forward and no foreign worktree/project touched.
+- Stop conditions: stop if the T13 DTO cannot represent a state/action truthfully or if implementation requires changing contract, route, write, ownership or admission behavior.
+- Remaining limitation: previous Tier-2/T18 evidence remains PARTIAL/NOT_RUN; no staging was run for T14.
+- Next exact action: implement against T13 DTO; do not recreate backend policy in React.
+
+- T14 scope addendum before source changes: `frontend/src/types/api.ts` is allowed only for aliases of existing generated T13 DTOs; `frontend/src/components/admin/PermanentDirectionQr.tsx` is allowed only for a parent callback after successful address provision, preventing stale `permanent_address_exists` display. A third exact-scope advisory-gate attempt including these paths returned the same non-blocking known-root-cause stop. Memory revision 4 records the final pre-edit path boundary.
+
+## T14 — local implementation validation — 2026-10-18T21:47:00+05:00
+
+- Commit under test: `baae35932e341ceaac163145d933639f735cb35c` (T13 merge / fresh `origin/main`); implementation changes are currently uncommitted on `codex/aqs-T14-admin-facts`.
+- Environment: Windows 11 worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final`, Node dependencies reused through a temporary junction to `C:\final\frontend\node_modules`; no staging or patient data.
+- Execution mode: `advisory_gate`, reason: UI/API adapter consumes the merged T13 read-only contract without changing DB, auth, routing, queue writes/admission/ownership/fairness or clinical behavior. Canonical gate returned `stop: reviewed scope requires a known root cause`; recorded as a non-blocking advisory misroute. No gate/router edit.
+- Allowed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`; `frontend/src/components/admin/PermanentDirectionQr.tsx` only for provision callback/documented lazy mount; `frontend/src/api/queueDirections.ts`; `frontend/src/types/api.ts` aliases only; `frontend/src/types/domain/adminQueueDirections.ts`; `frontend/src/api/mappers/adminQueueDirections.ts` and `frontend/src/api/mappers/index.ts`; `frontend/src/components/admin/admin.css`; focused setup/QR/mapper tests; five locale files; this plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Denied paths: backend, schema/OpenAPI/generated API output, routes, write/admission/queue ownership/fairness, DB/migrations, production/deploy, staging, and unrelated generated output.
+- Actual changed paths: `frontend/src/api/mappers/index.ts`; `frontend/src/api/queueDirections.ts`; `frontend/src/api/mappers/adminQueueDirections.ts`; `frontend/src/api/mappers/__tests__/adminQueueDirections.test.ts`; `frontend/src/components/admin/AdminSetupDirections.tsx`; `frontend/src/components/admin/PermanentDirectionQr.tsx`; `frontend/src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`; `frontend/src/components/admin/__tests__/permanentDirectionQr.test.tsx`; `frontend/src/components/admin/admin.css`; five locale files; `frontend/src/types/api.ts`; `frontend/src/types/domain/adminQueueDirections.ts`; and the three plan journals.
+- Original failure: setup screen computed owner/readiness locally and awaited per-profile QR reads before showing core facts. After T14 change, the screen consumes backend facts through a typed domain mapper; optional QR/resource reads are deferred and stale responses are guarded.
+- Validation commands/results:
+  - Focused Vitest (`adminSetupDirections.textPin`, `permanentDirectionQr`, `adminQueueDirections` mapper): PASS, 3 files / 26 tests. React Router future warnings and some test `act(...)` warnings were emitted; no failures.
+  - Scoped TypeScript (`tsc --noEmit -p tsconfig.t14.json`, temporary file removed after run): PASS for T14 screen, adapters, mapper/domain, focused tests and Vitest setup.
+  - Full `npm run type-check`: FAIL only on existing out-of-scope diagnostics: missing `nitro`, missing `nitro/runtime-config`, and implicit `route` type in `src/publicSiteHandler.test.tsx`. The T14 file errors found earlier were corrected; scoped TypeScript passes.
+  - Scoped ESLint for all changed application/test TypeScript files: PASS.
+  - Full frontend ESLint (`eslint "src/**/*.{ts,tsx}"`): PASS, 0 errors and 1,848 warnings already present across the repository.
+  - `npm run check-theme`: PASS.
+  - `npm run audit:icon-controls`: PASS, 410 files scanned, 0 findings.
+  - `scripts/i18n/validate_locales.py --strict`: PASS; all five locales have 10,510 matching keys.
+  - `git diff --check`: PASS (Git emitted only LF-to-CRLF working-copy notices).
+  - Stylelint: NOT_RUN; no local `stylelint.cmd` executable. Full Vitest suite, frontend build, browser/viewport/waterfall checks: NOT_RUN because host free memory was about 1.6 GiB; targeted suite is the only local unit evidence.
+- Scope check: `origin/main` equals T14 base; no backend/runtime contract, route, generated output, production, staging or `C:\final` source edits. Temporary `frontend/node_modules` junction removal was rejected by execution policy; it remains a junction to `C:\final\frontend\node_modules`, and the target was not touched.
+- Remaining limitation: full project type-check is not green due the three unrelated diagnostics above; stylelint/build/browser evidence remains absent. Overall Tier-2/T18 remains PARTIAL/NOT_RUN and is not claimed by this UI slice.
+- PR / merge: not yet created; no merge or deployment.
+- Next exact action: run final diff/scope check and commit hooks, then commit/push/open the T14 PR. User retains merge authority.

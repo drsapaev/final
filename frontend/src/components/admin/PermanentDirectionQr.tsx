@@ -2,9 +2,9 @@ import { useTranslation } from '../../i18n/useTranslation';
 /**
  * RQ-18 — permanent direction QR block (admin half of S-15).
  *
- * Rendered inside the AdminSetupDirections checklist card for every
- * QR-visible owning profile (the extension point deliberately left by
- * runtime-PR 3339: «QR появится здесь после RQ-18»).
+ * Mounted on demand inside the AdminSetupDirections card when an
+ * administrator expands a profile's QR section; the direction read model
+ * stays independent from these optional per-profile details.
  *
  * Contract honesty (directive §5/§12/§13):
  *  - `supported === null` (entry-methods read failed / unknown) renders
@@ -61,6 +61,8 @@ interface PermanentDirectionQrProps {
         supported: boolean | null,
         generation?: number,
     ) => void;
+    /** Notify the parent read-model that an address has now been confirmed. */
+    onAddressProvisioned?: (profileKey: string, generation?: number) => void;
     /**
      * RQ-18 follow-up round-4 (P2-2): the parent's full-read generation.
      * Every full read bumps it; a recheck answer is tagged with the
@@ -76,7 +78,7 @@ export function absolutePermanentUrl(publicCode: string): string {
     return `${window.location.origin}/q/${publicCode}`;
 }
 
-export default function PermanentDirectionQr({ profileKey, tag, supported, onSupportedChange, supportGeneration }: PermanentDirectionQrProps) {
+export default function PermanentDirectionQr({ profileKey, tag, supported, onSupportedChange, onAddressProvisioned, supportGeneration }: PermanentDirectionQrProps) {
     const { t } = useTranslation();
     const [state, setState] = useState<BlockState>('idle');
     const [provisioned, setProvisioned] = useState<PublicAddressProvisionResponse | null>(null);
@@ -121,6 +123,7 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
             // override and the local block state.
             const recheckGeneration = supportGenerationRef.current;
             const res = await provisionPublicAddress(profileKey);
+            onAddressProvisioned?.(profileKey, recheckGeneration);
             setProvisioned(res);
             setCopied(false);
             setState('shown');
@@ -159,7 +162,7 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
             logger.warn(`permanent QR provision failed for ${profileKey}`, err);
             setState('error');
         }
-    }, [profileKey, onSupportedChange]);
+    }, [profileKey, onAddressProvisioned, onSupportedChange]);
 
     const copyLink = useCallback(async () => {
         if (!provisioned) return;

@@ -1,30 +1,9 @@
 import { useTranslation } from '../../i18n/useTranslation';
 /**
- * AdminSetupDirections — экран-вход «собранный путь настройки направления»
- * (RQ-17 runtime-PR; brief `RQ17_SETUP_PATH_BRIEF.md` §4, §5-S-14).
- *
- * Один новый admin-route `/admin/setup-directions` (одна запись в реестре
- * маршрутов), который:
- *  1. показывает checklist готовности направлений по тег-строкам — шаги
- *     §3 (а)–(д) со статусами «готово / не хватает X / где исправить»;
- *     каждая «не хватает» ведёт прямой ссылкой в соответствующий экран;
- *  2. начинает мастер нового направления S-14 с пустой формы:
- *     последовательность §3 (исполнитель → услуги → отображение →
- *     проверка → QR), каждый шаг = переход в существующий экран с
- *     возвратом на checklist; для resource-owned — минимальная
- *     поверхность менеджера QueueResource (единственное новое UI);
- *     resource-flow можно начать БЕЗ существующего тега (round-3
- *     owner-ревью P1): у совершенно новой specialty тега ещё нет —
- *     он появится после создания профиля/услуги на шагах мастера,
- *     после возврата его можно выбрать в селекторе этого же шага;
- *  3. не требует технических ключей: queue_tag/profile_key не вводятся
- *     руками — выбор из существующих значений;
- *  4. QR-колонка — точка расширения зашита, но не реализуется (RQ-18).
- *
- * Экран НЕ редактирует данные сам (только ссылки/статусы; QueueResource
- * CRUD живёт своей поверхностью QueueResourceManager, экран-вход
- * ссылается на него). Статусы всегда пересчитываются из API.
- * Стили — в admin.css (секция RQ-17), без inline-styles (UI ratchet).
+ * AdminSetupDirections consumes the T13 read model. It does not reconstruct
+ * queue eligibility, profile ownership, or publication readiness in React.
+ * QueueResource CRUD and permanent-address writes remain in their existing
+ * surfaces; this page presents their backend facts and safe entry points.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -51,19 +30,18 @@ import {
     CardTitle,
     Select,
 } from '../ui/macos';
-import { type QueueResourceDto, listQueueResources } from '../../api/queueResources';
 import QueueResourceManager from './QueueResourceManager';
 import PermanentDirectionQr from './PermanentDirectionQr';
+import type {
+    QueueAdminDirections,
+    QueueDirectionNextAction,
+    QueueAdminDirection,
+} from '../../types/domain/adminQueueDirections';
+import { fetchAdminQueueDirections, fetchDirectionEntryMethods } from '../../api/queueDirections';
 import {
-    type Checklist,
-    type ChecklistDoctorDto,
     type ChecklistProfileDto,
     type ChecklistServiceDto,
-    type EntryMethodsDto,
-    type ServiceAssignmentGap,
-    buildChecklist,
-    candidateTags,
-    collectServiceAssignmentGaps,
+    readPermanentAddressSupported,
 } from './setupDirectionsReadiness';
 
 type ScreenView = 'checklist' | 'resources';
@@ -90,197 +68,217 @@ const WIZARD_STEP_KEYS = [
     'admin2.sdx_wizard_step_qr',
 ] as const;
 
+type QrReadState = {
+    generation: number;
+    status: 'loading' | 'loaded' | 'error';
+    supported: boolean | null;
+};
+
+const configurationStateKeys: Record<QueueAdminDirection['configuration_state'], string> = {
+    ready: 'admin2.sdx_state_ready',
+    incomplete: 'admin2.sdx_state_incomplete',
+    conflict: 'admin2.sdx_state_conflict',
+    unavailable: 'admin2.sdx_state_unavailable',
+};
+
+const modeKeys: Record<QueueAdminDirection['resolved_mode'], string> = {
+    booking: 'admin2.sdx_mode_booking',
+    overview: 'admin2.sdx_mode_overview',
+    unresolved: 'admin2.sdx_mode_unresolved',
+};
+
+const reasonKeys: Record<string, string> = {
+    manual_archived: 'admin2.sdx_reason_manual_archived',
+    parent_missing: 'admin2.sdx_reason_parent_missing',
+    parent_conflict: 'admin2.sdx_reason_parent_conflict',
+    parent_inactive: 'admin2.sdx_reason_parent_inactive',
+    no_bookable_owner: 'admin2.sdx_reason_no_bookable_owner',
+    mixed_direction_targets: 'admin2.sdx_reason_mixed_targets',
+    overview_must_remain_internal: 'admin2.sdx_reason_overview_internal',
+    not_published: 'admin2.sdx_reason_not_published',
+    public_target_not_selectable: 'admin2.sdx_reason_public_target',
+    publish_target_not_selectable: 'admin2.sdx_reason_publish_target',
+};
+
+const precreateReasonKeys: Record<string, string> = {
+    no_active_service: 'admin2.sdx_precreate_no_service',
+    active_resource_owner: 'admin2.sdx_precreate_resource_owner',
+    no_explicit_service_owner: 'admin2.sdx_precreate_no_explicit_owner',
+    multiple_active_service_owners: 'admin2.sdx_precreate_multiple_owners',
+    ineligible_service_owner: 'admin2.sdx_precreate_ineligible_owner',
+    single_active_service_owner: 'admin2.sdx_precreate_single_owner',
+    active_queue_exists: 'admin2.sdx_precreate_queue_exists',
+};
+
+const actionLabelKeys: Record<QueueDirectionNextAction['kind'], string> = {
+    restore_profile: 'admin2.sdx_action_restore_profile',
+    configure_ownership: 'admin2.sdx_action_configure_ownership',
+    review_configuration: 'admin2.sdx_action_review_configuration',
+    publish_profile: 'admin2.sdx_action_publish_profile',
+    provision_permanent_address: 'admin2.sdx_action_provision_address',
+};
+
 const AdminSetupDirections = () => {
-    const { t } = useTranslation();
+    const { t, language } = useTranslation();
     const [view, setView] = useState<ScreenView>('checklist');
     const [services, setServices] = useState<ChecklistServiceDto[]>([]);
     const [profiles, setProfiles] = useState<ChecklistProfileDto[]>([]);
-    const [resources, setResources] = useState<QueueResourceDto[]>([]);
-    const [doctors, setDoctors] = useState<ChecklistDoctorDto[]>([]);
-    const [entryMethodsByProfileKey, setEntryMethodsByProfileKey] = useState<
-        Record<string, EntryMethodsDto | null>
-    >({});
-    // RQ-18 follow-up round-3 (P2): post-provision recheck answers as a
-    // SEPARATE tri-state override (undefined = no recheck answer yet;
-    // boolean = proven; null = recheck failed → honest unknown). Writing
-    // null INTO entryMethodsByProfileKey destroyed the last-known
-    // EntryMethodsDto — a later `true` then hit `!current` and the
-    // checklist row was stuck at unknown forever (only a full page
-    // reload resynced it).
-    const [postProvisionSupportByProfileKey, setPostProvisionSupportByProfileKey] =
-        useState<Record<string, boolean | null | undefined>>({});
-    // RQ-18 follow-up round-4 (P2-2): request generation for the
-    // post-provision recheck. Every full read (loadCore) bumps the
-    // generation; a recheck callback is accepted ONLY when it was issued
-    // in the CURRENT generation — a late answer from a recheck that
-    // started BEFORE the refresh must never overwrite the fresher full
-    // read (the «ложно зелёная строка» race).
-    const supportGenerationRef = useRef(0);
-    const [supportGeneration, setSupportGeneration] = useState(0);
+    const [directions, setDirections] = useState<QueueAdminDirections | null>(null);
+    const [selectedDay, setSelectedDay] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [resourceLoading, setResourceLoading] = useState(false);
+    const [resourceError, setResourceError] = useState<string | null>(null);
+    const [resourceDataLoaded, setResourceDataLoaded] = useState(false);
+    const [expandedQrProfileKey, setExpandedQrProfileKey] = useState<string | null>(null);
+    const [qrReadStates, setQrReadStates] = useState<Record<string, QrReadState>>({});
+    const qrReadStatesRef = useRef<Record<string, QrReadState>>({});
+    const qrInFlightRef = useRef(new Map<string, { generation: number; promise: Promise<void> }>());
+    const qrQueueRef = useRef<Promise<void>>(Promise.resolve());
+    const coreRequestRef = useRef(0);
+    const resourceRequestRef = useRef(0);
+    const supportGenerationRef = useRef(0);
+    const [supportGeneration, setSupportGeneration] = useState(0);
     const [wizard, setWizard] = useState<WizardState>(emptyWizard);
 
-    // RQ-18: react-i18next's `t` gets a new identity on every render, so
-    // using it directly in loadCore's deps made the mount effect re-run
-    // FOREVER (measured: 360 GETs in 400ms on main — the checklist
-    // unmounted/remounted in a loop and any in-block state was wiped).
-    // The ref keeps loadCore's identity stable; language switches still
-    // take effect on the next render.
     const tRef = useRef(t);
     useEffect(() => {
         tRef.current = t;
     });
 
-    const loadCore = useCallback(async () => {
-        try {
-            // Round-4 (P2-2): the new full read invalidates every recheck
-            // issued in a previous generation. Bumped BEFORE the awaits so
-            // an in-flight recheck is already stale from this moment.
-            supportGenerationRef.current += 1;
-            setSupportGeneration(supportGenerationRef.current);
-            setLoading(true);
-            setError(null);
-            const [servicesRes, profilesRes, resourcesRows, doctorsRes] = await Promise.all([
-                api.get('/services?limit=1000') as Promise<{ data: unknown }>,
-                api.get('/queues/profiles?active_only=false') as Promise<{
-                    data: { profiles?: ChecklistProfileDto[] };
-                }>,
-                listQueueResources(),
-                // (а) doctor-owned leg: read-side активных Doctor-записей
-                // (brief §3(а)); endpoint отдаёт только active=true
-                api.get('/services/admin/doctors?limit=500') as Promise<{
-                    data: ChecklistDoctorDto[];
-                }>,
-            ]);
-            const serviceRows = (Array.isArray(servicesRes.data)
-                ? servicesRes.data
-                : []) as ChecklistServiceDto[];
-            const profileRows = (profilesRes.data?.profiles || []) as ChecklistProfileDto[];
-            const doctorRows = (
-                Array.isArray(doctorsRes.data) ? doctorsRes.data : []
-            ) as ChecklistDoctorDto[];
-            setServices(serviceRows);
-            setProfiles(profileRows);
-            setResources(resourcesRows);
-            setDoctors(doctorRows);
+    const writeQrReadState = useCallback((profileKey: string, state: QrReadState) => {
+        qrReadStatesRef.current = { ...qrReadStatesRef.current, [profileKey]: state };
+        setQrReadStates((previous) => ({ ...previous, [profileKey]: state }));
+    }, []);
 
-            // (д) provision-статус — только для QR-visible профилей (иначе
-            // read-side честно отказывает); ошибка чтения → статус неизвестен.
-            const qrVisible = profileRows.filter(
-                (p) => p.is_active !== false && p.show_on_qr_page === true && p.key,
-            );
-            const methods = await Promise.all(
-                qrVisible.map(async (profile) => {
-                    try {
-                        const res = (await api.get(
-                            `/queue/directions/${encodeURIComponent(String(profile.key))}/entry-methods`,
-                        )) as { data: EntryMethodsDto };
-                        return [String(profile.key), res.data] as const;
-                    } catch (err) {
-                        logger.warn(
-                            `entry-methods unavailable for profile ${String(profile.key)}`,
-                            err,
-                        );
-                        return [String(profile.key), null] as const;
-                    }
-                }),
-            );
-            setEntryMethodsByProfileKey(Object.fromEntries(methods));
-            // A fresh FULL read is the new source of truth — any
-            // post-provision override from a previous lifecycle is stale.
-            setPostProvisionSupportByProfileKey({});
+    const loadCore = useCallback(async (day?: string) => {
+        const requestId = ++coreRequestRef.current;
+        const nextGeneration = supportGenerationRef.current + 1;
+        supportGenerationRef.current = nextGeneration;
+        setSupportGeneration(nextGeneration);
+        qrReadStatesRef.current = {};
+        setQrReadStates({});
+        setExpandedQrProfileKey(null);
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await fetchAdminQueueDirections(day);
+            if (requestId !== coreRequestRef.current) return;
+            setDirections(response);
         } catch (err) {
+            if (requestId !== coreRequestRef.current) return;
             logger.error('Error loading setup directions data:', err);
             setError(tRef.current('admin2.sdx_load_failed'));
         } finally {
-            setLoading(false);
+            if (requestId === coreRequestRef.current) setLoading(false);
         }
     }, []);
 
     useEffect(() => {
-        void loadCore();
-    }, [loadCore]);
+        void loadCore(selectedDay || undefined);
+        return () => {
+            coreRequestRef.current += 1;
+        };
+    }, [loadCore, selectedDay]);
 
-    const checklist: Checklist = useMemo(
-        () =>
-            buildChecklist(
-                services,
-                profiles,
-                resources,
-                entryMethodsByProfileKey,
-                doctors,
-                postProvisionSupportByProfileKey,
-            ),
-        [services, profiles, resources, entryMethodsByProfileKey, doctors, postProvisionSupportByProfileKey],
-    );
-
-    // Workstream A (Tasks 2/5): явные назначения «услуга → врач», которые
-    // не может исполнить ни одна карточка мастера (врач неактивен/отсутствует
-    // или не проходит специальность), и врач-исполняемые услуги без
-    // specialty-маппинга. Виден только на checklist-виде; каждая строка —
-    // точная причина + ссылка на экран исправления.
-    const assignmentGaps: ServiceAssignmentGap[] = useMemo(
-        // PR 3511 review P1 (round 5): ресурсы реестра передаются в
-        // проверку назначений — закреплённая услуга с тегом АКТИВНОЙ
-        // ресурсной очереди это видимый админу конфликт владельца
-        // (номер PR без решётки: ui-baseline tsxHex ratchet считает
-        // hex-литералом любую решётку с 3-8 hex-цифрами в TSX).
-        () => collectServiceAssignmentGaps(services, doctors, resources),
-        [services, doctors, resources],
-    );
-
-    // RQ-18 follow-up (P2-4): the permanent address is provisioned PER
-    // PROFILE, while checklist rows are per-tag — a profile carrying
-    // several queue_tags must render its QR block ONCE (the first visible
-    // tag row owns it), not once per tag with independent React states.
-    // Pure derivation — no render-order mutations (StrictMode-safe).
-    const qrRowByProfileKey = useMemo(() => {
-        const first: Record<string, string> = {};
-        for (const row of Object.values(checklist)) {
-            const key = row.owningProfile?.key;
-            if (key && row.owningProfileVisible && !(String(key) in first)) {
-                first[String(key)] = row.tag;
-            }
+    const loadResourceData = useCallback(async (force = false) => {
+        if (resourceDataLoaded && !force) return;
+        const requestId = ++resourceRequestRef.current;
+        setResourceLoading(true);
+        setResourceError(null);
+        try {
+            const [serviceResponse, profileResponse] = await Promise.all([
+                api.get('/services?limit=1000') as Promise<{ data: unknown }>,
+                api.get('/queues/profiles?active_only=false') as Promise<{
+                    data: { profiles?: ChecklistProfileDto[] };
+                }>,
+            ]);
+            if (requestId !== resourceRequestRef.current) return;
+            setServices(
+                Array.isArray(serviceResponse.data)
+                    ? serviceResponse.data as ChecklistServiceDto[]
+                    : [],
+            );
+            setProfiles(profileResponse.data?.profiles || []);
+            setResourceDataLoaded(true);
+        } catch (err) {
+            if (requestId !== resourceRequestRef.current) return;
+            logger.error('Error loading queue resource editor data:', err);
+            setResourceError(tRef.current('admin2.sdx_resource_load_failed'));
+        } finally {
+            if (requestId === resourceRequestRef.current) setResourceLoading(false);
         }
-        return first;
-    }, [checklist]);
+    }, [resourceDataLoaded]);
 
-    // RQ-18 follow-up (P2-3): the QR block re-reads entry-methods after a
-    // provision and reports the fresh permanent_address.supported — the
-    // checklist row status must follow (a freshly provisioned healthy
-    // direction drops the stale «не готово» state; a failed recheck is an
-    // honest unknown, never a confident «недоступно»).
+    useEffect(() => {
+        if (view === 'resources') void loadResourceData();
+    }, [loadResourceData, view]);
+
+    const ensureQrRead = useCallback((profileKey: string, retry = false) => {
+        const generation = supportGenerationRef.current;
+        const current = qrReadStatesRef.current[profileKey];
+        if (!retry && current?.generation === generation && current.status !== 'error') return;
+        const inFlight = qrInFlightRef.current.get(profileKey);
+        if (!retry && inFlight?.generation === generation) return;
+
+        writeQrReadState(profileKey, { generation, status: 'loading', supported: null });
+        const queued = qrQueueRef.current.then(async () => {
+            if (generation !== supportGenerationRef.current) return null;
+            return fetchDirectionEntryMethods(profileKey);
+        });
+        qrQueueRef.current = queued.then(() => undefined, () => undefined);
+        const request = queued.then(
+            (methods) => {
+                if (!methods || generation !== supportGenerationRef.current) return;
+                writeQrReadState(profileKey, {
+                    generation,
+                    status: 'loaded',
+                    supported: readPermanentAddressSupported(methods),
+                });
+            },
+            (err) => {
+                if (generation !== supportGenerationRef.current) return;
+                logger.warn('entry-methods unavailable for profile ' + profileKey, err);
+                writeQrReadState(profileKey, { generation, status: 'error', supported: null });
+            },
+        );
+        qrInFlightRef.current.set(profileKey, { generation, promise: request });
+        void request.finally(() => {
+            if (qrInFlightRef.current.get(profileKey)?.promise === request) {
+                qrInFlightRef.current.delete(profileKey);
+            }
+        });
+    }, [writeQrReadState]);
+
     const handleQrSupportedChange = useCallback(
         (profileKey: string, supported: boolean | null, generation?: number) => {
-            // RQ-18 follow-up round-3 (P2): record the recheck answer as a
-            // tri-state OVERRIDE — the last-known EntryMethodsDto is never
-            // destroyed, so the row can move unknown → true (or → false)
-            // when the recheck answers after the pending unknown.
-            // RQ-18 follow-up round-4 (P2-2): the override is accepted only
-            // from a recheck issued in the CURRENT generation — a late
-            // answer from a pre-refresh recheck is dropped (not older than
-            // the last full read, or it never lands).
-            const issuedGeneration =
-                typeof generation === 'number'
-                    ? generation
-                    : supportGenerationRef.current;
-            if (issuedGeneration < supportGenerationRef.current) {
-                return;
-            }
-            setPostProvisionSupportByProfileKey((prev) => ({
-                ...prev,
-                [profileKey]: supported,
-            }));
+            const issuedGeneration = generation ?? supportGenerationRef.current;
+            if (issuedGeneration !== supportGenerationRef.current) return;
+            writeQrReadState(profileKey, { generation: issuedGeneration, status: 'loaded', supported });
         },
-        [],
+        [writeQrReadState],
     );
 
-    const wizardTagOptions = useMemo(
-        () => candidateTags(services, profiles).map((tag) => ({ value: tag, label: tag })),
-        [services, profiles],
-    );
+    const handleAddressProvisioned = useCallback((profileKey: string, generation?: number) => {
+        if ((generation ?? supportGenerationRef.current) !== supportGenerationRef.current) return;
+        setDirections((previous) => previous ? {
+            ...previous,
+            directions: (previous.directions || []).map((direction) =>
+                direction.profile.key === profileKey
+                    ? { ...direction, permanent_address_exists: true }
+                    : direction,
+            ),
+        } : previous);
+    }, []);
 
+    const wizardTagOptions = useMemo(() => {
+        const tags = new Set<string>();
+        for (const direction of directions?.directions || []) {
+            for (const tag of direction.profile.queue_tags || []) if (tag) tags.add(tag);
+        }
+        for (const tag of directions?.unattached?.queue_tags || []) if (tag) tags.add(tag);
+        return [...tags].sort((a, b) => a.localeCompare(b)).map((tag) => ({ value: tag, label: tag }));
+    }, [directions]);
     const openResources = useCallback(() => setView('resources'), []);
     const openChecklist = useCallback(() => setView('checklist'), []);
 
@@ -295,6 +293,63 @@ const AdminSetupDirections = () => {
         return (
             <span className={cls}>
                 <Icon size={15} aria-hidden />
+            </span>
+        );
+    };
+
+    const directionTitle = (direction: QueueAdminDirection) =>
+        (language === 'ru' ? direction.profile.title_ru : null) ||
+        direction.profile.title ||
+        (direction.profile.queue_tags || []).join(', ');
+
+    const reasonLabel = (code: string) =>
+        t(reasonKeys[code] || 'admin2.sdx_reason_unknown');
+
+    const toggleQr = (profileKey: string) => {
+        if (expandedQrProfileKey === profileKey) {
+            setExpandedQrProfileKey(null);
+            return;
+        }
+        setExpandedQrProfileKey(profileKey);
+        ensureQrRead(profileKey);
+    };
+
+    const openOwnershipSetup = (action: QueueDirectionNextAction, direction: QueueAdminDirection) => {
+        setView('checklist');
+        setWizard({
+            open: true,
+            step: 0,
+            axis: null,
+            tag: action.entity_key || direction.profile.queue_tags?.[0] || '',
+        });
+    };
+
+    const renderActionControl = (action: QueueDirectionNextAction, direction: QueueAdminDirection) => {
+        const label = t(actionLabelKeys[action.kind]);
+        if (action.kind === 'provision_permanent_address') {
+            return (
+                <Button key={`${action.kind}:${action.entity_key || ''}`} variant="secondary" size="sm" onClick={() => toggleQr(direction.profile.key)}>
+                    {label}
+                </Button>
+            );
+        }
+        if (action.kind === 'configure_ownership' || (action.kind === 'review_configuration' && action.entity_type === 'queue_tag')) {
+            return (
+                <Button key={`${action.kind}:${action.entity_key || ''}`} variant="secondary" size="sm" onClick={() => openOwnershipSetup(action, direction)}>
+                    {label}
+                </Button>
+            );
+        }
+        if (action.kind === 'restore_profile' || action.kind === 'publish_profile' || (action.kind === 'review_configuration' && action.entity_type === 'queue_profile')) {
+            return (
+                <Link key={`${action.kind}:${action.entity_key || ''}`} className="admin-sdx-link" to="/admin/services?servicesTab=queue-profiles">
+                    {label} <ExternalLink className="admin-sdx-icon-m" size={11} />
+                </Link>
+            );
+        }
+        return (
+            <span key={`${action.kind}:${action.entity_type}:${action.entity_key || ''}`} className="admin-sdx-muted" data-testid="setup-action-without-editor">
+                {label} — {t('admin2.sdx_action_no_direct_editor')}
             </span>
         );
     };
@@ -326,7 +381,7 @@ const AdminSetupDirections = () => {
                     <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => void loadCore()}
+                        onClick={() => void loadCore(selectedDay || undefined)}
                         disabled={loading}
                         data-testid="setup-refresh"
                     >
@@ -341,6 +396,9 @@ const AdminSetupDirections = () => {
             {error && (
                 <div role="alert" className="admin-sdx-alert" data-testid="setup-directions-error">
                     {error}
+                    <Button variant="secondary" size="sm" onClick={() => void loadCore(selectedDay || undefined)}>
+                        {t('admin2.sdx_retry')}
+                    </Button>
                 </div>
             )}
 
@@ -357,11 +415,26 @@ const AdminSetupDirections = () => {
                             {t('admin2.sdx_back_to_checklist')}
                         </Button>
                     </div>
-                    <QueueResourceManager
-                        services={services}
-                        profiles={profiles}
-                        onRegistryChanged={() => void loadCore()}
-                    />
+                    {resourceError && (
+                        <div role="alert" className="admin-sdx-alert" data-testid="setup-resource-error">
+                            {resourceError}
+                            <Button variant="secondary" size="sm" onClick={() => void loadResourceData(true)}>
+                                {t('admin2.sdx_retry')}
+                            </Button>
+                        </div>
+                    )}
+                    {resourceLoading ? (
+                        <div className="admin-sdx-note" role="status">{t('admin2.sdx_loading')}</div>
+                    ) : resourceDataLoaded && !resourceError ? (
+                        <QueueResourceManager
+                            services={services}
+                            profiles={profiles}
+                            onRegistryChanged={() => {
+                                void loadResourceData(true);
+                                void loadCore(selectedDay || undefined);
+                            }}
+                        />
+                    ) : null}
                 </>
             ) : (
                 <>
@@ -534,7 +607,7 @@ const AdminSetupDirections = () => {
                                                 variant="secondary"
                                                 size="sm"
                                                 onClick={() => {
-                                                    void loadCore();
+                                                    void loadCore(selectedDay || undefined);
                                                     setView('checklist');
                                                     setWizard((w) => ({ ...w, step: 4 }));
                                                 }}
@@ -583,213 +656,351 @@ const AdminSetupDirections = () => {
                         </Card>
                     )}
 
-                    {/* —— Workstream A: назначения «услуга → врач» —— */}
-                    {view === 'checklist' && assignmentGaps.length > 0 && (
-                        <Card data-testid="setup-assignment-gaps" className="admin-sdx-card-gap">
-                            <CardHeader>
-                                <CardTitle>{t('admin2.sdx_assignment_title')}</CardTitle>
-                                <CardDescription>{t('admin2.sdx_assignment_subtitle')}</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="admin-sdx-rows">
-                                    {assignmentGaps.map((gap) => (
-                                        <div
-                                            key={`${gap.serviceId}:${gap.reason}`}
-                                            className="admin-sdx-card"
-                                            data-testid={`setup-assignment-gap-${gap.serviceId}`}
-                                        >
-                                            <div className="admin-sdx-row-head">
-                                                <code className="admin-sdx-code">{gap.serviceCode || gap.serviceId}</code>
-                                                <span className="admin-sdx-row-sub">{gap.serviceName}</span>
-                                            </div>
-                                            <table className="admin-sdx-table">
-                                                <tbody>
-                                                    <tr>
-                                                        <td className="admin-sdx-cell-icon">{statusIcon(false)}</td>
-                                                        <td className="admin-sdx-cell">
-                                                            {gap.reason === 'doctor_missing' &&
-                                                                t('admin2.sdx_assignment_doctor_missing', {
-                                                                    service: gap.serviceName,
-                                                                    id: gap.pinnedDoctorId ?? '',
-                                                                })}
-                                                            {gap.reason === 'specialty_mismatch' &&
-                                                                t('admin2.sdx_assignment_specialty_mismatch', {
-                                                                    service: gap.serviceName,
-                                                                })}
-                                                            {gap.reason === 'missing_specialty_mapping' &&
-                                                                t('admin2.sdx_assignment_missing_mapping', {
-                                                                    service: gap.serviceName,
-                                                                })}
-                                                            {gap.reason === 'resource_queue_conflict' &&
-                                                                t('admin2.sdx_assignment_resource_queue', {
-                                                                    service: gap.serviceName,
-                                                                    tag: gap.queueTag ?? '',
-                                                                })}
-                                                        </td>
-                                                        <td className="admin-sdx-cell-right">
-                                                            {gap.reason === 'doctor_missing' ? (
-                                                                <Link className="admin-sdx-link" to="/admin/doctors">
-                                                                    {t('admin2.sdx_assignment_fix_doctors')} <ExternalLink className="admin-sdx-icon-m" size={11} />
-                                                                </Link>
-                                                            ) : (
-                                                                <Link className="admin-sdx-link" to="/admin/services?servicesTab=catalog">
-                                                                    {t('admin2.sdx_assignment_fix_catalog')} <ExternalLink className="admin-sdx-icon-m" size={11} />
-                                                                </Link>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                    <div className="admin-sdx-day-bar">
+                        <label htmlFor="setup-directions-day">{t('admin2.sdx_day_label')}</label>
+                        <input
+                            id="setup-directions-day"
+                            type="date"
+                            aria-label={t('admin2.sdx_day_label')}
+                            value={selectedDay || (!loading ? directions?.as_of_day || '' : '')}
+                            onChange={(event) => setSelectedDay(event.currentTarget.value)}
+                            data-testid="setup-day-select"
+                        />
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedDay('')} data-testid="setup-day-today">
+                            {t('admin2.sdx_day_today')}
+                        </Button>
+                        {directions?.as_of_day && (
+                            <span className="admin-sdx-muted" data-testid="setup-day-context">
+                                {t('admin2.sdx_day_context', { day: directions.as_of_day })}
+                            </span>
+                        )}
+                        {loading && directions && <span role="status">{t('admin2.sdx_refreshing')}</span>}
+                    </div>
 
-                    {/* —— Checklist готовности по тег-строкам —— */}
-                    <Card data-testid="setup-checklist">
+                    <Card data-testid="setup-directions-facts">
                         <CardHeader>
                             <CardTitle>{t('admin2.sdx_checklist_title')}</CardTitle>
                             <CardDescription>{t('admin2.sdx_checklist_subtitle')}</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            {loading ? (
-                                <div className="admin-sdx-note">{t('admin2.sdx_loading')}</div>
-                            ) : Object.keys(checklist).length === 0 ? (
+                            {!directions && loading ? (
+                                <div className="admin-sdx-note" role="status">{t('admin2.sdx_loading')}</div>
+                            ) : !directions ? (
                                 <div className="admin-sdx-note" data-testid="setup-checklist-empty">
                                     {t('admin2.sdx_checklist_empty')}
                                 </div>
+                            ) : (directions.directions || []).length === 0 ? (
+                                <div className="admin-sdx-note" data-testid="setup-checklist-empty">
+                                    {t('admin2.sdx_no_profiles')}
+                                </div>
                             ) : (
                                 <div className="admin-sdx-rows">
-                                    {Object.values(checklist).map((row) => (
-                                        <div key={row.tag} className="admin-sdx-card" data-testid={`setup-checklist-row-${row.tag}`}>
-                                            <div className="admin-sdx-row-head">
-                                                <code className="admin-sdx-code">{row.tag}</code>
-                                                {row.axis === 'resource' && (
-                                                    <Badge variant="info" data-testid="setup-row-axis-resource">
-                                                        {t('admin2.sdx_axis_resource_badge')}
+                                    {(directions.directions || []).map((direction) => {
+                                        const profile = direction.profile;
+                                        const qrKey = profile.key;
+                                        const qrState = qrReadStates[qrKey]?.generation === supportGeneration
+                                            ? qrReadStates[qrKey]
+                                            : undefined;
+                                        const provisionAction = (direction.allowed_next_actions || []).some(
+                                            (action) => action.kind === 'provision_permanent_address',
+                                        );
+                                        const canOpenQr = direction.public_availability &&
+                                            (direction.permanent_address_exists || provisionAction);
+                                        const firstTag = profile.queue_tags?.[0] || String(profile.id);
+                                        const reasons = direction.configuration_reasons || [];
+                                        const targets = direction.booking_targets || [];
+                                        const queues = direction.current_day_queues || [];
+                                        const precreate = direction.precreate_by_tag || [];
+
+                                        return (
+                                            <section
+                                                key={profile.id}
+                                                className="admin-sdx-card admin-sdx-direction-card"
+                                                data-testid={'setup-checklist-row-' + firstTag}
+                                            >
+                                                <div className="admin-sdx-row-head">
+                                                    <h3 className="admin-sdx-direction-title">{directionTitle(direction)}</h3>
+                                                    <Badge variant={direction.configuration_state === 'ready' ? 'info' : 'secondary'}>
+                                                        {t(configurationStateKeys[direction.configuration_state])}
                                                     </Badge>
-                                                )}
-                                                {row.axis === 'doctor' && (
-                                                    <Badge data-testid="setup-row-axis-doctor">
-                                                        {t('admin2.sdx_axis_doctor_badge')}
-                                                    </Badge>
-                                                )}
-                                                {row.owningProfile?.title_ru && (
-                                                    <span className="admin-sdx-row-sub">
-                                                        {String(row.owningProfile.title_ru)}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <table className="admin-sdx-table">
-                                                <tbody>
-                                                    <tr data-testid="setup-row-executor">
-                                                        <td className="admin-sdx-cell-icon">{statusIcon(row.executorReady)}</td>
-                                                        <td className="admin-sdx-cell">{t('admin2.sdx_step_executor')}</td>
-                                                        <td className="admin-sdx-cell-right">
-                                                            {!row.executorReady && (
-                                                                <Link className="admin-sdx-link" to="/admin/users">
-                                                                    {t('admin2.sdx_fix_executor')} <ExternalLink className="admin-sdx-icon-m" size={11} />
-                                                                </Link>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                    <tr data-testid="setup-row-services">
-                                                        <td className="admin-sdx-cell-icon">{statusIcon(row.activeServices.length > 0)}</td>
-                                                        <td className="admin-sdx-cell">
-                                                            {t('admin2.sdx_step_services', { n: row.activeServices.length })}
-                                                        </td>
-                                                        <td className="admin-sdx-cell-right">
-                                                            {row.activeServices.length === 0 && (
-                                                                <Link className="admin-sdx-link" to="/admin/services?servicesTab=catalog">
-                                                                    {t('admin2.sdx_fix_services')} <ExternalLink className="admin-sdx-icon-m" size={11} />
-                                                                </Link>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                    {row.axis === 'resource' && (
-                                                        <tr data-testid="setup-row-doctorless">
-                                                            <td className="admin-sdx-cell-icon">
-                                                                {statusIcon(row.activeDoctorlessServices.length > 0)}
-                                                            </td>
-                                                            <td className="admin-sdx-cell">
-                                                                {t('admin2.sdx_step_doctorless', { n: row.activeDoctorlessServices.length })}
-                                                            </td>
-                                                            <td className="admin-sdx-cell-right">
-                                                                {row.activeDoctorlessServices.length === 0 && (
-                                                                    <Link className="admin-sdx-link" to="/admin/services?servicesTab=catalog">
-                                                                        {t('admin2.sdx_fix_services')} <ExternalLink className="admin-sdx-icon-m" size={11} />
-                                                                    </Link>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                    <tr data-testid="setup-row-profile">
-                                                        <td className="admin-sdx-cell-icon">{statusIcon(row.owningProfile != null)}</td>
-                                                        <td className="admin-sdx-cell">{t('admin2.sdx_step_profile')}</td>
-                                                        <td className="admin-sdx-cell-right">
-                                                            {!row.owningProfile && (
-                                                                <Link className="admin-sdx-link" to="/admin/services?servicesTab=queue-profiles">
-                                                                    {t('admin2.sdx_fix_profile')} <ExternalLink className="admin-sdx-icon-m" size={11} />
-                                                                </Link>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                    <tr data-testid="setup-row-visible">
-                                                        <td className="admin-sdx-cell-icon">{statusIcon(row.owningProfileVisible)}</td>
-                                                        <td className="admin-sdx-cell">{t('admin2.sdx_step_visible')}</td>
-                                                        <td className="admin-sdx-cell-right">
-                                                            {row.owningProfile && !row.owningProfileVisible && (
-                                                                <Link className="admin-sdx-link" to="/admin/services?servicesTab=queue-profiles">
-                                                                    {t('admin2.sdx_fix_visible')} <ExternalLink className="admin-sdx-icon-m" size={11} />
-                                                                </Link>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                    <tr data-testid="setup-row-permanent-address">
-                                                        <td className="admin-sdx-cell-icon">{statusIcon(row.permanentAddress)}</td>
-                                                        <td className="admin-sdx-cell">
-                                                            {row.permanentAddress === null
-                                                                ? t('admin2.sdx_step_address_unknown')
-                                                                : t('admin2.sdx_step_address')}
-                                                        </td>
-                                                        <td className={`admin-sdx-cell-right admin-sdx-muted`}>
-                                                            {row.permanentAddress !== true && t('admin2.sdx_step_address_hint')}
-                                                        </td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                            {row.owningProfile?.key && row.owningProfileVisible && (
-                                                qrRowByProfileKey[String(row.owningProfile.key)] === row.tag ? (
-                                                    <PermanentDirectionQr
-                                                        profileKey={String(row.owningProfile.key)}
-                                                        tag={row.tag}
-                                                        supported={row.permanentAddress}
-                                                        onSupportedChange={handleQrSupportedChange}
-                                                        supportGeneration={supportGeneration}
-                                                    />
-                                                ) : (
-                                                    /* RQ-18 follow-up (P2-4): sibling tag rows of the
-                                                       SAME profile show a pointer instead of a second,
-                                                       independent QR block — the address belongs to the
-                                                       profile as a whole, not to an individual tag. */
-                                                    <div
-                                                        className="admin-sdx-qr-dedupe-note"
-                                                        data-testid={`setup-qr-dedupe-${row.tag}`}
-                                                    >
-                                                        {t('admin2.qrdx_dedupe_note', {
-                                                            tag: qrRowByProfileKey[String(row.owningProfile.key)],
-                                                        })}
+                                                    {(profile.queue_tags || []).map((tag) => (
+                                                        <code className="admin-sdx-code" key={tag}>{tag}</code>
+                                                    ))}
+                                                </div>
+
+                                                <section className="admin-sdx-fact-group" aria-label={t('admin2.sdx_group_configuration')}>
+                                                    <h4>{t('admin2.sdx_group_configuration')}</h4>
+                                                    <div className="admin-sdx-fact-row">
+                                                        {statusIcon(
+                                                            direction.configuration_state === 'ready'
+                                                                ? true
+                                                                : direction.configuration_state === 'incomplete'
+                                                                  ? null
+                                                                  : false,
+                                                        )}
+                                                        <span>{t(configurationStateKeys[direction.configuration_state])}</span>
+                                                        <span className="admin-sdx-muted">{t(modeKeys[direction.resolved_mode])}</span>
                                                     </div>
-                                                )
-                                            )}
-                                        </div>
-                                    ))}
+                                                    <div className="admin-sdx-fact-row">
+                                                        {statusIcon(
+                                                            direction.effective_availability === 'available'
+                                                                ? true
+                                                                : direction.effective_availability === 'conflict'
+                                                                  ? false
+                                                                  : null,
+                                                        )}
+                                                        <span>{t('admin2.sdx_effective_availability')}</span>
+                                                        <span>{t('admin2.sdx_availability_' + direction.effective_availability)}</span>
+                                                    </div>
+                                                    {reasons.length > 0 && (
+                                                        <ul className="admin-sdx-reason-list" data-testid="setup-direction-reasons">
+                                                            {reasons.map((reason, index) => (
+                                                                <li key={reason.code + ':' + index} data-severity={reason.severity}>
+                                                                    {reasonLabel(reason.code)}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                    {(direction.effective_availability_reasons || []).length > 0 && (
+                                                        <ul className="admin-sdx-reason-list">
+                                                            {(direction.effective_availability_reasons || []).map((code, index) => (
+                                                                <li key={code + ':' + index}>{reasonLabel(code)}</li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </section>
+
+                                                <section className="admin-sdx-fact-group" aria-label={t('admin2.sdx_group_public')}>
+                                                    <h4>{t('admin2.sdx_group_public')}</h4>
+                                                    <div className="admin-sdx-fact-row" data-testid="setup-row-profile-active">
+                                                        <span>{t('admin2.sdx_profile_activity')}</span>
+                                                        <span>{t(profile.is_active ? 'admin2.sdx_profile_active' : 'admin2.sdx_profile_inactive')}</span>
+                                                    </div>
+                                                    <div className="admin-sdx-fact-row" data-testid="setup-row-public-setting">
+                                                        <span>{t('admin2.sdx_saved_qr_setting')}</span>
+                                                        <span>{t(profile.show_on_qr_page ? 'admin2.sdx_qr_setting_on' : 'admin2.sdx_qr_setting_off')}</span>
+                                                    </div>
+                                                    <div className="admin-sdx-fact-row" data-testid="setup-row-public-availability">
+                                                        <span>{t('admin2.sdx_public_entry')}</span>
+                                                        <span>{t(direction.public_availability ? 'admin2.sdx_public_available' : 'admin2.sdx_public_unavailable')}</span>
+                                                    </div>
+                                                    <div className="admin-sdx-fact-row" data-testid="setup-row-permanent-address">
+                                                        <span>{t('admin2.sdx_address_exists')}</span>
+                                                        <span>{t(direction.permanent_address_exists ? 'admin2.sdx_yes' : 'admin2.sdx_no')}</span>
+                                                    </div>
+                                                    {canOpenQr && (
+                                                        <div className="admin-sdx-qr-disclosure">
+                                                            <Button
+                                                                variant="secondary"
+                                                                size="sm"
+                                                                aria-expanded={expandedQrProfileKey === qrKey}
+                                                                onClick={() => toggleQr(qrKey)}
+                                                                data-testid={'setup-qr-expand-' + firstTag}
+                                                            >
+                                                                {t(provisionAction ? actionLabelKeys.provision_permanent_address : 'admin2.sdx_qr_open')}
+                                                            </Button>
+                                                            {expandedQrProfileKey === qrKey && (
+                                                                <div className="admin-sdx-qr-load-state">
+                                                                    {qrState?.status === 'loading' && (
+                                                                        <div role="status">{t('admin2.sdx_qr_loading')}</div>
+                                                                    )}
+                                                                    {qrState?.status === 'error' && (
+                                                                        <div role="alert" className="admin-sdx-qr-error">
+                                                                            {t('admin2.sdx_qr_read_failed')}
+                                                                            <Button
+                                                                                variant="secondary"
+                                                                                size="sm"
+                                                                                onClick={() => ensureQrRead(qrKey, true)}
+                                                                                data-testid={'setup-qr-read-retry-' + firstTag}
+                                                                            >
+                                                                                {t('admin2.sdx_retry')}
+                                                                            </Button>
+                                                                        </div>
+                                                                    )}
+                                                                    {qrState?.status === 'loaded' && (
+                                                                        <>
+                                                                            {qrState.supported === null && (
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    onClick={() => ensureQrRead(qrKey, true)}
+                                                                                    data-testid={'setup-qr-read-retry-' + firstTag}
+                                                                                >
+                                                                                    {t('admin2.sdx_retry')}
+                                                                                </Button>
+                                                                            )}
+                                                                            <PermanentDirectionQr
+                                                                                profileKey={qrKey}
+                                                                                tag={firstTag}
+                                                                                supported={qrState.supported}
+                                                                                onSupportedChange={handleQrSupportedChange}
+                                                                                onAddressProvisioned={handleAddressProvisioned}
+                                                                                supportGeneration={supportGeneration}
+                                                                            />
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </section>
+
+                                                <section className="admin-sdx-fact-group" aria-label={t('admin2.sdx_group_targets')}>
+                                                    <h4>{t('admin2.sdx_group_targets')}</h4>
+                                                    {targets.length === 0 ? (
+                                                        <p className="admin-sdx-muted">{t('admin2.sdx_targets_empty')}</p>
+                                                    ) : (
+                                                        <ul className="admin-sdx-entity-list" data-testid="setup-direction-targets">
+                                                            {targets.map((target) => {
+                                                                const existingQueueCount = target.existing_daily_queue_ids?.length ?? 0;
+                                                                return (
+                                                                    <li key={target.owner_type + ':' + target.owner_id + ':' + target.queue_tag}>
+                                                                        <span className="admin-sdx-entity-title">
+                                                                            {target.label} — {t('admin2.sdx_owner_' + target.owner_type)}
+                                                                        </span>
+                                                                        <span>{t(target.eligible_for_new_booking ? 'admin2.sdx_target_bookable' : 'admin2.sdx_target_not_bookable')}</span>
+                                                                        {!target.is_active && <span>{t('admin2.sdx_target_inactive')}</span>}
+                                                                        {existingQueueCount > 0 && (
+                                                                            <span>{t('admin2.sdx_target_existing_queues', { n: existingQueueCount })}</span>
+                                                                        )}
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ul>
+                                                    )}
+                                                </section>
+
+                                                <section className="admin-sdx-fact-group" aria-label={t('admin2.sdx_group_queues')}>
+                                                    <h4>{t('admin2.sdx_group_queues', { day: directions.as_of_day })}</h4>
+                                                    {queues.length === 0 ? (
+                                                        <p className="admin-sdx-muted">{t('admin2.sdx_queues_empty')}</p>
+                                                    ) : (
+                                                        <ul className="admin-sdx-entity-list" data-testid="setup-direction-queues">
+                                                            {queues.map((queue) => {
+                                                                const target = targets.find((candidate) =>
+                                                                    candidate.owner_type === queue.owner_type &&
+                                                                    candidate.owner_id === queue.owner_id &&
+                                                                    candidate.queue_tag === queue.queue_tag,
+                                                                );
+                                                                const ownerType = queue.owner_type || 'unresolved';
+                                                                const ownerKey = ownerType === 'doctor' || ownerType === 'resource'
+                                                                    ? 'admin2.sdx_owner_' + ownerType
+                                                                    : 'admin2.sdx_owner_unresolved';
+                                                                const ownerLabel = target?.label || t(ownerKey);
+                                                                return (
+                                                                    <li key={queue.daily_queue_id}>
+                                                                        <span>{queue.queue_tag} — {ownerLabel}</span>
+                                                                        <span>{t('admin2.sdx_queue_id', { id: queue.daily_queue_id })}</span>
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ul>
+                                                    )}
+                                                </section>
+
+                                                <section className="admin-sdx-fact-group" aria-label={t('admin2.sdx_group_precreate')}>
+                                                    <h4>{t('admin2.sdx_group_precreate')}</h4>
+                                                    {precreate.length === 0 ? (
+                                                        <p className="admin-sdx-muted">{t('admin2.sdx_precreate_empty')}</p>
+                                                    ) : (
+                                                        <ul className="admin-sdx-entity-list" data-testid="setup-direction-precreate">
+                                                            {precreate.map((item) => (
+                                                                <li key={item.queue_tag}>
+                                                                    <span className="admin-sdx-entity-title">{item.queue_tag}</span>
+                                                                    <span>{t('admin2.sdx_precreate_state_' + item.state)}</span>
+                                                                    <span>{t('admin2.sdx_precreate_count', { n: item.active_service_count })}</span>
+                                                                    {item.owner_type && <span>{t('admin2.sdx_owner_' + item.owner_type)}</span>}
+                                                                    {(item.reason_codes || []).map((code, index) => (
+                                                                        <span className="admin-sdx-muted" key={code + ':' + index}>
+                                                                            {t(precreateReasonKeys[code] || 'admin2.sdx_reason_unknown')}
+                                                                        </span>
+                                                                    ))}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </section>
+
+                                                <section className="admin-sdx-fact-group" aria-label={t('admin2.sdx_group_actions')}>
+                                                    <h4>{t('admin2.sdx_group_actions')}</h4>
+                                                    {(direction.allowed_next_actions || []).filter((action) => action.kind !== 'provision_permanent_address').length === 0 ? (
+                                                        <p className="admin-sdx-muted">{t('admin2.sdx_actions_none')}</p>
+                                                    ) : (
+                                                        <div className="admin-sdx-action-list" data-testid="setup-direction-actions">
+                                                            {(direction.allowed_next_actions || []).filter((action) => action.kind !== 'provision_permanent_address').map((action) =>
+                                                                renderActionControl(action, direction),
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </section>
+                                            </section>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </CardContent>
                     </Card>
+
+                    {directions && (
+                        <Card data-testid="setup-unattached-catalog">
+                            <CardHeader>
+                                <CardTitle>{t('admin2.sdx_unattached_title')}</CardTitle>
+                                <CardDescription>{t('admin2.sdx_unattached_subtitle')}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {(directions.unattached?.queue_tags || []).length === 0 &&
+                                (directions.unattached?.services || []).length === 0 &&
+                                (directions.unattached?.resources || []).length === 0 ? (
+                                    <p className="admin-sdx-muted">{t('admin2.sdx_unattached_empty')}</p>
+                                ) : (
+                                    <div className="admin-sdx-unattached-grid">
+                                        <div>
+                                            <h4>{t('admin2.sdx_unattached_tags')}</h4>
+                                            {(directions.unattached?.queue_tags || []).length === 0 ? (
+                                                <p className="admin-sdx-muted">{t('admin2.sdx_unattached_empty_group')}</p>
+                                            ) : (
+                                                <ul className="admin-sdx-entity-list">
+                                                    {(directions.unattached?.queue_tags || []).map((tag) => <li key={tag}><code>{tag}</code></li>)}
+                                                </ul>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h4>{t('admin2.sdx_unattached_services')}</h4>
+                                            {(directions.unattached?.services || []).length === 0 ? (
+                                                <p className="admin-sdx-muted">{t('admin2.sdx_unattached_empty_group')}</p>
+                                            ) : (
+                                                <ul className="admin-sdx-entity-list">
+                                                    {(directions.unattached?.services || []).map((service) => (
+                                                        <li key={service.service_id}>
+                                                            <span>{service.name}</span>
+                                                            {service.queue_tag && <code>{service.queue_tag}</code>}
+                                                            {!service.active && <span>{t('admin2.sdx_target_inactive')}</span>}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h4>{t('admin2.sdx_unattached_resources')}</h4>
+                                            {(directions.unattached?.resources || []).length === 0 ? (
+                                                <p className="admin-sdx-muted">{t('admin2.sdx_unattached_empty_group')}</p>
+                                            ) : (
+                                                <ul className="admin-sdx-entity-list">
+                                                    {(directions.unattached?.resources || []).map((resource) => (
+                                                        <li key={resource.resource_id}>
+                                                            <span>{resource.display_name}</span>
+                                                            <code>{resource.queue_tag}</code>
+                                                            {!resource.active && <span>{t('admin2.sdx_target_inactive')}</span>}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
                 </>
             )}
         </div>
