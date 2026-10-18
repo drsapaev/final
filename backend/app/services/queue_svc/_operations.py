@@ -193,6 +193,200 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
     """Operations methods."""
 
     @classmethod
+    def _qr_doctor_direction_key(cls, specialty: str) -> str:
+        """Collapse only the specialty variants already accepted by registrar."""
+        from app.services.registrar_doctor_eligibility import (
+            DOCTOR_QUEUE_SPECIALTY_VARIANTS,
+        )
+
+        normalized = str(specialty or "").strip().lower()
+        if not normalized:
+            return ""
+        for variants in DOCTOR_QUEUE_SPECIALTY_VARIANTS.values():
+            group = {str(value).strip().lower() for value in variants if value}
+            if normalized in group:
+                return f"doctor:{min(group)}"
+        return f"doctor:{cls._normalize_qr_specialty_key(normalized)}"
+
+    @classmethod
+    def _qr_profile_owner_scope_from_targets(
+        cls,
+        profile: Any,
+        *,
+        resource_route_tags: set[str],
+        eligible_doctor_specialties: set[str],
+    ) -> tuple[tuple[str, str] | None, str | None]:
+        """Resolve configured tags to one concrete owner direction, if any.
+
+        Tags without a current booking owner do not create a second target.
+        Several accepted specialty spellings may still name one direction;
+        independent doctor families or resources are an internal overview.
+        """
+        from app.core.specialties import expand_queue_tags
+
+        profile_key = getattr(profile, "key", None)
+        if not profile_key:
+            return None, "no_bookable_owner"
+        queue_tags = set(
+            expand_queue_tags(
+                list(getattr(profile, "queue_tags", None) or [profile_key])
+            )
+        )
+        resources = sorted(queue_tags & resource_route_tags)
+        # ADR-001 QD-2C resolves an active registry surface before doctor selection.
+        # A doctor with the same specialty spelling is not a second routing
+        # target for that tag; doctors on other configured tags remain
+        # independent targets and still make the profile an internal overview.
+        doctor_specialties = sorted(
+            (queue_tags & eligible_doctor_specialties) - set(resources)
+        )
+
+        if len(resources) > 1 or (resources and doctor_specialties):
+            return None, "mixed_direction_targets"
+        if resources:
+            return ("resource", resources[0]), None
+        if not doctor_specialties:
+            return None, "no_bookable_owner"
+
+        doctor_directions = {
+            cls._qr_doctor_direction_key(specialty) for specialty in doctor_specialties
+        }
+        if len(doctor_directions) != 1:
+            return None, "mixed_direction_targets"
+        return ("doctor", next(iter(doctor_directions))), None
+
+    @classmethod
+    def _qr_profile_owner_scope(
+        cls,
+        db: Session,
+        profile: Any,
+        *,
+        day: date,
+    ) -> tuple[tuple[str, str] | None, str | None, list[str], set[str]]:
+        """Resolve a profile's live owner direction using canonical eligibility."""
+        from app.core.specialties import expand_queue_tags
+
+        profile_key = getattr(profile, "key", None)
+        if not profile_key:
+            return None, "no_bookable_owner", [], set()
+        queue_tags = expand_queue_tags(
+            list(getattr(profile, "queue_tags", None) or [profile_key])
+        )
+        resource_tags = cls._qr_profile_resource_tags(db, profile, day)
+        doctor_specialties = {
+            row[0]
+            for row in (
+                db.query(Doctor.specialty)
+                .join(User, Doctor.user_id == User.id)
+                .filter(
+                    Doctor.active.is_(True),
+                    Doctor.specialty.in_(queue_tags),
+                    Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+                    *qr_doctor_owner_eligibility_filters(),
+                )
+                .distinct()
+                .all()
+            )
+            if row[0]
+        }
+        scope, conflict = cls._qr_profile_owner_scope_from_targets(
+            profile,
+            resource_route_tags=set(resource_tags),
+            eligible_doctor_specialties=doctor_specialties,
+        )
+        return scope, conflict, resource_tags, doctor_specialties
+
+    @classmethod
+    def _qr_profile_owner_scopes_for_catalog(
+        cls,
+        db: Session,
+        profiles: list[Any],
+        *,
+        day: date,
+    ) -> tuple[dict[Any, tuple[str, str] | None], set[str]]:
+        """Resolve owner scopes and eligible doctor tags with bounded reads."""
+        if not profiles:
+            return {}, set()
+
+        queue_tags: set[str] = set()
+        for profile in profiles:
+            profile_key = getattr(profile, "key", None)
+            route_tags = expand_queue_tags(
+                list(
+                    getattr(profile, "queue_tags", None)
+                    or ([profile_key] if profile_key else [])
+                )
+            )
+            queue_tags.update(tag for tag in route_tags if tag)
+
+        resource_route_tags: set[str] = set()
+        eligible_doctor_specialties: set[str] = set()
+        if queue_tags:
+            sorted_queue_tags = sorted(queue_tags)
+            active_registry_tags = {
+                row[0]
+                for row in db.query(QueueResource.queue_tag)
+                .filter(
+                    QueueResource.active.is_(True),
+                    QueueResource.queue_tag.in_(sorted_queue_tags),
+                )
+                .all()
+            }
+            first_active_queue_owner_by_tag: dict[str, int | None] = {}
+            active_queue_rows = (
+                db.query(DailyQueue.queue_tag, DailyQueue.queue_resource_id)
+                .filter(
+                    DailyQueue.day == day,
+                    DailyQueue.active.is_(True),
+                    DailyQueue.queue_tag.in_(sorted_queue_tags),
+                )
+                .order_by(DailyQueue.id.asc())
+                .all()
+            )
+            for tag, resource_id in active_queue_rows:
+                first_active_queue_owner_by_tag.setdefault(tag, resource_id)
+            resource_route_tags = active_registry_tags | {
+                tag
+                for tag, resource_id in first_active_queue_owner_by_tag.items()
+                if resource_id is not None
+            }
+            eligible_doctor_specialties = {
+                row[0]
+                for row in (
+                    db.query(Doctor.specialty)
+                    .join(User, Doctor.user_id == User.id)
+                    .filter(
+                        Doctor.active.is_(True),
+                        Doctor.specialty.in_(sorted_queue_tags),
+                        Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+                        *qr_doctor_owner_eligibility_filters(),
+                    )
+                    .distinct()
+                    .all()
+                )
+                if row[0]
+            }
+
+        owner_scope_by_profile: dict[Any, tuple[str, str] | None] = {}
+        for profile in profiles:
+            profile_key = getattr(profile, "key", None)
+            if not profile_key:
+                owner_scope_by_profile[profile] = None
+                continue
+            route_tags = expand_queue_tags(
+                list(getattr(profile, "queue_tags", None) or [profile_key])
+            )
+            owner_scope, owner_conflict = cls._qr_profile_owner_scope_from_targets(
+                profile,
+                resource_route_tags=resource_route_tags,
+                eligible_doctor_specialties=eligible_doctor_specialties,
+            )
+            owner_scope_by_profile[profile] = (
+                None if owner_conflict or not route_tags else owner_scope
+            )
+        return owner_scope_by_profile, eligible_doctor_specialties
+
+    @classmethod
     def _qr_profile_candidates_are_unambiguous(
         cls,
         profiles: list[Any],
@@ -200,6 +394,8 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         availability_by_profile: dict[Any, Any],
         *,
         route_queue_tag: str | None = None,
+        day: date | None = None,
+        owner_scope_by_profile: dict[Any, tuple[str, str] | None] | None = None,
     ) -> bool:
         """Require every shared-tag candidate to describe the same public target.
 
@@ -219,7 +415,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if not target_profiles:
             return False
 
-        target_scopes: set[tuple[str, str, str | None]] = set()
+        target_scopes: set[tuple[str, str, str | None, tuple[str, str]]] = set()
         for profile in target_profiles:
             availability = availability_by_profile.get(profile)
             if availability is None or not cls._is_qr_visible_profile(
@@ -230,6 +426,43 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 logger.warning(
                     "[QR availability] rejected unavailable published QueueProfile target: candidates=%d",
                     len(target_profiles),
+                )
+                return False
+            if owner_scope_by_profile is not None:
+                owner_scope = owner_scope_by_profile.get(profile)
+            elif db is None:
+                # These policy-only unit tests intentionally provide no ORM
+                # session. Use the explicitly supplied route as the resource
+                # identity, or the one configured tag as a doctor identity.
+                tags = list(getattr(profile, "queue_tags", None) or [])
+                owner_scope = (
+                    ("resource", route_queue_tag)
+                    if route_queue_tag
+                    else (
+                        ("doctor", cls._qr_doctor_direction_key(tags[0]))
+                        if len(tags) == 1
+                        else None
+                    )
+                )
+            else:
+                if day is None:
+                    from app.crud.clinic import clinic_today
+
+                    resolved_day = clinic_today(db)
+                else:
+                    resolved_day = day
+                owner_scope, owner_conflict, _resources, _doctors = (
+                    cls._qr_profile_owner_scope(db, profile, day=resolved_day)
+                )
+                if owner_conflict:
+                    logger.warning(
+                        "[QR availability] rejected QueueProfile owner scope: reason=%s",
+                        owner_conflict,
+                    )
+                    return False
+            if owner_scope is None:
+                logger.warning(
+                    "[QR availability] rejected QueueProfile without one owner scope"
                 )
                 return False
             target_scopes.add(
@@ -245,6 +478,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                         if route_queue_tag is None
                         else None
                     ),
+                    owner_scope,
                 )
             )
 
@@ -265,6 +499,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         *,
         profiles: list[Any] | None = None,
         lock_parent_rows: bool = False,
+        day: date | None = None,
     ) -> bool:
         """Validate all published profiles that can resolve ``queue_tag``."""
         from app.services.queue_profile_availability import (
@@ -287,6 +522,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             db,
             availability_by_profile,
             route_queue_tag=queue_tag,
+            day=day,
         )
 
     @classmethod
@@ -320,6 +556,140 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         )
 
     @classmethod
+    def _qr_profile_resource_tags(
+        cls,
+        db: Session,
+        profile: Any,
+        day: date,
+    ) -> list[str]:
+        """Return every configured tag that currently routes to a resource."""
+        profile_key = getattr(profile, "key", None)
+        if not profile_key:
+            return []
+        queue_tags = expand_queue_tags(
+            list(getattr(profile, "queue_tags", None) or [profile_key])
+        )
+        if not queue_tags:
+            return []
+
+        active_registry_tags = {
+            row[0]
+            for row in db.query(QueueResource.queue_tag)
+            .filter(
+                QueueResource.active.is_(True),
+                QueueResource.queue_tag.in_(queue_tags),
+            )
+            .all()
+        }
+        first_active_queue_owner_by_tag: dict[str, int | None] = {}
+        active_queue_rows = (
+            db.query(DailyQueue.queue_tag, DailyQueue.queue_resource_id)
+            .filter(
+                DailyQueue.day == day,
+                DailyQueue.active.is_(True),
+                DailyQueue.queue_tag.in_(queue_tags),
+            )
+            .order_by(DailyQueue.id.asc())
+            .all()
+        )
+        for tag, resource_id in active_queue_rows:
+            first_active_queue_owner_by_tag.setdefault(tag, resource_id)
+        active_resource_queue_tags = {
+            tag
+            for tag, resource_id in first_active_queue_owner_by_tag.items()
+            if resource_id is not None
+        }
+        return sorted(active_registry_tags | active_resource_queue_tags)
+
+    @classmethod
+    def qr_profile_publication_conflict(
+        cls,
+        db: Session,
+        profile: Any,
+        *,
+        day: date,
+        lock_parent_rows: bool = False,
+    ) -> str | None:
+        """Return the reason a public QR booking target cannot be selected.
+
+        A public direction resolves through current queue owners, not merely
+        the number of configured service tags. Multiple doctors in one
+        accepted specialty family are valid; independent owner directions are
+        internal overviews and cannot be published as one booking target.
+        """
+        from app.services.queue_profile_availability import (
+            load_queue_profile_availability,
+            queue_profile_is_qr_selectable,
+        )
+
+        if not getattr(profile, "is_active", False):
+            return "profile_inactive"
+        if not getattr(profile, "show_on_qr_page", False):
+            return "profile_unpublished"
+
+        availability = load_queue_profile_availability(
+            db, [profile], lock_parent_rows=lock_parent_rows
+        )[profile]
+        if not queue_profile_is_qr_selectable(profile, availability):
+            return "profile_unavailable"
+        owner_scope, owner_conflict, resource_tags, doctor_specialties = (
+            cls._qr_profile_owner_scope(db, profile, day=day)
+        )
+        if owner_conflict:
+            return owner_conflict
+        if owner_scope is None:
+            return "no_bookable_owner"
+
+        if resource_tags:
+            if not cls._qr_profile_target_is_unambiguous(
+                db,
+                resource_tags[0],
+                profile,
+                lock_parent_rows=lock_parent_rows,
+                day=day,
+            ):
+                return "ambiguous_profile_target"
+            return None
+
+        # The set of profile rows is a small configuration catalog. Resolve it
+        # once, then lock/revalidate only candidates for the owner's tags; do
+        # not take Department locks for unrelated directions.
+        from app.models.queue_profile import QueueProfile
+
+        profiles = db.query(QueueProfile).all()
+        selected_key = getattr(profile, "key", None)
+        checked_candidates: set[tuple[str, ...]] = set()
+        for specialty in sorted(doctor_specialties):
+            candidates = cls._get_qr_profile_candidates_for_tag(
+                db,
+                specialty,
+                profiles=profiles,
+                prefer_exact_key=True,
+            )
+            if not any(
+                getattr(candidate, "key", None) == selected_key
+                for candidate in candidates
+            ):
+                return "ambiguous_profile_target"
+            candidate_keys = tuple(
+                sorted(str(getattr(candidate, "key", "")) for candidate in candidates)
+            )
+            if candidate_keys in checked_candidates:
+                continue
+            checked_candidates.add(candidate_keys)
+            availability_by_profile = load_queue_profile_availability(
+                db, candidates, lock_parent_rows=lock_parent_rows
+            )
+            if not cls._qr_profile_candidates_are_unambiguous(
+                candidates,
+                db,
+                availability_by_profile,
+                day=day,
+            ):
+                return "ambiguous_profile_target"
+        return None if checked_candidates else "no_bookable_owner"
+
+    @classmethod
     def is_qr_profile_target_bookable(
         cls,
         db: Session,
@@ -334,17 +704,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         records. A shared resource tag is selectable only when every published
         profile that resolves to that target is available and unambiguous.
         """
-        if not cls._is_qr_visible_profile(profile, db, availability=availability):
-            return False
-        profile_key = getattr(profile, "key", None)
-        if not profile_key:
-            return False
-        resource_tag = cls._qr_profile_resource_tag(db, profile, day)
-        return cls._qr_profile_target_is_unambiguous(
-            db,
-            resource_tag or profile_key,
-            profile,
-        )
+        return cls.qr_profile_publication_conflict(db, profile, day=day) is None
 
     @classmethod
     def public_qr_catalog_bookable_profiles(
@@ -354,6 +714,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         *,
         day: date,
         availability_by_profile: dict[Any, Any],
+        candidate_profiles: list[Any] | None = None,
+        owner_scope_by_profile: dict[Any, tuple[str, str] | None] | None = None,
+        eligible_doctor_specialties: set[str] | None = None,
     ) -> list[Any]:
         """Filter a loaded profile catalog using bounded batch reads.
 
@@ -365,9 +728,19 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if not profiles:
             return []
 
-        queue_tags: set[str] = set()
+        # Candidate precedence in admission considers hidden profiles too:
+        # an exact-key hidden profile can suppress a published alias profile.
+        # Load that small configuration catalog once for resolution, while
+        # keeping the returned rows limited to the caller's published set.
+        from app.models.queue_profile import QueueProfile
+
+        all_candidate_profiles = (
+            candidate_profiles
+            if candidate_profiles is not None
+            else db.query(QueueProfile).all()
+        )
         profiles_by_tag: dict[str, list[Any]] = {}
-        for profile in profiles:
+        for profile in all_candidate_profiles:
             profile_key = getattr(profile, "key", None)
             raw_profile_tags = getattr(profile, "queue_tags", None)
             route_tags = expand_queue_tags(
@@ -376,7 +749,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             candidate_tags = set(route_tags)
             if profile_key:
                 candidate_tags.add(profile_key)
-            queue_tags.update(tag for tag in route_tags if tag)
             for tag in candidate_tags:
                 if not tag:
                     continue
@@ -384,35 +756,16 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 if normalized_tag:
                     profiles_by_tag.setdefault(normalized_tag, []).append(profile)
 
-        resource_route_tags: set[str] = set()
-        if queue_tags:
-            active_registry_tags = {
-                row[0]
-                for row in db.query(QueueResource.queue_tag)
-                .filter(
-                    QueueResource.active.is_(True),
-                    QueueResource.queue_tag.in_(sorted(queue_tags)),
+        if owner_scope_by_profile is None or eligible_doctor_specialties is None:
+            resolved_owner_scopes, resolved_doctor_specialties = (
+                cls._qr_profile_owner_scopes_for_catalog(
+                    db, all_candidate_profiles, day=day
                 )
-                .all()
-            }
-            first_active_queue_owner_by_tag: dict[str, int | None] = {}
-            active_queue_rows = (
-                db.query(DailyQueue.queue_tag, DailyQueue.queue_resource_id)
-                .filter(
-                    DailyQueue.day == day,
-                    DailyQueue.active.is_(True),
-                    DailyQueue.queue_tag.in_(sorted(queue_tags)),
-                )
-                .order_by(DailyQueue.id.asc())
-                .all()
             )
-            for tag, resource_id in active_queue_rows:
-                first_active_queue_owner_by_tag.setdefault(tag, resource_id)
-            resource_route_tags = active_registry_tags | {
-                tag
-                for tag, resource_id in first_active_queue_owner_by_tag.items()
-                if resource_id is not None
-            }
+            if owner_scope_by_profile is None:
+                owner_scope_by_profile = resolved_owner_scopes
+            if eligible_doctor_specialties is None:
+                eligible_doctor_specialties = resolved_doctor_specialties
 
         bookable: list[Any] = []
         for profile in profiles:
@@ -425,16 +778,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             profile_key = getattr(profile, "key", None)
             if not profile_key:
                 continue
-            resource_tag = next(
-                (
-                    tag
-                    for tag in expand_queue_tags(
-                        list(getattr(profile, "queue_tags", None) or [profile_key])
-                    )
-                    if tag in resource_route_tags
-                ),
-                None,
+            route_tags = expand_queue_tags(
+                list(getattr(profile, "queue_tags", None) or [profile_key])
             )
+            owner_scope = owner_scope_by_profile.get(profile)
+            if owner_scope is None:
+                continue
+            resource_tag = owner_scope[1] if owner_scope[0] == "resource" else None
             route_tag = resource_tag or profile_key
             candidates = profiles_by_tag.get(
                 cls._normalize_qr_specialty_key(route_tag), []
@@ -444,13 +794,51 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 for candidate in candidates
             ):
                 continue
-            if cls._qr_profile_candidates_are_unambiguous(
+            if not cls._qr_profile_candidates_are_unambiguous(
                 candidates,
                 db,
                 availability_by_profile,
                 route_queue_tag=route_tag,
+                day=day,
+                owner_scope_by_profile=owner_scope_by_profile,
             ):
-                bookable.append(profile)
+                continue
+
+            if not resource_tag:
+                doctor_targets = [
+                    specialty
+                    for specialty in eligible_doctor_specialties
+                    if specialty in route_tags
+                ]
+                if not doctor_targets:
+                    continue
+                # Admission checks every owner specialty, so the catalog must reject
+                # the card when even one alias resolves to another profile.
+                selected_for_all_doctors = bool(doctor_targets)
+                for specialty in sorted(doctor_targets):
+                    doctor_candidates = cls._get_qr_profile_candidates_for_tag(
+                        db,
+                        specialty,
+                        profiles=all_candidate_profiles,
+                        prefer_exact_key=True,
+                    )
+                    selected_for_doctor = any(
+                        getattr(candidate, "key", None) == profile_key
+                        for candidate in doctor_candidates
+                    ) and cls._qr_profile_candidates_are_unambiguous(
+                        doctor_candidates,
+                        db,
+                        availability_by_profile,
+                        day=day,
+                        owner_scope_by_profile=owner_scope_by_profile,
+                    )
+                    if not selected_for_doctor:
+                        selected_for_all_doctors = False
+                        break
+                if not selected_for_all_doctors:
+                    continue
+
+            bookable.append(profile)
         return bookable
 
     @classmethod
@@ -495,6 +883,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 if daily_queue.queue_resource_id is not None
                 else None
             ),
+            day=daily_queue.day,
         )
 
     @classmethod
@@ -1368,6 +1757,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                             if daily_queue.queue_resource_id is not None
                             else None
                         ),
+                        day=daily_queue.day,
                     ):
                         raise QueueValidationError(
                             "Специалист недоступен для QR-записи"
@@ -1510,27 +1900,12 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         here; the join itself (``join_queue_with_token``) keeps every
         routing rule and enforces time windows / limits at booking time.
         """
-        profile_key = getattr(profile, "key", None)
-        if not profile_key:
-            return False
-        queue_tags = expand_queue_tags(
-            list(getattr(profile, "queue_tags", None) or [profile_key])
+        from app.crud.clinic import clinic_today
+
+        return (
+            self.qr_profile_publication_conflict(db, profile, day=clinic_today(db))
+            is None
         )
-        for tag in queue_tags:
-            if queue_resource_routing.resolve_tag_resource(db, tag) is not None:
-                return True
-        eligible_doctor = (
-            db.query(Doctor.id)
-            .join(User, Doctor.user_id == User.id)
-            .filter(
-                Doctor.active.is_(True),
-                Doctor.specialty.in_(queue_tags),
-                Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
-                *qr_doctor_owner_eligibility_filters(),
-            )
-            .first()
-        )
-        return eligible_doctor is not None
 
     def provision_public_address(self, db: Session, *, profile):
         """RQ-16.d provision/enable of the permanent public address
@@ -1732,7 +2107,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     tag = self._qr_profile_resource_tag(db, queue_profile, day)
                     tag = tag or queue_profile.key
                     if tag and self._qr_profile_target_is_unambiguous(
-                        db, tag, queue_profile
+                        db, tag, queue_profile, day=day
                     ):
                         targets[index] = tag
                     continue
@@ -1913,18 +2288,24 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 # selection here would fork a parallel legacy queue and
                 # re-create the split-queue incident class.
                 resource_tag = self._qr_profile_resource_tag(db, queue_profile, day)
-                if (
-                    specialist_type == "profile"
-                    and not self._qr_profile_target_is_unambiguous(
+                if specialist_type == "profile":
+                    target_conflict = self.qr_profile_publication_conflict(
                         db,
-                        resource_tag or profile_key,
                         queue_profile,
+                        day=day,
                         lock_parent_rows=True,
                     )
-                ):
-                    raise QueueValidationError(
-                        "Профиль направления неоднозначен для QR-записи"
-                    )
+                    if target_conflict:
+                        message = (
+                            "Профиль направления неоднозначен для QR-записи"
+                            if target_conflict
+                            in {
+                                "mixed_direction_targets",
+                                "ambiguous_profile_target",
+                            }
+                            else "Профиль направления недоступен для QR-записи"
+                        )
+                        raise QueueValidationError(message)
                 if resource_tag is not None:
                     tag_claim = _lock_and_resolve_tag_claim(
                         db,
@@ -2130,6 +2511,23 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 )
                 if not qr_profile:
                     raise QueueValidationError("Специалист недоступен для QR-записи")
+                target_conflict = self.qr_profile_publication_conflict(
+                    db,
+                    qr_profile,
+                    day=day,
+                    lock_parent_rows=True,
+                )
+                if target_conflict:
+                    message = (
+                        "Профиль направления неоднозначен для QR-записи"
+                        if target_conflict
+                        in {
+                            "mixed_direction_targets",
+                            "ambiguous_profile_target",
+                        }
+                        else "Профиль направления недоступен для QR-записи"
+                    )
+                    raise QueueValidationError(message)
 
                 # RQ-14.b (D-01 APPROVED 2026-09-15): the canonical queue tag
                 # of the doctor's QR direction is the QR-visible profile's

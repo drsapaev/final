@@ -1,4 +1,20 @@
-## Current checkpoint — T12.1 exact-head CI pass; Tier-2 not run — 2026-10-16T22:04:00+05:00
+## Current checkpoint — T12.2 #3693 focused synthetic staging PASS; acceptance partial / merge hold — 2026-10-17T16:38:21+05:00
+
+Continue task `431e8e5b-7c74-459e-8038-26f0f17adf1d` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t122-publish-policy\final`, branch `codex/aqs-T12.2-publish-readiness`. PR #3693 is OPEN/READY FOR REVIEW, HEAD `dde8f799a804bd0e71eed9802c879b03d01effb1`, base `db91cc0ef87c8a51eb4b4e816d25077c8ce397d6`, mergeable; user performs merge.
+
+T12.1 / PR #3690 is merged at `0a3304f5ec7d3702d0fbe3642fdec078eb3edaea`; do not resume it. Do not begin T13 until PR #3693 is merged, the merge commit is verified, and clean `main` is synced.
+
+Current exact-head Unified CI run `39025238384` on `dde8f799a804bd0e71eed9802c879b03d01effb1` completed SUCCESS. Backend/PostgreSQL, frontend unit/E2E/lint/build, OpenAPI freshness, quality, parity, security/gitleaks, i18n and PR Required Gate passed. Path-aware DAST/nightly, metadata, Docker, standalone security/integration/load, staging-readiness and production-readiness checks are SKIPPED, not PASS.
+
+Focused synthetic staging cycle11 on `clinic-aqs-t122-c8-20261017` passed canonical Preflight/Start/Session; 20 PostgreSQL regressions (0 skipped/failures/errors); DEV-DEMO owner seed with no patient/clinical data; ordinary Admin password+TOTP and authenticated profile; hide then explicit publish of the canonical cardiology profile; and agreement between public catalog and available-specialists with one synthetic bookable owner. Teardown removed 5 containers, 3 volumes and 1 network, leaving zero owned resources.
+
+Do not credit the earlier c9 browser result as exact-current-head browser evidence: backend source changed after that run. Current launcher still reports `served_revision_verified=false`; current-head browser/manual UI, full `docs/runbooks/STAGING_VALIDATION.md`, negative-role proof, named legacy specs and full T18 remain NOT_RUN/unverified. Overall Tier-2 is focused PASS / PARTIAL; no deferral is accepted.
+
+Live GitHub review state: three Codex COMMENTED submissions are on earlier commits; three inline threads remain unresolved (two not marked outdated, one outdated); no APPROVE is recorded on current HEAD. Do not claim independent approval. Merge remains HOLD pending reviewer/acceptance disposition; user owns merge.
+
+Next exact action: finalize the four-file plan/evidence update, run `git diff --check`, applicable hooks and the PR-body quality gate; commit/push only the documentation checkpoint; inspect exact-head checks after push. Do not change runtime or repeat staging for documentation-only edits.
+
+## Historical checkpoint — T12.1 exact-head CI pass; Tier-2 not run — 2026-10-16T22:04:00+05:00
 
 PR #3639 merged at `7443b0e290b9143e877d5898a5589df52592d3b3`. T12.1 worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t12-publish-overview\final`; branch `codex/aqs-T12.1-hidden-profile-create`; base `7443b0e`; tested code commit `ca04e20ad08a5e661ca9ddc9a0d4d8b27157092a`. A plan-only evidence checkpoint was added after that exact-head CI; it changes no tested source or tests. Main checkout was not switched or modified.
 

@@ -36744,6 +36744,28 @@ export type components = {
             active_public_addresses: number;
         };
         /**
+         * QueueProfilePublicationConflictDetail
+         * @description A profile cannot be published as one bookable QR direction yet.
+         */
+        QueueProfilePublicationConflictDetail: {
+            /**
+             * Reason
+             * @constant
+             */
+            reason: "profile_publication_blocked";
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "profile_inactive" | "profile_unpublished" | "profile_unavailable" | "mixed_direction_targets" | "ambiguous_profile_target" | "no_bookable_owner";
+            /** Message */
+            message: string;
+        };
+        /** QueueProfilePublicationConflictResponse */
+        QueueProfilePublicationConflictResponse: {
+            detail: components["schemas"]["QueueProfilePublicationConflictDetail"];
+        };
+        /**
          * QueueProfileUpdate
          * @description Schema for updating an existing QueueProfile
          */
@@ -53992,13 +54014,13 @@ export interface operations {
                     };
                 };
             };
-            /** @description Binding changes are blocked while the profile is in use, or the submitted binding snapshot became stale. */
+            /** @description Binding changes are blocked while the profile is in use, the submitted binding snapshot became stale, or the profile does not resolve to one available QR booking target. */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QueueProfileBindingConflictResponse"] | components["schemas"]["QueueProfileBindingChangedResponse"];
+                    "application/json": components["schemas"]["QueueProfileBindingConflictResponse"] | components["schemas"]["QueueProfileBindingChangedResponse"] | components["schemas"]["QueueProfilePublicationConflictResponse"];
                 };
             };
             /** @description Validation Error */

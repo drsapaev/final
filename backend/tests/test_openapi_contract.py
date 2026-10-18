@@ -373,7 +373,25 @@ def test_openapi_queue_profile_binding_409_variants_are_typed(
     assert conflict_refs == {
         "#/components/schemas/QueueProfileBindingConflictResponse",
         "#/components/schemas/QueueProfileBindingChangedResponse",
+        "#/components/schemas/QueueProfilePublicationConflictResponse",
     }
+
+    publication_detail_ref = components["QueueProfilePublicationConflictResponse"][
+        "properties"
+    ]["detail"]["$ref"]
+    publication_detail = components[publication_detail_ref.rsplit("/", 1)[-1]]
+    assert publication_detail["properties"]["reason"]["const"] == (
+        "profile_publication_blocked"
+    )
+    assert publication_detail["properties"]["code"]["enum"] == [
+        "profile_inactive",
+        "profile_unpublished",
+        "profile_unavailable",
+        "mixed_direction_targets",
+        "ambiguous_profile_target",
+        "no_bookable_owner",
+    ]
+    assert set(publication_detail["required"]) == {"reason", "code", "message"}
 
     stale_detail = components["QueueProfileBindingChangedResponse"]["properties"][
         "detail"
