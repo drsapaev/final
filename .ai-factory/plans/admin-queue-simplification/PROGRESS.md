@@ -1,4 +1,4 @@
-## Latest checkpoint — T14 PR #3702 P2 fixes committed — 2026-10-18T22:54:55+05:00
+## Latest checkpoint — T14 PR #3702 P2 fixes pushed; exact-head CI PASS — 2026-10-18T23:10:09+05:00
 
 Plan version: 4.02
 Current task: T14 — setup UI consumes backend facts
@@ -6,22 +6,23 @@ Current status: PR_OPEN / Draft / HOLD for Tier-2 disposition
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final
 Branch: codex/aqs-T14-admin-facts
 Base commit: baae35932e341ceaac163145d933639f735cb35c (T13 merge; synced origin/main)
-Current commit: 0db15cacb (P2 source/tests/journals commit; not yet pushed)
+Current source commit: 0db15cacb; current pushed PR HEAD: 0337028b7ee5cbfa41a00250d01cfb61f5f4c2ee
 Task memory: cb71d205-e655-482a-a72b-38c66d3d2011 (revision 8)
 
 | Task | Status | PR / commit | Evidence |
 |------|--------|-------------|----------|
 | T12.2 | MERGED | PR #3693, merge 7f923f14a347a26b7f80da0fb40a0cff8858ef27 | Focused PostgreSQL 3/3 PASS; broader Tier-2 remains PARTIAL |
 | T13 | MERGED | PR #3697, merge baae35932e341ceaac163145d933639f735cb35c | Exact-head CI PASS; T13 review fixes included |
-| T14 | PR_OPEN / HOLD | PR #3702 Draft; remote head e952521a; local commit 0db15cacb pending push | Earlier Tier 1 PASS; follow-up focused tests, lint and hooks PASS; Tier 2 NOT RUN, no reviewer deferral |
+| T14 | PR_OPEN / HOLD | PR #3702 Draft; source commit 0db15cacb; current HEAD 0337028b7 | Exact-head Unified CI and auxiliary gates PASS; Tier 2 NOT RUN, no reviewer deferral |
 | T15-T18 | PLANNED | | |
 
 ## Current checkpoint
 - Pre-edit execution record for PR review #5564122058: `direct_execute`; cause is localized to `AdminSetupDirections.tsx` (`canOpenQr` couples existing-address inspection to current public availability; provision callback leaves stale `provision_permanent_address`). No gate is needed for this narrow UI-only fix. Canonical anchors: T14 frontend scope, `AdminSetupDirections.tsx`, `PermanentDirectionQr.tsx`, focused RQ-18 tests. First-touch: focused parent-composition tests and `AdminSetupDirections.tsx`. Allowed source: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/__tests__/permanentDirectionQr.test.tsx`; allowed journals: this plan directory. Denied: backend/API/OpenAPI/generated types, routes, queue writes/ownership, DB, staging, production, PR metadata, merge/deploy. Validation target: focused Vitest, scoped type-check/lint, `git diff --check`. Stop if truthful QR inspection requires contract changes or any path outside this boundary.
 - Both review findings were reproduced fail-first, then fixed locally: an existing address is inspectable even when public booking is unavailable; successful provision marks address existence and removes only the stale provision action, retaining the generation guard.
 - Validation after the fix: focused Vitest `permanentDirectionQr` + `adminSetupDirections.textPin` = 26/26 PASS; scoped ESLint from `frontend/` PASS; `git diff --check` PASS. Full local `npx tsc --noEmit --pretty false` has the same three previously recorded unrelated diagnostics (`nitro`, `nitro/runtime-config`, implicit `route` in `publicSiteHandler.test.tsx`). An initial scoped ESLint invocation from the repo root resolved the wrong tsconfig; the correct frontend-root rerun passed.
-- Commit `0db15cacb` (`fix(queue): preserve access to permanent direction QR`) created. Repository commit hooks passed, including ESLint and gitleaks. Local commit is not pushed yet.
-- No staging or browser execution was performed. GitHub PR #3702 was refreshed at remote head e952521a immediately before preparing the patch; it remains open Draft/mergeable. PR body, review threads, merge and deployment were not changed.
+- Commit `0db15cacb` (`fix(queue): preserve access to permanent direction QR`) was pushed, followed by a journal-only checkpoint commit. Repository commit hooks passed, including ESLint and gitleaks.
+- Exact PR HEAD `0337028b7ee5cbfa41a00250d01cfb61f5f4c2ee`: Unified CI 39151823862, PR Review Quality Gate 39151823849, i18n 39151823864, lifecycle 39151823852, regression audit 39151823871, gitleaks 39151823854 and security 39151823880 all PASS. Backend, staging-readiness, integration, load, production-readiness and other path-aware jobs were SKIPPED, not PASS.
+- No staging/browser execution was performed. GitHub confirms PR #3702 is OPEN, Draft and mergeable at the exact HEAD above. Review threads and PR body were not changed; merge/deployment were not performed.
 - Verified PR #3697 is merged and synced to `origin/main`; T14 base and `origin/main` are both `baae35932e341ceaac163145d933639f735cb35c`. The production-surface checkout was only fast-forwarded, preserving its pre-existing untracked `.gate_artifacts/` and `.scratch/`.
 - T14 mode: `advisory_gate` (UI/API consumption of an existing read contract; no DB, auth, route, queue ownership/fairness, write behavior, or backend contract changes). The canonical launcher was attempted from `ai/langgraph` with exact UI/API/test/i18n scopes and returned `stop: reviewed scope requires a known root cause`. Under the plan’s explicitly selected advisory mode this is recorded as a non-blocking gate misroute; no gate/router edit and no source edit followed it.
 - Shape brief: Admin configures a clinic direction; primary task is understand configuration/public entry/current-day queues and act on backend-provided next actions. Queue correctness risk is controlled by keeping workflow facts server-owned. Current surface is an existing Admin screen with local readiness heuristics and eager QR requests. Keep quiet clinical hierarchy, accessible loading/error/retry states, and five-locale coverage. Out of scope: route/wizard changes, queue writes/admission, T13 API changes, ownership policy, Resource Manager behavior.
@@ -31,9 +32,9 @@ Task memory: cb71d205-e655-482a-a72b-38c66d3d2011 (revision 8)
 - Completed: UI consumes the T13 admin facts through a domain mapper; configuration, effective availability, public entry/address facts, typed booking targets, selected-day queues, separate precreate facts, backend next actions and unattached catalog are presented without local eligibility inference. Core facts render before QR reads; QR details load on disclosure, resource-editor inputs load only on entry, stale day/QR responses are ignored. This follow-up also removes the stale provision action after success and keeps existing permanent QR inspectable while booking is unavailable.
 - Validation: focused Vitest 3 files / 26 tests PASS; scoped TypeScript 10 changed source/test files plus test setup PASS; full ESLint PASS (0 errors, 1,848 existing warnings); `check-theme` PASS; icon-control accessibility audit PASS (410 files, 0 findings); strict locale parity PASS for all five locales (10,510 keys each); `git diff --check` PASS. Full `npm run type-check` reports only three existing out-of-scope errors: missing `nitro`, missing `nitro/runtime-config`, and implicit `route` in `src/publicSiteHandler.test.tsx`. Stylelint NOT_RUN (binary absent); full unit suite, build/browser/waterfall NOT_RUN due low host memory (about 1.6 GiB free at check time). React test warnings occurred but tests passed.
 - Dependency cleanup: the worktree's temporary `frontend/node_modules` junction points to `C:\final\frontend\node_modules`. Removal was blocked by the command policy; it remains and must be treated as a link, never recursively deleted. No target files were changed by this check.
-- Before the current follow-up push, PR #3702 was refreshed open/Draft/mergeable at exact remote HEAD `e952521a62dc077ad2a71410aa641c6b5a7342c0`, base `baae35932e341ceaac163145d933639f735cb35c`. The previous exact-head Tier 1 checks passed; backend, staging-readiness, load and production-readiness jobs were skipped due scope, not PASS evidence. Commit `0db15cacb` contains the current fix and has not yet been pushed at this checkpoint.
+- Immediately before the follow-up, PR #3702 was refreshed open/Draft/mergeable at exact remote HEAD `e952521a62dc077ad2a71410aa641c6b5a7342c0`, base `baae35932e341ceaac163145d933639f735cb35c`.
 - Tier-2/backend staging was not run; no reviewer deferral is acknowledged. The updated PR body marks all Tier 1 checks passed and accurately leaves Tier 2 NOT RUN. PR body gate passed its 19 validator tests after this update.
-- Next exact action: push commit `0db15cacb` to the existing PR branch and check CI on the exact new head. Keep PR #3702 Draft/HOLD pending separate Tier-2 disposition; do not start T15.
+- Next exact action: keep PR #3702 Draft/HOLD until a reviewer resolves Tier-2 NOT RUN versus deferral. Do not start T15 or merge; the user owns merge. Refresh the PR body only if separately authorized because this follow-up scope excluded PR metadata.
 - Full Tier-2/T18 remain PARTIAL/NOT_RUN from prior plan stages; this T14 UI task does not claim those checks. No staging, production, browser, visual viewport or deployment verification was performed.
 ## Historical checkpoint — T13 before PR review corrections
 

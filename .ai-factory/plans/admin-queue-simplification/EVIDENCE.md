@@ -4340,3 +4340,11 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: both P2 findings fixed locally; change awaits commit/push and exact-head CI. PR remains Draft/HOLD due separate Tier-2 disposition; no deferral is accepted.
 - Commit: `0db15cacb` (`fix(queue): preserve access to permanent direction QR`) created with repository hooks all passing: large-file/conflict/private-key/YAML/JSON/TOML/whitespace checks, gitleaks and frontend ESLint; non-applicable Python/DB hooks skipped.
 - Commit is local and unpushed. PR #3702 was confirmed open, Draft and mergeable at prior HEAD e952521a; exact-head checks for the new commit do not yet exist.
+
+## T14 PR #3702 — pushed review fix and exact-head CI — 2026-10-18T23:10:09+05:00
+
+- PR #3702 was OPEN/Draft/mergeable at verified HEAD `0337028b7ee5cbfa41a00250d01cfb61f5f4c2ee`; base `baae35932e341ceaac163145d933639f735cb35c`. Source fix is commit `0db15cacb`; the following commit contains plan-journal checkpoint only.
+- Exact-head checks: Unified CI run `39151823862`, PR Review Quality Gate `39151823849`, i18n Quality Gate `39151823864`, PR Lifecycle Recommendation `39151823852`, Regression Audit `39151823871`, Gitleaks `39151823854`, and Security Scan `39151823880` all SUCCESS.
+- Unified CI path-aware skipped jobs include backend tests, integration, staging readiness, production readiness, Docker, load and unrelated Telegram/docs/metadata jobs. Skipped is not treated as PASS.
+- GitHub exact-head PR read confirmed open, Draft=true, mergeable=true, merged=false. No human APPROVE, Tier-2 deferral, review-thread resolution, PR-body update, merge or deployment occurred.
+- Tier-2/staging/browser checks remain NOT_RUN. Keep T14 in HOLD; next action is reviewer disposition on the separate Tier-2 requirement. Do not start T15 until this PR is resolved, merged, and main is synced.

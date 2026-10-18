@@ -1,6 +1,6 @@
-## Latest checkpoint — T14 PR #3702 P2 fixes committed — 2026-10-18T22:54:55+05:00
+## Latest checkpoint — T14 PR #3702 P2 fixes pushed; exact-head CI PASS — 2026-10-18T23:10:09+05:00
 
-Continue task `cb71d205-e655-482a-a72b-38c66d3d2011` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final`, branch `codex/aqs-T14-admin-facts`. Base and `origin/main` equal T13 merge `baae35932e341ceaac163145d933639f735cb35c`; PR #3702 is open Draft at locally verified clean HEAD `e952521a62dc077ad2a71410aa641c6b5a7342c0`. Do not modify/rebase `C:\final`.
+Continue task `cb71d205-e655-482a-a72b-38c66d3d2011` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final`, branch `codex/aqs-T14-admin-facts`. Base and `origin/main` equal T13 merge `baae35932e341ceaac163145d933639f735cb35c`; PR #3702 is OPEN/Draft at exact pushed HEAD `0337028b7ee5cbfa41a00250d01cfb61f5f4c2ee`. Source fix commit: `0db15cacb`; subsequent checkpoint commit is journal-only. Do not modify/rebase `C:\final`.
 
 Task memory exact ID: `cb71d205-e655-482a-a72b-38c66d3d2011`, revision 8.
 
@@ -8,9 +8,11 @@ Current review #5564122058 has two P2s. Pre-edit record: `direct_execute`; both 
 
 Pre-edit checkpoint: branch was clean at e952521a62dc077ad2a71410aa641c6b5a7342c0. Both new regression expectations failed before the code patch, confirming the review defects. After the patch, the two focused files pass 26/26; scoped ESLint and `git diff --check` pass. Repository commit hooks passed, including ESLint and gitleaks. Full local TypeScript check still reports only the previously recorded unrelated missing `nitro`/`nitro/runtime-config` and implicit `route` diagnostics. An initial ESLint invocation from repo root used the wrong config path; rerunning from `frontend/` passed.
 
-Commit `0db15cacb` (`fix(queue): preserve access to permanent direction QR`) now contains `AdminSetupDirections.tsx`, the focused test, and the T14 journals. Existing permanent QR inspection is independent of current booking availability; new provisioning still requires server permission and availability. After successful provisioning, the matching profile's address fact is updated and its stale provision action removed; generation protection remains. Commit is local and not pushed yet. No staging/browser checks, PR body/thread updates, merge, or deploy occurred. Tier-2 remains NOT RUN and no deferral is acknowledged; PR stays Draft/HOLD.
+Commit `0db15cacb` (`fix(queue): preserve access to permanent direction QR`) contains `AdminSetupDirections.tsx`, the focused test, and the pre-edit T14 checkpoint. Existing permanent QR inspection is independent of current booking availability; new provisioning still requires server permission and availability. After successful provisioning, the matching profile's address fact is updated and its stale provision action removed; generation protection remains. Current PR HEAD `0337028b7ee5cbfa41a00250d01cfb61f5f4c2ee` adds a journal-only checkpoint.
 
-Next exact action: push commit `0db15cacb` to the existing PR branch and inspect CI on exact new HEAD. Do not start T15 until T14 is merged and local main is synced.
+Exact-head GitHub evidence on `0337028b7ee5cbfa41a00250d01cfb61f5f4c2ee`: Unified CI run 39151823862, PR Review Quality Gate 39151823849, i18n 39151823864, lifecycle 39151823852, regression audit 39151823871, gitleaks 39151823854 and security 39151823880 all PASS. Backend, staging-readiness, integration, load, production-readiness and other path-aware jobs were SKIPPED, not PASS. No staging/browser checks, PR body/thread updates, merge, or deploy occurred. Tier-2 remains NOT RUN and no deferral is acknowledged; PR stays Draft/HOLD.
+
+Next exact action: keep PR #3702 Draft/HOLD until a reviewer resolves Tier-2 NOT RUN versus a deferral. Do not start T15 or merge; user owns merge. Refresh PR body only if separately authorized because the present scope excluded PR metadata.
 
 T14 UI now consumes the existing T13 Admin directions read model through `fetchAdminQueueDirections` and a typed frontend domain mapper. The page displays backend-owned configuration/effective/public availability facts, typed targets, selected-day queues, separate precreate facts, next actions and unattached catalog. Per-profile QR details load only when expanded; resource editor reads happen only on entry; stale day/QR responses are dropped; successful address provisioning updates the displayed address-exists fact. No backend, route, generated API, DB, queue command or ownership changes were made.
 
