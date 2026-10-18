@@ -1,19 +1,19 @@
-## Latest checkpoint — T13 merged; T14 locally validated, PR prep next — 2026-10-18T21:47:00+05:00
+## Latest checkpoint — T13 merged; T14 commit pushed, Draft PR creation next — 2026-10-18T21:49:00+05:00
 
 Plan version: 4.02
 Current task: T14 — setup UI consumes backend facts
-Current status: VALIDATED (local checks; no PR yet)
+Current status: VALIDATED (local checks; PR body gate passed; PR not yet created)
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final
 Branch: codex/aqs-T14-admin-facts
 Base commit: baae35932e341ceaac163145d933639f735cb35c (T13 merge; synced origin/main)
-Current commit: baae35932e341ceaac163145d933639f735cb35c (source changes uncommitted)
-Task memory: cb71d205-e655-482a-a72b-38c66d3d2011 (revision 4; capture after checkpoint)
+Current commit: 44b166f0a7e83a0125e46a4c5eddfcbc22b198fd (T14 implementation + journals, pushed)
+Task memory: cb71d205-e655-482a-a72b-38c66d3d2011 (revision 6)
 
 | Task | Status | PR / commit | Evidence |
 |------|--------|-------------|----------|
 | T12.2 | MERGED | PR #3693, merge 7f923f14a347a26b7f80da0fb40a0cff8858ef27 | Focused PostgreSQL 3/3 PASS; broader Tier-2 remains PARTIAL |
 | T13 | MERGED | PR #3697, merge baae35932e341ceaac163145d933639f735cb35c | Exact-head CI PASS; T13 review fixes included |
-| T14 | VALIDATED | codex/aqs-T14-admin-facts | Focused UI tests 26/26; scoped TS, ESLint, locales, diff check PASS; full project TS has 3 unrelated baseline errors; see T14 evidence |
+| T14 | VALIDATED | codex/aqs-T14-admin-facts, commit 44b166f0a | Focused UI tests 26/26; scoped TS, full ESLint, theme/a11y/locales, body gate PASS; full project TS has 3 unrelated baseline errors; PR creation next |
 | T15-T18 | PLANNED | | |
 
 ## Current checkpoint
@@ -26,7 +26,8 @@ Task memory: cb71d205-e655-482a-a72b-38c66d3d2011 (revision 4; capture after che
 - Completed: UI consumes the T13 admin facts through a domain mapper; configuration, effective availability, public entry/address facts, typed booking targets, selected-day queues, separate precreate facts, backend next actions and unattached catalog are presented without local eligibility inference. Core facts render before QR reads; QR details load on disclosure, resource-editor inputs load only on entry, stale day/QR responses are ignored, and successful provision updates the displayed address-exists fact. The QR component comment now documents lazy mounting.
 - Validation: focused Vitest 3 files / 26 tests PASS; scoped TypeScript 10 changed source/test files plus test setup PASS; full ESLint PASS (0 errors, 1,848 existing warnings); `check-theme` PASS; icon-control accessibility audit PASS (410 files, 0 findings); strict locale parity PASS for all five locales (10,510 keys each); `git diff --check` PASS. Full `npm run type-check` reports only three existing out-of-scope errors: missing `nitro`, missing `nitro/runtime-config`, and implicit `route` in `src/publicSiteHandler.test.tsx`. Stylelint NOT_RUN (binary absent); full unit suite, build/browser/waterfall NOT_RUN due low host memory (about 1.6 GiB free at check time). React test warnings occurred but tests passed.
 - Dependency cleanup: the worktree's temporary `frontend/node_modules` junction points to `C:\final\frontend\node_modules`. Removal was blocked by the command policy; it remains and must be treated as a link, never recursively deleted. No target files were changed by this check.
-- Next exact action: run final status/diff review and applicable commit hooks, commit T14, push the branch and open a single-purpose PR with these local validation results and the known unrelated full-type-check failures. Do not merge; user owns merge. Check exact-head CI after PR creation.
+- The T14 commit was created with the repository pre-commit hooks passing and pushed to `origin/codex/aqs-T14-admin-facts`. PR-body quality gate passed its 19 validator tests and the prepared Draft body. No PR exists yet.
+- Next exact action: create a Draft PR using the prepared body; attach it to this task; inspect exact-head CI. Do not merge; user owns merge.
 - Full Tier-2/T18 remain PARTIAL/NOT_RUN from prior plan stages; this T14 UI task does not claim those checks. No staging, production, browser, visual viewport or deployment verification was performed.
 ## Historical checkpoint — T13 before PR review corrections
 

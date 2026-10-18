@@ -1,6 +1,8 @@
-## Latest checkpoint — T14 locally validated; PR preparation next — 2026-10-18T21:47:00+05:00
+## Latest checkpoint — T14 commit pushed; Draft PR creation next — 2026-10-18T21:49:00+05:00
 
-Continue task `cb71d205-e655-482a-a72b-38c66d3d2011` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final`, branch `codex/aqs-T14-admin-facts`. Base and `origin/main` both equal T13 merge `baae35932e341ceaac163145d933639f735cb35c`; PR #3697 is merged. Do not modify/rebase `C:\final`.
+Continue task `cb71d205-e655-482a-a72b-38c66d3d2011` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final`, branch `codex/aqs-T14-admin-facts`. Base and `origin/main` both equal T13 merge `baae35932e341ceaac163145d933639f735cb35c`; PR #3697 is merged. T14 implementation commit `44b166f0a7e83a0125e46a4c5eddfcbc22b198fd` is pushed. Do not modify/rebase `C:\final`.
+
+Task memory exact ID: `cb71d205-e655-482a-a72b-38c66d3d2011`, revision 6.
 
 T14 UI now consumes the existing T13 Admin directions read model through `fetchAdminQueueDirections` and a typed frontend domain mapper. The page displays backend-owned configuration/effective/public availability facts, typed targets, selected-day queues, separate precreate facts, next actions and unattached catalog. Per-profile QR details load only when expanded; resource editor reads happen only on entry; stale day/QR responses are dropped; successful address provisioning updates the displayed address-exists fact. No backend, route, generated API, DB, queue command or ownership changes were made.
 
@@ -8,7 +10,9 @@ Local evidence: 3 focused Vitest files / 26 tests PASS; scoped TypeScript PASS u
 
 Allowed files remain in the latest T14 PROGRESS/EVIDENCE block. `setupDirectionsReadiness.ts` was preserved. Do not expand into backend/API contract, routes, queue writes/admission/ownership, DB/migrations, production or staging. The temporary worktree `frontend/node_modules` junction still points to `C:\final\frontend\node_modules`; its removal was blocked by command policy, and the target was untouched. Handle only as a junction if cleanup becomes allowed.
 
-Next exact action: inspect final `git diff --stat`, `git diff --check`, and status; run commit hooks, create one T14 commit, push and open a single-purpose PR. Then inspect exact-head GitHub checks and fix any in-scope failure. Do not merge; the user owns merge.
+The repository pre-commit hooks passed on the implementation commit. PR review quality gate passed all 19 validator tests and the prepared body. The branch has not yet been opened as a PR.
+
+Next exact action: create a Draft PR with `.scratch/t14-pr-body.md`, attach it to this task, inspect exact-head GitHub checks, and fix any in-scope failure. Do not merge; the user owns merge.
 
 ## Previous checkpoint — T13 merged; T14 frontend implementation active — 2026-10-18T21:35:00+05:00
 

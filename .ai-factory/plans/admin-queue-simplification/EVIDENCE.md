@@ -4281,7 +4281,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 
 ## T14 — local implementation validation — 2026-10-18T21:47:00+05:00
 
-- Commit under test: `baae35932e341ceaac163145d933639f735cb35c` (T13 merge / fresh `origin/main`); implementation changes are currently uncommitted on `codex/aqs-T14-admin-facts`.
+- Base commit under test: `baae35932e341ceaac163145d933639f735cb35c` (T13 merge / fresh `origin/main`). T14 implementation commit: `44b166f0a7e83a0125e46a4c5eddfcbc22b198fd`, pushed to `origin/codex/aqs-T14-admin-facts`.
 - Environment: Windows 11 worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final`, Node dependencies reused through a temporary junction to `C:\final\frontend\node_modules`; no staging or patient data.
 - Execution mode: `advisory_gate`, reason: UI/API adapter consumes the merged T13 read-only contract without changing DB, auth, routing, queue writes/admission/ownership/fairness or clinical behavior. Canonical gate returned `stop: reviewed scope requires a known root cause`; recorded as a non-blocking advisory misroute. No gate/router edit.
 - Allowed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`; `frontend/src/components/admin/PermanentDirectionQr.tsx` only for provision callback/documented lazy mount; `frontend/src/api/queueDirections.ts`; `frontend/src/types/api.ts` aliases only; `frontend/src/types/domain/adminQueueDirections.ts`; `frontend/src/api/mappers/adminQueueDirections.ts` and `frontend/src/api/mappers/index.ts`; `frontend/src/components/admin/admin.css`; focused setup/QR/mapper tests; five locale files; this plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
@@ -4300,6 +4300,8 @@ Recorded: 2026-10-01T16:41:51+05:00
   - `git diff --check`: PASS (Git emitted only LF-to-CRLF working-copy notices).
   - Stylelint: NOT_RUN; no local `stylelint.cmd` executable. Full Vitest suite, frontend build, browser/viewport/waterfall checks: NOT_RUN because host free memory was about 1.6 GiB; targeted suite is the only local unit evidence.
 - Scope check: `origin/main` equals T14 base; no backend/runtime contract, route, generated output, production, staging or `C:\final` source edits. Temporary `frontend/node_modules` junction removal was rejected by execution policy; it remains a junction to `C:\final\frontend\node_modules`, and the target was not touched.
+- Commit hooks: repository pre-commit passed large-file, merge-conflict, private-key, whitespace, branch, gitleaks and staged-file ESLint hooks; backend-only hooks were skipped because no backend files changed.
+- PR quality gate: `scripts/run_pr_review_gate_checks.py --body-file .scratch/t14-pr-body.md` passed all 19 validator tests, documented sample checks, and the completed Draft PR body. First attempt found missing required summary fields; body was corrected before the passing run.
 - Remaining limitation: full project type-check is not green due the three unrelated diagnostics above; stylelint/build/browser evidence remains absent. Overall Tier-2/T18 remains PARTIAL/NOT_RUN and is not claimed by this UI slice.
-- PR / merge: not yet created; no merge or deployment.
-- Next exact action: run final diff/scope check and commit hooks, then commit/push/open the T14 PR. User retains merge authority.
+- PR / merge: branch is pushed; Draft PR not yet created; no merge or deployment.
+- Next exact action: create/attach Draft PR, then inspect CI on the exact PR head. User retains merge authority.
