@@ -30,6 +30,33 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
     assert len(schema["paths"]) >= 100
 
 
+def test_openapi_admin_queue_directions_read_contract(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    path = "/api/v1/queue/admin/directions"
+    operation = schema["paths"][path]["get"]
+
+    assert operation["operationId"] == "getAdminQueueDirections"
+    assert (
+        operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/AdminQueueDirectionsResponse"
+    )
+
+    components = schema["components"]["schemas"]
+    booking_target = components["AdminDirectionBookingTarget"]["properties"]
+    owner_type = booking_target["owner_type"]
+    assert set(owner_type.get("enum", [])) == {"doctor", "resource"}
+    assert "owner_id" in booking_target
+
+    direction_properties = components["AdminQueueDirection"]["properties"]
+    assert "public_availability" in direction_properties
+    assert "permanent_address_exists" in direction_properties
+    assert "precreate_by_tag" in direction_properties
+    assert "allowed_next_actions" in direction_properties
+    assert not {"patient_id", "patient_name", "phone"}.intersection(
+        direction_properties
+    )
+
+
 def test_openapi_ai_v2_medical_responses_require_doctor_confirmation(
     client: TestClient,
 ) -> None:
@@ -100,9 +127,8 @@ def test_openapi_contains_critical_routes(
 ) -> None:
     schema = _get_openapi_schema(client)
     assert path in schema["paths"], f"Missing route in OpenAPI: {path}"
-    assert (
-        method in schema["paths"][path]
-    ), f"Missing method in OpenAPI: {method.upper()} {path}"
+    method_message = f"Missing method in OpenAPI: {method.upper()} {path}"
+    assert method in schema["paths"][path], method_message
 
 
 def test_openapi_documents_public_site_detail_not_found_contract(
@@ -604,9 +630,10 @@ def test_openapi_has_no_duplicate_operation_id_warnings() -> None:
         for item in captured
         if "Duplicate Operation ID" in str(item.message)
     ]
-    assert (
-        not duplicate_messages
-    ), "Duplicate OpenAPI operation IDs found:\n" + "\n".join(duplicate_messages)
+    duplicate_message = "\n".join(
+        ["Duplicate OpenAPI operation IDs found:", *duplicate_messages]
+    )
+    assert not duplicate_messages, duplicate_message
 
 
 def _decorator_route(decorator: ast.expr) -> tuple[str, str] | None:
@@ -695,9 +722,10 @@ def test_fastapi_static_routes_are_declared_before_same_shape_parameter_routes()
                     f"is shadowed by {previous_route_path} at {previous_line}"
                 )
 
-    assert (
-        not shadow_messages
-    ), "Static routes declared after parameter routes:\n" + "\n".join(shadow_messages)
+    shadow_message = "\n".join(
+        ["Static routes declared after parameter routes:", *shadow_messages]
+    )
+    assert not shadow_messages, shadow_message
 
 
 def test_published_fastapi_routes_do_not_shadow_static_paths_across_routers() -> None:
@@ -731,9 +759,10 @@ def test_published_fastapi_routes_do_not_shadow_static_paths_across_routers() ->
                 f"{previous_route_path} ({previous_route_name}) at {previous_index}"
             )
 
-    assert (
-        not shadow_messages
-    ), "Published static routes shadowed by app order:\n" + "\n".join(shadow_messages)
+    shadow_message = "\n".join(
+        ["Published static routes shadowed by app order:", *shadow_messages]
+    )
+    assert not shadow_messages, shadow_message
 
 
 def test_openapi_user_create_publishes_catalog_503_and_price_bounds(

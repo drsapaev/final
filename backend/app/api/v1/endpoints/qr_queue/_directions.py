@@ -51,11 +51,11 @@ creates).
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import Any
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, Query, Request, status
 
 from app.api.v1.endpoints.qr_queue._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.qr_queue._helpers import (
@@ -75,16 +75,39 @@ from app.models.queue_direction_public_address import (
     QueueDirectionPublicAddress,
     normalize_public_code,
 )
+from app.schemas.admin_queue_directions import AdminQueueDirectionsResponse
 from app.schemas.queue_profile_conflicts import QueueProfileBindingChangedResponse
+from app.services.queue_admin_directions_read_service import (
+    build_admin_queue_directions,
+)
 from app.services.queue_svc import QueueBusinessService
 
 
-class DirectionEntryMethod(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
+# manual-review: StrEnum needs a Python 3.11+ compatibility check first.
+class DirectionEntryMethod(str, Enum):  # noqa: UP042
     """The contract methods space (DIRECTION_CONTRACT.md §6.2)."""
 
     SESSION_QR = "session_qr"
     PERMANENT_ADDRESS = "permanent_address"
     VIEW_ONLY = "view_only"
+
+
+@router.get(
+    "/admin/directions",
+    response_model=AdminQueueDirectionsResponse,
+    operation_id="getAdminQueueDirections",
+    summary="Read queue direction setup facts (Admin)",
+)
+def get_admin_queue_directions(
+    day: date | None = Query(
+        default=None,
+        description="Clinic-local day for existing queue references; omitted means clinic today.",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+) -> AdminQueueDirectionsResponse:
+    """Read configuration and eligibility facts without creating queue state."""
+    return build_admin_queue_directions(db, requested_day=day)
 
 
 class DirectionEntryMethodSupport(BaseModel):
@@ -100,7 +123,9 @@ class DirectionEntryMethodsResponse(BaseModel):
     direction_key: str = Field(
         ..., description="Canonical QR-visible profile key (normalized)"
     )
-    profile_id: int = Field(..., description="QueueProfile.id — a separate id space (D-01)")
+    profile_id: int = Field(
+        ..., description="QueueProfile.id — a separate id space (D-01)"
+    )
     title: str = Field(..., description="Public display title (title_ru preferred)")
     entry_methods: list[DirectionEntryMethodSupport] = Field(
         ...,
@@ -115,8 +140,12 @@ class DirectionEntryMethodsResponse(BaseModel):
 class PublicAddressProvisionResponse(BaseModel):
     """Result of the Admin provision/enable of a permanent address."""
 
-    profile_id: int = Field(..., description="QueueProfile.id — a separate id space (D-01)")
-    direction_key: str = Field(..., description="Canonical profile key the address is bound to")
+    profile_id: int = Field(
+        ..., description="QueueProfile.id — a separate id space (D-01)"
+    )
+    direction_key: str = Field(
+        ..., description="Canonical profile key the address is bound to"
+    )
     public_code: str = Field(
         ...,
         description=(
@@ -125,7 +154,9 @@ class PublicAddressProvisionResponse(BaseModel):
             "direction title or key"
         ),
     )
-    url_path: str = Field(..., description="The permanent frontend route: /q/<public_code>")
+    url_path: str = Field(
+        ..., description="The permanent frontend route: /q/<public_code>"
+    )
     created: bool = Field(
         ...,
         description=(
@@ -134,16 +165,22 @@ class PublicAddressProvisionResponse(BaseModel):
             "generated ONCE, re-provision returns the SAME address)"
         ),
     )
-    provisioned_at: str | None = Field(None, description="Address creation timestamp (ISO-8601)")
+    provisioned_at: str | None = Field(
+        None, description="Address creation timestamp (ISO-8601)"
+    )
 
 
 class PublicDirectionAddressInfo(BaseModel):
     """The direction a permanent-address session is scoped to."""
 
-    profile_id: int = Field(..., description="QueueProfile.id — a separate id space (D-01)")
+    profile_id: int = Field(
+        ..., description="QueueProfile.id — a separate id space (D-01)"
+    )
     key: str = Field(..., description="Canonical direction key")
     title: str = Field(..., description="Public display title (title_ru preferred)")
-    public_code: str = Field(..., description="The canonical lowercase public code of the address")
+    public_code: str = Field(
+        ..., description="The canonical lowercase public code of the address"
+    )
 
 
 class PublicDirectionStartResponse(BaseModel):
@@ -169,9 +206,7 @@ class PublicDirectionStartResponse(BaseModel):
     )
     attempt_expires_at: str | None = Field(
         None,
-        description=(
-            "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки"
-        ),
+        description=("Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки"),
     )
     direction: PublicDirectionAddressInfo
     queue_info: dict[str, Any] = Field(
@@ -231,9 +266,7 @@ def get_direction_entry_methods(
     if not normalized:
         raise _anonymous_refusal()
 
-    profile = (
-        db.query(QueueProfile).filter(QueueProfile.key == normalized).first()
-    )
+    profile = db.query(QueueProfile).filter(QueueProfile.key == normalized).first()
     if profile is None or not QueueBusinessService._is_qr_visible_profile(profile, db):
         raise _anonymous_refusal()
 
@@ -265,7 +298,9 @@ def get_direction_entry_methods(
     response_model=PublicAddressProvisionResponse,
     summary="Provision постоянного публичного адреса направления (RQ-16.d)",
     responses={
-        400: {"description": "Зарезервированный ключ направления или исчерпаны попытки генерации"},
+        400: {
+            "description": "Зарезервированный ключ направления или исчерпаны попытки генерации"
+        },
         401: {"description": "Требуется аутентификация"},
         403: {"description": "Только роль Admin"},
         404: {"description": "Направление не найдено"},
@@ -301,9 +336,7 @@ def provision_public_address(
             ),
         )
 
-    profile = (
-        db.query(QueueProfile).filter(QueueProfile.key == normalized).first()
-    )
+    profile = db.query(QueueProfile).filter(QueueProfile.key == normalized).first()
     if profile is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Направление не найдено"
@@ -356,15 +389,15 @@ def _direction_selectable_specialists(
         "(RQ-16.d, анонимный путь)"
     ),
     responses={
-        400: {"description": "Честный отказ существующего сессионного контракта (окно записи и т.п.)"},
+        400: {
+            "description": "Честный отказ существующего сессионного контракта (окно записи и т.п.)"
+        },
         404: {
             "description": (
                 "Анонимный отказ (S-15): направление недоступно — "
                 "unknown/archived/hidden/deleted/retired неразличимы"
             ),
-            "content": {
-                "application/json": {"example": {"detail": _REFUSAL_DETAIL}}
-            },
+            "content": {"application/json": {"example": {"detail": _REFUSAL_DETAIL}}},
         },
         429: {"description": "Rate limit превышен (анонимный путь)"},
     },
