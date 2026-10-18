@@ -1,3 +1,61 @@
+## Latest checkpoint — T13 PR #3697 review fixes validated; journal amendment CI pending — 2026-10-18T09:01:36+05:00
+
+Plan version: 4.02
+Current task: T13 — canonical Admin directions read contract
+Current status: PR_OPEN
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t13-admin-directions\final
+Branch: codex/aqs-T13-admin-directions
+Base commit: 7f923f14a347a26b7f80da0fb40a0cff8858ef27
+Code commit with exact-head CI PASS: ca6416d0ee5ac8d4ce988fe70338413e753d557f
+Task memory: 6419e86d-e56a-41c3-bd01-2463a5bfd661
+
+| Task | Status | PR / commit | Evidence |
+|------|--------|-------------|----------|
+| T12.2 | MERGED | PR #3693, merge 7f923f14a347a26b7f80da0fb40a0cff8858ef27 | Focused PostgreSQL 3/3 PASS; broader Tier-2 remains PARTIAL |
+| T13 | PR_OPEN | PR #3697, code commit ca6416d0ee5ac8d4ce988fe70338413e753d557f | Both P2 regressions fixed; exact-head Unified CI PASS; journal-only amendment will trigger final check rerun |
+| T14-T18 | PLANNED | | |
+
+## Current checkpoint
+- Both P2 findings from Review #5561104585 were reproduced before the fixes and are now covered by passing regressions: hidden same-specialty profiles are assessed independently for publication; existing queues are matched by typed owner plus queue tag.
+- Exact-head Unified CI run 39094679700 on code commit ca6416d0ee5ac8d4ce988fe70338413e753d557f completed successfully: Backend tests, Frontend E2E, PR Required Gate, build, unit tests, lint, quality, security, documentation, parity, and applicable checks PASS. Docker build, integration tests, staging readiness, load tests, DAST, metadata and production-readiness jobs were SKIPPED by workflow scope/conditions; skipped is not PASS.
+- Local validation: 59 passed, 1 warning across characterization concurrency, Admin directions integration, and OpenAPI contract tests; focused regression pair 2 passed; Ruff check/format, Python compilation and git diff --check PASS. Commit hooks PASS.
+- The previous exact-head failure on 63f03267 was a test-isolation issue: an earlier characterization test left a synthetic Service in a session-scoped SQLite database. The empty-catalog regression now uses an explicit empty read snapshot; the failing sequence was reproduced and passes locally.
+- A journal-only amendment is being prepared to keep this single T13 commit and preserve plan evidence. Hosted checks on the resulting amended SHA will be the final verification. Full Tier-2/T18 remain NOT_RUN; no staging, production, deployment, review reply/thread resolution, merge or T14 work occurred.
+- Allowed source paths: backend/app/services/queue_admin_directions_read_service.py and backend/tests/integration/test_queue_admin_directions_read_model.py; plan journals are allowed for checkpoint/evidence. No API schema/OpenAPI/generated/frontend/model/migration/admission paths changed.
+- Next exact action: amend the user-approved single T13 commit with this evidence, verify the remote head immediately before force-with-lease, push, and confirm checks on the final SHA. User retains merge authority.
+- Stop if the final check requires an out-of-scope source change or any branch/base divergence.
+## Historical checkpoint — T13 before PR review corrections
+
+Plan version: 4.02
+Current task: T13 — canonical Admin directions read contract
+Current status: PR_OPEN
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t13-admin-directions\final
+Branch: codex/aqs-T13-admin-directions
+Base commit: 7f923f14a347a26b7f80da0fb40a0cff8858ef27 (fresh origin/main)
+Current source: single T13 commit pushed to PR #3697; branch HEAD recorded by GitHub PR metadata
+Task memory: 6419e86d-e56a-41c3-bd01-2463a5bfd661
+
+| Task | Status | PR / commit | Evidence |
+|------|--------|-------------|----------|
+| T12.2 | MERGED | PR #3693, merge 7f923f14a347a26b7f80da0fb40a0cff8858ef27 | Focused PostgreSQL 3/3 PASS; broader Tier-2 remains PARTIAL |
+| T13 | PR_OPEN | PR #3697, codex/aqs-T13-admin-directions | API/OpenAPI 55 passed (1 warning); final endpoint-only 7 passed; non-ESLint hooks PASS; exact-head CI queued |
+| T14-T18 | PLANNED | | |
+
+## Current checkpoint
+- PR #3693 is MERGED at 7f923f14a347a26b7f80da0fb40a0cff8858ef27; this worktree is based on that fresh origin/main. The primary C:\final checkout was not changed and its pre-existing dirty/untracked state is untouched.
+- T13 adds Admin-only GET /api/v1/queue/admin/directions to the existing /queue router. It is read-only, uses clinic-local today by default, returns typed owner identities, current-day queues, effective/public state, publish readiness, separate precreate policy, active permanent-address existence and unattached catalog facts. No public code, URL, patient data or write action is returned.
+- Publication readiness for hidden profiles uses the canonical public-catalog selector with an in-memory proxy; it does not mutate ORM objects. Ordinary booking and morning precreate remain separate. No admission, ownership, model or migration code changed.
+- Mandatory gate: initial no-first-touch stop; known-root retry selected the UI screen only; exact user-plan narrow_override was applied for the approved backend T13 scope. Result emitted gate_misroute=no, override_used=yes, handoff_required=yes; generated prompt was read and honored.
+- Local evidence: focused backend integration + OpenAPI contract tests 55 passed, 1 warning; after the final precreate-tag simplification, endpoint integration tests 7 passed, 1 warning. Ruff check and Python compilation passed. OpenAPI snapshot and generated TypeScript were produced from the app schema; openapi-typescript 7.13.0 generation was hash-stable.
+- Final pre-commit: all non-ESLint hooks PASS after formatter-stable cleanup; ESLint was skipped because this worktree has no frontend dependencies. Full frontend type-check/build remains NOT_RUN locally due absent node_modules and constrained host memory. PR review-body gate PASS. No staging or production action was needed or performed for this read-only slice.
+- Tier-2 gaps from #3693 remain PARTIAL and are unrelated to this T13 implementation: full staging runbook, three legacy browser specs, full T18 and canonical served_revision_verified remain NOT_RUN/unverified.
+- Allowed paths: backend/app/api/v1/endpoints/qr_queue/_directions.py; backend/app/schemas/admin_queue_directions.py; backend/app/services/queue_admin_directions_read_service.py; backend/app/crud/queue_admin_directions_read_repository.py; backend/tests/integration/test_queue_admin_directions_read_model.py; backend/tests/test_openapi_contract.py; backend/openapi.json; frontend/src/types/generated/api.ts; this plan's PROGRESS.md, DECISIONS.md, EVIDENCE.md and RESUME.md.
+- Denied paths remain frontend screen/readiness edits; admission/ownership/fairness/queue command or clinical runtime behavior; models/migrations; route registration absent collision; staging, production, deployment, merge and changes to C:\final.
+- PR #3697 is OPEN, not Draft, against current `main`; GitHub reports mergeable and the PR head matches the pushed T13 commit. PR artifact is attached to this task. User owns merge.
+- The authorized single commit `feat(queue): add admin directions read model` has been created and pushed. All non-ESLint pre-commit hooks passed; ESLint was skipped because frontend dependencies are absent from the worktree.
+- Exact-head GitHub workflow runs were queued when checked; no GitHub CI result is yet claimed. Local frontend type-check/build and broader Tier-2/T18 remain NOT_RUN as described above.
+- Next exact action: wait for exact-head CI to finish, inspect required jobs and address any actionable failure within PR #3697. Do not merge or begin T14; user owns merge.
+- Blocker: exact-head CI is pending. Stop if scope expands beyond the allowed paths or a required check fails without an in-scope fix.
 ## Current checkpoint — T12.2 #3693 focused synthetic staging PASS; overall acceptance PARTIAL / merge hold — 2026-10-17T16:38:21+05:00
 
 Plan version: 4.01

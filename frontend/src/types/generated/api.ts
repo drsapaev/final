@@ -2916,6 +2916,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/admin/directions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read queue direction setup facts (Admin)
+         * @description Read configuration and eligibility facts without creating queue state.
+         */
+        get: operations["getAdminQueueDirections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/directions/{profile_key}/entry-methods": {
         parameters: {
             query?: never;
@@ -24047,6 +24067,197 @@ export type components = {
         AddUserToGroupRequest: {
             /** User Id */
             user_id: number;
+        };
+        /** AdminDirectionAction */
+        AdminDirectionAction: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "restore_profile" | "configure_ownership" | "review_configuration" | "publish_profile" | "provision_permanent_address";
+            /**
+             * Entity Type
+             * @enum {string}
+             */
+            entity_type: "queue_profile" | "queue_tag" | "department";
+            /** Entity Id */
+            entity_id?: number | null;
+            /** Entity Key */
+            entity_key?: string | null;
+        };
+        /** AdminDirectionBookingTarget */
+        AdminDirectionBookingTarget: {
+            /**
+             * Owner Type
+             * @enum {string}
+             */
+            owner_type: "doctor" | "resource";
+            /** Owner Id */
+            owner_id: number;
+            /** Queue Tag */
+            queue_tag: string;
+            /** Label */
+            label: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Eligible For New Booking */
+            eligible_for_new_booking: boolean;
+            /** Existing Daily Queue Ids */
+            existing_daily_queue_ids?: number[];
+        };
+        /** AdminDirectionDailyQueueReference */
+        AdminDirectionDailyQueueReference: {
+            /** Daily Queue Id */
+            daily_queue_id: number;
+            /** Queue Tag */
+            queue_tag: string;
+            /**
+             * Owner Type
+             * @enum {string}
+             */
+            owner_type: "doctor" | "resource" | "unresolved";
+            /** Owner Id */
+            owner_id?: number | null;
+        };
+        /** AdminDirectionPrecreateTag */
+        AdminDirectionPrecreateTag: {
+            /** Queue Tag */
+            queue_tag: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "eligible" | "already_exists" | "blocked";
+            /** Can Precreate */
+            can_precreate: boolean;
+            /** Active Service Count */
+            active_service_count: number;
+            /** Owner Type */
+            owner_type?: ("doctor" | "resource") | null;
+            /** Owner Id */
+            owner_id?: number | null;
+            /** Existing Daily Queue Ids */
+            existing_daily_queue_ids?: number[];
+            /** Reason Codes */
+            reason_codes?: string[];
+        };
+        /** AdminDirectionProfile */
+        AdminDirectionProfile: {
+            /** Id */
+            id: number;
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
+            /** Title Ru */
+            title_ru?: string | null;
+            /** Queue Tags */
+            queue_tags: string[];
+            /** Department Key */
+            department_key?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Show On Qr Page */
+            show_on_qr_page: boolean;
+            /** Display Order */
+            display_order: number;
+            /** Icon */
+            icon?: string | null;
+            /** Color */
+            color?: string | null;
+        };
+        /** AdminDirectionReason */
+        AdminDirectionReason: {
+            /** Code */
+            code: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "error";
+            /** Subject Type */
+            subject_type?: ("queue_profile" | "department" | "queue_tag") | null;
+            /** Subject Key */
+            subject_key?: string | null;
+        };
+        /** AdminQueueDirection */
+        AdminQueueDirection: {
+            profile: components["schemas"]["AdminDirectionProfile"];
+            /**
+             * Resolved Mode
+             * @enum {string}
+             */
+            resolved_mode: "booking" | "overview" | "unresolved";
+            /**
+             * Configuration State
+             * @enum {string}
+             */
+            configuration_state: "ready" | "incomplete" | "conflict" | "unavailable";
+            /** Configuration Reasons */
+            configuration_reasons?: components["schemas"]["AdminDirectionReason"][];
+            /**
+             * Effective Availability
+             * @enum {string}
+             */
+            effective_availability: "available" | "unavailable" | "conflict";
+            /** Effective Availability Reasons */
+            effective_availability_reasons?: string[];
+            /** Booking Targets */
+            booking_targets?: components["schemas"]["AdminDirectionBookingTarget"][];
+            /** Current Day Queues */
+            current_day_queues?: components["schemas"]["AdminDirectionDailyQueueReference"][];
+            /** Public Availability */
+            public_availability: boolean;
+            /** Permanent Address Exists */
+            permanent_address_exists: boolean;
+            /** Precreate By Tag */
+            precreate_by_tag?: components["schemas"]["AdminDirectionPrecreateTag"][];
+            /** Allowed Next Actions */
+            allowed_next_actions?: components["schemas"]["AdminDirectionAction"][];
+        };
+        /** AdminQueueDirectionsResponse */
+        AdminQueueDirectionsResponse: {
+            /**
+             * As Of Day
+             * Format: date
+             */
+            as_of_day: string;
+            /** Directions */
+            directions?: components["schemas"]["AdminQueueDirection"][];
+            unattached: components["schemas"]["AdminUnattachedCatalog"];
+        };
+        /** AdminUnattachedCatalog */
+        AdminUnattachedCatalog: {
+            /** Queue Tags */
+            queue_tags?: string[];
+            /** Services */
+            services?: components["schemas"]["AdminUnattachedService"][];
+            /** Resources */
+            resources?: components["schemas"]["AdminUnattachedResource"][];
+        };
+        /** AdminUnattachedResource */
+        AdminUnattachedResource: {
+            /** Resource Id */
+            resource_id: number;
+            /** Queue Tag */
+            queue_tag: string;
+            /** Display Name */
+            display_name: string;
+            /** Active */
+            active: boolean;
+        };
+        /** AdminUnattachedService */
+        AdminUnattachedService: {
+            /** Service Id */
+            service_id: number;
+            /** Name */
+            name: string;
+            /** Code */
+            code?: string | null;
+            /** Queue Tag */
+            queue_tag?: string | null;
+            /** Active */
+            active: boolean;
         };
         /** AllFreeApprovalRequest */
         AllFreeApprovalRequest: {
@@ -48036,6 +48247,38 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getAdminQueueDirections: {
+        parameters: {
+            query?: {
+                /** @description Clinic-local day for existing queue references; omitted means clinic today. */
+                day?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminQueueDirectionsResponse"];
                 };
             };
             /** @description Validation Error */

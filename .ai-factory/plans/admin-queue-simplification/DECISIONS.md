@@ -196,3 +196,17 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - Plan/policy basis: T12 requires all new profiles hidden, publication through a separate explicit action, and explicitly allows a backward-compatible reject/defer behavior for old clients posting show_on_qr_page=true.
 - Technical choice for T12.1: defer such create-time publication. The new profile is persisted with show_on_qr_page=false; response/UI must state that publication was deferred. No existing profile is mass-hidden. No readiness/ambiguity decision is added to the create path here; that is T12.2.
 - Scope boundary: eight gate-approved source/test paths only. The discovered generated-file drift is handled as separately gated T12.1a; do not silently expand T12.1.
+
+## T13 canonical Admin directions read model — 2026-10-17
+
+- **Technical choice:** expose the read-only Admin contract from the existing `/queue` router at `/admin/directions`; the router is already mounted at `/api/v1/queue`, so no route-registry change is needed.
+- **Identity choice:** queue owners always carry `owner_type` with the numeric `owner_id`; a Doctor ID and QueueResource ID are never combined or inferred. Today's queue references are a separate collection from future/default targets.
+- **Eligibility choice:** current public availability is computed through the canonical public-catalog selector. A hidden profile's proposed publication readiness is evaluated through that same selector using an in-memory profile proxy; ORM state is not mutated and the publish command remains responsible for transactional revalidation.
+- **Precreate choice:** automatic morning precreate eligibility is returned separately from ordinary booking. It follows the active-resource or one-explicit-eligible-service-doctor rule; `Service.doctor_id` is not required for normal multi-doctor booking.
+- **Privacy/read-only choice:** the endpoint returns no patient data, public address code, or URL. For permanent addresses it reports only active-address existence. The read uses bulk catalog/owner/queue lookups and performs no provisioning or queue creation.
+
+## T13 #3697 review-fix contract clarifications — 2026-10-18
+
+- **Publication readiness:** assess each hidden profile as the sole hypothetical published candidate against the current catalog; other hidden profiles remain hidden. Reuse the snapshot's preloaded availability, owner scopes, and eligible specialties.
+- **Precreate owner matching:** detect existing queues by (owner_type, owner_id, queue_tag) for the selected target owner. A same-tag queue for another owner does not satisfy or block this target.
+- **Precreate field meaning:** can_precreate describes policy feasibility from the active service/resource-or-explicit-doctor owner. state and existing_daily_queue_ids describe whether that exact typed owner/tag queue exists for the selected day; therefore an eligible policy with an existing exact-day queue is can_precreate=true, state=already_exists.

@@ -1,3 +1,14 @@
+## Latest checkpoint — T13 PR #3697 open; exact-head CI queued — 2026-10-18T07:09:30+05:00
+
+Continue task `6419e86d-e56a-41c3-bd01-2463a5bfd661` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t13-admin-directions\final`, branch `codex/aqs-T13-admin-directions`, based on fresh origin/main `7f923f14a347a26b7f80da0fb40a0cff8858ef27`. PR #3697 is open (not Draft), based on current `main`; its exact head is recorded in GitHub metadata. The single requested T13 commit has been pushed; the main checkout was not changed.
+
+T13 implements Admin-only, read-only `GET /api/v1/queue/admin/directions`, with typed Doctor/QueueResource identities, clinic-local day default, current-day queue references, canonical effective/public booking facts, safe publish-readiness actions, separately computed morning-precreate eligibility and unattached catalog items. Address presence is boolean only. No patient data, address code/URL, provisioning or queue mutations are returned/performed. Hidden publication readiness uses the canonical public selector with an in-memory proxy to avoid changing ORM state.
+
+Validation: focused backend integration + OpenAPI tests 55 passed/1 warning after formatter cleanup; final endpoint-focused suite 7 passed/1 warning. Ruff check and Python compilation PASS. All non-ESLint pre-commit hooks PASS; ESLint was skipped because the worktree lacks frontend dependencies. PR body gate PASS. OpenAPI and generated TypeScript are generated; `openapi-typescript` 7.13.0 output hash is stable. Full frontend type-check/build was NOT_RUN locally because this isolated worktree has no `node_modules` and available host memory was 1.55 GiB. No staging/production run was performed.
+
+Execution gate: mandatory gate initially stopped for no first-touch; known-root retry selected only the denied UI root; exact-scope user-plan `narrow_override` was applied and its execution prompt was read. Gate reported `gate_misroute=no`, `override_used=yes`, `handoff_required=yes`. Allowed/denied path lists are current in PROGRESS.md and EVIDENCE.md; preserve them.
+
+Next exact action: inspect exact-head GitHub CI on PR #3697 after it completes; fix any actionable failure within the approved T13 paths. No merge or T14 work. The user owns merge. Do not edit AdminSetupDirections or widen to T14. T12.2's unrelated Tier-2 status remains PARTIAL: full staging runbook, three named legacy browser specs, T18 and `served_revision_verified` are NOT_RUN/unverified.
 ## Current checkpoint — T12.2 #3693 focused synthetic staging PASS; acceptance partial / merge hold — 2026-10-17T16:38:21+05:00
 
 Continue task `431e8e5b-7c74-459e-8038-26f0f17adf1d` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t122-publish-policy\final`, branch `codex/aqs-T12.2-publish-readiness`. PR #3693 is OPEN/READY FOR REVIEW, HEAD `dde8f799a804bd0e71eed9802c879b03d01effb1`, base `db91cc0ef87c8a51eb4b4e816d25077c8ce397d6`, mergeable; user performs merge.

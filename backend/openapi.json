@@ -8348,6 +8348,64 @@
         }
       }
     },
+    "/api/v1/queue/admin/directions": {
+      "get": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Read queue direction setup facts (Admin)",
+        "description": "Read configuration and eligibility facts without creating queue state.",
+        "operationId": "getAdminQueueDirections",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Clinic-local day for existing queue references; omitted means clinic today.",
+              "title": "Day"
+            },
+            "description": "Clinic-local day for existing queue references; omitted means clinic today."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminQueueDirectionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queue/directions/{profile_key}/entry-methods": {
       "get": {
         "tags": [
@@ -70899,6 +70957,591 @@
           "user_id"
         ],
         "title": "AddUserToGroupRequest"
+      },
+      "AdminDirectionAction": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "restore_profile",
+              "configure_ownership",
+              "review_configuration",
+              "publish_profile",
+              "provision_permanent_address"
+            ],
+            "title": "Kind"
+          },
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "queue_profile",
+              "queue_tag",
+              "department"
+            ],
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
+          },
+          "entity_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "entity_type"
+        ],
+        "title": "AdminDirectionAction"
+      },
+      "AdminDirectionBookingTarget": {
+        "properties": {
+          "owner_type": {
+            "type": "string",
+            "enum": [
+              "doctor",
+              "resource"
+            ],
+            "title": "Owner Type"
+          },
+          "owner_id": {
+            "type": "integer",
+            "title": "Owner Id"
+          },
+          "queue_tag": {
+            "type": "string",
+            "title": "Queue Tag"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "eligible_for_new_booking": {
+            "type": "boolean",
+            "title": "Eligible For New Booking"
+          },
+          "existing_daily_queue_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Existing Daily Queue Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "owner_type",
+          "owner_id",
+          "queue_tag",
+          "label",
+          "is_active",
+          "eligible_for_new_booking"
+        ],
+        "title": "AdminDirectionBookingTarget"
+      },
+      "AdminDirectionDailyQueueReference": {
+        "properties": {
+          "daily_queue_id": {
+            "type": "integer",
+            "title": "Daily Queue Id"
+          },
+          "queue_tag": {
+            "type": "string",
+            "title": "Queue Tag"
+          },
+          "owner_type": {
+            "type": "string",
+            "enum": [
+              "doctor",
+              "resource",
+              "unresolved"
+            ],
+            "title": "Owner Type"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "daily_queue_id",
+          "queue_tag",
+          "owner_type"
+        ],
+        "title": "AdminDirectionDailyQueueReference"
+      },
+      "AdminDirectionPrecreateTag": {
+        "properties": {
+          "queue_tag": {
+            "type": "string",
+            "title": "Queue Tag"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "eligible",
+              "already_exists",
+              "blocked"
+            ],
+            "title": "State"
+          },
+          "can_precreate": {
+            "type": "boolean",
+            "title": "Can Precreate"
+          },
+          "active_service_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Active Service Count"
+          },
+          "owner_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "doctor",
+                  "resource"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Type"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
+          },
+          "existing_daily_queue_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Existing Daily Queue Ids"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reason Codes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "queue_tag",
+          "state",
+          "can_precreate",
+          "active_service_count"
+        ],
+        "title": "AdminDirectionPrecreateTag"
+      },
+      "AdminDirectionProfile": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "title_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Ru"
+          },
+          "queue_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Queue Tags"
+          },
+          "department_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Key"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "show_on_qr_page": {
+            "type": "boolean",
+            "title": "Show On Qr Page"
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "title",
+          "queue_tags",
+          "is_active",
+          "show_on_qr_page",
+          "display_order"
+        ],
+        "title": "AdminDirectionProfile"
+      },
+      "AdminDirectionReason": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "title": "Severity"
+          },
+          "subject_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "queue_profile",
+                  "department",
+                  "queue_tag"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Type"
+          },
+          "subject_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "severity"
+        ],
+        "title": "AdminDirectionReason"
+      },
+      "AdminQueueDirection": {
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/AdminDirectionProfile"
+          },
+          "resolved_mode": {
+            "type": "string",
+            "enum": [
+              "booking",
+              "overview",
+              "unresolved"
+            ],
+            "title": "Resolved Mode"
+          },
+          "configuration_state": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "incomplete",
+              "conflict",
+              "unavailable"
+            ],
+            "title": "Configuration State"
+          },
+          "configuration_reasons": {
+            "items": {
+              "$ref": "#/components/schemas/AdminDirectionReason"
+            },
+            "type": "array",
+            "title": "Configuration Reasons"
+          },
+          "effective_availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable",
+              "conflict"
+            ],
+            "title": "Effective Availability"
+          },
+          "effective_availability_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Effective Availability Reasons"
+          },
+          "booking_targets": {
+            "items": {
+              "$ref": "#/components/schemas/AdminDirectionBookingTarget"
+            },
+            "type": "array",
+            "title": "Booking Targets"
+          },
+          "current_day_queues": {
+            "items": {
+              "$ref": "#/components/schemas/AdminDirectionDailyQueueReference"
+            },
+            "type": "array",
+            "title": "Current Day Queues"
+          },
+          "public_availability": {
+            "type": "boolean",
+            "title": "Public Availability"
+          },
+          "permanent_address_exists": {
+            "type": "boolean",
+            "title": "Permanent Address Exists"
+          },
+          "precreate_by_tag": {
+            "items": {
+              "$ref": "#/components/schemas/AdminDirectionPrecreateTag"
+            },
+            "type": "array",
+            "title": "Precreate By Tag"
+          },
+          "allowed_next_actions": {
+            "items": {
+              "$ref": "#/components/schemas/AdminDirectionAction"
+            },
+            "type": "array",
+            "title": "Allowed Next Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "profile",
+          "resolved_mode",
+          "configuration_state",
+          "effective_availability",
+          "public_availability",
+          "permanent_address_exists"
+        ],
+        "title": "AdminQueueDirection"
+      },
+      "AdminQueueDirectionsResponse": {
+        "properties": {
+          "as_of_day": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of Day"
+          },
+          "directions": {
+            "items": {
+              "$ref": "#/components/schemas/AdminQueueDirection"
+            },
+            "type": "array",
+            "title": "Directions"
+          },
+          "unattached": {
+            "$ref": "#/components/schemas/AdminUnattachedCatalog"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "as_of_day",
+          "unattached"
+        ],
+        "title": "AdminQueueDirectionsResponse"
+      },
+      "AdminUnattachedCatalog": {
+        "properties": {
+          "queue_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Queue Tags"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUnattachedService"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUnattachedResource"
+            },
+            "type": "array",
+            "title": "Resources"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AdminUnattachedCatalog"
+      },
+      "AdminUnattachedResource": {
+        "properties": {
+          "resource_id": {
+            "type": "integer",
+            "title": "Resource Id"
+          },
+          "queue_tag": {
+            "type": "string",
+            "title": "Queue Tag"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "resource_id",
+          "queue_tag",
+          "display_name",
+          "active"
+        ],
+        "title": "AdminUnattachedResource"
+      },
+      "AdminUnattachedService": {
+        "properties": {
+          "service_id": {
+            "type": "integer",
+            "title": "Service Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "queue_tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Tag"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "service_id",
+          "name",
+          "active"
+        ],
+        "title": "AdminUnattachedService"
       },
       "AllFreeApprovalRequest": {
         "properties": {
