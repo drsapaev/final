@@ -9,6 +9,9 @@ unauthenticated caller. Their only consumers are admin-panel components
 ServiceAuditHistory.tsx), so Admin is the correct guard role.
 """
 
+from sqlalchemy import func, or_
+
+from app.core.roles import INTERNAL_ONLY_ROLE_SPELLINGS
 from app.models.clinic import Doctor
 from app.models.service import Service
 from app.models.user import User
@@ -49,9 +52,27 @@ def test_admin_can_read_temp_doctor_list(client, auth_headers):
     assert isinstance(response.json(), list)
 
 
-def test_compact_doctor_options_include_display_name_and_apply_database_pagination(
+def test_compact_doctor_options_exclude_internal_resource_before_pagination(
     client, db_session, auth_headers
 ):
+    internal_user = User(
+        username="synthetic_compact_resource_options",
+        email="synthetic-compact-resource-options@example.test",
+        full_name="SYNTHETIC Internal Queue Resource",
+        hashed_password="not-used-by-test",
+        role="Resource",
+        is_active=True,
+    )
+    db_session.add(internal_user)
+    db_session.flush()
+    internal_doctor = Doctor(
+        user_id=internal_user.id,
+        specialty="synthetic-internal-queue-resource",
+        active=True,
+    )
+    db_session.add(internal_doctor)
+    db_session.flush()
+
     user = User(
         username="synthetic_compact_doctor_options",
         email="synthetic-compact-doctor-options@example.test",
@@ -74,7 +95,16 @@ def test_compact_doctor_options_include_display_name_and_apply_database_paginati
 
     offset = (
         db_session.query(Doctor)
-        .filter(Doctor.active.is_(True), Doctor.id < doctor.id)
+        .outerjoin(User, User.id == Doctor.user_id)
+        .filter(
+            Doctor.active.is_(True),
+            Doctor.id < doctor.id,
+            or_(
+                Doctor.user_id.is_(None),
+                User.role.is_(None),
+                func.lower(User.role).notin_(INTERNAL_ONLY_ROLE_SPELLINGS),
+            ),
+        )
         .count()
     )
     response = client.get(
@@ -93,6 +123,7 @@ def test_compact_doctor_options_include_display_name_and_apply_database_paginati
             "display_name": "SYNTHETIC Compact Doctor",
         }
     ]
+    assert internal_doctor.id not in {row["id"] for row in response.json()}
 
 
 def test_admin_can_read_service_history(client, db, auth_headers):

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.core.roles import INTERNAL_ONLY_ROLE_SPELLINGS
 from app.crud import service as crud
 from app.models.clinic import Doctor, ServiceCategory
 from app.models.service import Service
@@ -132,8 +133,15 @@ class ServicesApiRepository:
                 Doctor.active,
                 User.full_name.label("display_name"),
             )
-            .outerjoin(User, Doctor.user_id == User.id)
-            .filter(Doctor.active.is_(True))
+            .outerjoin(User, User.id == Doctor.user_id)
+            .filter(
+                Doctor.active.is_(True),
+                or_(
+                    Doctor.user_id.is_(None),
+                    User.role.is_(None),
+                    func.lower(User.role).notin_(INTERNAL_ONLY_ROLE_SPELLINGS),
+                ),
+            )
             .order_by(Doctor.id.asc())
             .offset(offset)
             .limit(limit)
