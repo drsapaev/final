@@ -4338,3 +4338,5 @@ Recorded: 2026-10-01T16:41:51+05:00
 - `git diff --check` — PASS.
 - Browser/staging/Tier-2: NOT_RUN. No PR metadata, review thread, merge, or deployment mutation.
 - Result: both P2 findings fixed locally; change awaits commit/push and exact-head CI. PR remains Draft/HOLD due separate Tier-2 disposition; no deferral is accepted.
+- Commit: `0db15cacb` (`fix(queue): preserve access to permanent direction QR`) created with repository hooks all passing: large-file/conflict/private-key/YAML/JSON/TOML/whitespace checks, gitleaks and frontend ESLint; non-applicable Python/DB hooks skipped.
+- Commit is local and unpushed. PR #3702 was confirmed open, Draft and mergeable at prior HEAD e952521a; exact-head checks for the new commit do not yet exist.
