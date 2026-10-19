@@ -9,6 +9,7 @@ import os
 import socket
 import sys
 from contextlib import asynccontextmanager
+from datetime import time
 from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import FastAPI
@@ -130,6 +131,7 @@ if IS_PROD and (CORS_DISABLE or CORS_ALLOW_ALL):
 _background_tasks: set[asyncio.Task] = set()
 _inflight_thread_jobs: set[asyncio.Future] = set()
 _scheduled_backup_service = None
+_public_site_media_cleanup_scheduler = None
 _BACKGROUND_SHUTDOWN_GRACE_SECONDS = 30
 
 
@@ -156,6 +158,12 @@ async def _shutdown_background_tasks() -> None:
     if backup_service is not None:
         await backup_service.stop()
 
+    global _public_site_media_cleanup_scheduler
+    media_cleanup_scheduler = _public_site_media_cleanup_scheduler
+    if media_cleanup_scheduler is not None:
+        await media_cleanup_scheduler.stop()
+        _public_site_media_cleanup_scheduler = None
+
     if _inflight_thread_jobs:
         pending = list(_inflight_thread_jobs)
         try:
@@ -165,8 +173,7 @@ async def _shutdown_background_tasks() -> None:
             )
         except TimeoutError:
             log.warning(
-                "Background job shutdown grace expired; %d job(s) will finish"
-                " detached",
+                "Background job shutdown grace expired; %d job(s) will finish detached",
                 len(pending),
             )
 
@@ -705,14 +712,33 @@ async def _startup_tasks() -> None:
             # Get backup time from env (default: 2 AM)
             backup_hour = int(os.getenv("BACKUP_HOUR", "2"))
             backup_minute = int(os.getenv("BACKUP_MINUTE", "0"))
-            from datetime import time
-
             backup_time = time(backup_hour, backup_minute)
 
             await backup_service.start_daily_backups(backup_time)
             log.info(f"✅ Scheduled backups enabled (daily at {backup_time})")
         except Exception as e:
             log.error(f"Failed to start backup scheduler: {e}")
+
+    if settings.PUBLIC_SITE_MEDIA_ROOT is not None and not TESTING:
+        try:
+            from app.services.public_site_media_cleanup import (
+                PublicSiteMediaCleanupScheduler,
+            )
+
+            cleanup_time = time(
+                settings.PUBLIC_SITE_MEDIA_CLEANUP_HOUR,
+                settings.PUBLIC_SITE_MEDIA_CLEANUP_MINUTE,
+            )
+            media_cleanup_scheduler = PublicSiteMediaCleanupScheduler(cleanup_time)
+            await media_cleanup_scheduler.start()
+
+            global _public_site_media_cleanup_scheduler
+            _public_site_media_cleanup_scheduler = media_cleanup_scheduler
+        except Exception as e:
+            log.error(
+                "Failed to start public-site media cleanup scheduler: %s",
+                type(e).__name__,
+            )
 
     if TESTING and os.getenv("LAB_SCHEDULER_FORCE_START") != "1":
         # Test container: the every-5-minutes worker shares the sqlite engine
