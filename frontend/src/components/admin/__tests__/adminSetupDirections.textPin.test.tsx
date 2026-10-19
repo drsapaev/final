@@ -17,8 +17,12 @@ vi.mock('../../../api/client', () => ({
   setSessionInvalidationListener: vi.fn(),
 }));
 
+vi.mock('../QueueProfilesManager', () => ({ default: () => null }));
+vi.mock('../ServiceCatalog', () => ({ default: () => null }));
+
 import { api } from '../../../api/client';
 import AdminSetupDirections from '../AdminSetupDirections';
+import AdminServices from '../AdminServices';
 import {
   buildSetupReturnLocation as buildServicesReturnLocation,
   parseSetupReturnContext as parseServicesReturnContext,
@@ -167,6 +171,16 @@ const renderScreen = (initialEntries = ['/admin/setup-directions']) =>
     </ThemeProvider>,
   );
 
+const renderServices = (initialEntries: string[]) =>
+  render(
+    <ThemeProvider>
+      <MemoryRouter initialEntries={initialEntries}>
+        <LocationProbe />
+        <AdminServices />
+      </MemoryRouter>
+    </ThemeProvider>,
+  );
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockReadSide();
@@ -285,6 +299,31 @@ describe('AdminSetupDirections — backend facts and lazy details', () => {
 });
 
 describe('AdminSetupDirections — setup entry points', () => {
+  it('offers fixed editor links when no directions are configured', async () => {
+    mockedGet.mockImplementation(async (url: string) =>
+      url.startsWith('/queue/admin/directions')
+        ? { data: { as_of_day: '2026-10-18', directions: [], unattached: emptyUnattached } }
+        : { data: {} },
+    );
+
+    renderScreen();
+
+    const links = within(await screen.findByTestId('setup-empty-editors')).getAllByRole('link');
+    const urls = links.map((link) => new URL(link.getAttribute('href') || '', 'http://localhost'));
+    expect(urls.map(({ pathname }) => pathname)).toEqual([
+      '/admin/services',
+      '/admin/services',
+      '/admin/users',
+    ]);
+    expect(urls[0].searchParams.get('servicesTab')).toBe('catalog');
+    expect(urls[1].searchParams.get('servicesTab')).toBe('queue-profiles');
+    for (const url of urls) {
+      expect(url.searchParams.get('setupReturn')).toBe('queue-directions-v1');
+      expect(url.searchParams.get('setupSection')).toBe('checklist');
+      expect(url.searchParams.has('setupEntityKind')).toBe(false);
+    }
+  });
+
   it('restores a valid deep link and selected profile after mounting', async () => {
     renderScreen(['/admin/setup-directions?section=checklist&day=2026-10-17&profile=lab-key']);
 
@@ -421,6 +460,38 @@ describe('AdminSetupDirections — setup entry points', () => {
 });
 
 describe('queue setup editor return context', () => {
+  it('preserves shared return context while switching queue profiles to catalog and back', async () => {
+    const user = userEvent.setup();
+    renderServices([
+      '/admin/services?servicesTab=queue-profiles&setupReturn=queue-directions-v1&setupSection=checklist&setupProfile=lab-key&setupDay=2026-10-17&setupEntityKind=queue_profile&setupEntityKey=lab-key',
+    ]);
+
+    expect(await screen.findByTestId('queue-setup-return-link')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Справочник услуг' }));
+
+    const afterCatalog = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
+    expect(afterCatalog.searchParams.get('servicesTab')).toBe('catalog');
+    expect(afterCatalog.searchParams.get('setupReturn')).toBe('queue-directions-v1');
+    expect(afterCatalog.searchParams.get('setupProfile')).toBe('lab-key');
+    expect(afterCatalog.searchParams.get('setupSection')).toBe('checklist');
+    expect(afterCatalog.searchParams.get('setupDay')).toBe('2026-10-17');
+    expect(afterCatalog.searchParams.has('setupEntityKind')).toBe(false);
+    expect(afterCatalog.searchParams.has('setupEntityKey')).toBe(false);
+    expect(screen.getByTestId('queue-setup-return-link')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Вкладки регистратуры' }));
+
+    const afterQueueProfiles = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
+    expect(afterQueueProfiles.searchParams.get('servicesTab')).toBe('queue-profiles');
+    expect(afterQueueProfiles.searchParams.get('setupReturn')).toBe('queue-directions-v1');
+    expect(afterQueueProfiles.searchParams.get('setupProfile')).toBe('lab-key');
+    expect(afterQueueProfiles.searchParams.get('setupSection')).toBe('checklist');
+    expect(afterQueueProfiles.searchParams.get('setupDay')).toBe('2026-10-17');
+    expect(afterQueueProfiles.searchParams.has('setupEntityKind')).toBe(false);
+    expect(afterQueueProfiles.searchParams.has('setupEntityKey')).toBe(false);
+    expect(screen.getByTestId('queue-setup-return-link')).toBeVisible();
+  });
+
   it('accepts typed service context and always builds a fixed setup return path', () => {
     const search = '?servicesTab=catalog&setupReturn=queue-directions-v1&setupSection=resources&setupProfile=lab-key&setupDay=2026-10-17&setupEntityKind=service&setupEntityId=11';
     const context = parseServicesReturnContext(search, 'service-catalog');

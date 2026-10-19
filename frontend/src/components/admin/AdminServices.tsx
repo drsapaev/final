@@ -120,6 +120,16 @@ const AdminServices = () => {
     setServicesTab(tabKey);
     const params = new URLSearchParams(location.search);
     params.set('servicesTab', tabKey);
+    const destination = tabKey === 'catalog'
+      ? 'service-catalog'
+      : tabKey === 'queue-profiles'
+        ? 'queue-profiles'
+        : null;
+    if (destination && !parseSetupEntity(params, destination).valid) {
+      params.delete('setupEntityKind');
+      params.delete('setupEntityKey');
+      params.delete('setupEntityId');
+    }
     navigate({
       pathname: location.pathname,
       search: `?${params.toString()}`,

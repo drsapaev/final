@@ -1024,3 +1024,14 @@ Older timestamped “Active step — T08.1b” records below are historical and 
 - PR3639 description replaced with final source/evidence/disposition; existing GitHub review remains COMMENT, no human APPROVE submitted.
 - The first body rewrite omitted the repository template's exact required field labels, so the body-triggered PR Review Quality Gate failed. No code/staging test regressed. Corrected labels and validated the exact body locally with scripts/check_pr_review_template.py --body-file output/staging/t11-pr3639-final-20261016-r8/pr-body-final.md: PASS (one expected not-applicable reason warning). Hosted metadata recheck triggered; wait for its real result before final readiness claim. No gate/router/test/workflow source changed.
 - Preserve all five local plan documents and sanitized r8 evidence packet in the next worktree before cleaning/archiving this one. Do not transfer private env/auth data. Current source remains committed acb509c36; journals intentionally uncommitted.
+## Current checkpoint — PR #3711 review P2 fixes in progress — 2026-10-19
+
+Continue T15 in `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready for review at reviewed HEAD `264430e42ec0ec651b6c2c71f44db570c8b1be31`, base `984b49905ba162dea29e25c144137bd8fb864e11`.
+
+Fix the two P2 findings from review #5574854400: add fixed editor links to the empty directions state; clear incompatible entity-specific query fields when changing AdminServices tabs while retaining the shared return context; test the round trip `queue-profiles → catalog → queue-profiles`.
+
+Gate: mandatory root-cause retry produced scoped `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt read. Allowed implementation files: `AdminSetupDirections.tsx`, `AdminServices.tsx`, `adminSetupDirections.textPin.test.tsx`. T15 operational journals are also approved for checkpoint/evidence. No route registry, backend/API, auth, DB, queue runtime, staging, production, deployment, other PR, or merge changes.
+
+Both review defects were reproduced by fail-first regressions, then fixed. Focused Vitest is 18/18 PASS; scoped ESLint PASS with one existing warning; `git diff --check` PASS. Local type-check/build are blocked by the shared dependency cache missing `nitro`, with no changed-file diagnostics. Temporary `node_modules` junctions were removed; no dependency install occurred.
+
+Next exact action: stage only the three approved frontend files and three T15 journal files, run normal commit hooks, commit and push the fix to #3711, then inspect exact-head hosted CI. Do not merge. Tier-2/T18 remains NOT_RUN by plan sequence; no deferral is claimed. User owns merge.

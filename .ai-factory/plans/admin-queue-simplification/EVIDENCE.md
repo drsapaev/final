@@ -4431,3 +4431,32 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Path-aware jobs skipped by CI remain SKIPPED: backend, integration, context-boundary, docs generation, metadata, Docker, frontend/backend parity, staging readiness, production readiness, k6, nightly DAST, Supabase Preview and Telegram release gate.
 - Scope check: only T15 plan journals and PR metadata changed in this checkpoint; no runtime code, staging, production, deployment or merge.
 - Next exact action: user reviews/merges PR #3711; then verify merge, sync main and begin T16. Full Tier-2/T18 remains scheduled after T01-T17.
+## PR #3711 review corrections — pre-edit checkpoint — 2026-10-19
+
+- Commit under inspection: `264430e42ec0ec651b6c2c71f44db570c8b1be31`; base: `984b49905ba162dea29e25c144137bd8fb864e11`.
+- Environment: Windows worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`; branch `codex/aqs-t15-setup-context`.
+- Execution mode: `gate_known_root_cause` with scoped `narrow_override`; the explicit basis is the two confirmed P2 findings supplied in the user's review and the request to continue implementation. Gate reported `gate_misroute=false`, `override_used=true`, `handoff_required=true`; execution prompt read.
+- Allowed paths: the two Admin UI components, the focused shared T15 test, and T15 plan checkpoint files. Denied: backend/API/contracts, route registry/guards, auth/RBAC, DB, queue behavior, staging/production/deployment, other PRs, merge.
+- Original failure: review reports no editor entry point when the T13 read returns an empty directions list, and loss of valid return context when switching from queue profiles to catalog because `setupEntityKind=queue_profile` remains incompatible with catalog parsing.
+- Validation command/result: NOT_RUN before edits. No source change yet; workspace clean at reviewed HEAD.
+- Scope check: PASS for planned files. Stop if additional implementation paths are required or typed return contracts become ambiguous.
+
+## PR #3711 review corrections — local validation — 2026-10-19
+
+- Commit under test: local changes based on reviewed PR HEAD `264430e42ec0ec651b6c2c71f44db570c8b1be31`; base `984b49905ba162dea29e25c144137bd8fb864e11`.
+- Environment: Windows worktree; existing shared dependencies reused through a temporary worktree-local junction. The junction was checked against `C:\final\frontend\node_modules` and removed in `finally`; shared dependencies were not modified.
+- Actual changed paths: `AdminSetupDirections.tsx`, `AdminServices.tsx`, `adminSetupDirections.textPin.test.tsx`, and T15 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Original failure: both new regression assertions failed before the UI patch (empty state lacked editor links; catalog tab retained `setupEntityKind=queue_profile`). Baseline: 2 failed / 16 passed.
+- Validation command: `npm.cmd run test:run -- src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx --reporter=dot`.
+- Result: PASS — 18 tests, including empty-catalog editor entry points and `queue-profiles → catalog → queue-profiles` return-context retention. The available shared cache supplied Vitest 3.2.7; exact locked dependencies remain covered by hosted CI.
+- Validation command: scoped ESLint on the three changed frontend files.
+- Result: PASS — 0 errors, one existing warning for unchanged non-auth `localStorage.setItem` in `AdminServices.tsx`.
+- Validation command: `npm.cmd run type-check`.
+- Result: FAIL only on unrelated project/environment diagnostics: missing `nitro`, missing `nitro/runtime-config`, and implicit `route` typing in `src/publicSiteHandler.test.tsx`. No changed-file diagnostics.
+- Validation command: `npm.cmd run build`.
+- Result: FAIL before app compilation because shared dependency cache lacks `nitro`, imported by `vite.config.ts`. No dependency installation was attempted.
+- Validation command: `git diff --check`.
+- Result: PASS. Git emitted only CRLF-normalization warnings for the three plan documents.
+- Hosted exact-head checks: PENDING until the fix is pushed. Tier-2/T18: NOT_RUN by plan sequence; no deferral claimed.
+- Scope check: PASS. No staging, production, deployment, PR-thread mutation, merge, backend/API, route-registry, auth, DB, or queue-runtime changes.
+- Remaining limitation: hosted frontend unit/lint/type-check/build/E2E and PR Required Gate must pass on the pushed fix head before declaring this PR ready for user merge.
