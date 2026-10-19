@@ -34,5 +34,6 @@ export * from './appointment';
 export * from './doctor';
 export * from './billing';
 export * from './queue';
+export * from './adminQueueDirections';
 export * from './chat';
 export * from './patientAccess';

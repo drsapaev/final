@@ -20,14 +20,28 @@
 
 import { api } from './client';
 import type {
+    AdminQueueDirectionsResponseDto,
     DirectionEntryMethodsResponseDto,
     PublicAddressProvisionResponseDto,
     PublicDirectionStartResponseDto,
 } from '../types/api';
+import type { QueueAdminDirections } from '../types/domain/adminQueueDirections';
+import { mapAdminQueueDirections } from './mappers/adminQueueDirections';
 
 export type PublicAddressProvisionResponse = PublicAddressProvisionResponseDto;
 export type PublicDirectionStartResponse = PublicDirectionStartResponseDto;
 export type DirectionEntryMethodsResponse = DirectionEntryMethodsResponseDto;
+
+/** Read-only Admin setup facts for the requested clinic-local day. */
+export async function fetchAdminQueueDirections(
+    day?: string,
+): Promise<QueueAdminDirections> {
+    const query = day ? `?day=${encodeURIComponent(day)}` : '';
+    const response = await api.get<AdminQueueDirectionsResponseDto>(
+        `/queue/admin/directions${query}`,
+    );
+    return mapAdminQueueDirections(response.data);
+}
 
 /** Admin-only, idempotent provision of the permanent /q/<public_code>. */
 export async function provisionPublicAddress(
