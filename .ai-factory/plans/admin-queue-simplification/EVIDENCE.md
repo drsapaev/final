@@ -1,3 +1,19 @@
+## T15 PR #3711 — exact-head CI after review fixes — 2026-10-19T22:24:18+05:00
+
+- Commit under test: `115c6dae2e9a3f4852ff453f1053c4fda4ff69c5`; base `279638ddf884f9da8012ddbdb13f2035abb2c96c`; PR #3711 OPEN/Ready for review/MERGEABLE.
+- Environment: GitHub Actions exact-head Unified run `39291497713`; PR Review Quality Gate `39291750532`; PR lifecycle recommendation `39291750203`; Regression Audit Gate `39291497725`.
+- Execution mode: T15 user-authorized fix scope after review #5574854400; canonical gate and approved narrow override are recorded in the preceding checkpoint. No gate/router edits.
+- Allowed source paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/AdminServices.tsx`, `frontend/src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`; plan journals `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Actual source paths: the three allowed frontend files. This evidence update changes only the three approved T15 plan journals.
+- Original failures: empty T13 catalog had no editor entry point; tab navigation retained an incompatible `setupEntityKind=queue_profile` on catalog, causing the return link to disappear. Both regression expectations failed before implementation (2 failed / 16 passed).
+- Validation: focused Vitest 18/18 PASS; scoped ESLint PASS with 0 errors and one existing warning; `git diff --check` PASS; commit hooks PASS. Exact-head hosted frontend build, frontend lint/type-check, frontend unit and full Chromium E2E PASS. PR Required Gate, security/secrets, CodeQL, locale parity, CI Scope, Regression Audit, PR Review Quality and lifecycle recommendation PASS.
+- Hosted job scope: backend, integration, Docker, docs generation, metadata, context-boundary, parity, staging readiness, production readiness, load tests and nightly DAST were SKIPPED by path/scope, not passed.
+- Result: all applicable exact-head CI checks PASS; no new review blocker established. PR review decision is empty, so no formal APPROVE is claimed. PR remains open; merge not performed.
+- Tier-2/staging/T18: NOT_RUN; no deferral accepted. No staging, production, deployment or merge.
+- Scope check: implementation remained limited to the two existing UI files and one focused test; only approved T15 journals were additionally updated. No backend/API, route registry/guards, auth/RBAC, DB, queue runtime, unrelated PR, or live data touched.
+- Remaining limitation: local build/type-check cannot resolve Nitro from the shared dependency cache and report one unrelated existing route typing issue; hosted exact-head build/type-check passed. Path-aware jobs listed above remain skipped.
+- Next action: commit/push this journal-only checkpoint and verify checks for its exact new head. User owns merge; after confirmed merge, verify merge commit, sync main, then start T16.
+
 ## T11 r3 follow-up — offline fix for staging harness guard — 2026-10-15T23:36+05:00
 
 - Diagnosis source: executed r3 copy output/staging/t11-pr3639-tier2-20261015-r3/verify-owned-pg.py hard-coded 25491; executed session env set the owned Postgres port to 25493. The previous r3 cycle report and session report remain unchanged.

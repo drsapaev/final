@@ -1,4 +1,16 @@
-## Latest checkpoint — T15 PR #3711 Ready for review; Tier-1 CI PASS — 2026-10-19T17:53:53+05:00
+## Latest checkpoint — T15 review fixes and exact-head CI complete — 2026-10-19T22:24:18+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready for review/MERGEABLE at head `115c6dae2e9a3f4852ff453f1053c4fda4ff69c5`, based on `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+Review #5574854400's two P2s are fixed in the empty-direction state and AdminServices tab query handling, with focused regressions. Source/test fix commit `c0306eac9`; latest commit records the plan checkpoint. Exact-head Unified CI `39291497713`, PR Required Gate, frontend unit/build/lint/type-check/full E2E, security, locale parity and Regression Audit passed. PR Review Quality Gate `39291750532` and lifecycle recommendation `39291750203` passed. Path-aware unrelated jobs are SKIPPED, not PASS. Review decision is empty; no formal approval is claimed.
+
+Tier-2 staging and T18 remain `NOT_RUN`; no deferral is claimed. No merge, staging, production or deployment occurred. The user owns merge.
+
+Next exact action: commit/push this journal-only checkpoint, confirm checks for its new exact head, then hand PR #3711 back to the user for review/merge. After the actual merge is confirmed, verify the merge commit, sync main and clean up this worktree before starting T16.
+
+Allowed scope for the current checkpoint: T15 source/test files and this plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Do not modify routes/guards, backend/API/OpenAPI/generated types, auth/RBAC, DB, queue runtime, staging, production, deployment, unrelated PRs, or perform merge.
+
+## Previous checkpoint — T15 PR #3711 Ready for review; Tier-1 CI PASS — 2026-10-19T17:53:53+05:00
 
 Continue task memory 174595f3-1a65-4f05-8b3d-1f2f5e2f27cb in this worktree on branch `codex/aqs-t15-setup-context`. Fresh base/origin/main is `984b49905ba162dea29e25c144137bd8fb864e11`; T14 merged at `99f0b5a098dccce4f1166ae52bd7d5c93d92af70`.
 
