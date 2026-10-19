@@ -1,13 +1,13 @@
-## Latest checkpoint — T15 PR #3711 year-zero date fix pushed; applicable CI PASS — 2026-10-19T23:25:09+05:00
+## Latest checkpoint — T15 PR #3711 year-zero date fix; exact current-head CI PASS — 2026-10-19T23:44:09+05:00
 
-- PR #3711 is OPEN, Ready for review, MERGEABLE at exact HEAD `2dc0f50429221bb59240849f2d52e01bc7d9c007`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Branch is clean and synchronized with origin.
-- Review #5575562069's year-zero P2 is fixed in all three query validators. Date strings must still have ISO shape and valid calendar days; year `0000` is rejected, while `0001` and `9999` remain accepted. Independent regression tests cover page `day`, AdminServices `setupDay`, UserManagement `setupDay`, and both valid boundary years.
-- Fail-first run reproduced all three defects (3 failed / 19 passed among 22 tests). Post-fix focused Vitest is 22/22 PASS. Scoped ESLint is 0 errors with one pre-existing warning in unchanged `AdminServices.tsx` localStorage code. Normal hooks and `git diff --check` passed.
-- Exact-head Unified CI `39299922045`: Frontend build, lint/type-check, unit tests, full Chromium E2E, and PR Required Gate PASS. CodeQL, secret/security scans, locale checks, CI Scope, Regression Audit, PR Review Quality and lifecycle recommendation PASS. Backend, integration, Docker, docs generation, metadata, parity, context-boundary, staging, production-readiness, load and nightly DAST were SKIPPED by path/scope, not passed.
-- PR review decision is empty. The reported P2 is fixed and validated; reviewer recheck is still pending. Three review threads remain open and untouched because thread mutation is outside this gate scope. No formal approval is claimed.
-- Local TypeScript check remains limited by the shared dependency cache lacking Nitro and an unrelated existing `publicSiteHandler.test.tsx` route typing diagnostic; hosted exact-head type-check passed. No local build was run to avoid writing generated build output.
+- PR #3711 is OPEN, Ready for review, MERGEABLE at exact HEAD `d4e2d1ebb98ec692c0d1c34cee52ce0e9a6f0404`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`; branch `codex/aqs-t15-setup-context` is clean and synchronized with origin.
+- Review #5575562069's year-zero P2 is fixed in all three query validators. ISO shape and calendar validation remain; year `0000` is rejected and years `0001` and `9999` remain valid. Regression tests cover page `day`, AdminServices `setupDay`, UserManagement `setupDay`, and both boundaries.
+- Fail-first reproduced all three defects (3 failed / 19 passed among 22 tests). Post-fix focused Vitest: 22/22 PASS. Scoped ESLint: 0 errors and one pre-existing warning in unchanged AdminServices localStorage code. Normal hooks and `git diff --check` passed.
+- Exact current-head Unified CI run `39302431453`: Frontend build, lint/type-check, unit tests, full Chromium E2E (16m36s), PR Required Gate, Regression Audit, CodeQL/security/secret scans, locale checks, CI Scope, PR Review Quality and lifecycle checks PASS. Backend, integration, Docker, docs generation, metadata, parity, context-boundary, staging, production-readiness, load and nightly DAST are SKIPPED by path/scope, not passed.
+- PR review decision is empty; reviewer recheck is pending. Three review threads remain open and untouched because thread mutation is outside this gate scope. No formal approval is claimed.
+- Local TypeScript check remains limited by the shared dependency cache lacking Nitro and an unrelated existing `publicSiteHandler.test.tsx` route typing diagnostic; hosted exact-head type-check passed. No local build was run to avoid generated output.
 - Tier-2/T18 staging remains `NOT_RUN`; no deferral is claimed. No staging, production, deployment, review-thread mutation, or merge occurred.
-- Next exact action: reviewer/user rechecks and merges PR #3711. After actual merge, verify the merge commit, sync `main`, then continue T16.
+- Next exact action: user/reviewer rechecks and user merges PR #3711. After actual merge, verify merge SHA, sync `main`, clean up the worktree, then continue T16.
 
 ## Latest checkpoint — T15 PR #3711 year-zero date P2 fixed locally — 2026-10-19T23:06:33+05:00
 
@@ -1416,7 +1416,7 @@ Last updated: 2026-10-08T21:45+05:00
 | T12 | PLANNED | | | |
 | T13 | PLANNED | | | |
 | T14 | PLANNED | | | |
-| T15 | PLANNED | | | |
+| T15 | PR_OPEN | [PR #3711](https://github.com/drsapaev/final/pull/3711) — year-zero date validation fixed; exact-head CI PASS | | `EVIDENCE.md#pr-3711-year-zero-date-p2-exact-head-ci` |
 | T16 | PLANNED | | | |
 | T17 | PLANNED | | | |
 | T18 | PLANNED | | | |

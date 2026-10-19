@@ -4508,3 +4508,15 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: PASS. No staging, production, deployment, PR-thread mutation, merge, backend/API, route-registry, auth, DB, or queue-runtime changes.
 - Remaining limitation: hosted frontend unit/lint/type-check/build/E2E and PR Required Gate must pass on the pushed fix head before declaring this PR ready for user merge.
 - Post-rebase rerun: focused Vitest 18/18 PASS; scoped ESLint 0 errors and the same existing non-auth localStorage warning; temporary dependency junction removed. `git diff --check` passes after rebase and checkpoint edits. Hosted exact-head CI remains pending push.
+## PR #3711 year-zero date P2 — exact current-head CI — 2026-10-19T23:44:09+05:00
+
+- Commit under test: `d4e2d1ebb98ec692c0d1c34cee52ce0e9a6f0404`; source/test fix commit `2dc0f50429221bb59240849f2d52e01bc7d9c007`; base `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+- Environment: Windows managed worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`; PR #3711 OPEN/Ready/MERGEABLE.
+- Allowed paths: three T15 date validators, focused T15 test, and T15 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Actual code/test paths are recorded in the preceding local-validation entry; this checkpoint changes only plan journals.
+- Original failure: JS calendar validation accepted `0000-01-01`, which FastAPI/Python rejects. Fail-first focused run: 3 failed / 19 passed among 22 tests.
+- Validation: focused Vitest after fix — PASS, 22/22; scoped ESLint — PASS, zero errors and one pre-existing warning in unchanged AdminServices localStorage code; normal commit hooks — PASS; `git diff --check` — PASS.
+- Exact-head hosted validation: Unified CI run `39302431453` — Frontend build, lint/type-check, unit tests, full Chromium E2E (16m36s), and PR Required Gate PASS. Regression Audit, CodeQL, secret/security scans, Locale Key Parity, Hardcoded Russian Text Detector, CI Scope, PR Review Quality Gate, lifecycle recommendation and notifications PASS. Backend, integration, Docker build, docs generation, metadata, parity, context-boundary, staging/production readiness, k6/load and nightly DAST were SKIPPED by path/scope, not passed.
+- Result: the reported year-zero P2 is fixed and all applicable exact-head automated checks pass. GitHub review decision is empty; reviewer recheck is pending and three review threads remain open. No formal human approval is claimed.
+- Tier-2/T18: NOT_RUN by plan sequence; no deferral claimed. Full staging and browser acceptance remains assigned to T18.
+- Scope check: PASS. No runtime change in this checkpoint, no staging, review-thread mutation, production, deployment or merge.
+- Remaining limitation: independent reviewer/user disposition and user merge are pending. After merge, verify merge SHA, sync main and clean the worktree before T16.
