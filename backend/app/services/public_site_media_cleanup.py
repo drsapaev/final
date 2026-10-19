@@ -73,10 +73,10 @@ class PublicSiteMediaCleanupScheduler:
             if not self.running:
                 break
 
-            cleanup_job = spawn_daemon_job(self._cleanup)
-            self._inflight.add(cleanup_job)
-            cleanup_job.add_done_callback(self._inflight.discard)
             try:
+                cleanup_job = spawn_daemon_job(self._cleanup)
+                self._inflight.add(cleanup_job)
+                cleanup_job.add_done_callback(self._inflight.discard)
                 removed_count = await asyncio.shield(cleanup_job)
             except asyncio.CancelledError:
                 raise
