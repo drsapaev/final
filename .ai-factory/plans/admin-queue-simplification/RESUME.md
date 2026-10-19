@@ -1047,3 +1047,23 @@ Gate: mandatory root-cause retry produced scoped `narrow_override`, `gate_misrou
 Both review defects were reproduced by fail-first regressions, then fixed in code/test commit `c0306eac9` after rebasing onto `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Post-rebase focused Vitest is 18/18 PASS; scoped ESLint PASS with one existing warning; `git diff --check` PASS. Local type-check/build are blocked by the shared dependency cache missing `nitro`, with no changed-file diagnostics. Temporary `node_modules` junctions were removed; no dependency install occurred.
 
 Next exact action: commit the three journal updates, push the rewritten PR branch with `--force-with-lease`, then inspect exact-head hosted CI. Do not merge. Tier-2/T18 remains NOT_RUN by plan sequence; no deferral is claimed. User owns merge.
+## Latest checkpoint — T15 year-zero date P2 pre-edit — 2026-10-19T22:57:48+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready for review at HEAD `de50fb3db570d899b4367957584c2b348615462d`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+New review #5575562069 found that year `0000` slips through three calendar validators. Mandatory route/query gate ran from `ai/langgraph/scripts/run_agent_gate.ps1` with confirmed root `frontend/src/components/admin/UserManagement.tsx`; exact-scope result was `narrow_override`, misroute false, override used, handoff required. The generated prompt was read. Allowed files and denied areas are listed in the current `PROGRESS.md`.
+
+No source edit has started. Next exact action: add fail-first tests for page `day=0000-01-01` and typed editor `setupDay=0000-01-01` parsing in both services/users surfaces; then reject year zero in all three validators, rerun focused tests/lint/diff-check, commit and push. Do not change route/API/backend/auth/database/queue runtime, stage, deploy, resolve review threads, or merge under this slice.
+
+## Previous checkpoint — T15 review fixes and exact-head CI complete — 2026-10-19T22:24:18+05:00
+## Latest checkpoint — T15 PR #3711 year-zero date P2 fixed locally — 2026-10-19T23:06:33+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready/MERGEABLE at the pre-fix HEAD `de50fb3db570d899b4367957584c2b348615462d`; base `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+Review #5575562069's year-zero P2 is fixed locally across AdminSetupDirections, AdminServices and UserManagement validators. New tests independently fail-first on all three entry points, and preserve accepted year boundaries `0001` and `9999`. Focused Vitest is 22/22 PASS; scoped ESLint is 0 errors / one pre-existing warning. Local type-check is blocked by missing shared-cache Nitro packages and an unrelated existing route typing diagnostic. Hosted checks await push.
+
+Gate mode is `gate_known_root_cause` with an exact-scope `narrow_override` based on the human review; generated execution prompt read. Exact allowed/denied paths and gate result are in current PROGRESS. Three GitHub review threads remain untouched because thread mutation is outside the gate scope.
+
+Next exact action: rerun `git diff --check`, commit with normal hooks, push, verify exact-head GitHub checks, then leave PR #3711 for reviewer/user disposition. Tier-2/T18 remains NOT_RUN; no deferral. No merge/staging/deployment.
+
+## Previous checkpoint — T15 review fixes and exact-head CI complete — 2026-10-19T22:24:18+05:00

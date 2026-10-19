@@ -1,3 +1,24 @@
+## Latest checkpoint — T15 PR #3711 year-zero date P2 fixed locally — 2026-10-19T23:06:33+05:00
+
+- New review #5575562069's P2 is fixed in all three allowed validators: page `day` plus AdminServices and UserManagement `setupDay` context. ISO format and real calendar-day checks remain; `0000-*` is rejected, with valid year boundaries `0001` and `9999` retained.
+- Regression proof: fail-first run reached 3 failed / 19 passed in 22 tests (page, services parser, users parser each accepted `0000-01-01`). After fix, focused `adminSetupDirections.textPin.test.tsx` passes 22/22, including both boundary years.
+- Scoped ESLint passes with 0 errors and 1 pre-existing warning in unchanged `AdminServices.tsx` (`localStorage.setItem`). Local `tsc --noEmit` remains blocked by missing `nitro`, `nitro/runtime-config`, and an unrelated `publicSiteHandler.test.tsx` implicit-`route` diagnostic; no changed-file diagnostic. Hosted exact-head validation is pending.
+- Current PR at edit start: #3711 OPEN/Ready/MERGEABLE, HEAD `de50fb3db570d899b4367957584c2b348615462d`, base/main `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Source/test edits and this checkpoint are not yet committed. The gate denies review-thread mutation; all three reported threads remain untouched.
+- Execution mode and pre-edit gate result are recorded immediately below. Scope remains the three date validators, one focused test, and the three T15 plan journals only.
+- Next exact action: rerun `git diff --check`, commit with normal hooks, push to PR #3711, then verify exact-head build, unit, lint, E2E and required/quality checks. No local build was run because exact-head hosted CI provides the build without writing generated output into the worktree.
+- Tier-2/T18 remains `NOT_RUN`; no deferral is claimed. No staging, production, deployment, review-thread mutation, or merge occurred.
+
+## Pre-edit checkpoint — T15 PR #3711 new date-validation P2 — 2026-10-19T22:57:48+05:00
+
+- Current PR #3711 is OPEN/Ready for review at HEAD `de50fb3db570d899b4367957584c2b348615462d`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`; current main is the same base. New review #5575562069 identifies year `0000` accepted by three ISO date validators. Three review threads are reported open; this checkpoint does not resolve them.
+- Chosen mode: mandatory `gate_known_root_cause`, with scoped `narrow_override` returned by the canonical launcher. Root cause is confirmed in `frontend/src/components/admin/UserManagement.tsx`; the same duplicated calendar validator exists in `AdminSetupDirections.tsx` and `AdminServices.tsx`. Reason: route/query-context validation is a strict gate trigger.
+- Gate command was run from `ai/langgraph` via `scripts/run_agent_gate.ps1`, with `--known-root-cause frontend/src/components/admin/UserManagement.tsx` and exact `--scope` entries for the three components, `adminSetupDirections.textPin.test.tsx`, and these three T15 journals. Result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. No gate/router edits.
+- Allowed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/AdminServices.tsx`, `frontend/src/components/admin/UserManagement.tsx`, `frontend/src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`, and this plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Denied paths: all other source/tests, route registry/guards, API/backend/OpenAPI/generated types, auth/RBAC, DB, queue runtime, dependencies, staging, production, deployment, other PRs, review-thread mutation, and merge.
+- First-touch: add failing regressions for `day=0000-01-01` and `setupDay=0000-01-01`; make all three validators reject year 0000 while retaining valid calendar dates from `0001-01-01` through `9999-12-31` and existing invalid-date behavior.
+- Validation targets: focused `adminSetupDirections.textPin.test.tsx`, scoped ESLint, `git diff --check`, normal commit hooks, and exact-head hosted CI. Stop if a shared date contract requires an out-of-scope helper/API change or any required edit exceeds the allowed paths.
+- Status: no source edit has started. Previous P2 fixes remain in PR; this new P2 is pending fail-first reproduction.
+
 ## Latest checkpoint — T15 PR #3711 fixes pushed; exact-head Tier-1 CI PASS — 2026-10-19T22:24:18+05:00
 
 - PR #3711 was OPEN, Ready for review, and mergeable at the tested head `115c6dae2e9a3f4852ff453f1053c4fda4ff69c5`; base/current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Source/test fix is `c0306eac9`. This journal-only checkpoint is being committed after those exact-head checks; verify the resulting docs-only run before handoff.

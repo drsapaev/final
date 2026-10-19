@@ -1,3 +1,23 @@
+## T15 PR #3711 — year-zero date P2 fixed locally — 2026-10-19T23:06:33+05:00
+
+- Commit under test: uncommitted source/test work against PR HEAD `de50fb3db570d899b4367957584c2b348615462d`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+- Original failure: on fail-first run, all three entry points accepted `0000-01-01`: AdminSetupDirections page `day`, AdminServices return-context `setupDay`, UserManagement return-context `setupDay`. The isolated fail-first run was 3 failed / 19 passed out of 22.
+- Execution mode: gate_known_root_cause plus narrow_override. Known root `frontend/src/components/admin/UserManagement.tsx`; exact first-touch scope/result/denied paths are in the pre-edit checkpoint. Gate reported `gate_misroute=false`, `override_used=true`, `handoff_required=true`; its prompt was read.
+- Changes: all three ISO validators reject year `0000` before Date parsing; focused regression tests cover invalid page day, both editor parsers, and valid years `0001`/`9999`.
+- Validation: focused Vitest 22/22 PASS; scoped ESLint 0 errors / 1 pre-existing warning in unchanged AdminServices localStorage code. Local TypeScript check FAILs on absent shared-cache dependencies `nitro` and `nitro/runtime-config` plus existing unrelated `publicSiteHandler.test.tsx` implicit-`route` error; changed files have no reported diagnostics. `git diff --check` and hosted exact-head checks pending final rerun/push.
+- Scope: three existing components, one focused test, and T15 plan journals only. No route registry/API/backend/auth/DB/queue-runtime changes. No review-thread mutation, staging, production, deployment or merge.
+- Next action: rerun diff check, commit through normal hooks, push, and verify exact-head GitHub CI. Tier-2/T18 remains NOT_RUN; no deferral.
+
+## T15 PR #3711 — pre-edit record for year-zero date P2 — 2026-10-19T22:57:48+05:00
+
+- Commit under review: PR HEAD `de50fb3db570d899b4367957584c2b348615462d`; base/main `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+- Original failure: review #5575562069 reports that `0000-01-01` passes three duplicated ISO-calendar validators although Python/FastAPI date parsing rejects year zero.
+- Execution mode: canonical `gate_known_root_cause` plus exact-scope `narrow_override`; gate result `gate_misroute=false`, `override_used=true`, `handoff_required=true`. Known root: `frontend/src/components/admin/UserManagement.tsx`; execution prompt read.
+- Allowed files: `AdminSetupDirections.tsx`, `AdminServices.tsx`, `UserManagement.tsx`, `adminSetupDirections.textPin.test.tsx`, and T15 `PROGRESS.md`/`EVIDENCE.md`/`RESUME.md`. Denied areas are recorded in the latest `PROGRESS.md` checkpoint.
+- First-touch tests: invalid `day=0000-01-01` must be discarded by setup-page parsing; invalid `setupDay=0000-01-01` must reject typed return context in both AdminServices and UserManagement parser surfaces.
+- Validation plan: fail-first focused Vitest, focused Vitest after fix, scoped ESLint, `git diff --check`, normal commit hooks, exact-head GitHub checks. No staging or runtime validation is implied.
+- Result at checkpoint: NOT_RUN; no source files changed before this checkpoint.
+
 ## T15 PR #3711 — exact-head CI after review fixes — 2026-10-19T22:24:18+05:00
 
 - Commit under test: `115c6dae2e9a3f4852ff453f1053c4fda4ff69c5`; base `279638ddf884f9da8012ddbdb13f2035abb2c96c`; PR #3711 OPEN/Ready for review/MERGEABLE.

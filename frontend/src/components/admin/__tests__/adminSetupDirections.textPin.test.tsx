@@ -378,6 +378,16 @@ describe('AdminSetupDirections — setup entry points', () => {
     expect(screen.queryByTestId('setup-wizard')).toBeNull();
   });
 
+  it('removes a setup-page day with ISO year zero', async () => {
+    renderScreen(['/admin/setup-directions?section=checklist&day=0000-01-01']);
+
+    await screen.findByTestId('setup-checklist-row-lab');
+    await waitFor(() => {
+      const routeUrl = new URL(screen.getByTestId('route-location').textContent || '', 'http://localhost');
+      expect(routeUrl.searchParams.has('day')).toBe(false);
+    });
+  });
+
   it('rejects duplicated setup state parameters before reading a day or selecting a profile', async () => {
     renderScreen([
       '/admin/setup-directions?section=resources&section=checklist&day=2026-10-17&day=2026-10-18&profile=lab-key&profile=other',
@@ -524,6 +534,27 @@ describe('queue setup editor return context', () => {
     expect(parseUsersReturnContext(
       '?setupReturn=queue-directions-v1&setupSection=checklist&setupDay=2026-02-30',
     )).toBeNull();
+  });
+
+  it('rejects year-zero setup dates in the services return-context parser', () => {
+    const search = '?setupReturn=queue-directions-v1&setupSection=checklist&setupDay=0000-01-01';
+
+    expect(parseServicesReturnContext(search, 'service-catalog')).toBeNull();
+  });
+
+  it('rejects year-zero setup dates in the users return-context parser', () => {
+    const search = '?setupReturn=queue-directions-v1&setupSection=checklist&setupDay=0000-01-01';
+
+    expect(parseUsersReturnContext(search)).toBeNull();
+  });
+
+  it('accepts supported editor return-context year boundaries', () => {
+    for (const day of ['0001-01-01', '9999-12-31']) {
+      const search = `?setupReturn=queue-directions-v1&setupSection=checklist&setupDay=${day}`;
+
+      expect(parseServicesReturnContext(search, 'service-catalog')?.day).toBe(day);
+      expect(parseUsersReturnContext(search)?.day).toBe(day);
+    }
   });
 
   it('preserves typed queue-tag context for the existing user editor return link', () => {
