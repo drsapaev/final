@@ -1,12 +1,14 @@
-## Latest checkpoint — T15 implemented and focused checks passed — 2026-10-19T16:50:51+05:00
+## Latest checkpoint — T15 PR #3711 Draft; initial hosted checks partial — 2026-10-19T16:56:09+05:00
 
-Continue task memory 174595f3-1a65-4f05-8b3d-1f2f5e2f27cb in C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final, branch codex/aqs-t15-setup-context, based on fresh origin/main 984b49905ba162dea29e25c144137bd8fb864e11. T14 / PR #3702 is merged at 99f0b5a098dccce4f1166ae52bd7d5c93d92af70.
+Continue task memory 174595f3-1a65-4f05-8b3d-1f2f5e2f27cb, last saved revision 3, in C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final on branch codex/aqs-t15-setup-context. Base/origin/main is 984b49905ba162dea29e25c144137bd8fb864e11; T14 merged at 99f0b5a098dccce4f1166ae52bd7d5c93d92af70.
 
-T15 implementation commit 76eccdb9db2389913e47a3f6fe6bcf9bb57847fd is local and not yet pushed. /admin/setup-directions now persists profile, section, and day in the URL; the fake multi-step wizard is removed; editor links use typed, allowlisted context and fixed internal paths; the existing catalog and user screens render safe return links. Focused tests pass 16/16, including duplicate query-state rejection and browser history restoration. Scoped ESLint has no errors (one existing non-auth localStorage warning); git diff --check passes. Full local TypeScript/build cannot complete because the shared dependencies lack nitro; TypeScript also reports the unrelated publicSiteHandler.test.tsx implicit route diagnostic. Hosted exact-head CI remains pending.
+PR #3711 is OPEN/Draft/mergeable. Code-bearing checkpoint 8494a534fe14958f6280f3873ff403a2d2510e14 includes implementation 76eccdb9db2389913e47a3f6fe6bcf9bb57847fd and a journal checkpoint. On that head Frontend lint/build and auxiliary blocking checks passed; unit and E2E remained pending. This docs-only refresh is ready to push and will trigger checks on the resulting PR head.
 
-The gate misrouted once. The one permitted known-root retry returned narrow_override, with gate_misroute=true, override_used=true, handoff_required=true; the generated execution prompt was read. Preserve the exact first-touch scope from the T15 block in PROGRESS.md. Do not touch route registry/guards, backend/API, auth/RBAC, database, queue ownership, production, staging, deployment, other PRs, or merge.
+T15 behavior is implemented: setup profile/section/day are URL-owned; the fake multi-step wizard is removed; existing editor links carry a validated typed context and return to a fixed setup URL; catalog/user screens show a return link only for valid destination-specific context. Focused tests pass 16/16; scoped ESLint passes (0 errors, one pre-existing warning); PR-body gate passed. Full local type-check/build cannot complete because shared frontend dependencies lack nitro, with one unrelated implicit route type diagnostic. Hosted exact-head validation is pending.
 
-Next exact action: push the T15 implementation commit, open a Draft PR, and inspect hosted checks on the exact HEAD. Fix in-scope CI failures in that PR. User owns merge.
+Keep the PR Draft; do not merge or deploy. Allowed scope remains the four T15 frontend/test paths and four T15 plan journals. Backend/API/OpenAPI/types, route registry/guards, auth/RBAC, database, queue ownership, staging, production, deployment, other PRs, and merge remain denied.
+
+Next exact action: wait for and inspect all applicable #3711 checks on exact HEAD 8494a534fe14958f6280f3873ff403a2d2510e14; repair only in-scope failures in the same PR and update journals/evidence.
 
 ## Earlier checkpoint — T15 begins after T14 merge — 2026-10-19
 

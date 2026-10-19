@@ -1450,7 +1450,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: focused behavior, compilation, import sorting and diff hygiene PASS. PostgreSQL and staging checks are NOT_RUN for T06.2; the separate T06.1 disposable-PostgreSQL evidence remains recorded above and is not represented as a T06.2 runtime test.
 - Scope check: the creation flag was never changed outside isolated test processes. Production checkout/database, shared staging, API contracts and UI were not touched. Existing queues, counters and owner identities are not rewritten.
 - Remaining limitation: constructor integration ran on SQLite, not disposable PostgreSQL; no staging/browser check was run. The worktree diff is not committed and no PR exists yet. Full-file Ruff/format warnings are pre-existing outside the changed hunks and should be made explicit in the PR evidence.
-- PR: pending push/create; Draft, no merge or deployment.
+- PR: https://github.com/drsapaev/final/pull/3711 — OPEN/Draft/mergeable. At evidence update, exact-head GitHub checks were still in progress; no merge or deployment.
 - Merge commit: none.
 - Next exact action: final diff/allowlist review, commit/push this worktree branch, open T06.2 PR, and wait for exact-head checks. Do not start T07 before this PR cycle closes; do not activate the flag or deploy.
 
@@ -1538,7 +1538,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: PASS — fresh main and T06.2 merge verified; initial source inventory complete. Pre-edit tests are recorded by the exact baseline tests during implementation; no tests were run at the docs-only boundary.
 - Staging/PG availability: NOT_CHECKED at kickoff; do not imply these environments are available. No production or staging process/data was touched.
 - Stop conditions: unclear owner/claim route, adapter bypassing the common admission rule, overnight interval, requirement to change future-date behavior, ownership/quota/numbering/clinical lifecycle. If mandatory synthetic PG/staging proof cannot be run, record NOT_RUN and follow the plan's stage/merge gate; never use production as substitute.
-- PR: pending push/create; Draft, no merge or deployment.
+- PR: https://github.com/drsapaev/final/pull/3711 — OPEN/Draft/mergeable. At evidence update, exact-head GitHub checks were still in progress; no merge or deployment.
 - Merge commit: none yet.
 - Next exact action: finish strict `HH:MM` and start-before-end parsing in the shared daily queue policy helper; make the allowed T06.2 constructors consume its start/end values; add focused boundary tests before wiring adapters.
 
@@ -1575,7 +1575,7 @@ Recorded: 2026-10-01T16:41:51+05:00
   - `git diff --check` — PASS.
 - PostgreSQL/staging availability: `127.0.0.1:55432` refused the connection; staging ports `18001` and `18080` were not listening; Docker CLI was unavailable. WSL listed `Ubuntu-24.04`, but no isolated staging service was listening. PostgreSQL integration beyond CI, browser/staging scenarios, visual QA and first-screen timing remain **NOT_RUN**. These facts are not a T07 staging pass or an accepted T07 deferral.
 - Safety/scope: no production or staging request/data/process was touched; `QUEUE_POLICY_V2_CREATION_ENABLED` remains off. No migration, ownership, quota counter, queue numbering or clinical lifecycle change was made.
-- PR: pending push/create; Draft, no merge or deployment. Merge commit: none.
+- PR: https://github.com/drsapaev/final/pull/3711 — OPEN/Draft/mergeable. At evidence update, exact-head GitHub checks were still in progress; no merge or deployment. Merge commit: none.
 
 ## T12.1 OpenAPI freshness CI fix — 2026-10-16T17:59:51+05:00
 
@@ -1630,7 +1630,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - First commit-hook attempt also found the pre-existing `isinstance(value, (int, float))` Ruff `UP038` in touched `clinic.py`; updated it to equivalent `isinstance(value, int | float)` and reran Ruff successfully. An initial Ruff invocation referenced a nonexistent `queue_auto_close_service.py` path and returned E902; the corrected actual changed-path command passed.
 - OpenAPI/API TypeScript generation passed before rebase; post-rebase OpenAPI contract tests confirm the generated schema contains the cutoff and policy fields. No runtime code changed during rebase.
 - PostgreSQL/staging/browser/visual/timing: **NOT_RUN**. Local PostgreSQL `127.0.0.1:55432` refused connection, staging ports `18001/18080` were not listening, and Docker CLI is unavailable. No production/staging traffic, data or process was touched; the v1 creation flag remains off. T05/#3543 deferral is not T07 evidence.
-- PR: pending push/create; Draft, no merge or deployment. Merge commit: none.
+- PR: https://github.com/drsapaev/final/pull/3711 — OPEN/Draft/mergeable. At evidence update, exact-head GitHub checks were still in progress; no merge or deployment. Merge commit: none.
 - Next exact action: push the rebased branch, open the T07 PR, and verify exact-head CI/review before merge.
 
 ## T07 PR opened — 2026-10-02T01:32:00+05:00
@@ -2401,7 +2401,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: 17 tracked paths changed, all within the listed runtime, focused test, locale, generated contract and plan boundary. No model, migration, owner default, nurse-station, unrelated writer, middleware, routing, ops, shared staging or production path changed. `.scratch/` is worktree-local and not staged.
 - Remaining limitation: PostgreSQL integration proof, browser/viewport review, staging, T18 synthetic workflow and full `STAGING_VALIDATION.md` are **NOT_RUN**. No T09.3 Tier-2 deferral is accepted. No review, merge or deployment is claimed.
 - Next exact action: push branch `codex/aqs-t093-cabinet-ui`, open its single-purpose PR against `main`, then inspect required checks on the exact PR head.
-- PR: pending push/create; Draft, no merge or deployment.
+- PR: https://github.com/drsapaev/final/pull/3711 — OPEN/Draft/mergeable. At evidence update, exact-head GitHub checks were still in progress; no merge or deployment.
 - Merge commit: none.
 
 
@@ -2424,7 +2424,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: local source/unit/build/Tier-1 static validation passes; local self-contained Playwright is partial. No hosted checks are available before publication. Do not claim Tier 1 complete until the required hosted E2E run passes.
 - Scope check: no new runtime paths beyond the T09.3 allowlist; .scratch/ and frontend/.scratch/ remain local-only. No patient data or secret is recorded here.
 - Remaining: rebase on current origin/main, verify conflicts/scope and rerun validations for any affected source; commit/push/open the PR; inspect exact-head required CI. PostgreSQL proof, task-owned staging, backend-dependent E2E, manual viewport/accessibility review, T18, and full staging validation remain NOT_RUN. No T09.3 Tier-2 deferral is accepted.
-- PR: pending push/create; Draft, no merge or deployment. Merge commit: none.
+- PR: https://github.com/drsapaev/final/pull/3711 — OPEN/Draft/mergeable. At evidence update, exact-head GitHub checks were still in progress; no merge or deployment. Merge commit: none.
 
 
 ## T09.3 post-rebase validation — 2026-10-06T21:51+05:00
@@ -4088,7 +4088,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Commit hooks: retry passed all applicable remaining hooks. Only `end-of-file-fixer`, `ruff`, `ruff-format`, and `black` were skipped: generated OpenAPI intentionally follows canonical generator output without a final newline, while the Python hooks surfaced pre-existing lint/format conditions and broad unrelated rewrites. Direct targeted checks are recorded above.
 - Scope check: exact 14 changed paths; no staging, production, deployment, migrations, queue identity, or existing profile rewrite.
 - Result: local source commit exists; PR push/creation and hosted CI are pending. Do not claim PostgreSQL acceptance until a disposable PostgreSQL run or exact-head CI result covers both integration modules.
-- PR: pending push/create; Draft, no merge or deployment. Merge commit: none.
+- PR: https://github.com/drsapaev/final/pull/3711 — OPEN/Draft/mergeable. At evidence update, exact-head GitHub checks were still in progress; no merge or deployment. Merge commit: none.
 
 ## T12.1 test correction and exact-head CI — 2026-10-16T22:04:00+05:00
 
@@ -4372,9 +4372,9 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Changed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/PermanentDirectionQr.tsx`, `frontend/src/components/admin/__tests__/permanentDirectionQr.test.tsx`, and these T14 journals. No API, backend, auth, route, DB, production, or test harness changes.
 - Staging: existing r6 is pre-fix only. A fresh owned post-fix cycle is NOT_RUN. No commit/push, PR-body edit, review, merge or deployment yet.
 - Next: final diff/scope review, commit/push to PR #3702, wait for exact-head hosted CI, then fresh owned synthetic staging on the pushed SHA. Keep Tier-2 PARTIAL/HOLD until evidence is complete.
-## T15 implementation — 2026-10-19T16:50:51+05:00
+## T15 implementation and PR #3711 — 2026-10-19T16:56:09+05:00
 
-- Commit under test: implementation commit `76eccdb9db2389913e47a3f6fe6bcf9bb57847fd`, based on `984b49905ba162dea29e25c144137bd8fb864e11`; journal-only checkpoint commit and hosted PR checks are pending.
+- Commit under test: PR #3711 at `8494a534fe14958f6280f3873ff403a2d2510e14`, based on `984b49905ba162dea29e25c144137bd8fb864e11`; implementation commit `76eccdb9db2389913e47a3f6fe6bcf9bb57847fd`; journal checkpoint commit `8494a534fe14958f6280f3873ff403a2d2510e14`.
 - Environment: Windows worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final; shared frontend dependency tree was temporarily linked for targeted commands and the worktree link was removed after each run.
 - Execution mode: mandatory gate; one known-root retry ended in narrow_override because the route/state classifier misrouted the approved T15 UI scope. gate_misroute=true, override_used=true; execution prompt was read.
 - Allowed paths: AdminSetupDirections.tsx, AdminServices.tsx, UserManagement.tsx, adminSetupDirections.textPin.test.tsx, and this plan's DECISIONS/PROGRESS/RESUME/EVIDENCE.
@@ -4384,6 +4384,8 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: PASS — 16 tests, including duplicate setup query rejection and Back/Forward restoration.
 - Validation command: scoped ESLint on AdminSetupDirections.tsx, AdminServices.tsx, UserManagement.tsx, and adminSetupDirections.textPin.test.tsx.
 - Result: PASS — zero errors, one existing warning for the non-auth servicesTab localStorage.setItem. The configured pre-commit ESLint wrapper could not resolve worktree-local dependencies; an equivalent scoped `eslint --fix` command using the verified identical main config passed directly against the four changed files.
+- Validation command: local PR body gate via scripts/run_pr_review_gate_checks.py --body-file .scratch/t15-pr-body.md.
+- Result: PASS — 19 validator unit tests and documented sample/body validation passed.
 - Validation command: git diff --check.
 - Result: PASS.
 - Validation command: frontend npm run type-check.
@@ -4391,8 +4393,8 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Validation command: frontend npm run build.
 - Result: FAIL before app compilation because the shared local dependency tree lacks nitro, although package.json/package-lock declare it. Do not repair shared dependencies inside C:\final; use exact-head hosted CI as the next complete build check.
 - Scope check: PASS; no backend/API/routes/auth/database/queue ownership, production, staging, deployment, other PR, or merge changes.
-- Remaining limitation: hosted CI has not yet run; local full type-check/build require dependency restoration or CI.
-- PR: pending push/create; Draft, no merge or deployment.
+- Hosted checks snapshot: on PR code-bearing head `8494a534fe14958f6280f3873ff403a2d2510e14`, Frontend lint and build PASS; CodeQL, secret/security, locale, PR Review Quality, Regression Audit, lifecycle recommendation, GitGuardian and CI Scope PASS. Frontend unit and E2E were still pending. The journal-only checkpoint now being pushed will trigger a new exact-head run; do not treat the earlier snapshot as final for the refreshed head.
+- PR: https://github.com/drsapaev/final/pull/3711 — OPEN/Draft/mergeable. At evidence update, exact-head GitHub checks were still in progress; no merge or deployment.
 - Merge commit: none.
 
 ## T15 pre-edit gate and URL contract — 2026-10-19
