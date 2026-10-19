@@ -1,3 +1,13 @@
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
+
+- PR #3711 remains OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base/current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Source/test changes and this checkpoint are committed locally; push and hosted exact-head checks are pending.
+- Fixed review #5576603179's P2: shared links to service catalog, QueueProfiles and user management now render whenever T13 directions have loaded, whether the list is empty or contains a ready direction. Existing URL context builder is reused; no route or API contract changed.
+- Added ready-direction regression with `allowed_next_actions=[]`, covering all three editor destinations and T15 return/section context. Fail-first confirmed one new test failure / 22 existing passes. Focused Vitest after fix: 23/23 PASS.
+- Scoped ESLint on changed component/test: PASS, no diagnostics. `git diff --check`: PASS. Normal hooks PASS after retry with the verified temporary dependency junction; push and hosted exact-head checks are pending.
+- Local build failed before app compilation because the reused dependency cache lacks `nitro`, imported by `vite.config.ts`; no dependency install was attempted. Hosted CI on the exact pushed HEAD is required to validate build.
+- Temporary worktree dependency junction was verified and removed after each command; build scratch is absent and shared dependencies were not changed.
+- Gate: initial mandatory gate stopped requesting a confirmed root cause; one known-root retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Prompt read; basis is the exact review finding and narrow remediation. No gate/router edits.
+- Next exact action: commit the two code/test files and three plan journals with normal hooks, push, then verify exact-head CI. No review-thread mutation, staging, deployment, merge, or T16.
 ## Latest checkpoint — T15 PR #3711 year-zero date fix; exact current-head CI PASS — 2026-10-19T23:44:09+05:00
 
 - PR #3711 is OPEN, Ready for review, MERGEABLE at exact HEAD `d4e2d1ebb98ec692c0d1c34cee52ce0e9a6f0404`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`; branch `codex/aqs-t15-setup-context` is clean and synchronized with origin.
@@ -1416,7 +1426,7 @@ Last updated: 2026-10-08T21:45+05:00
 | T12 | PLANNED | | | |
 | T13 | PLANNED | | | |
 | T14 | PLANNED | | | |
-| T15 | PR_OPEN | [PR #3711](https://github.com/drsapaev/final/pull/3711) — year-zero date validation fixed; exact-head CI PASS | | `EVIDENCE.md#pr-3711-year-zero-date-p2-exact-head-ci` |
+| T15 | IN_PROGRESS | [PR #3711](https://github.com/drsapaev/final/pull/3711) — second-direction entry P2 fixed locally; validation/commit pending | | `EVIDENCE.md#pr-3711-second-direction-entry-p2-local-validation` |
 | T16 | PLANNED | | | |
 | T17 | PLANNED | | | |
 | T18 | PLANNED | | | |
@@ -1500,3 +1510,23 @@ Last updated: 2026-10-08T21:45+05:00
 - PR3639 description replaced with final source/evidence/disposition; existing GitHub review remains COMMENT, no human APPROVE submitted.
 - The first body rewrite omitted the repository template's exact required field labels, so the body-triggered PR Review Quality Gate failed. No code/staging test regressed. Corrected labels and validated the exact body locally with scripts/check_pr_review_template.py --body-file output/staging/t11-pr3639-final-20261016-r8/pr-body-final.md: PASS (one expected not-applicable reason warning). Hosted metadata recheck triggered; wait for its real result before final readiness claim. No gate/router/test/workflow source changed.
 - Preserve all five local plan documents and sanitized r8 evidence packet in the next worktree before cleaning/archiving this one. Do not transfer private env/auth data. Current source remains committed acb509c36; journals intentionally uncommitted.
+## Pre-edit checkpoint — T15 PR #3711 second-direction entry P2 — 2026-10-20T00:27:40+05:00
+
+- PR #3711 is OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base and current `origin/main` are `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final` is clean before this checkpoint.
+- Review #5576603179 identifies a confirmed P2: universal links to the catalog, QueueProfiles and user management are rendered only when `directions.length === 0`; with an existing ready direction, there is no way to start configuring a second direction from this screen. Root cause is confirmed in `AdminSetupDirections.tsx` and existing empty-state regression test.
+- Chosen mode: mandatory `gate_known_root_cause`. Initial canonical gate stopped because it required the confirmed root file; the single known-root retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Generated execution prompt was read. Explicit basis is the user's supplied exact review and its narrow remediation recommendation. No router/gate changes.
+- Allowed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`, and this T15 plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Denied: backend/API/OpenAPI, route registry/guards, auth/RBAC, DB, queue runtime, staging, production, deployment, review-thread mutation, other PRs and merge.
+- Canonical anchors: root `AGENTS.md`, `docs/devbrain/PROJECT_MEMORY.md`, `docs/devbrain/DEVBRAIN_STATUS.md`, the existing setup page and its focused Vitest suite. No read-only reference paths were returned by the gate.
+- Validation targets: `cd frontend; npm.cmd run test:run -- src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`; `cd frontend; npm.cmd run build`; `git diff --check`.
+- First stop condition: stop if the links require any path outside the named component/test/journals, if canonical editor targets or return-context contract are unclear, or if the focused validation cannot run. No source/test edit has started.
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
+
+- PR #3711 remains OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base/current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Source/test changes and this checkpoint are committed locally; push and hosted exact-head checks are pending.
+- Fixed review #5576603179's P2: shared links to service catalog, QueueProfiles and user management now render whenever T13 directions have loaded, whether the list is empty or contains a ready direction. Existing URL context builder is reused; no route or API contract changed.
+- Added ready-direction regression with `allowed_next_actions=[]`, covering all three editor destinations and T15 return/section context. Fail-first confirmed one new test failure / 22 existing passes. Focused Vitest after fix: 23/23 PASS.
+- Scoped ESLint on changed component/test: PASS, no diagnostics. `git diff --check`: PASS. Normal hooks PASS after retry with the verified temporary dependency junction; push and hosted exact-head checks are pending.
+- Local build was attempted in a worktree-owned scratch output and failed before app compilation because the reused dependency cache lacks package `nitro` imported by `vite.config.ts`; no dependency install attempted. Hosted CI on exact pushed HEAD is required to validate build.
+- Temporary junction to `C:\final\frontend\node_modules` was removed after each command by verifying its Junction type and target; the build scratch directory is absent. Shared dependencies were not changed.
+- Gate: initial mandatory gate stopped requesting confirmed root cause; one `--known-root-cause` retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Prompt read; basis is the user's exact review finding and narrow prescribed remedy. See pre-edit checkpoint below. No gate/router edits.
+- Next exact action: push the committed T15 fix, then verify exact-head CI. Do not touch review threads, stage, deploy, merge, or begin T16.

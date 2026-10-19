@@ -425,7 +425,7 @@ const AdminSetupDirections = () => {
         day: selectedDay || null,
         entity,
     });
-    const emptyStateEditorLink = (destination: QueueSetupEditorDestination) => serializeQueueSetupEditorLink({
+    const setupEditorLink = (destination: QueueSetupEditorDestination) => serializeQueueSetupEditorLink({
         version: 1,
         destination,
         profileKey: null,
@@ -607,17 +607,6 @@ const AdminSetupDirections = () => {
                             ) : (directions.directions || []).length === 0 ? (
                                 <div className="admin-sdx-note" data-testid="setup-checklist-empty">
                                     {t('admin2.sdx_no_profiles')}
-                                    <div className="admin-sdx-action-list" data-testid="setup-empty-editors">
-                                        <Link className="admin-sdx-link" to={emptyStateEditorLink('service-catalog')}>
-                                            {t('admin2.sdx_wizard_services_link')}
-                                        </Link>
-                                        <Link className="admin-sdx-link" to={emptyStateEditorLink('queue-profiles')}>
-                                            {t('admin2.qp_page_title')}
-                                        </Link>
-                                        <Link className="admin-sdx-link" to={emptyStateEditorLink('user-management')}>
-                                            {t('admin2.sdx_axis_doctor_link')}
-                                        </Link>
-                                    </div>
                                 </div>
                             ) : (
                                 <div className="admin-sdx-rows">
@@ -876,6 +865,19 @@ const AdminSetupDirections = () => {
                                             </section>
                                         );
                                     })}
+                                </div>
+                            )}
+                            {directions && (
+                                <div className="admin-sdx-action-list" data-testid="setup-editor-links">
+                                    <Link className="admin-sdx-link" to={setupEditorLink('service-catalog')}>
+                                        {t('admin2.sdx_wizard_services_link')}
+                                    </Link>
+                                    <Link className="admin-sdx-link" to={setupEditorLink('queue-profiles')}>
+                                        {t('admin2.qp_page_title')}
+                                    </Link>
+                                    <Link className="admin-sdx-link" to={setupEditorLink('user-management')}>
+                                        {t('admin2.sdx_axis_doctor_link')}
+                                    </Link>
                                 </div>
                             )}
                         </CardContent>

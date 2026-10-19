@@ -136,9 +136,9 @@ function entryMethods(supported = false) {
   };
 }
 
-function mockReadSide() {
+function mockReadSide(directionsResponse = response()) {
   mockedGet.mockImplementation(async (url: string) => {
-    if (url.startsWith('/queue/admin/directions')) return { data: response() };
+    if (url.startsWith('/queue/admin/directions')) return { data: directionsResponse };
     if (url.startsWith('/services?limit=1000')) return { data: [serviceRow] };
     if (url.startsWith('/queues/profiles?active_only=false')) {
       return { data: { profiles: [profileRow] } };
@@ -308,7 +308,7 @@ describe('AdminSetupDirections — setup entry points', () => {
 
     renderScreen();
 
-    const links = within(await screen.findByTestId('setup-empty-editors')).getAllByRole('link');
+    const links = within(await screen.findByTestId('setup-editor-links')).getAllByRole('link');
     const urls = links.map((link) => new URL(link.getAttribute('href') || '', 'http://localhost'));
     expect(urls.map(({ pathname }) => pathname)).toEqual([
       '/admin/services',
@@ -321,6 +321,27 @@ describe('AdminSetupDirections — setup entry points', () => {
       expect(url.searchParams.get('setupReturn')).toBe('queue-directions-v1');
       expect(url.searchParams.get('setupSection')).toBe('checklist');
       expect(url.searchParams.has('setupEntityKind')).toBe(false);
+    }
+  });
+
+  it('keeps editor links available when a direction is already ready', async () => {
+    mockReadSide(response({ ...direction, allowed_next_actions: [] }));
+    renderScreen();
+
+    expect(await screen.findByTestId('setup-checklist-row-lab')).toBeVisible();
+    const links = within(screen.getByTestId('setup-editor-links')).getAllByRole('link');
+    const urls = links.map((link) => new URL(link.getAttribute('href') || '', 'http://localhost'));
+
+    expect(urls.map(({ pathname }) => pathname)).toEqual([
+      '/admin/services',
+      '/admin/services',
+      '/admin/users',
+    ]);
+    expect(urls[0].searchParams.get('servicesTab')).toBe('catalog');
+    expect(urls[1].searchParams.get('servicesTab')).toBe('queue-profiles');
+    for (const url of urls) {
+      expect(url.searchParams.get('setupReturn')).toBe('queue-directions-v1');
+      expect(url.searchParams.get('setupSection')).toBe('checklist');
     }
   });
 

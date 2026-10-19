@@ -1,3 +1,22 @@
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 remains OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`, based on current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+Review #5576603179's P2 is fixed locally: the three setup editor links are outside the empty-list branch and render after T13 facts load. Regression covers a ready direction with `allowed_next_actions=[]`, plus the empty catalog case. Focused Vitest 23/23; scoped ESLint and `git diff --check` PASS. Local build is blocked before app compilation by missing `nitro` in the reused dependency cache; no install was attempted. This limitation and safe scratch/junction cleanup are recorded in `EVIDENCE.md`.
+
+Gate sequence: mandatory gate stopped requesting a known source root; one retry with confirmed `AdminSetupDirections.tsx` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Its prompt is read. Scope and stop conditions are in `PROGRESS.md`.
+
+Next exact action: push the committed fix and verify exact-head hosted checks. If they pass, leave PR #3711 for reviewer/user recheck and user merge. Do not resolve review threads, stage, deploy, merge, or start T16.
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
+
+- PR #3711 remains OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base/current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Source/test changes and this checkpoint are committed locally; push and hosted exact-head checks are pending.
+- Fixed review #5576603179's P2: shared links to service catalog, QueueProfiles and user management now render whenever T13 directions have loaded, whether the list is empty or contains a ready direction. Existing URL context builder is reused; no route or API contract changed.
+- Added ready-direction regression with `allowed_next_actions=[]`, covering all three editor destinations and T15 return/section context. Fail-first confirmed one new test failure / 22 existing passes. Focused Vitest after fix: 23/23 PASS.
+- Scoped ESLint on changed component/test: PASS, no diagnostics. `git diff --check`: PASS. Normal hooks PASS after retry with the verified temporary dependency junction; push and hosted exact-head checks are pending.
+- Local build failed before app compilation because the reused dependency cache lacks `nitro`, imported by `vite.config.ts`; no dependency install was attempted. Hosted CI on the exact pushed HEAD is required to validate build.
+- Temporary worktree dependency junction was verified and removed after each command; build scratch is absent and shared dependencies were not changed.
+- Gate: initial mandatory gate stopped requesting a confirmed root cause; one known-root retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Prompt read; basis is the exact review finding and narrow remediation. No gate/router edits.
+- Next exact action: commit the two code/test files and three plan journals with normal hooks, push, then verify exact-head CI. No review-thread mutation, staging, deployment, merge, or T16.
 ## Latest checkpoint — T15 PR #3711 year-zero date P2 fixed; exact-head CI PASS — 2026-10-19T23:44:09+05:00
 
 Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready for review/MERGEABLE at exact HEAD `d4e2d1ebb98ec692c0d1c34cee52ce0e9a6f0404`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
@@ -1080,3 +1099,21 @@ The new P2 is addressed; reviewer recheck is pending, `reviewDecision` is empty,
 Next exact action: reviewer/user rechecks and merges PR #3711. After confirmed merge, verify the merge commit, synchronize main and begin T16.
 
 ## Previous checkpoint — T15 year-zero date P2 fixed locally — 2026-10-19T23:06:33+05:00
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 — 2026-10-20T00:27:40+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`, based on current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+The new review P2 is reproduced by source structure: editor links render only in the empty-state branch. Next edit only `AdminSetupDirections.tsx` to make the existing editor links available independent of direction count; add a focused regression with one ready direction and assert the same editor targets remain available. Reuse existing URL helpers and return-context parameters.
+
+Gate: mandatory `gate_known_root_cause`; initial gate stopped pending root confirmation, then known-root retry returned `narrow_override` (`gate_misroute=true`, `override_used=true`, `handoff_required=true`) on the exact review-backed scope. Prompt read. Allowed files and denied boundaries are in current `PROGRESS.md`.
+
+Run focused Vitest, frontend build, and `git diff --check`. Stop if work escapes the named component/test/journals or the current editor target/return contract is ambiguous. No backend/API, route registry, staging, production, review-thread mutation, merge, or T16 work in this slice.
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base/current `origin/main` is `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+Review #5576603179's P2 is fixed locally: the three setup editor links are outside the empty-list branch and render after T13 facts load. Regression covers a ready direction with `allowed_next_actions=[]`, plus the empty catalog case. Focused Vitest 23/23, scoped ESLint and `git diff --check` PASS. Local build is blocked before app compilation by missing `nitro` in the reused dependency cache; no install was attempted. This limitation and safe scratch/junction cleanup are recorded in `EVIDENCE.md`.
+
+Gate sequence: mandatory gate stopped requesting a known source root; one retry with confirmed `AdminSetupDirections.tsx` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Its prompt is read. Scope and stop conditions are in `PROGRESS.md`.
+
+Next exact action: push the committed fix and verify exact-head hosted checks. If they pass, leave PR #3711 for reviewer/user recheck and user merge. Do not resolve review threads, stage, deploy, merge, or start T16.

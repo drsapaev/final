@@ -4520,3 +4520,25 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Tier-2/T18: NOT_RUN by plan sequence; no deferral claimed. Full staging and browser acceptance remains assigned to T18.
 - Scope check: PASS. No runtime change in this checkpoint, no staging, review-thread mutation, production, deployment or merge.
 - Remaining limitation: independent reviewer/user disposition and user merge are pending. After merge, verify merge SHA, sync main and clean the worktree before T16.
+## PR #3711 second-direction entry P2 — pre-edit checkpoint — 2026-10-20T00:27:40+05:00
+
+- Commit under inspection: PR HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base/current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+- Environment: Windows worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`.
+- Chosen mode: mandatory `gate_known_root_cause`. The initial canonical gate stopped because a confirmed source root was required. The single known-root retry (`AdminSetupDirections.tsx`) returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; the generated execution prompt was read. Basis: exact P2 and prescribed narrow fix in the user's review. Router/gate unchanged.
+- Original failure: fixed editor links exist only under the empty directions branch; a ready existing direction removes all entry points to create a second direction.
+- Allowed paths: `AdminSetupDirections.tsx`, `adminSetupDirections.textPin.test.tsx`, and T15 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Denied areas are recorded in the current `PROGRESS.md` checkpoint.
+- Planned validation: focused Vitest file, frontend build, `git diff --check`.
+- Result before edit: NOT_RUN. No source/test edits made yet.
+- Scope/stop condition: stop on need to change API/routes/backend or if editor targets/context contract are ambiguous; no staging, deployment, review-thread mutation or merge.
+## PR #3711 second-direction entry P2 — local validation — 2026-10-20T00:32:08+05:00
+
+- Commit under test: source/test edits based on PR HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base/current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+- Environment: Windows worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`.
+- Actual changed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`, and T15 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Original failure: the editor links were nested under the empty-list state. A new test using one `ready` direction with `allowed_next_actions=[]` failed before the fix; 22 existing cases passed.
+- Change: render universal catalog, QueueProfiles and users editor links after the empty/populated direction content whenever T13 facts are loaded. Reuse the existing serialized setup return context. No server-owned readiness logic or URLs changed.
+- Validation: focused Vitest — PASS, 23/23; scoped ESLint — PASS, no diagnostics; `git diff --check` — PASS.
+- Build: attempted `npm.cmd run build -- --outDir .scratch/t15-pr3711-second-direction-build`; FAIL before app compilation because shared dependency cache lacks package `nitro` imported by `vite.config.ts`. No package installation attempted. No build artifacts remained; exact-head hosted build is still required.
+- Temporary dependency junction to `C:\final\frontend\node_modules` was verified and removed; no shared dependency files were changed.
+- Normal hooks PASS after retry with the verified temporary dependency junction; push and hosted exact-head checks are pending. The first hook attempt stopped because this worktree lacks node_modules.
+- Scope check: PASS for named component/test/journals. No API/backend, route-registry/guards, auth/RBAC, DB, queue runtime, staging, production, review-thread mutation or merge.
