@@ -4,8 +4,13 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from app.core.config import Settings
-from app.services.public_site_media_service import PublicSiteMediaService
+from app.services.public_site_media_service import (
+    PublicSiteMediaError,
+    PublicSiteMediaService,
+)
 
 
 def _backup_copy_name(day: str, digest: str, suffix: str) -> str:
@@ -78,3 +83,29 @@ def test_cleanup_keeps_backup_copy_at_retention_cutoff(tmp_path: Path) -> None:
 
     assert removed == 0
     assert cutoff_copy.exists()
+
+
+def test_cleanup_fails_when_backup_root_is_missing(tmp_path: Path) -> None:
+    missing_root = tmp_path / "missing-backups"
+
+    with pytest.raises(PublicSiteMediaError) as error:
+        PublicSiteMediaService.cleanup_expired_backups(backup_root=missing_root)
+
+    assert error.value.status_code == 503
+    assert error.value.code == "public_media_storage_unavailable"
+
+
+def test_cleanup_fails_when_backup_root_is_a_symlink(tmp_path: Path) -> None:
+    target = tmp_path / "backups"
+    target.mkdir()
+    symlink = tmp_path / "backup-link"
+    try:
+        symlink.symlink_to(target, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("directory symlink creation is not available")
+
+    with pytest.raises(PublicSiteMediaError) as error:
+        PublicSiteMediaService.cleanup_expired_backups(backup_root=symlink)
+
+    assert error.value.status_code == 503
+    assert error.value.code == "public_media_storage_unavailable"

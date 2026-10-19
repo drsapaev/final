@@ -7,13 +7,36 @@ import logging
 from collections.abc import Callable
 from datetime import datetime, time, timedelta, timezone
 
+from sqlalchemy import text
+
 from app.core.background_jobs import spawn_daemon_job
+from app.db.session import engine
 from app.services.public_site_media_service import PublicSiteMediaService
 
 logger = logging.getLogger(__name__)
 
 _TASHKENT_TZ = timezone(timedelta(hours=5), name="Asia/Tashkent")
 _SHUTDOWN_GRACE_SECONDS = 30
+_CLEANUP_LOCK_KEY = 0x4B4F534D45444941  # KOSMEDIA, unique PostgreSQL advisory-lock key
+
+
+def _run_cleanup_with_postgres_lock(
+    cleanup: Callable[[], int], *, lock_key: int = _CLEANUP_LOCK_KEY
+) -> int | None:
+    """Run cleanup only when this process acquires the shared DB lock.
+
+    The transaction-scoped advisory lock is shared by every API worker using
+    the clinic database and is released automatically on commit or rollback.
+    ``None`` means another worker owns this day's run.
+    """
+    with engine.begin() as connection:
+        acquired = connection.scalar(
+            text("SELECT pg_try_advisory_xact_lock(:lock_key)"),
+            {"lock_key": lock_key},
+        )
+        if not acquired:
+            return None
+        return cleanup()
 
 
 def _next_cleanup_at(now: datetime, cleanup_time: time) -> datetime:
@@ -46,9 +69,13 @@ class PublicSiteMediaCleanupScheduler:
         cleanup_time: time,
         *,
         cleanup: Callable[[], int] | None = None,
+        cleanup_lock_runner: Callable[[Callable[[], int]], int | None] | None = None,
     ) -> None:
         self.cleanup_time = time(cleanup_time.hour, cleanup_time.minute)
         self._cleanup = cleanup or PublicSiteMediaService.cleanup_expired_backups
+        self._cleanup_lock_runner = (
+            cleanup_lock_runner or _run_cleanup_with_postgres_lock
+        )
         self.running = False
         self.task: asyncio.Task | None = None
         self._inflight: set[asyncio.Future] = set()
@@ -74,7 +101,7 @@ class PublicSiteMediaCleanupScheduler:
                 break
 
             try:
-                cleanup_job = spawn_daemon_job(self._cleanup)
+                cleanup_job = spawn_daemon_job(self._cleanup_lock_runner, self._cleanup)
                 self._inflight.add(cleanup_job)
                 cleanup_job.add_done_callback(self._inflight.discard)
                 removed_count = await asyncio.shield(cleanup_job)
@@ -86,10 +113,15 @@ class PublicSiteMediaCleanupScheduler:
                     type(exc).__name__,
                 )
             else:
-                logger.info(
-                    "public_site_media.backup_cleanup_completed removed_count=%s",
-                    removed_count,
-                )
+                if removed_count is None:
+                    logger.info(
+                        "public_site_media.backup_cleanup_skipped reason=another_worker"
+                    )
+                else:
+                    logger.info(
+                        "public_site_media.backup_cleanup_completed removed_count=%s",
+                        removed_count,
+                    )
 
     async def stop(self) -> None:
         self.running = False

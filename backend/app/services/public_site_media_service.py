@@ -578,10 +578,10 @@ class PublicSiteMediaService:
             else settings.PUBLIC_SITE_MEDIA_BACKUP_ROOT
         )
         if configured_root is None:
-            return 0
+            raise PublicSiteMediaError(503, "public_media_storage_unavailable")
         root = configured_root.expanduser()
         if root.is_symlink() or not root.is_dir():
-            return 0
+            raise PublicSiteMediaError(503, "public_media_storage_unavailable")
         days = (
             retention_days
             if retention_days is not None

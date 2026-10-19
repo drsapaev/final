@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from contextlib import contextmanager
 from datetime import datetime, time, timedelta, timezone
 
 import pytest
@@ -10,6 +11,36 @@ from app.services import public_site_media_cleanup as cleanup_module
 from app.services.public_site_media_cleanup import PublicSiteMediaCleanupScheduler
 
 TASHKENT = timezone(timedelta(hours=5))
+
+
+@pytest.mark.parametrize(("lock_acquired", "expected"), [(False, None), (True, 3)])
+def test_postgres_lock_runner_only_cleans_after_acquiring_lock(
+    monkeypatch: pytest.MonkeyPatch,
+    lock_acquired: bool,
+    expected: int | None,
+) -> None:
+    class Connection:
+        def scalar(self, statement, parameters):
+            assert "pg_try_advisory_xact_lock" in str(statement)
+            assert parameters["lock_key"] == cleanup_module._CLEANUP_LOCK_KEY
+            return lock_acquired
+
+    class FakeEngine:
+        @contextmanager
+        def begin(self):
+            yield Connection()
+
+    called = False
+
+    def cleanup() -> int:
+        nonlocal called
+        called = True
+        return 3
+
+    monkeypatch.setattr(cleanup_module, "engine", FakeEngine())
+
+    assert cleanup_module._run_cleanup_with_postgres_lock(cleanup) == expected
+    assert called is lock_acquired
 
 
 def test_next_cleanup_at_uses_tashkent_daily_boundary() -> None:
@@ -40,7 +71,9 @@ async def test_cleanup_runs_off_loop_and_scheduler_stops_cleanly(
         return 1
 
     monkeypatch.setattr(cleanup_module, "_seconds_until_next_cleanup", lambda *_: 0)
-    scheduler = PublicSiteMediaCleanupScheduler(time(4, 0), cleanup=cleanup)
+    scheduler = PublicSiteMediaCleanupScheduler(
+        time(4, 0), cleanup=cleanup, cleanup_lock_runner=lambda job: job()
+    )
     await scheduler.start()
 
     try:
