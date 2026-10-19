@@ -4422,3 +4422,12 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: six frontend/test paths in T15 (the four implementation/focused-test paths plus the two router test wrappers) and the four T15 plan journals only. No backend/API/schema/route registry/auth/queue ownership/staging/production/deployment/other PR changes.
 - Tier-2/T18: NOT_RUN. No deferral requested or inferred. PR #3711 remains OPEN/Draft/mergeable. No merge or deployment.
 - Next exact action: after pushing this journal checkpoint, inspect path-aware checks on the resulting docs-only head and leave merge to the user. Do not start T16 before PR #3711 merges and main is synced.
+
+## T15 PR #3711 corrected Tier-2 sequencing and marked ready — 2026-10-19T17:53:53+05:00
+
+- PR: https://github.com/drsapaev/final/pull/3711. The PR body first failed its template gate because the required `Targeted tests or smoke run` field used a shorter label. The label was corrected; the repository validator passed and hosted PR Review Quality Gate passed.
+- PR readiness: Tier-2 wording now states that integrated staging acceptance is T18 after T01-T17; it is NOT_RUN at T15, not claimed as PASS, and no deferral is requested. The PR was marked Ready for review; state is OPEN/mergeable. Merge remains user-owned.
+- Hosted checks before the readiness-only journal update: Unified CI run `39252747566` passed at docs-only HEAD `517eefa2dcdea501751901d3b38b218ca9d8a4b5`; PR Review Quality run `39255695993` and lifecycle recommendation `39255695991` passed after the body edit and Ready transition. Source/test HEAD remains `39ab56596eaa5f96bc5834f6d916070c488f64ef`.
+- Path-aware jobs skipped by CI remain SKIPPED: backend, integration, context-boundary, docs generation, metadata, Docker, frontend/backend parity, staging readiness, production readiness, k6, nightly DAST, Supabase Preview and Telegram release gate.
+- Scope check: only T15 plan journals and PR metadata changed in this checkpoint; no runtime code, staging, production, deployment or merge.
+- Next exact action: user reviews/merges PR #3711; then verify merge, sync main and begin T16. Full Tier-2/T18 remains scheduled after T01-T17.

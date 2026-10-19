@@ -1,14 +1,26 @@
-## Latest checkpoint — T15 PR #3711 Draft; Tier-1 CI PASS — 2026-10-19T17:30:00+05:00
+## Latest checkpoint — T15 PR #3711 Ready for review; Tier-1 CI PASS — 2026-10-19T17:53:53+05:00
 
 - Current task is T15. T14 / PR #3702 merged at 99f0b5a098dccce4f1166ae52bd7d5c93d92af70. Branch codex/aqs-t15-setup-context is based on fresh origin/main 984b49905ba162dea29e25c144137bd8fb864e11.
-- PR #3711 is OPEN/Draft/mergeable. Current code/test HEAD is 39ab56596eaa5f96bc5834f6d916070c488f64ef; it contains T15 implementation, journals, and the unit-test harness fix. Hosted Unified CI run 39250204373 passed on that exact HEAD.
+- PR #3711 is OPEN/Ready for review/mergeable. T15 source/test HEAD is 39ab56596eaa5f96bc5834f6d916070c488f64ef; implementation is unchanged after this commit. Unified CI run 39252747566 passed on the preceding docs checkpoint 517eefa2dcdea501751901d3b38b218ca9d8a4b5. PR Review Quality Gate 39255695993 and lifecycle recommendation 39255695991 passed after correcting the PR body and marking the PR ready.
 - Hosted Frontend unit, lint/type-check, build+Nitro, complete Frontend E2E, PR Required Gate, CodeQL, security/secrets, locale parity, Regression Audit, PR Review Quality, lifecycle recommendation, GitGuardian and CI Scope passed. Path-aware backend/integration/docs/context-boundary/metadata/docker/parity/staging/production/load jobs were skipped, not passed.
-- T15 behavior: setup profile/section/day are URL-owned; fake wizard removed; existing editors receive validated typed return context and fixed internal return links. Focused T15 suite passes 16/16. Regression correction: the two existing UserManagement component tests now render inside MemoryRouter; local combined focused run passes 8/8 and hosted full unit suite passes.
-- Scoped ESLint has zero errors (the only warning is the existing non-auth servicesTab localStorage warning). PR-body gate and diff checks pass. Local full build/type-check limitation remains documented; hosted CI covered frontend lint/type-check/build successfully.
+- T15 behavior: setup profile/section/day are URL-owned; fake wizard removed; existing editors receive validated typed return context and fixed internal return links. Focused T15 suite passes 16/16. The two UserManagement component tests now use MemoryRouter; local combined focused run passes 8/8 and hosted full unit suite passes.
+- Scoped ESLint has zero errors (one existing non-auth servicesTab localStorage warning). PR-body template validator and diff checks pass. Local full build/type-check limitations remain documented; hosted CI covered frontend lint/type-check/build successfully.
 - Gate misrouted once; one known-root retry returned narrow_override (`gate_misroute=true`, `override_used=true`, `handoff_required=true`); generated prompt was read. No gate/router edit.
-- Tier-2 staging and T18 remain NOT_RUN; no deferral is requested or inferred. Keep the PR Draft. No staging, production, deployment or merge was performed.
-- Next exact action: push this journal checkpoint, inspect path-aware checks on the resulting docs-only head, then leave PR #3711 for user review/merge. Start T16 only after T15 is merged and main is synced.
+- T15 Tier-2 is NOT_RUN. The integrated T18 staging acceptance is sequenced after T01-T17; this is not reported as passed or deferred. PR description now says so, and PR #3711 is Ready for review. No staging, production, deployment or merge was performed.
+- Next exact action: user reviews and merges PR #3711. Then verify the merge commit, sync main and clean up the T15 worktree; start T16 only after that sync.
 
+| Task | Status | PR / commit | Evidence |
+|------|--------|-------------|----------|
+| T15 | PR_OPEN / Ready for review | PR #3711; source/test HEAD 39ab56596eaa5f96bc5834f6d916070c488f64ef | Unified CI 39252747566 PASS; PR Quality 39255695993 PASS; lifecycle 39255695991 PASS; path-aware skips remain SKIPPED |
+| T16-T18 | PLANNED | | |
+
+## Current checkpoint
+- T15 implementation, tests and test-harness correction are pushed; PR #3711 is Ready for review and mergeable.
+- Changed source is validated locally and by hosted Tier-1 CI. The hosted full Chromium E2E and frontend unit/lint/type-check/build passed.
+- Tier-2/T18 staging remains NOT_RUN by sequence; no deferral is claimed. No production, deployment or merge.
+- Blocker: user-owned merge of PR #3711.
+- Next exact action: after merge, verify it on GitHub, sync main, clean up this worktree, and start T16 from fresh origin/main.
+- Checks to rerun after the next source change: focused T15 tests, frontend unit/lint/type-check/build, and applicable required CI.
 ## Earlier checkpoint — T15 URL contract recorded; implementation active — 2026-10-19
 
 - T14 / PR #3702 is merged in current `origin/main`; merge commit `99f0b5a098dccce4f1166ae52bd7d5c93d92af70`. This task starts from fresh `origin/main` `984b49905ba162dea29e25c144137bd8fb864e11`.
