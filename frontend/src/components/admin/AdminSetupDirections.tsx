@@ -311,12 +311,17 @@ const AdminSetupDirections = () => {
     const reasonLabel = (code: string) =>
         t(reasonKeys[code] || 'admin2.sdx_reason_unknown');
 
-    const toggleQr = (profileKey: string) => {
+    const toggleQr = (direction: QueueAdminDirection) => {
+        const profileKey = direction.profile.key;
         if (expandedQrProfileKey === profileKey) {
             setExpandedQrProfileKey(null);
             return;
         }
         setExpandedQrProfileKey(profileKey);
+        if (direction.permanent_address_exists && !direction.public_availability) {
+            handleQrSupportedChange(profileKey, false);
+            return;
+        }
         ensureQrRead(profileKey);
     };
 
@@ -334,7 +339,7 @@ const AdminSetupDirections = () => {
         const label = t(actionLabelKeys[action.kind]);
         if (action.kind === 'provision_permanent_address') {
             return (
-                <Button key={`${action.kind}:${action.entity_key || ''}`} variant="secondary" size="sm" onClick={() => toggleQr(direction.profile.key)}>
+                <Button key={`${action.kind}:${action.entity_key || ''}`} variant="secondary" size="sm" onClick={() => toggleQr(direction)}>
                     {label}
                 </Button>
             );
@@ -801,7 +806,7 @@ const AdminSetupDirections = () => {
                                                                 variant="secondary"
                                                                 size="sm"
                                                                 aria-expanded={expandedQrProfileKey === qrKey}
-                                                                onClick={() => toggleQr(qrKey)}
+                                                                onClick={() => toggleQr(direction)}
                                                                 data-testid={'setup-qr-expand-' + firstTag}
                                                             >
                                                                 {t(canProvisionQr ? actionLabelKeys.provision_permanent_address : 'admin2.sdx_qr_open')}
@@ -840,6 +845,8 @@ const AdminSetupDirections = () => {
                                                                                 profileKey={qrKey}
                                                                                 tag={firstTag}
                                                                                 supported={qrState.supported}
+                                                                                savedAddressExists={direction.permanent_address_exists}
+                                                                                publicAvailability={direction.public_availability}
                                                                                 onSupportedChange={handleQrSupportedChange}
                                                                                 onAddressProvisioned={handleAddressProvisioned}
                                                                                 supportGeneration={supportGeneration}

@@ -49,6 +49,10 @@ interface PermanentDirectionQrProps {
      * (read failure) — never collapsed into «not provisioned».
      */
     supported: boolean | null;
+    /** Server read-model fact: an already-issued permanent address exists. */
+    savedAddressExists?: boolean;
+    /** Server read-model fact; false means a recovered address is not bookable now. */
+    publicAvailability?: boolean;
     /**
      * RQ-18 follow-up (P2-3): the block re-reads entry-methods after a
      * successful provision and reports the fresh flag so the parent
@@ -78,7 +82,7 @@ export function absolutePermanentUrl(publicCode: string): string {
     return `${window.location.origin}/q/${publicCode}`;
 }
 
-export default function PermanentDirectionQr({ profileKey, tag, supported, onSupportedChange, onAddressProvisioned, supportGeneration }: PermanentDirectionQrProps) {
+export default function PermanentDirectionQr({ profileKey, tag, supported, savedAddressExists = false, publicAvailability, onSupportedChange, onAddressProvisioned, supportGeneration }: PermanentDirectionQrProps) {
     const { t } = useTranslation();
     const [state, setState] = useState<BlockState>('idle');
     const [provisioned, setProvisioned] = useState<PublicAddressProvisionResponse | null>(null);
@@ -139,6 +143,11 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
             // generation-guarded parent.
             setPostProvisionOverride({ generation: recheckGeneration, value: null });
             onSupportedChange?.(profileKey, null, recheckGeneration);
+            if (publicAvailability === false) {
+                setPostProvisionOverride({ generation: recheckGeneration, value: false });
+                onSupportedChange?.(profileKey, false, recheckGeneration);
+                return;
+            }
             try {
                 const methods = await fetchDirectionEntryMethods(profileKey);
                 if (supportGenerationRef.current > recheckGeneration) {
@@ -162,7 +171,7 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
             logger.warn(`permanent QR provision failed for ${profileKey}`, err);
             setState('error');
         }
-    }, [profileKey, onAddressProvisioned, onSupportedChange]);
+    }, [profileKey, publicAvailability, onAddressProvisioned, onSupportedChange]);
 
     const copyLink = useCallback(async () => {
         if (!provisioned) return;
@@ -236,13 +245,13 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
                 <span className="admin-sdx-qr-title">{t('admin2.qrdx_block_title')}</span>
             </div>
 
-            {effectiveSupported === null && (
+            {effectiveSupported === null && publicAvailability !== false && (
                 <div className="admin-sdx-qr-unknown" data-testid={`setup-qr-unknown-${tag}`}>
                     {t('admin2.qrdx_unknown')}
                 </div>
             )}
 
-            {effectiveSupported !== null && state !== 'shown' && state !== 'error' && (
+            {(effectiveSupported !== null || savedAddressExists) && state !== 'shown' && state !== 'error' && (
                 <Button
                     variant="secondary"
                     size="sm"
@@ -250,13 +259,9 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
                         void provision();
                     }}
                     disabled={state === 'loading'}
-                    data-testid={
-                        effectiveSupported
-                            ? `setup-qr-show-${tag}`
-                            : `setup-qr-provision-${tag}`
-                    }
+                    data-testid={effectiveSupported || savedAddressExists ? `setup-qr-show-${tag}` : `setup-qr-provision-${tag}`}
                 >
-                    {effectiveSupported ? t('admin2.qrdx_show') : t('admin2.qrdx_create')}
+                    {effectiveSupported || savedAddressExists ? t('admin2.qrdx_show') : t('admin2.qrdx_create')}
                 </Button>
             )}
 
@@ -287,7 +292,7 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
                     {/* honest states: note ONLY for a definitive false — an
                         unknown status (null) renders the unknown banner
                         above, never a confident «недоступно» claim. */}
-                    {effectiveSupported === false && (
+                    {(effectiveSupported === false || publicAvailability === false) && (
                         <div className="admin-sdx-qr-note-warn" data-testid={`setup-qr-not-bookable-note-${tag}`}>
                             {t('admin2.qrdx_not_bookable_note')}
                         </div>
