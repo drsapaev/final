@@ -11,6 +11,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { MemoryRouter } from 'react-router-dom';
 import UserManagement from '../UserManagement';
 import { api } from '@/api/client';
 
@@ -45,9 +46,11 @@ const oneUserPage = {
 
 const renderPanel = () =>
   render(
-    <ThemeProvider>
-      <UserManagement />
-    </ThemeProvider>,
+    <MemoryRouter>
+      <ThemeProvider>
+        <UserManagement />
+      </ThemeProvider>
+    </MemoryRouter>,
   );
 
 describe('UserManagement actions menu positioning', () => {

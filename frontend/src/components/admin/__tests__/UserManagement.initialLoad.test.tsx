@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { render, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { api } from '@/api/client';
 import UserManagement from '../UserManagement';
@@ -30,9 +31,11 @@ beforeEach(() => {
 
 it('requests the first users page only once on initial render', async () => {
   render(
-    <ThemeProvider>
-      <UserManagement />
-    </ThemeProvider>,
+    <MemoryRouter>
+      <ThemeProvider>
+        <UserManagement />
+      </ThemeProvider>
+    </MemoryRouter>,
   );
 
   await waitFor(() => {
