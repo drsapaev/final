@@ -1,3 +1,14 @@
+## T15 PR #3711 — exact-head CI for year-zero date fix — 2026-10-19T23:25:09+05:00
+
+- Commit under test: `2dc0f50429221bb59240849f2d52e01bc7d9c007`; base `279638ddf884f9da8012ddbdb13f2035abb2c96c`; PR #3711 OPEN/Ready/MERGEABLE.
+- Environment: GitHub Unified run `39299922045`, PR Review Quality Gate `39299922151`, lifecycle recommendation `39299922340`, Regression Audit Gate `39299922136`, analysis run `39299917060`, locale run `39299922494`.
+- Result: exact-head frontend build, lint/type-check, unit tests, full Chromium E2E, Required Gate, CodeQL, secret/security scans, locale, CI Scope, Regression Audit, PR Review Quality and lifecycle recommendation PASS. Path-aware backend, integration, Docker, docs-generation, metadata, context-boundary, API parity, staging/production readiness, load and nightly DAST jobs were SKIPPED, not passed.
+- Local regression validation: fail-first 3 failed / 19 passed; post-fix focused Vitest 22/22 PASS, including year boundary coverage. Scoped ESLint 0 errors / one existing warning; standard hooks and `git diff --check` PASS.
+- Local `tsc --noEmit` reports missing shared-cache Nitro modules plus an unrelated existing `publicSiteHandler.test.tsx` implicit-`route` diagnostic. Hosted exact-head lint/type-check passed. Local build NOT_RUN to avoid generated output; hosted exact-head build PASS.
+- Review state: the year-zero P2 is fixed and validated; reviewer recheck remains pending. Three GitHub review threads were not mutated because excluded by the gate scope. Formal `APPROVE` not recorded.
+- Tier-2/T18: NOT_RUN; no deferral accepted. No staging, production, deployment or merge.
+- Next action: reviewer/user rechecks and merges. Then verify merge commit, synchronize main, and start T16.
+
 ## T15 PR #3711 — year-zero date P2 fixed locally — 2026-10-19T23:06:33+05:00
 
 - Commit under test: uncommitted source/test work against PR HEAD `de50fb3db570d899b4367957584c2b348615462d`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`.

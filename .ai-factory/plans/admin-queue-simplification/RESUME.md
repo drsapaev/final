@@ -1067,3 +1067,14 @@ Gate mode is `gate_known_root_cause` with an exact-scope `narrow_override` based
 Next exact action: rerun `git diff --check`, commit with normal hooks, push, verify exact-head GitHub checks, then leave PR #3711 for reviewer/user disposition. Tier-2/T18 remains NOT_RUN; no deferral. No merge/staging/deployment.
 
 ## Previous checkpoint — T15 review fixes and exact-head CI complete — 2026-10-19T22:24:18+05:00
+## Latest checkpoint — T15 PR #3711 date P2 fixed; exact-head CI PASS — 2026-10-19T23:25:09+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready/MERGEABLE at head `2dc0f50429221bb59240849f2d52e01bc7d9c007`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+Review #5575562069's year-zero date P2 is fixed in all three validators and regression-tested. Focused Vitest 22/22 PASS; scoped ESLint 0 errors/one pre-existing warning; hooks and diff-check PASS. Exact-head Unified CI `39299922045` frontend build/lint/unit/full E2E and PR Required Gate PASS; security, CodeQL, locale, Regression Audit, PR Review Quality and lifecycle checks PASS. Path-aware unrelated jobs are SKIPPED, not passed. Local type-check limitations and local build NOT_RUN are in EVIDENCE.md.
+
+The new P2 is addressed; reviewer recheck is pending, `reviewDecision` is empty, and three review threads remain untouched due to the current gate scope. Tier-2/T18 stays NOT_RUN with no deferral. No merge, staging, production or deployment.
+
+Next exact action: reviewer/user rechecks and merges PR #3711. After confirmed merge, verify the merge commit, synchronize main and begin T16.
+
+## Previous checkpoint — T15 year-zero date P2 fixed locally — 2026-10-19T23:06:33+05:00

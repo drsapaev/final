@@ -1,3 +1,14 @@
+## Latest checkpoint — T15 PR #3711 year-zero date fix pushed; applicable CI PASS — 2026-10-19T23:25:09+05:00
+
+- PR #3711 is OPEN, Ready for review, MERGEABLE at exact HEAD `2dc0f50429221bb59240849f2d52e01bc7d9c007`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Branch is clean and synchronized with origin.
+- Review #5575562069's year-zero P2 is fixed in all three query validators. Date strings must still have ISO shape and valid calendar days; year `0000` is rejected, while `0001` and `9999` remain accepted. Independent regression tests cover page `day`, AdminServices `setupDay`, UserManagement `setupDay`, and both valid boundary years.
+- Fail-first run reproduced all three defects (3 failed / 19 passed among 22 tests). Post-fix focused Vitest is 22/22 PASS. Scoped ESLint is 0 errors with one pre-existing warning in unchanged `AdminServices.tsx` localStorage code. Normal hooks and `git diff --check` passed.
+- Exact-head Unified CI `39299922045`: Frontend build, lint/type-check, unit tests, full Chromium E2E, and PR Required Gate PASS. CodeQL, secret/security scans, locale checks, CI Scope, Regression Audit, PR Review Quality and lifecycle recommendation PASS. Backend, integration, Docker, docs generation, metadata, parity, context-boundary, staging, production-readiness, load and nightly DAST were SKIPPED by path/scope, not passed.
+- PR review decision is empty. The reported P2 is fixed and validated; reviewer recheck is still pending. Three review threads remain open and untouched because thread mutation is outside this gate scope. No formal approval is claimed.
+- Local TypeScript check remains limited by the shared dependency cache lacking Nitro and an unrelated existing `publicSiteHandler.test.tsx` route typing diagnostic; hosted exact-head type-check passed. No local build was run to avoid writing generated build output.
+- Tier-2/T18 staging remains `NOT_RUN`; no deferral is claimed. No staging, production, deployment, review-thread mutation, or merge occurred.
+- Next exact action: reviewer/user rechecks and merges PR #3711. After actual merge, verify the merge commit, sync `main`, then continue T16.
+
 ## Latest checkpoint — T15 PR #3711 year-zero date P2 fixed locally — 2026-10-19T23:06:33+05:00
 
 - New review #5575562069's P2 is fixed in all three allowed validators: page `day` plus AdminServices and UserManagement `setupDay` context. ISO format and real calendar-day checks remain; `0000-*` is rejected, with valid year boundaries `0001` and `9999` retained.
