@@ -1,15 +1,14 @@
-## Latest checkpoint — T15 PR #3711 Draft; initial hosted checks partial — 2026-10-19T16:56:09+05:00
+## Latest checkpoint — T15 PR #3711 Draft; Tier-1 CI PASS — 2026-10-19T17:30:00+05:00
 
-Continue task memory 174595f3-1a65-4f05-8b3d-1f2f5e2f27cb, last saved revision 3, in C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final on branch codex/aqs-t15-setup-context. Base/origin/main is 984b49905ba162dea29e25c144137bd8fb864e11; T14 merged at 99f0b5a098dccce4f1166ae52bd7d5c93d92af70.
+Continue task memory 174595f3-1a65-4f05-8b3d-1f2f5e2f27cb in C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final on branch codex/aqs-t15-setup-context. Base/origin/main is 984b49905ba162dea29e25c144137bd8fb864e11; T14 merged at 99f0b5a098dccce4f1166ae52bd7d5c93d92af70.
 
-PR #3711 is OPEN/Draft/mergeable. Code-bearing checkpoint 8494a534fe14958f6280f3873ff403a2d2510e14 includes implementation 76eccdb9db2389913e47a3f6fe6bcf9bb57847fd and a journal checkpoint. On that head Frontend lint/build and auxiliary blocking checks passed; unit and E2E remained pending. This docs-only refresh is ready to push and will trigger checks on the resulting PR head.
+PR #3711 is OPEN/Draft/mergeable at code/test HEAD 39ab56596eaa5f96bc5834f6d916070c488f64ef. Unified CI run 39250204373 passed on that exact HEAD: frontend unit, lint/type-check, build+Nitro, complete E2E, PR Required Gate and applicable security/quality checks passed. Path-aware skips are recorded as skipped. A prior unit failure on e22b79b3 was caused by two UserManagement tests mounting the newly route-aware component without Router; both tests now use MemoryRouter and pass locally and in hosted full unit tests.
 
-T15 behavior is implemented: setup profile/section/day are URL-owned; the fake multi-step wizard is removed; existing editor links carry a validated typed context and return to a fixed setup URL; catalog/user screens show a return link only for valid destination-specific context. Focused tests pass 16/16; scoped ESLint passes (0 errors, one pre-existing warning); PR-body gate passed. Full local type-check/build cannot complete because shared frontend dependencies lack nitro, with one unrelated implicit route type diagnostic. Hosted exact-head validation is pending.
+T15 implementation and focused tests are complete. Scoped ESLint has zero errors and one existing warning; local full type-check/build remain limited by missing nitro and an unrelated route typing diagnostic, while hosted checks pass. Keep Tier-2/T18 NOT_RUN; no deferral is requested or inferred. Keep the PR Draft; no staging, merge or deployment.
 
-Keep the PR Draft; do not merge or deploy. Allowed scope remains the four T15 frontend/test paths and four T15 plan journals. Backend/API/OpenAPI/types, route registry/guards, auth/RBAC, database, queue ownership, staging, production, deployment, other PRs, and merge remain denied.
+Allowed work remains T15 UI/tests and its plan journals. Backend/API/OpenAPI/types, route registry/guards, auth/RBAC, database, queue ownership, staging, production, deployment, other PRs, and merge remain denied.
 
-Next exact action: wait for and inspect all applicable #3711 checks on exact HEAD 8494a534fe14958f6280f3873ff403a2d2510e14; repair only in-scope failures in the same PR and update journals/evidence.
-
+Next exact action: after pushing this journal checkpoint, inspect path-aware checks on the resulting docs-only head and leave merge to the user. Start T16 only after PR #3711 merges and main is synced.
 ## Earlier checkpoint — T15 begins after T14 merge — 2026-10-19
 
 Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` at revision 2 in `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`, based on `origin/main` `984b49905ba162dea29e25c144137bd8fb864e11`. PR #3702 / T14 is merged at `99f0b5a098dccce4f1166ae52bd7d5c93d92af70`.

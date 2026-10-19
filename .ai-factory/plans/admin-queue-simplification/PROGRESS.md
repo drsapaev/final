@@ -1,12 +1,13 @@
-## Latest checkpoint — T15 PR #3711 Draft; initial hosted checks partial — 2026-10-19T16:56:09+05:00
+## Latest checkpoint — T15 PR #3711 Draft; Tier-1 CI PASS — 2026-10-19T17:30:00+05:00
 
 - Current task is T15. T14 / PR #3702 merged at 99f0b5a098dccce4f1166ae52bd7d5c93d92af70. Branch codex/aqs-t15-setup-context is based on fresh origin/main 984b49905ba162dea29e25c144137bd8fb864e11.
-- PR #3711 is OPEN/Draft/mergeable. The first published PR HEAD was 8494a534fe14958f6280f3873ff403a2d2510e14, with implementation commit 76eccdb9db2389913e47a3f6fe6bcf9bb57847fd and a journal-only checkpoint.
-- On that code-bearing head, Frontend lint/build, CodeQL, security, gitleaks, locale, review-quality, regression audit, PR lifecycle, GitGuardian and CI Scope passed; Frontend unit and E2E were still pending at this snapshot. The journal-only update below is not yet pushed and will require a fresh exact-head check set.
-- T15 implementation is complete locally and pushed: URL-owned profile/section/day state, fake wizard removal, typed validated links to existing editors, safe return links, and 16 focused tests passing.
-- Local full type-check/build remain limited by missing nitro and an unrelated implicit route diagnostic. Scoped ESLint has zero errors and one pre-existing warning; PR body gate and diff checks pass.
+- PR #3711 is OPEN/Draft/mergeable. Current code/test HEAD is 39ab56596eaa5f96bc5834f6d916070c488f64ef; it contains T15 implementation, journals, and the unit-test harness fix. Hosted Unified CI run 39250204373 passed on that exact HEAD.
+- Hosted Frontend unit, lint/type-check, build+Nitro, complete Frontend E2E, PR Required Gate, CodeQL, security/secrets, locale parity, Regression Audit, PR Review Quality, lifecycle recommendation, GitGuardian and CI Scope passed. Path-aware backend/integration/docs/context-boundary/metadata/docker/parity/staging/production/load jobs were skipped, not passed.
+- T15 behavior: setup profile/section/day are URL-owned; fake wizard removed; existing editors receive validated typed return context and fixed internal return links. Focused T15 suite passes 16/16. Regression correction: the two existing UserManagement component tests now render inside MemoryRouter; local combined focused run passes 8/8 and hosted full unit suite passes.
+- Scoped ESLint has zero errors (the only warning is the existing non-auth servicesTab localStorage warning). PR-body gate and diff checks pass. Local full build/type-check limitation remains documented; hosted CI covered frontend lint/type-check/build successfully.
 - Gate misrouted once; one known-root retry returned narrow_override (`gate_misroute=true`, `override_used=true`, `handoff_required=true`); generated prompt was read. No gate/router edit.
-- Next exact action: commit and push the T15 journal-only status update, then inspect all applicable checks on the new exact PR HEAD. Keep the PR Draft; no merge or deployment.
+- Tier-2 staging and T18 remain NOT_RUN; no deferral is requested or inferred. Keep the PR Draft. No staging, production, deployment or merge was performed.
+- Next exact action: push this journal checkpoint, inspect path-aware checks on the resulting docs-only head, then leave PR #3711 for user review/merge. Start T16 only after T15 is merged and main is synced.
 
 ## Earlier checkpoint — T15 URL contract recorded; implementation active — 2026-10-19
 
@@ -44,7 +45,7 @@
 - Validation target: canonical Preflight; one owned `Start`; one `Session` covering ordinary Admin 2FA and the focused T14 UI path plus independent frontend revision attestation; confirm owned teardown. First stop: any ambiguous ownership, failed storage/port preflight, unavailable normal 2FA enrollment, or need to modify runtime/test source.
 - Current PR HEAD before staging: `999b3c62af446822b2de53d891ec4c0c5d97111e`; PR is OPEN/Draft/mergeable, base `baae35932e341ceaac163145d933639f735cb35c`. `origin/main` has one unrelated backup-diagnostics commit; no branch sync is needed for this validation-only slice. No staging result is claimed yet.
 
-## Latest checkpoint — T15 PR #3711 Draft; initial hosted checks partial — 2026-10-19T16:56:09+05:00
+## Historical checkpoint — T15 PR #3711 initial hosted checks partial — 2026-10-19T16:56:09+05:00
 
 - T14 / PR #3702 merged at 99f0b5a098dccce4f1166ae52bd7d5c93d92af70. T15 branch codex/aqs-t15-setup-context is pushed from fresh origin/main 984b49905ba162dea29e25c144137bd8fb864e11.
 - PR #3711: https://github.com/drsapaev/final/pull/3711; Draft, OPEN, mergeable. Code-bearing PR checkpoint 8494a534fe14958f6280f3873ff403a2d2510e14; a journal-only status update is being prepared. Implementation commit 76eccdb9db2389913e47a3f6fe6bcf9bb57847fd; documentation checkpoint commit 8494a534fe14958f6280f3873ff403a2d2510e14.
@@ -58,25 +59,27 @@
 
 Plan version: 4.02
 Current task: T15 — persistable Admin queue setup context
-Current status: PR_OPEN / Draft; exact-head hosted CI in progress
+Current status: PR_OPEN / Draft; Tier-1 hosted CI PASS at code/test HEAD 39ab56596eaa5f96bc5834f6d916070c488f64ef
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final
 Branch: codex/aqs-t15-setup-context
 Base commit: 984b49905ba162dea29e25c144137bd8fb864e11 (fresh origin/main)
 Implementation commit: 76eccdb9db2389913e47a3f6fe6bcf9bb57847fd
-Code-bearing PR checkpoint: 8494a534fe14958f6280f3873ff403a2d2510e14; latest journal-only update pending push
-Task memory: 174595f3-1a65-4f05-8b3d-1f2f5e2f27cb (revision 3)
+Current code/test commit: 39ab56596eaa5f96bc5834f6d916070c488f64ef
+Journal status: this checkpoint is in the current local journal commit; verify the pushed PR head before continuing.
+Task memory: 174595f3-1a65-4f05-8b3d-1f2f5e2f27cb (revision 4 before final capture)
 | Task | Status | PR / commit | Evidence |
 |------|--------|-------------|----------|
 | T12.2 | MERGED | PR #3693, merge 7f923f14a347a26b7f80da0fb40a0cff8858ef27 | Focused PostgreSQL 3/3 PASS; broader Tier-2 remains PARTIAL |
 | T13 | MERGED | PR #3697, merge baae35932e341ceaac163145d933639f735cb35c | Exact-head CI PASS; T13 review fixes included |
 | T14 | MERGED | PR #3702, merge 99f0b5a098dccce4f1166ae52bd7d5c93d92af70 | Confirmed by user |
-| T15 | PR_OPEN / Draft | PR #3711; implementation commit 76eccdb9db2389913e47a3f6fe6bcf9bb57847fd | Focused tests 16/16 PASS; code-bearing CI lint/build pass, unit/E2E pending; journal update pending CI |
+| T15 | PR_OPEN / Draft | PR #3711; code/test HEAD 39ab56596eaa5f96bc5834f6d916070c488f64ef | Unified CI 39250204373 PASS: unit, lint/type-check, build+Nitro, full E2E and Required Gate; path-aware jobs SKIPPED |
 | T16-T18 | PLANNED | | |
 
 ## Current checkpoint
-- T15 implementation is pushed and under Draft PR #3711 review. The implementation commit and initial journal checkpoint are recorded above. At code-bearing head 8494a534, lint/build and auxiliary blocking checks passed while unit/E2E remained pending; this docs-only update requires refreshed exact-head checks.
-- Local target checks: focused Vitest 16/16 PASS, scoped ESLint 0 errors/one existing warning, PR body gate PASS, and diff checks PASS. Full local build/type-check limitations are accurately recorded above.
-- No staging, production, deployment, or merge was performed. The user owns merge.
+- T15 implementation and test harness correction are pushed in Draft PR #3711. The code/test HEAD is 39ab56596eaa5f96bc5834f6d916070c488f64ef; Unified CI run 39250204373 passed the full frontend unit/lint/type-check/build+Nitro/E2E matrix and Required Gate. Backend/integration/staging and other path-aware jobs were skipped, not passed.
+- Local validation: setup tests 16/16 PASS; combined setup and UserManagement router tests 8/8 PASS; scoped ESLint PASS (0 errors, one existing warning); check-theme PASS; PR-body validator PASS; diff check PASS. Hosted strict/component icon-control audits passed. Isolated local default icon-baseline audit is NOT_RUN because `@typescript-eslint/parser` is unavailable in the worktree.
+- PR body now reflects code/test SHA and hosted results. Tier-2/T18 remain NOT_RUN; no deferral requested. PR remains Draft and mergeable. No staging, production, deployment, or merge was performed; the user owns merge.
+- Next: commit/push this journal checkpoint, inspect path-aware checks on the journal-only head, then leave PR #3711 for user review/merge. Start T16 only after T15 is merged and main is synced.
 
 ## Historical checkpoint — T13 before PR review corrections
 
