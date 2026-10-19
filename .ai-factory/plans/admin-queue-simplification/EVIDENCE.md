@@ -4433,7 +4433,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Next exact action: user reviews/merges PR #3711; then verify merge, sync main and begin T16. Full Tier-2/T18 remains scheduled after T01-T17.
 ## PR #3711 review corrections — pre-edit checkpoint — 2026-10-19
 
-- Commit under inspection: `264430e42ec0ec651b6c2c71f44db570c8b1be31`; base: `984b49905ba162dea29e25c144137bd8fb864e11`.
+- Commit under inspection: `264430e42ec0ec651b6c2c71f44db570c8b1be31`; the fix branch has since been rebased onto fresh `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
 - Environment: Windows worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`; branch `codex/aqs-t15-setup-context`.
 - Execution mode: `gate_known_root_cause` with scoped `narrow_override`; the explicit basis is the two confirmed P2 findings supplied in the user's review and the request to continue implementation. Gate reported `gate_misroute=false`, `override_used=true`, `handoff_required=true`; execution prompt read.
 - Allowed paths: the two Admin UI components, the focused shared T15 test, and T15 plan checkpoint files. Denied: backend/API/contracts, route registry/guards, auth/RBAC, DB, queue behavior, staging/production/deployment, other PRs, merge.
@@ -4443,7 +4443,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 
 ## PR #3711 review corrections — local validation — 2026-10-19
 
-- Commit under test: local changes based on reviewed PR HEAD `264430e42ec0ec651b6c2c71f44db570c8b1be31`; base `984b49905ba162dea29e25c144137bd8fb864e11`.
+- Commit under test: code/test commit `c0306eac9`, rebased onto refreshed `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`; reviewed starting PR HEAD was `264430e42ec0ec651b6c2c71f44db570c8b1be31`.
 - Environment: Windows worktree; existing shared dependencies reused through a temporary worktree-local junction. The junction was checked against `C:\final\frontend\node_modules` and removed in `finally`; shared dependencies were not modified.
 - Actual changed paths: `AdminSetupDirections.tsx`, `AdminServices.tsx`, `adminSetupDirections.textPin.test.tsx`, and T15 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
 - Original failure: both new regression assertions failed before the UI patch (empty state lacked editor links; catalog tab retained `setupEntityKind=queue_profile`). Baseline: 2 failed / 16 passed.
@@ -4460,3 +4460,4 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Hosted exact-head checks: PENDING until the fix is pushed. Tier-2/T18: NOT_RUN by plan sequence; no deferral claimed.
 - Scope check: PASS. No staging, production, deployment, PR-thread mutation, merge, backend/API, route-registry, auth, DB, or queue-runtime changes.
 - Remaining limitation: hosted frontend unit/lint/type-check/build/E2E and PR Required Gate must pass on the pushed fix head before declaring this PR ready for user merge.
+- Post-rebase rerun: focused Vitest 18/18 PASS; scoped ESLint 0 errors and the same existing non-auth localStorage warning; temporary dependency junction removed. `git diff --check` passes after rebase and checkpoint edits. Hosted exact-head CI remains pending push.

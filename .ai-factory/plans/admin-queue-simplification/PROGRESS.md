@@ -1,6 +1,6 @@
-## Latest checkpoint — T15 PR #3711 review P2 fixes in progress — 2026-10-19
+## Latest checkpoint — T15 PR #3711 P2 fixes implemented and rebased — 2026-10-19
 
-- PR #3711 is OPEN/Ready for review at exact reviewed HEAD `264430e42ec0ec651b6c2c71f44db570c8b1be31`, base `984b49905ba162dea29e25c144137bd8fb864e11`. The user-provided review #5574854400 identifies two P2 navigation defects; no source changes have been made for them yet.
+- PR #3711 is OPEN/Ready for review. The fix branch has been rebased onto refreshed `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`; the reviewed starting HEAD was `264430e42ec0ec651b6c2c71f44db570c8b1be31`. Review #5574854400's two P2s are fixed in code/test commit `c0306eac9`.
 - Execution mode: `gate_known_root_cause` with a scoped `narrow_override`, based on the confirmed review findings and the user's continuing implementation request. Gate initial response required a known root; a malformed retry included a directory and was rejected; the valid known-root run returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`. Its exact execution prompt was read. No gate/router changes.
 - Canonical anchors: `AGENTS.md`; T15 URL/return contract in `DECISIONS.md`; `AdminSetupDirections.tsx`; `AdminServices.tsx`; `adminSetupDirections.textPin.test.tsx`.
 - Allowed implementation paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/AdminServices.tsx`, and `frontend/src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`. Approved operational checkpoint files: this plan's `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`.
@@ -9,6 +9,7 @@
 - Validation target: focused `adminSetupDirections.textPin.test.tsx`, scoped ESLint, `git diff --check`, then exact-head hosted PR checks. First stop: any needed source path outside the allowed implementation paths or evidence that current contracts cannot safely preserve the return context.
 - Implemented in the three allowed frontend paths. Fail-first regressions reproduced both P2s (2 failed, 16 passed); post-fix focused suite passes 18/18. Scoped ESLint passes with 0 errors and 1 existing `localStorage.setItem` warning. `git diff --check` passes.
 - Local `type-check` and build were attempted through a temporary worktree junction to existing shared frontend dependencies; the junction was removed and the shared target was untouched. Type-check reports only unrelated missing `nitro`, missing `nitro/runtime-config`, and `publicSiteHandler.test.tsx` implicit-`route` diagnostics; build cannot load the Vite config because shared dependencies lack `nitro`. Hosted exact-head checks are required after push.
+- Post-rebase validation rerun: focused Vitest 18/18 PASS; scoped ESLint 0 errors / 1 existing warning; temporary dependency junction removed. This invocation used the shared Vitest 3.2.7 cache. Exact-head hosted CI is still pending push.
 - Current changed paths: the three allowed UI/test files and three approved T15 checkpoint files. No route registry, backend/API, auth/RBAC, DB, queue runtime, staging, production, deployment, other PR, PR-thread mutation, or merge changes.
 
 ## Prior checkpoint — T15 PR #3711 Ready for review; Tier-1 CI PASS — 2026-10-19T17:53:53+05:00
@@ -24,13 +25,13 @@
 
 | Task | Status | PR / commit | Evidence |
 |------|--------|-------------|----------|
-| T15 | PR_OPEN / review P2 fixes implemented locally | PR #3711; base HEAD 264430e42ec0ec651b6c2c71f44db570c8b1be31 | 2 fail-first regressions reproduced; focused 18/18 PASS; ESLint and diff check PASS; hosted checks pending push |
+| T15 | PR_OPEN / fixes committed locally; journal commit pending | PR #3711; code/test commit c0306eac9, fresh base 279638ddf884f9da8012ddbdb13f2035abb2c96c | Post-rebase focused suite 18/18 PASS; ESLint and commit hooks PASS; exact-head hosted checks pending push |
 | T16-T18 | PLANNED | | |
 
 ## Current checkpoint
 - T15's two latest review P2s are fixed locally in `AdminSetupDirections.tsx` and `AdminServices.tsx`, with regressions in `adminSetupDirections.textPin.test.tsx`. The empty state now links to the existing catalog, profile manager, and users; tab switching removes incompatible entity fields while retaining shared return context.
 - Fail-first reproduced both defects. Focused suite: 18/18 PASS. Scoped ESLint: PASS, zero errors and one existing localStorage warning. `git diff --check`: PASS. Local type-check/build are blocked by missing `nitro` in shared dependencies and one existing unrelated route typing diagnostic; no changed-file diagnostics.
-- Next exact action: stage only the three approved frontend files and three T15 checkpoint files, run normal commit hooks, commit and push to PR #3711, then inspect exact-head hosted checks and update this checkpoint with actual results. Do not merge; the user owns merge.
+- Next exact action: commit the three journal updates, push the rebased PR branch with `--force-with-lease`, then inspect exact-head hosted checks and update evidence. Do not merge; the user owns merge.
 - Tier-2/T18 remains NOT_RUN by plan sequence; no deferral is claimed. No staging, production, or deployment occurred.
 - Scope: three approved frontend/test files and three T15 plan journal files only. No backend/API/routes/auth/DB/queue runtime/staging/production changes.
 - Checks to rerun after any source change: focused T15 test, scoped ESLint, `git diff --check`, then exact-head hosted CI. Stop if commit hooks request out-of-scope changes.
