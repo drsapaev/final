@@ -575,7 +575,7 @@ def _clinic_timezone() -> ZoneInfo:
     return ZoneInfo(settings.TIMEZONE)
 
 
-def _appointment_start_utc(visit) -> "datetime | None":
+def _appointment_start_utc(visit) -> datetime | None:
     """The visit's appointment start as an aware UTC datetime, or None when
     no moment can be derived (no date, or a malformed time string)."""
     if visit.visit_date is None:
@@ -593,7 +593,7 @@ def _appointment_start_utc(visit) -> "datetime | None":
     return local_start.astimezone(UTC)
 
 
-def _visit_reminder_moment(visit) -> "datetime | None":
+def _visit_reminder_moment(visit) -> datetime | None:
     """The intended reminder time for a visit: appointment start − 24h,
     in UTC (Codex round 15, P1 — the wall-clock appointment is resolved in
     the CLINIC timezone first, then converted to UTC). A visit with no
@@ -662,13 +662,21 @@ async def run_visit_reminder_sweep(ctx) -> None:
                 Visit.reminder_sent_at.is_(None),
                 Visit.visit_date.isnot(None),
                 Visit.visit_date >= (now - timedelta(days=2)).date(),
-                Visit.visit_date <= (window_end + timedelta(hours=REMINDER_HOURS_BEFORE) + timedelta(days=1)).date(),
+                Visit.visit_date
+                <= (
+                    window_end
+                    + timedelta(hours=REMINDER_HOURS_BEFORE)
+                    + timedelta(days=1)
+                ).date(),
             )
             .order_by(Visit.id)
             .all()
         )
-        from app.tasks.scheduler import build_reminder_schedule_version, enqueue_reminder
-        from app.tasks.scheduler import TaskEnqueueError
+        from app.tasks.scheduler import (
+            TaskEnqueueError,
+            build_reminder_schedule_version,
+            enqueue_reminder,
+        )
 
         enqueued = skipped = failed = 0
         for visit in candidates:
@@ -751,6 +759,28 @@ async def run_data_retention(ctx) -> None:
         logger.info("job.run_data_retention complete: %s", result)
     finally:
         db.close()
+
+
+async def run_public_site_media_backup_cleanup(ctx) -> int:
+    """Delete expired public-site media copies, independently of DB backups."""
+    from app.services.public_site_media_service import PublicSiteMediaService
+
+    logger.info("job.run_public_site_media_backup_cleanup starting")
+    try:
+        removed_count = await asyncio.to_thread(
+            PublicSiteMediaService.cleanup_expired_backups
+        )
+    except Exception as exc:
+        logger.error(
+            "job.run_public_site_media_backup_cleanup failed error_type=%s",
+            type(exc).__name__,
+        )
+        raise
+    logger.info(
+        "job.run_public_site_media_backup_cleanup complete removed=%s",
+        removed_count,
+    )
+    return removed_count
 
 
 async def generate_scheduled_report(
@@ -853,6 +883,7 @@ class WorkerSettings:
     functions = [
         send_visit_reminder,
         run_data_retention,
+        run_public_site_media_backup_cleanup,
         generate_scheduled_report,
         run_lab_follow_up_reminders,
         run_visit_reminder_sweep,
@@ -876,6 +907,11 @@ class WorkerSettings:
     # path ever called enqueue_reminder and patients never got reminders.
     cron_jobs = [
         cron(run_data_retention, hour=3, minute=0),  # Daily 03:00 UTC
+        cron(
+            run_public_site_media_backup_cleanup,
+            hour=4,
+            minute=0,
+        ),  # Daily 04:00 UTC; independent of database backup scheduling.
         cron(run_lab_follow_up_reminders, hour=8, minute=0),  # Daily 08:00 UTC
         cron(
             run_visit_reminder_sweep,
@@ -890,6 +926,7 @@ __all__ = [
     "REMINDER_HOURS_BEFORE",
     "send_visit_reminder",
     "run_data_retention",
+    "run_public_site_media_backup_cleanup",
     "generate_scheduled_report",
     "run_lab_follow_up_reminders",
     "run_visit_reminder_sweep",

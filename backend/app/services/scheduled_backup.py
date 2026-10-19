@@ -101,28 +101,6 @@ class ScheduledBackupService:
                                     )
                                     await asyncio.sleep(backoff)
 
-                        try:
-                            from app.services.public_site_media_service import (
-                                PublicSiteMediaService,
-                            )
-
-                            cleanup_job = spawn_daemon_job(
-                                PublicSiteMediaService.cleanup_expired_backups
-                            )
-                            self._inflight.add(cleanup_job)
-                            cleanup_job.add_done_callback(self._inflight.discard)
-                            removed_count = await asyncio.shield(cleanup_job)
-                            if removed_count:
-                                logger.info(
-                                    "public_site_media.backup_cleanup_removed count=%s",
-                                    removed_count,
-                                )
-                        except Exception as exc:
-                            logger.error(
-                                "public_site_media.backup_cleanup_failed error_type=%s",
-                                type(exc).__name__,
-                            )
-
                 except asyncio.CancelledError:
                     break
                 except Exception as e:
