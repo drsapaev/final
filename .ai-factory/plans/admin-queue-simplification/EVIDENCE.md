@@ -4372,3 +4372,36 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Changed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/PermanentDirectionQr.tsx`, `frontend/src/components/admin/__tests__/permanentDirectionQr.test.tsx`, and these T14 journals. No API, backend, auth, route, DB, production, or test harness changes.
 - Staging: existing r6 is pre-fix only. A fresh owned post-fix cycle is NOT_RUN. No commit/push, PR-body edit, review, merge or deployment yet.
 - Next: final diff/scope review, commit/push to PR #3702, wait for exact-head hosted CI, then fresh owned synthetic staging on the pushed SHA. Keep Tier-2 PARTIAL/HOLD until evidence is complete.
+## T15 implementation — 2026-10-19T16:48:49+05:00
+
+- Commit under test: uncommitted worktree changes based on 984b49905ba162dea29e25c144137bd8fb864e11.
+- Environment: Windows worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final; shared frontend dependency tree was temporarily linked for targeted commands and the worktree link was removed after each run.
+- Execution mode: mandatory gate; one known-root retry ended in narrow_override because the route/state classifier misrouted the approved T15 UI scope. gate_misroute=true, override_used=true; execution prompt was read.
+- Allowed paths: AdminSetupDirections.tsx, AdminServices.tsx, UserManagement.tsx, adminSetupDirections.textPin.test.tsx, and this plan's DECISIONS/PROGRESS/RESUME/EVIDENCE.
+- Actual changed paths: exactly the four approved frontend/test files and four T15 journal files.
+- Original failure: pre-existing setup experience had fake local wizard state; no runtime crash was reproduced. Regression expectations were added for durable URL state and fixed return destinations.
+- Validation command: frontend npm run test:run -- src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx --reporter=dot.
+- Result: PASS — 16 tests, including duplicate setup query rejection and Back/Forward restoration.
+- Validation command: scoped ESLint on AdminSetupDirections.tsx, AdminServices.tsx, UserManagement.tsx, and adminSetupDirections.textPin.test.tsx.
+- Result: PASS — zero errors, one existing warning for the non-auth servicesTab localStorage.setItem.
+- Validation command: git diff --check.
+- Result: PASS.
+- Validation command: frontend npm run type-check.
+- Result: FAIL due to three diagnostics outside T15: missing nitro, missing nitro/runtime-config, and implicit route typing in publicSiteHandler.test.tsx. No changed T15 file diagnostics.
+- Validation command: frontend npm run build.
+- Result: FAIL before app compilation because the shared local dependency tree lacks nitro, although package.json/package-lock declare it. Do not repair shared dependencies inside C:\final; use exact-head hosted CI as the next complete build check.
+- Scope check: PASS; no backend/API/routes/auth/database/queue ownership, production, staging, deployment, other PR, or merge changes.
+- Remaining limitation: hosted CI has not yet run; local full type-check/build require dependency restoration or CI.
+- PR: none yet.
+- Merge commit: none.
+
+## T15 pre-edit gate and URL contract — 2026-10-19
+
+- Base/source under inspection: `984b49905ba162dea29e25c144137bd8fb864e11` (`origin/main`); T14 merge ancestor: `99f0b5a098dccce4f1166ae52bd7d5c93d92af70`.
+- Worktree/branch: `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final` / `codex/aqs-t15-setup-context`.
+- Execution mode: mandatory `gate` because T15 persists route query state and typed editor return context. Initial command returned `stop: reviewed scope requires a known root cause`. One retry with `--known-root-cause frontend/src/components/admin/AdminSetupDirections.tsx` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated prompt was read. Basis: direct user GO to implement T15 and the repository-approved T15 card. No router/gate source was modified.
+- Allowed first-touch paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/AdminServices.tsx`, `frontend/src/components/admin/UserManagement.tsx`, `frontend/src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`, and T15 plan journals `DECISIONS.md`, `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`.
+- Denied: backend/API/OpenAPI/generated types, route registry/guards, auth/RBAC, database, ownership/fairness, production, deployment, staging, other PRs, merge.
+- Pre-edit source facts: the fake five-step wizard and local view/day state live in `AdminSetupDirections.tsx`; `/admin/services` hosts catalog and QueueProfiles tabs; `/admin/users` renders the existing unified user manager and UserModal. No shared typed return-context adapter was found.
+- URL contract: `profile` is a QueueProfile key; `section` is `checklist|resources`; optional `day` is ISO and absent means backend clinic-local today. Return context uses `setupReturn=queue-directions-v1`, allowlisted context fields, closed entity kinds and fixed internal editor destinations; arbitrary redirect URLs are not accepted.
+- Validation command/result: `NOT_RUN` (pre-edit checkpoint only). Actual changed paths: plan journals only so far. Scope check: PASS. Remaining: implement, focused tests, build/lint, diff check, exact-head CI/PR. First stop: required edit outside gate first-touch list or unresolved route/ownership boundary.

@@ -1,3 +1,24 @@
+## Latest checkpoint — T15 context implementation locally validated; hosted CI pending — 2026-10-19T16:48:49+05:00
+
+- T14 / PR #3702 merged at 99f0b5a098dccce4f1166ae52bd7d5c93d92af70. T15 worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final, branch codex/aqs-t15-setup-context, is based on fresh origin/main 984b49905ba162dea29e25c144137bd8fb864e11; a fresh fetch confirmed origin/main has not advanced. Implementation is locally validated; commit and Draft PR are the next steps.
+- Task memory: 174595f3-1a65-4f05-8b3d-1f2f5e2f27cb; checkpoint revision will be refreshed after this update.
+- T15 implemented: setup profile/section/day are URL-owned; the five-step mock wizard is removed; cards can select a profile; editor links carry validated typed context to fixed catalog/profile/user destinations; catalog and user screens provide validated return links; normal UserModal onboarding remains intact. Setup re-entry reloads T13 facts through the existing read effect.
+- Validation: focused adminSetupDirections.textPin.test.tsx PASS, 16/16 including duplicate query rejection and browser Back/Forward restoration; scoped ESLint PASS with 0 errors and one existing non-auth localStorage.setItem warning; git diff --check PASS. Full TypeScript check exits 2 on three diagnostics outside changed files: absent local nitro, absent nitro/runtime-config, and an implicit route type in publicSiteHandler.test.tsx; no T15-file diagnostics. Local Vite build cannot load the same missing nitro package. Hosted exact-head CI is not run yet.
+- Scope check: actual changes are the four gate-approved frontend/test paths and four T15 journal files only. The temporary worktree dependency junction was removed after tests. No backend/API/OpenAPI/generated types, route registry/guards, auth/RBAC, database, queue ownership, production, staging, deployment, merge, or other-PR changes.
+- Execution boundary: mandatory route/state gate misrouted once; the one permitted --known-root-cause retry returned narrow_override with gate_misroute=true, override_used=true, handoff_required=true. The generated prompt was read; no gate/router source changed.
+- Next exact action: final diff/scope review, create one conventional T15 commit, push this branch, open a Draft PR, and inspect exact-head hosted CI. Fix any in-scope CI failures in the same PR. User owns merge; do not merge or deploy.
+
+## Earlier checkpoint — T15 URL contract recorded; implementation active — 2026-10-19
+
+- T14 / PR #3702 is merged in current `origin/main`; merge commit `99f0b5a098dccce4f1166ae52bd7d5c93d92af70`. This task starts from fresh `origin/main` `984b49905ba162dea29e25c144137bd8fb864e11`.
+- Current task: T15, `IN_PROGRESS`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. Implementation is locally validated; commit and Draft PR are the next steps.
+- Task memory: `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb`, revision 2.
+- Execution mode: mandatory `gate` for URL/routing state. First gate call stopped with `reviewed scope requires a known root cause`; one permitted retry used confirmed state owner `AdminSetupDirections.tsx` and returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. The generated execution prompt was read before editing. Scope is limited to the gate's exact first-touch list and relies on the user's direct T15 GO plus the approved T15 plan; no router, guard, role, backend, API, schema, deployment, staging, merge, or other-PR changes.
+- URL contract is recorded in `DECISIONS.md`: selected `profile`, `section=checklist|resources`, optional ISO `day` (omitted means clinic-local current day), closed typed return context, fixed internal destinations, malformed-context rejection, and no local completion flags.
+- Gate first-touch/allowed files: `AdminSetupDirections.tsx`, `AdminServices.tsx`, `UserManagement.tsx`, `adminSetupDirections.textPin.test.tsx`, and this plan directory's `DECISIONS.md`, `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`.
+- Completed: source relationship inspection; T14 merge/base verification; T15 contract decision; pre-edit checkpoint saved. Validation of implementation: `NOT_RUN`.
+- Next exact action: implement URL-owned setup section/profile/day and remove the mock wizard; add fixed typed return links in the existing catalog/users screens and focused URL/return tests, staying inside the gate scope.
+
 ## Latest checkpoint — T14 archived saved-QR UI fix implemented locally — 2026-10-19T02:23:41+05:00
 
 - PR #3702 is OPEN/Draft/mergeable at HEAD `999b3c62af446822b2de53d891ec4c0c5d97111e`, base `baae35932e341ceaac163145d933639f735cb35c`. This change is uncommitted and unpushed. No PR-body update, review, merge, or deployment.
@@ -36,8 +57,9 @@ Task memory: cb71d205-e655-482a-a72b-38c66d3d2011 (revision 8)
 |------|--------|-------------|----------|
 | T12.2 | MERGED | PR #3693, merge 7f923f14a347a26b7f80da0fb40a0cff8858ef27 | Focused PostgreSQL 3/3 PASS; broader Tier-2 remains PARTIAL |
 | T13 | MERGED | PR #3697, merge baae35932e341ceaac163145d933639f735cb35c | Exact-head CI PASS; T13 review fixes included |
-| T14 | PR_OPEN / HOLD | PR #3702 Draft; source commit 0db15cacb; current HEAD 0337028b7 | Exact-head Unified CI and auxiliary gates PASS; Tier 2 NOT RUN, no reviewer deferral |
-| T15-T18 | PLANNED | | |
+| T14 | MERGED | PR #3702, merge 99f0b5a098dccce4f1166ae52bd7d5c93d92af70 | Confirmed by user |
+| T15 | IN_PROGRESS | codex/aqs-t15-setup-context; commit pending | Focused tests 16/16 PASS; hosted CI pending |
+| T16-T18 | PLANNED | | |
 
 ## Current checkpoint
 - Pre-edit execution record for PR review #5564122058: `direct_execute`; cause is localized to `AdminSetupDirections.tsx` (`canOpenQr` couples existing-address inspection to current public availability; provision callback leaves stale `provision_permanent_address`). No gate is needed for this narrow UI-only fix. Canonical anchors: T14 frontend scope, `AdminSetupDirections.tsx`, `PermanentDirectionQr.tsx`, focused RQ-18 tests. First-touch: focused parent-composition tests and `AdminSetupDirections.tsx`. Allowed source: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/__tests__/permanentDirectionQr.test.tsx`; allowed journals: this plan directory. Denied: backend/API/OpenAPI/generated types, routes, queue writes/ownership, DB, staging, production, PR metadata, merge/deploy. Validation target: focused Vitest, scoped type-check/lint, `git diff --check`. Stop if truthful QR inspection requires contract changes or any path outside this boundary.
