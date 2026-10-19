@@ -60,7 +60,7 @@ class ScheduledBackupService:
 
                     wait_seconds = (next_backup - now).total_seconds()
                     logger.info(
-                        f"⏰ Next backup scheduled for: {next_backup} (in {wait_seconds/3600:.1f} hours)"
+                        f"⏰ Next backup scheduled for: {next_backup} (in {wait_seconds / 3600:.1f} hours)"
                     )
 
                     await asyncio.sleep(wait_seconds)
@@ -100,28 +100,6 @@ class ScheduledBackupService:
                                         f"❌ Scheduled backup attempt {attempt}/{max_attempts} failed: {e} — retrying in {backoff}s"
                                     )
                                     await asyncio.sleep(backoff)
-
-                        try:
-                            from app.services.public_site_media_service import (
-                                PublicSiteMediaService,
-                            )
-
-                            cleanup_job = spawn_daemon_job(
-                                PublicSiteMediaService.cleanup_expired_backups
-                            )
-                            self._inflight.add(cleanup_job)
-                            cleanup_job.add_done_callback(self._inflight.discard)
-                            removed_count = await asyncio.shield(cleanup_job)
-                            if removed_count:
-                                logger.info(
-                                    "public_site_media.backup_cleanup_removed count=%s",
-                                    removed_count,
-                                )
-                        except Exception as exc:
-                            logger.error(
-                                "public_site_media.backup_cleanup_failed error_type=%s",
-                                type(exc).__name__,
-                            )
 
                 except asyncio.CancelledError:
                     break

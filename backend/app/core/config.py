@@ -258,6 +258,18 @@ class Settings(BaseSettings):
         le=365,
         description="Retention period for public-site media version copies.",
     )
+    PUBLIC_SITE_MEDIA_CLEANUP_HOUR: int = Field(
+        default=4,
+        ge=0,
+        le=23,
+        description="Daily public-site media backup cleanup hour in Asia/Tashkent.",
+    )
+    PUBLIC_SITE_MEDIA_CLEANUP_MINUTE: int = Field(
+        default=0,
+        ge=0,
+        le=59,
+        description="Daily public-site media backup cleanup minute in Asia/Tashkent.",
+    )
     PUBLIC_SITE_MEDIA_MAX_UPLOAD_BYTES: int = Field(
         default=5 * 1024 * 1024,
         ge=1024,
@@ -542,14 +554,6 @@ class Settings(BaseSettings):
             if common in (media, backup):
                 raise ValueError(
                     "Public-site media and backup roots must be separate folders."
-                )
-            if (self.ENV or "").strip().lower() in (
-                "prod",
-                "production",
-            ) and not self.AUTO_BACKUP_ENABLED:
-                raise ValueError(
-                    "AUTO_BACKUP_ENABLED must be enabled when public-site media "
-                    "backup retention is configured in production."
                 )
         return self
 
