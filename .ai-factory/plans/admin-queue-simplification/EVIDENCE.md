@@ -4609,3 +4609,24 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: PASS. PR body and plan journals only changed after the implementation-head CI. No backend/runtime, staging, production, deployment, review-thread mutation or merge.
 - Remaining limitation: this journal update requires a documentation-only commit and exact-head checks; independent review is pending.
 - Next exact action: commit/push this final plan checkpoint, verify resulting PR checks, and leave review/merge to the user.
+
+## T17 — local implementation and validation — 2026-10-20T12:46:00+05:00
+
+- Commit under test: uncommitted T17 working-tree diff based on `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`; branch `codex/aqs-T17-bulk-csv`.
+- Environment: Windows PowerShell, isolated worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`; freshly fetched `origin/main` equals the base. The primary checkout and independent photo-cleanup task were not changed.
+- Execution mode: `advisory_gate` for plan-approved existing-command UI behavior. Canonical launcher first stopped for a known root; one retry with `frontend/src/components/admin/QueueProfilesManager.tsx` returned `narrow_override` (`gate_misroute=false`, `override_used=true`, `handoff_required=true`). Generated prompt was read; plan T17 is the repository-approved basis. Gate/router were not edited.
+- Allowed paths: `QueueProfilesManager.tsx`; existing focused CSV/interaction tests; five locale files; T17 plan, `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: backend/API/OpenAPI/DB/migrations/new write commands, queue ownership/runtime, routing/auth/RBAC, other worktrees, staging/production/deployment, review-thread mutation and merge.
+- Actual changed paths: `.ai-factory/plans/codex-admin-queue-simplification.md`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS.md,RESUME.md,EVIDENCE.md}`; `frontend/src/components/admin/QueueProfilesManager.tsx`; `frontend/src/components/admin/__tests__/QueueProfilesManager.csv.test.tsx`; `frontend/src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx`; `frontend/src/i18n/locales/{en.ts,kk.ts,ru.ts,uz-Cyrl.ts,uz-Latn.ts}`.
+- Original failure: bulk writes stopped at the first API refusal and did not reliably reread persisted state; CSV import gave aggregate results, had no safe remaining-row retry, and passed QR publication intent on newly created profiles.
+- Change: continue each bulk/CSV row independently; reread before and after writes; show per-row completed/refused/not-started/unverified state and structured reasons; reconcile lost responses; retry only unresolved rows after fresh reads; compare CSV retries to original preview and refuse changed rows; classify already-matching rows separately; create new CSV profiles hidden and keep requested publication as a persisted explicit review action; add impact previews and live result announcements; correct success translations in all five locales.
+- Validation command: from `frontend/`, `npm run test:run -- src/components/admin/__tests__/QueueProfilesManager.csv.test.tsx src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx src/components/admin/__tests__/AdminRemaining.i18n.contract.test.tsx` — PASS, 64/64.
+- Validation command: scoped `npx eslint` over the changed component, tests and five locale files with `jsx-a11y/control-has-associated-label:error` — PASS, exit 0, 0 errors; 3 existing hardcoded-color warnings remain.
+- Validation command: `git diff --check` — PASS. Fresh `git fetch origin main` confirmed remote main remains equal to the base. No build output was created.
+- Type-check: `npm run type-check` — FAIL due to missing `nitro`/`nitro/runtime-config` in shared `C:\final\frontend\node_modules` and an unrelated implicit-`route` diagnostic in `src/publicSiteHandler.test.tsx`; no changed-path TypeScript errors remain after fixes.
+- Build: `npm run build -- --outDir .scratch/t17-build` — FAIL while loading `vite.config.ts` because shared dependencies lack Nitro. Application compilation did not start. No install was attempted and no build output remains.
+- Browser visual QA: NOT_RUN; local Vite build cannot start due to missing Nitro. UI behavior has focused DOM tests; hosted exact-head CI remains required.
+- Result: local implementation validation complete; PR creation and exact-head CI are pending. No staging/Tier-2, production or deployment validation is claimed.
+- Scope check: PASS. Only the allowed T17 UI, tests, locales and plan journals changed. The temporary dependency junction targets exactly `C:\final\frontend\node_modules`; remove only the junction after hooks/commands and preserve its target.
+- Remaining limitation: no PR or hosted CI yet; user retains merge.
+- PR: not created.
+- Merge commit: none.

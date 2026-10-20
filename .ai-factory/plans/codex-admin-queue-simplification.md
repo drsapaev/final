@@ -1,11 +1,11 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 4.03 — T12.2 / PR #3693, T13 / #3697, T14 / #3702 и T15 / #3711 MERGED; T16 / PR #3718 Ready for review, implementation-head CI PASS.
-**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-20T10:26:30+05:00, Asia/Tashkent.
-**Текущий этап:** T16 — работа в отдельном worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t16-navigation\final`, ветка `codex/aqs-T16-navigation`; PR #3718 Ready for review на HEAD `70f7999e637efbfac021fd80ddefe564beff3581`, база `ccbf519fdb0f9a32c3a71837202dfea296f13383`. Фокусные тесты 54/54 PASS; на этом HEAD Unified CI `39374182108`, frontend unit/E2E, build, lint/type-check, PR Required Gate, parity, regression audit, locale/security/secret checks, CodeQL, PR Quality Gate и lifecycle — PASS. Path-aware backend/integration/staging/production и прочие несвязанные jobs — SKIPPED, не PASS. Независимое ревью ожидается. Локальные type-check/build ограничены отсутствующим в общем dependency cache Nitro и существующим независимым type diagnostic; Tier-2/T18 не выполнялись.
-**Task memory ID:** 1b8ddc8f-3dec-4d6c-8077-acc268801763.
+**Версия:** 4.04 — T16 / PR #3718 MERGED; T17 реализуется в изолированном worktree.
+**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-20T12:46:00+05:00, Asia/Tashkent.
+**Текущий этап:** T17 — `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, ветка `codex/aqs-T17-bulk-csv`, база `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` (= свежий `origin/main`). Реализация и локальные проверки выполняются; фокусные CSV/interactions/i18n tests 64/64 PASS, scoped ESLint — 0 errors и 3 предупреждения о существующих цветах, `git diff --check` PASS. Полная локальная проверка типов и сборка ограничены отсутствующим Nitro в общей папке зависимостей; в проверке типов после исправлений нет ошибок в изменённых файлах, остаются ошибки Nitro и независимый `publicSiteHandler.test.tsx`. PR для T17 пока не создан; exact-head hosted CI и review впереди.
+**Task memory ID:** 17c471a8-6772-4081-bea0-1e82ad1bcd05.
 **T11 результат:** PR #3639 merged commit 7443b0e290b9143e877d5898a5589df52592d3b3. Ограниченный T11 Tier-2 прошёл на зафиксированном кодовом HEAD; три legacy live-spec остаются DEFERRED для T18 с 0% credit; полный STAGING_VALIDATION.md не завершён.
-**Ограничения:** пользователь мержит PR самостоятельно. Production, deployment и активация v1-флага не разрешены. Эта T16-задача меняет только административную frontend-навигацию, тесты, локализации и routing-документацию; backend/API/RBAC/DB/queue runtime/staging/production не входят в scope. Исторические Tier-2 deferrals и partial evidence не наследуются и не превращаются в PASS; полная интеграционная приёмка остаётся для T18.
+**Ограничения:** пользователь мержит PR самостоятельно. Production, deployment и активация v1-флага не разрешены. Текущая T17-задача меняет только существующий административный frontend, тесты и пять локалей; новые backend/API/RBAC/DB/queue-runtime/staging/production контракты не входят в scope. Исторические Tier-2 deferrals и partial evidence не наследуются и не превращаются в PASS; полная интеграционная приёмка остаётся для T18.
 
 
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
@@ -81,8 +81,8 @@
 | T13 | MERGED | Canonical Admin read contract; #3697, merge `baae35932e341ceaac163145d933639f735cb35c` |
 | T14 | MERGED | Setup UI на backend facts; #3702, merge `99f0b5a098dccce4f1166ae52bd7d5c93d92af70` |
 | T15 | MERGED | Восстанавливаемый URL-контекст; #3711, merge `ccbf519fdb0f9a32c3a71837202dfea296f13383` |
-| T16 | PR_OPEN | Конечная навигация и совместимые входы; PR #3718 Ready for review, exact implementation-head CI PASS |
-| T17 | PLANNED | Bulk/CSV и structured conflicts |
+| T16 | MERGED | Конечная навигация и совместимые входы; PR #3718, merge `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` |
+| T17 | IN_PROGRESS | Bulk/CSV и structured conflicts; isolated worktree `aqs-t17-bulk-csv`; local 64/64 focused PASS, exact-head CI pending |
 | T18 | PLANNED | Сквозная приёмка и оставшийся safe live-spec harness |
 
 ### Неопределённости и условия их закрытия

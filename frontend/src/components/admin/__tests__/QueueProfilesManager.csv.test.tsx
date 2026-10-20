@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -28,7 +28,13 @@ if (typeof File !== 'undefined' && typeof File.prototype.text !== 'function') {
 // any API call. SYNTHETIC/DEV-DEMO fixtures only — synthetic domain
 // identifiers, no PHI/PII values anywhere.
 
-const syntheticProfiles = [
+interface SyntheticQueueProfile {
+  key: string;
+  queue_tags: string[];
+  [field: string]: unknown;
+}
+
+const syntheticProfiles: SyntheticQueueProfile[] = [
   {
     key: 'synthetic-cardio',
     title: 'Синтетическая кардио, взрослая',
@@ -59,7 +65,7 @@ vi.mock('../../../api/client', () => {
   const apiMock = {
     get: vi.fn((url: string) => {
       if (url.startsWith('/queues/profiles')) {
-        return Promise.resolve({ data: { profiles: syntheticProfiles } });
+        return Promise.resolve({ data: { profiles: [...syntheticProfiles] } });
       }
 
       if (url === '/admin/departments') {
@@ -89,7 +95,7 @@ vi.mock('../../../services/notify', () => ({
 
 const newFormatCsv = [
   'key,title,title_ru,queue_tags,department_key,icon,color,display_order,is_active,show_on_qr_page',
-  '"synthetic-cardio","Синтетическая кардио, взрослая","Синтетическая кардиология","cardio;ekg","cardiology","Heart","#E53E3E","3","true","true"',
+  '"synthetic-cardio","Синтетическая кардио, взрослая обновлённая","Синтетическая кардиология","cardio;ekg","cardiology","Heart","#E53E3E","3","true","true"',
   '"synthetic-new","Синтетическая новая вкладка","Синтетическая новая","derma",,,"","7","true","false"'
 ].join('\n');
 
@@ -100,6 +106,8 @@ const oldFormatCsv = [
 
 const capturedBlobs: Blob[] = [];
 const capturedBlobTexts: string[] = [];
+const baselineSyntheticProfiles = syntheticProfiles.map((profile) => ({ ...profile, queue_tags: [...profile.queue_tags] }));
+const defaultGetImplementation = (api.get as ReturnType<typeof vi.fn>).getMockImplementation();
 
 // jsdom has no URL.createObjectURL/revokeObjectURL and its Blob lacks .text()
 // — stub Blob + URL.assign directly (vi.restoreAllMocks would also reset the
@@ -150,7 +158,7 @@ const restoreDownload = () => {
 };
 
 const renderManager = async () => {
-  render(
+  const view = render(
     <ThemeProvider>
       <QueueProfilesManager />
     </ThemeProvider>
@@ -162,18 +170,26 @@ const renderManager = async () => {
   await waitFor(() => {
     expect(screen.getByText('Синтетическая кардио, взрослая')).toBeInTheDocument();
   });
+  return view;
 };
 
-const uploadCsv = async (text: string) => {
+const uploadCsv = async (text: string, confirmPreview = true) => {
   const user = userEvent.setup();
   const input = screen.getByLabelText('Импортировать профили очереди из CSV');
   await user.upload(input, new File([text], 'profiles.csv', { type: 'text/csv' }));
+  if (confirmPreview) {
+    const preview = await screen.findByRole('dialog', { name: 'Предварительный просмотр импорта CSV' });
+    await user.click(within(preview).getByRole('button', { name: 'Импортировать' }));
+  }
   return user;
 };
 
 afterEach(() => {
   vi.clearAllMocks();
+  if (defaultGetImplementation) (api.get as ReturnType<typeof vi.fn>).mockImplementation(defaultGetImplementation);
   restoreDownload();
+  window.sessionStorage.removeItem('admin.queueProfiles.pendingCsvPublication.v1');
+  syntheticProfiles.splice(0, syntheticProfiles.length, ...baselineSyntheticProfiles.map((profile) => ({ ...profile, queue_tags: [...profile.queue_tags] })));
 });
 
 describe('QueueProfilesManager CSV export (RQ-26.a)', () => {
@@ -229,7 +245,7 @@ describe('QueueProfilesManager CSV import (RQ-26.a)', () => {
         '/queues/profiles/synthetic-cardio',
         expect.objectContaining({
           key: 'synthetic-cardio',
-          title: 'Синтетическая кардио, взрослая',
+          title: 'Синтетическая кардио, взрослая обновлённая',
           title_ru: 'Синтетическая кардиология',
           queue_tags: ['cardio', 'ekg'],
           department_key: 'cardiology',
@@ -271,16 +287,34 @@ describe('QueueProfilesManager CSV import (RQ-26.a)', () => {
     expect(payload).not.toHaveProperty('show_on_qr_page');
   });
 
+  it('reports an already matching CSV row as unchanged and avoids a write', async () => {
+    const matchingCsv = [
+      'key,title,title_ru,queue_tags,department_key,icon,color,display_order,is_active,show_on_qr_page',
+      'synthetic-cardio,"Синтетическая кардио, взрослая",Синтетическая кардиология,cardio;ekg,cardiology,Heart,#E53E3E,3,true,true',
+    ].join('\n');
+    await renderManager();
+    await uploadCsv(matchingCsv);
+
+    const results = screen.getByRole('region', { name: 'Результаты операции' });
+    const row = within(results).getByRole('listitem');
+    expect(row).toHaveTextContent('Выполнено');
+    expect(row).toHaveTextContent('Нужное состояние уже сохранено; повторная запись не требовалась.');
+    expect(api.put).not.toHaveBeenCalled();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(notify.success).toHaveBeenCalledWith(expect.stringContaining('уже соответствовали 1'));
+  });
+
   it('warns when a CSV-created profile requested for QR remains hidden until explicit publication', async () => {
     const requestedPublicProfileCsv = [
       'key,title,title_ru,queue_tags,department_key,icon,color,display_order,is_active,show_on_qr_page',
       '"synthetic-neurology","Синтетическая неврология","Синтетическая неврология","neuro",,,"#718096","1","true","true"'
     ].join('\n');
-    (api.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      data: { success: true, publication_deferred: true }
+    (api.post as ReturnType<typeof vi.fn>).mockImplementationOnce((_url: string, payload: Record<string, unknown>) => {
+      syntheticProfiles.push({ ...payload, key: String(payload.key), queue_tags: payload.queue_tags as string[], show_on_qr_page: false });
+      return Promise.resolve({ data: { success: true, publication_deferred: true } });
     });
 
-    await renderManager();
+    const { unmount } = await renderManager();
     await uploadCsv(requestedPublicProfileCsv);
 
     await waitFor(() => {
@@ -294,15 +328,21 @@ describe('QueueProfilesManager CSV import (RQ-26.a)', () => {
     expect(notify.success).not.toHaveBeenCalled();
     expect(api.post).toHaveBeenCalledWith('/queues/profiles', expect.objectContaining({
       key: 'synthetic-neurology',
-      show_on_qr_page: true
+      show_on_qr_page: false
     }));
+    expect(api.put).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: 'Проверить QR-настройку synthetic-neurology' })).toBeInTheDocument();
+    expect(window.sessionStorage.getItem('admin.queueProfiles.pendingCsvPublication.v1')).toContain('synthetic-neurology');
+    unmount();
+    await renderManager();
+    expect(await screen.findByRole('button', { name: 'Проверить QR-настройку synthetic-neurology' })).toBeInTheDocument();
   });
 
   it('aborts the whole import with a visible error when the file has duplicate keys', async () => {
     const duplicatedRow = '"synthetic-cardio","Дубль синтетической вкладки","","","","","","","","false"';
     const duplicated = `${newFormatCsv}\n${duplicatedRow}\n`;
     await renderManager();
-    await uploadCsv(duplicated);
+    await uploadCsv(duplicated, false);
 
     await waitFor(() => {
       expect(screen.getByText(/Импорт отменён|найдено проблем/i)).toBeInTheDocument();
@@ -320,12 +360,156 @@ describe('QueueProfilesManager CSV import (RQ-26.a)', () => {
     await uploadCsv(newFormatCsv);
 
     await waitFor(() => {
-      expect(screen.getByText(/qp_import_failed_count|Не удалось импортировать/)).toBeInTheDocument();
+      expect(screen.getAllByText(/Отклонено/)).toHaveLength(2);
     });
     // The create call happened exactly once and failed (mocked rejection);
     // the existing profile still went through the update path.
     expect(api.post).toHaveBeenCalledTimes(1);
     expect(api.put).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows per-row outcomes after partial import and retries only refused rows after rereading profiles', async () => {
+    const twoNewProfilesCsv = [
+      'key,title,title_ru,queue_tags,is_active,show_on_qr_page',
+      'synthetic-import-a,Synthetic import A,Синтетический импорт A,import_a,true,false',
+      'synthetic-import-b,Synthetic import B,Синтетический импорт B,import_b,true,false',
+    ].join('\n');
+    const createProfile = (_url: string, payload: Record<string, unknown>) => {
+      syntheticProfiles.push({ ...payload, key: String(payload.key), queue_tags: payload.queue_tags as string[] });
+      return Promise.resolve({ data: { success: true } });
+    };
+    (api.post as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce({ response: { status: 409, data: { detail: { reason: 'profile_binding_changed', message: 'Связь профиля изменилась. Обновите список.' } } } })
+      .mockImplementationOnce(createProfile)
+      .mockImplementationOnce(createProfile);
+
+    await renderManager();
+    await uploadCsv(twoNewProfilesCsv);
+
+    expect(api.post).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('region', { name: 'Результаты операции' })).toBeInTheDocument();
+    const results = screen.getByRole('region', { name: 'Результаты операции' });
+    const resultRows = within(results).getAllByRole('listitem');
+    expect(resultRows).toHaveLength(2);
+    expect(resultRows[0]).toHaveTextContent('synthetic-import-a');
+    expect(resultRows[0]).toHaveTextContent('Отклонено');
+    expect(resultRows[0]).toHaveTextContent('Связь профиля изменилась. Обновите список.');
+    expect(resultRows[1]).toHaveTextContent('synthetic-import-b');
+    expect(resultRows[1]).toHaveTextContent('Выполнено');
+    expect(api.post).toHaveBeenCalledTimes(2);
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Повторить оставшиеся после проверки' }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(3));
+    expect((api.post as ReturnType<typeof vi.fn>).mock.calls.map((call) => (call[1] as Record<string, unknown>).key)).toEqual([
+      'synthetic-import-a',
+      'synthetic-import-b',
+      'synthetic-import-a',
+    ]);
+    expect(await screen.findByText('Синтетический импорт A')).toBeInTheDocument();
+    expect(within(results).getAllByRole('listitem').filter((row) => row.textContent?.includes('Выполнено'))).toHaveLength(2);
+  });
+
+  it('stops without writing when a profile changes after the CSV impact preview', async () => {
+    const updateExistingCsv = [
+      'key,title,title_ru,queue_tags,is_active,show_on_qr_page',
+      'synthetic-cardio,Updated after preview,Updated after preview,cardio;ekg,true,true',
+    ].join('\n');
+    const user = userEvent.setup();
+    await renderManager();
+    await uploadCsv(updateExistingCsv, false);
+
+    const preview = await screen.findByRole('dialog', { name: 'Предварительный просмотр импорта CSV' });
+    syntheticProfiles[0].title_ru = 'Изменено после предварительного просмотра';
+    await user.click(within(preview).getByRole('button', { name: 'Импортировать' }));
+
+    const results = await screen.findByRole('region', { name: 'Результаты операции' });
+    expect(within(results).getByText('synthetic-cardio')).toBeInTheDocument();
+    expect(within(results).getByText(/Профиль изменился после предварительного просмотра/)).toBeInTheDocument();
+    expect(api.put).not.toHaveBeenCalled();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(within(results).queryByRole('button', { name: 'Повторить оставшиеся после проверки' })).not.toBeInTheDocument();
+  });
+
+  it('does not retry an update after the profile changes since the CSV preview', async () => {
+    const updateExistingCsv = [
+      'key,title,title_ru,queue_tags,is_active,show_on_qr_page',
+      'synthetic-cardio,Updated synthetic cardiology,Обновлённая синтетическая кардиология,cardio;ekg,true,true',
+    ].join('\n');
+    (api.put as ReturnType<typeof vi.fn>).mockRejectedValueOnce({
+      response: { status: 409, data: { detail: { reason: 'profile_binding_changed', message: 'Связь профиля изменилась.' } } },
+    });
+
+    await renderManager();
+    await uploadCsv(updateExistingCsv);
+
+    const results = screen.getByRole('region', { name: 'Результаты операции' });
+    expect(within(results).getByText(/Связь профиля изменилась/)).toBeInTheDocument();
+    expect(api.put).toHaveBeenCalledTimes(1);
+
+    // A different administrator changes the profile after this import's
+    // preview and first refused write. Retrying must preserve that change.
+    syntheticProfiles[0].title_ru = 'Стороннее изменение после первого отказа';
+    await userEvent.setup().click(within(results).getByRole('button', { name: 'Повторить оставшиеся после проверки' }));
+
+    expect(await within(results).findByText(/Профиль изменился после предварительного просмотра/)).toBeInTheDocument();
+    expect(api.put).toHaveBeenCalledTimes(1);
+    expect(syntheticProfiles[0].title_ru).toBe('Стороннее изменение после первого отказа');
+  });
+
+  it('verifies a saved row after a lost response and does not offer a duplicate retry', async () => {
+    const newProfileCsv = [
+      'key,title,title_ru,queue_tags,is_active,show_on_qr_page',
+      'synthetic-lost-response,Synthetic lost response,Синтетический ответ потерян,lost_response,true,false',
+    ].join('\n');
+    (api.post as ReturnType<typeof vi.fn>).mockImplementationOnce((_url: string, payload: Record<string, unknown>) => {
+      syntheticProfiles.push({ ...payload, key: String(payload.key), queue_tags: payload.queue_tags as string[] });
+      return Promise.reject({ message: 'synthetic response lost' });
+    });
+
+    await renderManager();
+    await uploadCsv(newProfileCsv);
+
+    const results = screen.getByRole('region', { name: 'Результаты операции' });
+    expect(within(results).getByText('synthetic-lost-response')).toBeInTheDocument();
+    expect(within(results).getAllByText(/Выполнено/).length).toBeGreaterThan(0);
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(within(results).queryByRole('button', { name: 'Повторить оставшиеся после проверки' })).not.toBeInTheDocument();
+  });
+
+  it('marks a row unverified when refresh fails, then rechecks before avoiding a duplicate retry', async () => {
+    const newProfileCsv = [
+      'key,title,title_ru,queue_tags,is_active,show_on_qr_page',
+      'synthetic-refresh-failure,Synthetic refresh failure,Синтетическая ошибка обновления,refresh_failure,true,false',
+    ].join('\n');
+    (api.post as ReturnType<typeof vi.fn>).mockImplementationOnce((_url: string, payload: Record<string, unknown>) => {
+      // Simulate the server committing the row while the response is lost.
+      // The following refresh fails, and retry must discover this saved row.
+      syntheticProfiles.push({ ...payload, key: String(payload.key), queue_tags: payload.queue_tags as string[] });
+      return Promise.reject(new Error('synthetic response lost after commit'));
+    });
+    let profileReads = 0;
+    (api.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url.startsWith('/queues/profiles')) {
+        profileReads += 1;
+        if (profileReads === 4) return Promise.reject(new Error('synthetic refresh failure'));
+      }
+      return defaultGetImplementation?.(url);
+    });
+
+    await renderManager();
+    await uploadCsv(newProfileCsv);
+
+    const results = screen.getByRole('region', { name: 'Результаты операции' });
+    expect(within(results).getByText('synthetic-refresh-failure')).toBeInTheDocument();
+    expect(within(results).getByText(/Не удалось проверить состояние/)).toBeInTheDocument();
+    expect(api.post).toHaveBeenCalledTimes(1);
+
+    await userEvent.setup().click(within(results).getByRole('button', { name: 'Повторить оставшиеся после проверки' }));
+
+    await waitFor(() => expect(within(results).getAllByText(/Выполнено/).length).toBeGreaterThan(0));
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(within(results).queryByRole('button', { name: 'Повторить оставшиеся после проверки' })).not.toBeInTheDocument();
   });
 });
 

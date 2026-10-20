@@ -1,4 +1,36 @@
-## Latest checkpoint — T16 PR #3718 Ready for review; code-head checks passed — 2026-10-20T10:26:30+05:00
+## Latest checkpoint — T17 local validation complete; PR preparation next — 2026-10-20T12:47:00+05:00
+
+- T16 / PR #3718 was merged by the user at `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. Fresh `origin/main` and the isolated T17 worktree base both equal this commit. Primary checkout `C:\final` and the independent photo-cleanup worktree remain untouched.
+- Task/memory ID: `17c471a8-6772-4081-bea0-1e82ad1bcd05`. T17 is `IN_PROGRESS`; branch `codex/aqs-T17-bulk-csv`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`; base `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. Product changes are uncommitted.
+- Mode and gate: `advisory_gate` because T17 is existing-command UI behavior. Canonical launcher `ai/langgraph/scripts/run_agent_gate.ps1` first stopped for a known root; one retry with confirmed root `frontend/src/components/admin/QueueProfilesManager.tsx` returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt was read. T17 plan is the repository-approved basis; gate/router are unchanged.
+- Shape brief: Admin registrar/configuration workflow; primary actions are import or bulk-change profiles; moderate operational risk because CSV can change multiple configurations and publication intent must remain explicit. Existing macOS/Admin UI components and current API commands remain the layer. Tone is quiet and operational: preview impact, show per-row state, explain refusal/retry, announce result for assistive technology. No backend/write-contract, publication-policy, routing, RBAC, DB, queue runtime, staging, production or deployment change.
+- Allowed paths: `QueueProfilesManager.tsx`; its CSV/interaction tests; five locale files (`en.ts`, `kk.ts`, `ru.ts`, `uz-Cyrl.ts`, `uz-Latn.ts`); this plan and `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. `queueProfilesCsv.ts` and pure parser tests are read-only. Denied: backend/API/OpenAPI/DB/migrations/new commands, ownership/order/fairness/lifecycle, auth/RBAC/routes, other worktrees, staging/production/deployment, merge and review-thread mutation.
+- Implemented locally: per-row continuation and result list for bulk/archive/delete and CSV; pre-write and post-write rereads; retry only unresolved rows; retry checks original CSV preview before updating changed rows; lost-response reconciliation; exact already-matching/no-op messaging; unsupported/conflicting states stay visible; new CSV profiles remain hidden and requested publication becomes a persisted, explicit review reminder; impact previews; aria-live result summary; corrected success messaging in EN/KK/UZ-Cyrl.
+- Validation after the final source edit: focused CSV + interactions + Admin locale contract tests PASS, 64/64; scoped ESLint including `jsx-a11y/control-has-associated-label:error` PASS, 0 errors and 3 existing hardcoded-color warnings; `git diff --check` PASS. No task-owned build output was created. Exact-head hosted CI is not started because no PR exists.
+- Checks with limitations: `npm run type-check` after fixing task-local type issues reports only missing `nitro`/`nitro/runtime-config` and independent `publicSiteHandler.test.tsx` implicit-route typing; no changed-file diagnostics remain. `npm run build -- --outDir .scratch/t17-build` stops while loading `vite.config.ts` because shared `C:\final\frontend\node_modules` lacks Nitro; app compilation did not begin and no output was created. Do not install into the shared dependency tree.
+- Failures observed and resolved: first retry test lacked a simulated server commit before a lost response; the fixture now persists the row before rejecting. Adding `t` to `loadProfiles` callback dependencies caused repeated loads because translator identity changes; switched to a stable callback using a ref. Type-check then exposed a test fixture shape and refresh-button event mismatch; both were corrected. These are test/implementation corrections, not remaining failures.
+- Blocker: no source defect known. Local full build/type-check cannot complete with the current shared dependency cache; hosted exact-head CI is required.
+- Next exact action: append final EVIDENCE, synchronize RESUME/plan header and capture DevBrain state; commit with normal hooks, push T17 branch, create the single-purpose PR and verify exact-head CI. User retains merge.
+- Stop condition: if retry safety requires a backend compare-and-set/new write contract, stop T17 and create a separate mandatory-scope slice; do not bypass stale state or expand into runtime/API.
+
+| Task | Status | PR / commit | Evidence |
+|------|--------|-------------|----------|
+| T16 | MERGED | [PR #3718](https://github.com/drsapaev/final/pull/3718), merge `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` | Exact-head Unified CI PASS; T18 remains separate |
+| T17 | IN_PROGRESS | `codex/aqs-T17-bulk-csv` | Local focused validation; PR not created yet |
+| T18 | PLANNED | | Full synthetic integrated acceptance |
+
+## Previous checkpoint — T17 pre-edit scope recorded; implementation not started — 2026-10-20T12:03:37+05:00
+
+- T16 / PR #3718 is MERGED at `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`; `origin/main`, the primary checkout HEAD, and the isolated T17 worktree base all resolve to that merge commit. The primary checkout and the independent photo-cleanup worktree were not changed.
+- Task/memory ID: `17c471a8-6772-4081-bea0-1e82ad1bcd05`. T17 is `IN_PROGRESS`; branch `codex/aqs-T17-bulk-csv`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`; base commit `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+- Mode: `advisory_gate` — plan T17 explicitly scopes this as UI-only work over existing commands. Gate command: `ai/langgraph/scripts/run_agent_gate.ps1` from `ai/langgraph`. Initial call returned `stop: reviewed scope requires a known root cause`; the single retry with confirmed root `frontend/src/components/admin/QueueProfilesManager.tsx` returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`. The generated execution prompt was read. Repo-approved basis: T17 says “advisory existing-command UI; new write contract→separate mandatory slice”; no router/gate edits.
+- Canonical anchors: T17 card in `codex-admin-queue-simplification.md`; `QueueProfilesManager.tsx`; `queueProfilesCsv.ts` and existing CSV tests as references; existing profile API `_queue_profiles.py` is reference-only; T10–T12 lifecycle/publication contract and T15 return context.
+- Allowed first-touch files: `frontend/src/components/admin/QueueProfilesManager.tsx`; its existing CSV and interaction tests; five locale files `en.ts`, `kk.ts`, `ru.ts`, `uz-Cyrl.ts`, `uz-Latn.ts`; this plan and `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. `queueProfilesCsv.ts` and pure parser tests are read-only references unless source evidence shows a necessary change; any expansion triggers the stop condition first.
+- Denied: backend/API/OpenAPI/DB/migrations, new write commands, queue identity/ownership/order/fairness/lifecycle changes, automatic publication, route/auth/RBAC changes, other worktrees, production/staging/deployment, merge and review-thread mutation.
+- Confirmed source root: bulk loops stop on first rejected row and skip refresh; import reports aggregate counts without row outcomes/retry and sends requested QR publication in new-profile payload. First validation target: fail-first focused Vitest for CSV and interaction suites; then scoped lint/type-check/build as available, locale checks, and `git diff --check`.
+- First stop condition: any required change to backend contract, API write boundary, publication policy, path outside this list, or inability to safely distinguish persisted state after a lost response. No product source/test edits have started.
+
+## Previous checkpoint — T16 PR #3718 Ready for review; code-head checks passed — 2026-10-20T10:26:30+05:00
 
 - T15 / PR #3711 was merged by the user at `ccbf519fdb0f9a32c3a71837202dfea296f13383`. Fresh `origin/main` and this isolated worktree base are that same commit. Work is on `codex/aqs-T16-navigation`; `C:\final` and the parallel photo-cleanup task's worktree remain untouched.
 - T13 #3697 and T14 #3702 are merged. T12.2 #3693 is in current main at `7f923f14a347a26b7f80da0fb40a0cff8858ef27`; its partial Tier-2 evidence remains historical and does not close T18.
@@ -15,11 +47,19 @@
 
 | Task | Status | PR / commit | Evidence |
 |------|--------|-------------|----------|
-| T16 | PR_OPEN | [PR #3718](https://github.com/drsapaev/final/pull/3718), HEAD `70f7999e6` | 54/54 focused; implementation-head Unified CI PASS; Ready for review; Tier-2 assigned to T18 |
-| T17 | PLANNED | | |
+| T16 | MERGED | [PR #3718](https://github.com/drsapaev/final/pull/3718), merge `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` | Implementation-head Unified CI PASS; Tier-2 assigned to T18 |
+| T17 | IN_PROGRESS | `codex/aqs-T17-bulk-csv` | Pre-edit scope and gate result recorded; source edits not started |
 | T18 | PLANNED | | |
 
 ## Current checkpoint
+- Completed: confirmed PR #3718 merge at `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`; created isolated T17 worktree from that exact `origin/main`; read T17 plan and canonical source/tests; recorded mode, gate outcome, allowed/denied scope, validation target and stop condition before source edits.
+- Changed but not verified: T17 plan registry/checkpoint only; no runtime/product source or test edits yet.
+- Remaining: run fail-first focused tests, implement per-row outcomes/revalidation/retry and explicit pending publication intent, then run focused tests and scoped checks.
+- Blocker: none. Initial advisory gate stop was handled by one retry with the confirmed root file; no gate/router change.
+- Next exact action: reproduce bulk partial failure and CSV outcome gaps in focused tests before changing product code.
+- Checks to rerun after a source change: CSV and interaction Vitest suites, relevant locale/i18n checks, scoped ESLint/type-check and `git diff --check`; hosted build/E2E are required on the PR's exact implementation head.
+
+## Previous checkpoint — T16 PR #3718 Ready for review
 - Completed: merged-T15 state verified; isolated worktree and T16 gate prompt verified; fail-first issue reproduced; URL state/history, Admin route ownership, route nav keys/order, five locales and operator routing docs implemented. Focused tests 54/54; Unified CI passed on the implementation HEAD; PR #3718 is Ready for review.
 - Changed but not verified: final plan-journal commit and checks on that journal checkpoint; independent review. Local type-check/build remain unavailable because the shared cache lacks Nitro, although hosted type-check/build passed.
 - Remaining: commit/push the final plan checkpoint, confirm checks on that journal HEAD, then leave independent review and merge to the user. Integrated staging/live acceptance belongs to T18.
