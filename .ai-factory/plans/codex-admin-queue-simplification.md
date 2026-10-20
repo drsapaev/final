@@ -1,8 +1,8 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 4.04 — T16 / PR #3718 MERGED; T17 реализуется в изолированном worktree.
-**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-20T12:46:00+05:00, Asia/Tashkent.
-**Текущий этап:** T17 — `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, ветка `codex/aqs-T17-bulk-csv`, база `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` (= свежий `origin/main`). Реализация и локальные проверки выполняются; фокусные CSV/interactions/i18n tests 64/64 PASS, scoped ESLint — 0 errors и 3 предупреждения о существующих цветах, `git diff --check` PASS. Полная локальная проверка типов и сборка ограничены отсутствующим Nitro в общей папке зависимостей; в проверке типов после исправлений нет ошибок в изменённых файлах, остаются ошибки Nitro и независимый `publicSiteHandler.test.tsx`. PR для T17 пока не создан; exact-head hosted CI и review впереди.
+**Версия:** 4.09 — T16 / PR #3718 MERGED; T17 / PR #3721 implementation, scoped Tier 2 PASS, PR description and body gate PASS; documentation checkpoint and post-update CI recheck in progress.
+**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-20, Asia/Tashkent.
+**Текущий этап:** T17 — PR #3721, code HEAD `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`, base `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. Exact-head applicable Tier 1 CI passed; focused UI tests 64/64, scoped lint and hooks passed. Targeted T17 synthetic Tier 2 passed on r6: exact served frontend SHA, normal Admin 2FA enrollment and TOTP login, QueueProfiles screen, hidden CSV create/API response, visible publication-review reminder, persisted hidden state after refresh, and bulk archive. Canonical teardown removed 5 containers, 3 volumes and 1 network; zero project resources remained. PR body gate (19 tests and exact body validation) passed and the PR description now records r6. Host policy blocked cleanup of ignored local env/harness artifacts before execution; they remain untracked, excluded from the PR, and disclosed. Earlier r1-r5 readiness/harness attempts and their successful teardowns are documented in EVIDENCE; they do not replace or weaken the final r6 PASS. Full STAGING_VALIDATION.md and T18 integrated acceptance remain separate and are not claimed complete. Next: commit/push only the four plan journals, check exact docs HEAD and metadata workflows, then mark PR #3721 Ready if checks remain green; user retains merge. No runtime/API code changed.
 **Task memory ID:** 17c471a8-6772-4081-bea0-1e82ad1bcd05.
 **T11 результат:** PR #3639 merged commit 7443b0e290b9143e877d5898a5589df52592d3b3. Ограниченный T11 Tier-2 прошёл на зафиксированном кодовом HEAD; три legacy live-spec остаются DEFERRED для T18 с 0% credit; полный STAGING_VALIDATION.md не завершён.
 **Ограничения:** пользователь мержит PR самостоятельно. Production, deployment и активация v1-флага не разрешены. Текущая T17-задача меняет только существующий административный frontend, тесты и пять локалей; новые backend/API/RBAC/DB/queue-runtime/staging/production контракты не входят в scope. Исторические Tier-2 deferrals и partial evidence не наследуются и не превращаются в PASS; полная интеграционная приёмка остаётся для T18.
@@ -82,7 +82,7 @@
 | T14 | MERGED | Setup UI на backend facts; #3702, merge `99f0b5a098dccce4f1166ae52bd7d5c93d92af70` |
 | T15 | MERGED | Восстанавливаемый URL-контекст; #3711, merge `ccbf519fdb0f9a32c3a71837202dfea296f13383` |
 | T16 | MERGED | Конечная навигация и совместимые входы; PR #3718, merge `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` |
-| T17 | IN_PROGRESS | Bulk/CSV и structured conflicts; isolated worktree `aqs-t17-bulk-csv`; local 64/64 focused PASS, exact-head CI pending |
+| T17 | PR_OPEN | Bulk/CSV; PR #3721 at code HEAD `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`; focused 64/64, exact-head applicable CI, targeted r6 Tier 2, PR body gate and PR description PASS; docs-only checkpoint and post-update CI pending; local ignored env/harness cleanup rejected by host policy and disclosed |
 | T18 | PLANNED | Сквозная приёмка и оставшийся safe live-spec harness |
 
 ### Неопределённости и условия их закрытия
