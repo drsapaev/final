@@ -25,7 +25,3 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
-
-## 2026-10-20 - Enforcing aria-busy on Loading Skeletons
-**Learning:** Container components designed specifically to indicate loading states (like `AppLoading`) often use `role="status"` and `aria-live="polite"`, but forget `aria-busy="true"`. Without `aria-busy="true"`, screen readers may announce the initial state but not reliably communicate that the region is actively busy updating or fetching content.
-**Action:** When inspecting or creating dedicated loading state components, always ensure `aria-busy="true"` is applied to the root element alongside `role="status"` and `aria-live` attributes to explicitly indicate an active loading state to assistive technologies.

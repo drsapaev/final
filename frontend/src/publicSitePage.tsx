@@ -21,6 +21,8 @@ interface Copy {
   staffLogin: string;
   language: string;
   navigation: string;
+  breadcrumbs: string;
+  home: string;
   mobileMenu: string;
   loading: string;
   loadError: string;
@@ -58,6 +60,8 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     staffLogin: 'Вход для персонала',
     language: 'Язык',
     navigation: 'Навигация сайта',
+    breadcrumbs: 'Навигационная цепочка',
+    home: 'Главная',
     mobileMenu: 'Меню',
     loading: 'Загружаем актуальную информацию клиники…',
     loadError: 'Не удалось загрузить актуальную информацию клиники.',
@@ -93,6 +97,8 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     staffLogin: 'Xodimlar uchun kirish',
     language: 'Til',
     navigation: 'Sayt navigatsiyasi',
+    breadcrumbs: 'Sahifa yo‘nalishi',
+    home: 'Bosh sahifa',
     mobileMenu: 'Menyu',
     loading: 'Klinikaning dolzarb ma’lumotlari yuklanmoqda…',
     loadError: 'Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi.',
@@ -162,6 +168,72 @@ function formatPrice(service: PublicSiteService, locale: PublicSiteLocale, copy:
 
 function localizePath(kind: PublicSitePageKind, locale: PublicSiteLocale, slug?: string): string {
   return getPublicSitePath(kind, locale, slug);
+}
+
+export interface PublicSiteBreadcrumb {
+  name: string;
+  path: string;
+}
+
+/** Build one localized breadcrumb source for both visible navigation and SSR JSON-LD. */
+export function getPublicSiteBreadcrumbs(
+  route: PublicSiteRouteMatch,
+  data: PublicSitePageData,
+): PublicSiteBreadcrumb[] {
+  if (route.kind === 'home') return [];
+
+  const copy = COPY[route.locale];
+  const home: PublicSiteBreadcrumb = {
+    name: copy.home,
+    path: localizePath('home', route.locale),
+  };
+
+  switch (route.kind) {
+    case 'services':
+      return [home, { name: copy.services, path: localizePath('services', route.locale) }];
+    case 'doctors':
+      return [home, { name: copy.doctors, path: localizePath('doctors', route.locale) }];
+    case 'prices':
+      return [home, { name: copy.prices, path: localizePath('prices', route.locale) }];
+    case 'contacts':
+      return [home, { name: copy.contacts, path: localizePath('contacts', route.locale) }];
+    case 'service':
+      if (!data.service || !route.slug) return [];
+      return [
+        home,
+        { name: copy.services, path: localizePath('services', route.locale) },
+        { name: data.service.name, path: localizePath('service', route.locale, route.slug) },
+      ];
+    case 'doctor':
+      if (!data.doctor || !route.slug) return [];
+      return [
+        home,
+        { name: copy.doctors, path: localizePath('doctors', route.locale) },
+        { name: data.doctor.name, path: localizePath('doctor', route.locale, route.slug) },
+      ];
+    default:
+      return [];
+  }
+}
+
+function BreadcrumbNavigation({ items, label }: {
+  items: PublicSiteBreadcrumb[];
+  label: string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <nav className="public-site__breadcrumbs" aria-label={label}>
+      <ol>
+        {items.map((item, index) => (
+          <li key={[item.path, index].join(':')}>
+            {index === items.length - 1
+              ? <span aria-current="page">{item.name}</span>
+              : <a href={item.path}>{item.name}</a>}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
 }
 
 function SiteHeader({ locale, route, copy }: {
@@ -362,6 +434,10 @@ export function PublicSitePage({ route, data }: PublicSitePageProps) {
     <div className="public-site">
       <SiteHeader locale={route.locale} route={route} copy={copy} />
       <main className="public-site__main" id="main-content">
+        <BreadcrumbNavigation
+          items={getPublicSiteBreadcrumbs(route, data)}
+          label={copy.breadcrumbs}
+        />
         <PageContent route={route} data={data} copy={copy} />
       </main>
       <SiteFooter clinicName={data.clinic?.name} locale={route.locale} copy={copy} />

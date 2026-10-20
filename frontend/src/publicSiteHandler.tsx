@@ -16,7 +16,7 @@ import {
   type PublicSiteService,
 } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
-import { PublicSitePage } from './publicSitePage';
+import { getPublicSiteBreadcrumbs, PublicSitePage } from './publicSitePage';
 
 export interface PublicSiteRuntimeConfig {
   apiOrigin?: string;
@@ -105,6 +105,15 @@ function truncateDescription(value: string): string {
   return `${compact.slice(0, 157).trimEnd()}…`;
 }
 
+function serializeJsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
 function pageMeta(route: PublicSiteRouteMatch, data: PublicSitePageData): PageMeta {
   const base = META_COPY[route.locale][route.kind];
   if (route.kind === 'service' && data.service) {
@@ -137,6 +146,19 @@ function renderPublicDocument(
   const canonical = new URL(pagePath(route, route.locale), origin).href;
   const alternateUz = new URL(pagePath(route, 'uz-Latn'), origin).href;
   const alternateRu = new URL(pagePath(route, 'ru'), origin).href;
+  const breadcrumbs = getPublicSiteBreadcrumbs(route, data);
+  const breadcrumbJsonLd = breadcrumbs.length > 0
+    ? `<script type="application/ld+json">${serializeJsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: breadcrumbs.map((item, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: item.name,
+        item: new URL(item.path, origin).href,
+      })),
+    })}</script>`
+    : '';
   const body = renderToString(<PublicSitePage route={route} data={data} />);
   const css = renderPageStyles(styles, pageStyleText);
 
@@ -152,7 +174,7 @@ function renderPublicDocument(
     `<meta property="og:description" content="${escapeHtml(meta.description)}">` +
     `<meta property="og:type" content="website"><meta property="og:url" content="${escapeHtml(canonical)}">` +
     `<meta property="og:locale" content="${route.locale === 'ru' ? 'ru_RU' : 'uz_UZ'}">` +
-    `<meta name="twitter:card" content="summary">${css}</head>` +
+    `<meta name="twitter:card" content="summary">${breadcrumbJsonLd}${css}</head>` +
     `<body><div id="public-site-root">${body}</div></body></html>`;
 }
 

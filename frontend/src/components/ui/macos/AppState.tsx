@@ -97,7 +97,6 @@ export const AppLoading = React.forwardRef<HTMLElement, AppLoadingProps>(({
       className={`mac-app-loading ${className}`.trim()}
       role="status"
       aria-live="polite"
-      aria-busy="true"
       aria-label={ariaLabel || (typeof title === 'string' ? title : undefined)}
       style={{
         display: 'flex',
