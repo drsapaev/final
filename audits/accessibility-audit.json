@@ -7,9 +7,16 @@
     "Public page and loading/error page landmarks",
     "Keyboard bypass from site navigation to main content"
   ],
-  "method": "Static source review only",
+  "method": "Static source review plus targeted automated keyboard smoke against Vite and Nitro SSR error pages",
+  "runtime_checks": {
+    "skip_link_first_tab": "passed_in_vite_and_nitro_for_ru_and_uz-Latn",
+    "skip_link_visible_when_focused": "passed_in_vite_and_nitro_for_ru_and_uz-Latn",
+    "activation_moves_focus_to_main": "passed_in_vite_and_nitro_for_ru_and_uz-Latn",
+    "nitro_error_response": "tested_with_expected_503_when_local_api_origin_is_unconfigured"
+  },
   "automated_checks": {
     "axe": "not_run",
+    "targeted_keyboard_smoke": "passed_vite_and_nitro_ru_and_uz-Latn",
     "coverage_note": "The existing generic Axe route list does not explicitly include localized public-site catalog, doctor, service, or contact routes."
   },
   "manual_checks": {
@@ -22,9 +29,9 @@
     {
       "criterion": "WCAG 2.2 SC 2.4.1 Bypass Blocks",
       "severity": "moderate",
-      "status": "source_change_added_runtime_verification_pending",
-      "observation": "The shared public renderer placed the site header before the main landmark without a skip link. A localized focus-only link now targets the main landmark in both the page and loading/error renderers; the target is programmatically focusable.",
-      "verification_needed": "Use keyboard navigation in the built Vite and Nitro SSR pages to confirm the first Tab reveals the link and activation moves focus to the main content."
+      "status": "source_change_and_targeted_automated_runtime_smoke_passed",
+      "observation": "The shared public renderer placed the site header before the main landmark without a skip link. A localized focus-only link now targets the main landmark in normal pages, loading/error states, and the Nitro-rendered 503 error document; each target is programmatically focusable.",
+      "verification_needed": "Manual keyboard use, screen-reader behavior, and a full WCAG 2.2 AA audit remain unverified."
     }
   ],
   "result": "partial_not_a_conformance_pass",
