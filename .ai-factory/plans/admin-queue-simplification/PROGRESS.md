@@ -1,3 +1,32 @@
+## Latest checkpoint — T16 local checks and diff review complete — 2026-10-20T10:12:01+05:00
+
+- T15 / PR #3711 was merged by the user at `ccbf519fdb0f9a32c3a71837202dfea296f13383`. Fresh `origin/main` and this isolated worktree base are that same commit. Work is on `codex/aqs-T16-navigation`; `C:\final` and the parallel photo-cleanup task's worktree remain untouched.
+- T13 #3697 and T14 #3702 are merged. T12.2 #3693 is in current main at `7f923f14a347a26b7f80da0fb40a0cff8858ef27`; its partial Tier-2 evidence remains historical and does not close T18.
+- Current task/memory ID: `1b8ddc8f-3dec-4d6c-8077-acc268801763`. Status: T16 IN_PROGRESS; no PR yet.
+- Execution mode: mandatory `gate_known_root_cause` for route/query contract work. Initial canonical gate stopped for a known root; the single retry with `frontend/src/components/admin/AdminServices.tsx` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. The generated prompt was read. The explicit user instruction to continue the plan is the narrow basis; no gate/router files were edited.
+- Allowed implementation paths are the exact T16 scope in the plan: `AdminServices.tsx` and its new focused test; `routeRegistry.ts` and focused route/nav tests; five locales; `docs/ROLES_AND_ROUTING.md`; this plan, `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Denied: backend/API/OpenAPI, auth/RBAC policy, DB/migrations, queue runtime/ownership, broad alias cleanup, staging/production/deploy, other worktrees and merge.
+- Fail-first: `AdminServices.navigation.test.tsx` reproduced three regressions (3 failed / 1 passed): invalid query did not safely select catalog, Back/Forward did not restore the selected tab, and a saved legacy tab preference did not normalize into the URL. The final focused route/ownership/nav/i18n suite passes 54/54.
+- A first expanded run had one test-harness-only failure because the mock intercepted `Storage.prototype.getItem` rather than the JSDOM `localStorage` instance; the test now mocks the actual instance and the full targeted suite is green. No product failure was found in that run.
+- Changes: URL/query is canonical for the selected service tab, unknown/duplicate values safely normalize to catalog, entity-only setup context is pruned when incompatible, tab changes create history entries, and labels for the four preserved URLs are unified across five locales. Route order and operator routing documentation are updated.
+- Scoped ESLint: 0 errors / 16 warnings, all in pre-existing unused fixtures/constants in `routeContract.test.ts`. `npm run type-check` FAILS only on unavailable `nitro`/`nitro/runtime-config` and unrelated existing `publicSiteHandler.test.tsx` implicit-`route` diagnostic. Build FAILS while loading `vite.config.ts` because the shared dependency cache lacks Nitro; app compilation did not begin. No dependency install was attempted.
+- `admin-navigation.spec.ts` is NOT_RUN: it demands `QA_ADMIN_PASSWORD`, implements password-only login without Admin TOTP handling, and Playwright defaults to `localhost:5173`; a safe synthetic 2FA harness is not part of T16 scope. Targeted route/component tests cover the changed contract. Tier-2/T18 was not attempted and no deferral is claimed.
+- Temporary worktree-only node dependency junctions are tracked in `.scratch/t16-node-module-junctions.txt`; remove only those exact junctions after final checks, never their shared targets. No staging/production data or services were touched.
+- Current checkpoint: changed source/test/locales/docs are uncommitted in the isolated worktree; HEAD/base remain `ccbf519fdb0f9a32c3a71837202dfea296f13383`.
+
+| Task | Status | PR / commit | Evidence |
+|------|--------|-------------|----------|
+| T16 | IN_PROGRESS | `codex/aqs-T16-navigation`, base `ccbf519fdb0f9a32c3a71837202dfea296f13383` | Focused route/ownership/nav/i18n 54/54 PASS; local build/type-check limitations recorded |
+| T17 | PLANNED | | |
+| T18 | PLANNED | | |
+
+## Current checkpoint
+- Completed: merged-T15 state verified; isolated worktree and T16 gate prompt verified; fail-first issue reproduced; URL state/history, Admin route ownership, route nav keys/order, five locales and operator routing docs implemented. Focused route/ownership/nav/i18n tests 54/54 and scoped ESLint 0 errors.
+- Changed but not verified: full exact-head hosted CI and reviewer recheck; local type-check/build are limited by the dependency cache and pre-existing diagnostics noted above.
+- Remaining: final check of scratch/junction ownership and diff scope, normal commit hooks, push, create the T16 PR and verify its exact-head CI. Keep `admin-navigation.spec.ts` NOT_RUN unless a compatible synthetic 2FA harness is provided by the existing project setup.
+- Blocker: none currently.
+- Next exact action: inspect the complete diff and verify only declared paths changed; `git diff --check` already passes. Then execute the normal commit/push/PR cycle and monitor exact-head CI.
+- Checks to rerun after any source change: all six targeted Vitest files, locale/navigation contract tests, scoped ESLint and `git diff --check`; hosted frontend build/type-check/E2E are required on the pushed exact head. Remote `main` still equals base `ccbf519fdb0f9a32c3a71837202dfea296f13383`.
+
 ## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
 
 - PR #3711 remains OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base/current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Source/test changes and this checkpoint are committed locally; push and hosted exact-head checks are pending.
@@ -78,7 +107,8 @@
 | Task | Status | PR / commit | Evidence |
 |------|--------|-------------|----------|
 | T15 | PR_OPEN / fixes committed locally; journal commit pending | PR #3711; code/test commit c0306eac9, fresh base 279638ddf884f9da8012ddbdb13f2035abb2c96c | Post-rebase focused suite 18/18 PASS; ESLint and commit hooks PASS; exact-head hosted checks pending push |
-| T16-T18 | PLANNED | | |
+| T16 | IN_PROGRESS | isolated worktree `codex/aqs-T16-navigation`; base `ccbf519fdb0f9a32c3a71837202dfea296f13383` | Current checkpoint above |
+| T17-T18 | PLANNED | | |
 
 ## Current checkpoint
 - T15's two latest review P2s are fixed locally in `AdminSetupDirections.tsx` and `AdminServices.tsx`, with regressions in `adminSetupDirections.textPin.test.tsx`. The empty state now links to the existing catalog, profile manager, and users; tab switching removes incompatible entity fields while retaining shared return context.
@@ -1423,11 +1453,11 @@ Last updated: 2026-10-08T21:45+05:00
 | T09 | PLANNED | | | |
 | T10 | MERGED | [PR #3633](https://github.com/drsapaev/final/pull/3633) | `6315c62edb888bb8864928a41dd70a4c00be6e3d` | `EVIDENCE.md#t10-merge-checkpoint` |
 | T11 | IN_PROGRESS | [PR #3639](https://github.com/drsapaev/final/pull/3639) — r6 Session FAIL: STAGING_NOT_READY, teardown PASS | | EVIDENCE.md#t11-pr3639-r6-readiness-failure-2026-10-16 |
-| T12 | PLANNED | | | |
-| T13 | PLANNED | | | |
-| T14 | PLANNED | | | |
-| T15 | IN_PROGRESS | [PR #3711](https://github.com/drsapaev/final/pull/3711) — second-direction entry P2 fixed locally; validation/commit pending | | `EVIDENCE.md#pr-3711-second-direction-entry-p2-local-validation` |
-| T16 | PLANNED | | | |
+| T12 | MERGED | #3690 / #3693; see plan main status table | | `codex-admin-queue-simplification.md#реестр-текущих-статусов` |
+| T13 | MERGED | [PR #3697](https://github.com/drsapaev/final/pull/3697), `baae35932e341ceaac163145d933639f735cb35c` | | Current main history |
+| T14 | MERGED | [PR #3702](https://github.com/drsapaev/final/pull/3702), `99f0b5a098dccce4f1166ae52bd7d5c93d92af70` | | Current main history |
+| T15 | MERGED | [PR #3711](https://github.com/drsapaev/final/pull/3711), `ccbf519fdb0f9a32c3a71837202dfea296f13383` | | Current main history |
+| T16 | IN_PROGRESS | T16 navigation in isolated worktree; no PR yet | | `EVIDENCE.md#t16-navigation-worktree-and-fail-first` |
 | T17 | PLANNED | | | |
 | T18 | PLANNED | | | |
 
