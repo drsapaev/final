@@ -161,6 +161,10 @@ artifacts/non_shim_endpoints.txt
 # Stray dev artifacts at repo root — keep them OUT of git
 /tmp/
 /scratch/
+# Reserved generated agent artifacts; never put source or required evidence here.
+# Root-only ignores preserve visibility of similarly named application paths.
+/.scratch/
+/.gate_artifacts/
 *.draft.md
 *.scratch.py
 
