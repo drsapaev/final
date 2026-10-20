@@ -1,3 +1,167 @@
+## Latest continuation — T17 PR #3721 exact-head CI passed — 2026-10-20T17:48:01+05:00
+
+Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. Product commit `e88cc6aa1a7a31339c42455598f03a3f42d57eea` is pushed to PR #3721, which is OPEN/Ready/MERGEABLE. Base/current `origin/main` is `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+
+Exact code-head run `39422914134` passed, including frontend unit, build, lint, E2E (14m11s), PR Required Gate, security, CodeQL, gitleaks, locale, regression, and scratch guards. Path-aware backend/integration/Docker/parity/readiness and unrelated jobs are skipped, not passed. No review replies or thread resolutions were sent; user retains merge. Local validation also passed: focused CSV tests 17/17, type-check, scoped ESLint, frontend build, locale parity, backend alias expansion, and diff check.
+
+Only the plan journals will change in the next docs checkpoint. That will create a new PR SHA and require checks on that exact SHA. Do not resolve threads or merge. Do not start T18 before user merge.
+
+## Previous continuation — T17 PR #3721 review fixes validated locally — 2026-10-20T17:27:42+05:00
+
+Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. PR #3721 is OPEN/Ready/MERGEABLE at remote HEAD `fe2944ff90a410ff8df2393d4a91bd73b3f25102`, base/current `origin/main` `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. The two review threads remain open; local changes are not committed or pushed. User retains merge.
+
+The P1 is fixed: CSV true is review intent, never a publish command for existing rows; create sends false, update omits the field, and requested visibility is included in accurate preview/reminder counts. The P2 is fixed: saved queue-tag comparison mirrors backend dental alias expansion and key fallback. Regression tests cover both.
+
+Local checks: focused CSV tests 17/17 PASS; type-check PASS; scoped ESLint PASS (0 errors, 3 existing warnings outside changed lines); build PASS (vendor/CSS warnings); locale parity PASS (10,550 keys each); backend expansion check PASS; `git diff --check` PASS. Dependencies were installed inside this worktree only. Ignored `frontend/node_modules/`, `frontend/dist/`, and `.scratch/aqs-t17-npm-cache/` remain local; the cache is under reserved root scratch. A recursive cleanup was rejected by host policy before execution. Exact-head CI is still required after push.
+
+Next: review final diff, commit using normal hooks, push to the existing PR branch, and verify exact-head GitHub CI. Do not resolve review threads or merge; no review-thread mutation, merge, deployment, or staging occurred in this fix.
+
+## Previous continuation — T17 PR Ready; exact docs-head CI passed — 2026-10-20T14:37:00+05:00
+
+Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. PR #3721 is OPEN/Ready for review/MERGEABLE at HEAD `ef41f75c262488741053d74e8b96ab9059514aa8`; base and `origin/main` are `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. User performs merge.
+
+Exact-head Unified CI run `39399756835` passed on `ef41f75c`, including Frontend E2E (16m33s), build, unit, lint, Required Gate, security, CodeQL, Gitleaks, locale, regression and scratch guards; GitGuardian passed. Path-aware backend/integration/Docker/parity/readiness jobs are skipped, not passed. The two post-Ready status gates also passed. T17 r6 targeted Admin/CSV/bulk synthetic staging acceptance and owned teardown are PASS. Full `STAGING_VALIDATION.md` and T18 remain outstanding.
+
+The plan and PR description record staging/CI evidence. Host policy blocked deletion of ignored local env/harness files before execution; they remain local and uncommitted, no alternate deletion method was attempted, and the PR body discloses this. Compose resources are all torn down.
+
+Next: create/push this final documentation-only status checkpoint, then verify its exact-head jobs. After green, leave PR #3721 Ready for reviewer/user disposition. Do not merge, deploy, or start T18 before user merge. Preserve isolation from `C:\final` and the parallel photo-cleanup worktree.
+
+## Latest continuation — T17 PR description and body gate complete; checkpoint push next — 2026-10-20T14:16:00+05:00
+
+Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. PR #3721 is OPEN/Draft/MERGEABLE at code HEAD `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`; base and `origin/main` are `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. User performs merge.
+
+T17 scoped Tier 2 passed on r6, including exact served frontend revision, Admin 2FA enrollment and TOTP login, hidden CSV create/review reminder/persisted state, bulk archive, and canonical teardown. Full `STAGING_VALIDATION.md` and T18 remain outstanding.
+
+The PR body is updated with r6 evidence and truthful path-aware skips. Local body quality validation passed: 19/19 runner tests, both sample bodies, and the T17 body. The PR body update succeeded without changing code HEAD. Applicable exact-code-head CI was green before the final body update; recheck after the docs checkpoint push because the body update may start metadata workflows.
+
+Cleanup boundary: r6 Compose teardown removed all owned runtime resources. A single exact-path cleanup command for ignored local env/harness files was rejected by the host policy before execution; do not retry through another deletion mechanism. Those ignored files remain in this worktree, are not committed, and are disclosed in the PR body and EVIDENCE. No other files were touched.
+
+Current tracked diff is limited to this plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`, and main plan document. Next: inspect diff, run `git diff --check`, commit only these four plan files with normal hooks, push, recheck PR #3721 exact HEAD and applicable jobs, then mark Ready for review if checks remain green. No merge or deployment.
+
+## Latest continuation — T17 targeted staging PASS; PR documentation next — 2026-10-20T14:11:24+05:00
+
+Continue task 17c471a8-6772-4081-bea0-1e82ad1bcd05 in the isolated T17 worktree, branch codex/aqs-T17-bulk-csv. PR #3721 is Draft at code HEAD f1c3007c590d98ea6ce15a1c7358ceebbf86d410, base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43. User performs merge. Primary checkout and parallel photo-cleanup worktree remain untouched.
+
+r6 completed canonical Preflight, Start and Session on the owned synthetic project. Exact served frontend SHA, first-time synthetic Admin 2FA enrollment, fresh-context normal password-plus-TOTP login, QueueProfiles page load, CSV create hidden request and matching response, pending-publication review reminder, persisted hidden state after refresh, bulk archive and persisted inactive state all passed. Teardown passed: five owned containers, three volumes and one network removed; zero remained. The session JSON lists six PASS checks. No patient data was created.
+
+Earlier r1-r5 attempts are not hidden: r1 stopped before tests on readiness; r2-r5 each found harness issues before all assertions. Each owned project was torn down. The final r6 PASS resolves the T17 targeted scenarios, but does not claim the full production STAGING_VALIDATION checklist or T18 integrated acceptance.
+
+Next exact action: update the Draft PR body to state code HEAD and exact CI run 39390525002; distinguish path-aware skipped backend/integration/Docker jobs from passes; record r6 targeted Tier 2 and teardown; retain full STAGING_VALIDATION/T18 as outstanding. Run the PR review body quality gate. Remove only this worktree's ignored ops/staging.env and temporary output/staging files. Commit/push the four plan journal/document changes in the T17 branch, check the new exact HEAD, and mark Ready for independent review only after applicable docs-head checks pass. Do not merge.
+## Latest continuation — T17 r5 result and r6 next — 2026-10-20T14:04:11+05:00
+
+Continue task 17c471a8-6772-4081-bea0-1e82ad1bcd05 in the isolated T17 worktree, branch codex/aqs-T17-bulk-csv. PR #3721 remains Draft at exact HEAD f1c3007c590d98ea6ce15a1c7358ceebbf86d410, base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43. User performs merge. Main and the parallel photo-cleanup task remain untouched.
+
+r5 canonical Preflight and Start passed for the new synthetic project. Session verified the exact served frontend SHA, normal Admin 2FA enrollment, password-plus-TOTP login, and QueueProfiles screen. CSV POST succeeded; request show_on_qr_page=false and response publication_deferred=false matched the intended hidden-create contract. The UI results region appeared. The child then stopped because a strict locator found two elements with the same synthetic profile key: the per-row result and the publication reminder. Session reported STAGING_TEARDOWN=PASS. We did not complete the explicit persisted-state assertion or bulk archive.
+
+The temporary harness now scopes the result list and pending-publication list separately and targets the specific review-QR action; it uses first-match only where the UI intentionally renders the key twice. Node syntax check passes. The leftover fixed CSV fixture from r3 was removed from the task-owned output directory after all prior teardowns. No app/runtime or tracked test code changed.
+
+Next exact action: rotate the ignored env to fresh synthetic credentials, project clinic-aqs-t17-pr3721-20261020-r6, bounded lease and ports 28671/28672/26071. Run canonical Preflight. If it passes, immediately run Start-to-Session. Verify exact served SHA, 2FA, successful hidden CSV create and response, visible pending-publication reminder, persisted hidden profile after reload, bulk archive and automatic teardown. Do not touch any unrelated Compose project.
+## Latest continuation — T17 r4 harness output collision fixed — 2026-10-20T13:54:48+05:00
+
+Continue task 17c471a8-6772-4081-bea0-1e82ad1bcd05 in the isolated T17 worktree, branch codex/aqs-T17-bulk-csv. PR #3721 remains Draft at exact HEAD f1c3007c590d98ea6ce15a1c7358ceebbf86d410, base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43. User performs merge. The primary checkout and independent photo-cleanup task remain untouched.
+
+r4 first failed canonical Preflight because STAGING_PUBLIC_WS_HOST did not include the selected frontend port. The task-owned env was corrected to match the loopback frontend authority, then Preflight passed. Canonical Start passed; Session confirmed exact served frontend SHA, normal synthetic Admin 2FA enrollment, subsequent password-plus-TOTP login, and QueueProfiles page load. The child stopped before CSV upload because a fixed synthetic CSV filename remained from r3. Session reported STAGING_TEARDOWN=PASS. No profile mutation or bulk archive ran.
+
+The temporary harness now chooses a unique per-run CSV filename and removes it in final cleanup only after this run created it. Node syntax check passes. No product or tracked test code changed. Mandatory staging gate, handoff, and scope are recorded in earlier checkpoints; the user authorized repeated isolated cycles.
+
+Next exact action: after confirmed r4 teardown, rotate only the ignored staging env to fresh synthetic credentials, project clinic-aqs-t17-pr3721-20261020-r5, a bounded lease, and ports 28571/28572/25971. Run canonical Preflight. If it passes, invoke the existing Start-to-Session orchestrator immediately with no intervening command. Verify served SHA, normal Admin 2FA, hidden CSV create, visible pending-publication reminder, persisted hidden state, bulk archive, and automatic teardown. Do not inspect or delete global Docker resources.
+## Latest continuation — T17 r3 harness contract corrected — 2026-10-20T13:48:28+05:00
+
+Continue task 17c471a8-6772-4081-bea0-1e82ad1bcd05 in C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final, branch codex/aqs-T17-bulk-csv. PR #3721 remains Draft at exact HEAD 1c3007c590d98ea6ce15a1c7358ceebbf86d410, base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43. User performs merge. The primary checkout and photo-cleanup task remain untouched.
+
+r3 canonical Start passed and the immediately chained Session verified exact served frontend SHA, first-time synthetic Admin 2FA enrollment, fresh-context TOTP login, and QueueProfiles screen. It reached the CSV create request; the request correctly carried show_on_qr_page=false and the API returned success. The temporary harness then failed because it expected publication_deferred=true. That expectation was wrong: the backend derives that field from the submitted payload, and the frontend intentionally hides new CSV profiles. The requested publication intent is represented by the UI's pending-publication review reminder, not an API-deferred flag. Session reported teardown PASS. No product defect confirmed; profile persistence/reminder and bulk archive were not verified in r3.
+
+Only output/staging/validate-t17.cjs was corrected: it now matches the API response to the hidden payload and explicitly checks the pending-publication list and review action.
+ode.exe --check passed. No runtime or tracked tests changed. Mandatory staging gate/handoff and scope remain as recorded in earlier checkpoints; user has authorized repeated isolated cycles.
+
+Next exact action: after confirmed r3 teardown, replace only the ignored synthetic ops/staging.env with fresh synthetic credentials, unique project clinic-aqs-t17-pr3721-20261020-r4, bounded lease and ports 28471/28472/25871. Run canonical Preflight. If PASS, call the existing Start→Session orchestrator immediately with no intervening command. Session must verify exact served SHA, normal Admin 2FA, hidden CSV create, visible pending-publication reminder, persisted hidden state, bulk archive, and owned teardown. Do not inspect or mutate unrelated Docker resources.
+## Latest checkpoint — T17 r3 Preflight PASS; title selector corrected — 2026-10-20T13:41:13+05:00
+
+- PR #3721 remains Draft at exact HEAD 1c3007c590d98ea6ce15a1c7358ceebbf86d410; Tier 1 PASS; no source/runtime edits.
+- r2 staging evidence: exact served frontend SHA PASS, initial Admin 2FA enrollment PASS, subsequent normal TOTP login PASS; Session then failed only because temporary harness expected the wrong heading. Source-backed actual title Вкладки регистратуры is now used. r2 teardown PASS; no CSV/profile mutation ran.
+- Fresh synthetic project clinic-aqs-t17-pr3721-20261020-r3 Preflight PASS. Exact worktree/commit; ports 28371/28372/25771; C: free 17 GiB, WSL backing disk free 28 GiB, Linux/Docker root free 913 GiB, WSL available memory 3157 MiB; warnings none. Runtime readiness NOT_RUN.
+- Next exact action: run the corrected canonical Start→Session orchestrator immediately, with no intervening command. It will verify revision, normal Admin 2FA, CSV creation hidden + reminder, persisted hidden state, bulk archive, and owned teardown.
+- Current allowed temporary scope remains ignored ops/staging.env, output/staging/**, and plan journals only. No other worktree, production, Compose source, review or merge is touched.
+
+---## Latest checkpoint — T17 staging reached Admin; harness title corrected — 2026-10-20T13:40:22+05:00
+
+- PR #3721 remains Draft at exact HEAD 1c3007c590d98ea6ce15a1c7358ceebbf86d410; Tier 1 PASS. No source/runtime edits.
+- Fresh r2 project clinic-aqs-t17-pr3721-20261020-r2: canonical Start PASS and immediate Session ran the browser child. The child confirmed served /sw.js contains the exact commit SHA, normal initial Admin 2FA enrollment, and a subsequent password+TOTP login. It then timed out because the temporary harness expected heading “Профили очередей”; source shows QueueProfilesManager's actual heading is “Вкладки регистратуры”. This is a confirmed harness selector error, not a product defect.
+- Session reported VALIDATION_FAILED only for that locator and automatic teardown PASS. No CSV import or bulk action ran; those remain NOT_RUN. The project is removed.
+- output/staging/validate-t17.cjs will be corrected to use the canonical actual heading; the backend build/provenance/TOTP evidence can be repeated in a fresh project. Do not reuse r2; use a new project/lease/ports.
+- Current mode remains gate for staging evidence; gate output/handoff and boundaries remain recorded. Allowed temporary paths remain only ignored ops/staging.env, output/staging/**, plus plan journals. Denials unchanged.
+- Next exact action: update the test selector only; create fresh r3 synthetic project and run Preflight. If PASS, Start then Session immediately in one orchestrator; complete CSV create-hidden/reminder, API persisted-hidden check, bulk archive, and verified teardown.
+- Main checkout, photo-cleanup worktree, production, foreign staging resources, Compose source and runtime code remain untouched.
+
+---## Latest checkpoint — T17 fresh project Preflight PASS — 2026-10-20T13:34:21+05:00
+
+- PR #3721 Draft remains at 1c3007c590d98ea6ce15a1c7358ceebbf86d410; exact-head Tier 1 PASS. No code files changed.
+- Previous project clinic-aqs-t17-pr3721-20261020 has confirmed teardown PASS. Its Session failed before child execution with STAGING_NOT_READY; no tests or browser ran, and the exact cause is unknown.
+- Fresh synthetic project clinic-aqs-t17-pr3721-20261020-r2 Preflight PASS at the exact worktree/commit. Ports 28271/28272/25671; WSL available memory 3205 MiB; C: free 17 GiB; WSL backing disk free 28 GiB; Linux root/Docker root free 913 GiB; warnings none. Runtime readiness NOT_RUN.
+- Current allowed temporary files: ignored ops/staging.env for only r2 and output/staging/**. Previous synthetic env was removed only after verified teardown; current values remain private. The test harness is syntax-checked and has no credentials.
+- Next exact action: run canonical Start and immediately Session in one task-owned PowerShell orchestrator, with no intervening work; Session executes the Admin 2FA/CSV/bulk/revision checks and owns teardown. Do not claim the first cycle passed.
+- Worktree isolation and denials unchanged: no app/runtime/Compose source edits; no C:\final, other worktrees, production, foreign resources, review or merge changes.
+
+---## Latest checkpoint — T17 first staging attempt cleaned; retry plan tightened — 2026-10-20T13:33:21+05:00
+
+- PR #3721 remains Draft at exact HEAD 1c3007c590d98ea6ce15a1c7358ceebbf86d410; base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43. Exact-head Tier 1 PASS; local check-theme PASS.
+- First owned project clinic-aqs-t17-pr3721-20261020: canonical Start PASS (runtime ready, exact commit, no warnings), but subsequent canonical Session stopped before the child command because one or more services were missing/stopped/unhealthy. No browser or T17 test ran. Session reports STAGING_TEARDOWN=PASS; this project has been removed. Root cause of the gap is not yet confirmed.
+- The built frontend revision was not checked; served_revision_verified remains NOT_RUN. The Admin 2FA flow, CSV import, and bulk archive are NOT_RUN.
+- Temporary output/staging/validate-t17.cjs was syntax-checked and Playwright module load passed; it contains no credentials. The prior ignored ops/staging.env contains only synthetic credentials and the expired project context; remove it after confirming teardown, then create a fresh unique project/lease/ports in the same allowed path.
+- Mode remains mandatory gate for staging evidence. Gate returned gate_ok/execute, handoff required, no misroute/override; generated prompt read and Compose files inspected without edits. Allowed operational paths remain only ops/staging.env, output/staging/**, and the four plan journals. Denied scope unchanged.
+- Next exact action: remove only the previous synthetic env after confirmed teardown; create a fresh project and lease; run canonical Preflight. If PASS, run canonical Start immediately followed by Session in the same shell invocation, with no intervening work, and let Session teardown the new project.
+- No source/runtime/Compose code, C:\final, other worktrees, production, foreign Docker resources, reviews or merge were changed.
+
+---## Latest checkpoint — T17 owned staging Start PASS — 2026-10-20T13:33:21+05:00
+
+- PR #3721 remains Draft at exact HEAD `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`; base `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. Exact-head Tier 1 PASS, including Frontend E2E (17m05s); local `npm run check-theme` PASS. Path-filtered backend/Docker/integration jobs are SKIPPED.
+- Canonical `Start` PASS for only `clinic-aqs-t17-pr3721-20261020`; commit/worktree match the PR. Built image IDs: backend `sha256:4eb7287f1bad88fceff64413a5dd6899b7a5e2e8660f96d5ccfbcae4a9eaa0f2`, frontend `sha256:ec93a5a07fded4627b0b2697c6f6f19adbce3a557844a9fcf242dc4a88de8b53`, worker `sha256:f970f6bca698c97ef7287e9d2eadc98d2ac32375b58dff5fd0c21a9059c1b8ae`. Ports 28171/28172/25571; WSL memory 3201 MiB; reserve and identity guards passed, warnings none.
+- Runtime readiness at Start: PASS. `served_revision_verified=false` pending explicit fetch of built `/sw.js`; teardown is `PENDING_SESSION`. Keep only this project until the immediately following Session; no other project or main worktree was touched.
+- The ignored `ops/staging.env` contains bounded synthetic credentials and lease. It is not to be committed or printed. No application/runtime or Compose source files changed.
+- Next exact action: one canonical Session, invoking a temporary Playwright script under `output/staging` to complete normal synthetic Admin 2FA, re-login with TOTP, verify exact served SHA, CSV import stays hidden with a publication reminder, then bulk-archive the created profile. Session must perform its owned teardown and verify absence.
+
+---## Latest checkpoint — T17 Tier 1 PASS; canonical Preflight PASS — 2026-10-20T13:28:00+05:00
+
+- PR #3721 remains Draft at exact HEAD `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`; base `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`; mergeability `MERGEABLE`. No code commit changed during validation.
+- Tier 1 PASS on exact HEAD: Frontend unit, type-check/lint/a11y, build, self-contained E2E (17m05s), PR Required Gate, CodeQL/security/gitleaks, locale parity, scratch guards and quality gates. `npm run check-theme` PASS locally. Backend, Docker, integration and staging-readiness jobs were path-aware SKIPPED, not PASS.
+- Canonical staging Preflight PASS for `clinic-aqs-t17-pr3721-20261020`, exact worktree and commit. Ports are 28171/28172/25571; Windows backing disk free 17 GiB, WSL VHD backing disk free 28 GiB, WSL Linux root free 913 GiB, available WSL memory 3201 MiB; no warnings. Runtime readiness remains NOT_RUN. `served_revision_verified=false` until a built image is checked.
+- Temporary ignored synthetic config: `ops/staging.env`; expiry is bounded to four hours from creation. Only this project's resources may be started. `worktree_dirty=true` reflects four modified plan journals only; app/test/locales are at committed exact HEAD. Main `C:\final` and photo-cleanup worktree remain untouched.
+- Selected mode/gate unchanged: mandatory `gate`; gate returned `gate_ok/execute`, handoff required, no misroute/override. Generated prompt was read and Compose files were read, with no edits.
+- Next exact action: run canonical `Start` for this project, then one `Session` covering normal synthetic Admin 2FA plus T17 CSV import-hidden / publication-reminder / bulk archive behavior; verify built revision and let Session teardown its own project. Stop if any ownership, health, auth or resource guard fails.
+
+---## Latest checkpoint — T17 exact-head CI and owned staging pre-work — 2026-10-20T13:15:00+05:00
+
+- T17 PR #3721 is Draft at exact HEAD `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`, base `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`; branch `codex/aqs-T17-bulk-csv` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`. `C:\final` and the independent photo-cleanup worktree remain untouched.
+- Exact-head Tier 1: Frontend unit, lint/type-check, build, locale, security, regression, scratch guards and PR-quality checks are PASS; Frontend E2E is still running (UX audit/visual regression step). Backend, Docker and other path-aware jobs are SKIPPED, not PASS. No staging has started.
+- Selected mode: mandatory `gate` because this continuation executes a staging evidence/acceptance cycle. Canonical `run_agent_gate.ps1` ran from `ai/langgraph` for the exact T17 staging-validation task; result `gate_ok`, `mode=execute`, `handoff_required=true`, reason `compose runtime ownership`, `gate_misroute=false`, `override_used=false`. Generated prompt read. First-touch files `ops/docker-compose.yml` and `ops/compose.staging.yml` were read; no edits to them are planned.
+- Validation-only scope before any environment creation: allowed tracked files are this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`; allowed temporary ignored files are only this worktree's `ops/staging.env` and `output/staging/**`. Denied: all other tracked/runtime code, Compose source, other worktrees/projects, production, deployment, global Docker cleanup, review-thread changes and merge.
+- Basis: user's explicit continuing authorization for repeated isolated cycles until completion; repository runbook requires an ignored worktree-local synthetic env and canonical launcher. No staging action starts until exact-head Tier 1 completes and canonical Preflight confirms isolation/storage. The current PR remains Draft.
+- Host free space observed: C: 17.8 GiB, D: 28.8 GiB. Ubuntu-24.04 is registered. Direct WSL filesystem-capacity output was not obtained; canonical Preflight must decide readiness. `ops/staging.env` and `output/staging` do not exist yet; no resources were started.
+- Next exact action: await the exact-head Frontend E2E job. If it passes, prepare a unique synthetic project/env and run canonical Preflight; stop and document any ownership, disk, auth or resource failure.
+
+---## Latest continuation — T17 CI type error fixed; exact-head checks rerunning — 2026-10-20T13:03:40+05:00
+
+Continue task memory 17c471a8-6772-4081-bea0-1e82ad1bcd05 in the isolated worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final, branch codex/aqs-T17-bulk-csv. PR #3721 is Draft: https://github.com/drsapaev/final/pull/3721. Current HEAD is f1c3007c590d98ea6ce15a1c7358ceebbf86d410, base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43. Do not touch C:\final or the independent photo-cleanup task; user performs merge.
+
+Local focused tests passed 64/64; scoped ESLint, git diff check, normal commit hooks and PR body quality gate passed. The PR gate ran 19/19 tests and accepted both sample bodies and the filled PR description. Local full type-check/build could not complete because shared node_modules lacks Nitro; type-check also reports an unrelated publicSiteHandler.test.tsx typing diagnostic. The temporary PR body and verified dependency junction have been removed.
+
+Unified CI on the previous HEAD 84a7ee382 failed only because TypeScript rejected the Vitest mock type in QueueProfilesManager.csv.test.tsx:497. The narrow test-only type annotation is fixed and committed at f1c3007c5. The focused suite passes 64/64 after the fix, scoped ESLint and normal hooks pass, and the PR body quality gate passed 19/19. The current exact-head CI is still running; recheck f1c3007c5 before advancing. Tier 2 synthetic staging has not run and has not been deferred. After blocking Tier 1 checks pass, continue with the T17 validation boundary and record actual results before Ready for review; leave merge to the user.
+
+## Previous continuation — T17 local checks complete; PR preparation next — 2026-10-20T12:47:00+05:00
+
+Continue task memory `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. Base and freshly fetched `origin/main` are `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. PR has not been created; all T17 product and journal changes are currently uncommitted in this isolated worktree. `C:\final` and the parallel photo-cleanup task were not modified.
+
+T17 allowed mode: `advisory_gate` for existing-command Admin UI behavior. Canonical gate first stopped because it requested a known root; the one retry against `frontend/src/components/admin/QueueProfilesManager.tsx` returned `narrow_override` (`gate_misroute=false`, `override_used=true`, `handoff_required=true`). The generated prompt was read. T17's plan card is the repo-approved basis; the gate and router are unchanged. Keep the exact allowed scope in the latest `PROGRESS.md`; any need for a new backend write contract stops T17 and becomes a separate mandatory slice.
+
+Current implementation in `QueueProfilesManager.tsx` continues per-row bulk and CSV operations after individual refusal, refreshes persisted state, reports completed/refused/not-started/unverified, and retries only unresolved rows after rereading. CSV retry compares update rows against the original preview snapshot and refuses stale rows instead of overwriting another administrator's changes. A lost write response is reconciled against saved state to avoid duplicate create. CSV create requests are forced hidden; requested QR visibility is retained as an explicit review action in session storage. Already-matching rows are reported as unchanged and do not inflate the updated count. Result summary is announced with `role=status`/polite live region. Success copy in the five locales is aligned, including previous non-English Russian fallback strings.
+
+Final local targeted command after the source/test/locale edits: from `frontend/`, `npm run test:run -- src/components/admin/__tests__/QueueProfilesManager.csv.test.tsx src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx src/components/admin/__tests__/AdminRemaining.i18n.contract.test.tsx` — PASS, 64/64. Scoped ESLint including `jsx-a11y/control-has-associated-label:error` — exit 0, 0 errors, 3 existing hardcoded-color warnings. `git diff --check` — PASS. No task-owned build output was created.
+
+Final `npm run type-check` after task-local type corrections: only unresolved diagnostics are missing `nitro` and `nitro/runtime-config` in the shared dependency cache and an unrelated implicit `route` type in `publicSiteHandler.test.tsx`. No changed-path diagnostics remain. `npm run build -- --outDir .scratch/t17-build` fails while loading Vite config because the shared `C:\final\frontend\node_modules` junction target has no Nitro; application build did not start, and no build output was created. Do not install dependencies into shared `node_modules`; hosted exact-head CI must prove build/type-check.
+
+The worktree has a temporary `frontend/node_modules` junction to exactly `C:\final\frontend\node_modules`; keep it only for local commands/hooks, verify its target before removal, then remove the junction itself without deleting its target. Do not touch other worktrees, staging, production, routes, backend/API/OpenAPI, DB, auth/RBAC, or review threads. Do not claim T17 merged or T18/staging complete.
+
+Next exact action: append final EVIDENCE and capture DevBrain state; run normal commit hooks; push this branch and create one purpose-limited PR; verify required CI on the exact PR HEAD. Leave merge to the user.
 ## Latest continuation — T16 queue administration navigation — 2026-10-20T10:26:30+05:00
 
 Continue task memory `1b8ddc8f-3dec-4d6c-8077-acc268801763` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t16-navigation\final`, branch `codex/aqs-T16-navigation`. Current local implementation commit is `5c2509be6`, based on fresh `origin/main` `ccbf519fdb0f9a32c3a71837202dfea296f13383` (T15 merge). Do not use or clean `C:\final` or the parallel photo-cleanup worktree.
@@ -1135,3 +1299,14 @@ Review #5576603179's P2 is fixed locally: the three setup editor links are outsi
 Gate sequence: mandatory gate stopped requesting a known source root; one retry with confirmed `AdminSetupDirections.tsx` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Its prompt is read. Scope and stop conditions are in `PROGRESS.md`.
 
 Next exact action: push the committed fix and verify exact-head hosted checks. If they pass, leave PR #3711 for reviewer/user recheck and user merge. Do not resolve review threads, stage, deploy, merge, or start T16.
+## Latest continuation — T17 PR #3721 P1/P2 follow-up — 2026-10-20T17:17:03+05:00
+
+Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. PR #3721 remains OPEN/Ready at remote HEAD `fe2944ff90a410ff8df2393d4a91bd73b3f25102`, based on current `origin/main` `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. Two exact, unresolved review threads from Review #5584710581 are being addressed in the same PR.
+
+The local code now prevents CSV upserts from sending `show_on_qr_page=true`; create still sends false. Deferred-publication preview/count/reminders cover existing rows and use accurate wording. CSV post-write matching mirrors backend `_canonical_profile_tags`/`expand_queue_tags` dental aliases. Two focused regressions cover create-hidden → same-file re-import → still hidden (and an unrelated update payload omits QR publication), and a dental create whose read response contains expanded tags.
+
+Gate: selected `advisory_gate` for a client-only update. Two `run_agent_gate.ps1` invocations used the confirmed component owner and complete scope; both returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`. Their execution prompts were read; no backend, DB, staging, production or fairness behavior is in scope. Full scope and the human-review basis are in `PROGRESS.md`.
+
+Validation so far: backend canonicalization output, locale key parity (10,550 keys per locale), and `git diff --check` PASS. Focused Vitest could not execute: no worktree `node_modules`; reusing the main checkout’s Vitest binary failed to resolve `vitest/config`. Frontend build, lint and type-check are NOT_RUN. Exact-head CI on this patch is still required. The local changes are not committed/pushed yet; review threads were not replied to/resolved and no merge or deployment occurred.
+
+Next: inspect the final diff, commit with normal hooks, push this branch to PR #3721, and wait for exact-head CI. Keep both review threads open until the reviewer/user resolves them. User retains merge; do not start T18 before PR #3721 is merged.
