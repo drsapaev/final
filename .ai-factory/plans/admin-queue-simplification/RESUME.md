@@ -1,3 +1,57 @@
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 remains OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`, based on current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+Review #5576603179's P2 is fixed locally: the three setup editor links are outside the empty-list branch and render after T13 facts load. Regression covers a ready direction with `allowed_next_actions=[]`, plus the empty catalog case. Focused Vitest 23/23; scoped ESLint and `git diff --check` PASS. Local build is blocked before app compilation by missing `nitro` in the reused dependency cache; no install was attempted. This limitation and safe scratch/junction cleanup are recorded in `EVIDENCE.md`.
+
+Gate sequence: mandatory gate stopped requesting a known source root; one retry with confirmed `AdminSetupDirections.tsx` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Its prompt is read. Scope and stop conditions are in `PROGRESS.md`.
+
+Next exact action: push the committed fix and verify exact-head hosted checks. If they pass, leave PR #3711 for reviewer/user recheck and user merge. Do not resolve review threads, stage, deploy, merge, or start T16.
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
+
+- PR #3711 remains OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base/current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Source/test changes and this checkpoint are committed locally; push and hosted exact-head checks are pending.
+- Fixed review #5576603179's P2: shared links to service catalog, QueueProfiles and user management now render whenever T13 directions have loaded, whether the list is empty or contains a ready direction. Existing URL context builder is reused; no route or API contract changed.
+- Added ready-direction regression with `allowed_next_actions=[]`, covering all three editor destinations and T15 return/section context. Fail-first confirmed one new test failure / 22 existing passes. Focused Vitest after fix: 23/23 PASS.
+- Scoped ESLint on changed component/test: PASS, no diagnostics. `git diff --check`: PASS. Normal hooks PASS after retry with the verified temporary dependency junction; push and hosted exact-head checks are pending.
+- Local build failed before app compilation because the reused dependency cache lacks `nitro`, imported by `vite.config.ts`; no dependency install was attempted. Hosted CI on the exact pushed HEAD is required to validate build.
+- Temporary worktree dependency junction was verified and removed after each command; build scratch is absent and shared dependencies were not changed.
+- Gate: initial mandatory gate stopped requesting a confirmed root cause; one known-root retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Prompt read; basis is the exact review finding and narrow remediation. No gate/router edits.
+- Next exact action: commit the two code/test files and three plan journals with normal hooks, push, then verify exact-head CI. No review-thread mutation, staging, deployment, merge, or T16.
+## Latest checkpoint — T15 PR #3711 year-zero date P2 fixed; exact-head CI PASS — 2026-10-19T23:44:09+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready for review/MERGEABLE at exact HEAD `d4e2d1ebb98ec692c0d1c34cee52ce0e9a6f0404`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+Review #5575562069's year-zero P2 is fixed across the page date and both setup-context validators. Fail-first: 3 failed / 19 passed; focused Vitest after fix: 22/22 PASS. Scoped ESLint and normal hooks passed; one pre-existing localStorage warning remains. Exact current-head Unified CI `39302431453`: frontend build/lint/type-check/unit/full Chromium E2E, PR Required Gate, Regression Audit, CodeQL/security/secrets, locale, CI Scope, PR Review Quality and lifecycle PASS. Path-aware unrelated jobs are SKIPPED, not passed.
+
+Review decision is empty and reviewer recheck is pending; three review threads remain untouched because thread mutation is outside this gate scope. Tier-2/T18 is `NOT_RUN` with no deferral. No merge, staging, production or deployment occurred; merge remains with the user.
+
+Next exact action: user/reviewer rechecks and user merges PR #3711. After confirming the merge SHA, synchronize main and clean up this worktree before starting T16. Do not begin T16 from this open PR branch.
+
+Allowed follow-up scope: confirm review/merge state, then synchronize and clean up after merge. No new source edits, review-thread mutation, staging, production, deployment, or merge by this agent.
+
+## Previous checkpoint — T15 review fixes and exact-head CI complete — 2026-10-19T22:24:18+05:00
+
+## Previous checkpoint — T15 PR #3711 Ready for review; Tier-1 CI PASS — 2026-10-19T17:53:53+05:00
+
+Continue task memory 174595f3-1a65-4f05-8b3d-1f2f5e2f27cb in this worktree on branch `codex/aqs-t15-setup-context`. Fresh base/origin/main is `984b49905ba162dea29e25c144137bd8fb864e11`; T14 merged at `99f0b5a098dccce4f1166ae52bd7d5c93d92af70`.
+
+PR #3711 is OPEN/Ready for review/mergeable. Source/test HEAD `39ab56596eaa5f96bc5834f6d916070c488f64ef` passed hosted Unified CI run `39250204373`; a later full run `39252747566` passed on the docs-only checkpoint `517eefa2dcdea501751901d3b38b218ca9d8a4b5`. The PR Review Quality Gate and lifecycle recommendation passed after the PR body was corrected and the PR was marked Ready for review.
+
+T15 implementation and focused tests are complete. The fake wizard is removed; setup context persists in the URL and editor return paths are validated/fixed. Focused tests pass 16/16; the router harness corrections pass 8/8 locally. Hosted frontend unit, lint/type-check, build+Nitro, full Chromium E2E, PR Required Gate and applicable quality/security checks passed. Path-aware skipped jobs remain SKIPPED. Local full build/type-check limitations are documented.
+
+Tier-2/T18 is NOT_RUN at T15. Integrated staging acceptance belongs to T18 after T01-T17; no deferral is requested or claimed. PR description reflects this sequencing. No staging, production, deployment or merge was performed.
+
+Allowed work remains the T15 UI/tests and its plan journals. No backend/API/OpenAPI/types, route registry/guards, auth/RBAC, database, queue ownership, staging, production or deployment changes. Merge is left to the user.
+
+Next exact action: user reviews and merges PR #3711. Verify the merge commit, synchronize main and clean up this worktree; start T16 only from fresh origin/main.
+## Earlier checkpoint — T15 begins after T14 merge — 2026-10-19
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` at revision 2 in `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`, based on `origin/main` `984b49905ba162dea29e25c144137bd8fb864e11`. PR #3702 / T14 is merged at `99f0b5a098dccce4f1166ae52bd7d5c93d92af70`.
+
+The approved T15 URL contract is at the end of `DECISIONS.md`. The mandatory gate misrouted once; the single known-root retry returned `narrow_override` with `gate_misroute=true`, `override_used=true`, and `handoff_required=true`. Its execution prompt was read. Work is restricted to the gate's exact first-touch files. Do not modify route registry/guards, backend/API, auth/RBAC, queue ownership, database, deployment, staging, other PRs, or merge.
+
+Next exact action: implement and test the setup URL state and fixed internal typed-return contract using only the approved first-touch paths. Source changes and validation have not yet started.
+
 ## Latest checkpoint — T14 PR #3702 P2 fixes pushed; exact-head CI PASS — 2026-10-18T23:10:09+05:00
 
 Continue task `cb71d205-e655-482a-a72b-38c66d3d2011` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final`, branch `codex/aqs-T14-admin-facts`. Base and `origin/main` equal T13 merge `baae35932e341ceaac163145d933639f735cb35c`; PR #3702 is OPEN/Draft at exact pushed HEAD `0337028b7ee5cbfa41a00250d01cfb61f5f4c2ee`. Source fix commit: `0db15cacb`; subsequent checkpoint commit is journal-only. Do not modify/rebase `C:\final`.
@@ -1003,3 +1057,63 @@ Older timestamped “Active step — T08.1b” records below are historical and 
 - PR3639 description replaced with final source/evidence/disposition; existing GitHub review remains COMMENT, no human APPROVE submitted.
 - The first body rewrite omitted the repository template's exact required field labels, so the body-triggered PR Review Quality Gate failed. No code/staging test regressed. Corrected labels and validated the exact body locally with scripts/check_pr_review_template.py --body-file output/staging/t11-pr3639-final-20261016-r8/pr-body-final.md: PASS (one expected not-applicable reason warning). Hosted metadata recheck triggered; wait for its real result before final readiness claim. No gate/router/test/workflow source changed.
 - Preserve all five local plan documents and sanitized r8 evidence packet in the next worktree before cleaning/archiving this one. Do not transfer private env/auth data. Current source remains committed acb509c36; journals intentionally uncommitted.
+## Current checkpoint — PR #3711 review P2 fixes in progress — 2026-10-19
+
+Continue T15 in `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready for review; the fix branch has been rebased onto refreshed `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. The reviewed starting HEAD was `264430e42ec0ec651b6c2c71f44db570c8b1be31`.
+
+Fix the two P2 findings from review #5574854400: add fixed editor links to the empty directions state; clear incompatible entity-specific query fields when changing AdminServices tabs while retaining the shared return context; test the round trip `queue-profiles → catalog → queue-profiles`.
+
+Gate: mandatory root-cause retry produced scoped `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt read. Allowed implementation files: `AdminSetupDirections.tsx`, `AdminServices.tsx`, `adminSetupDirections.textPin.test.tsx`. T15 operational journals are also approved for checkpoint/evidence. No route registry, backend/API, auth, DB, queue runtime, staging, production, deployment, other PR, or merge changes.
+
+Both review defects were reproduced by fail-first regressions, then fixed in code/test commit `c0306eac9` after rebasing onto `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Post-rebase focused Vitest is 18/18 PASS; scoped ESLint PASS with one existing warning; `git diff --check` PASS. Local type-check/build are blocked by the shared dependency cache missing `nitro`, with no changed-file diagnostics. Temporary `node_modules` junctions were removed; no dependency install occurred.
+
+Next exact action: commit the three journal updates, push the rewritten PR branch with `--force-with-lease`, then inspect exact-head hosted CI. Do not merge. Tier-2/T18 remains NOT_RUN by plan sequence; no deferral is claimed. User owns merge.
+## Latest checkpoint — T15 year-zero date P2 pre-edit — 2026-10-19T22:57:48+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready for review at HEAD `de50fb3db570d899b4367957584c2b348615462d`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+New review #5575562069 found that year `0000` slips through three calendar validators. Mandatory route/query gate ran from `ai/langgraph/scripts/run_agent_gate.ps1` with confirmed root `frontend/src/components/admin/UserManagement.tsx`; exact-scope result was `narrow_override`, misroute false, override used, handoff required. The generated prompt was read. Allowed files and denied areas are listed in the current `PROGRESS.md`.
+
+No source edit has started. Next exact action: add fail-first tests for page `day=0000-01-01` and typed editor `setupDay=0000-01-01` parsing in both services/users surfaces; then reject year zero in all three validators, rerun focused tests/lint/diff-check, commit and push. Do not change route/API/backend/auth/database/queue runtime, stage, deploy, resolve review threads, or merge under this slice.
+
+## Previous checkpoint — T15 review fixes and exact-head CI complete — 2026-10-19T22:24:18+05:00
+## Latest checkpoint — T15 PR #3711 year-zero date P2 fixed locally — 2026-10-19T23:06:33+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready/MERGEABLE at the pre-fix HEAD `de50fb3db570d899b4367957584c2b348615462d`; base `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+Review #5575562069's year-zero P2 is fixed locally across AdminSetupDirections, AdminServices and UserManagement validators. New tests independently fail-first on all three entry points, and preserve accepted year boundaries `0001` and `9999`. Focused Vitest is 22/22 PASS; scoped ESLint is 0 errors / one pre-existing warning. Local type-check is blocked by missing shared-cache Nitro packages and an unrelated existing route typing diagnostic. Hosted checks await push.
+
+Gate mode is `gate_known_root_cause` with an exact-scope `narrow_override` based on the human review; generated execution prompt read. Exact allowed/denied paths and gate result are in current PROGRESS. Three GitHub review threads remain untouched because thread mutation is outside the gate scope.
+
+Next exact action: rerun `git diff --check`, commit with normal hooks, push, verify exact-head GitHub checks, then leave PR #3711 for reviewer/user disposition. Tier-2/T18 remains NOT_RUN; no deferral. No merge/staging/deployment.
+
+## Previous checkpoint — T15 review fixes and exact-head CI complete — 2026-10-19T22:24:18+05:00
+## Latest checkpoint — T15 PR #3711 date P2 fixed; exact-head CI PASS — 2026-10-19T23:25:09+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready/MERGEABLE at head `2dc0f50429221bb59240849f2d52e01bc7d9c007`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+Review #5575562069's year-zero date P2 is fixed in all three validators and regression-tested. Focused Vitest 22/22 PASS; scoped ESLint 0 errors/one pre-existing warning; hooks and diff-check PASS. Exact-head Unified CI `39299922045` frontend build/lint/unit/full E2E and PR Required Gate PASS; security, CodeQL, locale, Regression Audit, PR Review Quality and lifecycle checks PASS. Path-aware unrelated jobs are SKIPPED, not passed. Local type-check limitations and local build NOT_RUN are in EVIDENCE.md.
+
+The new P2 is addressed; reviewer recheck is pending, `reviewDecision` is empty, and three review threads remain untouched due to the current gate scope. Tier-2/T18 stays NOT_RUN with no deferral. No merge, staging, production or deployment.
+
+Next exact action: reviewer/user rechecks and merges PR #3711. After confirmed merge, verify the merge commit, synchronize main and begin T16.
+
+## Previous checkpoint — T15 year-zero date P2 fixed locally — 2026-10-19T23:06:33+05:00
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 — 2026-10-20T00:27:40+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`, based on current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+The new review P2 is reproduced by source structure: editor links render only in the empty-state branch. Next edit only `AdminSetupDirections.tsx` to make the existing editor links available independent of direction count; add a focused regression with one ready direction and assert the same editor targets remain available. Reuse existing URL helpers and return-context parameters.
+
+Gate: mandatory `gate_known_root_cause`; initial gate stopped pending root confirmation, then known-root retry returned `narrow_override` (`gate_misroute=true`, `override_used=true`, `handoff_required=true`) on the exact review-backed scope. Prompt read. Allowed files and denied boundaries are in current `PROGRESS.md`.
+
+Run focused Vitest, frontend build, and `git diff --check`. Stop if work escapes the named component/test/journals or the current editor target/return contract is ambiguous. No backend/API, route registry, staging, production, review-thread mutation, merge, or T16 work in this slice.
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
+
+Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 is OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base/current `origin/main` is `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
+
+Review #5576603179's P2 is fixed locally: the three setup editor links are outside the empty-list branch and render after T13 facts load. Regression covers a ready direction with `allowed_next_actions=[]`, plus the empty catalog case. Focused Vitest 23/23, scoped ESLint and `git diff --check` PASS. Local build is blocked before app compilation by missing `nitro` in the reused dependency cache; no install was attempted. This limitation and safe scratch/junction cleanup are recorded in `EVIDENCE.md`.
+
+Gate sequence: mandatory gate stopped requesting a known source root; one retry with confirmed `AdminSetupDirections.tsx` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Its prompt is read. Scope and stop conditions are in `PROGRESS.md`.
+
+Next exact action: push the committed fix and verify exact-head hosted checks. If they pass, leave PR #3711 for reviewer/user recheck and user merge. Do not resolve review threads, stage, deploy, merge, or start T16.

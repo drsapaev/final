@@ -5,15 +5,13 @@ import { useTranslation } from '../../i18n/useTranslation';
  * QueueResource CRUD and permanent-address writes remain in their existing
  * surfaces; this page presents their backend facts and safe entry points.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-    ArrowRight,
     CheckCircle2,
     CircleAlert,
     ExternalLink,
     ListChecks,
-    Plus,
     RefreshCw,
     RotateCcw,
     XCircle,
@@ -28,7 +26,6 @@ import {
     CardDescription,
     CardHeader,
     CardTitle,
-    Select,
 } from '../ui/macos';
 import QueueResourceManager from './QueueResourceManager';
 import PermanentDirectionQr from './PermanentDirectionQr';
@@ -44,29 +41,76 @@ import {
     readPermanentAddressSupported,
 } from './setupDirectionsReadiness';
 
-type ScreenView = 'checklist' | 'resources';
+type ScreenView = QueueSetupSection;
 
-interface WizardState {
-    open: boolean;
-    step: number; // 0..4: исполнитель → услуги → отображение → проверка → QR
-    axis: 'doctor' | 'resource' | null;
-    tag: string;
+export type QueueSetupSection = 'checklist' | 'resources';
+export type QueueSetupEditorDestination = 'service-catalog' | 'queue-profiles' | 'user-management';
+export type QueueSetupEntityRef =
+    | { kind: 'queue_profile' | 'queue_tag'; key: string }
+    | { kind: 'service' | 'doctor' | 'queue_resource'; id: number };
+
+/** Typed, allowlisted context carried from setup into an existing editor. */
+export interface QueueSetupReturnContext {
+    version: 1;
+    destination: QueueSetupEditorDestination;
+    profileKey: string | null;
+    section: QueueSetupSection;
+    day: string | null;
+    entity: QueueSetupEntityRef | null;
 }
 
-const emptyWizard = (): WizardState => ({
-    open: false,
-    step: 0,
-    axis: null,
-    tag: '',
-});
+const QUEUE_SETUP_RETURN_MARKER = 'queue-directions-v1';
+const validQueueSetupSections = new Set<QueueSetupSection>(['checklist', 'resources']);
 
-const WIZARD_STEP_KEYS = [
-    'admin2.sdx_wizard_step_executor',
-    'admin2.sdx_wizard_step_services',
-    'admin2.sdx_wizard_step_display',
-    'admin2.sdx_wizard_step_verify',
-    'admin2.sdx_wizard_step_qr',
-] as const;
+const isIsoCalendarDay = (value: string): boolean => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith('0000-')) return false;
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
+
+const isSafeProfileKey = (value: string): boolean =>
+    value.length > 0 && value.length <= 128 && value.trim() === value &&
+    !Array.from(value).some((character) => {
+        const code = character.charCodeAt(0);
+        return code <= 0x1f || code === 0x7f;
+    });
+
+const readSetupPageContext = (search: string) => {
+    const params = new URLSearchParams(search);
+    const rawSection = params.getAll('section').length === 1 ? params.get('section') : null;
+    const rawDay = params.getAll('day').length === 1 ? params.get('day') : null;
+    const rawProfileKey = params.getAll('profile').length === 1 ? params.get('profile') : null;
+    return {
+        section: validQueueSetupSections.has(rawSection as QueueSetupSection)
+            ? rawSection as QueueSetupSection
+            : 'checklist' as const,
+        day: rawDay && isIsoCalendarDay(rawDay) ? rawDay : '',
+        profileKey: rawProfileKey && isSafeProfileKey(rawProfileKey) ? rawProfileKey : null,
+    };
+};
+
+const serializeQueueSetupEditorLink = (context: QueueSetupReturnContext): string => {
+    const params = new URLSearchParams();
+    params.set('setupReturn', QUEUE_SETUP_RETURN_MARKER);
+    params.set('setupSection', context.section);
+    if (context.profileKey) params.set('setupProfile', context.profileKey);
+    if (context.day) params.set('setupDay', context.day);
+    if (context.entity) {
+        params.set('setupEntityKind', context.entity.kind);
+        if ('key' in context.entity) params.set('setupEntityKey', context.entity.key);
+        else params.set('setupEntityId', String(context.entity.id));
+    }
+
+    const query = params.toString();
+    switch (context.destination) {
+        case 'service-catalog':
+            return `/admin/services?servicesTab=catalog&${query}`;
+        case 'queue-profiles':
+            return `/admin/services?servicesTab=queue-profiles&${query}`;
+        case 'user-management':
+            return `/admin/users?${query}`;
+    }
+};
 
 type QrReadState = {
     generation: number;
@@ -120,11 +164,15 @@ const actionLabelKeys: Record<QueueDirectionNextAction['kind'], string> = {
 
 const AdminSetupDirections = () => {
     const { t, language } = useTranslation();
-    const [view, setView] = useState<ScreenView>('checklist');
+    const location = useLocation();
+    const navigate = useNavigate();
+    const setupPageContext = readSetupPageContext(location.search);
+    const view = setupPageContext.section;
+    const selectedDay = setupPageContext.day;
+    const selectedProfileKey = setupPageContext.profileKey;
     const [services, setServices] = useState<ChecklistServiceDto[]>([]);
     const [profiles, setProfiles] = useState<ChecklistProfileDto[]>([]);
     const [directions, setDirections] = useState<QueueAdminDirections | null>(null);
-    const [selectedDay, setSelectedDay] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [resourceLoading, setResourceLoading] = useState(false);
@@ -139,7 +187,50 @@ const AdminSetupDirections = () => {
     const resourceRequestRef = useRef(0);
     const supportGenerationRef = useRef(0);
     const [supportGeneration, setSupportGeneration] = useState(0);
-    const [wizard, setWizard] = useState<WizardState>(emptyWizard);
+
+    const updateSetupPageContext = useCallback((patch: Partial<{
+        profileKey: string | null;
+        section: ScreenView;
+        day: string | null;
+    }>, replace = false) => {
+        const current = readSetupPageContext(location.search);
+        const hasProfilePatch = Object.prototype.hasOwnProperty.call(patch, 'profileKey');
+        const hasDayPatch = Object.prototype.hasOwnProperty.call(patch, 'day');
+        const nextProfileKey = hasProfilePatch ? patch.profileKey || null : current.profileKey;
+        const nextSection = patch.section || current.section;
+        const nextDay = hasDayPatch ? patch.day || '' : current.day;
+        const params = new URLSearchParams();
+        if (nextProfileKey) params.set('profile', nextProfileKey);
+        params.set('section', nextSection);
+        if (nextDay) params.set('day', nextDay);
+        const search = params.toString();
+        navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace });
+    }, [location.pathname, location.search, navigate]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        let changed = false;
+        const rawSection = params.get('section');
+        const rawDay = params.get('day');
+        const rawProfile = params.get('profile');
+        if (params.getAll('section').length > 1 ||
+            (rawSection !== null && !validQueueSetupSections.has(rawSection as QueueSetupSection))) {
+            params.set('section', 'checklist');
+            changed = true;
+        }
+        if (params.getAll('day').length > 1 || (rawDay !== null && !isIsoCalendarDay(rawDay))) {
+            params.delete('day');
+            changed = true;
+        }
+        if (params.getAll('profile').length > 1 || (rawProfile !== null && !isSafeProfileKey(rawProfile))) {
+            params.delete('profile');
+            changed = true;
+        }
+        if (changed) {
+            const search = params.toString();
+            navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true });
+        }
+    }, [location.pathname, location.search, navigate]);
 
     const tRef = useRef(t);
     useEffect(() => {
@@ -277,16 +368,8 @@ const AdminSetupDirections = () => {
         } : previous);
     }, []);
 
-    const wizardTagOptions = useMemo(() => {
-        const tags = new Set<string>();
-        for (const direction of directions?.directions || []) {
-            for (const tag of direction.profile.queue_tags || []) if (tag) tags.add(tag);
-        }
-        for (const tag of directions?.unattached?.queue_tags || []) if (tag) tags.add(tag);
-        return [...tags].sort((a, b) => a.localeCompare(b)).map((tag) => ({ value: tag, label: tag }));
-    }, [directions]);
-    const openResources = useCallback(() => setView('resources'), []);
-    const openChecklist = useCallback(() => setView('checklist'), []);
+    const openResources = useCallback(() => updateSetupPageContext({ section: 'resources' }), [updateSetupPageContext]);
+    const openChecklist = useCallback(() => updateSetupPageContext({ section: 'checklist' }), [updateSetupPageContext]);
 
     const statusIcon = (ready: boolean | null) => {
         const cls =
@@ -325,14 +408,38 @@ const AdminSetupDirections = () => {
         ensureQrRead(profileKey);
     };
 
-    const openOwnershipSetup = (action: QueueDirectionNextAction, direction: QueueAdminDirection) => {
-        setView('checklist');
-        setWizard({
-            open: true,
-            step: 0,
-            axis: null,
-            tag: action.entity_key || direction.profile.queue_tags?.[0] || '',
-        });
+    const queueTagEntity = (action: QueueDirectionNextAction): QueueSetupEntityRef | null => {
+        const key = action.entity_key || '';
+        return key ? { kind: 'queue_tag', key } : null;
+    };
+
+    const editorLink = (
+        destination: QueueSetupEditorDestination,
+        direction: QueueAdminDirection,
+        entity: QueueSetupEntityRef | null,
+    ) => serializeQueueSetupEditorLink({
+        version: 1,
+        destination,
+        profileKey: direction.profile.key,
+        section: view,
+        day: selectedDay || null,
+        entity,
+    });
+    const setupEditorLink = (destination: QueueSetupEditorDestination) => serializeQueueSetupEditorLink({
+        version: 1,
+        destination,
+        profileKey: null,
+        section: view,
+        day: selectedDay || null,
+        entity: null,
+    });
+
+    const profileSelectionLink = (profileKey: string) => {
+        const params = new URLSearchParams();
+        params.set('section', view);
+        params.set('profile', profileKey);
+        if (selectedDay) params.set('day', selectedDay);
+        return { pathname: location.pathname, search: '?' + params.toString() };
     };
 
     const renderActionControl = (action: QueueDirectionNextAction, direction: QueueAdminDirection) => {
@@ -345,15 +452,30 @@ const AdminSetupDirections = () => {
             );
         }
         if (action.kind === 'configure_ownership' || (action.kind === 'review_configuration' && action.entity_type === 'queue_tag')) {
+            const entity = queueTagEntity(action);
             return (
-                <Button key={`${action.kind}:${action.entity_key || ''}`} variant="secondary" size="sm" onClick={() => openOwnershipSetup(action, direction)}>
-                    {label}
-                </Button>
+                <div key={`${action.kind}:${action.entity_key || ''}`} className="admin-sdx-action-list" data-testid="setup-action-editors">
+                    <span className="admin-sdx-muted">{label}</span>
+                    <Link className="admin-sdx-link" to={editorLink('service-catalog', direction, entity)}>
+                        {t('admin2.sdx_wizard_services_link')} <ExternalLink className="admin-sdx-icon-m" size={11} />
+                    </Link>
+                    <Link className="admin-sdx-link" to={editorLink('user-management', direction, entity)}>
+                        {t('admin2.sdx_axis_doctor_link')} <ExternalLink className="admin-sdx-icon-m" size={11} />
+                    </Link>
+                    <Button variant="ghost" size="sm" onClick={openResources}>
+                        {t('admin2.sdx_view_resources')}
+                    </Button>
+                </div>
             );
         }
         if (action.kind === 'restore_profile' || action.kind === 'publish_profile' || (action.kind === 'review_configuration' && action.entity_type === 'queue_profile')) {
+            const profileKey = action.entity_key || direction.profile.key;
             return (
-                <Link key={`${action.kind}:${action.entity_key || ''}`} className="admin-sdx-link" to="/admin/services?servicesTab=queue-profiles">
+                <Link
+                    key={`${action.kind}:${action.entity_key || ''}`}
+                    className="admin-sdx-link"
+                    to={editorLink('queue-profiles', direction, { kind: 'queue_profile', key: profileKey })}
+                >
                     {label} <ExternalLink className="admin-sdx-icon-m" size={11} />
                 </Link>
             );
@@ -449,224 +571,6 @@ const AdminSetupDirections = () => {
                 </>
             ) : (
                 <>
-                    {/* —— Мастер нового направления S-14 (пустая форма) —— */}
-                    {!wizard.open ? (
-                        <Card className="admin-sdx-header" data-testid="setup-wizard-teaser">
-                            <CardContent>
-                                <div className="admin-sdx-teaser">
-                                    <div className="admin-sdx-teaser-title">
-                                        <strong>{t('admin2.sdx_wizard_teaser_title')}</strong>
-                                        <div className="admin-sdx-teaser-desc">
-                                            {t('admin2.sdx_wizard_teaser_desc')}
-                                        </div>
-                                    </div>
-                                    <Button
-                                        variant="primary"
-                                        size="sm"
-                                        onClick={() => setWizard({ ...emptyWizard(), open: true })}
-                                        data-testid="setup-wizard-open"
-                                    >
-                                        <Plus className="admin-sdx-icon-l" size={14} />
-                                        {t('admin2.sdx_wizard_open')}
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <Card className="admin-sdx-card-gap" data-testid="setup-wizard">
-                            <CardHeader>
-                                <CardTitle>{t('admin2.sdx_wizard_title')}</CardTitle>
-                                <CardDescription>{t('admin2.sdx_wizard_subtitle')}</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="admin-sdx-steps">
-                                    {WIZARD_STEP_KEYS.map((key, index) => (
-                                        <Badge
-                                            key={key}
-                                            variant={index === wizard.step ? 'info' : 'secondary'}
-                                            data-testid={`setup-wizard-step-${index}`}
-                                        >
-                                            {index + 1}. {t(key)}
-                                        </Badge>
-                                    ))}
-                                </div>
-
-                                {wizard.step === 0 && (
-                                    <div data-testid="setup-wizard-step-executor">
-                                        <p className="admin-sdx-step-hint">
-                                            {t('admin2.sdx_wizard_executor_hint')}
-                                        </p>
-                                        <div className="admin-sdx-axis-grid">
-                                            <div className="admin-sdx-axis-card">
-                                                <strong className="admin-sdx-axis-title">{t('admin2.sdx_axis_doctor_title')}</strong>
-                                                <p className="admin-sdx-axis-desc">
-                                                    {t('admin2.sdx_axis_doctor_desc')}
-                                                </p>
-                                                <Link className="admin-sdx-link" to="/admin/users">
-                                                    {t('admin2.sdx_axis_doctor_link')} <ExternalLink className="admin-sdx-icon-m" size={11} />
-                                                </Link>
-                                                <div className="admin-sdx-step-nav">
-                                                    <Button
-                                                        variant="secondary"
-                                                        size="sm"
-                                                        onClick={() => setWizard((w) => ({ ...w, axis: 'doctor', step: 1 }))}
-                                                        data-testid="setup-wizard-axis-doctor"
-                                                    >
-                                                        {t('admin2.sdx_choose')} <ArrowRight className="admin-sdx-icon-r" size={12} />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                            <div className="admin-sdx-axis-card">
-                                                <strong className="admin-sdx-axis-title">{t('admin2.sdx_axis_resource_title')}</strong>
-                                                <p className="admin-sdx-axis-desc">
-                                                    {t('admin2.sdx_axis_resource_desc')}
-                                                </p>
-                                                <div className="admin-sdx-axis-select">
-                                                    <Select
-                                                        placeholder={t('admin2.sdx_wizard_tag_placeholder')}
-                                                        options={wizardTagOptions}
-                                                        value={wizard.tag}
-                                                        onValueChange={(value) => setWizard((w) => ({ ...w, tag: String(value) }))}
-                                                        data-testid="setup-wizard-tag-select"
-                                                    />
-                                                </div>
-                                                <p className="admin-sdx-step-hint admin-sdx-muted">
-                                                    {t('admin2.sdx_wizard_tag_optional_hint')}
-                                                </p>
-                                                {/* Round-3 (P1): кнопка НЕ заблокирована пустым тегом —
-                                                    новое направление начинается «с пустой формы»: тег
-                                                    появится после создания профиля/услуги (шаги ниже)
-                                                    и выбирается в селекторе после возврата. */}
-                                                <Button
-                                                    variant="secondary"
-                                                    size="sm"
-                                                    onClick={() => setWizard((w) => ({ ...w, axis: 'resource', step: 1 }))}
-                                                    data-testid="setup-wizard-axis-resource"
-                                                >
-                                                    {t('admin2.sdx_choose')} <ArrowRight className="admin-sdx-icon-r" size={12} />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {wizard.step === 1 && (
-                                    <div data-testid="setup-wizard-step-services">
-                                        <p className="admin-sdx-step-hint">
-                                            {t('admin2.sdx_wizard_services_hint')}
-                                        </p>
-                                        <Link className="admin-sdx-link" to="/admin/services?servicesTab=catalog">
-                                            {t('admin2.sdx_wizard_services_link')} <ExternalLink className="admin-sdx-icon-m" size={11} />
-                                        </Link>
-                                        <div className="admin-sdx-step-nav">
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                onClick={() => setWizard((w) => ({ ...w, step: 2 }))}
-                                                data-testid="setup-wizard-services-next"
-                                            >
-                                                {t('admin2.sdx_next')} <ArrowRight className="admin-sdx-icon-r" size={12} />
-                                            </Button>
-                                            <Button variant="ghost" size="sm" onClick={() => setWizard((w) => ({ ...w, step: 0 }))}>
-                                                {t('admin2.sdx_back')}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {wizard.step === 2 && (
-                                    <div data-testid="setup-wizard-step-display">
-                                        <p className="admin-sdx-step-hint">
-                                            {t('admin2.sdx_wizard_display_hint')}
-                                        </p>
-                                        {wizard.axis === 'resource' && (
-                                            <p className="admin-sdx-step-hint admin-sdx-muted">
-                                                {t('admin2.sdx_wizard_display_resource_note')}
-                                            </p>
-                                        )}
-                                        <Link className="admin-sdx-link" to="/admin/services?servicesTab=queue-profiles">
-                                            {t('admin2.sdx_wizard_display_link')} <ExternalLink className="admin-sdx-icon-m" size={11} />
-                                        </Link>
-                                        <div className="admin-sdx-step-nav">
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                onClick={() => setWizard((w) => ({ ...w, step: 3 }))}
-                                                data-testid="setup-wizard-display-next"
-                                            >
-                                                {t('admin2.sdx_next')} <ArrowRight className="admin-sdx-icon-r" size={12} />
-                                            </Button>
-                                            <Button variant="ghost" size="sm" onClick={() => setWizard((w) => ({ ...w, step: 1 }))}>
-                                                {t('admin2.sdx_back')}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {wizard.step === 3 && (
-                                    <div data-testid="setup-wizard-step-verify">
-                                        <p className="admin-sdx-step-hint">
-                                            {t('admin2.sdx_wizard_verify_hint')}
-                                        </p>
-                                        {wizard.axis === 'resource' && (
-                                            <p className="admin-sdx-step-hint">
-                                                {t('admin2.sdx_wizard_verify_resource_note')}
-                                            </p>
-                                        )}
-                                        <div className="admin-sdx-step-nav">
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                onClick={() => {
-                                                    void loadCore(selectedDay || undefined);
-                                                    setView('checklist');
-                                                    setWizard((w) => ({ ...w, step: 4 }));
-                                                }}
-                                                data-testid="setup-wizard-verify-open"
-                                            >
-                                                {t('admin2.sdx_wizard_verify_open')} <ArrowRight className="admin-sdx-icon-r" size={12} />
-                                            </Button>
-                                            <Button variant="ghost" size="sm" onClick={() => setWizard((w) => ({ ...w, step: 2 }))}>
-                                                {t('admin2.sdx_back')}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {wizard.step === 4 && (
-                                    <div data-testid="setup-wizard-step-qr">
-                                        <p className="admin-sdx-step-hint">
-                                            {t('admin2.sdx_wizard_qr_hint')}
-                                        </p>
-                                        <div className="admin-sdx-step-nav">
-                                            <Button
-                                                variant="primary"
-                                                size="sm"
-                                                onClick={() => setWizard(emptyWizard())}
-                                                data-testid="setup-wizard-finish"
-                                            >
-                                                {t('admin2.sdx_wizard_finish')}
-                                            </Button>
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                onClick={() => setWizard((w) => ({ ...w, step: 3 }))}
-                                            >
-                                                {t('admin2.sdx_back')}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="admin-sdx-step-nav">
-                                    <Button variant="ghost" size="sm" onClick={() => setWizard(emptyWizard())} data-testid="setup-wizard-close">
-                                        {t('admin2.sdx_wizard_close')}
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
                     <div className="admin-sdx-day-bar">
                         <label htmlFor="setup-directions-day">{t('admin2.sdx_day_label')}</label>
                         <input
@@ -674,10 +578,10 @@ const AdminSetupDirections = () => {
                             type="date"
                             aria-label={t('admin2.sdx_day_label')}
                             value={selectedDay || (!loading ? directions?.as_of_day || '' : '')}
-                            onChange={(event) => setSelectedDay(event.currentTarget.value)}
+                            onChange={(event) => updateSetupPageContext({ day: event.currentTarget.value || null })}
                             data-testid="setup-day-select"
                         />
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedDay('')} data-testid="setup-day-today">
+                        <Button variant="ghost" size="sm" onClick={() => updateSetupPageContext({ day: null })} data-testid="setup-day-today">
                             {t('admin2.sdx_day_today')}
                         </Button>
                         {directions?.as_of_day && (
@@ -728,10 +632,21 @@ const AdminSetupDirections = () => {
                                             <section
                                                 key={profile.id}
                                                 className="admin-sdx-card admin-sdx-direction-card"
+                                                aria-current={selectedProfileKey === profile.key ? 'true' : undefined}
+                                                data-selected={selectedProfileKey === profile.key ? 'true' : undefined}
                                                 data-testid={'setup-checklist-row-' + firstTag}
                                             >
                                                 <div className="admin-sdx-row-head">
-                                                    <h3 className="admin-sdx-direction-title">{directionTitle(direction)}</h3>
+                                                    <h3 className="admin-sdx-direction-title">
+                                                        <Link
+                                                            className="admin-sdx-link"
+                                                            to={profileSelectionLink(profile.key)}
+                                                            aria-current={selectedProfileKey === profile.key ? 'page' : undefined}
+                                                            data-testid={'setup-select-profile-' + profile.key}
+                                                        >
+                                                            {directionTitle(direction)}
+                                                        </Link>
+                                                    </h3>
                                                     <Badge variant={direction.configuration_state === 'ready' ? 'info' : 'secondary'}>
                                                         {t(configurationStateKeys[direction.configuration_state])}
                                                     </Badge>
@@ -950,6 +865,19 @@ const AdminSetupDirections = () => {
                                             </section>
                                         );
                                     })}
+                                </div>
+                            )}
+                            {directions && (
+                                <div className="admin-sdx-action-list" data-testid="setup-editor-links">
+                                    <Link className="admin-sdx-link" to={setupEditorLink('service-catalog')}>
+                                        {t('admin2.sdx_wizard_services_link')}
+                                    </Link>
+                                    <Link className="admin-sdx-link" to={setupEditorLink('queue-profiles')}>
+                                        {t('admin2.qp_page_title')}
+                                    </Link>
+                                    <Link className="admin-sdx-link" to={setupEditorLink('user-management')}>
+                                        {t('admin2.sdx_axis_doctor_link')}
+                                    </Link>
                                 </div>
                             )}
                         </CardContent>

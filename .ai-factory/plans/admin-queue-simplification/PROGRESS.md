@@ -1,3 +1,103 @@
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
+
+- PR #3711 remains OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base/current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Source/test changes and this checkpoint are committed locally; push and hosted exact-head checks are pending.
+- Fixed review #5576603179's P2: shared links to service catalog, QueueProfiles and user management now render whenever T13 directions have loaded, whether the list is empty or contains a ready direction. Existing URL context builder is reused; no route or API contract changed.
+- Added ready-direction regression with `allowed_next_actions=[]`, covering all three editor destinations and T15 return/section context. Fail-first confirmed one new test failure / 22 existing passes. Focused Vitest after fix: 23/23 PASS.
+- Scoped ESLint on changed component/test: PASS, no diagnostics. `git diff --check`: PASS. Normal hooks PASS after retry with the verified temporary dependency junction; push and hosted exact-head checks are pending.
+- Local build failed before app compilation because the reused dependency cache lacks `nitro`, imported by `vite.config.ts`; no dependency install was attempted. Hosted CI on the exact pushed HEAD is required to validate build.
+- Temporary worktree dependency junction was verified and removed after each command; build scratch is absent and shared dependencies were not changed.
+- Gate: initial mandatory gate stopped requesting a confirmed root cause; one known-root retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Prompt read; basis is the exact review finding and narrow remediation. No gate/router edits.
+- Next exact action: commit the two code/test files and three plan journals with normal hooks, push, then verify exact-head CI. No review-thread mutation, staging, deployment, merge, or T16.
+## Latest checkpoint — T15 PR #3711 year-zero date fix; exact current-head CI PASS — 2026-10-19T23:44:09+05:00
+
+- PR #3711 is OPEN, Ready for review, MERGEABLE at exact HEAD `d4e2d1ebb98ec692c0d1c34cee52ce0e9a6f0404`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`; branch `codex/aqs-t15-setup-context` is clean and synchronized with origin.
+- Review #5575562069's year-zero P2 is fixed in all three query validators. ISO shape and calendar validation remain; year `0000` is rejected and years `0001` and `9999` remain valid. Regression tests cover page `day`, AdminServices `setupDay`, UserManagement `setupDay`, and both boundaries.
+- Fail-first reproduced all three defects (3 failed / 19 passed among 22 tests). Post-fix focused Vitest: 22/22 PASS. Scoped ESLint: 0 errors and one pre-existing warning in unchanged AdminServices localStorage code. Normal hooks and `git diff --check` passed.
+- Exact current-head Unified CI run `39302431453`: Frontend build, lint/type-check, unit tests, full Chromium E2E (16m36s), PR Required Gate, Regression Audit, CodeQL/security/secret scans, locale checks, CI Scope, PR Review Quality and lifecycle checks PASS. Backend, integration, Docker, docs generation, metadata, parity, context-boundary, staging, production-readiness, load and nightly DAST are SKIPPED by path/scope, not passed.
+- PR review decision is empty; reviewer recheck is pending. Three review threads remain open and untouched because thread mutation is outside this gate scope. No formal approval is claimed.
+- Local TypeScript check remains limited by the shared dependency cache lacking Nitro and an unrelated existing `publicSiteHandler.test.tsx` route typing diagnostic; hosted exact-head type-check passed. No local build was run to avoid generated output.
+- Tier-2/T18 staging remains `NOT_RUN`; no deferral is claimed. No staging, production, deployment, review-thread mutation, or merge occurred.
+- Next exact action: user/reviewer rechecks and user merges PR #3711. After actual merge, verify merge SHA, sync `main`, clean up the worktree, then continue T16.
+
+## Latest checkpoint — T15 PR #3711 year-zero date P2 fixed locally — 2026-10-19T23:06:33+05:00
+
+- New review #5575562069's P2 is fixed in all three allowed validators: page `day` plus AdminServices and UserManagement `setupDay` context. ISO format and real calendar-day checks remain; `0000-*` is rejected, with valid year boundaries `0001` and `9999` retained.
+- Regression proof: fail-first run reached 3 failed / 19 passed in 22 tests (page, services parser, users parser each accepted `0000-01-01`). After fix, focused `adminSetupDirections.textPin.test.tsx` passes 22/22, including both boundary years.
+- Scoped ESLint passes with 0 errors and 1 pre-existing warning in unchanged `AdminServices.tsx` (`localStorage.setItem`). Local `tsc --noEmit` remains blocked by missing `nitro`, `nitro/runtime-config`, and an unrelated `publicSiteHandler.test.tsx` implicit-`route` diagnostic; no changed-file diagnostic. Hosted exact-head validation is pending.
+- Current PR at edit start: #3711 OPEN/Ready/MERGEABLE, HEAD `de50fb3db570d899b4367957584c2b348615462d`, base/main `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Source/test edits and this checkpoint are not yet committed. The gate denies review-thread mutation; all three reported threads remain untouched.
+- Execution mode and pre-edit gate result are recorded immediately below. Scope remains the three date validators, one focused test, and the three T15 plan journals only.
+- Next exact action: rerun `git diff --check`, commit with normal hooks, push to PR #3711, then verify exact-head build, unit, lint, E2E and required/quality checks. No local build was run because exact-head hosted CI provides the build without writing generated output into the worktree.
+- Tier-2/T18 remains `NOT_RUN`; no deferral is claimed. No staging, production, deployment, review-thread mutation, or merge occurred.
+
+## Pre-edit checkpoint — T15 PR #3711 new date-validation P2 — 2026-10-19T22:57:48+05:00
+
+- Current PR #3711 is OPEN/Ready for review at HEAD `de50fb3db570d899b4367957584c2b348615462d`, base `279638ddf884f9da8012ddbdb13f2035abb2c96c`; current main is the same base. New review #5575562069 identifies year `0000` accepted by three ISO date validators. Three review threads are reported open; this checkpoint does not resolve them.
+- Chosen mode: mandatory `gate_known_root_cause`, with scoped `narrow_override` returned by the canonical launcher. Root cause is confirmed in `frontend/src/components/admin/UserManagement.tsx`; the same duplicated calendar validator exists in `AdminSetupDirections.tsx` and `AdminServices.tsx`. Reason: route/query-context validation is a strict gate trigger.
+- Gate command was run from `ai/langgraph` via `scripts/run_agent_gate.ps1`, with `--known-root-cause frontend/src/components/admin/UserManagement.tsx` and exact `--scope` entries for the three components, `adminSetupDirections.textPin.test.tsx`, and these three T15 journals. Result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. No gate/router edits.
+- Allowed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/AdminServices.tsx`, `frontend/src/components/admin/UserManagement.tsx`, `frontend/src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`, and this plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Denied paths: all other source/tests, route registry/guards, API/backend/OpenAPI/generated types, auth/RBAC, DB, queue runtime, dependencies, staging, production, deployment, other PRs, review-thread mutation, and merge.
+- First-touch: add failing regressions for `day=0000-01-01` and `setupDay=0000-01-01`; make all three validators reject year 0000 while retaining valid calendar dates from `0001-01-01` through `9999-12-31` and existing invalid-date behavior.
+- Validation targets: focused `adminSetupDirections.textPin.test.tsx`, scoped ESLint, `git diff --check`, normal commit hooks, and exact-head hosted CI. Stop if a shared date contract requires an out-of-scope helper/API change or any required edit exceeds the allowed paths.
+- Status: no source edit has started. Previous P2 fixes remain in PR; this new P2 is pending fail-first reproduction.
+
+## Latest checkpoint — T15 PR #3711 fixes pushed; exact-head Tier-1 CI PASS — 2026-10-19T22:24:18+05:00
+
+- PR #3711 was OPEN, Ready for review, and mergeable at the tested head `115c6dae2e9a3f4852ff453f1053c4fda4ff69c5`; base/current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Source/test fix is `c0306eac9`. This journal-only checkpoint is being committed after those exact-head checks; verify the resulting docs-only run before handoff.
+- Review #5574854400's P2s are fixed: empty T13 catalog offers fixed links to existing editors; switching `queue-profiles → catalog → queue-profiles` removes incompatible entity-specific query fields and preserves shared return context. Regression proof was fail-first (2 failed / 16 passed), then 18/18 focused Vitest passed.
+- Exact-head Unified CI run `39291497713` completed with applicable frontend build, lint/type-check, unit tests (6m06s), full Chromium E2E (15m06s), Required Gate, security/secrets, CodeQL, locale parity, CI Scope and notification checks passing. PR Review Quality Gate `39291750532`, lifecycle recommendation `39291750203`, and Regression Audit `39291497725` passed. Path-aware Docker, backend, integration, docs-generation, metadata, parity, context-boundary, staging, production-readiness, load and nightly DAST checks were SKIPPED, not passed.
+- PR review result: no new unresolved P0/P1/P2 is recorded after the fixes; `reviewDecision` is empty, so this checkpoint does not claim a formal approval. No merge or deployment was performed; user owns merge.
+- Local focused suite: 18/18 PASS; scoped ESLint: 0 errors, one existing warning in unchanged code; `git diff --check` PASS. Local full build/type-check could not complete because shared dependencies lack Nitro and an unrelated existing route typing diagnostic; hosted exact-head build and lint/type-check passed.
+- Tier-2 / staging and T18 are `NOT_RUN`; no deferral is claimed. No staging, production, deployment, route/auth/backend/database/queue-runtime changes were made.
+- Current task status: T15 `PR_OPEN`; T16–T18 remain `PLANNED`. Next exact action: commit/push this journal-only checkpoint, verify checks on its resulting HEAD, then leave PR #3711 for the user to review/merge. Start T16 only after the actual merge is confirmed and main is synced.
+
+## Previous checkpoint — T15 PR #3711 P2 fixes implemented and rebased — 2026-10-19
+
+- PR #3711 is OPEN/Ready for review. The fix branch has been rebased onto refreshed `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`; the reviewed starting HEAD was `264430e42ec0ec651b6c2c71f44db570c8b1be31`. Review #5574854400's two P2s are fixed in code/test commit `c0306eac9`.
+- Execution mode: `gate_known_root_cause` with a scoped `narrow_override`, based on the confirmed review findings and the user's continuing implementation request. Gate initial response required a known root; a malformed retry included a directory and was rejected; the valid known-root run returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`. Its exact execution prompt was read. No gate/router changes.
+- Canonical anchors: `AGENTS.md`; T15 URL/return contract in `DECISIONS.md`; `AdminSetupDirections.tsx`; `AdminServices.tsx`; `adminSetupDirections.textPin.test.tsx`.
+- Allowed implementation paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/AdminServices.tsx`, and `frontend/src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`. Approved operational checkpoint files: this plan's `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`.
+- Denied: routes/guards, backend/API/OpenAPI/generated types, auth/RBAC, database, queue behavior/ownership, staging/production/deployment, other PRs, and merge.
+- First-touch fixes: (1) empty T13 directions state gets fixed links to existing catalog, queue profile, and user editors; (2) switching AdminServices tabs drops incompatible entity-specific query fields while preserving `setupReturn`, `setupProfile`, `setupSection`, and `setupDay`; add a `queue-profiles → catalog → queue-profiles` regression.
+- Validation target: focused `adminSetupDirections.textPin.test.tsx`, scoped ESLint, `git diff --check`, then exact-head hosted PR checks. First stop: any needed source path outside the allowed implementation paths or evidence that current contracts cannot safely preserve the return context.
+- Implemented in the three allowed frontend paths. Fail-first regressions reproduced both P2s (2 failed, 16 passed); post-fix focused suite passes 18/18. Scoped ESLint passes with 0 errors and 1 existing `localStorage.setItem` warning. `git diff --check` passes.
+- Local `type-check` and build were attempted through a temporary worktree junction to existing shared frontend dependencies; the junction was removed and the shared target was untouched. Type-check reports only unrelated missing `nitro`, missing `nitro/runtime-config`, and `publicSiteHandler.test.tsx` implicit-`route` diagnostics; build cannot load the Vite config because shared dependencies lack `nitro`. Hosted exact-head checks are required after push.
+- Post-rebase validation rerun: focused Vitest 18/18 PASS; scoped ESLint 0 errors / 1 existing warning; temporary dependency junction removed. This invocation used the shared Vitest 3.2.7 cache. Exact-head hosted CI is still pending push.
+- Current changed paths: the three allowed UI/test files and three approved T15 checkpoint files. No route registry, backend/API, auth/RBAC, DB, queue runtime, staging, production, deployment, other PR, PR-thread mutation, or merge changes.
+
+## Prior checkpoint — T15 PR #3711 Ready for review; Tier-1 CI PASS — 2026-10-19T17:53:53+05:00
+
+- Current task is T15. T14 / PR #3702 merged at 99f0b5a098dccce4f1166ae52bd7d5c93d92af70. Branch codex/aqs-t15-setup-context is based on fresh origin/main 984b49905ba162dea29e25c144137bd8fb864e11.
+- PR #3711 is OPEN/Ready for review/mergeable. T15 source/test HEAD is 39ab56596eaa5f96bc5834f6d916070c488f64ef; implementation is unchanged after this commit. Unified CI run 39252747566 passed on the preceding docs checkpoint 517eefa2dcdea501751901d3b38b218ca9d8a4b5. PR Review Quality Gate 39255695993 and lifecycle recommendation 39255695991 passed after correcting the PR body and marking the PR ready.
+- Hosted Frontend unit, lint/type-check, build+Nitro, complete Frontend E2E, PR Required Gate, CodeQL, security/secrets, locale parity, Regression Audit, PR Review Quality, lifecycle recommendation, GitGuardian and CI Scope passed. Path-aware backend/integration/docs/context-boundary/metadata/docker/parity/staging/production/load jobs were skipped, not passed.
+- T15 behavior: setup profile/section/day are URL-owned; fake wizard removed; existing editors receive validated typed return context and fixed internal return links. Focused T15 suite passes 16/16. The two UserManagement component tests now use MemoryRouter; local combined focused run passes 8/8 and hosted full unit suite passes.
+- Scoped ESLint has zero errors (one existing non-auth servicesTab localStorage warning). PR-body template validator and diff checks pass. Local full build/type-check limitations remain documented; hosted CI covered frontend lint/type-check/build successfully.
+- Gate misrouted once; one known-root retry returned narrow_override (`gate_misroute=true`, `override_used=true`, `handoff_required=true`); generated prompt was read. No gate/router edit.
+- T15 Tier-2 is NOT_RUN. The integrated T18 staging acceptance is sequenced after T01-T17; this is not reported as passed or deferred. PR description now says so, and PR #3711 is Ready for review. No staging, production, deployment or merge was performed.
+- Next exact action: user reviews and merges PR #3711. Then verify the merge commit, sync main and clean up the T15 worktree; start T16 only after that sync.
+
+| Task | Status | PR / commit | Evidence |
+|------|--------|-------------|----------|
+| T15 | PR_OPEN / fixes committed locally; journal commit pending | PR #3711; code/test commit c0306eac9, fresh base 279638ddf884f9da8012ddbdb13f2035abb2c96c | Post-rebase focused suite 18/18 PASS; ESLint and commit hooks PASS; exact-head hosted checks pending push |
+| T16-T18 | PLANNED | | |
+
+## Current checkpoint
+- T15's two latest review P2s are fixed locally in `AdminSetupDirections.tsx` and `AdminServices.tsx`, with regressions in `adminSetupDirections.textPin.test.tsx`. The empty state now links to the existing catalog, profile manager, and users; tab switching removes incompatible entity fields while retaining shared return context.
+- Fail-first reproduced both defects. Focused suite: 18/18 PASS. Scoped ESLint: PASS, zero errors and one existing localStorage warning. `git diff --check`: PASS. Local type-check/build are blocked by missing `nitro` in shared dependencies and one existing unrelated route typing diagnostic; no changed-file diagnostics.
+- Next exact action: commit the three journal updates, push the rebased PR branch with `--force-with-lease`, then inspect exact-head hosted checks and update evidence. Do not merge; the user owns merge.
+- Tier-2/T18 remains NOT_RUN by plan sequence; no deferral is claimed. No staging, production, or deployment occurred.
+- Scope: three approved frontend/test files and three T15 plan journal files only. No backend/API/routes/auth/DB/queue runtime/staging/production changes.
+- Checks to rerun after any source change: focused T15 test, scoped ESLint, `git diff --check`, then exact-head hosted CI. Stop if commit hooks request out-of-scope changes.
+## Earlier checkpoint — T15 URL contract recorded; implementation active — 2026-10-19
+
+- T14 / PR #3702 is merged in current `origin/main`; merge commit `99f0b5a098dccce4f1166ae52bd7d5c93d92af70`. This task starts from fresh `origin/main` `984b49905ba162dea29e25c144137bd8fb864e11`.
+- Current task: T15, `IN_PROGRESS`; worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. Implementation commit 76eccdb9db2389913e47a3f6fe6bcf9bb57847fd is created locally; branch is ready to push and open as a Draft PR.
+- Task memory: `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb`, revision 2.
+- Execution mode: mandatory `gate` for URL/routing state. First gate call stopped with `reviewed scope requires a known root cause`; one permitted retry used confirmed state owner `AdminSetupDirections.tsx` and returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. The generated execution prompt was read before editing. Scope is limited to the gate's exact first-touch list and relies on the user's direct T15 GO plus the approved T15 plan; no router, guard, role, backend, API, schema, deployment, staging, merge, or other-PR changes.
+- URL contract is recorded in `DECISIONS.md`: selected `profile`, `section=checklist|resources`, optional ISO `day` (omitted means clinic-local current day), closed typed return context, fixed internal destinations, malformed-context rejection, and no local completion flags.
+- Gate first-touch/allowed files: `AdminSetupDirections.tsx`, `AdminServices.tsx`, `UserManagement.tsx`, `adminSetupDirections.textPin.test.tsx`, and this plan directory's `DECISIONS.md`, `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`.
+- Completed: source relationship inspection; T14 merge/base verification; T15 contract decision; pre-edit checkpoint saved. Validation of implementation: `NOT_RUN`.
+- Next exact action: implement URL-owned setup section/profile/day and remove the mock wizard; add fixed typed return links in the existing catalog/users screens and focused URL/return tests, staying inside the gate scope.
+
 ## Latest checkpoint — T14 archived saved-QR UI fix implemented locally — 2026-10-19T02:23:41+05:00
 
 - PR #3702 is OPEN/Draft/mergeable at HEAD `999b3c62af446822b2de53d891ec4c0c5d97111e`, base `baae35932e341ceaac163145d933639f735cb35c`. This change is uncommitted and unpushed. No PR-body update, review, merge, or deployment.
@@ -23,42 +123,42 @@
 - Validation target: canonical Preflight; one owned `Start`; one `Session` covering ordinary Admin 2FA and the focused T14 UI path plus independent frontend revision attestation; confirm owned teardown. First stop: any ambiguous ownership, failed storage/port preflight, unavailable normal 2FA enrollment, or need to modify runtime/test source.
 - Current PR HEAD before staging: `999b3c62af446822b2de53d891ec4c0c5d97111e`; PR is OPEN/Draft/mergeable, base `baae35932e341ceaac163145d933639f735cb35c`. `origin/main` has one unrelated backup-diagnostics commit; no branch sync is needed for this validation-only slice. No staging result is claimed yet.
 
-Plan version: 4.02
-Current task: T14 — setup UI consumes backend facts
-Current status: PR_OPEN / Draft / HOLD for Tier-2 disposition
-Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t14-admin-facts\final
-Branch: codex/aqs-T14-admin-facts
-Base commit: baae35932e341ceaac163145d933639f735cb35c (T13 merge; synced origin/main)
-Current source commit: 0db15cacb; current pushed PR HEAD: 0337028b7ee5cbfa41a00250d01cfb61f5f4c2ee
-Task memory: cb71d205-e655-482a-a72b-38c66d3d2011 (revision 8)
+## Historical checkpoint — T15 PR #3711 initial hosted checks partial — 2026-10-19T16:56:09+05:00
 
+- T14 / PR #3702 merged at 99f0b5a098dccce4f1166ae52bd7d5c93d92af70. T15 branch codex/aqs-t15-setup-context is pushed from fresh origin/main 984b49905ba162dea29e25c144137bd8fb864e11.
+- PR #3711: https://github.com/drsapaev/final/pull/3711; Draft, OPEN, mergeable. Code-bearing PR checkpoint 8494a534fe14958f6280f3873ff403a2d2510e14; a journal-only status update is being prepared. Implementation commit 76eccdb9db2389913e47a3f6fe6bcf9bb57847fd; documentation checkpoint commit 8494a534fe14958f6280f3873ff403a2d2510e14.
+- Task memory: 174595f3-1a65-4f05-8b3d-1f2f5e2f27cb; last saved revision 3, refresh after this checkpoint.
+- T15 persists profile/section/day in setup URL, removes the fake wizard, and carries typed validated context through fixed catalog/profile/user editors and safe return links. Existing UserModal onboarding remains unchanged.
+- Focused Vitest PASS, 16/16; scoped ESLint PASS with zero errors and one pre-existing non-auth localStorage warning; PR body gate PASS (19 helper tests plus sample/body validation); diff checks PASS. Local full build/type-check remain limited by missing nitro and one unrelated route type diagnostic; no changed T15-file diagnostics.
+- On exact code-bearing head 8494a534, Frontend lint and build, CodeQL, security, gitleaks, locale parity, review-quality, regression audit, PR lifecycle, GitGuardian and CI Scope passed; Frontend unit and E2E remained pending. This journal-only update will trigger a new exact-head check set; earlier results are not claimed as final for its new head.
+- Scope: exactly the four approved frontend/test paths and four T15 journal paths. No backend/API/OpenAPI/generated types, route registry/guards, auth/RBAC, database, queue ownership, staging, production, deployment, or merge changes.
+- Gate record: mandatory route/state gate misrouted once; the single --known-root-cause retry returned narrow_override with gate_misroute=true, override_used=true, handoff_required=true. Its execution prompt was read; no gate/router change.
+- Next exact action: push this journal-only check-in, then inspect all applicable checks on the refreshed exact PR HEAD; fix in-scope failures in #3711 if needed. Keep Draft and leave merge to the user.
+
+Plan version: 4.02
+Current task: T15 — persistable Admin queue setup context
+Current status: PR_OPEN / Draft; Tier-1 hosted CI PASS at code/test HEAD 39ab56596eaa5f96bc5834f6d916070c488f64ef
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final
+Branch: codex/aqs-t15-setup-context
+Base commit: 984b49905ba162dea29e25c144137bd8fb864e11 (fresh origin/main)
+Implementation commit: 76eccdb9db2389913e47a3f6fe6bcf9bb57847fd
+Current code/test commit: 39ab56596eaa5f96bc5834f6d916070c488f64ef
+Journal status: this checkpoint is in the current local journal commit; verify the pushed PR head before continuing.
+Task memory: 174595f3-1a65-4f05-8b3d-1f2f5e2f27cb (revision 4 before final capture)
 | Task | Status | PR / commit | Evidence |
 |------|--------|-------------|----------|
 | T12.2 | MERGED | PR #3693, merge 7f923f14a347a26b7f80da0fb40a0cff8858ef27 | Focused PostgreSQL 3/3 PASS; broader Tier-2 remains PARTIAL |
 | T13 | MERGED | PR #3697, merge baae35932e341ceaac163145d933639f735cb35c | Exact-head CI PASS; T13 review fixes included |
-| T14 | PR_OPEN / HOLD | PR #3702 Draft; source commit 0db15cacb; current HEAD 0337028b7 | Exact-head Unified CI and auxiliary gates PASS; Tier 2 NOT RUN, no reviewer deferral |
-| T15-T18 | PLANNED | | |
+| T14 | MERGED | PR #3702, merge 99f0b5a098dccce4f1166ae52bd7d5c93d92af70 | Confirmed by user |
+| T15 | PR_OPEN / Draft | PR #3711; code/test HEAD 39ab56596eaa5f96bc5834f6d916070c488f64ef | Unified CI 39250204373 PASS: unit, lint/type-check, build+Nitro, full E2E and Required Gate; path-aware jobs SKIPPED |
+| T16-T18 | PLANNED | | |
 
 ## Current checkpoint
-- Pre-edit execution record for PR review #5564122058: `direct_execute`; cause is localized to `AdminSetupDirections.tsx` (`canOpenQr` couples existing-address inspection to current public availability; provision callback leaves stale `provision_permanent_address`). No gate is needed for this narrow UI-only fix. Canonical anchors: T14 frontend scope, `AdminSetupDirections.tsx`, `PermanentDirectionQr.tsx`, focused RQ-18 tests. First-touch: focused parent-composition tests and `AdminSetupDirections.tsx`. Allowed source: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/__tests__/permanentDirectionQr.test.tsx`; allowed journals: this plan directory. Denied: backend/API/OpenAPI/generated types, routes, queue writes/ownership, DB, staging, production, PR metadata, merge/deploy. Validation target: focused Vitest, scoped type-check/lint, `git diff --check`. Stop if truthful QR inspection requires contract changes or any path outside this boundary.
-- Both review findings were reproduced fail-first, then fixed locally: an existing address is inspectable even when public booking is unavailable; successful provision marks address existence and removes only the stale provision action, retaining the generation guard.
-- Validation after the fix: focused Vitest `permanentDirectionQr` + `adminSetupDirections.textPin` = 26/26 PASS; scoped ESLint from `frontend/` PASS; `git diff --check` PASS. Full local `npx tsc --noEmit --pretty false` has the same three previously recorded unrelated diagnostics (`nitro`, `nitro/runtime-config`, implicit `route` in `publicSiteHandler.test.tsx`). An initial scoped ESLint invocation from the repo root resolved the wrong tsconfig; the correct frontend-root rerun passed.
-- Commit `0db15cacb` (`fix(queue): preserve access to permanent direction QR`) was pushed, followed by a journal-only checkpoint commit. Repository commit hooks passed, including ESLint and gitleaks.
-- Exact PR HEAD `0337028b7ee5cbfa41a00250d01cfb61f5f4c2ee`: Unified CI 39151823862, PR Review Quality Gate 39151823849, i18n 39151823864, lifecycle 39151823852, regression audit 39151823871, gitleaks 39151823854 and security 39151823880 all PASS. Backend, staging-readiness, integration, load, production-readiness and other path-aware jobs were SKIPPED, not PASS.
-- No staging/browser execution was performed. GitHub confirms PR #3702 is OPEN, Draft and mergeable at the exact HEAD above. Review threads and PR body were not changed; merge/deployment were not performed.
-- Verified PR #3697 is merged and synced to `origin/main`; T14 base and `origin/main` are both `baae35932e341ceaac163145d933639f735cb35c`. The production-surface checkout was only fast-forwarded, preserving its pre-existing untracked `.gate_artifacts/` and `.scratch/`.
-- T14 mode: `advisory_gate` (UI/API consumption of an existing read contract; no DB, auth, route, queue ownership/fairness, write behavior, or backend contract changes). The canonical launcher was attempted from `ai/langgraph` with exact UI/API/test/i18n scopes and returned `stop: reviewed scope requires a known root cause`. Under the plan’s explicitly selected advisory mode this is recorded as a non-blocking gate misroute; no gate/router edit and no source edit followed it.
-- Shape brief: Admin configures a clinic direction; primary task is understand configuration/public entry/current-day queues and act on backend-provided next actions. Queue correctness risk is controlled by keeping workflow facts server-owned. Current surface is an existing Admin screen with local readiness heuristics and eager QR requests. Keep quiet clinical hierarchy, accessible loading/error/retry states, and five-locale coverage. Out of scope: route/wizard changes, queue writes/admission, T13 API changes, ownership policy, Resource Manager behavior.
-- Allowed source paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/PermanentDirectionQr.tsx` only for reporting successful provision to the parent read-model state, `frontend/src/components/admin/setupDirectionsReadiness.ts` only if required to remove this screen’s policy dependency without breaking shared consumers, `frontend/src/api/queueDirections.ts`, `frontend/src/types/api.ts` for aliases of already-generated T13 DTOs only, `frontend/src/types/domain/adminQueueDirections.ts`, `frontend/src/api/mappers/adminQueueDirections.ts`, and `frontend/src/api/mappers/index.ts` to satisfy the repository’s no-DTO-in-components guard, `frontend/src/components/admin/admin.css`, focused setup/QR tests, and the five locale files. Plan journals may be updated for evidence. No generated API/contract/backend files.
-- Validation target: targeted Vitest (`adminSetupDirections.textPin`, `permanentDirectionQr`), TypeScript type-check, scoped lint/stylelint, locale parity, relevant frontend build if memory permits, request sequencing and stale-response regressions, plus available local browser/waterfall evidence. Synthetic screenshots only; no patient data.
-- Stop if T13 facts cannot represent a UI state/action truthfully; do not restore React-owned eligibility or extend the backend contract within T14. Also stop on changed route/write/ownership semantics or unexpected paths.
-- Completed: UI consumes the T13 admin facts through a domain mapper; configuration, effective availability, public entry/address facts, typed booking targets, selected-day queues, separate precreate facts, backend next actions and unattached catalog are presented without local eligibility inference. Core facts render before QR reads; QR details load on disclosure, resource-editor inputs load only on entry, stale day/QR responses are ignored. This follow-up also removes the stale provision action after success and keeps existing permanent QR inspectable while booking is unavailable.
-- Validation: focused Vitest 3 files / 26 tests PASS; scoped TypeScript 10 changed source/test files plus test setup PASS; full ESLint PASS (0 errors, 1,848 existing warnings); `check-theme` PASS; icon-control accessibility audit PASS (410 files, 0 findings); strict locale parity PASS for all five locales (10,510 keys each); `git diff --check` PASS. Full `npm run type-check` reports only three existing out-of-scope errors: missing `nitro`, missing `nitro/runtime-config`, and implicit `route` in `src/publicSiteHandler.test.tsx`. Stylelint NOT_RUN (binary absent); full unit suite, build/browser/waterfall NOT_RUN due low host memory (about 1.6 GiB free at check time). React test warnings occurred but tests passed.
-- Dependency cleanup: the worktree's temporary `frontend/node_modules` junction points to `C:\final\frontend\node_modules`. Removal was blocked by the command policy; it remains and must be treated as a link, never recursively deleted. No target files were changed by this check.
-- Immediately before the follow-up, PR #3702 was refreshed open/Draft/mergeable at exact remote HEAD `e952521a62dc077ad2a71410aa641c6b5a7342c0`, base `baae35932e341ceaac163145d933639f735cb35c`.
-- Tier-2/backend staging was not run; no reviewer deferral is acknowledged. The updated PR body marks all Tier 1 checks passed and accurately leaves Tier 2 NOT RUN. PR body gate passed its 19 validator tests after this update.
-- Next exact action: keep PR #3702 Draft/HOLD until a reviewer resolves Tier-2 NOT RUN versus deferral. Do not start T15 or merge; the user owns merge. Refresh the PR body only if separately authorized because this follow-up scope excluded PR metadata.
-- Full Tier-2/T18 remain PARTIAL/NOT_RUN from prior plan stages; this T14 UI task does not claim those checks. No staging, production, browser, visual viewport or deployment verification was performed.
+- T15 implementation and test harness correction are pushed in Draft PR #3711. The code/test HEAD is 39ab56596eaa5f96bc5834f6d916070c488f64ef; Unified CI run 39250204373 passed the full frontend unit/lint/type-check/build+Nitro/E2E matrix and Required Gate. Backend/integration/staging and other path-aware jobs were skipped, not passed.
+- Local validation: setup tests 16/16 PASS; combined setup and UserManagement router tests 8/8 PASS; scoped ESLint PASS (0 errors, one existing warning); check-theme PASS; PR-body validator PASS; diff check PASS. Hosted strict/component icon-control audits passed. Isolated local default icon-baseline audit is NOT_RUN because `@typescript-eslint/parser` is unavailable in the worktree.
+- PR body now reflects code/test SHA and hosted results. Tier-2/T18 remain NOT_RUN; no deferral requested. PR remains Draft and mergeable. No staging, production, deployment, or merge was performed; the user owns merge.
+- Next: commit/push this journal checkpoint, inspect path-aware checks on the journal-only head, then leave PR #3711 for user review/merge. Start T16 only after T15 is merged and main is synced.
+
 ## Historical checkpoint — T13 before PR review corrections
 
 Plan version: 4.02
@@ -1326,7 +1426,7 @@ Last updated: 2026-10-08T21:45+05:00
 | T12 | PLANNED | | | |
 | T13 | PLANNED | | | |
 | T14 | PLANNED | | | |
-| T15 | PLANNED | | | |
+| T15 | IN_PROGRESS | [PR #3711](https://github.com/drsapaev/final/pull/3711) — second-direction entry P2 fixed locally; validation/commit pending | | `EVIDENCE.md#pr-3711-second-direction-entry-p2-local-validation` |
 | T16 | PLANNED | | | |
 | T17 | PLANNED | | | |
 | T18 | PLANNED | | | |
@@ -1410,3 +1510,23 @@ Last updated: 2026-10-08T21:45+05:00
 - PR3639 description replaced with final source/evidence/disposition; existing GitHub review remains COMMENT, no human APPROVE submitted.
 - The first body rewrite omitted the repository template's exact required field labels, so the body-triggered PR Review Quality Gate failed. No code/staging test regressed. Corrected labels and validated the exact body locally with scripts/check_pr_review_template.py --body-file output/staging/t11-pr3639-final-20261016-r8/pr-body-final.md: PASS (one expected not-applicable reason warning). Hosted metadata recheck triggered; wait for its real result before final readiness claim. No gate/router/test/workflow source changed.
 - Preserve all five local plan documents and sanitized r8 evidence packet in the next worktree before cleaning/archiving this one. Do not transfer private env/auth data. Current source remains committed acb509c36; journals intentionally uncommitted.
+## Pre-edit checkpoint — T15 PR #3711 second-direction entry P2 — 2026-10-20T00:27:40+05:00
+
+- PR #3711 is OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base and current `origin/main` are `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final` is clean before this checkpoint.
+- Review #5576603179 identifies a confirmed P2: universal links to the catalog, QueueProfiles and user management are rendered only when `directions.length === 0`; with an existing ready direction, there is no way to start configuring a second direction from this screen. Root cause is confirmed in `AdminSetupDirections.tsx` and existing empty-state regression test.
+- Chosen mode: mandatory `gate_known_root_cause`. Initial canonical gate stopped because it required the confirmed root file; the single known-root retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Generated execution prompt was read. Explicit basis is the user's supplied exact review and its narrow remediation recommendation. No router/gate changes.
+- Allowed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`, `frontend/src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`, and this T15 plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Denied: backend/API/OpenAPI, route registry/guards, auth/RBAC, DB, queue runtime, staging, production, deployment, review-thread mutation, other PRs and merge.
+- Canonical anchors: root `AGENTS.md`, `docs/devbrain/PROJECT_MEMORY.md`, `docs/devbrain/DEVBRAIN_STATUS.md`, the existing setup page and its focused Vitest suite. No read-only reference paths were returned by the gate.
+- Validation targets: `cd frontend; npm.cmd run test:run -- src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`; `cd frontend; npm.cmd run build`; `git diff --check`.
+- First stop condition: stop if the links require any path outside the named component/test/journals, if canonical editor targets or return-context contract are unclear, or if the focused validation cannot run. No source/test edit has started.
+## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
+
+- PR #3711 remains OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`; base/current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`. Source/test changes and this checkpoint are committed locally; push and hosted exact-head checks are pending.
+- Fixed review #5576603179's P2: shared links to service catalog, QueueProfiles and user management now render whenever T13 directions have loaded, whether the list is empty or contains a ready direction. Existing URL context builder is reused; no route or API contract changed.
+- Added ready-direction regression with `allowed_next_actions=[]`, covering all three editor destinations and T15 return/section context. Fail-first confirmed one new test failure / 22 existing passes. Focused Vitest after fix: 23/23 PASS.
+- Scoped ESLint on changed component/test: PASS, no diagnostics. `git diff --check`: PASS. Normal hooks PASS after retry with the verified temporary dependency junction; push and hosted exact-head checks are pending.
+- Local build was attempted in a worktree-owned scratch output and failed before app compilation because the reused dependency cache lacks package `nitro` imported by `vite.config.ts`; no dependency install attempted. Hosted CI on exact pushed HEAD is required to validate build.
+- Temporary junction to `C:\final\frontend\node_modules` was removed after each command by verifying its Junction type and target; the build scratch directory is absent. Shared dependencies were not changed.
+- Gate: initial mandatory gate stopped requesting confirmed root cause; one `--known-root-cause` retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Prompt read; basis is the user's exact review finding and narrow prescribed remedy. See pre-edit checkpoint below. No gate/router edits.
+- Next exact action: push the committed T15 fix, then verify exact-head CI. Do not touch review threads, stage, deploy, merge, or begin T16.
