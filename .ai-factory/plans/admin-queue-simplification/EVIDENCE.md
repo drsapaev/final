@@ -4585,3 +4585,27 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: PASS. No changes to the main checkout, parallel task, staging, production, deployment, review threads or merge.
 - Remaining limitation: `git diff --check`, hosted exact-head CI and review are pending after final journal update. The branch has not been pushed and no PR exists yet.
 - Next exact action: run `git diff --check`, push the branch, open the T16 PR and verify exact-head CI. Merge remains with the user.
+
+## T16 — Draft PR opened; hosted checks in progress — 2026-10-20T10:23:28+05:00
+
+- Commit under test: PR #3718 HEAD `70f7999e637efbfac021fd80ddefe564beff3581`; implementation commit `5c2509be6da4a62b0ff364ef105ed606bee434dc`; base/current `origin/main` `ccbf519fdb0f9a32c3a71837202dfea296f13383`.
+- Environment: GitHub Actions and the isolated T16 Windows worktree. PR #3718 is OPEN / Draft / MERGEABLE. Worktree branch is pushed as `codex/aqs-T16-navigation`.
+- PR description initially failed the quality gate because required sections/fields were missing. It was updated to the repository template, and local `scripts/check_pr_review_template.py` passed. PR Review Quality Gate run `39374375922` and lifecycle recommendation `39374375980` passed against the same code HEAD.
+- Unified CI run `39374182108` exact-head status at this checkpoint: Frontend build PASS; Frontend lint and type-check PASS; metadata, locale parity, security/secrets, CodeQL, Regression Audit and CI Scope PASS. Frontend unit tests and Frontend E2E remain IN_PROGRESS. Backend, docs, Telegram, DAST and context-boundary jobs are SKIPPED by path/scope, not PASS.
+- Validation command: `gh pr checks 3718`; run detail `https://github.com/drsapaev/final/actions/runs/39374182108`.
+- Result: PR setup and template gate are corrected; overall exact-head CI is still pending unit/E2E completion.
+- Scope check: PASS. No source change occurred during PR-body correction; no staging, production, deployment, review-thread mutation or merge.
+- Next exact action: recheck run `39374182108`; record final unit/E2E results and commit/push the updated plan checkpoint before returning PR #3718 to the user for review. User owns merge.
+
+## T16 — implementation-head CI complete; PR ready for review — 2026-10-20T10:26:30+05:00
+
+- Commit under test: PR #3718 HEAD `70f7999e637efbfac021fd80ddefe564beff3581`; implementation commit `5c2509be6da4a62b0ff364ef105ed606bee434dc`; base/current `origin/main` `ccbf519fdb0f9a32c3a71837202dfea296f13383`.
+- Environment: GitHub Actions; PR #3718 is OPEN / Ready for review / MERGEABLE. User owns merge.
+- Unified CI run `39374182108` completed successfully on the implementation head. Frontend build, lint/type-check, unit tests, E2E (12m24s), frontend/backend parity, CI Scope, metadata, PR Required Gate, Regression Audit, locale checks, security/secrets scans, CodeQL, GitGuardian and notifications passed.
+- Path-aware backend, integration, Docker, docs generation, context-boundary, staging/production readiness, load, Telegram and nightly DAST jobs were SKIPPED. They are not represented as PASS and are outside this T16 frontend-only slice.
+- PR Review Quality Gate initially failed because the first PR body lacked repository-required sections. After completing the template, local `scripts/check_pr_review_template.py` passed and hosted PR Quality Gate `39375361463` passed. Lifecycle recommendation passed as run `39375361458` after marking the PR Ready.
+- Local focused tests: 54/54 PASS. Scoped ESLint: 0 errors, 16 pre-existing unused-variable warnings in route-contract fixtures. Normal hooks and `git diff --check` passed. Local type-check/build are limited by missing Nitro in the shared dependency cache and one unrelated existing type diagnostic; hosted checks passed both.
+- Admin live navigation spec and Tier-2/T18: NOT_RUN. No compatible verified Admin 2FA browser harness was available for T16; integrated staging/live checks remain assigned to T18. No deferral is claimed.
+- Scope check: PASS. PR body and plan journals only changed after the implementation-head CI. No backend/runtime, staging, production, deployment, review-thread mutation or merge.
+- Remaining limitation: this journal update requires a documentation-only commit and exact-head checks; independent review is pending.
+- Next exact action: commit/push this final plan checkpoint, verify resulting PR checks, and leave review/merge to the user.
