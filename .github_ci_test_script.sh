@@ -28,7 +28,21 @@ not applicable: No WebSocket or notification event changes.
 not applicable: Purely a semantic HTML/ARIA attribute addition, no async logic changed.
 
 ## Scope Gate
-not applicable: Verified no unintended zero-delta impacts as this is an isolated component fix.
+
+- Allowed paths: frontend/src/components/ui/macos/AppState.tsx
+- Denied paths: none
+- Migration/docs/test impact: none
+- Rollback note: trivial git revert
+
+## DevBrain Memory Impact
+
+- [ ] no durable memory update needed
+- [x] PROJECT_MEMORY updated
+- [ ] DEVBRAIN_STATUS updated
+- [ ] AI Factory dossier/log/patch updated
+- [ ] agent_gate routing rule updated
+- [ ] indexes/artifacts refreshed locally
+- [ ] regression matrix run
 
 ## Validation
 
