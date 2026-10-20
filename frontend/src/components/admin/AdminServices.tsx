@@ -21,11 +21,24 @@ const LazyServiceCatalog = React.lazy(() => import('./ServiceCatalog'));
 const getServiceTabs = (t: (key: string, options?: Record<string, unknown>) => string) => [
   { key: 'catalog', label: t('admin2.asv_tab_catalog'), icon: Package },
   { key: 'queue-profiles', label: t('admin2.asv_tab_queue_profiles'), icon: FolderTree },
-];
+] as const;
 
-const getInitialServicesTab = (search: string) => {
+type ServiceTabKey = 'catalog' | 'queue-profiles';
+
+const isServiceTab = (value: string | null): value is ServiceTabKey =>
+  value === 'catalog' || value === 'queue-profiles';
+
+const getInitialServicesTab = (search: string): ServiceTabKey => {
   const params = new URLSearchParams(search);
-  return params.get('servicesTab') || localStorage.getItem('servicesTab') || 'catalog';
+  const requestedTabs = params.getAll('servicesTab');
+  if (requestedTabs.length > 0) {
+    return requestedTabs.length === 1 && isServiceTab(requestedTabs[0])
+      ? requestedTabs[0]
+      : 'catalog';
+  }
+
+  const savedTab = localStorage.getItem('servicesTab');
+  return isServiceTab(savedTab) ? savedTab : 'catalog';
 };
 
 const isValidSetupDay = (value: string) => {
@@ -106,18 +119,53 @@ const AdminServices = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const { t: rawT } = useTranslation(); const t = rawT;
-  const [servicesTab, setServicesTab] = useState(() => getInitialServicesTab(location.search));
+  const [initialLocation] = useState(() => ({
+    key: location.key,
+    tab: getInitialServicesTab(location.search),
+  }));
+  const tabValues = new URLSearchParams(location.search).getAll('servicesTab');
+  const servicesTab: ServiceTabKey = tabValues.length > 0
+    ? (tabValues.length === 1 && isServiceTab(tabValues[0]) ? tabValues[0] : 'catalog')
+    : (location.key === initialLocation.key ? initialLocation.tab : 'catalog');
   const serviceTabs = getServiceTabs(t);
   const setupReturnContext = servicesTab === 'catalog' || servicesTab === 'queue-profiles'
     ? parseSetupReturnContext(location.search, servicesTab === 'catalog' ? 'service-catalog' : 'queue-profiles')
     : null;
 
   useEffect(() => {
+    // This is a non-authentication preference; the URL remains the canonical tab state.
+    // eslint-disable-next-line no-restricted-properties -- servicesTab contains no authentication data.
     localStorage.setItem('servicesTab', servicesTab);
   }, [servicesTab]);
 
-  const selectTab = (tabKey: string) => {
-    setServicesTab(tabKey);
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabValuesInUrl = params.getAll('servicesTab');
+    if (tabValuesInUrl.length !== 1 || tabValuesInUrl[0] !== servicesTab) {
+      params.delete('servicesTab');
+      params.set('servicesTab', servicesTab);
+    }
+
+    const destination = servicesTab === 'catalog' ? 'service-catalog' : 'queue-profiles';
+    if (!parseSetupEntity(params, destination).valid) {
+      params.delete('setupEntityKind');
+      params.delete('setupEntityKey');
+      params.delete('setupEntityId');
+    }
+
+    const normalizedSearch = params.toString();
+    const nextSearch = normalizedSearch ? `?${normalizedSearch}` : '';
+    if (nextSearch !== location.search) {
+      navigate({
+        pathname: location.pathname,
+        search: nextSearch,
+        hash: location.hash,
+      }, { replace: true, state: location.state });
+    }
+  }, [location.hash, location.pathname, location.search, location.state, navigate, servicesTab]);
+
+  const selectTab = (tabKey: ServiceTabKey) => {
+    if (tabKey === servicesTab) return;
     const params = new URLSearchParams(location.search);
     params.set('servicesTab', tabKey);
     const destination = tabKey === 'catalog'
@@ -133,7 +181,8 @@ const AdminServices = () => {
     navigate({
       pathname: location.pathname,
       search: `?${params.toString()}`,
-    }, { replace: true });
+      hash: location.hash,
+    }, { state: location.state });
   };
 
   return (

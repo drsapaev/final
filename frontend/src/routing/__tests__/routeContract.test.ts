@@ -142,6 +142,78 @@ function assertRouteSpecificChromeHeadings(routeHeadingContract: RouteHeadingCon
 }
 
 describe('route contract invariants', () => {
+  it('keeps the queue administration URLs Admin-owned and linked from the correct sidebar entries', () => {
+    const adminProfile = { role: 'Admin' };
+    const routeContracts = [
+      {
+        id: 'admin-setup-directions',
+        path: '/admin/setup-directions',
+        component: 'AdminSetupDirections',
+        labelKey: 'nav.setup_directions',
+        activeSidebarItem: 'admin-setup-directions',
+      },
+      {
+        id: 'admin-queue-settings',
+        path: '/admin/queue-settings',
+        component: 'UnifiedSettings',
+        labelKey: 'nav.queue_settings',
+        activeSidebarItem: 'admin-queue-settings',
+      },
+      {
+        id: 'admin-queue-cabinet-management',
+        path: '/admin/queue-cabinet-management',
+        component: 'QueueCabinetManagement',
+        labelKey: 'nav.queue_today',
+        activeSidebarItem: 'admin-queue-cabinet-management',
+      },
+      {
+        id: 'admin-services',
+        path: '/admin/services',
+        component: 'AdminServices',
+        labelKey: 'nav.services',
+        activeSidebarItem: 'admin-services',
+      },
+    ];
+
+    for (const expected of routeContracts) {
+      const route = getRouteById(expected.id) as {
+        auth?: string;
+        roles?: string[];
+        component?: string;
+        nav?: { labelKey?: string };
+        layout?: { activeSidebarItem?: string };
+      } | undefined;
+      const chrome = getRouteChromeState(expected.path, '', adminProfile);
+
+      expect(getEffectiveRouteByPath(expected.path)?.id).toBe(expected.id);
+      expect(route?.auth).toBe('role-scoped');
+      expect(route?.roles).toEqual(['Admin']);
+      expect(route?.component).toBe(expected.component);
+      expect(route?.nav && typeof route.nav === 'object' ? route.nav.labelKey : undefined).toBe(expected.labelKey);
+      expect(route?.layout?.activeSidebarItem).toBe(expected.activeSidebarItem);
+      expect(chrome.activeSidebarItem).toBe(expected.activeSidebarItem);
+      expect(isRouteAccessibleToProfile(route as never, adminProfile)).toBe(true);
+    }
+
+    const profileRoute = getEffectiveRouteByPath('/admin/services');
+    expect(profileRoute?.id).toBe('admin-services');
+    expect(getRouteChromeState('/admin/services', '?servicesTab=queue-profiles', adminProfile).activeSidebarItem)
+      .toBe('admin-services');
+
+    const queueNavigation = getAdminNavSections(adminProfile)
+      .flatMap((section) => section.items)
+      .filter((item) => [
+        'admin-setup-directions',
+        'admin-queue-cabinet-management',
+        'admin-queue-settings',
+      ].includes(item.id));
+    const queueNavigationIds = queueNavigation.map((item) => item.id);
+    expect(queueNavigationIds.indexOf('admin-setup-directions'))
+      .toBeLessThan(queueNavigationIds.indexOf('admin-queue-cabinet-management'));
+    expect(queueNavigationIds.indexOf('admin-queue-cabinet-management'))
+      .toBeLessThan(queueNavigationIds.indexOf('admin-queue-settings'));
+  });
+
   it('registers public-site pages in both locales and keeps their canonical URLs', () => {
     for (const definition of PUBLIC_SITE_ROUTE_DEFINITIONS) {
       const route = getRouteById(definition.id) as {

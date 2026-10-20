@@ -1,3 +1,21 @@
+## Latest continuation — T16 queue administration navigation — 2026-10-20T10:26:30+05:00
+
+Continue task memory `1b8ddc8f-3dec-4d6c-8077-acc268801763` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t16-navigation\final`, branch `codex/aqs-T16-navigation`. Current local implementation commit is `5c2509be6`, based on fresh `origin/main` `ccbf519fdb0f9a32c3a71837202dfea296f13383` (T15 merge). Do not use or clean `C:\final` or the parallel photo-cleanup worktree.
+
+T16 is in progress. Mandatory route/query gate was run from the canonical launcher: normal gate requested a known root; one exact-root retry for `frontend/src/components/admin/AdminServices.tsx` returned `narrow_override` (`gate_misroute=true`, `override_used=true`, `handoff_required=true`). Its generated execution prompt was read. The user's instruction to continue implementation is the narrow basis. Gate/router files remain unchanged.
+
+Scope is fixed to `AdminServices.tsx` and its focused test; `routeRegistry.ts` and route/nav tests; five locale files (`ru.ts`, `en.ts`, `kk.ts`, `uz-Latn.ts`, `uz-Cyrl.ts`); `docs/ROLES_AND_ROUTING.md`; and this plan's main document, `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Do not edit backend/API/OpenAPI/generated API, RBAC/auth, DB/migrations, queue runtime/ownership, unrelated routes/aliases, staging/production/deploy, another task/worktree, review threads or merge.
+
+The AdminServices focused regression was run fail-first: 3 failed / 1 passed. Final targeted AdminServices, route ownership/contract, role parity, Sidebar and nav i18n suite: 54/54 PASS. Scoped ESLint: 0 errors / 16 pre-existing warnings. `git diff --check` PASS and remote main still matches the worktree base. Local type-check/build failures are documented in `PROGRESS.md`; they did not identify changed-file errors.
+
+`admin-navigation.spec.ts` is NOT_RUN because it requires `QA_ADMIN_PASSWORD`, implements password-only login without Admin TOTP handling, and defaults to port 5173. Do not point it at an unverified host; full synthetic Admin2FA UI acceptance remains outside this T16 slice. No staging/Tier-2/T18 validation is claimed.
+
+Normal commit hooks passed on `5c2509be6` (large-file, conflict, private-key, gitleaks, and frontend ESLint checks). All 573 task-owned dependency junctions were verified and removed; their shared targets were preserved. One generated Vitest cache file remains under the isolated worktree's `frontend/node_modules/.vite`.
+
+PR #3718 is Ready for review at HEAD `70f7999e637efbfac021fd80ddefe564beff3581` against base `ccbf519fdb0f9a32c3a71837202dfea296f13383`. Unified CI run `39374182108` completed successfully: Frontend build, lint/type-check, unit tests and E2E passed. PR Required Gate, parity, regression audit, locale, security/secrets, CodeQL, metadata, PR Quality Gate and lifecycle recommendation passed. Path-aware unrelated backend/staging/DB/Telegram/docs jobs are skipped, not passed. The first PR Review Quality Gate failed because required template sections were missing; the PR body was completed, the local checker passed, and rerun `39374375922` passed. Lifecycle recommendation `39375361458` passed after the Ready transition.
+
+Next exact action: commit and push the updated plan journals, then confirm exact-head checks on that journal commit. User/reviewer handles code review and merge. Tier-2/T18 remains outstanding; no deferral is claimed.
+
 ## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
 
 Continue task memory `174595f3-1a65-4f05-8b3d-1f2f5e2f27cb` in worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t15-context\final`, branch `codex/aqs-t15-setup-context`. PR #3711 remains OPEN/Ready/MERGEABLE at HEAD `e8e31fbc2fb7a4d02ccb64bc643c246c08122401`, based on current `origin/main` `279638ddf884f9da8012ddbdb13f2035abb2c96c`.
