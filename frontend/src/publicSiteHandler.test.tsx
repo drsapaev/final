@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handlePublicSiteRequest } from './publicSiteHandler';
+import { getPublicSiteBreadcrumbs } from './publicSitePage';
 import type { PublicSiteFetch } from './publicSiteApi';
 import nitroConfig from '../nitro.config';
 import { PUBLIC_SITE_ROUTE_DEFINITIONS } from './routing/publicSiteRouteEntries';
+import { resolvePublicSiteRoute } from './routing/publicSiteRouteEntries';
 
 const assets = {
   pageStyles: ['/assets/public-site.css'],
@@ -86,6 +88,175 @@ describe('public-site SSR request handler', () => {
     expect(html).toContain('hreflang="x-default"');
     expect(html).toContain('/assets/public-site.css');
     expect(html).not.toContain('/assets/clinic-app.js');
+  });
+
+  it.each([
+    {
+      path: '/ru/services/laser-care',
+      locale: 'ru',
+      kind: 'service',
+      slug: 'laser-care',
+      homeLabel: 'Главная',
+      homePath: '/ru',
+      sectionLabel: 'Услуги',
+      sectionPath: '/ru/services',
+      pageName: 'Лазерная терапия',
+    },
+    {
+      path: '/services/laser-care',
+      locale: 'uz-Latn',
+      kind: 'service',
+      slug: 'laser-care',
+      homeLabel: 'Bosh sahifa',
+      homePath: '/',
+      sectionLabel: 'Xizmatlar',
+      sectionPath: '/services',
+      pageName: 'Lazer terapiyasi',
+    },
+    {
+      path: '/ru/doctors/dermatolog',
+      locale: 'ru',
+      kind: 'doctor',
+      slug: 'dermatolog',
+      homeLabel: 'Главная',
+      homePath: '/ru',
+      sectionLabel: 'Врачи',
+      sectionPath: '/ru/doctors',
+      pageName: 'Врач дерматолог',
+    },
+    {
+      path: '/doctors/dermatolog',
+      locale: 'uz-Latn',
+      kind: 'doctor',
+      slug: 'dermatolog',
+      homeLabel: 'Bosh sahifa',
+      homePath: '/',
+      sectionLabel: 'Shifokorlar',
+      sectionPath: '/doctors',
+      pageName: 'Dermatolog shifokor',
+    },
+  ])('renders matching localized breadcrumbs and JSON-LD for $path', async (scenario) => {
+    const { kind, locale, path, slug, pageName } = scenario;
+    const apiPath = kind === 'service'
+      ? `/api/v1/public-site/services/${slug}`
+      : `/api/v1/public-site/doctors/${slug}`;
+    const apiRecord = kind === 'service'
+      ? { slug, name: pageName, description: 'Published service description.', price: null, currency: null }
+      : { slug, name: pageName, bio: 'Published doctor biography.' };
+    const fetchImpl = createFetch((url) => {
+      expect(url.pathname).toBe(apiPath);
+      expect(url.searchParams.get('locale')).toBe(locale);
+      return jsonResponse(apiRecord);
+    });
+    const response = await handlePublicSiteRequest(
+      new Request(`https://preview.kosmed.test${path}`),
+      {
+        apiOrigin: 'https://api.kosmed.test',
+        siteOrigin: 'https://www.kosmed.test',
+        deploymentEnvironment: 'preview',
+      },
+      assets,
+      fetchImpl,
+    );
+    const html = await response.text();
+    const navigation = html.match(/<nav class="public-site__breadcrumbs"[\s\S]*?<\/nav>/);
+    const jsonLdTag = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+
+    expect(response.status).toBe(200);
+    expect(navigation).not.toBeNull();
+    expect(navigation?.[0]).toContain(`<a href="${scenario.homePath}">${scenario.homeLabel}</a>`);
+    expect(navigation?.[0]).toContain(`<a href="${scenario.sectionPath}">${scenario.sectionLabel}</a>`);
+    expect(navigation?.[0]).toContain(`<span aria-current="page">${pageName}</span>`);
+    expect(jsonLdTag).not.toBeNull();
+    if (!jsonLdTag) throw new Error('BreadcrumbList JSON-LD was not rendered.');
+
+    const jsonLd = JSON.parse(jsonLdTag[1]) as {
+      '@context': string;
+      '@type': string;
+      itemListElement: Array<{
+        '@type': string;
+        position: number;
+        name: string;
+        item: string;
+      }>;
+    };
+    expect(jsonLd).toEqual({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: scenario.homeLabel,
+          item: new URL(scenario.homePath, 'https://www.kosmed.test').href,
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: scenario.sectionLabel,
+          item: new URL(scenario.sectionPath, 'https://www.kosmed.test').href,
+        },
+        {
+          '@type': 'ListItem',
+          position: 3,
+          name: pageName,
+          item: new URL(path, 'https://www.kosmed.test').href,
+        },
+      ],
+    });
+  });
+
+  it('omits breadcrumbs from home, hidden details, and their JSON-LD', async () => {
+    const homeRoute = resolvePublicSiteRoute('/');
+    const missingRoute = resolvePublicSiteRoute('/ru/services/hidden-service');
+    expect(homeRoute).not.toBeNull();
+    expect(missingRoute).not.toBeNull();
+    if (!homeRoute || !missingRoute) throw new Error('Expected public routes to resolve.');
+    expect(getPublicSiteBreadcrumbs(homeRoute, {})).toEqual([]);
+    expect(getPublicSiteBreadcrumbs(missingRoute, {})).toEqual([]);
+
+    const fetchImpl = createFetch(() => jsonResponse({ detail: { code: 'public_content_not_found' } }, 404));
+    const response = await handlePublicSiteRequest(
+      new Request('https://preview.kosmed.test/ru/services/hidden-service'),
+      { apiOrigin: 'https://api.kosmed.test', deploymentEnvironment: 'preview' },
+      assets,
+      fetchImpl,
+    );
+    const html = await response.text();
+
+    expect(response.status).toBe(404);
+    expect(html).not.toContain('public-site__breadcrumbs');
+    expect(html).not.toContain('BreadcrumbList');
+  });
+
+  it('escapes untrusted catalog text inside the JSON-LD script element', async () => {
+    const unsafeName = '</script><script>alert(1)</script> &';
+    const fetchImpl = createFetch(() => jsonResponse({
+      slug: 'unsafe-name',
+      name: unsafeName,
+      description: 'Published service description.',
+      price: null,
+      currency: null,
+    }));
+    const response = await handlePublicSiteRequest(
+      new Request('https://preview.kosmed.test/ru/services/unsafe-name'),
+      { apiOrigin: 'https://api.kosmed.test', deploymentEnvironment: 'preview' },
+      assets,
+      fetchImpl,
+    );
+    const html = await response.text();
+    const jsonLdTag = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+
+    expect(response.status).toBe(200);
+    expect(html).not.toContain('</script><script>alert(1)</script>');
+    expect(html).toContain('&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt; &amp;');
+    expect(html).toContain('\\u003c/script\\u003e\\u003cscript\\u003ealert(1)\\u003c/script\\u003e \\u0026');
+    expect(jsonLdTag).not.toBeNull();
+    if (!jsonLdTag) throw new Error('BreadcrumbList JSON-LD was not rendered.');
+    const jsonLd = JSON.parse(jsonLdTag[1]) as {
+      itemListElement: Array<{ name: string }>;
+    };
+    expect(jsonLd.itemListElement[jsonLd.itemListElement.length - 1]?.name).toBe(unsafeName);
   });
 
   it('returns a generic 503 and never renders prior page data when the API fails', async () => {
