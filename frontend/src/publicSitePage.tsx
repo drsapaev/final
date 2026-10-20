@@ -24,6 +24,7 @@ interface Copy {
   breadcrumbs: string;
   home: string;
   mobileMenu: string;
+  skipToContent: string;
   loading: string;
   loadError: string;
   retry: string;
@@ -63,6 +64,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     breadcrumbs: 'Навигационная цепочка',
     home: 'Главная',
     mobileMenu: 'Меню',
+    skipToContent: 'Перейти к основному содержимому',
     loading: 'Загружаем актуальную информацию клиники…',
     loadError: 'Не удалось загрузить актуальную информацию клиники.',
     retry: 'Повторить',
@@ -100,6 +102,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     breadcrumbs: 'Sahifa yo‘nalishi',
     home: 'Bosh sahifa',
     mobileMenu: 'Menyu',
+    skipToContent: 'Asosiy mazmunga o‘tish',
     loading: 'Klinikaning dolzarb ma’lumotlari yuklanmoqda…',
     loadError: 'Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi.',
     retry: 'Qayta urinish',
@@ -432,8 +435,9 @@ export function PublicSitePage({ route, data }: PublicSitePageProps) {
   const copy = COPY[route.locale];
   return (
     <div className="public-site">
+      <a className="public-site__skip-link" href="#main-content">{copy.skipToContent}</a>
       <SiteHeader locale={route.locale} route={route} copy={copy} />
-      <main className="public-site__main" id="main-content">
+      <main className="public-site__main" id="main-content" tabIndex={-1}>
         <BreadcrumbNavigation
           items={getPublicSiteBreadcrumbs(route, data)}
           label={copy.breadcrumbs}
@@ -456,8 +460,9 @@ export function PublicSiteRequestState({
   const isError = status === 'error';
   return (
     <div className="public-site">
+      <a className="public-site__skip-link" href="#main-content">{copy.skipToContent}</a>
       <SiteHeader locale={route.locale} route={route} copy={copy} />
-      <main className="public-site__main" id="main-content" aria-busy={!isError}>
+      <main className="public-site__main" id="main-content" tabIndex={-1} aria-busy={!isError}>
         <section className="public-site__error" role={isError ? 'alert' : 'status'}>
           <h1>{isError ? copy.loadError : copy.loading}</h1>
           {isError && <a href={getPublicSitePath(route.kind, route.locale, route.slug)}>{copy.retry}</a>}

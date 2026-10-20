@@ -1,0 +1,36 @@
+{
+  "title": "Doktor KosMed public-site accessibility review",
+  "source_base_sha": "55a88b057f516ef86d01b7c927bee0013cbf477b",
+  "target_standard": "WCAG 2.2 AA",
+  "scope": [
+    "Shared public-site renderer used by Vite and Nitro SSR",
+    "Public page and loading/error page landmarks",
+    "Keyboard bypass from site navigation to main content"
+  ],
+  "method": "Static source review only",
+  "automated_checks": {
+    "axe": "not_run",
+    "coverage_note": "The existing generic Axe route list does not explicitly include localized public-site catalog, doctor, service, or contact routes."
+  },
+  "manual_checks": {
+    "keyboard_navigation": "not_run",
+    "screen_reader": "not_run",
+    "color_contrast": "not_run",
+    "real_mobile_devices": "not_run"
+  },
+  "findings": [
+    {
+      "criterion": "WCAG 2.2 SC 2.4.1 Bypass Blocks",
+      "severity": "moderate",
+      "status": "source_change_added_runtime_verification_pending",
+      "observation": "The shared public renderer placed the site header before the main landmark without a skip link. A localized focus-only link now targets the main landmark in both the page and loading/error renderers; the target is programmatically focusable.",
+      "verification_needed": "Use keyboard navigation in the built Vite and Nitro SSR pages to confirm the first Tab reveals the link and activation moves focus to the main content."
+    }
+  ],
+  "result": "partial_not_a_conformance_pass",
+  "limitations": [
+    "No Axe or equivalent automated scan was run.",
+    "No manual keyboard or screen-reader session was run.",
+    "This review does not assess all WCAG 2.2 AA criteria or real-device behavior."
+  ]
+}
