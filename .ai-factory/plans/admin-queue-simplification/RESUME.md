@@ -1,3 +1,13 @@
+## Latest continuation — T17 PR Ready; exact docs-head CI passed — 2026-10-20T14:37:00+05:00
+
+Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. PR #3721 is OPEN/Ready for review/MERGEABLE at HEAD `ef41f75c262488741053d74e8b96ab9059514aa8`; base and `origin/main` are `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. User performs merge.
+
+Exact-head Unified CI run `39399756835` passed on `ef41f75c`, including Frontend E2E (16m33s), build, unit, lint, Required Gate, security, CodeQL, Gitleaks, locale, regression and scratch guards; GitGuardian passed. Path-aware backend/integration/Docker/parity/readiness jobs are skipped, not passed. The two post-Ready status gates also passed. T17 r6 targeted Admin/CSV/bulk synthetic staging acceptance and owned teardown are PASS. Full `STAGING_VALIDATION.md` and T18 remain outstanding.
+
+The plan and PR description record staging/CI evidence. Host policy blocked deletion of ignored local env/harness files before execution; they remain local and uncommitted, no alternate deletion method was attempted, and the PR body discloses this. Compose resources are all torn down.
+
+Next: create/push this final documentation-only status checkpoint, then verify its exact-head jobs. After green, leave PR #3721 Ready for reviewer/user disposition. Do not merge, deploy, or start T18 before user merge. Preserve isolation from `C:\final` and the parallel photo-cleanup worktree.
+
 ## Latest continuation — T17 PR description and body gate complete; checkpoint push next — 2026-10-20T14:16:00+05:00
 
 Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. PR #3721 is OPEN/Draft/MERGEABLE at code HEAD `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`; base and `origin/main` are `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. User performs merge.

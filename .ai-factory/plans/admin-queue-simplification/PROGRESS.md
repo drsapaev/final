@@ -1,3 +1,12 @@
+## Latest checkpoint — T17 PR Ready; exact docs-head checks PASS — 2026-10-20T14:37:00+05:00
+
+- PR #3721 is OPEN/Ready for review/MERGEABLE at exact HEAD `ef41f75c262488741053d74e8b96ab9059514aa8`; base/current `origin/main` is `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+- Exact-head Unified CI run `39399756835` completed successfully on `ef41f75c`; Frontend build, unit, lint, E2E (16m33s), Required Gate, security, Gitleaks, locale, regression, scratch guards and CodeQL passed. GitGuardian passed. Backend, integration, Docker, parity, readiness and other unrelated path-aware jobs were SKIPPED, not passed.
+- Post-Ready `PR Review Quality Gate` and `Recommend PR lifecycle state` also PASS. User retains merge; no review approval or merge was submitted by this task.
+- T17 r6 targeted synthetic Tier 2 remains PASS with owned Compose teardown at zero resources. Full STAGING_VALIDATION.md and T18 integrated acceptance remain separate.
+- The four plan journals are clean and pushed at `ef41f75c`. A documentation-only final status checkpoint will trigger another applicable CI run; do not expand source scope. Local ignored env/harness cleanup remains host-policy blocked and is disclosed; no staging resources remain.
+- Next exact action: commit/push this final status checkpoint and verify its exact-head checks; then stop at Ready for review for the user/reviewer. Do not merge, deploy, or begin T18 before the user merges.
+
 ## Latest checkpoint — T17 staging and PR description verified; local cleanup blocked — 2026-10-20T14:16:00+05:00
 
 - PR #3721 remains OPEN/Draft/MERGEABLE at code HEAD `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`, base/current `origin/main` `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. Applicable exact-code-head CI was PASS before the description update; path-aware skipped jobs remain SKIPPED.

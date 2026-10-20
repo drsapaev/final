@@ -4800,3 +4800,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Actual tracked paths: only `.ai-factory/plans/admin-queue-simplification/{PROGRESS.md,EVIDENCE.md,RESUME.md}` and `.ai-factory/plans/codex-admin-queue-simplification.md` are modified.
 - Remaining limitation: local ignored-artifact cleanup is blocked by the host policy. The staging stack itself is stopped and its owned containers, volumes, and network were verified at zero by canonical r6 teardown. Full `STAGING_VALIDATION.md` and T18 remain outstanding.
 - Next exact action: inspect and diff-check the four journals, commit/push them with normal hooks, then verify PR #3721 exact head and all applicable CI including metadata workflows. Mark Ready for review only if those checks are green. User retains merge; no merge or deployment.
+
+## T17 — PR #3721 Ready and exact documentation-head checks passed — 2026-10-20T14:37:00+05:00
+
+- Commit under test: `ef41f75c262488741053d74e8b96ab9059514aa8`; PR #3721 base `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+- Environment: isolated T17 worktree. PR is OPEN, Ready for review, MERGEABLE. `origin/main` still matches the PR base.
+- Validation: Unified CI run `39399756835` completed PASS on exact HEAD `ef41f75c`: Frontend build, unit, lint, E2E (16m33s), PR Required Gate, CodeQL, security, Gitleaks, locale parity, regression, scratch guards and other applicable checks passed. GitGuardian passed. Backend, integration, Docker, parity, readiness and other unrelated/path-aware jobs were SKIPPED and are not counted as passes. Post-Ready PR Review Quality Gate and lifecycle recommendation checks passed.
+- PR lifecycle: `gh pr ready 3721` succeeded. No review approval, merge, or deployment was performed; user retains merge.
+- Scope: no product source changed in this checkpoint. Only the four T17 plan documents are intended for the next documentation-only commit. The r6 staging result and zero-resource teardown remain as recorded above.
+- Remaining limitation: ignored local synthetic env/harness files remain because host policy rejected the exact cleanup command before execution; the PR body discloses this. No alternate deletion path was used. No staging Compose resource remains. Full `STAGING_VALIDATION.md` and T18 are still outstanding.
+- Next exact action: commit/push the status checkpoint and recheck the exact new HEAD. After that, leave PR Ready for independent review/user merge.
