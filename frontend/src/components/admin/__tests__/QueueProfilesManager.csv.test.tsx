@@ -107,7 +107,8 @@ const oldFormatCsv = [
 const capturedBlobs: Blob[] = [];
 const capturedBlobTexts: string[] = [];
 const baselineSyntheticProfiles = syntheticProfiles.map((profile) => ({ ...profile, queue_tags: [...profile.queue_tags] }));
-const defaultGetImplementation = (api.get as ReturnType<typeof vi.fn>).getMockImplementation();
+type QueueProfilesGetImplementation = (url: string) => Promise<{ data: Record<string, unknown> }>;
+const defaultGetImplementation = (api.get as ReturnType<typeof vi.fn>).getMockImplementation() as QueueProfilesGetImplementation | undefined;
 
 // jsdom has no URL.createObjectURL/revokeObjectURL and its Blob lacks .text()
 // — stub Blob + URL.assign directly (vi.restoreAllMocks would also reset the
