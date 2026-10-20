@@ -1,6 +1,6 @@
-## T16 — route/nav regression validation and local tool limits — 2026-10-20T10:12:01+05:00
+## T16 — route/nav regression validation and local tool limits — 2026-10-20T10:13:25+05:00
 
-- Commit under test: clean base commit `ccbf519fdb0f9a32c3a71837202dfea296f13383`; source/docs are uncommitted in isolated worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t16-navigation\final`, branch `codex/aqs-T16-navigation`.
+- Commit under test: implementation commit `5c2509be6` on base `ccbf519fdb0f9a32c3a71837202dfea296f13383`, isolated worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t16-navigation\final`, branch `codex/aqs-T16-navigation`.
 - Environment: Windows PowerShell. Fresh GitHub main was fetched to the worktree without switching or modifying the main worktree. Existing frontend dependencies were exposed through individually tracked temporary junctions; shared dependency targets were not modified.
 - Execution mode: mandatory `gate_known_root_cause` for route/query and Admin navigation contract work. Initial canonical gate requested known root; exact-root retry for `frontend/src/components/admin/AdminServices.tsx` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. The generated execution prompt was read. The user's continuing implementation request is the narrow basis; gate/router were not changed.
 - Allowed paths: `AdminServices.tsx`; new `AdminServices.navigation.test.tsx`; `routeRegistry.ts`; focused route/nav tests; five locale files; `docs/ROLES_AND_ROUTING.md`; main plan and this plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
@@ -9,11 +9,11 @@
 - Results: targeted Vitest PASS, 6 files / 54 tests; `navI18nContract` contributes 12 locale/nav checks and role parity contributes 12 tests. A first expanded run had one test-harness-only failure because spying on `Storage.prototype.getItem` did not intercept JSDOM's actual `localStorage` instance. The mock was corrected to spy on that instance; final targeted suite passes 54/54. Scoped ESLint PASS, 0 errors / 16 pre-existing warnings in unused fixtures/constants in `routeContract.test.ts`.
 - Type-check: FAIL before changed-file diagnostics. Reported issues are unavailable `nitro`, unavailable `nitro/runtime-config`, and an unrelated existing implicit-`route` diagnostic in `publicSiteHandler.test.tsx`. Build: FAIL loading `vite.config.ts` because the shared dependency cache lacks `nitro`; app compilation did not begin. No dependency install was attempted. Output was directed to worktree `.scratch`; no build artifact remained. The exact temporary Vite config under `C:\final\frontend\node_modules\.vite-temp` was absent after the command.
 - `admin-navigation.spec.ts`: NOT_RUN after read-only inspection. It requires `QA_ADMIN_PASSWORD`, performs password-only Admin login without a TOTP challenge, and Playwright defaults to `localhost:5173`; no credentials were guessed and no host was contacted. Full synthetic Admin2FA UI acceptance belongs to later integration work.
-- `git diff --check`: PASS after the latest source/test/docs edits. `git ls-remote origin refs/heads/main` returned `ccbf519fdb0f9a32c3a71837202dfea296f13383`, equal to the clean worktree base. Hosted exact-head CI is pending PR creation. No staging/Tier-2/T18 validation or deferral is claimed.
+- `git diff --check`: PASS before commit. Normal commit hooks passed on `5c2509be6`: large-file, merge-conflict, private-key, YAML/JSON/TOML scope checks, end-of-file/whitespace fixes, gitleaks and frontend ESLint. `git ls-remote origin refs/heads/main` returned `ccbf519fdb0f9a32c3a71837202dfea296f13383`, equal to the base. Hosted exact-head CI is pending push/PR creation. No staging/Tier-2/T18 validation or deferral is claimed.
 - Read-only GitHub verification corrected the historical T12.2 card: PR #3693 is MERGED at `7f923f14a347a26b7f80da0fb40a0cff8858ef27`, final PR HEAD `2500478aacfce6268cfa419c1976a7b1814f7f4f`; Unified CI `39029748358` concluded success on that exact HEAD. Tier-2 remains partial with named NOT_RUN and provenance gaps.
 - Actual changed paths: `AdminServices.tsx`, its focused navigation test, `routeRegistry.ts`, route contract test, Sidebar nav i18n test, five locales, `docs/ROLES_AND_ROUTING.md`, the main plan and this plan's PROGRESS/EVIDENCE/RESUME.
 - Scope check: only the task's isolated worktree; no change to `C:\final`, the parallel task worktree, backend/API/OpenAPI, auth/RBAC policy, database/migrations, queue runtime, staging, production, deployment, other PRs, review threads or merge.
-- Next exact action: inspect the full diff, run `git diff --check`, verify allowed paths, then commit/push/create T16 PR and monitor exact-head CI. User retains merge authority.
+- Next exact action: verify the committed tree and remove only the exact own dependency junctions; then push/create the T16 PR and monitor exact-head CI. User retains merge authority.
 
 ## T15 PR #3711 — exact-head CI for year-zero date fix — 2026-10-19T23:25:09+05:00
 
@@ -4572,3 +4572,16 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: only own T16 worktree; no change to `C:\final`, parallel task worktree, backend/API/OpenAPI, auth/RBAC policy, database, queue runtime, staging, production, deployment, another PR, review threads or merge.
 - Remaining limitation: test suite is still partial; no hosted CI/PR yet. Tier-2/T18 is not attempted here and no staging deferral is claimed.
 - Next exact action: execute the remaining route/ownership/nav tests listed in `RESUME.md`; record each command/result, then run scoped lint/build and diff check.
+
+## T16 — committed implementation and dependency cleanup — 2026-10-20T10:16:26+05:00
+
+- Commit under test: `5c2509be6da4a62b0ff364ef105ed606bee434dc`; base and current `origin/main`: `ccbf519fdb0f9a32c3a71837202dfea296f13383`.
+- Environment: isolated Windows worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t16-navigation\final`, branch `codex/aqs-T16-navigation`. `C:\final` and the parallel photo-cleanup worktree were not changed.
+- Actual implementation paths: AdminServices URL/tab synchronization and focused tests; Admin route registry and route/navigation tests; five locale files; `docs/ROLES_AND_ROUTING.md`; T16 plan journals. No backend/API/OpenAPI, auth/RBAC, DB, queue-runtime, staging or production paths changed.
+- Validation: targeted Vitest across six files — PASS, 54/54; scoped ESLint — PASS, 0 errors and 16 pre-existing unused-variable warnings in route-contract fixtures; normal commit hooks — PASS; fresh remote-main check — PASS (still equals base).
+- Local TypeScript check — FAIL due unavailable `nitro`, `nitro/runtime-config`, plus an unrelated existing `publicSiteHandler.test.tsx` implicit-route diagnostic; no changed-file diagnostic was reported. Local build — FAIL before application compilation because the reused shared dependency cache lacks Nitro. No packages were installed.
+- Admin live browser spec `admin-navigation.spec.ts` — NOT_RUN: it uses password-only Admin login without TOTP handling and defaults to localhost:5173; no compatible verified synthetic harness is part of T16. Tier-2/T18 — NOT_RUN; no deferral claimed.
+- Dependency cleanup: verified and removed 573 task-owned junctions whose targets exactly matched entries under `C:\final\frontend\node_modules`; shared dependency targets were preserved. One generated Vitest cache file remains under the isolated worktree at `frontend/node_modules/.vite`.
+- Scope check: PASS. No changes to the main checkout, parallel task, staging, production, deployment, review threads or merge.
+- Remaining limitation: `git diff --check`, hosted exact-head CI and review are pending after final journal update. The branch has not been pushed and no PR exists yet.
+- Next exact action: run `git diff --check`, push the branch, open the T16 PR and verify exact-head CI. Merge remains with the user.

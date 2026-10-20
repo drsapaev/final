@@ -1,4 +1,4 @@
-## Latest checkpoint — T16 local checks and diff review complete — 2026-10-20T10:12:01+05:00
+## Latest checkpoint — T16 implementation committed; dependency junctions cleaned — 2026-10-20T10:16:26+05:00
 
 - T15 / PR #3711 was merged by the user at `ccbf519fdb0f9a32c3a71837202dfea296f13383`. Fresh `origin/main` and this isolated worktree base are that same commit. Work is on `codex/aqs-T16-navigation`; `C:\final` and the parallel photo-cleanup task's worktree remain untouched.
 - T13 #3697 and T14 #3702 are merged. T12.2 #3693 is in current main at `7f923f14a347a26b7f80da0fb40a0cff8858ef27`; its partial Tier-2 evidence remains historical and does not close T18.
@@ -10,21 +10,21 @@
 - Changes: URL/query is canonical for the selected service tab, unknown/duplicate values safely normalize to catalog, entity-only setup context is pruned when incompatible, tab changes create history entries, and labels for the four preserved URLs are unified across five locales. Route order and operator routing documentation are updated.
 - Scoped ESLint: 0 errors / 16 warnings, all in pre-existing unused fixtures/constants in `routeContract.test.ts`. `npm run type-check` FAILS only on unavailable `nitro`/`nitro/runtime-config` and unrelated existing `publicSiteHandler.test.tsx` implicit-`route` diagnostic. Build FAILS while loading `vite.config.ts` because the shared dependency cache lacks Nitro; app compilation did not begin. No dependency install was attempted.
 - `admin-navigation.spec.ts` is NOT_RUN: it demands `QA_ADMIN_PASSWORD`, implements password-only login without Admin TOTP handling, and Playwright defaults to `localhost:5173`; a safe synthetic 2FA harness is not part of T16 scope. Targeted route/component tests cover the changed contract. Tier-2/T18 was not attempted and no deferral is claimed.
-- Temporary worktree-only node dependency junctions are tracked in `.scratch/t16-node-module-junctions.txt`; remove only those exact junctions after final checks, never their shared targets. No staging/production data or services were touched.
-- Current checkpoint: changed source/test/locales/docs are uncommitted in the isolated worktree; HEAD/base remain `ccbf519fdb0f9a32c3a71837202dfea296f13383`.
+- All 573 temporary dependency junctions listed in the task-owned manifest were verified to target matching paths under `C:\final\frontend\node_modules`, then removed. Shared dependency targets were preserved. One generated Vitest cache file remains under this worktree's `frontend/node_modules/.vite`; it is not a dependency junction. No staging/production data or services were touched.
+- Current checkpoint: implementation, tests, locales, operator docs and plan updates are committed locally as `5c2509be6` on top of base `ccbf519fdb0f9a32c3a71837202dfea296f13383`; the branch has not been pushed and PR is not yet created.
 
 | Task | Status | PR / commit | Evidence |
 |------|--------|-------------|----------|
-| T16 | IN_PROGRESS | `codex/aqs-T16-navigation`, base `ccbf519fdb0f9a32c3a71837202dfea296f13383` | Focused route/ownership/nav/i18n 54/54 PASS; local build/type-check limitations recorded |
+| T16 | IN_PROGRESS | `codex/aqs-T16-navigation`, commit `5c2509be6`, base `ccbf519fdb0f9a32c3a71837202dfea296f13383` | 54/54 focused tests; lint/diff/hooks PASS; local build/type-check limitations recorded |
 | T17 | PLANNED | | |
 | T18 | PLANNED | | |
 
 ## Current checkpoint
 - Completed: merged-T15 state verified; isolated worktree and T16 gate prompt verified; fail-first issue reproduced; URL state/history, Admin route ownership, route nav keys/order, five locales and operator routing docs implemented. Focused route/ownership/nav/i18n tests 54/54 and scoped ESLint 0 errors.
 - Changed but not verified: full exact-head hosted CI and reviewer recheck; local type-check/build are limited by the dependency cache and pre-existing diagnostics noted above.
-- Remaining: final check of scratch/junction ownership and diff scope, normal commit hooks, push, create the T16 PR and verify its exact-head CI. Keep `admin-navigation.spec.ts` NOT_RUN unless a compatible synthetic 2FA harness is provided by the existing project setup.
+- Remaining: run `git diff --check`, push the committed branch, create the T16 PR and verify exact-head CI. Keep `admin-navigation.spec.ts` NOT_RUN unless a compatible synthetic 2FA harness is provided by the existing project setup.
 - Blocker: none currently.
-- Next exact action: inspect the complete diff and verify only declared paths changed; `git diff --check` already passes. Then execute the normal commit/push/PR cycle and monitor exact-head CI.
+- Next exact action: rerun `git diff --check`, push/open T16 PR and monitor exact-head CI.
 - Checks to rerun after any source change: all six targeted Vitest files, locale/navigation contract tests, scoped ESLint and `git diff --check`; hosted frontend build/type-check/E2E are required on the pushed exact head. Remote `main` still equals base `ccbf519fdb0f9a32c3a71837202dfea296f13383`.
 
 ## Latest checkpoint — T15 PR #3711 second-direction entry P2 fixed locally — 2026-10-20T00:32:08+05:00
