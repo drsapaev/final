@@ -1,4 +1,12 @@
-## Latest continuation — T17 PR #3721 review fixes validated locally — 2026-10-20T17:27:42+05:00
+## Latest continuation — T17 PR #3721 exact-head CI passed — 2026-10-20T17:48:01+05:00
+
+Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. Product commit `e88cc6aa1a7a31339c42455598f03a3f42d57eea` is pushed to PR #3721, which is OPEN/Ready/MERGEABLE. Base/current `origin/main` is `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+
+Exact code-head run `39422914134` passed, including frontend unit, build, lint, E2E (14m11s), PR Required Gate, security, CodeQL, gitleaks, locale, regression, and scratch guards. Path-aware backend/integration/Docker/parity/readiness and unrelated jobs are skipped, not passed. No review replies or thread resolutions were sent; user retains merge. Local validation also passed: focused CSV tests 17/17, type-check, scoped ESLint, frontend build, locale parity, backend alias expansion, and diff check.
+
+Only the plan journals will change in the next docs checkpoint. That will create a new PR SHA and require checks on that exact SHA. Do not resolve threads or merge. Do not start T18 before user merge.
+
+## Previous continuation — T17 PR #3721 review fixes validated locally — 2026-10-20T17:27:42+05:00
 
 Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. PR #3721 is OPEN/Ready/MERGEABLE at remote HEAD `fe2944ff90a410ff8df2393d4a91bd73b3f25102`, base/current `origin/main` `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. The two review threads remain open; local changes are not committed or pushed. User retains merge.
 

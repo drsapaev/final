@@ -4835,3 +4835,12 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Actual tracked paths: T17 `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`; `QueueProfilesManager.tsx`; its CSV regression test; locales `en.ts`, `kk.ts`, `ru.ts`, `uz-Cyrl.ts`, `uz-Latn.ts`.
 - Scope check: PASS. No backend/API/OpenAPI/DB, auth/RBAC, queue ownership/fairness, staging/Compose, production, `C:\final`, foreign worktree, review thread, merge, or deployment changed.
 - Remaining: normal commit hooks, push, and exact-head GitHub CI. Review threads remain open; no GitHub write yet. User retains merge.
+
+## T17 — PR #3721 exact product-head CI PASS — 2026-10-20T17:48:01+05:00
+
+- Product commit under test: `e88cc6aa1a7a31339c42455598f03a3f42d57eea`; PR #3721; base/current main `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+- GitHub state: PR OPEN/Ready/MERGEABLE at exact product head `e88cc6aa`; Unified CI `39422914134` completed successfully. Frontend unit tests, build, lint, E2E (14m11s), PR Required Gate, CI scope, CodeQL, security, gitleaks, GitGuardian, locale parity, regression audit, PR review quality/lifecycle gates, scratch guards, and notifications passed.
+- `SKIPPED`, not PASS: backend tests, integration tests, Docker build, Frontend-Backend Parity, production/staging readiness, Supabase preview, DAST, Telegram release gate, load tests, and unrelated path-aware jobs. T17 targeted synthetic staging evidence is from the prior recorded r6 cycle; this CSV patch did not use or rerun staging.
+- Local exact product validation is recorded in the preceding entry: focused CSV Vitest 17/17; type-check; scoped ESLint (0 errors, 3 existing warnings at unchanged lines); frontend build; locale parity; backend `stomatology` expansion; and `git diff --check` PASS.
+- Review threads: the two P1/P2 threads remain open. No review comment/reply/resolve, approval, merge, or deployment was performed. User retains merge.
+- Next exact action: commit/push this documentation-only status checkpoint and verify any new PR-head checks. No source behavior changes are planned.

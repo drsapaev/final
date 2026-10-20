@@ -1,4 +1,12 @@
-## Latest checkpoint — T17 PR #3721 P1/P2 fixes validated locally — 2026-10-20T17:27:42+05:00
+## Latest checkpoint — T17 PR #3721 exact-head checks passed — 2026-10-20T17:48:01+05:00
+
+- PR #3721 is OPEN/Ready/MERGEABLE at exact code HEAD `e88cc6aa1a7a31339c42455598f03a3f42d57eea`; base/current `origin/main` `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. P1/P2 review threads remain unresolved; no review reply/resolve was sent. User retains merge.
+- Unified CI run `39422914134` and all other applicable exact-head checks passed: Frontend unit/E2E/build/lint; PR Required Gate; CI scope; CodeQL; security/gitleaks/GitGuardian; locale parity; regression audit; PR review quality/lifecycle gates; scratch guards; notification checks. E2E duration 14m11s.
+- Backend tests, integration, Docker, frontend/backend parity, readiness, Supabase preview, DAST, Telegram, load tests, and other path-aware jobs were `SKIPPED`, not passed. This review fix is frontend-only; T17 scoped synthetic staging acceptance was already recorded in earlier entries and was not rerun for this CSV patch.
+- Local validation for `e88cc6aa` remains: CSV Vitest 17/17, type-check, scoped ESLint, frontend build, locale parity, backend dental expansion, and `git diff --check` PASS. Source commit is pushed and tracked worktree clean; ignored `node_modules`, `dist`, and root `.scratch` npm cache remain local.
+- Next exact action: update this documentation-only CI checkpoint, commit/push it, and verify the new exact PR head checks. Do not resolve threads or merge.
+
+## Previous checkpoint — T17 PR #3721 P1/P2 fixes validated locally — 2026-10-20T17:27:42+05:00
 
 - PR #3721 remains OPEN/Ready/MERGEABLE at remote HEAD `fe2944ff90a410ff8df2393d4a91bd73b3f25102`; base/current `origin/main` `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. Two current review threads remain unresolved. Local changes are uncommitted and not pushed.
 - Fixes: CSV re-import cannot publish a hidden profile (`true` is review intent; update omits the QR field), create remains hidden, existing pending requests are counted/reminded, and reminder/preview copy is accurate in five locales. Dental tag verification now mirrors backend canonical expansion.
