@@ -199,8 +199,25 @@ that no other operation is active. For synchronization without deployment, use
 `git pull --ff-only origin main` only when the clean main checkout is known idle
 and the action is authorized. Never use `git switch main` as a recovery shortcut.
 
-If another task owns dirty files or the checkout is not on `main`, stop only
-that production-checkout operation. Record its exact prerequisite and resume
+When adopting a reviewed ignore-rule change for the first time, the old
+checkout may still report only `?? .scratch/` and `?? .gate_artifacts/`.
+Do not wait indefinitely for those generated files to disappear. An already
+authorized sync of an idle `main` may proceed with `git merge --ff-only origin/main`
+after fetching and confirming all of the following: there are no tracked
+changes, every untracked path is under those exact reserved roots, the fetched
+ignore rules reserve both roots, neither the current index nor the incoming
+diff tracks any path inside them, and `HEAD` is an ancestor of `origin/main`.
+Inspect actual untracked paths with `git ls-files --others --exclude-standard`,
+the index with `git ls-files -- .scratch .gate_artifacts`, and incoming paths
+with `git diff --name-only HEAD..origin/main -- .scratch .gate_artifacts`.
+Preserve the files and let Git refuse any collision. Any other dirt, divergence
+or uncertain operation ownership stops this sync. Then rerun normal cleanliness
+checks; this exception permits only that initial fast-forward, never a deploy
+with a dirty tree. Do not use force, autostash, deletion or local blanket
+excludes to bypass the production guard.
+
+If another task owns tracked changes or ordinary untracked files, or the
+checkout is not on `main`, stop only that production-checkout operation. Record its exact prerequisite and resume
 independent work from current `origin/main`; do not wait for another chat to
 finish when a safe isolated path exists.
 
