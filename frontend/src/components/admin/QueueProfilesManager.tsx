@@ -54,6 +54,7 @@ import {
   parseQueueProfilesCsv,
   queueProfileToCsvPayload,
 } from './queueProfilesCsv';
+import type { QueueProfilesCsvRow } from './queueProfilesCsv';
 import { QUEUE_PROFILE_COLOR_PRESETS } from './queueProfileColors';
 
 interface QueueProfileDto {
@@ -84,6 +85,125 @@ interface DepartmentDto {
     name_ru?: string;
     [key: string]: unknown;
 }
+
+type QueueProfileOperationStatus = 'completed' | 'refused' | 'not_started' | 'unverified';
+
+interface QueueProfileOperationRowResult {
+    key: string;
+    status: QueueProfileOperationStatus;
+    message?: string;
+    requestedQrPublication?: boolean;
+}
+
+interface CsvImportTask {
+    row: QueueProfilesCsvRow;
+    mode?: 'create' | 'update';
+    requestedQrPublication: boolean;
+}
+
+type QueueProfileOperation =
+    | { kind: 'delete'; keys: string[] }
+    | { kind: 'set-active'; keys: string[]; active: boolean }
+    | { kind: 'csv-import'; rows: CsvImportTask[]; warnings: string[]; previewSnapshot: Record<string, string> };
+
+interface QueueProfileOperationReport {
+    kind: QueueProfileOperation['kind'];
+    rows: QueueProfileOperationRowResult[];
+    warnings: string[];
+}
+
+const PENDING_CSV_PUBLICATION_STORAGE_KEY = 'admin.queueProfiles.pendingCsvPublication.v1';
+
+const readPendingCsvPublicationKeys = (): string[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+        const parsed: unknown = JSON.parse(window.sessionStorage.getItem(PENDING_CSV_PUBLICATION_STORAGE_KEY) || '[]');
+        return Array.isArray(parsed)
+            ? Array.from(new Set(parsed.filter((key): key is string => typeof key === 'string' && key.trim().length > 0)))
+            : [];
+    } catch {
+        return [];
+    }
+};
+
+const DENTAL_QUEUE_TAG_FAMILY = new Set(['dentistry', 'dental', 'stomatology', 'dentist']);
+const DENTAL_QUEUE_TAG_VARIANTS = Array.from(DENTAL_QUEUE_TAG_FAMILY).sort();
+
+const canonicalQueueTagsForCsvComparison = (value: unknown, profileKey: string): string[] | null => {
+    if (!Array.isArray(value) || value.some((tag) => typeof tag !== 'string')) return null;
+
+    // Keep this equivalent to backend/app/core/specialties.py's
+    // expand_queue_tags() and _queue_profiles.py's profile-key fallback.
+    const submittedTags = (value as string[]).filter(Boolean);
+    if (submittedTags.length === 0) submittedTags.push(profileKey);
+    const keyIsDental = DENTAL_QUEUE_TAG_FAMILY.has(profileKey.trim().toLowerCase());
+    const submittedDentalTag = submittedTags.some((tag) => DENTAL_QUEUE_TAG_FAMILY.has(tag.trim().toLowerCase()));
+    if (keyIsDental && !submittedDentalTag) submittedTags.push(profileKey);
+
+    const expanded: string[] = [];
+    for (const tag of submittedTags) {
+        const trimmed = tag.trim();
+        if (!trimmed) continue;
+        const variants = DENTAL_QUEUE_TAG_FAMILY.has(trimmed.toLowerCase())
+            ? DENTAL_QUEUE_TAG_VARIANTS
+            : [trimmed];
+        for (const variant of variants) {
+            if (!expanded.includes(variant)) expanded.push(variant);
+        }
+    }
+    for (const tag of submittedTags) {
+        const trimmed = tag.trim();
+        if (trimmed && !expanded.includes(trimmed)) expanded.push(trimmed);
+    }
+    return expanded;
+};
+
+const profileMatchesCsvPayload = (
+    profile: QueueProfileDto,
+    payload: Record<string, unknown>,
+    ignorePublication = false,
+): boolean => Object.entries(payload).every(([field, expected]) => {
+    if (ignorePublication && field === 'show_on_qr_page') return true;
+    const actual = field === 'display_order'
+        ? profile.display_order ?? profile.order
+        : profile[field];
+    if (field === 'queue_tags' && Array.isArray(expected)) {
+        const expectedTags = canonicalQueueTagsForCsvComparison(expected, profile.key);
+        const actualTags = canonicalQueueTagsForCsvComparison(actual, profile.key);
+        return expectedTags !== null
+            && actualTags !== null
+            && expectedTags.length === actualTags.length
+            && expectedTags.every((tag, index) => tag === actualTags[index]);
+    }
+    return actual === expected;
+});
+
+const csvPayloadForImportTask = (task: CsvImportTask): Record<string, unknown> => {
+    const payload = queueProfileToCsvPayload(task.row);
+    if (task.mode === 'create') {
+        // New profiles remain hidden until the administrator publishes them separately.
+        payload.show_on_qr_page = false;
+    } else if (task.requestedQrPublication) {
+        // A CSV's true value is review intent, never a publication command.
+        // Omitting it from this partial update also avoids a hidden-to-public
+        // transition if another administrator changes state after our read.
+        delete payload.show_on_qr_page;
+    }
+    return payload;
+};
+
+const queueProfilePreviewSnapshot = (profile: QueueProfileDto | undefined): string => JSON.stringify(profile ? {
+    key: profile.key,
+    title: profile.title ?? null,
+    title_ru: profile.title_ru ?? null,
+    queue_tags: profile.queue_tags ?? null,
+    department_key: profile.department_key ?? null,
+    icon: profile.icon ?? null,
+    color: profile.color ?? null,
+    display_order: profile.display_order ?? profile.order ?? null,
+    is_active: profile.is_active ?? null,
+    show_on_qr_page: profile.show_on_qr_page ?? null,
+} : null);
 
 const getStatusFilterOptions = (t: (key: string, options?: Record<string, unknown>) => string) => [
     { value: 'all', label: t('admin2.qp_filter_all') },
@@ -131,6 +251,10 @@ const getQueueProfileDisplayName = (profile: QueueProfileDto): string =>
 const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' }) => {
     const { t: rawT } = useTranslation();
   const t = rawT;
+    const tRef = useRef(t);
+    useEffect(() => {
+        tRef.current = t;
+    }, [t]);
     const statusFilterOptions = getStatusFilterOptions(t);
     const availableIcons = getAvailableIcons(t);
     // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
@@ -144,6 +268,9 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     const [showCreateForm, setShowCreateForm] = useState(false);
     // PR-21: load departments for department_key Select in ProfileForm
     const [departments, setDepartments] = useState<DepartmentDto[]>([]);
+    const [operationReport, setOperationReport] = useState<QueueProfileOperationReport | null>(null);
+    const [retryOperation, setRetryOperation] = useState<QueueProfileOperation | null>(null);
+    const [pendingCsvPublicationKeys, setPendingCsvPublicationKeys] = useState<string[]>(readPendingCsvPublicationKeys);
 
     // ⭐ New: Search and filter
     const [searchTerm, setSearchTerm] = useState('');
@@ -155,21 +282,32 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     const isDark = theme === 'dark';
 
     // Load profiles from API
-    const loadProfiles = useCallback(async () => {
+    const loadProfiles = useCallback(async (options: { silent?: boolean; clearSelection?: boolean } = {}): Promise<QueueProfileDto[] | null> => {
         try {
-            setLoading(true);
             setError(null);
+            if (!options.silent) setLoading(true);
             const response = (await api.get('/queues/profiles?active_only=false')) as import('axios').AxiosResponse<Record<string, unknown>>;
-            setProfiles(((response.data.profiles as unknown[]) || []) as unknown as QueueProfileDto[]);
-            setSelectedProfiles([]); // Clear selection on reload
-            logger.info(`Loaded ${(response.data?.profiles as unknown[])?.length || 0} queue profiles`);
+            const loadedProfiles = ((response.data.profiles as unknown[]) || []) as unknown as QueueProfileDto[];
+            setProfiles(loadedProfiles);
+            if (options.clearSelection !== false) setSelectedProfiles([]);
+            logger.info(`Loaded ${loadedProfiles.length} queue profiles`);
+            return loadedProfiles;
         } catch (err) {
             logger.error('Error loading queue profiles:', err);
-            setError(t('admin2.qp_load_failed'));
+            setError(tRef.current('admin2.qp_load_failed'));
+            return null;
         } finally {
-            setLoading(false);
+            if (!options.silent) setLoading(false);
         }
     }, []);
+
+    useEffect(() => {
+        try {
+            window.sessionStorage.setItem(PENDING_CSV_PUBLICATION_STORAGE_KEY, JSON.stringify(pendingCsvPublicationKeys));
+        } catch {
+            // The in-memory reminder remains visible for this page if browser storage is unavailable.
+        }
+    }, [pendingCsvPublicationKeys]);
 
     useEffect(() => {
         loadProfiles();
@@ -208,6 +346,292 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
         totalTags: profiles.reduce((sum: number, p: QueueProfileDto) => sum + (p.queue_tags?.length || 0), 0),
     }), [profiles]);
 
+    const runQueueProfileOperation = async (
+        requestedOperation: QueueProfileOperation,
+        previousReport: QueueProfileOperationReport | null = null,
+    ) => {
+        setSaving(true);
+        setError(null);
+        try {
+            // Re-read immediately before every initial write or retry. A retry
+            // never trusts the list shown before the previous refusal.
+            const currentProfiles = await loadProfiles({ silent: true, clearSelection: false });
+            if (!currentProfiles) return;
+
+            if (requestedOperation.kind === 'csv-import' && !previousReport) {
+                const previewBecameStale = requestedOperation.rows.some((task) => {
+                    const current = currentProfiles.find((profile) => profile.key === task.row.key);
+                    return requestedOperation.previewSnapshot[task.row.key] !== queueProfilePreviewSnapshot(current);
+                });
+                if (previewBecameStale) {
+                    setOperationReport({
+                        kind: 'csv-import',
+                        rows: requestedOperation.rows.map((task) => ({
+                            key: task.row.key,
+                            status: 'not_started',
+                            message: t('admin2.qp_operation_stale_preview'),
+                            requestedQrPublication: task.requestedQrPublication,
+                        })),
+                        warnings: requestedOperation.warnings,
+                    });
+                    setRetryOperation(null);
+                    return;
+                }
+            }
+
+            const operation: QueueProfileOperation = requestedOperation.kind === 'csv-import'
+                ? {
+                    ...requestedOperation,
+                    rows: requestedOperation.rows.map((task) => ({
+                        ...task,
+                        mode: task.mode ?? (currentProfiles.some((profile) => profile.key === task.row.key) ? 'update' : 'create'),
+                    })),
+                }
+                : requestedOperation;
+            setRetryOperation(operation);
+
+            const keys = operation.kind === 'csv-import'
+                ? operation.rows.map((task) => task.row.key)
+                : operation.keys;
+            const priorByKey = new Map((previousReport?.rows ?? []).map((row) => [row.key, row]));
+            const rowResults = new Map<string, QueueProfileOperationRowResult>();
+            for (const key of keys) {
+                rowResults.set(key, priorByKey.get(key) ?? { key, status: 'not_started' });
+            }
+            const retryableStatuses = new Set<QueueProfileOperationStatus>(['refused', 'not_started', 'unverified']);
+            const candidateKeys = previousReport
+                ? keys.filter((key) => retryableStatuses.has(priorByKey.get(key)?.status ?? 'not_started'))
+                : keys;
+            const attempted = new Set<string>();
+            const writeErrors = new Map<string, string>();
+            const skippedMessages = new Map<string, string>();
+            const alreadySatisfiedMessages = new Map<string, string>();
+
+            for (const key of candidateKeys) {
+                const profile = currentProfiles.find((item) => item.key === key);
+                if (operation.kind === 'delete' && !profile) {
+                    alreadySatisfiedMessages.set(key, t('admin2.qp_operation_already_absent'));
+                    rowResults.set(key, { key, status: 'completed' });
+                    continue;
+                }
+                if (operation.kind === 'set-active' && profile && (profile.is_active !== false) === operation.active) {
+                    alreadySatisfiedMessages.set(key, t('admin2.qp_operation_already_satisfied'));
+                    rowResults.set(key, { key, status: 'completed' });
+                    continue;
+                }
+
+                let csvTask: CsvImportTask | undefined;
+                let csvPayload: Record<string, unknown> | undefined;
+                if (operation.kind === 'csv-import') {
+                    csvTask = operation.rows.find((task) => task.row.key === key);
+                    if (!csvTask) {
+                        skippedMessages.set(key, t('admin2.qp_operation_not_found'));
+                        continue;
+                    }
+                    csvPayload = csvPayloadForImportTask(csvTask);
+                    if (csvTask.mode === 'create') {
+                        if (profile) {
+                            const matchesCreate = profileMatchesCsvPayload(profile, csvPayload, csvTask.requestedQrPublication);
+                            if (matchesCreate) {
+                                alreadySatisfiedMessages.set(key, t('admin2.qp_operation_already_created'));
+                                rowResults.set(key, { key, status: 'completed', requestedQrPublication: csvTask.requestedQrPublication });
+                                continue;
+                            }
+                            skippedMessages.set(key, t('admin2.qp_operation_key_conflict'));
+                            continue;
+                        }
+                    } else {
+                        if (!profile) {
+                            skippedMessages.set(key, t('admin2.qp_operation_profile_missing'));
+                            continue;
+                        }
+                        if (csvPayload && profileMatchesCsvPayload(profile, csvPayload)) {
+                            alreadySatisfiedMessages.set(key, t('admin2.qp_operation_already_satisfied'));
+                            rowResults.set(key, { key, status: 'completed' });
+                            continue;
+                        }
+                        if (previousReport
+                            && operation.previewSnapshot[key] !== queueProfilePreviewSnapshot(profile)) {
+                            skippedMessages.set(key, t('admin2.qp_operation_stale_preview'));
+                            continue;
+                        }
+                    }
+                } else if (!profile) {
+                    skippedMessages.set(key, t('admin2.qp_operation_profile_missing'));
+                    continue;
+                }
+
+                attempted.add(key);
+                try {
+                    if (operation.kind === 'delete') {
+                        await api.delete(`/queues/profiles/${key}`);
+                    } else if (operation.kind === 'set-active') {
+                        await api.put(`/queues/profiles/${key}`, { is_active: operation.active });
+                    } else if (csvTask && csvPayload) {
+                        if (csvTask.mode === 'create') {
+                            await api.post('/queues/profiles', csvPayload);
+                        } else {
+                            await api.put(`/queues/profiles/${key}`, csvPayload);
+                        }
+                    }
+                } catch (operationError) {
+                    // Keep the server's structured refusal text; do not log
+                    // arbitrary CSV rows or raw request/response payloads.
+                    writeErrors.set(key, apiErrorMessage(operationError, t('admin2.qp_operation_row_failed')));
+                }
+            }
+
+            // Always verify actual persisted state, including after a rejected
+            // write or a lost response. If this read fails, report uncertainty.
+            const refreshedProfiles = await loadProfiles({ silent: true, clearSelection: false });
+            if (!refreshedProfiles) {
+                for (const key of candidateKeys) {
+                    const wasAttempted = attempted.has(key);
+                    rowResults.set(key, {
+                        key,
+                        status: wasAttempted ? 'unverified' : 'not_started',
+                        message: t('admin2.qp_operation_unverified'),
+                        requestedQrPublication: operation.kind === 'csv-import'
+                            ? operation.rows.find((task) => task.row.key === key)?.requestedQrPublication
+                            : undefined,
+                    });
+                }
+            } else {
+                for (const key of candidateKeys) {
+                    const profile = refreshedProfiles.find((item) => item.key === key);
+                    const csvTask = operation.kind === 'csv-import'
+                        ? operation.rows.find((task) => task.row.key === key)
+                        : undefined;
+                    let completed = false;
+                    if (operation.kind === 'delete') completed = !profile;
+                    else if (operation.kind === 'set-active') completed = Boolean(profile && (profile.is_active !== false) === operation.active);
+                    else if (csvTask && profile) {
+                        const payload = csvPayloadForImportTask(csvTask);
+                        // A successful create must be confirmed hidden; only
+                        // a pre-existing row can ignore requested publication.
+                        completed = profileMatchesCsvPayload(profile, payload);
+                    }
+
+                    if (completed) {
+                        rowResults.set(key, {
+                            key,
+                            status: 'completed',
+                            message: alreadySatisfiedMessages.get(key),
+                            requestedQrPublication: csvTask?.requestedQrPublication,
+                        });
+                    } else if (skippedMessages.has(key)) {
+                        rowResults.set(key, {
+                            key,
+                            status: 'refused',
+                            message: skippedMessages.get(key),
+                            requestedQrPublication: csvTask?.requestedQrPublication,
+                        });
+                    } else if (writeErrors.has(key)) {
+                        rowResults.set(key, {
+                            key,
+                            status: 'refused',
+                            message: writeErrors.get(key),
+                            requestedQrPublication: csvTask?.requestedQrPublication,
+                        });
+                    } else if (attempted.has(key)) {
+                        rowResults.set(key, {
+                            key,
+                            status: 'refused',
+                            message: t('admin2.qp_operation_state_changed'),
+                            requestedQrPublication: csvTask?.requestedQrPublication,
+                        });
+                    } else {
+                        rowResults.set(key, { key, status: 'not_started', requestedQrPublication: csvTask?.requestedQrPublication });
+                    }
+                }
+
+                if (operation.kind === 'csv-import') {
+                    const pendingKeys = operation.rows
+                        .filter((task) => task.requestedQrPublication)
+                        .filter((task) => {
+                            const profile = refreshedProfiles.find((item) => item.key === task.row.key);
+                            return rowResults.get(task.row.key)?.status === 'completed'
+                                && !(profile?.show_on_qr_page === true && profile.effective_availability?.is_available === true);
+                        })
+                        .map((task) => task.row.key);
+                    const completedPublications = new Set(operation.rows
+                        .filter((task) => task.requestedQrPublication)
+                        .filter((task) => {
+                            const profile = refreshedProfiles.find((item) => item.key === task.row.key);
+                            return profile?.show_on_qr_page === true && profile.effective_availability?.is_available === true;
+                        })
+                        .map((task) => task.row.key));
+                    setPendingCsvPublicationKeys((previous) => Array.from(new Set([
+                        ...previous.filter((key) => !completedPublications.has(key)),
+                        ...pendingKeys,
+                    ])));
+                }
+
+                if ([...rowResults.values()].some((row) => row.status === 'completed')) {
+                    window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
+                }
+            }
+
+            if (operation.kind === 'delete' && refreshedProfiles) {
+                const completedDeletes = candidateKeys.filter((key) => rowResults.get(key)?.status === 'completed');
+                if (completedDeletes.length > 0) {
+                    setPendingCsvPublicationKeys((previous) => previous.filter((key) => !completedDeletes.includes(key)));
+                }
+            }
+
+            const report: QueueProfileOperationReport = {
+                kind: operation.kind,
+                rows: keys.map((key) => rowResults.get(key) ?? { key, status: 'not_started' }),
+                warnings: operation.kind === 'csv-import' ? operation.warnings : [],
+            };
+            setOperationReport(report);
+            setRetryOperation(operation);
+            setSelectedProfiles([]);
+
+            const completedCount = report.rows.filter((row) => row.status === 'completed').length;
+            const refused = report.rows.filter((row) => row.status === 'refused' || row.status === 'unverified' || row.status === 'not_started').length;
+            if (refused > 0) {
+                notify.warning(t('admin2.qp_operation_partial', { completed: completedCount, refused }));
+            } else if (operation.kind === 'csv-import') {
+                const imported = operation.rows.filter((task) => task.mode === 'create' && rowResults.get(task.row.key)?.status === 'completed').length;
+                const updated = operation.rows.filter((task) => task.mode === 'update'
+                    && rowResults.get(task.row.key)?.status === 'completed'
+                    && attempted.has(task.row.key)).length;
+                const unchanged = operation.rows.filter((task) => task.mode === 'update'
+                    && rowResults.get(task.row.key)?.status === 'completed'
+                    && !attempted.has(task.row.key)).length;
+                const deferredPublication = refreshedProfiles
+                    ? operation.rows.filter((task) => {
+                        if (!task.requestedQrPublication || rowResults.get(task.row.key)?.status !== 'completed') return false;
+                        const profile = refreshedProfiles.find((item) => item.key === task.row.key);
+                        return !(profile?.show_on_qr_page === true && profile.effective_availability?.is_available === true);
+                    }).length
+                    : 0;
+                if (deferredPublication > 0) {
+                    notify.warning(t('admin2.qp_import_publication_deferred', {
+                        imported,
+                        updated,
+                        unchanged,
+                        failed: 0,
+                        deferred: deferredPublication,
+                    }), { autoClose: 8000 });
+                } else if (report.warnings.length > 0) {
+                    notify.warning(t('admin2.qp_operation_warnings', { count: report.warnings.length }));
+                } else {
+                    notify.success(t('admin2.qp_import_success', { imported, updated, unchanged }));
+                }
+            } else if (completedCount > 0) {
+                notify.success(t('admin2.qp_operation_complete', { count: completedCount }));
+            }
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const removePendingCsvPublication = (key: string) => {
+        setPendingCsvPublicationKeys((current) => current.filter((pendingKey) => pendingKey !== key));
+    };
+
     // Create new profile
     const handleCreate = async (profileData: Record<string, unknown>) => {
         try {
@@ -231,7 +655,11 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             setSaving(true);
             setError(null);
             await api.put(`/queues/profiles/${profileKey}`, profileData);
-            await loadProfiles();
+            const refreshedProfiles = await loadProfiles();
+            if (profileData.show_on_qr_page === true
+                && refreshedProfiles?.find((profile) => profile.key === profileKey)?.effective_availability?.is_available === true) {
+                removePendingCsvPublication(profileKey);
+            }
             setEditingProfile(null);
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
@@ -262,6 +690,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             setError(null);
             await api.delete(`/queues/profiles/${profileKey}`);
             await loadProfiles();
+            removePendingCsvPublication(profileKey);
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error deleting profile:', err);
@@ -296,58 +725,33 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     // ⭐ New: Bulk delete
     const handleBulkDelete = async () => {
         if (selectedProfiles.length === 0) return;
+        const keys = [...selectedProfiles];
 
         // P-013 fix: replaced window.confirm() with shared useConfirm hook.
         const ok = await confirm({
             title: t('admin2.bulk_delete_queue_tabs_title'),
-            message: t('admin2.qp_bulk_delete_confirm_msg', { count: selectedProfiles.length }),
+            message: t('admin2.qp_bulk_delete_confirm_msg', { count: keys.length }),
             description: t('admin2.qp_bulk_delete_confirm_desc'),
             confirmLabel: t('admin2.delete_all_confirm'),
             cancelLabel: t('admin2.cancel'),
             intent: 'destructive',
         });
-        if (!ok) {
-            return;
-        }
-
-        try {
-            setSaving(true);
-            setError(null);
-
-            for (const key of selectedProfiles) {
-                await api.delete(`/queues/profiles/${key}`);
-            }
-
-            await loadProfiles();
-            window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
-        } catch (err) {
-            logger.error('Error bulk deleting profiles:', err);
-            setError(String((err as Record<string, unknown> & { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.qp_bulk_delete_error')));
-        } finally {
-            setSaving(false);
-        }
+        if (ok) await runQueueProfileOperation({ kind: 'delete', keys });
     };
 
     // ⭐ New: Bulk activate/deactivate
     const handleBulkActivate = async (activate: boolean) => {
         if (selectedProfiles.length === 0) return;
-
-        try {
-            setSaving(true);
-            setError(null);
-
-            for (const key of selectedProfiles) {
-                await api.put(`/queues/profiles/${key}`, { is_active: activate });
-            }
-
-            await loadProfiles();
-            window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
-        } catch (err) {
-            logger.error('Error bulk updating profiles:', err);
-            setError(String((err as Record<string, unknown> & { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.qp_bulk_update_error')));
-        } finally {
-            setSaving(false);
-        }
+        const keys = [...selectedProfiles];
+        const ok = await confirm({
+            title: t('admin2.qp_bulk_preview_title'),
+            message: t(activate ? 'admin2.qp_bulk_activate_preview' : 'admin2.qp_bulk_archive_preview', { count: keys.length }),
+            description: t('admin2.qp_bulk_preview_desc'),
+            confirmLabel: t('admin2.qp_bulk_preview_confirm'),
+            cancelLabel: t('admin2.cancel'),
+            intent: 'default',
+        });
+        if (ok) await runQueueProfileOperation({ kind: 'set-active', keys, active: activate });
     };
 
     // ⭐ New: Export to CSV — RQ-26.a: full current contract (F-22), all fields quoted.
@@ -368,9 +772,8 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
         }
     };
 
-    // ⭐ New: Import from CSV — RQ-26.a: RFC-4180 parser + validation BEFORE
-    // any API call (F-22). Blocking issues abort the whole import; per-profile
-    // API failures and unknown-department warnings are reported visibly.
+    // CSV rows are parsed and previewed before any write. New rows always
+    // remain hidden; requested publication is retained as a separate review.
     const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -398,52 +801,53 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                 return;
             }
 
-            setSaving(true);
-            let imported = 0;
-            let updated = 0;
-            let failed = 0;
-            let deferredPublication = 0;
+            const beforePreview = await loadProfiles({ silent: true, clearSelection: false });
+            if (!beforePreview) return;
+            const createCount = rows.filter((row) => !beforePreview.some((profile) => profile.key === row.key)).length;
+            const updateCount = rows.length - createCount;
+            const requestedPublicationCount = rows.filter((row) => {
+                if (row.showOnQrPage !== true) return false;
+                const existingProfile = beforePreview.find((profile) => profile.key === row.key);
+                return !(existingProfile?.show_on_qr_page === true
+                    && existingProfile.effective_availability?.is_available === true);
+            }).length;
+            const previewSnapshot = Object.fromEntries(rows.map((row) => [
+                row.key,
+                queueProfilePreviewSnapshot(beforePreview.find((profile) => profile.key === row.key)),
+            ]));
+            const accepted = await confirm({
+                title: t('admin2.qp_import_preview_title'),
+                message: t('admin2.qp_import_preview_msg', {
+                    create: createCount,
+                    update: updateCount,
+                    publication: requestedPublicationCount,
+                }),
+                description: t('admin2.qp_import_preview_desc'),
+                confirmLabel: t('admin2.qp_import_preview_confirm'),
+                cancelLabel: t('admin2.cancel'),
+                intent: 'default',
+            });
+            if (!accepted) return;
 
-            for (const row of rows) {
-                try {
-                    const payload = queueProfileToCsvPayload(row);
-                    const existing = profiles.find((p: QueueProfileDto) => p.key === row.key);
-                    if (existing) {
-                        await api.put(`/queues/profiles/${row.key}`, payload);
-                        updated++;
-                    } else {
-                        const response = await api.post('/queues/profiles', payload);
-                        imported++;
-                        if (response.data?.publication_deferred === true) {
-                            deferredPublication++;
-                        }
-                    }
-                } catch (err) {
-                    failed++;
-                    logger.error(`Error importing profile ${row.key}:`, err);
+            const warnings = issues.flatMap((issue) => {
+                if (issue.code === 'unknown_department') {
+                    return [t('admin2.qp_import_unknown_department_row', { row: issue.row, key: issue.key })];
                 }
+                return [];
+            });
+            const unknownColumns = Array.from(new Set(issues
+                .filter((issue) => issue.code === 'unknown_column' && issue.column)
+                .map((issue) => issue.column as string)));
+            if (unknownColumns.length > 0) {
+                warnings.push(t('admin2.qp_import_unknown_columns', { columns: unknownColumns.join(', ') }));
             }
 
-            await loadProfiles();
-            window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
-            setError(null);
-            if (deferredPublication > 0) {
-                notify.warning(t('admin2.qp_import_publication_deferred', {
-                    imported,
-                    updated,
-                    failed,
-                    deferred: deferredPublication
-                }), { autoClose: 8000 });
-            } else {
-                notify.success(t('admin2.qp_import_success', { imported, updated }));
-            }
-
-            const unknownDepartments = issues.filter((issue) => issue.code === 'unknown_department').length;
-            if (failed > 0) {
-                setError(t('admin2.qp_import_failed_count', { count: failed }));
-            } else if (unknownDepartments > 0) {
-                setError(t('admin2.qp_import_unknown_department', { count: unknownDepartments }));
-            }
+            await runQueueProfileOperation({
+                kind: 'csv-import',
+                rows: rows.map((row) => ({ row, requestedQrPublication: row.showOnQrPage === true })),
+                warnings,
+                previewSnapshot,
+            });
 
         } catch (err) {
             logger.error('Error importing profiles:', err);
@@ -453,6 +857,12 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             event.target.value = '';
         }
     };
+
+    const handleRetryRemaining = async () => {
+        if (!retryOperation || !operationReport) return;
+        await runQueueProfileOperation(retryOperation, operationReport);
+    };
+
     if (loading) {
         return (
             <div className="admin-qp-container">
@@ -540,7 +950,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                         {/* Refresh */}
                         <button
                             className="admin-qp-button"
-                            onClick={loadProfiles}
+                            onClick={() => { void loadProfiles(); }}
                             disabled={saving}
                             aria-label={t('admin2.qp_refresh_aria')}
                         >
@@ -572,6 +982,77 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                             <X size={16} />
                         </button>
                     </div>
+                )}
+
+                {(operationReport || pendingCsvPublicationKeys.length > 0) && (
+                    <section
+                        className="admin-p-16-radius-12-bd-1px-solid-var-mac-bo-mb-16"
+                        role="region"
+                        aria-label={t('admin2.qp_operation_results')}
+                    >
+                        <h3 className="admin-fs-16-fw-600-primary-mt-0">{t('admin2.qp_operation_results')}</h3>
+                        {operationReport && (
+                            <>
+                                <p role="status" aria-live="polite" aria-atomic="true">
+                                    {t('admin2.qp_operation_summary', {
+                                        completed: operationReport.rows.filter((row) => row.status === 'completed').length,
+                                        refused: operationReport.rows.filter((row) => row.status === 'refused').length,
+                                        notStarted: operationReport.rows.filter((row) => row.status === 'not_started').length,
+                                        unverified: operationReport.rows.filter((row) => row.status === 'unverified').length,
+                                    })}
+                                </p>
+                                {operationReport.warnings.length > 0 && (
+                                    <ul aria-label={t('admin2.qp_operation_warnings_label')}>
+                                        {operationReport.warnings.map((warning, index) => <li key={`${index}-${warning}`}>{warning}</li>)}
+                                    </ul>
+                                )}
+                                <ul>
+                                    {operationReport.rows.map((row) => (
+                                        <li key={row.key}>
+                                            <strong>{row.key}</strong>: {t(`admin2.qp_operation_status_${row.status}`)}
+                                            {row.message ? ` — ${row.message}` : ''}
+                                        </li>
+                                    ))}
+                                </ul>
+                                {retryOperation && operationReport.rows.some((row) => row.status === 'refused' || row.status === 'not_started' || row.status === 'unverified') && (
+                                    <button className="admin-qp-button" onClick={handleRetryRemaining} disabled={saving}>
+                                        {t('admin2.qp_operation_retry')}
+                                    </button>
+                                )}
+                            </>
+                        )}
+                        {pendingCsvPublicationKeys.length > 0 && (
+                            <div>
+                                <p>{t('admin2.qp_pending_csv_publication_help')}</p>
+                                <ul aria-label={t('admin2.qp_pending_csv_publication_label')}>
+                                    {pendingCsvPublicationKeys.map((key) => {
+                                        const profile = profiles.find((item) => item.key === key);
+                                        return (
+                                            <li key={key}>
+                                                <strong>{key}</strong>
+                                                <button
+                                                    className="admin-qp-button"
+                                                    onClick={() => profile && setEditingProfile(profile)}
+                                                    disabled={!profile || saving}
+                                                    aria-label={t('admin2.qp_pending_csv_publication_review_aria', { key })}
+                                                >
+                                                    {t('admin2.qp_pending_csv_publication_review')}
+                                                </button>
+                                                <button
+                                                    className="admin-ml-8-bg-none-bd-none-cur-pointer-secondary"
+                                                    onClick={() => removePendingCsvPublication(key)}
+                                                    disabled={saving}
+                                                    aria-label={t('admin2.qp_pending_csv_publication_dismiss_aria', { key })}
+                                                >
+                                                    {t('admin2.qp_pending_csv_publication_dismiss')}
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        )}
+                    </section>
                 )}
 
                 {/* Bulk actions bar */}

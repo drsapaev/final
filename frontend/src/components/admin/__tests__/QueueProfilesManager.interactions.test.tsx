@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import QueueProfilesManager from '../QueueProfilesManager';
 
-const { apiMock } = vi.hoisted(() => {
+const { apiMock, syntheticProfiles } = vi.hoisted(() => {
   const syntheticProfiles = [
     {
       key: 'synthetic-active',
@@ -61,7 +61,7 @@ const { apiMock } = vi.hoisted(() => {
   const apiMock = {
     get: vi.fn((url: string) => {
       if (url.startsWith('/queues/profiles')) {
-        return Promise.resolve({ data: { profiles: syntheticProfiles } });
+        return Promise.resolve({ data: { profiles: syntheticProfiles.map((profile) => ({ ...profile, queue_tags: [...profile.queue_tags] })) } });
       }
       if (url === '/admin/departments') {
         return Promise.resolve({ data: { data: [] } });
@@ -69,12 +69,24 @@ const { apiMock } = vi.hoisted(() => {
       return Promise.resolve({ data: { data: [] } });
     }),
     post: vi.fn(() => Promise.resolve({ data: { success: true } })),
-    put: vi.fn(() => Promise.resolve({ data: { success: true } })),
-    delete: vi.fn(() => Promise.resolve({ data: { success: true } })),
+    put: vi.fn((url: string, payload: Record<string, unknown>) => {
+      const key = url.split('/').at(-1);
+      const profile = syntheticProfiles.find((item) => item.key === key);
+      if (profile) Object.assign(profile, payload);
+      return Promise.resolve({ data: { success: true } });
+    }),
+    delete: vi.fn((url: string) => {
+      const key = url.split('/').at(-1);
+      const index = syntheticProfiles.findIndex((item) => item.key === key);
+      if (index >= 0) syntheticProfiles.splice(index, 1);
+      return Promise.resolve({ data: { success: true } });
+    }),
   };
 
-  return { apiMock };
+  return { apiMock, syntheticProfiles };
 });
+
+const baselineSyntheticProfiles = syntheticProfiles.map((profile) => ({ ...profile, queue_tags: [...profile.queue_tags] }));
 
 vi.mock('../../../api/client', () => ({
   default: apiMock,
@@ -102,11 +114,13 @@ const openCreateDialog = async (user: ReturnType<typeof userEvent.setup>) => {
 };
 
 beforeEach(() => {
+  syntheticProfiles.splice(0, syntheticProfiles.length, ...baselineSyntheticProfiles.map((profile) => ({ ...profile, queue_tags: [...profile.queue_tags] })));
   vi.clearAllMocks();
 });
 
 afterEach(() => {
   vi.clearAllMocks();
+  window.sessionStorage.removeItem('admin.queueProfiles.pendingCsvPublication.v1');
 });
 
 describe('QueueProfilesManager interactions', () => {
@@ -295,6 +309,40 @@ describe('QueueProfilesManager interactions', () => {
     expect(screen.getByText('Синтетический профиль для проверки удаления')).toBeInTheDocument();
     expect(within(row).getByTitle('Архивировать профиль')).toBeEnabled();
     expect(apiMock.get.mock.calls.filter(([url]) => url.startsWith('/queues/profiles'))).toHaveLength(1);
+  });
+
+  it('reports each bulk result and retries only the refused profile after rereading current state', async () => {
+    const user = userEvent.setup();
+    await renderManager();
+
+    await user.click(screen.getByRole('button', { name: 'Выбрать вкладку Синтетическая активная очередь' }));
+    await user.click(screen.getByRole('button', { name: 'Выбрать вкладку Синтетическое неопубликованное направление' }));
+    apiMock.put.mockRejectedValueOnce({
+      response: { status: 409, data: { detail: { reason: 'profile_binding_changed', message: 'Связь профиля изменилась. Обновите список.' } } },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Архивировать выбранные профили' }));
+    const preview = await screen.findByRole('dialog', { name: 'Подтвердите массовое изменение' });
+    await user.click(within(preview).getByRole('button', { name: 'Продолжить' }));
+
+    await waitFor(() => expect(apiMock.put).toHaveBeenCalledTimes(2));
+    const results = await screen.findByRole('region', { name: 'Результаты операции' });
+    expect(within(results).getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    expect(within(results).getByText('synthetic-active')).toBeInTheDocument();
+    const resultRows = within(results).getAllByRole('listitem');
+    expect(resultRows).toHaveLength(2);
+    expect(resultRows[0]).toHaveTextContent('synthetic-active');
+    expect(resultRows[0]).toHaveTextContent('Отклонено');
+    expect(resultRows[0]).toHaveTextContent('Связь профиля изменилась. Обновите список.');
+    expect(resultRows[1]).toHaveTextContent('synthetic-unpublished');
+    expect(resultRows[1]).toHaveTextContent('Выполнено');
+
+    await user.click(within(results).getByRole('button', { name: 'Повторить оставшиеся после проверки' }));
+
+    await waitFor(() => expect(apiMock.put).toHaveBeenCalledTimes(3));
+    expect(apiMock.put.mock.calls.filter(([url]) => url.endsWith('/synthetic-unpublished'))).toHaveLength(1);
+    expect(apiMock.get.mock.calls.filter(([url]) => url.startsWith('/queues/profiles'))).toHaveLength(5);
+    expect(within(results).getAllByRole('listitem').filter((row) => row.textContent?.includes('Выполнено'))).toHaveLength(2);
   });
 
   it('traps keyboard focus, closes on Escape, and restores focus to the opener', async () => {

@@ -1,11 +1,11 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 4.03 — T12.2 / PR #3693, T13 / #3697, T14 / #3702 и T15 / #3711 MERGED; T16 / PR #3718 Ready for review, implementation-head CI PASS.
-**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-20T10:26:30+05:00, Asia/Tashkent.
-**Текущий этап:** T16 — работа в отдельном worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t16-navigation\final`, ветка `codex/aqs-T16-navigation`; PR #3718 Ready for review на HEAD `70f7999e637efbfac021fd80ddefe564beff3581`, база `ccbf519fdb0f9a32c3a71837202dfea296f13383`. Фокусные тесты 54/54 PASS; на этом HEAD Unified CI `39374182108`, frontend unit/E2E, build, lint/type-check, PR Required Gate, parity, regression audit, locale/security/secret checks, CodeQL, PR Quality Gate и lifecycle — PASS. Path-aware backend/integration/staging/production и прочие несвязанные jobs — SKIPPED, не PASS. Независимое ревью ожидается. Локальные type-check/build ограничены отсутствующим в общем dependency cache Nitro и существующим независимым type diagnostic; Tier-2/T18 не выполнялись.
-**Task memory ID:** 1b8ddc8f-3dec-4d6c-8077-acc268801763.
+**Версия:** 4.10 — T16 / PR #3718 MERGED; T17 / PR #3721 implementation, scoped Tier 2 PASS, PR Ready for review; exact documentation-head CI PASS, final status checkpoint in progress.
+**Создан:** 30 сентября 2026. **Обновлён:** 2026-10-20, Asia/Tashkent.
+**Текущий этап:** T17 — PR #3721, HEAD `ef41f75c262488741053d74e8b96ab9059514aa8`, base `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`, Ready for review/MERGEABLE. Exact-head Unified CI `39399756835` passed, including Frontend E2E (16m33s), build, unit, lint, Required Gate, security, CodeQL, Gitleaks, locale parity, regression and scratch guards; GitGuardian passed. Path-aware backend/integration/Docker/parity/readiness jobs are skipped, not passed. Post-Ready quality/lifecycle gates passed. Focused UI tests 64/64, scoped lint and hooks passed. Targeted T17 synthetic Tier 2 passed on r6: exact served frontend SHA, normal Admin 2FA enrollment and TOTP login, QueueProfiles screen, hidden CSV create/API response, visible publication-review reminder, persisted hidden state after refresh, and bulk archive. Canonical teardown removed 5 containers, 3 volumes and 1 network; zero project resources remained. PR body gate passed and the PR description records r6 and skipped jobs. Host policy blocked cleanup of ignored local env/harness artifacts before execution; they remain untracked, excluded from the PR, and disclosed. Earlier r1-r5 readiness/harness attempts and their successful teardowns are documented in EVIDENCE; they do not replace or weaken the final r6 PASS. Full STAGING_VALIDATION.md and T18 integrated acceptance remain separate and are not claimed complete. Next: commit/push this status checkpoint, verify its exact-head checks, then leave PR #3721 Ready for reviewer/user; user retains merge. No runtime/API code changed.
+**Task memory ID:** 17c471a8-6772-4081-bea0-1e82ad1bcd05.
 **T11 результат:** PR #3639 merged commit 7443b0e290b9143e877d5898a5589df52592d3b3. Ограниченный T11 Tier-2 прошёл на зафиксированном кодовом HEAD; три legacy live-spec остаются DEFERRED для T18 с 0% credit; полный STAGING_VALIDATION.md не завершён.
-**Ограничения:** пользователь мержит PR самостоятельно. Production, deployment и активация v1-флага не разрешены. Эта T16-задача меняет только административную frontend-навигацию, тесты, локализации и routing-документацию; backend/API/RBAC/DB/queue runtime/staging/production не входят в scope. Исторические Tier-2 deferrals и partial evidence не наследуются и не превращаются в PASS; полная интеграционная приёмка остаётся для T18.
+**Ограничения:** пользователь мержит PR самостоятельно. Production, deployment и активация v1-флага не разрешены. Текущая T17-задача меняет только существующий административный frontend, тесты и пять локалей; новые backend/API/RBAC/DB/queue-runtime/staging/production контракты не входят в scope. Исторические Tier-2 deferrals и partial evidence не наследуются и не превращаются в PASS; полная интеграционная приёмка остаётся для T18.
 
 
 **Основание аудита:** `main`, `07ea63368989290318212635a7ab3a3bc2ed756d`.
@@ -81,8 +81,8 @@
 | T13 | MERGED | Canonical Admin read contract; #3697, merge `baae35932e341ceaac163145d933639f735cb35c` |
 | T14 | MERGED | Setup UI на backend facts; #3702, merge `99f0b5a098dccce4f1166ae52bd7d5c93d92af70` |
 | T15 | MERGED | Восстанавливаемый URL-контекст; #3711, merge `ccbf519fdb0f9a32c3a71837202dfea296f13383` |
-| T16 | PR_OPEN | Конечная навигация и совместимые входы; PR #3718 Ready for review, exact implementation-head CI PASS |
-| T17 | PLANNED | Bulk/CSV и structured conflicts |
+| T16 | MERGED | Конечная навигация и совместимые входы; PR #3718, merge `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` |
+| T17 | PR_OPEN / READY FOR REVIEW | Bulk/CSV; PR #3721 at docs HEAD `ef41f75c262488741053d74e8b96ab9059514aa8`; focused 64/64, exact-head applicable CI `39399756835`, targeted r6 Tier 2, PR body gate and post-Ready quality/lifecycle checks PASS; final status checkpoint pending. Local ignored env/harness cleanup was rejected by host policy and disclosed |
 | T18 | PLANNED | Сквозная приёмка и оставшийся safe live-spec harness |
 
 ### Неопределённости и условия их закрытия

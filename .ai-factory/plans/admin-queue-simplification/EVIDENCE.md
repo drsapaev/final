@@ -1,4 +1,14 @@
-## T16 — route/nav regression validation and local tool limits — 2026-10-20T10:13:25+05:00
+## Latest checkpoint — T17 first staging attempt cleaned; retry plan tightened — 2026-10-20T13:33:21+05:00
+
+- PR #3721 remains Draft at exact HEAD 1c3007c590d98ea6ce15a1c7358ceebbf86d410; base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43. Exact-head Tier 1 PASS; local check-theme PASS.
+- First owned project clinic-aqs-t17-pr3721-20261020: canonical Start PASS (runtime ready, exact commit, no warnings), but subsequent canonical Session stopped before the child command because one or more services were missing/stopped/unhealthy. No browser or T17 test ran. Session reports STAGING_TEARDOWN=PASS; this project has been removed. Root cause of the gap is not yet confirmed.
+- The built frontend revision was not checked; served_revision_verified remains NOT_RUN. The Admin 2FA flow, CSV import, and bulk archive are NOT_RUN.
+- Temporary output/staging/validate-t17.cjs was syntax-checked and Playwright module load passed; it contains no credentials. The prior ignored ops/staging.env contains only synthetic credentials and the expired project context; remove it after confirming teardown, then create a fresh unique project/lease/ports in the same allowed path.
+- Mode remains mandatory gate for staging evidence. Gate returned gate_ok/execute, handoff required, no misroute/override; generated prompt read and Compose files inspected without edits. Allowed operational paths remain only ops/staging.env, output/staging/**, and the four plan journals. Denied scope unchanged.
+- Next exact action: remove only the previous synthetic env after confirmed teardown; create a fresh project and lease; run canonical Preflight. If PASS, run canonical Start immediately followed by Session in the same shell invocation, with no intervening work, and let Session teardown the new project.
+- No source/runtime/Compose code, C:\final, other worktrees, production, foreign Docker resources, reviews or merge were changed.
+
+---## T16 — route/nav regression validation and local tool limits — 2026-10-20T10:13:25+05:00
 
 - Commit under test: implementation commit `5c2509be6` on base `ccbf519fdb0f9a32c3a71837202dfea296f13383`, isolated worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t16-navigation\final`, branch `codex/aqs-T16-navigation`.
 - Environment: Windows PowerShell. Fresh GitHub main was fetched to the worktree without switching or modifying the main worktree. Existing frontend dependencies were exposed through individually tracked temporary junctions; shared dependency targets were not modified.
@@ -4609,3 +4619,228 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: PASS. PR body and plan journals only changed after the implementation-head CI. No backend/runtime, staging, production, deployment, review-thread mutation or merge.
 - Remaining limitation: this journal update requires a documentation-only commit and exact-head checks; independent review is pending.
 - Next exact action: commit/push this final plan checkpoint, verify resulting PR checks, and leave review/merge to the user.
+
+## T17 — local implementation and validation — 2026-10-20T12:46:00+05:00
+
+- Commit under test: uncommitted T17 working-tree diff based on `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`; branch `codex/aqs-T17-bulk-csv`.
+- Environment: Windows PowerShell, isolated worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`; freshly fetched `origin/main` equals the base. The primary checkout and independent photo-cleanup task were not changed.
+- Execution mode: `advisory_gate` for plan-approved existing-command UI behavior. Canonical launcher first stopped for a known root; one retry with `frontend/src/components/admin/QueueProfilesManager.tsx` returned `narrow_override` (`gate_misroute=false`, `override_used=true`, `handoff_required=true`). Generated prompt was read; plan T17 is the repository-approved basis. Gate/router were not edited.
+- Allowed paths: `QueueProfilesManager.tsx`; existing focused CSV/interaction tests; five locale files; T17 plan, `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: backend/API/OpenAPI/DB/migrations/new write commands, queue ownership/runtime, routing/auth/RBAC, other worktrees, staging/production/deployment, review-thread mutation and merge.
+- Actual changed paths: `.ai-factory/plans/codex-admin-queue-simplification.md`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS.md,RESUME.md,EVIDENCE.md}`; `frontend/src/components/admin/QueueProfilesManager.tsx`; `frontend/src/components/admin/__tests__/QueueProfilesManager.csv.test.tsx`; `frontend/src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx`; `frontend/src/i18n/locales/{en.ts,kk.ts,ru.ts,uz-Cyrl.ts,uz-Latn.ts}`.
+- Original failure: bulk writes stopped at the first API refusal and did not reliably reread persisted state; CSV import gave aggregate results, had no safe remaining-row retry, and passed QR publication intent on newly created profiles.
+- Change: continue each bulk/CSV row independently; reread before and after writes; show per-row completed/refused/not-started/unverified state and structured reasons; reconcile lost responses; retry only unresolved rows after fresh reads; compare CSV retries to original preview and refuse changed rows; classify already-matching rows separately; create new CSV profiles hidden and keep requested publication as a persisted explicit review action; add impact previews and live result announcements; correct success translations in all five locales.
+- Validation command: from `frontend/`, `npm run test:run -- src/components/admin/__tests__/QueueProfilesManager.csv.test.tsx src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx src/components/admin/__tests__/AdminRemaining.i18n.contract.test.tsx` — PASS, 64/64.
+- Validation command: scoped `npx eslint` over the changed component, tests and five locale files with `jsx-a11y/control-has-associated-label:error` — PASS, exit 0, 0 errors; 3 existing hardcoded-color warnings remain.
+- Validation command: `git diff --check` — PASS. Fresh `git fetch origin main` confirmed remote main remains equal to the base. No build output was created.
+- Type-check: `npm run type-check` — FAIL due to missing `nitro`/`nitro/runtime-config` in shared `C:\final\frontend\node_modules` and an unrelated implicit-`route` diagnostic in `src/publicSiteHandler.test.tsx`; no changed-path TypeScript errors remain after fixes.
+- Build: `npm run build -- --outDir .scratch/t17-build` — FAIL while loading `vite.config.ts` because shared dependencies lack Nitro. Application compilation did not start. No install was attempted and no build output remains.
+- Browser visual QA: NOT_RUN; local Vite build cannot start due to missing Nitro. UI behavior has focused DOM tests; hosted exact-head CI remains required.
+- Result: local implementation validation complete; PR creation and exact-head CI are pending. No staging/Tier-2, production or deployment validation is claimed.
+- Scope check: PASS. Only the allowed T17 UI, tests, locales and plan journals changed. The temporary dependency junction targets exactly `C:\final\frontend\node_modules`; remove only the junction after hooks/commands and preserve its target.
+- Remaining limitation: no PR or hosted CI yet; user retains merge.
+- PR: not created.
+- Merge commit: none.
+
+## T17 — implementation commit, Draft PR and exact-head CI start — 2026-10-20T12:54:00+05:00
+
+- Commit under test: 84a7ee3828781b9b68791ff6e123bbb602759a7d; base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43.
+- Environment: isolated worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final; branch codex/aqs-T17-bulk-csv; origin/main equaled the base at push.
+- Actual changed paths: 12 allowed T17 component/test/locale/plan files; no other paths.
+- Validation: focused Vitest CSV/interactions/i18n 64/64 PASS; scoped ESLint with accessibility rule PASS, 0 errors and 3 existing color warnings; git diff --check PASS; ordinary commit hooks PASS on commit (including Gitleaks and ESLint).
+- PR quality gate: 19/19 unit checks and two sample-body checks PASS; exact Draft PR body passed validation. First local body validation found three missing required Validation fields; fields were added and rerun passed.
+- GitHub: Draft PR #3721, https://github.com/drsapaev/final/pull/3721, exact HEAD 84a7ee3828781b9b68791ff6e123bbb602759a7d, base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43; mergeability MERGEABLE at first read. CI is in progress; initial scratch guard, locale parity, Russian-text detector and GitGuardian checks succeeded. This is not a final CI result.
+- Tier 2: NOT_RUN at this checkpoint; no deferral requested or accepted. Plan is to run owned synthetic staging after Tier 1 passes.
+- Local full type-check/build: type-check reports unavailable nitro/nitro/runtime-config plus one unrelated publicSiteHandler.test.tsx implicit-route diagnostic, with no task-path diagnostics. Build stops while loading Vite config due missing Nitro; app compilation did not start. No dependency installation attempted.
+- Cleanup: deleted only the task-owned temporary PR-body scratch and verified temporary node_modules junction; confirmed shared dependency target remains.
+- Result: implementation is PR_OPEN/Draft; no reviewer decision, merge, staging, production, deployment or review-thread mutation.
+- Next exact action: inspect complete exact-head CI; repair any failure in PR #3721, then perform T17 synthetic Tier-2 validation and update the PR and journals with actual evidence.
+
+## T17 — CI type-check failure and focused correction — 2026-10-20T13:03:40+05:00
+
+- Commit under test: corrected PR HEAD f1c3007c590d98ea6ce15a1c7358ceebbf86d410; base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43.
+- Original failure: Unified CI run 39389562581 / job Frontend lint completed lint successfully, then Type-check frontend failed with TS2349 at QueueProfilesManager.csv.test.tsx:497 because getMockImplementation() was inferred as a callable-or-constructor union.
+- Fix: added the explicit asynchronous GET-mock signature to the test fixture in commit f1c3007c5. No application behavior or other source path changed.
+- Validation after fix: focused CSV/interactions/i18n contract tests PASS 64/64; scoped ESLint on the test file PASS; local full type-check still reports only missing Nitro modules and the existing unrelated publicSiteHandler.test.tsx implicit-route diagnostic; normal commit hooks PASS on the fix commit; git diff --check PASS.
+- Current PR: #3721 Draft, https://github.com/drsapaev/final/pull/3721, current HEAD f1c3007c590d98ea6ce15a1c7358ceebbf86d410. PR body updated and quality-gate validated (19/19). Current exact-head GitHub workflows are still running; early completed checks on the corrected head are green. Do not transfer the failure from prior head as a current-head failure.
+- Tier 2: NOT_RUN; no deferral requested or accepted; staging remains outside the validated result at this checkpoint.
+- Result: no known code/test defect remains after the correction; exact-head CI has not completed.
+- Next exact action: inspect the full CI rollup for f1c3007c5, fix any newly observed failure in the same PR, then proceed with T17 acceptance without changing scope silently.
+
+## T17 — exact-head CI and staging pre-work — 2026-10-20T13:15:00+05:00
+
+- Commit under test: `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`; base `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+- Environment: isolated worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`; branch `codex/aqs-T17-bulk-csv`; Windows host. C: free 17.8 GiB; D: free 28.8 GiB. Ubuntu-24.04 is registered; Linux filesystem capacity not obtained outside launcher.
+- Execution mode: mandatory `gate` for staging acceptance/evidence. Canonical command from `ai/langgraph`: `run_agent_gate.ps1 "T17 validation-only synthetic staging acceptance for QueueProfilesManager bulk and CSV flows; exact PR head f1c3007c590d98ea6ce15a1c7358ceebbf86d410; no runtime edits; own ephemeral Compose project only"`.
+- Gate result: `gate_ok`, mode `execute`, handoff required, reason `compose runtime ownership`; no misroute and no override. Generated prompt was read; its first-touch `ops/docker-compose.yml` and `ops/compose.staging.yml` were read. Neither will be edited.
+- Allowed temporary paths for the pending validation: only ignored `ops/staging.env` and `output/staging/**`, plus this plan's journals. Denied: all other source/runtime paths, production/foreign projects/worktrees, global Docker cleanup, merge and review-thread changes. This operational scope is based on the user's continuing authorization for multiple isolated cycles and the staging runbook.
+- Original failure: NOT_APPLICABLE (no validation run yet).
+- Validation target: T17 Admin QueueProfiles CSV/bulk scenarios after normal Admin authentication/2FA, only in the synthetic owned project; exact served-build provenance required where supported.
+- Result: NOT_RUN so far. Tier 1 exact-head CI has Frontend E2E still in progress; other applicable frontend checks reported PASS. Path-aware backend/Docker jobs are SKIPPED.
+- Teardown: NOT_RUN (no resources started). PR remains Draft.
+- Next exact action: finish exact-head E2E; then Preflight, one owned staging session, and verified teardown if all guards pass.
+
+## T17 — exact-head Tier 1 and canonical Preflight — 2026-10-20T13:28:00+05:00
+
+- Commit under test: `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`; PR #3721; base `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+- Environment: isolated T17 worktree on Windows; `npm run check-theme` exit 0. Exact-head Unified CI run `39390525002`: Frontend unit PASS, lint/type-check/a11y PASS, build PASS, Frontend E2E PASS (17m05s), PR Required Gate PASS; applicable security, CodeQL, locale and scratch-guard checks PASS. Backend/integration/Docker/readiness jobs were SKIPPED by path filters.
+- Canonical command: `ops/scripts/wsl_staging.ps1 -Action Preflight -EnvFile ops/staging.env` — PASS. It confirmed exact commit and worktree; project `clinic-aqs-t17-pr3721-20261020`; ports backend 28171, frontend 28172, Postgres 25571; Ubuntu-24.04; Docker 29.1.3 / Compose 2.40.3; WSL available memory 3201 MiB; backing Windows disk free 17 GiB; WSL VHD backing disk free 28 GiB; Linux `/` and Docker root free 913 GiB; warnings none. Runtime readiness NOT_RUN; no services were started by Preflight.
+- Served revision at Preflight: NOT_RUN / false pending image build. Worktree reported dirty because only the four plan journal files have uncommitted updates; no app/test/locale files are dirty.
+- Actual change paths: `.ai-factory/plans/admin-queue-simplification/{PROGRESS.md,RESUME.md,EVIDENCE.md}` plus `.ai-factory/plans/codex-admin-queue-simplification.md`; ignored `ops/staging.env` contains synthetic credentials and bounded lease, never printed or committed.
+- Next: canonical Start, then one Session with normal Admin 2FA and T17 UI scenarios; verify exact served revision and teardown only this project. No production, foreign project, merge, or review mutation.
+
+## T17 — canonical Start — 2026-10-20T13:33:21+05:00
+
+- Commit under test: `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`; PR #3721 exact HEAD.
+- Environment: task-owned project `clinic-aqs-t17-pr3721-20261020` in `Ubuntu-24.04`, ports 28171/28172/25571; Windows C: free 17 GiB; WSL VHD backing disk free 28 GiB; Linux root/Docker root free 913 GiB; WSL available memory 3201 MiB.
+- Command: canonical `ops/scripts/wsl_staging.ps1 -Action Start -EnvFile ops/staging.env` — PASS. Runtime readiness PASS, exact worktree and commit confirmed, no warnings. Built image IDs: backend `sha256:4eb7287f1bad88fceff64413a5dd6899b7a5e2e8660f96d5ccfbcae4a9eaa0f2`; frontend `sha256:ec93a5a07fded4627b0b2697c6f6f19adbce3a557844a9fcf242dc4a88de8b53`; worker `sha256:f970f6bca698c97ef7287e9d2eadc98d2ac32375b58dff5fd0c21a9059c1b8ae`.
+- Served revision: NOT_RUN / false until the Session fetches `/sw.js` and checks the expected commit marker. Teardown: PENDING_SESSION, must be completed by the following canonical Session.
+- Scope: no tracked Compose or runtime code edits; only the own synthetic ignored env and temporary `output/staging` script/evidence are permitted. Production and other projects untouched.
+- Next: run exactly one Session with normal Admin 2FA enrollment and subsequent challenge, T17 CSV-hidden/reminder and bulk archive checks, exact SW revision marker, then verify automatic project teardown.
+
+## T17 — first Session readiness failure and owned teardown — 2026-10-20T13:33:21+05:00
+
+- Commit under test: 1c3007c590d98ea6ce15a1c7358ceebbf86d410; PR #3721.
+- Project: clinic-aqs-t17-pr3721-20261020; canonical Start returned PASS with runtime readiness PASS and 	eardown=PENDING_SESSION.
+- Canonical Session command used the no-build validation child. Outcome: FAIL before child execution with STAGING_NOT_READY: missing, stopped or unhealthy service; do not run dependent tests; appended status STAGING_TEARDOWN=PASS.
+- Browser, normal Admin 2FA, CSV, bulk action and served SHA: NOT_RUN. Exact frontend provenance remains false/unverified.
+- Root cause: NOT_CONFIRMED. The gap between Start and Session was several minutes; it may have allowed service/WSL state to change, but the launcher did not identify a specific service in the safe summary. Do not claim a confirmed cause.
+- Cleanup: PASS for the owned project; no foreign project or production action. Next cycle will use a new project/lease/ports and invoke Start immediately followed by Session in one PowerShell orchestration with no intervening work.
+
+## T17 — fresh owned project Preflight — 2026-10-20T13:34:21+05:00
+
+- Commit: 1c3007c590d98ea6ce15a1c7358ceebbf86d410; PR #3721 exact HEAD.
+- Previous owned project clinic-aqs-t17-pr3721-20261020: Session failed before child due STAGING_NOT_READY; automatic teardown PASS. Root cause NOT_CONFIRMED; no browser/test ran.
+- Replaced only the previous ignored synthetic env after its teardown PASS. New project: clinic-aqs-t17-pr3721-20261020-r2, lease bounded to four hours; ports backend 28271, frontend 28272, Postgres 25671.
+- Canonical Preflight PASS. Exact worktree/commit, Ubuntu-24.04, Docker/Compose readiness, storage/ownership/port checks passed; C: free 17 GiB, WSL VHD free 28 GiB, Linux / and Docker root free 913 GiB, WSL available memory 3205 MiB; warnings none. Runtime readiness NOT_RUN.
+- Next: Start and Session back-to-back in one orchestrator; no intervening command. Session must run child and teardown this exact project. Frontend revision and Admin/CSV/bulk evidence remain NOT_RUN.
+
+## T17 — staging Admin authentication PASS; locator error — 2026-10-20T13:40:22+05:00
+
+- Commit: 1c3007c590d98ea6ce15a1c7358ceebbf86d410; project clinic-aqs-t17-pr3721-20261020-r2.
+- Canonical Start PASS; immediate Session launched the validation child and then returned VALIDATION_FAILED because the harness's expected heading locator timed out. It reported STAGING_TEARDOWN=PASS and removed only r2.
+- Confirmed child checks PASS: served /sw.js contained exact expected frontend commit SHA; initial Admin 2FA enrollment completed through the UI and a new-context password+TOTP login succeeded.
+- Failure cause confirmed from canonical source: QueueProfilesManager title is the localized dmin2.qp_page_title, Russian value Вкладки регистратуры; the harness incorrectly expected Профили очередей. This is test harness defect, not a confirmed product issue.
+- CSV import, hidden setting, publication reminder, bulk archive: NOT_RUN because the script stopped before those assertions. No patient data created.
+- Next: fix only the temporary selector; use a fresh project/lease/ports after confirmed teardown; rerun Preflight and one immediate Start→Session cycle.
+
+## T17 — r3 canonical Preflight — 2026-10-20T13:41:13+05:00
+
+- Commit under test: 1c3007c590d98ea6ce15a1c7358ceebbf86d410; PR #3721.
+- r2 confirmed PASS: served /sw.js exact commit, initial Admin 2FA enrollment, and subsequent TOTP login. r2 failed only at a wrong heading expectation; actual QueueProfilesManager heading is Вкладки регистратуры. Teardown PASS.
+- Temporary harness updated to match the source-backed heading. Node syntax check PASS.
+- New owned project clinic-aqs-t17-pr3721-20261020-r3; canonical Preflight PASS; ports 28371/28372/25771; C: free 17 GiB; WSL backing disk free 28 GiB; Linux/Docker root free 913 GiB; WSL available 3157 MiB; warnings none; runtime readiness NOT_RUN.
+- Next: Start then Session immediately in one orchestrator; complete CSV and bulk checks and record Session teardown. No application files changed.
+
+## T17 — r3 Admin/CSV staging result and harness correction — 2026-10-20T13:48:28+05:00
+
+- Commit under test: f1c3007c590d98ea6ce15a1c7358ceebbf86d410; PR #3721; base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43.
+- Environment: isolated Windows worktree C:/Users/DrSapaev/.codex/worktrees/aqs-t17-bulk-csv/final; synthetic project clinic-aqs-t17-pr3721-20261020-r3 in Ubuntu-24.04; backend 28371, frontend 28372, PostgreSQL 25771. Host C: free 17 GiB; WSL backing volume free 28 GiB; Linux root and Docker root free 913 GiB; WSL available memory at Preflight 3157 MiB; warnings none.
+- Execution mode: mandatory gate for staging evidence. Gate/handoff, scope, and canonical Compose reads are recorded in the preceding T17 pre-work entry. No gate, router, or Compose source was changed.
+- Allowed paths: owned ignored ops/staging.env, output/staging files, and T17 plan journals. Denied: runtime/source/test changes, Compose source, other worktrees/projects, production, global Docker cleanup, review threads, and merge.
+- Actual temporary change: output/staging/validate-t17.cjs now asserts that the API response matches the forced-hidden create payload and explicitly checks the pending-publication review UI. Node syntax check and git diff check passed.
+- Original failure: r3 child stopped after a successful CSV POST with a harness assertion requiring publication_deferred=true. The request correctly sent show_on_qr_page=false. Canonical backend source derives publication_deferred from the submitted value, while the frontend preserves CSV intent and displays a separate review reminder. This was a harness assertion error; no product defect was confirmed.
+- Validation: canonical Preflight PASS; owned Start-to-Session; exact served /sw.js SHA PASS; normal Admin 2FA enrollment PASS; subsequent password-plus-TOTP login PASS; QueueProfiles page loaded PASS; CSV create endpoint returned success and hidden payload PASS; then the incorrect response assertion failed.
+- Result: T17 staging PARTIAL. Persisted profile state, visible reminder, and bulk archive were NOT_RUN in r3. Raw API payload was not recorded. Canonical Session reported STAGING_TEARDOWN=PASS; only r3 project resources were cleaned.
+- Scope check: PASS. No app source, tracked tests, backend, Compose source, production, unrelated worktree, or foreign Docker project changed. No patient data was created.
+- Remaining limitation: rerun with fresh project/lease/ports to validate persistence, reminder, and archive. r1 readiness failure cause remains unconfirmed.
+- PR #3721 remains Draft; no PR metadata change. No merge commit.
+
+## T17 — r4 staging browser reached Admin; harness file collision — 2026-10-20T13:54:48+05:00
+
+- Commit under test: f1c3007c590d98ea6ce15a1c7358ceebbf86d410; PR #3721; base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43.
+- Environment: isolated task worktree C:/Users/DrSapaev/.codex/worktrees/aqs-t17-bulk-csv/final; synthetic project clinic-aqs-t17-pr3721-20261020-r4, Ubuntu-24.04; backend/frontend/PostgreSQL ports 28471/28472/25871. Preflight recorded C: free 17 GiB, WSL backing volume free 28 GiB, Linux root and Docker root free 913 GiB, WSL available memory 3229 MiB; warnings none after correction.
+- Execution mode: same mandatory staging gate scope; handoff, canonical anchors, and allowed/denied paths are recorded above. No gate, router, or Compose source changed.
+- Allowed paths: ignored ops/staging.env, output/staging files, and task plan journals only. Denied: runtime/source/tests, Compose source, other worktrees/projects, production, global cleanup, review mutation, and merge.
+- Actual changed paths: ignored ops/staging.env and output/staging/validate-t17.cjs plus plan journals. Synthetic credentials were rotated; no secret value was printed or recorded.
+- Original failure: first r4 Preflight reported PUBLIC_ORIGIN_CONTEXT_MISMATCH because STAGING_PUBLIC_WS_HOST omitted the frontend port. Corrected to matching loopback host:port; second Preflight PASS. The failed Preflight started no services.
+- Validation: canonical Preflight PASS; Start PASS with runtime readiness PASS; immediate Session child passed exact served /sw.js SHA, normal Admin 2FA enrollment, password-plus-TOTP login, and QueueProfiles page load. Child stopped before CSV upload with EEXIST because a fixed temporary CSV artifact already existed from r3. Session reported VALIDATION_FAILED and STAGING_TEARDOWN=PASS.
+- Result: T17 staging remains PARTIAL. CSV import, hidden persistence, publication reminder, and bulk archive are NOT_RUN in r4. No QueueProfile write occurred.
+- Harness fix: unique per-run CSV filename with safe final cleanup; Node syntax check PASS; git diff check PASS.
+- Scope check: PASS; only the r4 owned project was cleaned. Main worktree, photo-cleanup task, production, and other Docker projects were untouched.
+- Remaining limitation: r1 readiness cause remains unknown. r2, r3, and r4 owned teardowns passed. Next r5 cycle must complete remaining CSV/reminder/persistence/archive assertions.
+- PR #3721 remains Draft; PR body/metadata unchanged. No merge commit.
+## T17 — r5 reached CSV results; strict locator stopped assertions — 2026-10-20T14:04:11+05:00
+
+- Commit under test: f1c3007c590d98ea6ce15a1c7358ceebbf86d410; PR #3721; base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43.
+- Environment: isolated worktree C:/Users/DrSapaev/.codex/worktrees/aqs-t17-bulk-csv/final; synthetic project clinic-aqs-t17-pr3721-20261020-r5 in Ubuntu-24.04; backend 28571, frontend 28572, PostgreSQL 25971. Preflight recorded C: free 17 GiB, WSL backing volume free 28 GiB, Linux root and Docker root free 913 GiB, WSL memory 3185 MiB; warnings none.
+- Execution mode: continuation of the mandatory staging gate scope; gate/handoff and allowed/denied paths are in prior T17 entries. No gate/router/Compose source changed.
+- Allowed paths: ignored ops/staging.env, output/staging files, and T17 plan journals. Denied: app/backend/API/runtime code, tracked tests, Compose source, other worktrees/projects, production, global cleanup, review threads, and merge.
+- Actual changed paths: owned ignored env, temporary validation harness/results, and plan journals only. Fresh synthetic project, credentials, lease and ports were used; no secret values recorded.
+- Original failure: harness strict-mode locator queried the operation-results region for an exact profile key and found two matches. The same key is intentionally rendered once in the result row and again in the pending-publication reminder. This is a harness ambiguity, not a product failure.
+- Validation: canonical Preflight PASS; Start PASS/runtime readiness PASS; immediate Session verified exact served frontend SHA, normal Admin 2FA enrollment, subsequent password-plus-TOTP login, and QueueProfiles page. CSV create response was HTTP success; request show_on_qr_page=false and response publication_deferred=false matched the hidden-create contract. Operation-results region appeared, then locator failed. Session reported STAGING_TEARDOWN=PASS.
+- Result: staging remains PARTIAL. The reminder list was not explicitly asserted, persisted profile reload assertion and bulk archive are NOT_RUN in r5. No clinical or patient records were created.
+- Harness fix: scope the matching key to the result list and separately to the labelled reminder list, target the specific review-QR button, and use a unique CSV artifact removed only if created by this invocation. Node syntax check PASS. The old r3 CSV fixture was removed from the task-owned output path after teardown. git diff check PASS.
+- Scope check: PASS; only the r5 project was started and removed. Main checkout, photo-cleanup worktree, production and foreign Docker projects untouched.
+- Remaining limitation: r1 readiness cause remains unknown; r2-r5 owned teardown PASS. Next r6 must finish reminder/persistence/archive assertions.
+- PR #3721 remains Draft; no PR metadata change. No merge commit.
+
+## T17 — r6 complete targeted Admin/CSV/bulk staging acceptance — 2026-10-20T14:11:24+05:00
+
+- Commit under test: f1c3007c590d98ea6ce15a1c7358ceebbf86d410; PR #3721; base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43.
+- Environment: isolated worktree C:/Users/DrSapaev/.codex/worktrees/aqs-t17-bulk-csv/final; owned synthetic project clinic-aqs-t17-pr3721-20261020-r6 in Ubuntu-24.04; backend 28671, frontend 28672, PostgreSQL 26071. Preflight recorded host C: free 17 GiB, WSL backing volume free 28 GiB, Linux root and Docker root free 913 GiB, available WSL memory 3218 MiB; no warnings.
+- Execution mode: mandatory gate for compose runtime ownership and staging acceptance; gate result, generated handoff and anchors are recorded in the T17 pre-work evidence. No gate/router/Compose source changed.
+- Allowed paths: this task's ignored ops/staging.env, output/staging temporary harness/evidence, and plan journals. Denied: runtime/application code, backend/API, tracked tests, Compose source, main checkout, parallel worktree, foreign Docker projects, production, global cleanup, review threads, and merge.
+- Actual changed paths: ignored ops/staging.env and output/staging harness/result plus the four plan documents; no product runtime/test file changed.
+- Original failure: none in r6. Earlier r1-r5 issues remain recorded individually: r1 service readiness before child; r2 wrong heading; r3 wrong deferred-flag expectation; r4 stale fixed file and an initial corrected Preflight authority; r5 ambiguous duplicate key locator. Each project ended with canonical teardown PASS.
+- Validation: canonical Preflight PASS; Start PASS/runtime readiness PASS; immediate Session PASS. The browser child reported all six checks PASS: exact served frontend SHA from /sw.js, initial Admin 2FA enrollment, normal password-plus-TOTP login, QueueProfiles admin page load, CSV create hidden and reminder, bulk archive report and persisted state. The POST sent show_on_qr_page=false and response publication_deferred=false. The UI displayed the pending review action; profile remained active but hidden after refresh; archive changed is_active to false and refreshed read confirmed it.
+- Additional checks: local check-theme PASS. Local standalone audit:icon-controls did not start because the shared worktree dependencies lack @typescript-eslint/parser; the exact-head hosted frontend lint job ran the strict and component icon-control audits successfully. Focused tests 64/64, scoped ESLint and commit hooks remain PASS as recorded earlier.
+- Teardown: PASS. Canonical Session removed 5 task-owned containers, 3 task-owned volumes and 1 task-owned network; zero remained. Local build images were removed by the launcher policy. No foreign project was touched.
+- Result: T17 targeted synthetic Tier 2 PASS for the scenarios above. Exact served revision independently passed in browser even though the launcher's aggregate field served_revision_verified remains false. Full STAGING_VALIDATION.md and T18 full integrated acceptance remain outstanding and are not claimed passed.
+- Scope check: PASS; no production, patient data, main checkout, parallel task or unrelated resource touched.
+- PR #3721 remains Draft pending PR body update, docs-only checkpoint push, exact-head checks and independent review. No merge commit.
+
+## T17 — PR body validated and updated; local ignored-artifact cleanup blocked — 2026-10-20T14:16:00+05:00
+
+- Commit under test: code HEAD `f1c3007c590d98ea6ce15a1c7358ceebbf86d410`; docs checkpoint not yet committed. PR #3721 base and current `origin/main`: `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+- Environment: isolated T17 worktree. GitHub reports PR OPEN, Draft, MERGEABLE. Exact code-head applicable CI was queried and all applicable jobs were PASS; path-aware Backend, integration, Docker, parity, Supabase preview and readiness jobs were SKIPPED, not PASS.
+- Allowed paths: T17 PR description, the four plan journals, and task-local staging artifacts. Denied: source/runtime, tracked tests, Compose source, other worktrees, production, foreign Docker projects, review-thread mutation and merge.
+- PR body validation: used `scripts/run_python.ps1 -RequireModule scripts.check_pr_review_template scripts/run_pr_review_gate_checks.py --body-file output/staging/pr-body-t17-final.md` with the configured bundled Python 3.12 runtime. Result PASS: 19/19 runner unit tests, both sample bodies and the T17 body. A first body-only attempt found the four required Notification/Realtime answers missing; field-level reasons were added and the final exact body passed. The single em dash after `Not applicable` also had to be replaced with the validator-supported hyphen; final run passed.
+- PR description: `gh pr edit 3721 --repo drsapaev/final --body-file ...` succeeded. The final body records the r6 evidence, accurately labels skipped CI jobs, and discloses that local ignored env/harness artifacts remain. PR code HEAD and base remained unchanged. Metadata-triggered checks must be rechecked after the documentation push.
+- Cleanup: canonical r6 teardown PASS removed all owned Compose resources. A subsequent exact-file cleanup command for `ops/staging.env` and the named T17 files under `output/staging` was rejected by the host policy before execution; nothing was removed. No alternate deletion mechanism was attempted. These ignored local files remain and are excluded from git/PR. No values from the synthetic environment were read or logged.
+- Actual tracked paths: only `.ai-factory/plans/admin-queue-simplification/{PROGRESS.md,EVIDENCE.md,RESUME.md}` and `.ai-factory/plans/codex-admin-queue-simplification.md` are modified.
+- Remaining limitation: local ignored-artifact cleanup is blocked by the host policy. The staging stack itself is stopped and its owned containers, volumes, and network were verified at zero by canonical r6 teardown. Full `STAGING_VALIDATION.md` and T18 remain outstanding.
+- Next exact action: inspect and diff-check the four journals, commit/push them with normal hooks, then verify PR #3721 exact head and all applicable CI including metadata workflows. Mark Ready for review only if those checks are green. User retains merge; no merge or deployment.
+
+## T17 — PR #3721 Ready and exact documentation-head checks passed — 2026-10-20T14:37:00+05:00
+
+- Commit under test: `ef41f75c262488741053d74e8b96ab9059514aa8`; PR #3721 base `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+- Environment: isolated T17 worktree. PR is OPEN, Ready for review, MERGEABLE. `origin/main` still matches the PR base.
+- Validation: Unified CI run `39399756835` completed PASS on exact HEAD `ef41f75c`: Frontend build, unit, lint, E2E (16m33s), PR Required Gate, CodeQL, security, Gitleaks, locale parity, regression, scratch guards and other applicable checks passed. GitGuardian passed. Backend, integration, Docker, parity, readiness and other unrelated/path-aware jobs were SKIPPED and are not counted as passes. Post-Ready PR Review Quality Gate and lifecycle recommendation checks passed.
+- PR lifecycle: `gh pr ready 3721` succeeded. No review approval, merge, or deployment was performed; user retains merge.
+- Scope: no product source changed in this checkpoint. Only the four T17 plan documents are intended for the next documentation-only commit. The r6 staging result and zero-resource teardown remain as recorded above.
+- Remaining limitation: ignored local synthetic env/harness files remain because host policy rejected the exact cleanup command before execution; the PR body discloses this. No alternate deletion path was used. No staging Compose resource remains. Full `STAGING_VALIDATION.md` and T18 are still outstanding.
+- Next exact action: commit/push the status checkpoint and recheck the exact new HEAD. After that, leave PR Ready for independent review/user merge.
+
+## T17 — PR #3721 review #5584710581 P1/P2 fixes local — 2026-10-20T17:17:03+05:00
+
+- Commit under test: product changes are uncommitted on top of `fe2944ff90a410ff8df2393d4a91bd73b3f25102`; PR #3721 base/current `origin/main` is `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+- Environment: isolated T17 worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`; PR is OPEN/Ready. Two unresolved current inline threads; no GitHub write performed.
+- Execution mode: `advisory_gate`, frontend-only CSV admin behavior. Gate command, known owner and complete allowed paths are recorded in `PROGRESS.md`. Both gate results: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; both execution prompts read. Human basis is the exact review and its two unresolved threads. No source paths outside the allowlist changed.
+- Allowed paths: `frontend/src/components/admin/QueueProfilesManager.tsx`; `frontend/src/components/admin/__tests__/QueueProfilesManager.csv.test.tsx`; locale files `en.ts`, `kk.ts`, `ru.ts`, `uz-Cyrl.ts`, `uz-Latn.ts`; T17 `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: backend/API/OpenAPI/DB, queue runtime/ownership/fairness, auth/RBAC, routes, Compose/staging, production, main checkout, other worktrees, review-thread mutation, merge and deployment.
+- Original failures: update path could send CSV `show_on_qr_page=true` for an existing hidden profile; read-after-write equality rejected the backend's dental-family-expanded `queue_tags`.
+- Changes: CSV create remains forced hidden; existing CSV updates omit a requested `show_on_qr_page=true`, while explicit false may still hide. Deferred-publication counts and pending-reminder reconciliation now include existing rows, and five locales say requested QR visibility requires review without labeling existing profiles as new. Saved tag comparison mirrors backend `expand_queue_tags`/profile-key fallback.
+- Regression coverage added: same requested-public CSV imported after hidden creation stays hidden, shows a review reminder, counts the existing row in preview, and an update of another field omits the QR flag; a `stomatology` create is recognized after backend-style expansion to all dental aliases. The existing update test now asserts a published profile remains published while CSV update omits a positive QR command.
+- Validation: `git diff --check` PASS. Backend `expand_queue_tags(['stomatology'])` returned exactly `['dental', 'dentist', 'dentistry', 'stomatology']`. `scripts/i18n/validate_locales.py` PASS with `PYTHONUTF8=1`, 10,550 keys in each of five locales. Focused Vitest NOT_RUN: branch has no `node_modules`; the first command could not find Vitest, and using the main checkout's binary failed to resolve `vitest/config` from Vite's temp config. Frontend build/lint/type-check NOT_RUN. Prior CI on `fe2944ff` does not validate this patch.
+- Actual changed paths: component, focused CSV regression file, five locale files and these three plan journals. No staging/production/DB/API changes.
+- Remaining limitation: exact-head CI still required. Normal commit hooks may also be unavailable due missing frontend dependencies; do not bypass them.
+- Next exact action: final diff review and `git diff --check`, then commit with normal hooks and push to PR #3721. Require exact-head CI before review disposition; leave inline threads unresolved unless explicitly instructed.
+
+## T17 — PR #3721 P1/P2 fixes local validation — 2026-10-20T17:27:42+05:00
+
+- Commit under test: `fe2944ff90a410ff8df2393d4a91bd73b3f25102`; product changes remain uncommitted. PR #3721 base/current main `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+- Environment: isolated T17 worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`; no staging was used. Before commit, GitHub showed PR OPEN/Ready/MERGEABLE with no head change.
+- Original failure: first focused Vitest run completed 14/17. The reminder created a second list item in the result region, so two tests used ambiguous `getByRole('listitem')`; the available-profile fixture omitted `effective_availability.is_available=true`; a warning assertion retained obsolete wording. The fixture, scoped selectors and copy assertion were corrected. These were test expectation issues, not a runtime failure.
+- Validation: `npm ci --no-audit --no-fund --cache .scratch/npm-cache` completed in this worktree; focused `npm run test:run -- src/components/admin/__tests__/QueueProfilesManager.csv.test.tsx` PASS, 17/17; `npm run type-check` PASS; scoped ESLint across the component, test and five locales PASS, 0 errors and 3 hardcoded-color warnings on unchanged lines; `npm run build` PASS with existing vendor/CSS warnings; `PYTHONUTF8=1 scripts/run_python.ps1 -RequireModule @() scripts/i18n/validate_locales.py` PASS, 10,550 matching keys per locale; backend expansion check PASS; `git diff --check` PASS.
+- Generated local files: ignored worktree `frontend/node_modules/` and `frontend/dist/` remain. The npm cache was moved from the accidentally created `frontend/.scratch/` to reserved root `.scratch/aqs-t17-npm-cache/`. Host policy rejected recursive cleanup of generated cache/build artifacts before execution; no alternate deletion attempt was made. No generated file is staged/tracked.
+- Actual tracked paths: T17 `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`; `QueueProfilesManager.tsx`; its CSV regression test; locales `en.ts`, `kk.ts`, `ru.ts`, `uz-Cyrl.ts`, `uz-Latn.ts`.
+- Scope check: PASS. No backend/API/OpenAPI/DB, auth/RBAC, queue ownership/fairness, staging/Compose, production, `C:\final`, foreign worktree, review thread, merge, or deployment changed.
+- Remaining: normal commit hooks, push, and exact-head GitHub CI. Review threads remain open; no GitHub write yet. User retains merge.
+
+## T17 — PR #3721 exact product-head CI PASS — 2026-10-20T17:48:01+05:00
+
+- Product commit under test: `e88cc6aa1a7a31339c42455598f03a3f42d57eea`; PR #3721; base/current main `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
+- GitHub state: PR OPEN/Ready/MERGEABLE at exact product head `e88cc6aa`; Unified CI `39422914134` completed successfully. Frontend unit tests, build, lint, E2E (14m11s), PR Required Gate, CI scope, CodeQL, security, gitleaks, GitGuardian, locale parity, regression audit, PR review quality/lifecycle gates, scratch guards, and notifications passed.
+- `SKIPPED`, not PASS: backend tests, integration tests, Docker build, Frontend-Backend Parity, production/staging readiness, Supabase preview, DAST, Telegram release gate, load tests, and unrelated path-aware jobs. T17 targeted synthetic staging evidence is from the prior recorded r6 cycle; this CSV patch did not use or rerun staging.
+- Local exact product validation is recorded in the preceding entry: focused CSV Vitest 17/17; type-check; scoped ESLint (0 errors, 3 existing warnings at unchanged lines); frontend build; locale parity; backend `stomatology` expansion; and `git diff --check` PASS.
+- Review threads: the two P1/P2 threads remain open. No review comment/reply/resolve, approval, merge, or deployment was performed. User retains merge.
+- Next exact action: commit/push this documentation-only status checkpoint and verify any new PR-head checks. No source behavior changes are planned.
