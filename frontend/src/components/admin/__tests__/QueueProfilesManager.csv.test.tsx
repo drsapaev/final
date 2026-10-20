@@ -237,7 +237,7 @@ describe('QueueProfilesManager CSV export (RQ-26.a)', () => {
 });
 
 describe('QueueProfilesManager CSV import (RQ-26.a)', () => {
-  it('updates an existing profile with every contract field preserved (round-trip)', async () => {
+  it('updates existing profile fields without sending QR publication as an import command', async () => {
     await renderManager();
     await uploadCsv(newFormatCsv);
 
@@ -251,11 +251,14 @@ describe('QueueProfilesManager CSV import (RQ-26.a)', () => {
           queue_tags: ['cardio', 'ekg'],
           department_key: 'cardiology',
           display_order: 3,
-          is_active: true,
-          show_on_qr_page: true
+          is_active: true
         })
       );
     });
+
+    const updatePayload = (api.put as ReturnType<typeof vi.fn>).mock.calls[0][1] as Record<string, unknown>;
+    expect(updatePayload).not.toHaveProperty('show_on_qr_page');
+    expect(syntheticProfiles.find((profile) => profile.key === 'synthetic-cardio')?.show_on_qr_page).toBe(true);
 
     // The row without an existing key goes through create, with typed fields.
     expect(api.post).toHaveBeenCalledWith(
@@ -293,11 +296,13 @@ describe('QueueProfilesManager CSV import (RQ-26.a)', () => {
       'key,title,title_ru,queue_tags,department_key,icon,color,display_order,is_active,show_on_qr_page',
       'synthetic-cardio,"Синтетическая кардио, взрослая",Синтетическая кардиология,cardio;ekg,cardiology,Heart,#E53E3E,3,true,true',
     ].join('\n');
+    syntheticProfiles[0].effective_availability = { is_available: true, state: 'available' };
     await renderManager();
     await uploadCsv(matchingCsv);
 
     const results = screen.getByRole('region', { name: 'Результаты операции' });
-    const row = within(results).getByRole('listitem');
+    const resultRows = within(results).getAllByRole('list');
+    const row = within(resultRows[0]).getByRole('listitem');
     expect(row).toHaveTextContent('Выполнено');
     expect(row).toHaveTextContent('Нужное состояние уже сохранено; повторная запись не требовалась.');
     expect(api.put).not.toHaveBeenCalled();
@@ -322,8 +327,8 @@ describe('QueueProfilesManager CSV import (RQ-26.a)', () => {
       expect(notify.warning).toHaveBeenCalledTimes(1);
     });
     const warningMessage = (notify.warning as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(warningMessage).toContain('они пока скрыты');
-    expect(warningMessage).toContain('опубликуйте отдельно');
+    expect(warningMessage).toContain('сейчас они недоступны пациентам');
+    expect(warningMessage).toContain('опубликуйте каждый отдельно');
     expect(warningMessage).toContain('создано 1');
     expect(notify.warning).toHaveBeenCalledWith(warningMessage, { autoClose: 8000 });
     expect(notify.success).not.toHaveBeenCalled();
@@ -337,6 +342,88 @@ describe('QueueProfilesManager CSV import (RQ-26.a)', () => {
     unmount();
     await renderManager();
     expect(await screen.findByRole('button', { name: 'Проверить QR-настройку synthetic-neurology' })).toBeInTheDocument();
+  });
+
+  it('keeps a hidden CSV profile unpublished when the same publication request is imported again', async () => {
+    const requestedPublicProfileCsv = [
+      'key,title,title_ru,queue_tags,department_key,icon,color,display_order,is_active,show_on_qr_page',
+      'synthetic-neurology,Synthetic neurology,Синтетическая неврология,neuro,,,#718096,1,true,true',
+    ].join('\n');
+    (api.post as ReturnType<typeof vi.fn>).mockImplementationOnce((_url: string, payload: Record<string, unknown>) => {
+      syntheticProfiles.push({
+        ...payload,
+        key: String(payload.key),
+        queue_tags: payload.queue_tags as string[],
+        show_on_qr_page: false,
+      });
+      return Promise.resolve({ data: { success: true, publication_deferred: true } });
+    });
+    (api.put as ReturnType<typeof vi.fn>).mockImplementation((_url: string, payload: Record<string, unknown>) => {
+      const profile = syntheticProfiles.find((item) => item.key === 'synthetic-neurology');
+      if (profile) Object.assign(profile, payload);
+      return Promise.resolve({ data: { success: true } });
+    });
+
+    await renderManager();
+    await uploadCsv(requestedPublicProfileCsv);
+    expect(syntheticProfiles.find((profile) => profile.key === 'synthetic-neurology')?.show_on_qr_page).toBe(false);
+
+    const user = await uploadCsv(requestedPublicProfileCsv, false);
+    const preview = await screen.findByRole('dialog', { name: 'Предварительный просмотр импорта CSV' });
+    expect(preview).toHaveTextContent('обновлено: 1');
+    expect(preview).toHaveTextContent('отдельную проверку перед показом пациентам: 1');
+    await user.click(within(preview).getByRole('button', { name: 'Импортировать' }));
+
+    const results = await screen.findByRole('region', { name: 'Результаты операции' });
+    const resultRows = within(results).getAllByRole('list');
+    const row = within(resultRows[0]).getByRole('listitem');
+    expect(row).toHaveTextContent('Выполнено');
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(api.put).not.toHaveBeenCalled();
+    expect(syntheticProfiles.find((profile) => profile.key === 'synthetic-neurology')?.show_on_qr_page).toBe(false);
+    expect(await screen.findByRole('button', { name: 'Проверить QR-настройку synthetic-neurology' })).toBeInTheDocument();
+    expect(notify.warning).toHaveBeenCalledTimes(2);
+    expect(String((notify.warning as ReturnType<typeof vi.fn>).mock.calls[1][0])).toContain('опубликуйте каждый отдельно');
+
+    const changedProfileCsv = requestedPublicProfileCsv.replace('Synthetic neurology', 'Updated synthetic neurology');
+    await uploadCsv(changedProfileCsv);
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(1));
+    const updatePayload = (api.put as ReturnType<typeof vi.fn>).mock.calls[0][1] as Record<string, unknown>;
+    expect(updatePayload.title).toBe('Updated synthetic neurology');
+    expect(updatePayload).not.toHaveProperty('show_on_qr_page');
+    expect(syntheticProfiles.find((profile) => profile.key === 'synthetic-neurology')).toMatchObject({
+      title: 'Updated synthetic neurology',
+      show_on_qr_page: false,
+    });
+    await waitFor(() => expect(notify.warning).toHaveBeenCalledTimes(3));
+  });
+
+  it('reconciles a successful dental CSV create with backend-expanded queue tags', async () => {
+    const dentalProfileCsv = [
+      'key,title,title_ru,queue_tags,department_key,icon,color,display_order,is_active,show_on_qr_page',
+      'stomatology,Synthetic dentistry,Синтетическая стоматология,stomatology,,Smile,#718096,4,true,false',
+    ].join('\n');
+    (api.post as ReturnType<typeof vi.fn>).mockImplementationOnce((_url: string, payload: Record<string, unknown>) => {
+      // The real QueueProfile create endpoint persists expand_queue_tags(),
+      // so a single submitted dental alias is returned with the full family.
+      syntheticProfiles.push({
+        ...payload,
+        key: String(payload.key),
+        queue_tags: ['dental', 'dentist', 'dentistry', 'stomatology'],
+      });
+      return Promise.resolve({ data: { success: true } });
+    });
+
+    await renderManager();
+    await uploadCsv(dentalProfileCsv);
+
+    const results = screen.getByRole('region', { name: 'Результаты операции' });
+    const row = within(results).getByRole('listitem');
+    expect(row).toHaveTextContent('Выполнено');
+    expect(row).not.toHaveTextContent('Отклонено');
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(api.put).not.toHaveBeenCalled();
+    expect(within(results).queryByRole('button', { name: 'Повторить оставшиеся после проверки' })).not.toBeInTheDocument();
   });
 
   it('aborts the whole import with a visible error when the file has duplicate keys', async () => {

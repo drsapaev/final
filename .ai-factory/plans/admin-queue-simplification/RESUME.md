@@ -1,4 +1,14 @@
-## Latest continuation — T17 PR Ready; exact docs-head CI passed — 2026-10-20T14:37:00+05:00
+## Latest continuation — T17 PR #3721 review fixes validated locally — 2026-10-20T17:27:42+05:00
+
+Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. PR #3721 is OPEN/Ready/MERGEABLE at remote HEAD `fe2944ff90a410ff8df2393d4a91bd73b3f25102`, base/current `origin/main` `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. The two review threads remain open; local changes are not committed or pushed. User retains merge.
+
+The P1 is fixed: CSV true is review intent, never a publish command for existing rows; create sends false, update omits the field, and requested visibility is included in accurate preview/reminder counts. The P2 is fixed: saved queue-tag comparison mirrors backend dental alias expansion and key fallback. Regression tests cover both.
+
+Local checks: focused CSV tests 17/17 PASS; type-check PASS; scoped ESLint PASS (0 errors, 3 existing warnings outside changed lines); build PASS (vendor/CSS warnings); locale parity PASS (10,550 keys each); backend expansion check PASS; `git diff --check` PASS. Dependencies were installed inside this worktree only. Ignored `frontend/node_modules/`, `frontend/dist/`, and `.scratch/aqs-t17-npm-cache/` remain local; the cache is under reserved root scratch. A recursive cleanup was rejected by host policy before execution. Exact-head CI is still required after push.
+
+Next: review final diff, commit using normal hooks, push to the existing PR branch, and verify exact-head GitHub CI. Do not resolve review threads or merge; no review-thread mutation, merge, deployment, or staging occurred in this fix.
+
+## Previous continuation — T17 PR Ready; exact docs-head CI passed — 2026-10-20T14:37:00+05:00
 
 Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. PR #3721 is OPEN/Ready for review/MERGEABLE at HEAD `ef41f75c262488741053d74e8b96ab9059514aa8`; base and `origin/main` are `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. User performs merge.
 
@@ -1281,3 +1291,14 @@ Review #5576603179's P2 is fixed locally: the three setup editor links are outsi
 Gate sequence: mandatory gate stopped requesting a known source root; one retry with confirmed `AdminSetupDirections.tsx` returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Its prompt is read. Scope and stop conditions are in `PROGRESS.md`.
 
 Next exact action: push the committed fix and verify exact-head hosted checks. If they pass, leave PR #3711 for reviewer/user recheck and user merge. Do not resolve review threads, stage, deploy, merge, or start T16.
+## Latest continuation — T17 PR #3721 P1/P2 follow-up — 2026-10-20T17:17:03+05:00
+
+Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. PR #3721 remains OPEN/Ready at remote HEAD `fe2944ff90a410ff8df2393d4a91bd73b3f25102`, based on current `origin/main` `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`. Two exact, unresolved review threads from Review #5584710581 are being addressed in the same PR.
+
+The local code now prevents CSV upserts from sending `show_on_qr_page=true`; create still sends false. Deferred-publication preview/count/reminders cover existing rows and use accurate wording. CSV post-write matching mirrors backend `_canonical_profile_tags`/`expand_queue_tags` dental aliases. Two focused regressions cover create-hidden → same-file re-import → still hidden (and an unrelated update payload omits QR publication), and a dental create whose read response contains expanded tags.
+
+Gate: selected `advisory_gate` for a client-only update. Two `run_agent_gate.ps1` invocations used the confirmed component owner and complete scope; both returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`. Their execution prompts were read; no backend, DB, staging, production or fairness behavior is in scope. Full scope and the human-review basis are in `PROGRESS.md`.
+
+Validation so far: backend canonicalization output, locale key parity (10,550 keys per locale), and `git diff --check` PASS. Focused Vitest could not execute: no worktree `node_modules`; reusing the main checkout’s Vitest binary failed to resolve `vitest/config`. Frontend build, lint and type-check are NOT_RUN. Exact-head CI on this patch is still required. The local changes are not committed/pushed yet; review threads were not replied to/resolved and no merge or deployment occurred.
+
+Next: inspect the final diff, commit with normal hooks, push this branch to PR #3721, and wait for exact-head CI. Keep both review threads open until the reviewer/user resolves them. User retains merge; do not start T18 before PR #3721 is merged.

@@ -126,6 +126,38 @@ const readPendingCsvPublicationKeys = (): string[] => {
     }
 };
 
+const DENTAL_QUEUE_TAG_FAMILY = new Set(['dentistry', 'dental', 'stomatology', 'dentist']);
+const DENTAL_QUEUE_TAG_VARIANTS = Array.from(DENTAL_QUEUE_TAG_FAMILY).sort();
+
+const canonicalQueueTagsForCsvComparison = (value: unknown, profileKey: string): string[] | null => {
+    if (!Array.isArray(value) || value.some((tag) => typeof tag !== 'string')) return null;
+
+    // Keep this equivalent to backend/app/core/specialties.py's
+    // expand_queue_tags() and _queue_profiles.py's profile-key fallback.
+    const submittedTags = (value as string[]).filter(Boolean);
+    if (submittedTags.length === 0) submittedTags.push(profileKey);
+    const keyIsDental = DENTAL_QUEUE_TAG_FAMILY.has(profileKey.trim().toLowerCase());
+    const submittedDentalTag = submittedTags.some((tag) => DENTAL_QUEUE_TAG_FAMILY.has(tag.trim().toLowerCase()));
+    if (keyIsDental && !submittedDentalTag) submittedTags.push(profileKey);
+
+    const expanded: string[] = [];
+    for (const tag of submittedTags) {
+        const trimmed = tag.trim();
+        if (!trimmed) continue;
+        const variants = DENTAL_QUEUE_TAG_FAMILY.has(trimmed.toLowerCase())
+            ? DENTAL_QUEUE_TAG_VARIANTS
+            : [trimmed];
+        for (const variant of variants) {
+            if (!expanded.includes(variant)) expanded.push(variant);
+        }
+    }
+    for (const tag of submittedTags) {
+        const trimmed = tag.trim();
+        if (trimmed && !expanded.includes(trimmed)) expanded.push(trimmed);
+    }
+    return expanded;
+};
+
 const profileMatchesCsvPayload = (
     profile: QueueProfileDto,
     payload: Record<string, unknown>,
@@ -136,10 +168,29 @@ const profileMatchesCsvPayload = (
         ? profile.display_order ?? profile.order
         : profile[field];
     if (field === 'queue_tags' && Array.isArray(expected)) {
-        return Array.isArray(actual) && expected.length === actual.length && expected.every((tag, index) => tag === actual[index]);
+        const expectedTags = canonicalQueueTagsForCsvComparison(expected, profile.key);
+        const actualTags = canonicalQueueTagsForCsvComparison(actual, profile.key);
+        return expectedTags !== null
+            && actualTags !== null
+            && expectedTags.length === actualTags.length
+            && expectedTags.every((tag, index) => tag === actualTags[index]);
     }
     return actual === expected;
 });
+
+const csvPayloadForImportTask = (task: CsvImportTask): Record<string, unknown> => {
+    const payload = queueProfileToCsvPayload(task.row);
+    if (task.mode === 'create') {
+        // New profiles remain hidden until the administrator publishes them separately.
+        payload.show_on_qr_page = false;
+    } else if (task.requestedQrPublication) {
+        // A CSV's true value is review intent, never a publication command.
+        // Omitting it from this partial update also avoids a hidden-to-public
+        // transition if another administrator changes state after our read.
+        delete payload.show_on_qr_page;
+    }
+    return payload;
+};
 
 const queueProfilePreviewSnapshot = (profile: QueueProfileDto | undefined): string => JSON.stringify(profile ? {
     key: profile.key,
@@ -377,11 +428,8 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                         skippedMessages.set(key, t('admin2.qp_operation_not_found'));
                         continue;
                     }
-                    csvPayload = queueProfileToCsvPayload(csvTask.row);
+                    csvPayload = csvPayloadForImportTask(csvTask);
                     if (csvTask.mode === 'create') {
-                        // New profiles are never exposed by an import. The
-                        // requested QR visibility remains a separate review action.
-                        csvPayload.show_on_qr_page = false;
                         if (profile) {
                             const matchesCreate = profileMatchesCsvPayload(profile, csvPayload, csvTask.requestedQrPublication);
                             if (matchesCreate) {
@@ -458,9 +506,10 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                     if (operation.kind === 'delete') completed = !profile;
                     else if (operation.kind === 'set-active') completed = Boolean(profile && (profile.is_active !== false) === operation.active);
                     else if (csvTask && profile) {
-                        const payload = queueProfileToCsvPayload(csvTask.row);
-                        if (csvTask.mode === 'create') payload.show_on_qr_page = false;
-                        completed = profileMatchesCsvPayload(profile, payload, csvTask.mode === 'create' && csvTask.requestedQrPublication);
+                        const payload = csvPayloadForImportTask(csvTask);
+                        // A successful create must be confirmed hidden; only
+                        // a pre-existing row can ignore requested publication.
+                        completed = profileMatchesCsvPayload(profile, payload);
                     }
 
                     if (completed) {
@@ -498,7 +547,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
 
                 if (operation.kind === 'csv-import') {
                     const pendingKeys = operation.rows
-                        .filter((task) => task.mode === 'create' && task.requestedQrPublication)
+                        .filter((task) => task.requestedQrPublication)
                         .filter((task) => {
                             const profile = refreshedProfiles.find((item) => item.key === task.row.key);
                             return rowResults.get(task.row.key)?.status === 'completed'
@@ -506,7 +555,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                         })
                         .map((task) => task.row.key);
                     const completedPublications = new Set(operation.rows
-                        .filter((task) => task.mode === 'create' && task.requestedQrPublication)
+                        .filter((task) => task.requestedQrPublication)
                         .filter((task) => {
                             const profile = refreshedProfiles.find((item) => item.key === task.row.key);
                             return profile?.show_on_qr_page === true && profile.effective_availability?.is_available === true;
@@ -553,7 +602,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                     && !attempted.has(task.row.key)).length;
                 const deferredPublication = refreshedProfiles
                     ? operation.rows.filter((task) => {
-                        if (task.mode !== 'create' || !task.requestedQrPublication || rowResults.get(task.row.key)?.status !== 'completed') return false;
+                        if (!task.requestedQrPublication || rowResults.get(task.row.key)?.status !== 'completed') return false;
                         const profile = refreshedProfiles.find((item) => item.key === task.row.key);
                         return !(profile?.show_on_qr_page === true && profile.effective_availability?.is_available === true);
                     }).length
@@ -756,8 +805,12 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             if (!beforePreview) return;
             const createCount = rows.filter((row) => !beforePreview.some((profile) => profile.key === row.key)).length;
             const updateCount = rows.length - createCount;
-            const requestedPublicationCount = rows.filter((row) => row.showOnQrPage === true
-                && !beforePreview.some((profile) => profile.key === row.key)).length;
+            const requestedPublicationCount = rows.filter((row) => {
+                if (row.showOnQrPage !== true) return false;
+                const existingProfile = beforePreview.find((profile) => profile.key === row.key);
+                return !(existingProfile?.show_on_qr_page === true
+                    && existingProfile.effective_availability?.is_available === true);
+            }).length;
             const previewSnapshot = Object.fromEntries(rows.map((row) => [
                 row.key,
                 queueProfilePreviewSnapshot(beforePreview.find((profile) => profile.key === row.key)),
