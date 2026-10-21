@@ -140,6 +140,7 @@ def _serialize_doctor(db: Session, doctor) -> DoctorOut:
         "id": doctor.id,
         "user_id": doctor.user_id,
         "specialty": doctor.specialty,
+        "experience_years": doctor.experience_years,
         "cabinet": doctor.cabinet,
         "price_default": doctor.price_default,
         "start_number_online": doctor.start_number_online,

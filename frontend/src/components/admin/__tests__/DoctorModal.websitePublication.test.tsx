@@ -69,6 +69,41 @@ afterEach(() => {
 });
 
 describe('DoctorModal website publication editor', () => {
+  it('saves confirmed experience years in the operational doctor profile', async () => {
+    const onSave = vi.fn();
+    render(
+      <ThemeProvider>
+        <DoctorModal
+          isOpen
+          onClose={vi.fn()}
+          doctor={{
+            id: 54,
+            user_id: 88,
+            specialty: 'dentistry',
+            active: true,
+            experience_years: null,
+            user: {
+              id: 88,
+              full_name: 'SYNTHETIC Website Doctor',
+              role: 'Doctor',
+              is_active: true,
+            },
+          }}
+          onSave={onSave}
+          availableUsers={[]}
+        />
+      </ThemeProvider>,
+    );
+
+    const experience = await screen.findByLabelText('Стаж, лет');
+    fireEvent.change(experience, { target: { value: '18' } });
+    fireEvent.submit(experience.closest('form') as HTMLFormElement);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ experienceYears: '18' }),
+    ));
+  });
+
   it('keeps website publication actions separate and locks the slug after first publish', async () => {
     const user = userEvent.setup();
     render(

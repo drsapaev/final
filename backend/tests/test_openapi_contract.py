@@ -30,6 +30,17 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
     assert len(schema["paths"]) >= 100
 
 
+def test_doctor_experience_is_published_in_admin_and_doctor_info_contracts(
+    client: TestClient,
+) -> None:
+    components = _get_openapi_schema(client)["components"]["schemas"]
+    admin_doctor = components["app__schemas__clinic__DoctorOut"]["properties"]
+    assert "experience_years" in admin_doctor
+    assert "experience_years" in components["DoctorCreate"]["properties"]
+    assert "experience_years" in components["DoctorUpdate"]["properties"]
+    assert "experience_years" in components["DoctorInfoResponse"]["properties"]
+
+
 def test_openapi_admin_queue_directions_read_contract(client: TestClient) -> None:
     schema = _get_openapi_schema(client)
     path = "/api/v1/queue/admin/directions"

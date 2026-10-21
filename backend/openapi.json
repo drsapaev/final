@@ -81942,6 +81942,19 @@
             "title": "Specialty",
             "description": "cardiology, dermatology, stomatology"
           },
+          "experience_years": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experience Years",
+            "description": "Confirmed total professional experience in whole years."
+          },
           "cabinet": {
             "anyOf": [
               {
@@ -83202,6 +83215,19 @@
               }
             ],
             "title": "Specialty"
+          },
+          "experience_years": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experience Years",
+            "description": "Confirmed total professional experience in whole years."
           },
           "cabinet": {
             "anyOf": [
@@ -103792,6 +103818,30 @@
               }
             ],
             "title": "Logo Url"
+          },
+          "working_hours_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Working Hours Start"
+          },
+          "working_hours_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Working Hours End"
           }
         },
         "additionalProperties": false,
@@ -103822,6 +103872,18 @@
               }
             ],
             "title": "Specialty"
+          },
+          "experience_years": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experience Years"
           },
           "portrait_url": {
             "anyOf": [
@@ -121609,6 +121671,19 @@
             "maxLength": 100,
             "title": "Specialty",
             "description": "cardiology, dermatology, stomatology"
+          },
+          "experience_years": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experience Years",
+            "description": "Confirmed total professional experience in whole years."
           },
           "cabinet": {
             "anyOf": [
