@@ -31,6 +31,24 @@
   outline-offset: 3px;
 }
 
+.public-site .public-site__skip-link {
+  position: fixed;
+  z-index: 1000;
+  inset-block-start: 8px;
+  inset-inline-start: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
+  border-radius: 8px;
+  background: var(--mac-bg-primary, rgb(238, 243, 250));
+  color: var(--mac-text-primary, rgb(0, 0, 0));
+  font-weight: 700;
+  transform: translateY(calc(-100% - 16px));
+}
+
+.public-site .public-site__skip-link:focus-visible {
+  transform: translateY(0);
+}
+
 .public-site__header,
 .public-site__main,
 .public-site__footer {

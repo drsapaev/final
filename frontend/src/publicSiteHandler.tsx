@@ -16,7 +16,7 @@ import {
   type PublicSiteService,
 } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
-import { getPublicSiteBreadcrumbs, PublicSitePage } from './publicSitePage';
+import { getPublicSiteBreadcrumbs, getPublicSiteSkipLinkLabel, PublicSitePage } from './publicSitePage';
 
 export interface PublicSiteRuntimeConfig {
   apiOrigin?: string;
@@ -417,5 +417,6 @@ function renderErrorDocument(locale: PublicSiteLocale, styles: string[], pageSty
     '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<meta name="robots" content="noindex,nofollow">' +
     `<title>${escapeHtml(error.title)}</title>${css}</head>` +
-    `<body><main class="public-site__error"><h1>${escapeHtml(error.title)}</h1><p>${escapeHtml(error.message)}</p></main></body></html>`;
+    `<body><div class="public-site"><a class="public-site__skip-link" href="#main-content">${escapeHtml(getPublicSiteSkipLinkLabel(locale))}</a>` +
+    `<main id="main-content" tabindex="-1" class="public-site__error"><h1>${escapeHtml(error.title)}</h1><p>${escapeHtml(error.message)}</p></main></div></body></html>`;
 }
