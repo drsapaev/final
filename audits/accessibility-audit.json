@@ -1,43 +1,55 @@
 {
   "title": "Doktor KosMed public-site accessibility review",
+  "audit_date": "2026-10-21",
   "source_base_sha": "55a88b057f516ef86d01b7c927bee0013cbf477b",
-  "target_standard": "WCAG 2.2 AA",
+  "application_sha": "7186dbd2e8bd9bc7ddbcaed4138b98b1c8f7d6ef",
+  "target_standard": "WCAG 2.2 AA (targeted checks; not a conformance claim)",
   "scope": [
-    "Shared public-site renderer used by Vite and Nitro SSR",
-    "Public page and loading/error page landmarks",
-    "Keyboard bypass from site navigation to main content"
+    "Localized public-site service pages rendered by Vite and Nitro",
+    "Localized Vite loading/error state",
+    "Skip-link focus order, visibility, target focus, and accessibility-tree roles/names"
   ],
-  "method": "Static source review plus targeted automated keyboard smoke against Vite and Nitro SSR error pages",
+  "method": "Source review plus dedicated Playwright keyboard and Axe E2E checks using synthetic public-site data.",
   "runtime_checks": {
-    "skip_link_first_tab": "passed_in_vite_and_nitro_for_ru_and_uz-Latn",
-    "skip_link_visible_when_focused": "passed_in_vite_and_nitro_for_ru_and_uz-Latn",
-    "activation_moves_focus_to_main": "passed_in_vite_and_nitro_for_ru_and_uz-Latn",
-    "nitro_error_response": "tested_with_expected_503_when_local_api_origin_is_unconfigured"
+    "skip_link_first_tab": "passed_on_vite_and_nitro_ru_and_uz_latn_in_chromium_and_emulated_mobile_chrome",
+    "skip_link_visible_when_focused": "passed_on_vite_and_nitro_ru_and_uz_latn_in_chromium_and_emulated_mobile_chrome",
+    "activation_moves_focus_to_main": "passed_on_vite_and_nitro_ru_and_uz_latn_in_chromium_and_emulated_mobile_chrome",
+    "localized_vite_error_state": "keyboard_bypass_and_axe_checks_passed_in_chromium_and_emulated_mobile_chrome",
+    "nitro_error_response": "previous_targeted_smoke_confirmed_expected_503_when_local_api_origin_is_unconfigured"
   },
   "automated_checks": {
-    "axe": "not_run",
-    "targeted_keyboard_smoke": "passed_vite_and_nitro_ru_and_uz-Latn",
-    "coverage_note": "The existing generic Axe route list does not explicitly include localized public-site catalog, doctor, service, or contact routes."
+    "playwright_test": "frontend/e2e/public-site-accessibility.spec.ts",
+    "axe": "passed_10_local_scans_without_violations: four_Vite_Nitro_locale_surfaces_plus_one_Vite_error_state_in_Chromium_and_emulated_Mobile_Chrome",
+    "axe_tags": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"],
+    "accessible_tree": "skip_link_and_main_landmark_order_and_localized_navigation_name_assertions_passed"
   },
   "manual_checks": {
-    "keyboard_navigation": "not_run",
-    "screen_reader": "not_run",
-    "color_contrast": "not_run",
-    "real_mobile_devices": "not_run"
+    "keyboard_navigation": "automated_browser_keyboard_input_passed; human_manual_session_not_run",
+    "screen_reader": "browser_accessibility_tree_reviewed; live_Narrator_or_other_screen_reader_speech_not_verified",
+    "color_contrast": "Axe_automated_rules_passed; manual_visual_contrast_review_not_run",
+    "real_mobile_devices": "not_run_emulated_Mobile_Chrome_only"
   },
   "findings": [
     {
       "criterion": "WCAG 2.2 SC 2.4.1 Bypass Blocks",
       "severity": "moderate",
-      "status": "source_change_and_targeted_automated_runtime_smoke_passed",
-      "observation": "The shared public renderer placed the site header before the main landmark without a skip link. A localized focus-only link now targets the main landmark in normal pages, loading/error states, and the Nitro-rendered 503 error document; each target is programmatically focusable.",
-      "verification_needed": "Manual keyboard use, screen-reader behavior, and a full WCAG 2.2 AA audit remain unverified."
+      "status": "targeted_automated_checks_passed; live_screen_reader_confirmation_pending",
+      "observation": "The localized skip link is the first page control, becomes visible on focus, and moves focus to the single main landmark. Playwright exposes its localized name, the named navigation, and main landmark in the browser accessibility tree.",
+      "verification_needed": "Listen to the link and main-landmark announcements with a live screen reader before claiming WCAG conformance."
+    },
+    {
+      "criterion": "Targeted Axe WCAG A/AA rules",
+      "severity": "none",
+      "status": "no_violations_in_10_scans",
+      "observation": "The localized service catalog on Vite and Nitro and the localized Vite error state passed the configured Axe rules in Chromium and emulated Mobile Chrome.",
+      "verification_needed": "This route sample and rule set do not evaluate every WCAG 2.2 AA criterion."
     }
   ],
-  "result": "partial_not_a_conformance_pass",
+  "result": "targeted_automated_checks_passed; not_a_wcag_conformance_assessment",
   "limitations": [
-    "No Axe or equivalent automated scan was run.",
-    "No manual keyboard or screen-reader session was run.",
-    "This review does not assess all WCAG 2.2 AA criteria or real-device behavior."
+    "A live Narrator or third-party screen-reader speech session was not verified; accessibility-tree assertions do not replace listening to assistive-technology output.",
+    "Only selected public catalog/error states were audited; this is not a complete WCAG 2.2 AA audit.",
+    "Local Firefox and WebKit Playwright binaries are absent; cross-browser CI remains to verify the new test.",
+    "Mobile Chrome used an emulated viewport, not a physical device."
   ]
 }
