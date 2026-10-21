@@ -3,6 +3,7 @@
 from datetime import date
 
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.crud.queue_admin_directions_read_repository import (
@@ -20,6 +21,7 @@ from app.models.queue_direction_public_address import QueueDirectionPublicAddres
 from app.models.queue_profile import QueueProfile
 from app.models.service import Service
 from app.models.user import User
+from app.models.user_profile import UserProfile
 
 
 def _admin_headers(admin_user: User) -> dict[str, str]:
@@ -194,6 +196,127 @@ def test_queue_admin_directions_uses_typed_owners_and_separates_precreate(
     assert resource_row["precreate_by_tag"][0]["owner_type"] == "resource"
     assert resource_row["precreate_by_tag"][0]["owner_id"] == 1
     assert "patient" not in str(payload).lower()
+
+
+def test_queue_admin_directions_uses_profile_names_with_bounded_profile_reads(
+    client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    profile = QueueProfile(
+        key="aqs-t18-doctor-labels",
+        title="Dermatology",
+        title_ru="Дерматология",
+        queue_tags=["dermatology"],
+        is_active=True,
+        show_on_qr_page=False,
+        display_order=1,
+    )
+    named_doctors = [
+        (
+            "aqs_t18_profile_doctor_one",
+            "t18-profile-doctor-one@example.test",
+            None,
+            "Synthetic Dermatology Doctor One",
+        ),
+        (
+            "aqs_t18_profile_doctor_two",
+            "t18-profile-doctor-two@example.test",
+            None,
+            "Synthetic Dermatology Doctor Two",
+        ),
+        (
+            "aqs_t18_legacy_doctor",
+            "t18-legacy-doctor@example.test",
+            "Synthetic Legacy Doctor Name",
+            None,
+        ),
+        (
+            "aqs_t18_unnamed_doctor",
+            "t18-unnamed-doctor@example.test",
+            None,
+            None,
+        ),
+    ]
+    users: list[User] = []
+    doctors: list[Doctor] = []
+    user_profiles: list[UserProfile] = []
+    for username, email, legacy_name, _profile_name in named_doctors:
+        user = User(
+            username=username,
+            email=email,
+            full_name=legacy_name,
+            hashed_password="not-used",
+            role="Doctor",
+            is_active=True,
+            is_superuser=False,
+        )
+        users.append(user)
+    db_session.add_all([profile, *users])
+    db_session.flush()
+
+    for (_username, _email, _legacy_name, profile_name), user in zip(
+        named_doctors, users, strict=True
+    ):
+        doctor = Doctor(user_id=user.id, specialty="dermatology", active=True)
+        doctors.append(doctor)
+        if profile_name is not None:
+            user_profiles.append(UserProfile(user_id=user.id, full_name=profile_name))
+    db_session.add_all([*doctors, *user_profiles])
+    db_session.commit()
+    db_session.expire_all()
+
+    headers = _admin_headers(admin_user)
+    profile_selects: list[str] = []
+
+    def record_profile_selects(
+        _connection, _cursor, statement, _parameters, _context, _many
+    ) -> None:
+        normalized = statement.lower()
+        if (
+            normalized.lstrip().startswith(("select", "with"))
+            and "user_profiles" in normalized
+        ):
+            profile_selects.append(statement)
+
+    engine = db_session.get_bind()
+    event.listen(engine, "before_cursor_execute", record_profile_selects)
+    try:
+        response = client.get(
+            "/api/v1/queue/admin/directions?day=2026-10-17",
+            headers=headers,
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", record_profile_selects)
+
+    assert response.status_code == 200, response.text
+    direction = next(
+        row
+        for row in response.json()["directions"]
+        if row["profile"]["key"] == "aqs-t18-doctor-labels"
+    )
+    targets = direction["booking_targets"]
+    doctor_targets = {
+        target["owner_id"]: target
+        for target in targets
+        if target["owner_type"] == "doctor"
+    }
+    assert len(doctor_targets) == 4
+    assert [target["label"] for target in doctor_targets.values()] == [
+        "Synthetic Dermatology Doctor One",
+        "Synthetic Dermatology Doctor Two",
+        "Synthetic Legacy Doctor Name",
+        "dermatology",
+    ]
+    assert all(
+        target["queue_tag"] == "dermatology" for target in doctor_targets.values()
+    )
+    assert all(target["is_active"] is True for target in doctor_targets.values())
+    assert all(
+        target["eligible_for_new_booking"] is True for target in doctor_targets.values()
+    )
+    assert len(profile_selects) == 1, (
+        "doctor profile names must be loaded in one bounded query, not once per doctor; "
+        f"observed {len(profile_selects)} profile reads"
+    )
 
 
 def test_inactive_resource_with_current_queue_remains_a_typed_target(
