@@ -49,7 +49,7 @@
   "limitations": [
     "A live Narrator or third-party screen-reader speech session was not verified; accessibility-tree assertions do not replace listening to assistive-technology output.",
     "Only selected public catalog/error states were audited; this is not a complete WCAG 2.2 AA audit.",
-    "Local Firefox and WebKit Playwright binaries are absent; cross-browser CI remains to verify the new test.",
+    "Local Firefox and WebKit Playwright binaries are absent; the dedicated CI spec runs only in Chromium, so cross-browser behavior remains unverified.",
     "Mobile Chrome used an emulated viewport, not a physical device."
   ]
 }
