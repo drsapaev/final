@@ -77,7 +77,7 @@ def load_queue_admin_directions_snapshot(
                 or_(*doctor_conditions),
                 *qr_doctor_owner_eligibility_filters(),
             )
-            .options(joinedload(Doctor.user))
+            .options(joinedload(Doctor.user).joinedload(User.profile))
             .order_by(Doctor.id)
             .all()
         )

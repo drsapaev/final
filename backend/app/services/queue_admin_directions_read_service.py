@@ -542,15 +542,16 @@ def build_admin_queue_directions(
                     queue_ids = queues_by_owner_tag.get(
                         ("doctor", int(doctor.id), tag), []
                     )
+                    doctor_user = getattr(doctor, "user", None)
+                    doctor_profile = getattr(doctor_user, "profile", None)
                     targets.append(
                         AdminDirectionBookingTarget(
                             owner_type="doctor",
                             owner_id=int(doctor.id),
                             queue_tag=tag,
                             label=(
-                                getattr(
-                                    getattr(doctor, "user", None), "full_name", None
-                                )
+                                getattr(doctor_profile, "full_name", None)
+                                or getattr(doctor_user, "full_name", None)
                                 or str(doctor.specialty)
                             ),
                             is_active=True,
