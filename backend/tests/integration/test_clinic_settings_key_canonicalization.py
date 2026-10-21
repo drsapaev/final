@@ -126,6 +126,56 @@ class TestClinicSettingsKeyCanonicalization:
 
         assert response.status_code == 422, response.text
 
+    def test_single_setting_put_validates_reserved_key_outside_clinic_category(
+        self, client: TestClient, auth_headers, db_session
+    ):
+        from app.models.clinic import ClinicSettings
+
+        start = ClinicSettings(
+            key="clinic_working_hours_start", value="09:00", category="clinic"
+        )
+        end = ClinicSettings(
+            key="clinic_working_hours_end", value="17:00", category="queue"
+        )
+        db_session.add_all([start, end])
+        db_session.commit()
+
+        response = client.put(
+            "/api/v1/admin/clinic/settings/clinic_working_hours_end",
+            headers=auth_headers,
+            json={"value": "08:00"},
+        )
+
+        assert response.status_code == 422, response.text
+        db_session.refresh(end)
+        assert end.value == "17:00"
+        assert end.category == "queue"
+
+    def test_valid_single_setting_put_canonicalizes_reserved_key_category(
+        self, client: TestClient, auth_headers, db_session
+    ):
+        from app.models.clinic import ClinicSettings
+
+        db_session.add(
+            ClinicSettings(
+                key="clinic_working_hours_start", value="09:00", category="clinic"
+            )
+        )
+        end = ClinicSettings(
+            key="clinic_working_hours_end", value="16:00", category="queue"
+        )
+        db_session.add(end)
+        db_session.commit()
+
+        response = client.put(
+            "/api/v1/admin/clinic/settings/clinic_working_hours_end",
+            headers=auth_headers,
+            json={"value": "17:00"},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["category"] == "clinic"
+
     def test_create_setting_cannot_bypass_hours_validation(
         self, client: TestClient, auth_headers, db_session
     ):
@@ -155,6 +205,94 @@ class TestClinicSettingsKeyCanonicalization:
             .first()
             is None
         )
+
+    @pytest.mark.parametrize("category", [None, "queue"])
+    def test_create_reserved_hours_key_validates_outside_clinic_category(
+        self, client: TestClient, auth_headers, db_session, category
+    ):
+        from app.models.clinic import ClinicSettings
+
+        db_session.add(
+            ClinicSettings(
+                key="clinic_working_hours_end", value="17:00", category="clinic"
+            )
+        )
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/admin/clinic/settings",
+            headers=auth_headers,
+            json={
+                "key": "clinic_working_hours_start",
+                "value": "25:00",
+                "category": category,
+            },
+        )
+
+        assert response.status_code == 422, response.text
+        assert (
+            db_session.query(ClinicSettings)
+            .filter(ClinicSettings.key == "clinic_working_hours_start")
+            .first()
+            is None
+        )
+
+    @pytest.mark.parametrize("category", [None, "queue"])
+    def test_create_reserved_hours_key_stores_canonical_category(
+        self, client: TestClient, auth_headers, db_session, category
+    ):
+        from app.models.clinic import ClinicSettings
+
+        db_session.add(
+            ClinicSettings(
+                key="clinic_working_hours_end", value="17:00", category="clinic"
+            )
+        )
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/admin/clinic/settings",
+            headers=auth_headers,
+            json={
+                "key": "clinic_working_hours_start",
+                "value": "09:00",
+                "category": category,
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["category"] == "clinic"
+
+    def test_batch_put_canonicalizes_existing_reserved_hours_categories(
+        self, client: TestClient, auth_headers, db_session
+    ):
+        from app.models.clinic import ClinicSettings
+
+        start = ClinicSettings(
+            key="clinic_working_hours_start", value="08:00", category="queue"
+        )
+        end = ClinicSettings(
+            key="clinic_working_hours_end", value="16:00", category="clinic"
+        )
+        db_session.add_all([start, end])
+        db_session.commit()
+
+        response = client.put(
+            "/api/v1/admin/clinic/settings",
+            headers=auth_headers,
+            json={
+                "settings": {
+                    "clinic_working_hours_start": "09:00",
+                    "clinic_working_hours_end": "17:00",
+                }
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        db_session.refresh(start)
+        db_session.refresh(end)
+        assert start.category == "clinic"
+        assert end.category == "clinic"
 
     def test_batch_put_accepts_valid_clinic_hours(
         self, client: TestClient, auth_headers

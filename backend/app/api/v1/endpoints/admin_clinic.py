@@ -52,10 +52,7 @@ def _validate_clinic_working_hours_update(db: Session, updates: dict[str, Any]) 
 
     current_rows = (
         db.query(ClinicSettings)
-        .filter(
-            ClinicSettings.category == "clinic",
-            ClinicSettings.key.in_(CLINIC_WORKING_HOURS_KEYS),
-        )
+        .filter(ClinicSettings.key.in_(CLINIC_WORKING_HOURS_KEYS))
         .all()
     )
     effective = {row.key: row.value for row in current_rows}
@@ -89,6 +86,22 @@ def _validate_clinic_working_hours_update(db: Session, updates: dict[str, Any]) 
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Clinic opening time must be earlier than closing time.",
         )
+
+
+def _canonicalize_clinic_working_hours_categories(
+    db: Session, updates: dict[str, Any]
+) -> None:
+    normalized = crud_clinic.normalize_clinic_setting_keys(updates)
+    if not set(normalized).intersection(CLINIC_WORKING_HOURS_KEYS):
+        return
+
+    rows = (
+        db.query(ClinicSettings)
+        .filter(ClinicSettings.key.in_(CLINIC_WORKING_HOURS_KEYS))
+        .all()
+    )
+    for row in rows:
+        row.category = "clinic"
 
 
 def _admin_clinic_http_error(exc: Exception) -> HTTPException:
@@ -148,6 +161,7 @@ def update_clinic_settings_batch(
 ):
     """Массовое обновление настроек клиники"""
     _validate_clinic_working_hours_update(db, settings.settings)
+    _canonicalize_clinic_working_hours_categories(db, settings.settings)
     try:
         updated_settings = crud_clinic.update_settings_batch(
             db, "clinic", settings.settings, current_user.id
@@ -171,8 +185,10 @@ def update_clinic_setting(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Настройка с ключом '{key}' не найдена",
         )
-    if existing_setting.category == "clinic" and "value" in setting.model_fields_set:
-        _validate_clinic_working_hours_update(db, {key: setting.value})
+    if key in CLINIC_WORKING_HOURS_KEYS:
+        if "value" in setting.model_fields_set:
+            _validate_clinic_working_hours_update(db, {key: setting.value})
+        existing_setting.category = "clinic"
     updated_setting = crud_clinic.update_setting(db, key, setting, current_user.id)
     if not updated_setting:
         raise HTTPException(
@@ -198,8 +214,9 @@ def create_clinic_setting(
                 detail=f"Настройка с ключом '{setting.key}' уже существует",
             )
 
-        if setting.category == "clinic":
+        if setting.key in CLINIC_WORKING_HOURS_KEYS:
             _validate_clinic_working_hours_update(db, {setting.key: setting.value})
+            setting = setting.model_copy(update={"category": "clinic"})
         new_setting = crud_clinic.create_setting(db, setting, current_user.id)
         return new_setting
     except HTTPException:
