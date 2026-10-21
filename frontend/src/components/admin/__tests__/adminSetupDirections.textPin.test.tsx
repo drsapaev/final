@@ -187,6 +187,29 @@ beforeEach(() => {
 });
 
 describe('AdminSetupDirections — backend facts and lazy details', () => {
+  it('localizes the directions retry action and restores rows after a failed read', async () => {
+    let reads = 0;
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url.startsWith('/queue/admin/directions')) {
+        reads += 1;
+        if (reads === 1) throw new Error('synthetic read failure');
+        return { data: response() };
+      }
+      return { data: {} };
+    });
+
+    renderScreen();
+
+    const retry = await screen.findByRole('button', { name: 'Повторить' });
+    expect(retry).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'admin2.sdx_retry' })).toBeNull();
+
+    await userEvent.setup().click(retry);
+
+    expect(await screen.findByTestId('setup-checklist-row-lab')).toBeVisible();
+    expect(reads).toBe(2);
+  });
+
   it('renders server-owned direction facts before making any per-profile QR request', async () => {
     renderScreen();
 
