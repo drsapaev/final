@@ -39,6 +39,15 @@ def test_doctor_experience_is_published_in_admin_and_doctor_info_contracts(
     assert "experience_years" in components["DoctorCreate"]["properties"]
     assert "experience_years" in components["DoctorUpdate"]["properties"]
     assert "experience_years" in components["DoctorInfoResponse"]["properties"]
+    for schema_name in ("DoctorCreate", "DoctorUpdate"):
+        experience_schema = components[schema_name]["properties"]["experience_years"]
+        integer_variants = [
+            variant
+            for variant in experience_schema.get("anyOf", [])
+            if variant.get("type") == "integer"
+        ]
+        assert len(integer_variants) == 1
+        assert integer_variants[0]["maximum"] == 2_147_483_647
 
 
 def test_openapi_admin_queue_directions_read_contract(client: TestClient) -> None:

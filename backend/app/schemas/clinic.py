@@ -9,6 +9,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+POSTGRES_INTEGER_MAX = 2_147_483_647
+
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
 
@@ -90,6 +92,7 @@ class DoctorBase(BaseModel):
     experience_years: int | None = Field(
         None,
         ge=0,
+        le=POSTGRES_INTEGER_MAX,
         description="Confirmed total professional experience in whole years.",
     )
     cabinet: str | None = Field(None, max_length=20)
@@ -110,6 +113,7 @@ class DoctorUpdate(BaseModel):
     experience_years: int | None = Field(
         None,
         ge=0,
+        le=POSTGRES_INTEGER_MAX,
         description="Confirmed total professional experience in whole years.",
     )
     cabinet: str | None = Field(None, max_length=20)

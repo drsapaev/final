@@ -33,6 +33,145 @@ def _saved_keys(db_session) -> set[str]:
 
 @pytest.mark.integration
 class TestClinicSettingsKeyCanonicalization:
+    @pytest.mark.parametrize(
+        "hours",
+        [
+            {
+                "clinic_working_hours_start": "18:00",
+                "clinic_working_hours_end": "09:00",
+            },
+            {
+                "clinic_working_hours_start": "25:00",
+                "clinic_working_hours_end": "26:00",
+            },
+            {
+                "clinic_working_hours_start": "09:00",
+                "clinic_working_hours_end": "09:00",
+            },
+        ],
+    )
+    def test_batch_put_rejects_invalid_clinic_hours_without_mutating(
+        self, client: TestClient, auth_headers, db_session, hours
+    ):
+        from app.models.clinic import ClinicSettings
+
+        start = ClinicSettings(
+            key="clinic_working_hours_start", value="09:00", category="clinic"
+        )
+        end = ClinicSettings(
+            key="clinic_working_hours_end", value="17:00", category="clinic"
+        )
+        db_session.add_all([start, end])
+        db_session.commit()
+
+        response = client.put(
+            "/api/v1/admin/clinic/settings",
+            headers=auth_headers,
+            json={"settings": hours},
+        )
+
+        assert response.status_code == 422, response.text
+        db_session.refresh(start)
+        db_session.refresh(end)
+        assert start.value == "09:00"
+        assert end.value == "17:00"
+
+    def test_batch_put_validates_partial_hours_against_saved_counterpart(
+        self, client: TestClient, auth_headers, db_session
+    ):
+        from app.models.clinic import ClinicSettings
+
+        db_session.add_all(
+            [
+                ClinicSettings(
+                    key="clinic_working_hours_start", value="09:00", category="clinic"
+                ),
+                ClinicSettings(
+                    key="clinic_working_hours_end", value="17:00", category="clinic"
+                ),
+            ]
+        )
+        db_session.commit()
+
+        response = client.put(
+            "/api/v1/admin/clinic/settings",
+            headers=auth_headers,
+            json={"settings": {"clinic_working_hours_end": "08:00"}},
+        )
+
+        assert response.status_code == 422, response.text
+
+    def test_single_setting_put_cannot_bypass_hours_validation(
+        self, client: TestClient, auth_headers, db_session
+    ):
+        from app.models.clinic import ClinicSettings
+
+        db_session.add_all(
+            [
+                ClinicSettings(
+                    key="clinic_working_hours_start", value="09:00", category="clinic"
+                ),
+                ClinicSettings(
+                    key="clinic_working_hours_end", value="17:00", category="clinic"
+                ),
+            ]
+        )
+        db_session.commit()
+
+        response = client.put(
+            "/api/v1/admin/clinic/settings/clinic_working_hours_end",
+            headers=auth_headers,
+            json={"value": "08:00"},
+        )
+
+        assert response.status_code == 422, response.text
+
+    def test_create_setting_cannot_bypass_hours_validation(
+        self, client: TestClient, auth_headers, db_session
+    ):
+        from app.models.clinic import ClinicSettings
+
+        db_session.add(
+            ClinicSettings(
+                key="clinic_working_hours_end", value="09:00", category="clinic"
+            )
+        )
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/admin/clinic/settings",
+            headers=auth_headers,
+            json={
+                "key": "clinic_working_hours_start",
+                "value": "18:00",
+                "category": "clinic",
+            },
+        )
+
+        assert response.status_code == 422, response.text
+        assert (
+            db_session.query(ClinicSettings)
+            .filter(ClinicSettings.key == "clinic_working_hours_start")
+            .first()
+            is None
+        )
+
+    def test_batch_put_accepts_valid_clinic_hours(
+        self, client: TestClient, auth_headers
+    ):
+        response = client.put(
+            "/api/v1/admin/clinic/settings",
+            headers=auth_headers,
+            json={
+                "settings": {
+                    "clinic_working_hours_start": "09:00",
+                    "clinic_working_hours_end": "17:00",
+                }
+            },
+        )
+
+        assert response.status_code == 200, response.text
+
     def test_batch_put_stores_canonical_keys(
         self, client: TestClient, auth_headers, db_session
     ):

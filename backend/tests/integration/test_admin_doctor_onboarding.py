@@ -205,6 +205,20 @@ def test_admin_doctor_profile_persists_optional_experience_years(
     )
     assert invalid.status_code == 422
 
+    out_of_range = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"experience_years": 2_147_483_648},
+    )
+    assert out_of_range.status_code == 422
+
+    create_out_of_range = client.post(
+        "/api/v1/admin/doctors",
+        headers=auth_headers,
+        json={"specialty": "cardiology", "experience_years": 2_147_483_648},
+    )
+    assert create_out_of_range.status_code == 422
+
     cleared = client.put(
         f"/api/v1/admin/doctors/{test_doctor.id}",
         headers=auth_headers,

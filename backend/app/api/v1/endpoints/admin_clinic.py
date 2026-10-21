@@ -4,7 +4,9 @@ API endpoints для управления настройками клиники 
 
 import logging
 import os
+import re
 import shutil
+from datetime import time
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user, get_db, require_roles
 from app.crud import clinic as crud_clinic
+from app.models.clinic import ClinicSettings
 from app.models.user import User
 from app.schemas.clinic import (
     ClinicSettingsBatch,
@@ -29,6 +32,63 @@ from app.schemas.clinic import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 ADMIN_CLINIC_PUBLIC_ERROR = "Internal server error"
+CLINIC_WORKING_HOURS_KEYS = (
+    "clinic_working_hours_start",
+    "clinic_working_hours_end",
+)
+_CLINIC_WORKING_HOURS_PATTERN = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
+
+
+def _validate_clinic_working_hours_update(db: Session, updates: dict[str, Any]) -> None:
+    """Reject invalid effective public hours before persisting clinic settings.
+
+    The settings API accepts partial updates, so compare the submitted values
+    with the currently saved counterpart before validating the pair. This
+    keeps all admin write routes aligned with the public read model.
+    """
+    normalized = crud_clinic.normalize_clinic_setting_keys(updates)
+    if not any(key in normalized for key in CLINIC_WORKING_HOURS_KEYS):
+        return
+
+    current_rows = (
+        db.query(ClinicSettings)
+        .filter(
+            ClinicSettings.category == "clinic",
+            ClinicSettings.key.in_(CLINIC_WORKING_HOURS_KEYS),
+        )
+        .all()
+    )
+    effective = {row.key: row.value for row in current_rows}
+    effective.update(
+        {
+            key: value
+            for key, value in normalized.items()
+            if key in CLINIC_WORKING_HOURS_KEYS
+        }
+    )
+
+    start_value = effective.get(CLINIC_WORKING_HOURS_KEYS[0])
+    end_value = effective.get(CLINIC_WORKING_HOURS_KEYS[1])
+    if start_value is None and end_value is None:
+        # Clearing both values restores the documented public defaults.
+        return
+
+    parsed: list[time] = []
+    for value in (start_value, end_value):
+        if not isinstance(value, str) or not _CLINIC_WORKING_HOURS_PATTERN.fullmatch(
+            value.strip()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Clinic working hours must use valid HH:MM values.",
+            )
+        parsed.append(time.fromisoformat(value.strip()))
+
+    if parsed[0] >= parsed[1]:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Clinic opening time must be earlier than closing time.",
+        )
 
 
 def _admin_clinic_http_error(exc: Exception) -> HTTPException:
@@ -40,6 +100,7 @@ def _admin_clinic_http_error(exc: Exception) -> HTTPException:
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail=ADMIN_CLINIC_PUBLIC_ERROR,
     )
+
 
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
@@ -86,6 +147,7 @@ def update_clinic_settings_batch(
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Массовое обновление настроек клиники"""
+    _validate_clinic_working_hours_update(db, settings.settings)
     try:
         updated_settings = crud_clinic.update_settings_batch(
             db, "clinic", settings.settings, current_user.id
@@ -103,6 +165,14 @@ def update_clinic_setting(
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить конкретную настройку"""
+    existing_setting = crud_clinic.get_setting_by_key(db, key)
+    if not existing_setting:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Настройка с ключом '{key}' не найдена",
+        )
+    if existing_setting.category == "clinic" and "value" in setting.model_fields_set:
+        _validate_clinic_working_hours_update(db, {key: setting.value})
     updated_setting = crud_clinic.update_setting(db, key, setting, current_user.id)
     if not updated_setting:
         raise HTTPException(
@@ -128,6 +198,8 @@ def create_clinic_setting(
                 detail=f"Настройка с ключом '{setting.key}' уже существует",
             )
 
+        if setting.category == "clinic":
+            _validate_clinic_working_hours_update(db, {setting.key: setting.value})
         new_setting = crud_clinic.create_setting(db, setting, current_user.id)
         return new_setting
     except HTTPException:
@@ -349,7 +421,7 @@ def get_system_info(current_user: User = Depends(require_roles("Admin"))):
                 "cpu_count": psutil.cpu_count(),
                 "memory_total": psutil.virtual_memory().total,
                 "memory_available": psutil.virtual_memory().available,
-                "disk_usage": psutil.disk_usage('/').percent,
+                "disk_usage": psutil.disk_usage("/").percent,
             },
             "application": {
                 "version": "1.0.0",
