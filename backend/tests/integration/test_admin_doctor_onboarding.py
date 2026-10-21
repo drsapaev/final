@@ -219,6 +219,14 @@ def test_admin_doctor_profile_persists_optional_experience_years(
     )
     assert create_out_of_range.status_code == 422
 
+    maximum_supported = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"experience_years": 100},
+    )
+    assert maximum_supported.status_code == 200, maximum_supported.text
+    assert maximum_supported.json()["experience_years"] == 100
+
     cleared = client.put(
         f"/api/v1/admin/doctors/{test_doctor.id}",
         headers=auth_headers,

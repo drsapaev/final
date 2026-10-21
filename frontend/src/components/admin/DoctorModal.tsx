@@ -19,6 +19,8 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import type { WebsiteDoctorContent } from '../../types/domain/clinic';
 
+const MAX_DOCTOR_EXPERIENCE_YEARS = 100;
+
 interface DoctorUser {
   id: string | number;
   full_name?: string;
@@ -294,7 +296,9 @@ const DoctorModal = ({
     }
     if (
       formData.experienceYears !== '' &&
-      (!Number.isInteger(Number(formData.experienceYears)) || Number(formData.experienceYears) < 0)
+      (!Number.isInteger(Number(formData.experienceYears)) ||
+        Number(formData.experienceYears) < 0 ||
+        Number(formData.experienceYears) > MAX_DOCTOR_EXPERIENCE_YEARS)
     ) {
       nextErrors.experienceYears = t('admin2.dmdl_err_experience_years');
     }
@@ -533,6 +537,7 @@ const DoctorModal = ({
               id="doctor-experience-years"
               type="number"
               min="0"
+              max={MAX_DOCTOR_EXPERIENCE_YEARS}
               step="1"
               value={formData.experienceYears}
               onChange={(event) => handleChange('experienceYears', event.target.value)}

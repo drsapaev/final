@@ -47,7 +47,7 @@ def test_doctor_experience_is_published_in_admin_and_doctor_info_contracts(
             if variant.get("type") == "integer"
         ]
         assert len(integer_variants) == 1
-        assert integer_variants[0]["maximum"] == 2_147_483_647
+        assert integer_variants[0]["maximum"] == 100
 
 
 def test_openapi_admin_queue_directions_read_contract(client: TestClient) -> None:

@@ -104,6 +104,41 @@ describe('DoctorModal website publication editor', () => {
     ));
   });
 
+  it('rejects experience above 100 years before saving', async () => {
+    const onSave = vi.fn();
+    render(
+      <ThemeProvider>
+        <DoctorModal
+          isOpen
+          onClose={vi.fn()}
+          doctor={{
+            id: 54,
+            user_id: 88,
+            specialty: 'dentistry',
+            active: true,
+            experience_years: null,
+            user: {
+              id: 88,
+              full_name: 'SYNTHETIC Website Doctor',
+              role: 'Doctor',
+              is_active: true,
+            },
+          }}
+          onSave={onSave}
+          availableUsers={[]}
+        />
+      </ThemeProvider>,
+    );
+
+    const experience = await screen.findByLabelText('Стаж, лет');
+    expect(experience).toHaveAttribute('max', '100');
+    fireEvent.change(experience, { target: { value: '101' } });
+    fireEvent.submit(experience.closest('form') as HTMLFormElement);
+
+    expect(await screen.findByText('Введите целое число лет от 0 до 100.')).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('keeps website publication actions separate and locks the slug after first publish', async () => {
     const user = userEvent.setup();
     render(

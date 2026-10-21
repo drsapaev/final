@@ -5764,7 +5764,7 @@ const uzLatn = {
     dmdl_select_department_placeholder: "— Bo'limni tanlang —",
     dmdl_specialty_hint: "Bo'lim kaliti bilan mos bo'lishi kerak (masalan: cardiology, derma, dental)",
     dmdl_label_experience_years: 'Ish staji, yil',
-    dmdl_err_experience_years: 'Yillar sonini butun va manfiy bo‘lmagan qiymat sifatida kiriting.',
+    dmdl_err_experience_years: '0 dan 100 gacha bo‘lgan butun yil sonini kiriting.',
     dmdl_label_price_default: 'Standart narx',
     dmdl_label_start_number: "Onlayn boshlang'ich raqami",
     dmdl_label_max_online: 'Kuniga onlayn yozuvlar',

@@ -5889,7 +5889,7 @@ const ru = {
     dmdl_select_department_placeholder: '— Выберите отделение —',
     dmdl_specialty_hint: 'Должно совпадать с key отделения (например: cardiology, derma, dental)',
     dmdl_label_experience_years: 'Стаж, лет',
-    dmdl_err_experience_years: 'Введите целое неотрицательное число лет.',
+    dmdl_err_experience_years: 'Введите целое число лет от 0 до 100.',
     dmdl_label_price_default: 'Цена по умолчанию',
     dmdl_label_start_number: 'Стартовый номер онлайн',
     dmdl_label_max_online: 'Онлайн записей в день',

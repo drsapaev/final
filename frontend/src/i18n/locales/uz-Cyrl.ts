@@ -5775,7 +5775,7 @@ const uzCyrl = {
     dmdl_select_department_placeholder: '— Выберите отделение —',
     dmdl_specialty_hint: 'Должно совпадать с key отделения (например: cardiology, derma, dental)',
     dmdl_label_experience_years: 'Иш стажи, йил',
-    dmdl_err_experience_years: 'Йиллар сонини бутун ва манфий бўлмаган қиймат сифатида киритинг.',
+    dmdl_err_experience_years: '0 дан 100 гача бўлган бутун йил сонини киритинг.',
     dmdl_label_price_default: 'Цена по умолчанию',
     dmdl_label_start_number: 'Стартовый номер онлайн',
     dmdl_label_max_online: 'Онлайн записей в день',
