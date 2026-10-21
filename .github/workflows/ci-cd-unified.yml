@@ -838,7 +838,7 @@ jobs:
         # PR7: dispatch with update_snapshots=true regenerates the LINUX
         # visual baselines in-place (the dedicated update step below runs
         # only after this step and cannot fix an already-failed spec run).
-        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts e2e/a11y-axe-authenticated.spec.ts --project=chromium --retries=0 $UPDATE_SNAPSHOTS_FLAG 2>&1 | tee ux-audit-output.txt
+        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts e2e/a11y-axe-authenticated.spec.ts e2e/public-site-accessibility.spec.ts --project=chromium --retries=0 $UPDATE_SNAPSHOTS_FLAG 2>&1 | tee ux-audit-output.txt
       # E2E root-cause fix: removed continue-on-error. All non-fixme tests
       # must pass. Tests marked test.fixme have documented root causes and
       # are tracked for follow-up. See PR description for details.
@@ -853,12 +853,12 @@ jobs:
         # reality: if the count drops below the expected number, something
         # was skipped).
         #
-        # Expected: 131 passed, 0 skipped, 0 failed
+        # Expected: 134 passed, 0 skipped, 0 failed
         # (12 cashier + 9 registrar + 40 visual [7 state baselines + EAT +
         #  pr16-landing + 22 pr18 twelve-screen baselines] + 12 route-smoke
-        # + 12 visual-a11y + 12 a11y-axe-audit + 34 a11y-axe-authenticated).
+        # + 12 visual-a11y + 12 a11y-axe-audit + 34 a11y-axe-authenticated + 3 public-site-accessibility).
         # Metric integrity (§17, original → revised → methodology → reason):
-        # 93 → 127 → 131. Methodology unchanged (same CI step, count-invariant
+        # 93 → 127 → 131 → 134. Methodology unchanged (same CI step, count-invariant
         # on passed tests). Reason: AXE-EXP-1 adds a11y-axe-authenticated.spec.ts
         # (17 authorized QA-harness routes × 2 themes = 34 audits, seeded
         # shrink-only baseline e2e/a11y-baseline-auth.json). 127 → 131: PR #3390
@@ -868,12 +868,14 @@ jobs:
         # pre-AXE-EXP canonical count (12+9+40+8+12+12); 127 = AXE-EXP-1
         # (12+9+40+8+12+12+34, floor never re-bumped for the route-smoke
         # growth to 11).
+        # 131 → 134: PR #3725 adds three public-site accessibility tests to CI.
+        # The spec covers localized skip navigation and Axe scans in Vite/Nitro.
         # Reconciliation note: registrar-time.spec.ts (1 test) runs in its own
         # step above and is intentionally NOT counted here. Empirically
         # verified locally with `playwright --list` per file on the PR-3390
         # review-fix head. If a test is intentionally added/removed, update
         # EXPECTED_COUNT below.
-        EXPECTED_COUNT=131
+        EXPECTED_COUNT=134
         if [ ! -f ux-audit-output.txt ]; then
           echo "ERROR: ux-audit-output.txt not found. The UX Audit step may not have run."
           exit 1
