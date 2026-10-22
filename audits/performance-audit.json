@@ -134,10 +134,10 @@
     },
     {
       "id": "cloudflare-web-analytics-rum-observed",
-      "severity": "policy_conflict",
-      "status": "confirmed_in_unblocked_probe_and_cloudflare_dashboard",
-      "observation": "The production page loaded static.cloudflareinsights.com/beacon.min.js (10478 transferred bytes) and made a request to /cdn-cgi/rum (HTTP 204). Cloudflare documents these as its Web Analytics/RUM beacon and reporting endpoint. The Cloudflare dashboard lists finalclinic.fyi in Web Analytics with automatic setup and shows RUM enabled while excluding EU visitors; the selected setting states that the JS snippet is not injected for EU visitors. The public-site plan excludes external RUM for the first release. No app-level reference was found in the searched frontend, Vercel, ops, and workflow paths. The dashboard listed 10 page views and 10 visits in the last 24 hours; these counts are not field p75 Core Web Vitals data.",
-      "verification_needed": "Resolve the policy conflict with the owner before treating the first-release no-external-RUM requirement as satisfied. No Cloudflare setting was changed."
+      "severity": "follow_up",
+      "status": "historically_confirmed_before_disable; live_browser_verification_pending",
+      "observation": "The production page loaded static.cloudflareinsights.com/beacon.min.js (10478 transferred bytes) and made a request to /cdn-cgi/rum (HTTP 204). Cloudflare documents these as its Web Analytics/RUM beacon and reporting endpoint. At the initial observation, the Cloudflare dashboard listed finalclinic.fyi in Web Analytics with automatic setup and showed RUM enabled while excluding EU visitors; the selected setting stated that the JS snippet was not injected for EU visitors. The owner later authorized disabling RUM, and the setting now shows Disable after reload. The public-site plan excludes external RUM for the first release. No app-level reference was found in the searched frontend, Vercel, ops, and workflow paths. The dashboard listed 10 page views and 10 visits in the last 24 hours before the setting change; these counts are not field p75 Core Web Vitals data.",
+      "verification_needed": "The owner authorized disabling RUM for finalclinic.fyi, and Cloudflare now shows Disable after a page reload. The first plain post-change GET still contained the beacon script marker; a later GET with Cache-Control: no-cache returned HTTP 200 with no beacon script or /cdn-cgi/rum marker. JavaScript execution and the browser network beacon remain unverified."
     }
   ],
   "unblocked_detection_probe": {
@@ -205,7 +205,7 @@
           "time_starttransfer_ms": [1287, 1072, 791],
           "range_ms": [791, 1287],
           "median_ms": 1072,
-          "rum_marker_in_html": true
+          "rum_marker_in_html_before_setting_change": true
         },
         {
           "target": "https://api.finalclinic.fyi/api/v1/public-site/services?locale=ru",
@@ -235,32 +235,54 @@
       "conclusion": "No aggregate Vercel Function duration or request-level FastAPI timing was available; no delay is attributed to Nitro, FastAPI, the database, or the network."
     },
     "rum_follow_up": {
-      "homepage_html_marker_present": true,
+      "pre_change_homepage_html_marker_present": true,
       "application_source_reference_found": false,
       "cloudflare_account_setting": {
         "observed_on": "2026-10-22",
         "site": "finalclinic.fyi",
         "setup": "automatic",
-        "rum_mode": "enabled_excluding_eu_visitors",
-        "snippet_behavior": "not_injected_for_eu_visitors",
+        "previous_rum_mode": "enabled_excluding_eu_visitors",
+        "previous_snippet_behavior": "not_injected_for_eu_visitors",
+        "rum_mode": "disabled",
+        "snippet_behavior": "not_injected_and_disabled",
+        "disable_selected_after_reload": true,
         "dashboard_page_views_last_24h": 10,
         "dashboard_visits_last_24h": 10,
-        "policy_assessment": "conflicts_with_no_external_rum_first_release_policy"
+        "dashboard_metrics_reflect_pre_change_observation": true,
+        "policy_assessment": "matches_no_external_rum_first_release_policy"
       },
-      "change_made": false,
-      "note": "The read-only dashboard review confirmed Web Analytics/RUM is enabled with EU visitors excluded. This probe checked delivered HTML but did not execute browser JavaScript. The earlier unblocked synthetic browser probe in this audit observed the beacon request. Dashboard page-view and visit counts do not establish LCP, INP, or CLS p75. No Cloudflare setting was changed."
+      "change_made": true,
+      "change_date": "2026-10-22",
+      "post_change_http_probes": [
+        {
+          "request": "Initial plain GET after saving the Cloudflare setting",
+          "status": 200,
+          "beacon_script_marker_present": true,
+          "rum_endpoint_marker_present": false,
+          "response_headers_recorded": false
+        },
+        {
+          "request": "GET https://finalclinic.fyi/ with Cache-Control: no-cache and Pragma: no-cache; JavaScript was not executed",
+          "status": 200,
+          "response_cache_control": "no-store",
+          "cf_cache_status": "DYNAMIC",
+          "beacon_script_marker_present": false,
+          "rum_endpoint_marker_present": false
+        }
+      ],
+      "note": "The Cloudflare dashboard showed Disable selected for finalclinic.fyi, and that state remained selected after reloading the settings page. A first plain post-change HTML GET still contained the beacon script marker, while a later no-cache GET returned HTTP 200 without the beacon script or endpoint marker. This audit did not execute page JavaScript after the change, so it does not confirm that no browser beacon request can occur. The earlier unblocked synthetic browser probe observed a beacon request before the setting change. Dashboard page-view and visit counts do not establish LCP, INP, or CLS p75."
     },
     "limitations": [
       "Three sequential samples from one Windows host on one date are a point-in-time diagnostic, not a field p75 or performance baseline.",
       "Direct public API timings cannot be used to infer the Vercel Function's server-to-server API duration.",
       "Local loopback FastAPI timings do not establish the cause of the public-route delay.",
-      "Cloudflare Web Analytics/RUM is configured to run outside the EU, which conflicts with the approved no-external-RUM first-release policy; no setting change or policy exception is authorized by this audit."
+      "Cloudflare now shows Web Analytics/RUM disabled for finalclinic.fyi, but a first plain post-change HTML GET still contained the beacon script marker. A later no-cache GET no longer contained it; post-change JavaScript execution and browser beacon requests have not been verified."
     ],
     "next_actions": [
       {
         "id": "review-cloudflare-rum-configuration",
-        "status": "owner_disposition_required",
-        "action": "The Cloudflare dashboard confirms Web Analytics/RUM is enabled with EU visitors excluded. Decide whether to disable it to meet the approved no-external-RUM first-release policy. No setting change has been made."
+        "status": "dashboard_disabled; live_browser_verification_pending",
+        "action": "The owner authorized disabling Web Analytics/RUM for finalclinic.fyi. Cloudflare shows Disable selected after reload. Verify after propagation in an ordinary browser that neither the beacon script nor /cdn-cgi/rum request is loaded; the first plain post-change HTML GET still contained the script marker, while a later no-cache GET did not."
       },
       {
         "id": "obtain-server-duration-evidence",
@@ -274,5 +296,5 @@
       }
     ]
   },
-  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. The 2026-10-22 follow-up captured point-in-time client timings and confirmed the RUM marker remains in homepage HTML; the Cloudflare dashboard confirms Web Analytics/RUM is enabled outside the EU, which conflicts with the approved first-release policy. Vercel Function/FastAPI duration attribution and field p75 remain unavailable."
+  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. On 2026-10-22 the owner-authorized Cloudflare setting for finalclinic.fyi was changed to Disable and remained selected after reload. A first plain post-change HTML GET still contained the beacon script marker; a later no-cache GET returned HTTP 200 without the beacon script or /cdn-cgi/rum marker. Browser JavaScript execution and post-change beacon requests remain unverified. Vercel Function/FastAPI duration attribution and field p75 remain unavailable."
 }
