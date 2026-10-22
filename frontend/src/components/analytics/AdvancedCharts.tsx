@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import type { ChartConfiguration } from 'chart.js';
 import { Card, Button,
@@ -14,10 +14,6 @@ import {
   TrendingUp,
   Activity,
   Target,
-  Users,
-  DollarSign,
-  Calendar,
-  Eye,
   Filter } from
 'lucide-react';
 
@@ -36,6 +32,44 @@ interface AdvancedChartsProps {
   showFilters?: boolean;
 }
 
+type ChartConfigData = Record<string, unknown>;
+type ChartGroups = Record<string, Record<string, ChartConfigData>>;
+
+interface ChartEntry {
+  id: string;
+  name: string;
+  config: ChartConfigData;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const isChartConfig = (value: unknown): value is ChartConfigData =>
+  isRecord(value) && typeof value.type === 'string' && isRecord(value.data);
+
+/** Accept the comprehensive API's category groups and the legacy flat chart map. */
+const getChartGroups = (data?: Record<string, unknown> | null): ChartGroups => {
+  if (!isRecord(data?.charts)) return {};
+
+  const groups: ChartGroups = {};
+  for (const [groupName, groupValue] of Object.entries(data.charts)) {
+    if (!isRecord(groupValue)) continue;
+
+    if (isChartConfig(groupValue)) {
+      (groups.overview ??= {})[groupName] = groupValue;
+      continue;
+    }
+
+    const group: Record<string, ChartConfigData> = {};
+    for (const [chartName, config] of Object.entries(groupValue)) {
+      if (isChartConfig(config)) group[chartName] = config;
+    }
+    if (Object.keys(group).length > 0) groups[groupName] = group;
+  }
+
+  return groups;
+};
+
 const AdvancedCharts = ({
   data,
   loading = false,
@@ -44,17 +78,30 @@ const AdvancedCharts = ({
   title = t18('misc.ac_prodvinutaya_analitika'),
   showFilters = true
 }: AdvancedChartsProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT;
+  useTranslation();
   void title;
   const chartRefs = useRef<Record<string, { destroy: () => void }>>({});
   const [activeTab, setActiveTab] = useState('overview');
   const [chartType, setChartType] = useState('line');
   const [timeRange, setTimeRange] = useState('30d');
   const [selectedMetrics, setSelectedMetrics] = useState(['revenue', 'visits', 'patients']);
+  const chartGroups = useMemo(() => getChartGroups(data), [data]);
+  const visibleTab = activeTab === 'overview' || chartGroups[activeTab] ? activeTab : 'overview';
+  const visibleCharts = useMemo<ChartEntry[]>(() => {
+    const entries: ChartEntry[] = [];
+    const groups = visibleTab === 'overview'
+      ? Object.entries(chartGroups)
+      : [[visibleTab, chartGroups[visibleTab] ?? {}] as [string, Record<string, ChartConfigData>]];
+
+    for (const [groupName, charts] of groups) {
+      for (const [chartName, config] of Object.entries(charts)) {
+        entries.push({ id: groupName + ':' + chartName, name: chartName, config });
+      }
+    }
+    return entries;
+  }, [chartGroups, visibleTab]);
 
   const renderAdvancedCharts = useCallback(() => {
-    if (!data?.charts) return;
-
     // Уничтожаем существующие графики
     Object.values(chartRefs.current).forEach((chart) => {
       if (chart) (chart as { destroy: () => void }).destroy();
@@ -62,8 +109,8 @@ const AdvancedCharts = ({
     chartRefs.current = {};
 
     // Рендерим новые графики с продвинутыми настройками
-    for (const [chartName, chartConfig] of Object.entries(data.charts)) {
-      const canvasId = `advanced-chart-${chartName}`;
+    for (const { id, config: chartConfig } of visibleCharts) {
+      const canvasId = 'advanced-chart-' + id;
       const canvas = document.getElementById(canvasId);
 
       if (canvas) {
@@ -117,16 +164,14 @@ const AdvancedCharts = ({
           }
         };
 
-        chartRefs.current[chartName] = new Chart(ctx, advancedConfig as unknown as ChartConfiguration) as unknown as { destroy: () => void };
+        chartRefs.current[id] = new Chart(ctx, advancedConfig as unknown as ChartConfiguration) as unknown as { destroy: () => void };
       }
     }
-  }, [data]);
+  }, [visibleCharts]);
 
   useEffect(() => {
-    if (data?.charts) {
-      renderAdvancedCharts();
-    }
-  }, [data, activeTab, chartType, timeRange, selectedMetrics, renderAdvancedCharts]);
+    renderAdvancedCharts();
+  }, [visibleCharts, chartType, timeRange, selectedMetrics, renderAdvancedCharts]);
 
   const getChartIcon = (chartType: string) => {
     const iconStyle = { width: '16px', height: '16px' };
@@ -140,8 +185,8 @@ const AdvancedCharts = ({
     }
   };
 
-  const renderChartCard = (chartName: string, chartConfig: Record<string, unknown>) => {
-    const canvasId = `advanced-chart-${chartName}`;
+  const renderChartCard = (chartId: string, chartName: string, chartConfig: Record<string, unknown>) => {
+    const canvasId = 'advanced-chart-' + chartId;
     const opts = (chartConfig.options ?? {}) as Record<string, unknown>;
     const plugins = (opts.plugins ?? {}) as Record<string, unknown>;
     const titleObj = (plugins.title ?? {}) as Record<string, unknown>;
@@ -250,17 +295,10 @@ const AdvancedCharts = ({
 
   };
 
-  const renderTabContent = (tabData: unknown, tabName?: string) => {
-    void tabName;
-    if (!tabData || !(tabData as Record<string, unknown>).charts) return null;
-
-    const charts = Object.entries((tabData as Record<string, unknown>).charts as Record<string, unknown>);
-
+  const renderChartList = (charts: ChartEntry[]) => {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {charts.map(([chartName, chartConfig]) =>
-        renderChartCard(chartName, chartConfig as Record<string, unknown>)
-        )}
+        {charts.map(({ id, name, config }) => renderChartCard(id, name, config))}
       </div>);
 
   };
@@ -278,7 +316,7 @@ const AdvancedCharts = ({
 
   }
 
-  if (!data || !data.charts) {
+  if (!data || visibleCharts.length === 0) {
     return (
       <Card className="w-full">
         <div className="p-8 text-center">
@@ -298,7 +336,19 @@ const AdvancedCharts = ({
 
   }
 
-  const dataCharts = data.charts as Record<string, unknown>;
+  const chartTabs = [
+    { id: 'overview', label: t18('misc.ac_obzor') },
+    ...Object.keys(chartGroups)
+      .filter((groupName) => groupName !== 'overview')
+      .map((groupName) => ({
+        id: groupName,
+        label: groupName === 'kpi' ? 'KPI'
+          : groupName === 'doctors' ? t18('misc.ac_vrachi')
+          : groupName === 'patients' ? t18('patients')
+          : groupName === 'revenue' ? t18('misc.ac_dohody')
+          : groupName,
+      })),
+  ];
 
   return (
     <div className="space-y-6">
@@ -306,26 +356,21 @@ const AdvancedCharts = ({
       {renderFilters()}
 
       {/* Навигация по вкладкам */}
-      {Object.keys(dataCharts).length > 1 &&
+      {chartTabs.length > 1 &&
       <div className="border-b border-gray-200">
           <nav className="flex space-x-8">
-            {[
-          { id: 'overview', label: t18('misc.ac_obzor'), icon: Eye },
-          { id: 'kpi', label: 'KPI', icon: Target },
-          { id: 'doctors', label: t18('misc.ac_vrachi'), icon: Users },
-          { id: 'revenue', label: t18('misc.ac_dohody'), icon: DollarSign },
-          { id: 'appointments', label: t18('misc.ac_zapisi'), icon: Calendar }].
-          map((tab) =>
+            {chartTabs.map((tab) =>
           <button
             key={tab.id}
+            type="button"
+            aria-pressed={visibleTab === tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-            activeTab === tab.id ?
+            visibleTab === tab.id ?
             'border-blue-500 text-blue-600' :
             'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`
             }>
 
-                <tab.icon className="w-4 h-4" />
                 <span>{tab.label}</span>
               </button>
           )}
@@ -335,11 +380,7 @@ const AdvancedCharts = ({
 
       {/* Контент вкладок */}
       <div className="space-y-6">
-        {activeTab === 'overview' && renderTabContent(dataCharts.overview || data, 'overview')}
-        {activeTab === 'kpi' && renderTabContent(dataCharts.kpi, 'kpi')}
-        {activeTab === 'doctors' && renderTabContent(dataCharts.doctors, 'doctors')}
-        {activeTab === 'revenue' && renderTabContent(dataCharts.revenue, 'revenue')}
-        {activeTab === 'appointments' && renderTabContent(dataCharts.appointments, 'appointments')}
+        {renderChartList(visibleCharts)}
       </div>
     </div>);
 
