@@ -19,6 +19,8 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import type { WebsiteDoctorContent } from '../../types/domain/clinic';
 
+const MAX_DOCTOR_EXPERIENCE_YEARS = 100;
+
 interface DoctorUser {
   id: string | number;
   full_name?: string;
@@ -36,6 +38,7 @@ interface DoctorRecord {
   id?: string | number;
   user_id?: string | number | null;
   specialty?: string;
+  experience_years?: number | null;
   cabinet?: string;
   price_default?: number | null;
   start_number_online?: number | null;
@@ -64,6 +67,7 @@ interface DoctorModalProps {
 interface DoctorFormState {
   userId: string;
   specialty: string;
+  experienceYears: string;
   cabinet: string;
   priceDefault: string;
   startNumberOnline: string;
@@ -84,6 +88,7 @@ const DoctorModal = ({
   const [formData, setFormData] = useState<DoctorFormState>({
     userId: '',
     specialty: '',
+    experienceYears: '',
     cabinet: '',
     priceDefault: '',
     startNumberOnline: '1',
@@ -227,6 +232,8 @@ const DoctorModal = ({
     setFormData({
       userId: doctor?.user_id != null ? String(doctor.user_id) : '',
       specialty: doctor?.specialty || '',
+      experienceYears:
+        doctor?.experience_years == null ? '' : String(doctor.experience_years),
       cabinet: doctor?.cabinet || '',
       priceDefault:
         doctor?.price_default == null
@@ -287,6 +294,14 @@ const DoctorModal = ({
       // PR-19: validate specialty format — must match queue_tag pattern
       nextErrors.specialty = t('admin2.dmdl_err_specialty_format');
     }
+    if (
+      formData.experienceYears !== '' &&
+      (!Number.isInteger(Number(formData.experienceYears)) ||
+        Number(formData.experienceYears) < 0 ||
+        Number(formData.experienceYears) > MAX_DOCTOR_EXPERIENCE_YEARS)
+    ) {
+      nextErrors.experienceYears = t('admin2.dmdl_err_experience_years');
+    }
     if (formData.priceDefault !== '' && Number.isNaN(Number(formData.priceDefault))) {
       nextErrors.priceDefault = t('admin2.dmdl_err_price_number');
     }
@@ -320,6 +335,7 @@ const DoctorModal = ({
       await onSave({
         userId: formData.userId,
         specialty: formData.specialty.trim(),
+        experienceYears: formData.experienceYears,
         cabinet: formData.cabinet.trim(),
         priceDefault: formData.priceDefault,
         startNumberOnline: formData.startNumberOnline,
@@ -511,6 +527,22 @@ const DoctorModal = ({
             <div className="admin-hint-text-12-secondary-mt-4">
               {t('admin2.dmdl_specialty_hint')}
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="doctor-experience-years" className="admin-label-block-mb-8">
+              {t('admin2.dmdl_label_experience_years')}
+            </Label>
+            <Input
+              id="doctor-experience-years"
+              type="number"
+              min="0"
+              max={MAX_DOCTOR_EXPERIENCE_YEARS}
+              step="1"
+              value={formData.experienceYears}
+              onChange={(event) => handleChange('experienceYears', event.target.value)}
+            />
+            {renderFieldError('experienceYears')}
           </div>
 
           <div>

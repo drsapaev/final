@@ -10,6 +10,12 @@ import { idleState, loadingState, successState, errorState, getError } from '../
 const normalizeDoctorPayload = (doctorData: Record<string, unknown>) => ({
   user_id: doctorData.userId ? Number(doctorData.userId) : null,
   specialty: String(doctorData.specialty ?? '').trim() || 'general',
+  ...(doctorData.experienceYears !== undefined && {
+    experience_years:
+      doctorData.experienceYears === '' || doctorData.experienceYears === null
+        ? null
+        : Number(doctorData.experienceYears),
+  }),
   cabinet: String(doctorData.cabinet ?? '').trim() || null,
   price_default:
     doctorData.priceDefault === '' || doctorData.priceDefault === null || doctorData.priceDefault === undefined

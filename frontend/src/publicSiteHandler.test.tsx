@@ -57,8 +57,8 @@ describe('public-site SSR request handler', () => {
         slug: 'laser-care',
         name: 'Лазерная терапия',
         description: 'Описание опубликованной услуги клиники.',
-        price: null,
-        currency: null,
+        price: '125000.00',
+        currency: 'UZS',
         category: 'Дерматология',
       });
     });
@@ -82,12 +82,112 @@ describe('public-site SSR request handler', () => {
     expect(html).toContain('<html lang="ru">');
     expect(html).toContain('<title>Лазерная терапия — Doktor KosMed Clinic</title>');
     expect(html).toContain('Описание опубликованной услуги клиники.');
-    expect(html).toContain('Цена по запросу');
+    expect(html).not.toContain('Цена по запросу');
+    expect(html).not.toContain('125000');
+    expect(html).not.toContain('UZS');
     expect(html).toContain('href="https://www.kosmed.test/ru/services/laser-care"');
     expect(html).toContain('hreflang="uz-Latn" href="https://www.kosmed.test/services/laser-care"');
     expect(html).toContain('hreflang="x-default"');
     expect(html).toContain('/assets/public-site.css');
     expect(html).not.toContain('/assets/clinic-app.js');
+  });
+
+  it('shows doctor specialty, full name, and persisted experience on the public profile', async () => {
+    const fetchImpl = createFetch((url) => {
+      expect(url.pathname).toBe('/api/v1/public-site/doctors/dermatolog');
+      return jsonResponse({
+        slug: 'dermatolog',
+        name: 'SYNTHETIC Doctor Name',
+        specialty: 'Дерматология',
+        experience_years: 18,
+        bio: 'SYNTHETIC verified doctor biography.',
+        portrait_url: null,
+      });
+    });
+
+    const response = await handlePublicSiteRequest(
+      new Request('https://preview.kosmed.test/ru/doctors/dermatolog'),
+      {
+        apiOrigin: 'https://api.kosmed.test',
+        siteOrigin: 'https://www.kosmed.test',
+        deploymentEnvironment: 'preview',
+      },
+      assets,
+      fetchImpl,
+    );
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain('Дерматология — SYNTHETIC Doctor Name');
+    expect(html).toContain('Стаж: 18 лет');
+    expect(html).toContain('SYNTHETIC verified doctor biography.');
+  });
+
+  it('keeps live service prices on the prices page', async () => {
+    const fetchImpl = createFetch((url) => {
+      expect(url.pathname).toBe('/api/v1/public-site/services');
+      expect(url.searchParams.get('locale')).toBe('ru');
+      return jsonResponse([
+        {
+          slug: 'consultation',
+          name: 'SYNTHETIC консультация',
+          description: 'SYNTHETIC description',
+          price: '125000.00',
+          currency: 'UZS',
+          category: null,
+        },
+      ]);
+    });
+
+    const response = await handlePublicSiteRequest(
+      new Request('https://preview.kosmed.test/ru/prices'),
+      {
+        apiOrigin: 'https://api.kosmed.test',
+        siteOrigin: 'https://www.kosmed.test',
+        deploymentEnvironment: 'preview',
+      },
+      assets,
+      fetchImpl,
+    );
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain('SYNTHETIC консультация');
+    expect(html).toContain('UZS');
+    expect(html).toContain('125');
+  });
+
+  it('renders the admin-managed clinic opening and closing times in localized contacts', async () => {
+    const fetchImpl = createFetch((url) => {
+      expect(url.pathname).toBe('/api/v1/public-site/clinic');
+      return jsonResponse({
+        name: 'Doktor KosMed Clinic',
+        address: 'SYNTHETIC address',
+        phone: null,
+        email: null,
+        logo_url: null,
+        working_hours_start: '09:00:00',
+        working_hours_end: '17:00:00',
+      });
+    });
+
+    const response = await handlePublicSiteRequest(
+      new Request('https://preview.kosmed.test/ru/contacts'),
+      {
+        apiOrigin: 'https://api.kosmed.test',
+        siteOrigin: 'https://www.kosmed.test',
+        deploymentEnvironment: 'preview',
+      },
+      assets,
+      fetchImpl,
+    );
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain('Понедельник–суббота');
+    expect(html).toContain('09:00');
+    expect(html).toContain('17:00');
+    expect(html).toContain('Воскресенье — выходной');
   });
 
   it.each([

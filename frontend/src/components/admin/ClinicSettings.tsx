@@ -53,7 +53,9 @@ const ClinicSettings = () => {
     clinic_phone: '',
     clinic_email: '',
     clinic_timezone: 'Asia/Tashkent',
-    clinic_logo_url: '/static/logo.png'
+    clinic_logo_url: '/static/logo.png',
+    clinic_working_hours_start: '09:00',
+    clinic_working_hours_end: '17:00',
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -159,6 +161,16 @@ const ClinicSettings = () => {
   };
 
   const saveSettings = async () => {
+    const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+    if (
+      !timePattern.test(settings.clinic_working_hours_start) ||
+      !timePattern.test(settings.clinic_working_hours_end) ||
+      settings.clinic_working_hours_start >= settings.clinic_working_hours_end
+    ) {
+      setMessage({ type: 'danger', text: t('admin2.cset_err_working_hours') });
+      return;
+    }
+
     try {
       setSaving(true);
       setMessage({ type: '', text: '' });
@@ -349,6 +361,36 @@ const ClinicSettings = () => {
                   className="w-full"
                 />
               </div>
+
+              <div className="admin-grid-autofit-220-16">
+                <div>
+                  <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
+                    <Clock className="w-4 h-4" />
+                    {t('admin2.cset_label_working_hours_start')}
+                  </label>
+                  <Input
+                    type="time"
+                    aria-label={t('admin2.cset_label_working_hours_start')}
+                    value={settings.clinic_working_hours_start}
+                    onChange={(e) => handleInputChange('clinic_working_hours_start', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
+                    <Clock className="w-4 h-4" />
+                    {t('admin2.cset_label_working_hours_end')}
+                  </label>
+                  <Input
+                    type="time"
+                    aria-label={t('admin2.cset_label_working_hours_end')}
+                    value={settings.clinic_working_hours_end}
+                    onChange={(e) => handleInputChange('clinic_working_hours_end', e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="admin-xs-tertiary-mt-4-m-4px000">
+                {t('admin2.cset_hint_working_hours')}
+              </p>
             </div>
           </Card>
 

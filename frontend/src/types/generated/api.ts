@@ -27886,6 +27886,11 @@ export type components = {
              * @description cardiology, dermatology, stomatology
              */
             specialty: string;
+            /**
+             * Experience Years
+             * @description Confirmed total professional experience in whole years.
+             */
+            experience_years?: number | null;
             /** Cabinet */
             cabinet?: string | null;
             /** Price Default */
@@ -28351,6 +28356,11 @@ export type components = {
             user_id?: number | null;
             /** Specialty */
             specialty?: string | null;
+            /**
+             * Experience Years
+             * @description Confirmed total professional experience in whole years.
+             */
+            experience_years?: number | null;
             /** Cabinet */
             cabinet?: string | null;
             /** Price Default */
@@ -36204,6 +36214,10 @@ export type components = {
             email?: string | null;
             /** Logo Url */
             logo_url?: string | null;
+            /** Working Hours Start */
+            working_hours_start?: string | null;
+            /** Working Hours End */
+            working_hours_end?: string | null;
         };
         /** PublicSiteDoctorOut */
         PublicSiteDoctorOut: {
@@ -36215,6 +36229,8 @@ export type components = {
             bio: string;
             /** Specialty */
             specialty?: string | null;
+            /** Experience Years */
+            experience_years?: number | null;
             /** Portrait Url */
             portrait_url?: string | null;
         };
@@ -42671,6 +42687,11 @@ export type components = {
              * @description cardiology, dermatology, stomatology
              */
             specialty: string;
+            /**
+             * Experience Years
+             * @description Confirmed total professional experience in whole years.
+             */
+            experience_years?: number | null;
             /** Cabinet */
             cabinet?: string | null;
             /** Price Default */

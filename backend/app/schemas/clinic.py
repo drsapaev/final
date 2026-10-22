@@ -9,12 +9,16 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+MAX_DOCTOR_EXPERIENCE_YEARS = 100
+
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
 
 class ClinicSettingsBase(BaseModel):
     key: str = Field(..., max_length=100)
-    value: Any | None = None  # Can be any JSON-serializable value (string, dict, list, etc.)
+    value: Any | None = (
+        None  # Can be any JSON-serializable value (string, dict, list, etc.)
+    )
     category: str | None = Field(None, max_length=50)
     description: str | None = None
 
@@ -85,13 +89,17 @@ class DoctorBase(BaseModel):
     specialty: str = Field(
         ..., max_length=100, description="cardiology, dermatology, stomatology"
     )
+    experience_years: int | None = Field(
+        None,
+        ge=0,
+        le=MAX_DOCTOR_EXPERIENCE_YEARS,
+        description="Confirmed total professional experience in whole years.",
+    )
     cabinet: str | None = Field(None, max_length=20)
     price_default: Decimal | None = Field(None, ge=0)
     start_number_online: int = Field(1, ge=1, le=100)
     max_online_per_day: int = Field(15, ge=1, le=100)
-    auto_close_time: time | None = Field(
-        None, description="Время автозакрытия очереди"
-    )
+    auto_close_time: time | None = Field(None, description="Время автозакрытия очереди")
     active: bool = True
 
 
@@ -102,6 +110,12 @@ class DoctorCreate(DoctorBase):
 class DoctorUpdate(BaseModel):
     user_id: int | None = None
     specialty: str | None = Field(None, max_length=100)
+    experience_years: int | None = Field(
+        None,
+        ge=0,
+        le=MAX_DOCTOR_EXPERIENCE_YEARS,
+        description="Confirmed total professional experience in whole years.",
+    )
     cabinet: str | None = Field(None, max_length=20)
     price_default: Decimal | None = Field(None, ge=0)
     start_number_online: int | None = Field(None, ge=1, le=100)
@@ -284,9 +298,7 @@ class QueueSettingsUpdate(BaseModel):
         end_time = time.fromisoformat(self.auto_close_time)
         start_time = time(self.queue_start_hour, 0)
         if end_time <= start_time:
-            raise ValueError(
-                "auto_close_time must be later than queue_start_hour"
-            )
+            raise ValueError("auto_close_time must be later than queue_start_hour")
         return self
 
 
@@ -355,19 +367,19 @@ class BranchOut(BranchBase):
         data = obj.__dict__.copy()
 
         # Преобразуем связанные объекты в словари
-        if hasattr(obj, 'manager') and obj.manager:
-            data['manager'] = {
-                'id': obj.manager.id,
-                'username': obj.manager.username,
-                'full_name': obj.manager.full_name,
-                'email': obj.manager.email,
+        if hasattr(obj, "manager") and obj.manager:
+            data["manager"] = {
+                "id": obj.manager.id,
+                "username": obj.manager.username,
+                "full_name": obj.manager.full_name,
+                "email": obj.manager.email,
             }
 
         # Подсчитываем количество врачей и оборудования
-        if hasattr(obj, 'doctors'):
-            data['doctors_count'] = len(obj.doctors) if obj.doctors else 0
-        if hasattr(obj, 'equipment'):
-            data['equipment_count'] = len(obj.equipment) if obj.equipment else 0
+        if hasattr(obj, "doctors"):
+            data["doctors_count"] = len(obj.doctors) if obj.doctors else 0
+        if hasattr(obj, "equipment"):
+            data["equipment_count"] = len(obj.equipment) if obj.equipment else 0
 
         return cls(**data)
 
@@ -436,21 +448,21 @@ class EquipmentOut(EquipmentBase):
         data = obj.__dict__.copy()
 
         # Преобразуем связанные объекты в словари
-        if hasattr(obj, 'branch') and obj.branch:
-            data['branch'] = {
-                'id': obj.branch.id,
-                'name': obj.branch.name,
-                'code': obj.branch.code,
-                'status': (
+        if hasattr(obj, "branch") and obj.branch:
+            data["branch"] = {
+                "id": obj.branch.id,
+                "name": obj.branch.name,
+                "code": obj.branch.code,
+                "status": (
                     obj.branch.status.value
-                    if hasattr(obj.branch.status, 'value')
+                    if hasattr(obj.branch.status, "value")
                     else str(obj.branch.status)
                 ),
             }
 
         # Подсчитываем количество записей обслуживания
-        if hasattr(obj, 'maintenance_records'):
-            data['maintenance_records_count'] = (
+        if hasattr(obj, "maintenance_records"):
+            data["maintenance_records_count"] = (
                 len(obj.maintenance_records) if obj.maintenance_records else 0
             )
 
@@ -518,9 +530,7 @@ class LicenseUpdate(BaseModel):
     license_type: str | None = Field(
         None, description="software, medical, business, data"
     )
-    status: str | None = Field(
-        None, description="active, expired, suspended, pending"
-    )
+    status: str | None = Field(None, description="active, expired, suspended, pending")
     issued_by: str | None = Field(None, max_length=200)
     issued_date: date | None = Field(None, description="Дата выдачи")
     expires_date: date | None = Field(None, description="Дата истечения")
@@ -556,9 +566,7 @@ class LicenseActivationCreate(LicenseActivationBase):
 class LicenseActivationUpdate(BaseModel):
     machine_id: str | None = Field(None, max_length=100)
     ip_address: str | None = Field(None, max_length=45)
-    status: str | None = Field(
-        None, description="active, expired, suspended, pending"
-    )
+    status: str | None = Field(None, description="active, expired, suspended, pending")
     notes: str | None = None
 
 

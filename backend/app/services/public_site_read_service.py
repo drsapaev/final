@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from datetime import time
 from typing import TYPE_CHECKING
 
 from app.repositories.public_site_read_repository import PublicSiteReadRepository
@@ -45,13 +47,41 @@ class PublicSiteReadService:
             return _clean_text(settings.get(key))
 
         logo = self.repository.get_published_clinic_logo()
+        raw_start = settings.get("clinic_working_hours_start")
+        raw_end = settings.get("clinic_working_hours_end")
+        if raw_start is None and raw_end is None:
+            # Owner-approved clinic hours. Admin changes are read from the same
+            # ClinicSettings keys and take effect on the next uncached request.
+            working_hours_start, working_hours_end = time(9), time(17)
+        else:
+            working_hours_start = self._parse_working_time(raw_start)
+            working_hours_end = self._parse_working_time(raw_end)
+            if (
+                working_hours_start is None
+                or working_hours_end is None
+                or working_hours_start >= working_hours_end
+            ):
+                working_hours_start = working_hours_end = None
         return PublicSiteClinicOut(
             name=value("clinic_name"),
             address=value("clinic_address"),
             phone=value("clinic_phone"),
             email=value("clinic_email"),
             logo_url=(self._media_url(logo.storage_key) if logo is not None else None),
+            working_hours_start=working_hours_start,
+            working_hours_end=working_hours_end,
         )
+
+    @staticmethod
+    def _parse_working_time(value: object) -> time | None:
+        if not isinstance(value, str) or not re.fullmatch(
+            r"(?:[01]\d|2[0-3]):[0-5]\d", value.strip()
+        ):
+            return None
+        try:
+            return time.fromisoformat(value.strip())
+        except ValueError:
+            return None
 
     @staticmethod
     def _media_url(storage_key: str) -> str:
@@ -193,6 +223,7 @@ class PublicSiteReadService:
             name=name,
             bio=bio,
             specialty=specialty_title,
+            experience_years=doctor.experience_years,
             portrait_url=portrait_url,
         )
 
