@@ -469,6 +469,52 @@ def test_native_failure_keeps_secret_stderr_and_arguments_private(monkeypatch):
 
 
 @pytest.mark.parametrize(
+    ("stderr", "category"),
+    [
+        (b"failed to solve: token=synthetic-secret", "image_build"),
+        (b"no space left on device", "disk_exhausted"),
+        (b"Cannot connect to the Docker daemon", "docker_daemon_unavailable"),
+        (b"port is already allocated", "network_or_port_setup"),
+        (b"unrecognized secret output", "unclassified"),
+    ],
+)
+def test_compose_failure_reports_only_allowlisted_category(
+    monkeypatch, stderr, category
+):
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=1, stdout=b"", stderr=stderr),
+    )
+
+    with pytest.raises(guard.GuardError, match=rf"category {category}") as error:
+        guard.native(
+            ["docker", "compose", "--env-file", "private-path"],
+            operation="compose-up",
+        )
+
+    message = str(error.value)
+    assert "synthetic-secret" not in message
+    assert "private-path" not in message
+    assert "failed to solve" not in message
+
+
+def test_non_compose_failure_does_not_add_compose_category(monkeypatch):
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(
+            returncode=1, stdout=b"", stderr=b"failed to solve"
+        ),
+    )
+
+    with pytest.raises(guard.GuardError, match=r"exit 1; no subsequent") as error:
+        guard.native(["wsl.exe"])
+
+    assert "category" not in str(error.value)
+
+
+@pytest.mark.parametrize(
     "failure", [OSError("private path"), subprocess.TimeoutExpired("secret", 30)]
 )
 def test_native_unavailable_is_safe_and_fail_closed(monkeypatch, failure):
