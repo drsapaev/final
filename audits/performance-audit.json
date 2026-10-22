@@ -1,0 +1,166 @@
+{
+  "title": "Doktor KosMed public-site performance baseline",
+  "audit_date": "2026-10-22",
+  "audit_timestamp_tashkent": "2026-10-22T12:09:24+05:00",
+  "source_base_sha": "4298419cab7cde00144d051cfef0c4da5744f5df",
+  "application_sha": "4298419cab7cde00144d051cfef0c4da5744f5df",
+  "production_deployment": {
+    "provider": "Vercel",
+    "deployment_id": "dpl_JzcmGJhswSwQVmJxLp2tRxSxygQD",
+    "deployment_sha": "4298419cab7cde00144d051cfef0c4da5744f5df",
+    "target": "production",
+    "status": "READY"
+  },
+  "scope": [
+    "Production public HTML route response and Cache-Control headers",
+    "Representative Uzbek and Russian public pages measured on simulated mobile and desktop profiles",
+    "Lighthouse performance score, FCP, LCP, CLS, TBT, transferred bytes, and server-response-time opportunities"
+  ],
+  "method": {
+    "tool": "Lighthouse CLI",
+    "lighthouse_version": "13.5.0",
+    "chrome_version": "156.0.8078.47",
+    "category": "performance",
+    "runs_per_route_device": 1,
+    "mobile_profile": {
+      "form_factor": "mobile",
+      "viewport": "412x823",
+      "device_scale_factor": 1.75,
+      "cpu_slowdown_multiplier": 4,
+      "throttling": "simulated"
+    },
+    "desktop_profile": {
+      "preset": "desktop",
+      "viewport": "1350x940",
+      "cpu_slowdown_multiplier": 1,
+      "throttling": "simulated"
+    },
+    "lighthouse_error_reporting": "disabled",
+    "full_page_screenshot": "disabled",
+    "cloudflare_rum_blocking": {
+      "patterns": [
+        "static.cloudflareinsights.com",
+        "/cdn-cgi/rum"
+      ],
+      "reason": "A Cloudflare Web Analytics/RUM beacon was observed in the initial probe; later measurements blocked the script and beacon to avoid additional telemetry submissions.",
+      "control_verification": "All 14 blocked measurement reports showed zero transferred bytes for the beacon script and no /cdn-cgi/rum request."
+    }
+  },
+  "production_http_checks": [
+    { "path": "/", "status": 200, "cache_control": "no-store" },
+    { "path": "/services", "status": 200, "cache_control": "no-store" },
+    { "path": "/prices", "status": 200, "cache_control": "no-store" },
+    { "path": "/doctors", "status": 200, "cache_control": "no-store" },
+    { "path": "/ru/services", "status": 200, "cache_control": "no-store" }
+  ],
+  "summary": {
+    "mobile": {
+      "runs": 7,
+      "performance_score_range": [96, 100],
+      "lcp_ms_range": [876, 2185],
+      "lcp_ms_median": 1928,
+      "cls_max": 0,
+      "tbt_ms_max": 4,
+      "transferred_bytes_range": [4912, 6107],
+      "transferred_bytes_median": 5226,
+      "server_response_time_estimated_savings_ms_range": [411, 1104],
+      "server_response_time_estimated_savings_ms_median": 758
+    },
+    "desktop": {
+      "runs": 7,
+      "performance_score_range": [96, 100],
+      "lcp_ms_range": [253, 968],
+      "lcp_ms_median": 889,
+      "cls_max": 0,
+      "tbt_ms_max": 0,
+      "transferred_bytes_range": [4919, 6096],
+      "transferred_bytes_median": 5227,
+      "server_response_time_estimated_savings_ms_range": [433, 1043],
+      "server_response_time_estimated_savings_ms_median": 881
+    }
+  },
+  "measurements": [
+    { "path": "/", "locale": "uz-Latn", "device": "mobile", "performance_score": 97, "fcp_ms": 2040, "lcp_ms": 2040, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5226, "server_response_time_estimated_savings_ms": 836 },
+    { "path": "/", "locale": "uz-Latn", "device": "desktop", "performance_score": 97, "fcp_ms": 946, "lcp_ms": 946, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5227, "server_response_time_estimated_savings_ms": 987 },
+    { "path": "/ru", "locale": "ru", "device": "mobile", "performance_score": 97, "fcp_ms": 1924, "lcp_ms": 1924, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5659, "server_response_time_estimated_savings_ms": 758 },
+    { "path": "/ru", "locale": "ru", "device": "desktop", "performance_score": 96, "fcp_ms": 968, "lcp_ms": 968, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5644, "server_response_time_estimated_savings_ms": 1043 },
+    { "path": "/services", "locale": "uz-Latn", "device": "mobile", "performance_score": 96, "fcp_ms": 2185, "lcp_ms": 2185, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5162, "server_response_time_estimated_savings_ms": 1104 },
+    { "path": "/services", "locale": "uz-Latn", "device": "desktop", "performance_score": 98, "fcp_ms": 889, "lcp_ms": 889, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5157, "server_response_time_estimated_savings_ms": 881 },
+    { "path": "/ru/services", "locale": "ru", "device": "mobile", "performance_score": 98, "fcp_ms": 1802, "lcp_ms": 1802, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5528, "server_response_time_estimated_savings_ms": 502 },
+    { "path": "/ru/services", "locale": "ru", "device": "desktop", "performance_score": 99, "fcp_ms": 669, "lcp_ms": 669, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5530, "server_response_time_estimated_savings_ms": 433 },
+    { "path": "/doctors", "locale": "uz-Latn", "device": "mobile", "performance_score": 97, "fcp_ms": 2083, "lcp_ms": 2083, "cls": 0, "tbt_ms": 0, "transferred_bytes": 4961, "server_response_time_estimated_savings_ms": 1074 },
+    { "path": "/doctors", "locale": "uz-Latn", "device": "desktop", "performance_score": 96, "fcp_ms": 952, "lcp_ms": 952, "cls": 0, "tbt_ms": 0, "transferred_bytes": 4988, "server_response_time_estimated_savings_ms": 992 },
+    { "path": "/prices", "locale": "uz-Latn", "device": "mobile", "performance_score": 98, "fcp_ms": 1928, "lcp_ms": 1928, "cls": 0, "tbt_ms": 0, "transferred_bytes": 4912, "server_response_time_estimated_savings_ms": 596 },
+    { "path": "/prices", "locale": "uz-Latn", "device": "desktop", "performance_score": 98, "fcp_ms": 854, "lcp_ms": 854, "cls": 0, "tbt_ms": 0, "transferred_bytes": 4919, "server_response_time_estimated_savings_ms": 820 },
+    { "path": "/contacts", "locale": "uz-Latn", "device": "mobile", "performance_score": 100, "fcp_ms": 876, "lcp_ms": 876, "cls": 0, "tbt_ms": 4, "transferred_bytes": 6107, "server_response_time_estimated_savings_ms": 411 },
+    { "path": "/contacts", "locale": "uz-Latn", "device": "desktop", "performance_score": 100, "fcp_ms": 253, "lcp_ms": 253, "cls": 0, "tbt_ms": 0, "transferred_bytes": 6096, "server_response_time_estimated_savings_ms": 774 }
+  ],
+  "field_data": {
+    "source": "PageSpeed Insights / Chrome UX Report",
+    "status": "unavailable",
+    "reason": "The PageSpeed Insights API returned HTTP 429 Too Many Requests; no field p75 metrics were retrieved.",
+    "lcp_p75_ms": null,
+    "inp_p75_ms": null,
+    "cls_p75": null,
+    "note": "Lighthouse TBT is a lab metric and is not an INP measurement. Lab samples do not establish Core Web Vitals p75 compliance."
+  },
+  "findings": [
+    {
+      "id": "repeated-server-response-time-opportunity",
+      "severity": "follow_up",
+      "status": "observed_on_14_of_14_lighthouse_runs",
+      "observation": "Lighthouse estimated 411-1104 ms savings from reducing initial server response time across the sampled routes. This is a diagnostic opportunity, not a verified root cause or guaranteed saving.",
+      "verification_needed": "Inspect aggregate Vercel Function and FastAPI request timings before attributing the delay to SSR, backend, database, or network."
+    },
+    {
+      "id": "cloudflare-web-analytics-rum-observed",
+      "severity": "policy_conflict",
+      "status": "observed_in_unblocked_initial_probe",
+      "observation": "The production page loaded static.cloudflareinsights.com/beacon.min.js (10478 transferred bytes) and made a request to /cdn-cgi/rum (HTTP 204). Cloudflare documents these as its Web Analytics/RUM beacon and reporting endpoint. The project plan currently excludes external RUM for the first release. No app-level reference was found in the searched frontend, Vercel, ops, and workflow paths; Cloudflare account settings were not inspected.",
+      "verification_needed": "Review Cloudflare Web Analytics/RUM configuration against the approved no-external-RUM policy. No Cloudflare setting was changed."
+    }
+  ],
+  "unblocked_detection_probe": {
+    "included_in_summary": false,
+    "path": "/",
+    "device": "mobile",
+    "performance_score": 98,
+    "lcp_ms": 1415,
+    "cls": 0,
+    "tbt_ms": 30,
+    "transferred_bytes": 16083,
+    "cloudflare_beacon_script_transfer_bytes": 10478,
+    "rum_endpoint_path": "/cdn-cgi/rum",
+    "rum_endpoint_status": 204,
+    "note": "One anonymous synthetic browser visit triggered a beacon. No patient account, patient record, or user-entered data was used. This probe is excluded from the blocked-RUM measurement summary."
+  },
+  "core_web_vitals_targets": {
+    "source": "Project plan section 12.2; Google web.dev Core Web Vitals thresholds",
+    "lcp_p75_max_ms": 2500,
+    "inp_p75_max_ms": 200,
+    "cls_p75_max": 0.1
+  },
+  "limitations": [
+    "One Lighthouse run per route and device profile; results are a directional lab snapshot and can vary between runs.",
+    "Routes sampled: Uzbek and Russian home, both localized service catalogs, Uzbek doctor/prices/contacts listings. Russian doctors/prices/contacts and individual service/doctor details were not measured.",
+    "No CrUX or other field p75 data was available.",
+    "INP was not measured; TBT must not be treated as its substitute.",
+    "Cloudflare RUM was blocked during the 14-run summary, so those transfer-size values exclude that script and endpoint.",
+    "The Lighthouse waterfall cannot separate Vercel Function, FastAPI, database, and network time; no backend or database root cause is assigned."
+  ],
+  "references": [
+    {
+      "title": "Lighthouse official release v13.5.0",
+      "url": "https://github.com/GoogleChrome/lighthouse/releases/tag/v13.5.0"
+    },
+    {
+      "title": "Core Web Vitals thresholds",
+      "url": "https://web.dev/articles/defining-core-web-vitals-thresholds"
+    },
+    {
+      "title": "Cloudflare Web Analytics data collection",
+      "url": "https://developers.cloudflare.com/web-analytics/data-metrics/data-origin-and-collection/"
+    }
+  ],
+  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. Before optimizing, review the repeated server-response-time opportunity and resolve the observed Cloudflare RUM policy conflict."
+}
