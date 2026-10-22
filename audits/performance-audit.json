@@ -188,11 +188,11 @@
     "date": "2026-10-22",
     "deployment": {
       "provider": "Vercel",
-      "deployment_id": "dpl_Bm6WqeMgN4zDSc2kvDwgsTrcwR6D",
-      "deployment_sha": "757beb4e5f57a553d4aca6d530d568c5e72940e2",
+      "deployment_id": "dpl_DGuCBCVTq6GSJVmwjK5EoziX3J6K",
+      "deployment_sha": "3e45603c6473d720b404b3ad315b158523a310b5",
       "target": "production",
       "status": "READY",
-      "change_note": "PR #3738 was docs-only; the runtime code remained at the existing production application SHA."
+      "change_note": "PR #3734 was docs-only; the public-site runtime code was not changed."
     },
     "http_probe": {
       "client": "Windows host using curl.exe",
