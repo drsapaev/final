@@ -274,6 +274,40 @@ describe('AdminSetupDirections — backend facts and lazy details', () => {
     expect(card).not.toHaveTextContent('Создать врача');
   });
 
+  it('routes parent-conflict review to the existing QueueProfile editor', async () => {
+    const conflictDirection: AdminQueueDirectionDto = {
+      ...direction,
+      configuration_state: 'conflict',
+      effective_availability: 'conflict',
+      effective_availability_reasons: ['parent_conflict'],
+      public_availability: false,
+      allowed_next_actions: [
+        {
+          kind: 'review_configuration',
+          entity_type: 'queue_profile',
+          entity_id: direction.profile.id,
+          entity_key: direction.profile.key,
+        },
+      ],
+    };
+    mockedGet.mockImplementation(async (url: string) =>
+      url.startsWith('/queue/admin/directions')
+        ? { data: response(conflictDirection) }
+        : { data: {} },
+    );
+
+    renderScreen();
+    const card = await screen.findByTestId('setup-checklist-row-lab');
+    const profileEditorLink = within(card)
+      .getAllByRole('link')
+      .find((link) => link.getAttribute('href')?.includes('setupEntityKind=queue_profile'));
+
+    expect(profileEditorLink).toBeDefined();
+    expect(profileEditorLink).toHaveAttribute('href', expect.stringContaining('servicesTab=queue-profiles'));
+    expect(profileEditorLink).toHaveAttribute('href', expect.stringContaining('setupEntityKey=lab-key'));
+    expect(within(card).queryByTestId('setup-action-without-editor')).not.toBeInTheDocument();
+  });
+
   it('keeps direction facts visible and retries a failed QR read', async () => {
     let reads = 0;
     mockedGet.mockImplementation(async (url: string) => {

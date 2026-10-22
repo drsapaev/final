@@ -646,6 +646,57 @@ def test_hidden_profile_with_inactive_parent_reports_unavailable_not_conflict(
     ]
 
 
+def test_parent_conflict_next_action_targets_queue_profile_editor(
+    client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    own_parent = Department(
+        key="aqs-t13-conflict-profile-parent",
+        name_ru="Собственное тестовое отделение",
+        name_uz="O'z test bo'limi",
+        active=True,
+    )
+    explicit_parent = Department(
+        key="aqs-t13-conflict-explicit-parent",
+        name_ru="Явное тестовое отделение",
+        name_uz="Aniq sinov bo'limi",
+        active=True,
+    )
+    profile = QueueProfile(
+        key=own_parent.key,
+        title="Conflicting parent direction",
+        title_ru="Направление с конфликтом родителей",
+        queue_tags=["lab"],
+        department_key=explicit_parent.key,
+        is_active=True,
+        show_on_qr_page=False,
+        display_order=1,
+    )
+    db_session.add_all([own_parent, explicit_parent, profile])
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/queue/admin/directions?day=2026-10-17",
+        headers=_admin_headers(admin_user),
+    )
+
+    assert response.status_code == 200, response.text
+    direction = next(
+        row
+        for row in response.json()["directions"]
+        if row["profile"]["key"] == profile.key
+    )
+    assert direction["configuration_state"] == "conflict"
+    assert direction["effective_availability_reasons"] == ["parent_conflict"]
+    assert direction["allowed_next_actions"] == [
+        {
+            "kind": "review_configuration",
+            "entity_type": "queue_profile",
+            "entity_id": profile.id,
+            "entity_key": profile.key,
+        }
+    ]
+
+
 def test_hidden_profiles_with_same_doctor_specialty_are_independently_publishable(
     client: TestClient, db_session: Session, admin_user: User
 ) -> None:
