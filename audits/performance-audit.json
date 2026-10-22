@@ -23,6 +23,20 @@
     "chrome_version": "156.0.8078.47",
     "category": "performance",
     "runs_per_route_device": 1,
+    "reproduction": {
+      "command_template": "npm exec --yes --package=lighthouse@13.5.0 -- lighthouse <measured_origin><path> <common_options> <profile_options>",
+      "common_options": [
+        "--output=json",
+        "--only-categories=performance",
+        "--disable-full-page-screenshot",
+        "--blocked-url-patterns=static.cloudflareinsights.com,/cdn-cgi/rum"
+      ],
+      "profile_options": {
+        "mobile": "--form-factor=mobile --screenEmulation.mobile --screenEmulation.width=412 --screenEmulation.height=823 --screenEmulation.deviceScaleFactor=1.75 --throttling-method=simulate --throttling.rttMs=150 --throttling.throughputKbps=1638.4 --throttling.requestLatencyMs=562.5 --throttling.downloadThroughputKbps=1474.56 --throttling.uploadThroughputKbps=675 --throttling.cpuSlowdownMultiplier=4",
+        "desktop": "--preset=desktop --screenEmulation.width=1350 --screenEmulation.height=940 --screenEmulation.deviceScaleFactor=1 --throttling-method=simulate --throttling.rttMs=40 --throttling.throughputKbps=10240 --throttling.requestLatencyMs=0 --throttling.downloadThroughputKbps=0 --throttling.uploadThroughputKbps=0 --throttling.cpuSlowdownMultiplier=1"
+      },
+      "source": "Profile values reconstructed from the per-run Lighthouse JSON configSettings. The original shell commands and output paths were not retained as durable files."
+    },
     "mobile_profile": {
       "form_factor": "mobile",
       "viewport": "412x823",
@@ -41,7 +55,7 @@
     "raw_report_links": {
       "available": false,
       "reason": "No durable Lighthouse report URLs were created for this run. The per-run aggregate values used for this baseline are retained below; raw local reports are not published.",
-      "reproduction": "Combine measured_origin with each measurements[].path and use the recorded Lighthouse version and device profiles."
+      "reproduction": "Use method.reproduction with measured_origin and each measurements[].path; raw report links are unavailable because this run did not publish durable report artifacts."
     },
     "cloudflare_rum_blocking": {
       "patterns": [
