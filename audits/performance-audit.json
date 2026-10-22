@@ -135,9 +135,9 @@
     {
       "id": "cloudflare-web-analytics-rum-observed",
       "severity": "policy_conflict",
-      "status": "observed_in_unblocked_initial_probe",
-      "observation": "The production page loaded static.cloudflareinsights.com/beacon.min.js (10478 transferred bytes) and made a request to /cdn-cgi/rum (HTTP 204). Cloudflare documents these as its Web Analytics/RUM beacon and reporting endpoint. The project plan currently excludes external RUM for the first release. No app-level reference was found in the searched frontend, Vercel, ops, and workflow paths; Cloudflare account settings were not inspected.",
-      "verification_needed": "Review Cloudflare Web Analytics/RUM configuration against the approved no-external-RUM policy. No Cloudflare setting was changed."
+      "status": "confirmed_in_unblocked_probe_and_cloudflare_dashboard",
+      "observation": "The production page loaded static.cloudflareinsights.com/beacon.min.js (10478 transferred bytes) and made a request to /cdn-cgi/rum (HTTP 204). Cloudflare documents these as its Web Analytics/RUM beacon and reporting endpoint. The Cloudflare dashboard lists finalclinic.fyi in Web Analytics with automatic setup and shows RUM enabled while excluding EU visitors; the selected setting states that the JS snippet is not injected for EU visitors. The public-site plan excludes external RUM for the first release. No app-level reference was found in the searched frontend, Vercel, ops, and workflow paths. The dashboard listed 10 page views and 10 visits in the last 24 hours; these counts are not field p75 Core Web Vitals data.",
+      "verification_needed": "Resolve the policy conflict with the owner before treating the first-release no-external-RUM requirement as satisfied. No Cloudflare setting was changed."
     }
   ],
   "unblocked_detection_probe": {
@@ -237,21 +237,30 @@
     "rum_follow_up": {
       "homepage_html_marker_present": true,
       "application_source_reference_found": false,
-      "cloudflare_account_setting": "not_inspected; dashboard sign-in required",
+      "cloudflare_account_setting": {
+        "observed_on": "2026-10-22",
+        "site": "finalclinic.fyi",
+        "setup": "automatic",
+        "rum_mode": "enabled_excluding_eu_visitors",
+        "snippet_behavior": "not_injected_for_eu_visitors",
+        "dashboard_page_views_last_24h": 10,
+        "dashboard_visits_last_24h": 10,
+        "policy_assessment": "conflicts_with_no_external_rum_first_release_policy"
+      },
       "change_made": false,
-      "note": "This probe checked delivered HTML but did not execute browser JavaScript. The earlier unblocked synthetic browser probe in this audit observed the beacon request."
+      "note": "The read-only dashboard review confirmed Web Analytics/RUM is enabled with EU visitors excluded. This probe checked delivered HTML but did not execute browser JavaScript. The earlier unblocked synthetic browser probe in this audit observed the beacon request. Dashboard page-view and visit counts do not establish LCP, INP, or CLS p75. No Cloudflare setting was changed."
     },
     "limitations": [
       "Three sequential samples from one Windows host on one date are a point-in-time diagnostic, not a field p75 or performance baseline.",
       "Direct public API timings cannot be used to infer the Vercel Function's server-to-server API duration.",
       "Local loopback FastAPI timings do not establish the cause of the public-route delay.",
-      "Cloudflare RUM configuration remains unknown until account settings can be inspected."
+      "Cloudflare Web Analytics/RUM is configured to run outside the EU, which conflicts with the approved no-external-RUM first-release policy; no setting change or policy exception is authorized by this audit."
     ],
     "next_actions": [
       {
         "id": "review-cloudflare-rum-configuration",
-        "status": "awaiting_account_access",
-        "action": "Inspect the active Web Analytics/RUM setting and compare it with the approved first-release exclusion; no setting change has been made."
+        "status": "owner_disposition_required",
+        "action": "The Cloudflare dashboard confirms Web Analytics/RUM is enabled with EU visitors excluded. Decide whether to disable it to meet the approved no-external-RUM first-release policy. No setting change has been made."
       },
       {
         "id": "obtain-server-duration-evidence",
@@ -265,5 +274,5 @@
       }
     ]
   },
-  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. The 2026-10-22 follow-up captured point-in-time client timings and confirmed the RUM marker remains in homepage HTML; Vercel Function/FastAPI duration attribution and Cloudflare account-setting review remain open."
+  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. The 2026-10-22 follow-up captured point-in-time client timings and confirmed the RUM marker remains in homepage HTML; the Cloudflare dashboard confirms Web Analytics/RUM is enabled outside the EU, which conflicts with the approved first-release policy. Vercel Function/FastAPI duration attribution and field p75 remain unavailable."
 }
