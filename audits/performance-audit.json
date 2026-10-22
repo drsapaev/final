@@ -2,6 +2,7 @@
   "title": "Doktor KosMed public-site performance baseline",
   "audit_date": "2026-10-22",
   "audit_timestamp_tashkent": "2026-10-22T12:09:24+05:00",
+  "measured_origin": "https://finalclinic.fyi",
   "source_base_sha": "4298419cab7cde00144d051cfef0c4da5744f5df",
   "application_sha": "4298419cab7cde00144d051cfef0c4da5744f5df",
   "production_deployment": {
@@ -37,6 +38,11 @@
     },
     "lighthouse_error_reporting": "disabled",
     "full_page_screenshot": "disabled",
+    "raw_report_links": {
+      "available": false,
+      "reason": "No durable Lighthouse report URLs were created for this run. The per-run aggregate values used for this baseline are retained below; raw local reports are not published.",
+      "reproduction": "Combine measured_origin with each measurements[].path and use the recorded Lighthouse version and device profiles."
+    },
     "cloudflare_rum_blocking": {
       "patterns": [
         "static.cloudflareinsights.com",
@@ -122,6 +128,7 @@
   ],
   "unblocked_detection_probe": {
     "included_in_summary": false,
+    "url": "https://finalclinic.fyi/",
     "path": "/",
     "device": "mobile",
     "performance_score": 98,
