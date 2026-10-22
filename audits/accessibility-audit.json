@@ -2,7 +2,8 @@
   "title": "Doktor KosMed public-site accessibility review",
   "audit_date": "2026-10-21",
   "source_base_sha": "55a88b057f516ef86d01b7c927bee0013cbf477b",
-  "application_sha": "7186dbd2e8bd9bc7ddbcaed4138b98b1c8f7d6ef",
+  "application_sha": "949c9f955f012919395981653a9b89706ea08166",
+  "merged_as_sha": "c58a071879c0ad099ce6928f223c4a0c5ca941dd",
   "target_standard": "WCAG 2.2 AA (targeted checks; not a conformance claim)",
   "scope": [
     "Localized public-site service pages rendered by Vite and Nitro",
@@ -24,8 +25,8 @@
     "accessible_tree": "skip_link_and_main_landmark_order_and_localized_navigation_name_assertions_passed"
   },
   "manual_checks": {
-    "keyboard_navigation": "automated_browser_keyboard_input_passed; human_manual_session_not_run",
-    "screen_reader": "browser_accessibility_tree_reviewed; live_Narrator_or_other_screen_reader_speech_not_verified",
+    "keyboard_navigation": "automated_browser_keyboard_input_passed; owner_confirmed_skip_link_visible_and_focus_moved_to_main",
+    "screen_reader": "owner_reported_skip_link_visibility_and_focus_transfer; exact_live_Narrator_announcement_not_recorded",
     "color_contrast": "Axe_automated_rules_passed; manual_visual_contrast_review_not_run",
     "real_mobile_devices": "not_run_emulated_Mobile_Chrome_only"
   },
@@ -33,9 +34,9 @@
     {
       "criterion": "WCAG 2.2 SC 2.4.1 Bypass Blocks",
       "severity": "moderate",
-      "status": "targeted_automated_checks_passed; live_screen_reader_confirmation_pending",
-      "observation": "The localized skip link is the first page control, becomes visible on focus, and moves focus to the single main landmark. Playwright exposes its localized name, the named navigation, and main landmark in the browser accessibility tree.",
-      "verification_needed": "Listen to the link and main-landmark announcements with a live screen reader before claiming WCAG conformance."
+      "status": "targeted_automated_checks_and_owner_manual_focus_smoke_passed; not_a_full_screen_reader_or_conformance_assessment",
+      "observation": "The localized skip link is the first page control, becomes visible on focus, and moves focus to the single main landmark. Playwright exposes its localized name, the named navigation, and main landmark in the browser accessibility tree. The owner manually confirmed the visible link and focus transfer.",
+      "verification_needed": "The exact live Narrator announcement was not recorded; broader assistive-technology testing remains necessary before any WCAG conformance claim."
     },
     {
       "criterion": "Targeted Axe WCAG A/AA rules",
@@ -45,9 +46,9 @@
       "verification_needed": "This route sample and rule set do not evaluate every WCAG 2.2 AA criterion."
     }
   ],
-  "result": "targeted_automated_checks_passed; not_a_wcag_conformance_assessment",
+  "result": "targeted_automated_checks_and_owner_manual_focus_smoke_passed; not_a_wcag_conformance_assessment",
   "limitations": [
-    "A live Narrator or third-party screen-reader speech session was not verified; accessibility-tree assertions do not replace listening to assistive-technology output.",
+    "The owner reported the visible link and focus transfer, but the exact live Narrator speech output was not recorded; accessibility-tree assertions do not replace broader assistive-technology testing.",
     "Only selected public catalog/error states were audited; this is not a complete WCAG 2.2 AA audit.",
     "Local Firefox and WebKit Playwright binaries are absent; the dedicated CI spec runs only in Chromium, so cross-browser behavior remains unverified.",
     "Mobile Chrome used an emulated viewport, not a physical device."
