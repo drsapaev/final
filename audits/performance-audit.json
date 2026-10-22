@@ -184,5 +184,69 @@
       "url": "https://developers.cloudflare.com/web-analytics/data-metrics/data-origin-and-collection/"
     }
   ],
-  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. Before optimizing, review the repeated server-response-time opportunity and resolve the observed Cloudflare RUM policy conflict."
+  "production_follow_up": {
+    "date": "2026-10-22",
+    "deployment": {
+      "provider": "Vercel",
+      "deployment_id": "dpl_DGuCBCVTq6GSJVmwjK5EoziX3J6K",
+      "deployment_sha": "3e45603c6473d720b404b3ad315b158523a310b5",
+      "target": "production",
+      "status": "READY",
+      "change_note": "PR #3734 was docs-only; the public-site runtime code was not changed."
+    },
+    "http_probe": {
+      "client": "Windows host using curl.exe",
+      "method": "Three sequential GET requests per target; curl time_starttransfer, rounded to milliseconds.",
+      "timing_limit": "Client-side time_starttransfer includes DNS, TCP, TLS, network transit, and response time; it is not an isolated server TTFB.",
+      "samples": [
+        {
+          "target": "https://finalclinic.fyi/",
+          "status": [200, 200, 200],
+          "time_starttransfer_ms": [1287, 1072, 791],
+          "range_ms": [791, 1287],
+          "median_ms": 1072,
+          "rum_marker_in_html": true
+        },
+        {
+          "target": "https://api.finalclinic.fyi/api/v1/public-site/services?locale=ru",
+          "status": [200, 200, 200],
+          "time_starttransfer_ms": [707, 477, 528],
+          "range_ms": [477, 707],
+          "median_ms": 528
+        },
+        {
+          "target": "local loopback FastAPI GET /api/v1/public-site/services?locale=ru",
+          "status": [200, 200, 200],
+          "time_starttransfer_ms": [74, 23, 22],
+          "range_ms": [22, 74],
+          "median_ms": 23,
+          "note": "Same-host measurement bypasses Cloudflare and the Vercel-to-API path; it is not directly comparable to the public API route."
+        }
+      ],
+      "cache_observation": "PowerShell probes observed cfCacheStatus DYNAMIC for the homepage and public API."
+    },
+    "vercel_timing_evidence": {
+      "observability_plus": "not_enabled",
+      "runtime_logs_window": "30m",
+      "runtime_logs_returned": 0,
+      "request_log_records": 11,
+      "request_log_statuses": [200],
+      "request_log_duration_field": "unavailable",
+      "conclusion": "No aggregate Vercel Function duration or request-level FastAPI timing was available; no delay is attributed to Nitro, FastAPI, the database, or the network."
+    },
+    "rum_follow_up": {
+      "homepage_html_marker_present": true,
+      "application_source_reference_found": false,
+      "cloudflare_account_setting": "not_inspected; dashboard sign-in required",
+      "change_made": false,
+      "note": "This probe checked delivered HTML but did not execute browser JavaScript. The earlier unblocked synthetic browser probe in this audit observed the beacon request."
+    },
+    "limitations": [
+      "Three sequential samples from one Windows host on one date are a point-in-time diagnostic, not a field p75 or performance baseline.",
+      "Direct public API timings cannot be used to infer the Vercel Function's server-to-server API duration.",
+      "Local loopback FastAPI timings do not establish the cause of the public-route delay.",
+      "Cloudflare RUM configuration remains unknown until account settings can be inspected."
+    ]
+  },
+  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. The 2026-10-22 follow-up captured point-in-time client timings and confirmed the RUM marker remains in homepage HTML; Vercel Function/FastAPI duration attribution and Cloudflare account-setting review remain open."
 }
