@@ -128,6 +128,7 @@
   ],
   "unblocked_detection_probe": {
     "included_in_summary": false,
+    "origin": "https://finalclinic.fyi",
     "url": "https://finalclinic.fyi/",
     "path": "/",
     "device": "mobile",
