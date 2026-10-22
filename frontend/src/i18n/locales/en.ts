@@ -2728,6 +2728,7 @@ const en = {
     sdx_refresh: 'Refresh',
     sdx_back_to_checklist: 'Back to checklist',
     sdx_load_failed: 'Failed to load setup path data',
+    sdx_retry: 'Retry',
     sdx_loading: 'Loading…',
     sdx_assignment_title: 'Service-to-doctor assignments',
     sdx_assignment_subtitle: 'Services pinned to a concrete doctor and doctor-performed services without a specialty mapping. Each row names the exact reason and the fixing screen.',
