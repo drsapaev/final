@@ -1,7 +1,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-const Chart = null as unknown as { new (ctx: unknown, config: unknown): { destroy: () => void; options: unknown }; registerables: unknown; register: (...args: unknown[]) => void };
-const registerables: unknown[] = [];
+import Chart from 'chart.js/auto';
+import type { ChartConfiguration } from 'chart.js';
 import { Card, Button,
   Checkbox } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -22,9 +22,6 @@ import {
 'lucide-react';
 
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
-
-// Регистрируем все компоненты Chart.js
-Chart.register(...registerables);
 
 /**
  * Продвинутые графики для аналитики
@@ -71,6 +68,7 @@ const AdvancedCharts = ({
 
       if (canvas) {
         const ctx = (canvas as HTMLCanvasElement).getContext('2d');
+        if (!ctx) continue;
 
         // Добавляем продвинутые настройки
         const advancedConfig = {
@@ -119,7 +117,7 @@ const AdvancedCharts = ({
           }
         };
 
-        chartRefs.current[chartName] = new Chart(ctx, advancedConfig) as unknown as { destroy: () => void };
+        chartRefs.current[chartName] = new Chart(ctx, advancedConfig as unknown as ChartConfiguration) as unknown as { destroy: () => void };
       }
     }
   }, [data]);
@@ -206,12 +204,12 @@ const AdvancedCharts = ({
             <Filter className="w-4 h-4" />
             <span className="text-sm font-medium">{t18('misc.ac_filtry')}</span>
           </div>
-          
+
           <select
             value={chartType}
             onChange={(e) => setChartType(e.target.value)}
             className="px-3 py-1 border border-gray-300 rounded-md text-sm">
-            
+
             <option value="line">{t18('misc.ac_lineynyy')}</option>
             <option value="bar">{t18('misc.ac_stolbchatyy')}</option>
             <option value="doughnut">{t18('misc.ac_krugovaya')}</option>
@@ -223,7 +221,7 @@ const AdvancedCharts = ({
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
             className="px-3 py-1 border border-gray-300 rounded-md text-sm">
-            
+
             <option value="7d">7 дней</option>
             <option value="30d">30 дней</option>
             <option value="90d">90 дней</option>
@@ -242,7 +240,7 @@ const AdvancedCharts = ({
                   }
                 }}
                 className="rounded" />
-              
+
                 <span className="text-sm capitalize">{metric}</span>
               </label>
             )}
@@ -326,7 +324,7 @@ const AdvancedCharts = ({
             'border-blue-500 text-blue-600' :
             'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`
             }>
-            
+
                 <tab.icon className="w-4 h-4" />
                 <span>{tab.label}</span>
               </button>
