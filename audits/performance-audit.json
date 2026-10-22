@@ -234,6 +234,97 @@
       "request_log_duration_field": "unavailable",
       "conclusion": "No aggregate Vercel Function duration or request-level FastAPI timing was available; no delay is attributed to Nitro, FastAPI, the database, or the network."
     },
+    "telemetry_recheck": {
+      "checked_at_utc": "2026-10-22T11:09:31Z",
+      "checked_at_tashkent": "2026-10-22T16:09:31+05:00",
+      "production_deployment": {
+        "provider": "Vercel",
+        "deployment_id": "dpl_Bm6WqeMgN4zDSc2kvDwgsTrcwR6D",
+        "deployment_sha": "757beb4e5f57a553d4aca6d530d568c5e72940e2",
+        "target": "production",
+        "status": "READY",
+        "runtime_code_sha": "4298419cab7cde00144d051cfef0c4da5744f5df",
+        "runtime_change_note": "The merged PR #3738 changed audit documentation only; runtime application code remains at the baseline SHA."
+      },
+      "vercel_metrics": {
+        "cli_version": "59.1.4",
+        "project": "v0-final",
+        "project_id": "prj_QQmq4y7N7KoTKWKXXOcPrfcERUnB",
+        "time_window_utc": {
+          "start": "2026-10-15T11:04:52Z",
+          "end": "2026-10-22T11:04:52Z"
+        },
+        "function_duration_p75": {
+          "metric": "vercel.function_invocation.function_duration_ms",
+          "result": "payment_required",
+          "detail": "Vercel returned that Function duration queries require Observability Plus; no duration value was returned and no upgrade was made."
+        },
+        "speed_insights_p75": {
+          "metrics": [
+            "vercel.speed_insights.lcp_ms",
+            "vercel.speed_insights.inp_ms",
+            "vercel.speed_insights.cls"
+          ],
+          "aggregation": "p75",
+          "environment": "production",
+          "result": "empty",
+          "summary_rows": 0,
+          "data_rows": 0,
+          "interpretation": "No values were available for this query window. Empty results do not establish whether Speed Insights is enabled or disabled and do not prove that the site had no visits."
+        }
+      },
+      "google_field_data": {
+        "pagespeed_insights_api": {
+          "strategies_attempted": ["mobile", "desktop"],
+          "api_key_supplied": false,
+          "http_status": 429,
+          "error_summary": "The API caller's default daily quota was zero; neither CrUX field data nor a Lighthouse report was returned."
+        },
+        "direct_crux_api": {
+          "queried": false,
+          "prerequisite": "The Chrome UX Report API requires a Google Cloud API key provisioned for that API."
+        },
+        "field_values_retrieved": false
+      },
+      "response_header_probe": {
+        "request": "One GET https://finalclinic.fyi/ from the Windows host",
+        "status": 200,
+        "server_timing_header": null,
+        "cache_control": "no-store",
+        "client_elapsed_ms": 2662.1,
+        "interpretation": "This single client-side duration includes network and connection time and is not a server-only timing or a statistical baseline."
+      },
+      "rum_policy": {
+        "approved_first_release_policy": "No external RUM trackers.",
+        "vercel_speed_insights_configuration": "not_inspected",
+        "change_made": false,
+        "decision": "No Vercel Speed Insights instrumentation or paid Observability Plus upgrade was enabled. Vercel documents Speed Insights as real-user measurements and the project plan excludes external RUM for the first release."
+      },
+      "browser_verification": {
+        "attempted": true,
+        "result": "Chrome navigation to https://finalclinic.fyi/ failed with ERR_CONNECTION_RESET; no page JavaScript or beacon network activity could be inspected.",
+        "cloudflare_disable_verification": "still_pending"
+      },
+      "references": [
+        {
+          "title": "Vercel Speed Insights",
+          "url": "https://vercel.com/docs/speed-insights"
+        },
+        {
+          "title": "Vercel Observability Plus limits and pricing",
+          "url": "https://vercel.com/docs/observability/observability-plus"
+        },
+        {
+          "title": "PageSpeed Insights API",
+          "url": "https://developers.google.com/speed/docs/insights/v5/get-started"
+        },
+        {
+          "title": "Chrome UX Report API",
+          "url": "https://developer.chrome.com/docs/crux/api"
+        }
+      ],
+      "conclusion": "No production Function p75 or field Core Web Vitals values were retrievable. One HTTP response exposed no Server-Timing header; its client-side elapsed time is not used to infer server latency. External RUM remains disabled per first-release policy."
+    },
     "rum_follow_up": {
       "pre_change_homepage_html_marker_present": true,
       "application_source_reference_found": false,
@@ -276,7 +367,7 @@
       "Three sequential samples from one Windows host on one date are a point-in-time diagnostic, not a field p75 or performance baseline.",
       "Direct public API timings cannot be used to infer the Vercel Function's server-to-server API duration.",
       "Local loopback FastAPI timings do not establish the cause of the public-route delay.",
-      "Cloudflare now shows Web Analytics/RUM disabled for finalclinic.fyi, but a first plain post-change HTML GET still contained the beacon script marker. A later no-cache GET no longer contained it; post-change JavaScript execution and browser beacon requests have not been verified."
+      "Cloudflare shows Web Analytics/RUM disabled for finalclinic.fyi. A no-cache HTML GET no longer contained the beacon marker, but post-change JavaScript and beacon requests remain unverified; a Chrome navigation attempt on 2026-10-22 failed with ERR_CONNECTION_RESET."
     ],
     "next_actions": [
       {
@@ -287,14 +378,14 @@
       {
         "id": "obtain-server-duration-evidence",
         "status": "unavailable",
-        "action": "Obtain separate duration-capable Vercel Function and FastAPI timings before assigning a cause; use minimized telemetry without PHI/PII or raw query strings."
+        "action": "The Vercel Function duration query requires Observability Plus, and no request-level FastAPI timing was available. Do not upgrade or enable telemetry without a separate decision; if attribution remains necessary, design internal aggregate timings without PHI/PII or raw query strings."
       },
       {
         "id": "obtain-field-core-web-vitals",
-        "status": "unavailable",
-        "action": "Recheck CrUX/PageSpeed Insights when field data is available and record p75 LCP, INP, and CLS separately from the Lighthouse lab baseline."
+        "status": "unavailable_no_samples_or_api_quota",
+        "action": "Vercel Speed Insights returned no p75 samples for the checked week. The PageSpeed Insights API returned HTTP 429 because the caller's default daily quota was zero; direct CrUX API access requires a provisioned Google Cloud API key. Recheck public aggregate field data when access is available, without adding external RUM, and keep p75 separate from Lighthouse lab values."
       }
     ]
   },
-  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. On 2026-10-22 the owner-authorized Cloudflare setting for finalclinic.fyi was changed to Disable and remained selected after reload. A first plain post-change HTML GET still contained the beacon script marker; a later no-cache GET returned HTTP 200 without the beacon script or /cdn-cgi/rum marker. Browser JavaScript execution and post-change beacon requests remain unverified. Vercel Function/FastAPI duration attribution and field p75 remain unavailable."
+  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. On 2026-10-22 the owner-authorized Cloudflare setting for finalclinic.fyi was changed to Disable and remained selected after reload. A later no-cache GET returned HTTP 200 without the beacon script or /cdn-cgi/rum marker; ordinary Chrome verification remains pending because navigation failed with ERR_CONNECTION_RESET. Vercel Speed Insights returned no p75 samples, Vercel Function duration required Observability Plus, and PageSpeed Insights returned HTTP 429 due to zero daily quota. No server-only timing or field p75 was obtained, and no external telemetry was enabled."
 }
