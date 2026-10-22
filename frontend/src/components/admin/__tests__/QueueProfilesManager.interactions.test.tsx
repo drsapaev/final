@@ -262,6 +262,54 @@ describe('QueueProfilesManager interactions', () => {
     ).toBeInTheDocument();
   });
 
+  it('restores focus after a refused QR publication so Escape closes and returns to the opener', async () => {
+    const user = userEvent.setup();
+    await renderManager();
+
+    const profileTitle = screen.getByText('Синтетическое неопубликованное направление');
+    const row = profileTitle.closest('tr')!;
+    const editButton = within(row).getByRole('button', {
+      name: 'Редактировать профиль Синтетическое неопубликованное направление для настройки QR-публикации',
+    });
+    await user.click(editButton);
+
+    const dialog = screen.getByRole('dialog', { name: 'Редактирование вкладки' });
+    const qrCheckbox = within(dialog).getByRole('checkbox', { name: 'Показывать профиль на QR-странице' });
+    await user.click(qrCheckbox);
+    const saveButton = within(dialog).getByRole('button', { name: 'Сохранить вкладку очереди' });
+    let refuseUpdate!: (reason: unknown) => void;
+    apiMock.put.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      refuseUpdate = reject;
+    }));
+    await user.click(saveButton);
+    await waitFor(() => expect(saveButton).toBeDisabled());
+    // JSDOM keeps focus on a button after it is disabled; browsers can drop it
+    // outside the dialog, so model that blur with an enabled page control.
+    const searchInput = screen.getByRole('textbox', { name: 'Поиск профилей очереди' });
+    searchInput.focus();
+    expect(searchInput).toHaveFocus();
+
+    refuseUpdate({
+      response: {
+        status: 409,
+        data: { detail: { reason: 'profile_publication_blocked', message: 'Для публикации нет доступного владельца очереди.' } },
+      },
+    });
+
+    expect(await screen.findByText('Для публикации нет доступного владельца очереди.')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Название вкладки очереди на английском')).toHaveFocus();
+    expect(qrCheckbox).toBeChecked();
+    expect(apiMock.put).toHaveBeenCalledWith(
+      '/queues/profiles/synthetic-unpublished',
+      expect.objectContaining({ show_on_qr_page: true }),
+    );
+    expect(syntheticProfiles.find((profile) => profile.key === 'synthetic-unpublished')?.show_on_qr_page).toBe(false);
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(editButton).toHaveFocus();
+  });
+
   it.each([
     {
       reason: 'profile_has_significant_links',
