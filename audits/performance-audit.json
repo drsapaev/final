@@ -246,6 +246,23 @@
       "Direct public API timings cannot be used to infer the Vercel Function's server-to-server API duration.",
       "Local loopback FastAPI timings do not establish the cause of the public-route delay.",
       "Cloudflare RUM configuration remains unknown until account settings can be inspected."
+    ],
+    "next_actions": [
+      {
+        "id": "review-cloudflare-rum-configuration",
+        "status": "awaiting_account_access",
+        "action": "Inspect the active Web Analytics/RUM setting and compare it with the approved first-release exclusion; no setting change has been made."
+      },
+      {
+        "id": "obtain-server-duration-evidence",
+        "status": "unavailable",
+        "action": "Obtain separate duration-capable Vercel Function and FastAPI timings before assigning a cause; use minimized telemetry without PHI/PII or raw query strings."
+      },
+      {
+        "id": "obtain-field-core-web-vitals",
+        "status": "unavailable",
+        "action": "Recheck CrUX/PageSpeed Insights when field data is available and record p75 LCP, INP, and CLS separately from the Lighthouse lab baseline."
+      }
     ]
   },
   "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. The 2026-10-22 follow-up captured point-in-time client timings and confirmed the RUM marker remains in homepage HTML; Vercel Function/FastAPI duration attribution and Cloudflare account-setting review remain open."
