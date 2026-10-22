@@ -1053,7 +1053,7 @@ class WslStaging:
             self.linux_storage(build_possible=build_possible)
         boot = self.summary["boot_id"]
         self.assert_session(keeper, boot)
-        if args.action == "start":
+        if args.action in {"start", "session"}:
             command = ["up", "-d", "--wait", "--wait-timeout", str(args.timeout)]
             if not args.no_build:
                 command.append("--build")

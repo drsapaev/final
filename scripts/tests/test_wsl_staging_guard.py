@@ -132,6 +132,9 @@ def session(staging, monkeypatch):
     monkeypatch.setattr(staging, "preflight", preflight)
     monkeypatch.setattr(staging, "host_storage", lambda **kwargs: None)
     monkeypatch.setattr(staging, "linux_storage", lambda **kwargs: None)
+    # Unit tests must never mutate a real Compose project unless they replace
+    # this stub with an explicit expectation.
+    monkeypatch.setattr(staging, "compose_command", lambda *args, **kwargs: "")
     monkeypatch.setattr(staging, "boot_id", lambda: "boot-1")
     monkeypatch.setattr(staging, "ready", lambda: None)
     set_ephemeral_lifecycle(staging)
@@ -994,6 +997,50 @@ def test_failed_up_aborts_readiness_and_closes_keeper(session, monkeypatch):
         staging.execute(args("start"))
     assert called == [("up", "-d", "--wait", "--wait-timeout", "180")]
     assert keeper.stdin.closed and keeper.waited
+
+
+@pytest.mark.parametrize(
+    ("no_build", "expected_command", "expected_timeout"),
+    [
+        (True, ("up", "-d", "--wait", "--wait-timeout", "180"), 210),
+        (
+            False,
+            ("up", "-d", "--wait", "--wait-timeout", "180", "--build"),
+            1980,
+        ),
+    ],
+)
+def test_session_starts_owned_compose_before_readiness_and_validation(
+    session, monkeypatch, no_build, expected_command, expected_timeout
+):
+    staging, _ = session
+    set_ephemeral_lifecycle(staging)
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    events = []
+    monkeypatch.setattr(
+        staging,
+        "compose_command",
+        lambda *command, **kwargs: events.append(("compose", command, kwargs)),
+    )
+    monkeypatch.setattr(staging, "ready", lambda: events.append(("ready",)))
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda command, **kwargs: (
+            events.append(("validation", command)) or SimpleNamespace(returncode=0)
+        ),
+    )
+
+    result = staging.execute(args("session", no_build=no_build))
+
+    assert events[0] == (
+        "compose",
+        expected_command,
+        {"timeout": expected_timeout},
+    )
+    assert events[1] == ("ready",)
+    assert events[2][0] == "validation"
+    assert result["runtime_readiness"] == "PASS"
 
 
 def test_preflight_action_reports_readiness_not_run_and_has_no_compose_mutation(
