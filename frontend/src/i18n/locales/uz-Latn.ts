@@ -2728,6 +2728,7 @@ const uzLatn = {
     sdx_refresh: 'Yangilash',
     sdx_back_to_checklist: 'Tekshiruv ro\'yxatiga qaytish',
     sdx_load_failed: 'Sozlash yo\'li ma\'lumotlarini yuklash muvaffaqiyatsiz',
+    sdx_retry: 'Qayta urinish',
     sdx_loading: 'Yuklanmoqda…',
     sdx_assignment_title: "Xizmatlarni shifokorlarga belgilash",
     sdx_assignment_subtitle: "Aniq shifokorga bog'langan xizmatlar va mutaxassislik mosligisiz shifokor xizmatlari. Har qator aniq sabab va tuzatish ekranini ko'rsatadi.",
