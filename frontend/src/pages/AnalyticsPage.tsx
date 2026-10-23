@@ -1014,7 +1014,7 @@ export default function AnalyticsPage() {
         </div>
       </section>
 
-      <AdminRouteSwitcher current="analytics" />
+      <AdminRouteSwitcher current="admin-analytics" />
 
       <section style={{
         background: analyticsSurface,
