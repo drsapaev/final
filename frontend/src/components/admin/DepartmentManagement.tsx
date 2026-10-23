@@ -74,7 +74,7 @@ const DEFAULT_FORM = {
   name_uz: '',
   key: '',
   description: '',
-  color: 'var(--mac-accent-blue)',
+  color: '#007aff',
   icon: 'Package', // ✅ ИЗМЕНЕНО: Используем имя иконки из iconMap вместо emoji
   display_order: 999,
   active: true
@@ -334,7 +334,7 @@ const DepartmentManagement = () => {
       name_uz: String(dept.name_uz ?? ''),
       key: String(dept.key ?? ''),
       description: String(dept.description ?? ''),
-      color: String(dept.color ?? 'var(--mac-accent-blue)'),
+      color: String(dept.color ?? '#007aff'),
       icon: String(dept.icon ?? '🏥'),
       display_order: Number(dept.display_order ?? 999),
       active: Boolean(dept.active ?? true)
@@ -355,7 +355,7 @@ const DepartmentManagement = () => {
       return;
     }
     try {
-      await api.put(`/admin/departments/${String(editingDepartment.id ?? "")}`, formData);
+      await api.put(`/admin/departments/${String(editingDepartment.id ?? '')}`, formData);
       toast.success(t('admin2.dept_updated'));
 
       // PR-20: Removed frontend POST /services call (same as create handler).
@@ -414,7 +414,7 @@ const DepartmentManagement = () => {
     );
     if (!ok) return;
     try {
-      await api.put(`/admin/departments/${String(dept.id ?? "")}`, { active: newActive });
+      await api.put(`/admin/departments/${String(dept.id ?? '')}`, { active: newActive });
       toast.success(newActive ? t('admin2.dept_activated') : t('admin2.dept_deactivated'));
       await loadDepartments();
       broadcastDepartmentsUpdate();
@@ -427,7 +427,7 @@ const DepartmentManagement = () => {
   // ✅ НОВОЕ: Быстрое обновление порядка
   const handleUpdateOrder = async (dept: Record<string, unknown>, newOrder: number) => {
     try {
-      await api.put(`/admin/departments/${String(dept.id ?? "")}`, { display_order: newOrder });
+      await api.put(`/admin/departments/${String(dept.id ?? '')}`, { display_order: newOrder });
       await loadDepartments();
       broadcastDepartmentsUpdate();
     } catch (err) {
@@ -840,7 +840,7 @@ const DepartmentManagement = () => {
                 variant="primary"
                 size="default"
                 onClick={() => setShowAddForm(!showAddForm)}>
-                
+
                                 <Plus size={16} className="mr-2" />
                                 {t('admin2.dept_add_btn')}
                             </Button>
@@ -850,7 +850,7 @@ const DepartmentManagement = () => {
                 size="default"
                 onClick={handleExport}
                 title={t('admin2.dept_export_title')}>
-                
+
                                 <Download size={16} className="mr-2" />
                                 {t('admin2.dept_export_btn')}
                             </Button>
@@ -862,7 +862,7 @@ const DepartmentManagement = () => {
                   as="span"
                   className="admin-cursor-pointer"
                   title={t('admin2.dept_import_title')}>
-                  
+
                                     <Upload size={16} className="mr-2" />
                                     {t('admin2.dept_import_btn')}
                                 </Button>
@@ -872,7 +872,7 @@ const DepartmentManagement = () => {
                   accept=".csv"
                   onChange={handleImport}
                   className="admin-file-input-overlay" />
-                
+
                             </label>
                         </div>
                     </div>
@@ -905,7 +905,7 @@ const DepartmentManagement = () => {
               size="small"
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               title={sortOrder === 'asc' ? t('admin2.dept_sort_asc') : t('admin2.dept_sort_desc')}>
-              
+
                             {sortOrder === 'asc' ? '↑' : '↓'}
                         </Button>
                     </div>
@@ -922,7 +922,7 @@ const DepartmentManagement = () => {
                   value={String(formData.name_ru ?? '')}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name_ru: e.target.value })}
                   className={validationErrors.name_ru ? 'admin-input-error' : undefined} />
-                
+
                                     {validationErrors.name_ru &&
                 <div className="admin-error-text-mt">
                                             {validationErrors.name_ru}
@@ -935,7 +935,7 @@ const DepartmentManagement = () => {
                   value={String(formData.name_uz ?? '')}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name_uz: e.target.value })}
                   className={validationErrors.name_uz ? 'admin-input-error' : undefined} />
-                
+
                                     {validationErrors.name_uz &&
                 <div className="admin-error-text-mt">
                                             {validationErrors.name_uz}
@@ -948,7 +948,7 @@ const DepartmentManagement = () => {
                   value={String(formData.key ?? '')}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, key: e.target.value })}
                   className={`admin-grid-col-1${validationErrors.key ? ' admin-input-error' : ''}`} />
-                
+
                                     {validationErrors.key &&
                 <div className="admin-error-text-mt">
                                             {validationErrors.key}
@@ -962,7 +962,7 @@ const DepartmentManagement = () => {
                   value={String(formData.display_order ?? '')}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
                   className={`admin-grid-col-2${validationErrors.display_order ? ' admin-input-error' : ''}`} />
-                
+
                                     {validationErrors.display_order &&
                 <div className="admin-error-text-mt">
                                             {validationErrors.display_order}
@@ -971,7 +971,7 @@ const DepartmentManagement = () => {
                                 </div>
                                 <div className="admin-grid-span-all">
                                     <Input value={String(formData.icon ?? '')} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, icon: e.target.value })} placeholder={t('admin2.dept_icon_ph')} />
-                
+
                                     {validationErrors.icon &&
                 <div className="admin-error-text-mt">
                                             {validationErrors.icon}
@@ -984,7 +984,7 @@ const DepartmentManagement = () => {
                   value={String(formData.color ?? '')}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, color: e.target.value })}
                   className="admin-grid-col-1" />
-                
+
                                     <label className="admin-label-hint">
                                         {t('admin2.dept_tab_color_label')}
                                     </label>
@@ -996,7 +996,7 @@ const DepartmentManagement = () => {
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
                   className={validationErrors.description ? 'admin-input-error' : undefined} />
-                
+
                                     {validationErrors.description &&
                 <div className="admin-error-text-mt">
                                             {validationErrors.description}
@@ -1016,7 +1016,7 @@ const DepartmentManagement = () => {
                   checked={serviceMapping.create_service}
                   onChange={(checked: boolean) => setServiceMapping({ ...serviceMapping, create_service: checked })}
                   label={t('admin2.dept_create_service_label')} />
-                
+
                                 </div>
 
                                 {serviceMapping.create_service &&
@@ -1026,7 +1026,7 @@ const DepartmentManagement = () => {
                     placeholder={t('admin2.dept_service_name_ph')}
                     value={serviceMapping.service_name}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_name: e.target.value })} />
-                  
+
                                         </div>
                                         <div>
                                             <Select
@@ -1039,7 +1039,7 @@ const DepartmentManagement = () => {
                     placeholder={t('admin2.dept_service_code_ph')}
                     value={serviceMapping.service_code_pattern}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_code_pattern: e.target.value.toUpperCase() })} />
-                  
+
                                         </div>
                                         <div>
                                             <Input
@@ -1047,14 +1047,14 @@ const DepartmentManagement = () => {
                     placeholder={t('admin2.dept_service_price_ph')}
                     value={serviceMapping.service_price}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })} />
-                  
+
                                         </div>
                                         <div className="admin-grid-span-all">
                                             <Input
                     placeholder={t('admin2.dept_queue_tag_ph')}
                     value={serviceMapping.queue_tag}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })} />
-                  
+
                                             <div className="admin-hint-text-12-secondary-mt-4">
                                                 {t('admin2.dept_service_mapping_hint', { key: formData.key || '...' })}
                                             </div>
@@ -1097,7 +1097,7 @@ const DepartmentManagement = () => {
               variant="danger"
               size="small"
               onClick={handleBulkDelete}>
-              
+
                                 <Trash2 size={14} className="admin-mr-6" />
                                 {t('admin2.dept_delete_btn')}
                             </Button>
@@ -1107,7 +1107,7 @@ const DepartmentManagement = () => {
               color="success"
               size="small"
               onClick={() => handleBulkActivate(true)}>
-              
+
                                 <CheckCircle size={14} className="admin-mr-6" />
                                 {t('admin2.dept_activate_btn')}
                             </Button>
@@ -1117,7 +1117,7 @@ const DepartmentManagement = () => {
               color="warning"
               size="small"
               onClick={() => handleBulkActivate(false)}>
-              
+
                                 <XCircle size={14} className="admin-mr-6" />
                                 {t('admin2.dept_deactivate_btn')}
                             </Button>
@@ -1129,7 +1129,7 @@ const DepartmentManagement = () => {
                 setSelectedDepartments([]);
                 setSelectAll(false);
               }}>
-              
+
                                 <X size={14} className="admin-mr-6" />
                                 {t('admin2.dept_clear_btn')}
                             </Button>
@@ -1146,7 +1146,7 @@ const DepartmentManagement = () => {
                                         <Checkbox
                       checked={selectAll}
                       onChange={(checked: boolean) => handleSelectAll(checked)} />
-                    
+
                                     </th>
                                     <th className="admin-th-w-60">
                                         {t('admin2.dept_col_icon')}
@@ -1173,7 +1173,7 @@ const DepartmentManagement = () => {
                   const IconComponent = null as unknown as React.ComponentType<{ size?: number }> | null; // IconSelector.jsx removed (Step 1); icon picker is a plain text Input. Icon rendering in table rows disabled until a icon-map helper is re-added.
                   return (
                     <tr
-                      key={String(dept.id ?? "")}
+                      key={String(dept.id ?? '')}
                       className="admin-tr-hover">
 
                                             <td className="admin-td-padded">
@@ -1199,7 +1199,7 @@ const DepartmentManagement = () => {
                                                     </div>
                                                     {Boolean(dept.description) &&
                           <div className="admin-cell-desc-truncate">
-                                                            {String(dept.description ?? "")}
+                                                            {String(dept.description ?? '')}
                                                         </div>
                           }
                                                 </div>
@@ -1276,7 +1276,7 @@ const DepartmentManagement = () => {
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage} />
-            
+
                             <div className="flex items-center justify-center gap-2">
                                 <span className="admin-text-14-secondary">
                                     {t('admin2.dept_showing')}
@@ -1310,7 +1310,7 @@ const DepartmentManagement = () => {
         }}
         title={t('admin2.dept_edit_modal_title')}
         size="large">
-        
+
                 <div className="admin-grid-2col">
                     <div>
                         <Input
@@ -1319,7 +1319,7 @@ const DepartmentManagement = () => {
               value={String(formData.name_ru ?? '')}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name_ru: e.target.value })}
               className={validationErrors.name_ru ? 'admin-input-error' : undefined} />
-            
+
                         {validationErrors.name_ru &&
             <div className="admin-error-text-mt">
                                 {validationErrors.name_ru}
@@ -1333,7 +1333,7 @@ const DepartmentManagement = () => {
               value={String(formData.name_uz ?? '')}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name_uz: e.target.value })}
               className={validationErrors.name_uz ? 'admin-input-error' : undefined} />
-            
+
                         {validationErrors.name_uz &&
             <div className="admin-error-text-mt">
                                 {validationErrors.name_uz}
@@ -1354,7 +1354,7 @@ const DepartmentManagement = () => {
               value={String(formData.key ?? '')}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, key: e.target.value })}
               className={`admin-grid-col-1${validationErrors.key ? ' admin-input-error' : ''}`} />
-            
+
                         {validationErrors.key &&
             <div className="admin-error-text-mt">
                                 {validationErrors.key}
@@ -1369,7 +1369,7 @@ const DepartmentManagement = () => {
               value={String(formData.display_order ?? '')}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
               className={`admin-grid-col-2${validationErrors.display_order ? ' admin-input-error' : ''}`} />
-            
+
                         {validationErrors.display_order &&
             <div className="admin-error-text-mt">
                                 {validationErrors.display_order}
@@ -1378,7 +1378,7 @@ const DepartmentManagement = () => {
                     </div>
                     <div className="admin-grid-span-all">
                         <Input value={String(formData.icon ?? '')} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, icon: e.target.value })} placeholder={t('admin2.dept_icon_ph')} />
-            
+
                         {validationErrors.icon &&
             <div className="admin-error-text-mt">
                                 {validationErrors.icon}
@@ -1392,7 +1392,7 @@ const DepartmentManagement = () => {
               value={String(formData.color ?? '')}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, color: e.target.value })}
               className="admin-grid-col-2" />
-            
+
                     </div>
                     <div className="admin-grid-span-all">
                         <Textarea
@@ -1402,7 +1402,7 @@ const DepartmentManagement = () => {
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
               rows={4}
               className={validationErrors.description ? 'admin-input-error' : undefined} />
-            
+
                         {validationErrors.description &&
             <div className="admin-error-text-mt">
                                 {validationErrors.description}
@@ -1422,7 +1422,7 @@ const DepartmentManagement = () => {
               checked={serviceMapping.create_service}
               onChange={(checked: boolean) => setServiceMapping({ ...serviceMapping, create_service: checked })}
               label={t('admin2.dept_create_service_short')} />
-            
+
                     </div>
 
                     {serviceMapping.create_service &&
@@ -1433,7 +1433,7 @@ const DepartmentManagement = () => {
                 placeholder={t('admin2.dept_service_name_label')}
                 value={serviceMapping.service_name}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_name: e.target.value })} />
-              
+
                             </div>
                             <div>
                                 <label className="admin-label-block-md">
@@ -1450,7 +1450,7 @@ const DepartmentManagement = () => {
                 placeholder={t('admin2.dept_service_code_ph')}
                 value={serviceMapping.service_code_pattern}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_code_pattern: e.target.value.toUpperCase() })} />
-              
+
                             </div>
                             <div>
                                 <Input
@@ -1459,7 +1459,7 @@ const DepartmentManagement = () => {
                 placeholder={t('admin2.dept_service_price_label')}
                 value={serviceMapping.service_price}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })} />
-              
+
                             </div>
                             <div className="admin-grid-span-all">
                                 <Input
@@ -1467,7 +1467,7 @@ const DepartmentManagement = () => {
                 placeholder={t('admin2.dept_queue_tag_ph_modal')}
                 value={serviceMapping.queue_tag}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })} />
-              
+
                                 <div className="admin-hint-text-12-secondary-mt-4">
                                     {t('admin2.dept_service_mapping_hint', { key: formData.key || '...' })}
                                 </div>
@@ -1492,13 +1492,13 @@ const DepartmentManagement = () => {
               setServiceMapping(DEFAULT_SERVICE_MAPPING);
               clearValidationErrors();
             }}>
-            
+
                         {t('admin2.dept_cancel_btn')}
                     </Button>
                     <Button
             variant="primary"
             onClick={handleUpdateDepartment}>
-            
+
                         <Save size={16} className="mr-2" />
                         {t('admin2.dept_save_changes_btn')}
                     </Button>

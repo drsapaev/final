@@ -144,14 +144,49 @@ describe('DepartmentManagement create-form key contract (rounds 2 and 5 review P
 
   it('accepts a contract-conforming key and submits it to the API', async () => {
     const user = userEvent.setup();
-    renderPanel();
+    const { container } = renderPanel();
     await openAddForm(user);
+    const colorInput = container.querySelector<HTMLInputElement>('input[type="color"]');
+    expect(colorInput?.value).toBe('#007aff');
     await fillCreateForm(user, 'cardio_lab2');
     await user.click(screen.getByRole('button', { name: 'Сохранить' }));
 
     await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1));
     expect(mockedPost.mock.calls[0][0]).toBe('/admin/departments');
-    expect(mockedPost.mock.calls[0][1]).toMatchObject({ key: 'cardio_lab2' });
+    expect(mockedPost.mock.calls[0][1]).toMatchObject({
+      key: 'cardio_lab2',
+      color: '#007aff',
+    });
+  });
+
+  it('uses a valid color fallback when editing a department with no stored color', async () => {
+    const user = userEvent.setup();
+    mockedGet.mockImplementation(async (url: string) => {
+      if (String(url).startsWith('/admin/departments/overview')) {
+        return { data: { data: { departments: [], totals: {} } } } as never;
+      }
+      if (String(url).startsWith('/admin/departments')) {
+        return {
+          data: {
+            data: departmentsFixture.map((department) =>
+              department.id === 2 ? { ...department, color: null } : department,
+            ),
+            count: 2,
+          },
+        } as never;
+      }
+      return { data: {} } as never;
+    });
+
+    const { container } = renderPanel();
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Edit department Дерматология SYNTH',
+      }),
+    );
+
+    const colorInput = container.querySelector<HTMLInputElement>('input[type="color"]');
+    expect(colorInput?.value).toBe('#007aff');
   });
 
   it('accepts a single-character key — the server contract is min_length=1 (round-5 review P2)', async () => {
