@@ -1097,8 +1097,7 @@ class WslStaging:
         self.assert_session(keeper, boot)
         if args.action in {"start", "session"}:
             command = ["up", "-d", "--wait", "--wait-timeout", str(args.timeout)]
-            if not args.no_build:
-                command.append("--build")
+            command.append("--no-build" if args.no_build else "--build")
             self.compose_command(
                 *command, timeout=args.timeout + (1800 if not args.no_build else 30)
             )

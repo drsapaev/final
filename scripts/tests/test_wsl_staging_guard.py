@@ -1041,14 +1041,20 @@ def test_failed_up_aborts_readiness_and_closes_keeper(session, monkeypatch):
     )
     with pytest.raises(guard.GuardError, match="NATIVE_FAILED"):
         staging.execute(args("start"))
-    assert called == [("up", "-d", "--wait", "--wait-timeout", "180")]
+    assert called == [
+        ("up", "-d", "--wait", "--wait-timeout", "180", "--no-build")
+    ]
     assert keeper.stdin.closed and keeper.waited
 
 
 @pytest.mark.parametrize(
     ("no_build", "expected_command", "expected_timeout"),
     [
-        (True, ("up", "-d", "--wait", "--wait-timeout", "180"), 210),
+        (
+            True,
+            ("up", "-d", "--wait", "--wait-timeout", "180", "--no-build"),
+            210,
+        ),
         (
             False,
             ("up", "-d", "--wait", "--wait-timeout", "180", "--build"),
