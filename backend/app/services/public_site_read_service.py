@@ -20,6 +20,26 @@ if TYPE_CHECKING:
     from app.models.service import Service
 
 
+_PROFESSIONAL_CATEGORY_LABELS = {
+    "third": {
+        "ru": "Третья квалификационная категория",
+        "uz-Latn": "Uchinchi malaka toifasi",
+    },
+    "second": {
+        "ru": "Вторая квалификационная категория",
+        "uz-Latn": "Ikkinchi malaka toifasi",
+    },
+    "first": {
+        "ru": "Первая квалификационная категория",
+        "uz-Latn": "Birinchi malaka toifasi",
+    },
+    "highest": {
+        "ru": "Высшая квалификационная категория",
+        "uz-Latn": "Oliy malaka toifasi",
+    },
+}
+
+
 def _clean_text(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -218,12 +238,20 @@ class PublicSiteReadService:
         if specialty is not None:
             specialty_title = _localized(specialty.title_ru, specialty.title_uz, locale)
 
+        category_labels = _PROFESSIONAL_CATEGORY_LABELS.get(
+            doctor.professional_category
+        )
+        professional_category = (
+            category_labels.get(locale) if category_labels is not None else None
+        )
+
         return PublicSiteDoctorOut(
             slug=doctor.slug,
             name=name,
             bio=bio,
             specialty=specialty_title,
             experience_years=doctor.experience_years,
+            professional_category=professional_category,
             portrait_url=portrait_url,
         )
 

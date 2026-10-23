@@ -17,9 +17,11 @@ import { useTranslation } from '../../i18n/useTranslation';
 import React from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
-import type { WebsiteDoctorContent } from '../../types/domain/clinic';
+import type { Doctor, WebsiteDoctorContent } from '../../types/domain/clinic';
 
 const MAX_DOCTOR_EXPERIENCE_YEARS = 100;
+type DoctorProfessionalCategory = NonNullable<Doctor['professional_category']>;
+type DoctorProfessionalCategoryFormValue = DoctorProfessionalCategory | '';
 
 interface DoctorUser {
   id: string | number;
@@ -39,6 +41,7 @@ interface DoctorRecord {
   user_id?: string | number | null;
   specialty?: string;
   experience_years?: number | null;
+  professional_category?: Doctor['professional_category'];
   cabinet?: string;
   price_default?: number | null;
   start_number_online?: number | null;
@@ -68,6 +71,7 @@ interface DoctorFormState {
   userId: string;
   specialty: string;
   experienceYears: string;
+  professionalCategory: DoctorProfessionalCategoryFormValue;
   cabinet: string;
   priceDefault: string;
   startNumberOnline: string;
@@ -89,6 +93,7 @@ const DoctorModal = ({
     userId: '',
     specialty: '',
     experienceYears: '',
+    professionalCategory: '',
     cabinet: '',
     priceDefault: '',
     startNumberOnline: '1',
@@ -234,6 +239,7 @@ const DoctorModal = ({
       specialty: doctor?.specialty || '',
       experienceYears:
         doctor?.experience_years == null ? '' : String(doctor.experience_years),
+      professionalCategory: doctor?.professional_category || '',
       cabinet: doctor?.cabinet || '',
       priceDefault:
         doctor?.price_default == null
@@ -336,6 +342,7 @@ const DoctorModal = ({
         userId: formData.userId,
         specialty: formData.specialty.trim(),
         experienceYears: formData.experienceYears,
+        professional_category: formData.professionalCategory || null,
         cabinet: formData.cabinet.trim(),
         priceDefault: formData.priceDefault,
         startNumberOnline: formData.startNumberOnline,
@@ -543,6 +550,30 @@ const DoctorModal = ({
               onChange={(event) => handleChange('experienceYears', event.target.value)}
             />
             {renderFieldError('experienceYears')}
+          </div>
+
+          <div>
+            <Label htmlFor="doctor-professional-category" className="admin-label-block-mb-8">
+              {t('admin2.dmdl_label_professional_category')}
+            </Label>
+            <Select
+              id="doctor-professional-category"
+              value={formData.professionalCategory}
+              onChange={(event: SelectChangeEvent) =>
+                handleChange(
+                  'professionalCategory',
+                  event.target.value as DoctorFormState['professionalCategory'],
+                )
+              }
+              options={[
+                { value: '', label: t('admin2.dmdl_professional_category_unspecified') },
+                { value: 'third', label: t('admin2.dmdl_professional_category_third') },
+                { value: 'second', label: t('admin2.dmdl_professional_category_second') },
+                { value: 'first', label: t('admin2.dmdl_professional_category_first') },
+                { value: 'highest', label: t('admin2.dmdl_professional_category_highest') },
+              ]}
+              size="large"
+            />
           </div>
 
           <div>

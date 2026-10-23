@@ -391,6 +391,7 @@ function DoctorList({ doctors, locale, copy }: {
           <div>
             <a className="public-site__list-title" href={localizePath('doctor', locale, doctor.slug)}>{formatDoctorHeading(doctor)}</a>
             {doctor.experience_years != null && <p className="public-site__muted">{copy.experience(doctor.experience_years)}</p>}
+            {doctor.professional_category && <p className="public-site__muted">{doctor.professional_category}</p>}
             <p>{doctor.bio}</p>
           </div>
           <a href={localizePath('doctor', locale, doctor.slug)}>{copy.openDoctor}</a>
@@ -462,6 +463,7 @@ function PageContent({ route, data, copy }: PublicSitePageProps & { copy: Copy }
           <p className="public-site__eyebrow">{copy.doctorDetails}</p>
           <h1>{formatDoctorHeading(data.doctor)}</h1>
           {data.doctor.experience_years != null && <p className="public-site__muted">{copy.experience(data.doctor.experience_years)}</p>}
+          {data.doctor.professional_category && <p className="public-site__muted">{data.doctor.professional_category}</p>}
           <p>{data.doctor.bio}</p>
           <a className="public-site__button public-site__button--primary" href={localizePath('contacts', locale)}>{copy.contactClinic}</a>
         </article>

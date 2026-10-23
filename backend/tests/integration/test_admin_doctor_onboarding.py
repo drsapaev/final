@@ -238,6 +238,51 @@ def test_admin_doctor_profile_persists_optional_experience_years(
     assert test_doctor.experience_years is None
 
 
+def test_admin_doctor_profile_persists_only_supported_professional_categories(
+    client, auth_headers, test_doctor, db_session
+):
+    response = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"professional_category": "highest"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["professional_category"] == "highest"
+    db_session.refresh(test_doctor)
+    assert test_doctor.professional_category == "highest"
+
+    invalid = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"professional_category": "honorary"},
+    )
+    assert invalid.status_code == 422
+
+    cleared = client.put(
+        f"/api/v1/admin/doctors/{test_doctor.id}",
+        headers=auth_headers,
+        json={"professional_category": None},
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["professional_category"] is None
+    db_session.refresh(test_doctor)
+    assert test_doctor.professional_category is None
+
+
+def test_doctor_professional_category_database_constraint_rejects_unknown_value(
+    test_doctor, db_session
+):
+    from sqlalchemy.exc import IntegrityError
+
+    test_doctor.professional_category = "honorary"
+    db_session.add(test_doctor)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+    db_session.refresh(test_doctor)
+    assert test_doctor.professional_category is None
+
+
 class TestOnboardingAtomicity:
     def test_doctor_failure_leaves_no_user(
         self, client, auth_headers, db_session, monkeypatch

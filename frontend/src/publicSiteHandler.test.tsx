@@ -100,6 +100,7 @@ describe('public-site SSR request handler', () => {
         name: 'SYNTHETIC Doctor Name',
         specialty: 'Дерматология',
         experience_years: 18,
+        professional_category: 'Высшая квалификационная категория',
         bio: 'SYNTHETIC verified doctor biography.',
         portrait_url: null,
       });
@@ -120,6 +121,7 @@ describe('public-site SSR request handler', () => {
     expect(response.status).toBe(200);
     expect(html).toContain('Дерматология — SYNTHETIC Doctor Name');
     expect(html).toContain('Стаж: 18 лет');
+    expect(html).toContain('Высшая квалификационная категория');
     expect(html).toContain('SYNTHETIC verified doctor biography.');
   });
 

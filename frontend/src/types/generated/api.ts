@@ -27891,6 +27891,11 @@ export type components = {
              * @description Confirmed total professional experience in whole years.
              */
             experience_years?: number | null;
+            /**
+             * Professional Category
+             * @description Verified professional qualification category; null means not specified.
+             */
+            professional_category?: ("third" | "second" | "first" | "highest") | null;
             /** Cabinet */
             cabinet?: string | null;
             /** Price Default */
@@ -28361,6 +28366,11 @@ export type components = {
              * @description Confirmed total professional experience in whole years.
              */
             experience_years?: number | null;
+            /**
+             * Professional Category
+             * @description Verified professional qualification category; null means not specified.
+             */
+            professional_category?: ("third" | "second" | "first" | "highest") | null;
             /** Cabinet */
             cabinet?: string | null;
             /** Price Default */
@@ -36231,6 +36241,11 @@ export type components = {
             specialty?: string | null;
             /** Experience Years */
             experience_years?: number | null;
+            /**
+             * Professional Category
+             * @description Localized professional qualification category.
+             */
+            professional_category?: string | null;
             /** Portrait Url */
             portrait_url?: string | null;
         };
@@ -42692,6 +42707,11 @@ export type components = {
              * @description Confirmed total professional experience in whole years.
              */
             experience_years?: number | null;
+            /**
+             * Professional Category
+             * @description Verified professional qualification category; null means not specified.
+             */
+            professional_category?: ("third" | "second" | "first" | "highest") | null;
             /** Cabinet */
             cabinet?: string | null;
             /** Price Default */

@@ -5,11 +5,12 @@ Pydantic схемы для управления клиникой в админ �
 import re
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 MAX_DOCTOR_EXPERIENCE_YEARS = 100
+DoctorProfessionalCategory = Literal["third", "second", "first", "highest"]
 
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
@@ -95,6 +96,10 @@ class DoctorBase(BaseModel):
         le=MAX_DOCTOR_EXPERIENCE_YEARS,
         description="Confirmed total professional experience in whole years.",
     )
+    professional_category: DoctorProfessionalCategory | None = Field(
+        None,
+        description="Verified professional qualification category; null means not specified.",
+    )
     cabinet: str | None = Field(None, max_length=20)
     price_default: Decimal | None = Field(None, ge=0)
     start_number_online: int = Field(1, ge=1, le=100)
@@ -115,6 +120,10 @@ class DoctorUpdate(BaseModel):
         ge=0,
         le=MAX_DOCTOR_EXPERIENCE_YEARS,
         description="Confirmed total professional experience in whole years.",
+    )
+    professional_category: DoctorProfessionalCategory | None = Field(
+        None,
+        description="Verified professional qualification category; null means not specified.",
     )
     cabinet: str | None = Field(None, max_length=20)
     price_default: Decimal | None = Field(None, ge=0)

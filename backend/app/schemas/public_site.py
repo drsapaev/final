@@ -66,4 +66,7 @@ class PublicSiteDoctorOut(BaseModel):
     bio: str
     specialty: str | None = None
     experience_years: int | None = Field(None, ge=0)
+    professional_category: str | None = Field(
+        None, description="Localized professional qualification category."
+    )
     portrait_url: str | None = None
