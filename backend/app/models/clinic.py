@@ -78,6 +78,11 @@ class Doctor(Base):
             name="ck_doctors_experience_years_nonnegative",
         ),
         CheckConstraint(
+            "professional_category IS NULL OR professional_category IN "
+            "('third', 'second', 'first', 'highest')",
+            name="ck_doctors_professional_category_allowed",
+        ),
+        CheckConstraint(
             "slug IS NULL OR slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'",
             name="ck_doctors_website_slug_format",
         ).ddl_if(dialect="postgresql"),
@@ -121,6 +126,7 @@ class Doctor(Base):
         String(100), nullable=False, index=True
     )  # cardiology, dermatology, stomatology
     experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    professional_category: Mapped[str | None] = mapped_column(String(12), nullable=True)
     cabinet: Mapped[str | None] = mapped_column(String(20), nullable=True)
     price_default: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     start_number_online: Mapped[int] = mapped_column(Integer, default=1, nullable=False)

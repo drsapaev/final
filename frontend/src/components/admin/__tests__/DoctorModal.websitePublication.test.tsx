@@ -139,6 +139,43 @@ describe('DoctorModal website publication editor', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it('saves the selected professional category in the working doctor profile', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <ThemeProvider>
+        <DoctorModal
+          isOpen
+          onClose={vi.fn()}
+          doctor={{
+            id: 54,
+            user_id: 88,
+            specialty: 'dentistry',
+            active: true,
+            professional_category: null,
+            user: {
+              id: 88,
+              full_name: 'SYNTHETIC Website Doctor',
+              role: 'Doctor',
+              is_active: true,
+            },
+          }}
+          onSave={onSave}
+          availableUsers={[]}
+        />
+      </ThemeProvider>,
+    );
+
+    const category = await screen.findByRole('button', { name: 'Квалификационная категория' });
+    await user.click(category);
+    await user.click(await screen.findByRole('option', { name: 'Высшая категория' }));
+    fireEvent.submit(category.closest('form') as HTMLFormElement);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ professional_category: 'highest' }),
+    ));
+  });
+
   it('keeps website publication actions separate and locks the slug after first publish', async () => {
     const user = userEvent.setup();
     render(

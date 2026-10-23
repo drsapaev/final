@@ -66,6 +66,7 @@ def _doctor(
     active: bool = True,
     published: bool = True,
     experience_years: int | None = None,
+    professional_category: str | None = None,
 ) -> Doctor:
     username = f"synthetic_public_site_{slug.replace('-', '_')}"
     user = User(
@@ -84,6 +85,7 @@ def _doctor(
         user_id=user.id,
         specialty=specialty,
         experience_years=experience_years,
+        professional_category=professional_category,
         active=active,
         show_on_website=published,
         bio_ru=f"SYNTHETIC биография {slug}",
@@ -312,7 +314,12 @@ def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
         )
     )
     db_session.commit()
-    doctor = _doctor(db_session, "published-doctor", experience_years=18)
+    doctor = _doctor(
+        db_session,
+        "published-doctor",
+        experience_years=18,
+        professional_category="highest",
+    )
     _doctor(db_session, "draft-doctor", published=False)
     _doctor(db_session, "inactive-doctor", active=False)
 
@@ -324,6 +331,7 @@ def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
     uzbek_body = uzbek.json()
     assert uzbek_body["specialty"] is None
     assert uzbek_body["experience_years"] == 18
+    assert uzbek_body["professional_category"] == "Oliy malaka toifasi"
     assert uzbek_body["portrait_url"] is None
     assert set(uzbek_body) == {
         "slug",
@@ -331,6 +339,7 @@ def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
         "bio",
         "specialty",
         "experience_years",
+        "professional_category",
         "portrait_url",
     }
     assert "synthetic-public-specialty" not in uzbek.text
@@ -344,6 +353,9 @@ def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
     assert russian.status_code == 200
     assert russian.json()["specialty"] == "SYNTHETIC специальность"
     assert russian.json()["experience_years"] == 18
+    assert (
+        russian.json()["professional_category"] == "Высшая квалификационная категория"
+    )
 
     doctors = client.get(
         "/api/v1/public-site/doctors",
@@ -352,6 +364,7 @@ def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
     assert doctors.status_code == 200
     assert [row["slug"] for row in doctors.json()] == [doctor.slug]
     assert doctors.json()[0]["experience_years"] == 18
+    assert doctors.json()[0]["professional_category"] == "Oliy malaka toifasi"
 
 
 def test_hidden_and_unknown_details_share_public_not_found_response(client, db_session):
@@ -368,7 +381,12 @@ def test_hidden_and_unknown_details_share_public_not_found_response(client, db_s
     assert hidden_service.status_code == unknown_service.status_code == 404
     assert hidden_service.json() == unknown_service.json() == expected_not_found
 
-    hidden_doctor = _doctor(db_session, "hidden-doctor", published=False)
+    hidden_doctor = _doctor(
+        db_session,
+        "hidden-doctor",
+        published=False,
+        professional_category="highest",
+    )
     hidden_doctor_response = client.get(
         f"/api/v1/public-site/doctors/{hidden_doctor.slug}",
         params={"locale": "ru"},
@@ -467,6 +485,7 @@ def test_public_site_openapi_contract_is_allowlisted(client):
         "bio",
         "specialty",
         "experience_years",
+        "professional_category",
         "portrait_url",
     }
     assert set(components["PublicSiteCategoryOut"]["properties"]) == {"name"}

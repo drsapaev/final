@@ -81956,6 +81956,24 @@
             "title": "Experience Years",
             "description": "Confirmed total professional experience in whole years."
           },
+          "professional_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "third",
+                  "second",
+                  "first",
+                  "highest"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Professional Category",
+            "description": "Verified professional qualification category; null means not specified."
+          },
           "cabinet": {
             "anyOf": [
               {
@@ -83230,6 +83248,24 @@
             ],
             "title": "Experience Years",
             "description": "Confirmed total professional experience in whole years."
+          },
+          "professional_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "third",
+                  "second",
+                  "first",
+                  "highest"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Professional Category",
+            "description": "Verified professional qualification category; null means not specified."
           },
           "cabinet": {
             "anyOf": [
@@ -103887,6 +103923,18 @@
             ],
             "title": "Experience Years"
           },
+          "professional_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Professional Category",
+            "description": "Localized professional qualification category."
+          },
           "portrait_url": {
             "anyOf": [
               {
@@ -121687,6 +121735,24 @@
             ],
             "title": "Experience Years",
             "description": "Confirmed total professional experience in whole years."
+          },
+          "professional_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "third",
+                  "second",
+                  "first",
+                  "highest"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Professional Category",
+            "description": "Verified professional qualification category; null means not specified."
           },
           "cabinet": {
             "anyOf": [

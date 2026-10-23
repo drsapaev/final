@@ -16,6 +16,9 @@ const normalizeDoctorPayload = (doctorData: Record<string, unknown>) => ({
         ? null
         : Number(doctorData.experienceYears),
   }),
+  ...(doctorData.professional_category !== undefined && {
+    professional_category: doctorData.professional_category || null,
+  }),
   cabinet: String(doctorData.cabinet ?? '').trim() || null,
   price_default:
     doctorData.priceDefault === '' || doctorData.priceDefault === null || doctorData.priceDefault === undefined
