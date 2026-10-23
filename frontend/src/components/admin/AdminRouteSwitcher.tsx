@@ -1,11 +1,15 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeftRight, LayoutDashboard, LineChart } from 'lucide-react';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors';
 
-const SWITCHER_ROUTE_IDS = ['admin-dashboard', 'admin-analytics'];
+const SWITCHER_ROUTE_IDS = ['admin-dashboard', 'admin-analytics'] as const;
+type SwitcherRouteId = (typeof SWITCHER_ROUTE_IDS)[number];
+
+const getSwitcherRouteId = (routeId?: string): SwitcherRouteId | undefined =>
+  SWITCHER_ROUTE_IDS.find((candidate) => candidate === routeId);
 
 type TranslationFunc = (key: string, options?: Record<string, unknown>) => string;
 
@@ -32,7 +36,7 @@ const buildSwitcherRoutes = (t: TranslationFunc) => SWITCHER_ROUTE_IDS
     return {
       id: route.id,
       path: route.path,
-      label: ((typeof route.nav === "object" && route.nav ? route.nav : null) as { label?: string } | null)?.label || route.title,
+      label: ((typeof route.nav === 'object' && route.nav ? route.nav : null) as { label?: string } | null)?.label || route.title,
       description: presentation.description,
       icon: presentation.icon,
     };
@@ -115,7 +119,7 @@ const getRouteIconStyle = (isActive: boolean) => ({
 
 interface AdminRouteSwitcherProps {
   /** Optional override for the active route id; if omitted, derived from location. */
-  current?: string;
+  current?: SwitcherRouteId;
 }
 
 export default function AdminRouteSwitcher({ current }: AdminRouteSwitcherProps = {}) {
@@ -124,7 +128,7 @@ export default function AdminRouteSwitcher({ current }: AdminRouteSwitcherProps 
   const location = useLocation();
 
   const currentRoute = getEffectiveRouteByPath(location.pathname);
-  const activeId = current ?? (currentRoute && SWITCHER_ROUTE_IDS.includes(currentRoute.id) ? currentRoute.id : 'admin-dashboard');
+  const activeId = current ?? getSwitcherRouteId(currentRoute?.id) ?? 'admin-dashboard';
   const switcherRoutes = buildSwitcherRoutes(t);
 
   return (
