@@ -249,7 +249,11 @@ run_check 6 "PII scrubbing (3 layers)" pii_check
 # Check 7: Pre-commit hooks installed
 # ---------------------------------------------------------------------------
 precommit_check() {
-    if [ ! -f .git/hooks/pre-commit ]; then
+    # Resolve the hook through Git instead of assuming .git is a directory.
+    # Linked worktrees store a .git file and share the common hooks directory.
+    local precommit_hook
+    precommit_hook="$(git rev-parse --git-path hooks/pre-commit 2>/dev/null || true)"
+    if [ -z "$precommit_hook" ] || [ ! -f "$precommit_hook" ]; then
         echo "    pre-commit hook not installed — run: bash scripts/setup-dev.sh"
         return 1
     fi
@@ -257,7 +261,7 @@ precommit_check() {
         echo "    .pre-commit-config.yaml not found"
         return 1
     fi
-    echo "    pre-commit hook installed at .git/hooks/pre-commit"
+    echo "    pre-commit hook installed"
     echo "    .pre-commit-config.yaml exists"
     # Try running pre-commit on a single file to verify it works.
     # This pipeline is the last statement, so its exit status (pipefail

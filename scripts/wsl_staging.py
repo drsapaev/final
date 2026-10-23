@@ -107,13 +107,55 @@ def native(argv: list[str], *, timeout: int = 30, operation: str = "native") -> 
         ) from None
     if result.returncode:
         # Native stderr can contain expanded secrets. Do not echo it or argv.
+        category = (
+            f"; category {_compose_failure_category(result.stderr)}"
+            if operation.startswith("compose-")
+            else ""
+        )
         raise GuardError(
-            f"NATIVE_FAILED ({operation}): exit {result.returncode}; no subsequent command continued"
+            f"NATIVE_FAILED ({operation}): exit {result.returncode}{category}; no subsequent command continued"
         )
     data = result.stdout
     return data.decode(
         "utf-16-le" if b"\0" in data else "utf-8", errors="replace"
     ).strip()
+
+
+def _compose_failure_category(stderr: bytes) -> str:
+    """Return one fixed category; never expose Compose stderr or arguments."""
+    text = stderr.decode("utf-8", errors="replace").casefold()
+    patterns = (
+        ("disk_exhausted", r"no space left on device|disk quota exceeded"),
+        (
+            "image_build",
+            r"failed to solve|failed to build|build failed|error: failed to",
+        ),
+        (
+            "image_unavailable",
+            r"pull access denied|manifest unknown|repository does not exist",
+        ),
+        (
+            "docker_daemon_unavailable",
+            r"cannot connect to the docker daemon|error during connect|is the docker daemon running",
+        ),
+        (
+            "platform_mismatch",
+            r"no matching manifest for|requested image(?:'s|’s) platform",
+        ),
+        (
+            "network_or_port_setup",
+            r"failed to create (?:the )?network|address already in use|port is already allocated",
+        ),
+        (
+            "container_startup",
+            r"failed to create shim|failed to create task|failed to start container|failed to mount",
+        ),
+        ("wsl_transport", r"wsl_e_[0-9a-f]+|wsl.*(?:failed|error)"),
+    )
+    for category, pattern in patterns:
+        if re.search(pattern, text):
+            return category
+    return "unclassified"
 
 
 def tcp_ready(port: int) -> bool:
@@ -1053,10 +1095,9 @@ class WslStaging:
             self.linux_storage(build_possible=build_possible)
         boot = self.summary["boot_id"]
         self.assert_session(keeper, boot)
-        if args.action == "start":
+        if args.action in {"start", "session"}:
             command = ["up", "-d", "--wait", "--wait-timeout", str(args.timeout)]
-            if not args.no_build:
-                command.append("--build")
+            command.append("--no-build" if args.no_build else "--build")
             self.compose_command(
                 *command, timeout=args.timeout + (1800 if not args.no_build else 30)
             )

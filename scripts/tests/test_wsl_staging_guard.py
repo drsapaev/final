@@ -132,6 +132,9 @@ def session(staging, monkeypatch):
     monkeypatch.setattr(staging, "preflight", preflight)
     monkeypatch.setattr(staging, "host_storage", lambda **kwargs: None)
     monkeypatch.setattr(staging, "linux_storage", lambda **kwargs: None)
+    # Unit tests must never mutate a real Compose project unless they replace
+    # this stub with an explicit expectation.
+    monkeypatch.setattr(staging, "compose_command", lambda *args, **kwargs: "")
     monkeypatch.setattr(staging, "boot_id", lambda: "boot-1")
     monkeypatch.setattr(staging, "ready", lambda: None)
     set_ephemeral_lifecycle(staging)
@@ -463,6 +466,52 @@ def test_native_failure_keeps_secret_stderr_and_arguments_private(monkeypatch):
     with pytest.raises(guard.GuardError, match=r"NATIVE_FAILED.*exit 7") as error:
         guard.native(["docker", "secret-password-in-argv"])
     assert "secret-password" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("stderr", "category"),
+    [
+        (b"failed to solve: token=synthetic-secret", "image_build"),
+        (b"no space left on device", "disk_exhausted"),
+        (b"Cannot connect to the Docker daemon", "docker_daemon_unavailable"),
+        (b"port is already allocated", "network_or_port_setup"),
+        (b"unrecognized secret output", "unclassified"),
+    ],
+)
+def test_compose_failure_reports_only_allowlisted_category(
+    monkeypatch, stderr, category
+):
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=1, stdout=b"", stderr=stderr),
+    )
+
+    with pytest.raises(guard.GuardError, match=rf"category {category}") as error:
+        guard.native(
+            ["docker", "compose", "--env-file", "private-path"],
+            operation="compose-up",
+        )
+
+    message = str(error.value)
+    assert "synthetic-secret" not in message
+    assert "private-path" not in message
+    assert "failed to solve" not in message
+
+
+def test_non_compose_failure_does_not_add_compose_category(monkeypatch):
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(
+            returncode=1, stdout=b"", stderr=b"failed to solve"
+        ),
+    )
+
+    with pytest.raises(guard.GuardError, match=r"exit 1; no subsequent") as error:
+        guard.native(["wsl.exe"])
+
+    assert "category" not in str(error.value)
 
 
 @pytest.mark.parametrize(
@@ -992,8 +1041,58 @@ def test_failed_up_aborts_readiness_and_closes_keeper(session, monkeypatch):
     )
     with pytest.raises(guard.GuardError, match="NATIVE_FAILED"):
         staging.execute(args("start"))
-    assert called == [("up", "-d", "--wait", "--wait-timeout", "180")]
+    assert called == [
+        ("up", "-d", "--wait", "--wait-timeout", "180", "--no-build")
+    ]
     assert keeper.stdin.closed and keeper.waited
+
+
+@pytest.mark.parametrize(
+    ("no_build", "expected_command", "expected_timeout"),
+    [
+        (
+            True,
+            ("up", "-d", "--wait", "--wait-timeout", "180", "--no-build"),
+            210,
+        ),
+        (
+            False,
+            ("up", "-d", "--wait", "--wait-timeout", "180", "--build"),
+            1980,
+        ),
+    ],
+)
+def test_session_starts_owned_compose_before_readiness_and_validation(
+    session, monkeypatch, no_build, expected_command, expected_timeout
+):
+    staging, _ = session
+    set_ephemeral_lifecycle(staging)
+    monkeypatch.setattr(staging, "validate_project_lifecycle_labels", dict)
+    events = []
+    monkeypatch.setattr(
+        staging,
+        "compose_command",
+        lambda *command, **kwargs: events.append(("compose", command, kwargs)),
+    )
+    monkeypatch.setattr(staging, "ready", lambda: events.append(("ready",)))
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda command, **kwargs: (
+            events.append(("validation", command)) or SimpleNamespace(returncode=0)
+        ),
+    )
+
+    result = staging.execute(args("session", no_build=no_build))
+
+    assert events[0] == (
+        "compose",
+        expected_command,
+        {"timeout": expected_timeout},
+    )
+    assert events[1] == ("ready",)
+    assert events[2][0] == "validation"
+    assert result["runtime_readiness"] == "PASS"
 
 
 def test_preflight_action_reports_readiness_not_run_and_has_no_compose_mutation(
