@@ -316,6 +316,15 @@ def _allowed_actions(
             )
         ]
     if availability.state != "available":
+        if "parent_conflict" in availability.reason_codes:
+            return [
+                AdminDirectionAction(
+                    kind="review_configuration",
+                    entity_type="queue_profile",
+                    entity_id=int(profile.id),
+                    entity_key=profile.key,
+                )
+            ]
         action = AdminDirectionAction(
             kind="review_configuration",
             entity_type="department",
