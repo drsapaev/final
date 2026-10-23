@@ -19,10 +19,15 @@ def upgrade() -> None:
         "appointments",
         sa.Column("duration_minutes_snapshot", sa.Integer(), nullable=True),
     )
-    op.create_check_constraint(
-        "ck_appointments_duration_snapshot_positive",
-        "appointments",
-        "duration_minutes_snapshot IS NULL OR duration_minutes_snapshot > 0",
+    # Enforce the check for new/updated rows without scanning the existing
+    # appointments table while this migration holds its DDL lock.
+    op.execute(
+        sa.text(
+            "ALTER TABLE appointments ADD CONSTRAINT "
+            "ck_appointments_duration_snapshot_positive CHECK ("
+            "duration_minutes_snapshot IS NULL OR duration_minutes_snapshot > 0"
+            ") NOT VALID"
+        )
     )
 
 
