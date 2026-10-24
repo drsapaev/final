@@ -511,13 +511,13 @@ def join_online_queue_multiple(
                     # #3579 follow-up: телефон нового пациента не пишется
                     # в открытом виде (PII-политика: только хвост номера);
                     # P2-1: неканонические форматы — fail-closed.
-                    # CodeQL py/clear-text-logging-sensitive-data: phone
-                    # маскируется _mask_phone_failclosed() перед логом
-                    # (fail-closed на неканонических форматах) — санитайзер
-                    # на месте, ложное срабатывание.
-                    logger.info(  # codeql[py/clear-text-logging-sensitive-data]
-                        "[join_online_queue_multiple] ✅ Создан новый пациент ID=%d для телефона %s",
-                        patient_id,
+                    # CodeQL py/clear-text-logging-sensitive-data (alert 1330):
+                    # patient_id не пишется в лог — CodeQL считает его
+                    # чувствительным через поток из find_or_create_patient;
+                    # телефон маскируется _mask_phone_failclosed()
+                    # (fail-closed на неканонических форматах).
+                    logger.info(
+                        "[join_online_queue_multiple] ✅ Создан новый пациент для телефона %s",
                         _mask_phone_failclosed(phone),
                     )
 
