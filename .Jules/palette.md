@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-10-07 - Tooltips on Disabled Buttons
+**Learning:** By default, HTML disabled elements (like `<button disabled>`) block pointer events (such as `mouseenter` and `mouseleave`). When a tooltip component depends on these events from its direct child, disabling the button prevents the tooltip from appearing, removing vital context for the user about *why* the button is disabled.
+**Action:** When applying a tooltip to a custom button component that might be disabled, wrap the disabled button in a standard non-disabled container element (e.g., `<span style={{ display: 'inline-block' }}>`) inside the `Tooltip` component so the pointer events are captured successfully.
