@@ -16,6 +16,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from uuid import uuid4
 
+import pytest
+
 from app.core.security import get_password_hash
 from app.models.clinic import Doctor
 from app.models.patient import Patient
@@ -160,6 +162,11 @@ class TestMobileBookingEligibility:
         assert body.get("id") is not None
         assert body.get("status") == "scheduled"
 
+        from app.models.appointment import Appointment
+
+        row = db_session.query(Appointment).filter_by(doctor_id=owner.id).one()
+        assert row.duration_minutes_snapshot is None
+
 
 class TestPatientFacingSelectors:
     def test_mobile_doctors_hides_incomplete(self, client, db_session, auth_headers):
@@ -277,8 +284,8 @@ class TestMobileBookingRound3Fixes:
 
         from app.models.service import Service
 
-        s1 = Service(name="ЭКГ", price=50000)
-        s2 = Service(name="Консультация кардиолога", price=150000)
+        s1 = Service(name="ЭКГ", price=50000, duration_minutes=20)
+        s2 = Service(name="Консультация кардиолога", price=150000, duration_minutes=40)
         db_session.add_all([s1, s2])
         db_session.commit()
         db_session.refresh(s1)
@@ -297,6 +304,7 @@ class TestMobileBookingRound3Fixes:
         )
         assert "ЭКГ" in (row.services or [])
         assert "Консультация кардиолога" in (row.services or [])
+        assert row.duration_minutes_snapshot is None
 
     def test_book_unknown_service_rejected(self, client, db_session, auth_headers):
         owner = _make_doctor(db_session, "cardiology", active=True)
@@ -372,7 +380,9 @@ class TestMobileBookingRound4Fixes:
 
         from app.models.service import Service
 
-        active = Service(name="УЗИ сердца", price=200000, active=True)
+        active = Service(
+            name="УЗИ сердца", price=200000, duration_minutes=45, active=True
+        )
         db_session.add(active)
         db_session.commit()
         db_session.refresh(active)
@@ -397,3 +407,82 @@ class TestMobileBookingRound4Fixes:
             .one()
         )
         assert row.services == ["УЗИ сердца"]
+        assert row.duration_minutes_snapshot == 45
+
+    def test_book_service_pinned_to_another_doctor_keeps_snapshot_unknown(
+        self, client, db_session, auth_headers
+    ):
+        pinned_doctor = _make_doctor(db_session, "cardiology", active=True)
+        requested_doctor = _make_doctor(db_session, "cardiology", active=True)
+        patient_user, _ = _make_patient_user(db_session)
+
+        from app.models.appointment import Appointment
+        from app.models.service import Service
+
+        service = Service(
+            name="Закреплённая консультация",
+            price=200000,
+            duration_minutes=30,
+            doctor_id=pinned_doctor.id,
+            active=True,
+        )
+        db_session.add(service)
+        db_session.commit()
+        db_session.refresh(service)
+
+        response = client.post(
+            "/api/v1/mobile/appointments/book",
+            json={
+                "doctor_id": requested_doctor.id,
+                "preferred_date": str(date.today() + timedelta(days=3)),
+                "services": [service.id],
+            },
+            headers=_patient_login(client, patient_user),
+        )
+
+        # This PR must not change the existing mobile endpoint's acceptance
+        # contract; the mismatched explicit pin only makes duration unknown.
+        assert response.status_code == 200, response.text
+        row = (
+            db_session.query(Appointment).filter_by(doctor_id=requested_doctor.id).one()
+        )
+        assert row.services == ["Закреплённая консультация"]
+        assert row.duration_minutes_snapshot is None
+
+    @pytest.mark.parametrize("duration_minutes", [None, 0, -10])
+    def test_book_invalid_service_duration_keeps_snapshot_unknown(
+        self, client, db_session, auth_headers, duration_minutes
+    ):
+        owner = _make_doctor(db_session, "cardiology", active=True)
+        patient_user, _ = _make_patient_user(db_session)
+
+        from app.models.appointment import Appointment
+        from app.models.service import Service
+
+        service = Service(
+            name="Неполная услуга",
+            price=200000,
+            duration_minutes=duration_minutes,
+            active=True,
+        )
+        db_session.add(service)
+        db_session.commit()
+        db_session.refresh(service)
+        service.duration_minutes = duration_minutes
+        db_session.commit()
+        db_session.refresh(service)
+
+        response = client.post(
+            "/api/v1/mobile/appointments/book",
+            json={
+                "doctor_id": owner.id,
+                "preferred_date": str(date.today() + timedelta(days=2)),
+                "preferred_time": "10:00",
+                "services": [service.id],
+            },
+            headers=_patient_login(client, patient_user),
+        )
+        assert response.status_code == 200, response.text
+
+        row = db_session.query(Appointment).filter_by(doctor_id=owner.id).one()
+        assert row.duration_minutes_snapshot is None
