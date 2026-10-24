@@ -293,10 +293,12 @@ def _rq09_cleanup(pg_session):
     """
     yield
     from app.models.clinic import Doctor
+    from app.models.department import Department
     from app.models.online_queue import (
         DailyQueue,
         OnlineQueueEntry,
         QueueJoinSession,
+        QueueResource,
         QueueStatistics,
         QueueToken,
     )
@@ -309,15 +311,18 @@ def _rq09_cleanup(pg_session):
     rq09_user_ids = [
         u.id for u in pg_session.query(User).filter(User.username.like("rq09_%")).all()
     ]
-    rq09_doctor_ids = (
-        [
+    rq09_doctor_ids = sorted(
+        {
             d.id
             for d in pg_session.query(Doctor)
-            .filter(Doctor.user_id.in_(rq09_user_ids))
+            .filter(
+                Doctor.user_id.in_(rq09_user_ids)
+                # userless synthetic doctors carry explicit rq09 ids and no
+                # user row to find them by (id=9325 owner-eligibility case)
+                | Doctor.cabinet.like("RQ09-%")
+            )
             .all()
-        ]
-        if rq09_user_ids
-        else []
+        }
     )
     queue_ids = (
         [
@@ -352,6 +357,45 @@ def _rq09_cleanup(pg_session):
     pg_session.query(QueueProfile).filter(QueueProfile.key.like("rq09_%")).delete(
         synchronize_session=False
     )
+    # Synthetic departments created by this module (#3693 tests) must go too:
+    # they are COMMITTED, _rq09_cleanup is the only cleanup, and every session
+    # that lands on a pre-provisioned shared database (scratch provisioning
+    # falls back to DATABASE_URL) otherwise collides on the unique
+    # ix_departments_key at re-seed — the mutmut nightly clean phase failed
+    # exactly this way on 2026-10-24 (profile visibility guard above already
+    # documents the same shared-database concern).
+    pg_session.query(Department).filter(Department.key.like("rq09%")).delete(
+        synchronize_session=False
+    )
+    # Same shared-database concern for the synthetic QueueResource rows
+    # (unique code) — drop their queues first, then the resources.
+    rq09_resource_ids = [
+        r.id
+        for r in pg_session.query(QueueResource.id)
+        .filter(QueueResource.code.like("rq09%"))
+        .all()
+    ]
+    if rq09_resource_ids:
+        pg_session.query(QueueStatistics).filter(
+            QueueStatistics.queue_id.in_(
+                pg_session.query(DailyQueue.id).filter(
+                    DailyQueue.queue_resource_id.in_(rq09_resource_ids)
+                )
+            )
+        ).delete(synchronize_session=False)
+        pg_session.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.queue_id.in_(
+                pg_session.query(DailyQueue.id).filter(
+                    DailyQueue.queue_resource_id.in_(rq09_resource_ids)
+                )
+            )
+        ).delete(synchronize_session=False)
+        pg_session.query(DailyQueue).filter(
+            DailyQueue.queue_resource_id.in_(rq09_resource_ids)
+        ).delete(synchronize_session=False)
+        pg_session.query(QueueResource).filter(
+            QueueResource.id.in_(rq09_resource_ids)
+        ).delete(synchronize_session=False)
     if rq09_doctor_ids:
         pg_session.query(Doctor).filter(Doctor.id.in_(rq09_doctor_ids)).delete(
             synchronize_session=False
