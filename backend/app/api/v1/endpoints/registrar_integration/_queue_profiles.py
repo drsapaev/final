@@ -351,7 +351,7 @@ def apply_queue_profile_parent_repair_command(
             status_code=status_code,
             detail={"reason": exc.reason, "message": exc.message},
         ) from exc
-    except Exception:
+    except Exception as exc:
         db.rollback()
         logger.exception(
             "queue_profile_parent_repair.failed profile_key=%s user_id=%s request_id=%s",
@@ -359,7 +359,7 @@ def apply_queue_profile_parent_repair_command(
             current_user.id,
             request_id,
         )
-        _raise_registrar_internal_error("queue profile parent repair")
+        _raise_registrar_internal_error("queue profile parent repair", exc)
 
 
 # ===================== QUEUE PROFILE CRUD (ADMIN) =====================

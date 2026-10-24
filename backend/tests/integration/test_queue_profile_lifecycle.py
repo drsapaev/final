@@ -4602,6 +4602,7 @@ def test_parent_repair_audit_failure_rolls_back_profile_change(
     )
 
     assert response.status_code == 500, response.text
+    assert response.json()["detail"] == "Internal server error"
     pg_session.refresh(profile)
     assert profile.department_key == world["conflicting"].key
     assert (
