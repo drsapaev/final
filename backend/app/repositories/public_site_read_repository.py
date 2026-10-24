@@ -20,6 +20,8 @@ class PublicSiteReadRepository:
         "clinic_address",
         "clinic_phone",
         "clinic_email",
+        "clinic_working_hours_start",
+        "clinic_working_hours_end",
     )
 
     def __init__(self, db: Session) -> None:

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../api/client';
 import KPIMetrics from '../components/analytics/KPIMetrics';
@@ -30,6 +30,19 @@ import {
 import { useTranslation } from '../i18n/useTranslation';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Extract the Chart.js visualization from the comprehensive endpoint envelope. */
+export const getAdvancedChartsData = (response: unknown): Record<string, unknown> | null => {
+  if (!response || typeof response !== 'object' || Array.isArray(response)) return null;
+
+  const visualization = (response as Record<string, unknown>).visualization;
+  if (!visualization || typeof visualization !== 'object' || Array.isArray(visualization)) return null;
+
+  const charts = (visualization as Record<string, unknown>).charts;
+  if (!charts || typeof charts !== 'object' || Array.isArray(charts)) return null;
+
+  return visualization as Record<string, unknown>;
+};
 
 type AnalyticsTab = 'overview' | 'appointments' | 'revenue' | 'providers' | 'visualization' | 'kpi' | 'predictive';
 type MetricFormat = 'count' | 'revenue' | 'percentage';
@@ -909,7 +922,7 @@ export default function AnalyticsPage() {
         return (
           <AnalyticsSectionCard title={t('misc.an_viz_section_title')} subtitle={t('misc.an_viz_section_subtitle')} compact={isCompactLayout}>
             <AdvancedCharts
-              data={data.visualization as Record<string, unknown> | null | undefined}
+              data={getAdvancedChartsData(data.visualization)}
               loading={loading}
               onRefresh={() => loadAnalytics('visualization')}
               onExport={() => exportData('json')}
@@ -1001,7 +1014,7 @@ export default function AnalyticsPage() {
         </div>
       </section>
 
-      <AdminRouteSwitcher current="analytics" />
+      <AdminRouteSwitcher current="admin-analytics" />
 
       <section style={{
         background: analyticsSurface,

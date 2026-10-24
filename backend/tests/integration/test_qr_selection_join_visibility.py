@@ -65,6 +65,26 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 SCRATCH_DB_PREFIX = "rq09_check"
 SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 
+# Exact synthetic-row ownership of THIS module (review #5636848241 P2): the
+# shared-database cleanup must delete ONLY rows this module commits — other
+# rq09 modules commit rows that a broad `rq09%` filter would destroy (e.g.
+# test_rq09b_specialist_type_resolution.py commits departments rq09bcard /
+# rq09bcard2). The generated resource codes are the only prefix-scoped
+# deletion; the `rq09-resource-doctor-` prefix is grep-unique to this file.
+_MODULE_DEPARTMENT_KEYS = (
+    "rq09-ecg-distinct-parent",
+    "rq09sharedparent",
+    "rq09-profile-target-off",
+    "rq09-profile-target-on",
+    "rq09-profile-available-parent-a",
+    "rq09-profile-available-parent-b",
+)
+_MODULE_RESOURCE_CODES = (
+    "rq09-profile-shared-resource",
+    "rq09-profile-available-resource",
+)
+_MODULE_RESOURCE_CODE_PATTERN = "rq09-resource-doctor-%"
+
 sys.path.insert(0, str(BACKEND_DIR))
 
 from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
@@ -309,15 +329,18 @@ def _rq09_cleanup(pg_session):
     rq09_user_ids = [
         u.id for u in pg_session.query(User).filter(User.username.like("rq09_%")).all()
     ]
-    rq09_doctor_ids = (
-        [
+    rq09_doctor_ids = sorted(
+        {
             d.id
             for d in pg_session.query(Doctor)
-            .filter(Doctor.user_id.in_(rq09_user_ids))
+            .filter(
+                Doctor.user_id.in_(rq09_user_ids)
+                # userless synthetic doctors carry explicit rq09 ids and no
+                # user row to find them by (id=9325 owner-eligibility case)
+                | Doctor.cabinet.like("RQ09-%")
+            )
             .all()
-        ]
-        if rq09_user_ids
-        else []
+        }
     )
     queue_ids = (
         [
@@ -352,6 +375,15 @@ def _rq09_cleanup(pg_session):
     pg_session.query(QueueProfile).filter(QueueProfile.key.like("rq09_%")).delete(
         synchronize_session=False
     )
+    # Synthetic departments/resources created by this module (#3693 tests)
+    # must go too: they are COMMITTED, _rq09_cleanup is the only cleanup, and
+    # every session that lands on a pre-provisioned shared database (scratch
+    # provisioning falls back to DATABASE_URL) otherwise collides on the
+    # unique ix_departments_key / queue_resources.code at re-seed — the
+    # mutmut nightly clean phase failed exactly this way on 2026-10-24.
+    # The helper deletes only THIS module's rows (review #5636848241 P2);
+    # the profile-visibility guard above documents the same concern.
+    _delete_module_owned_department_and_resource_rows(pg_session)
     if rq09_doctor_ids:
         pg_session.query(Doctor).filter(Doctor.id.in_(rq09_doctor_ids)).delete(
             synchronize_session=False
@@ -376,6 +408,61 @@ def _rq09_cleanup(pg_session):
     }.items():
         pg_session.query(_QP).filter(_QP.key == key).update({_QP.show_on_qr_page: show})
     pg_session.commit()
+
+
+def _delete_module_owned_department_and_resource_rows(pg_session) -> None:
+    """Delete the departments/resources this module committed, exactly.
+
+    Scoped to _MODULE_DEPARTMENT_KEYS / _MODULE_RESOURCE_CODES (+ the
+    generated rq09-resource-doctor-% codes) so a session that lands on the
+    pre-provisioned shared database can never destroy rows another rq09
+    module committed. Synthetic departments and resources are COMMITTED and
+    this cleanup is the only one — without it the second pytest session
+    collides on ix_departments_key / queue_resources.code (mutmut nightly
+    clean phase, 2026-10-24).
+    """
+    from app.models.department import Department
+    from app.models.online_queue import (
+        DailyQueue,
+        OnlineQueueEntry,
+        QueueResource,
+        QueueStatistics,
+    )
+
+    pg_session.query(Department).filter(
+        Department.key.in_(_MODULE_DEPARTMENT_KEYS)
+    ).delete(synchronize_session=False)
+
+    resource_ids = [
+        r.id
+        for r in pg_session.query(QueueResource.id)
+        .filter(
+            QueueResource.code.in_(_MODULE_RESOURCE_CODES)
+            | QueueResource.code.like(_MODULE_RESOURCE_CODE_PATTERN)
+        )
+        .all()
+    ]
+    if not resource_ids:
+        return
+    resource_queue_ids = [
+        q.id
+        for q in pg_session.query(DailyQueue.id)
+        .filter(DailyQueue.queue_resource_id.in_(resource_ids))
+        .all()
+    ]
+    if resource_queue_ids:
+        pg_session.query(QueueStatistics).filter(
+            QueueStatistics.queue_id.in_(resource_queue_ids)
+        ).delete(synchronize_session=False)
+        pg_session.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.queue_id.in_(resource_queue_ids)
+        ).delete(synchronize_session=False)
+        pg_session.query(DailyQueue).filter(
+            DailyQueue.id.in_(resource_queue_ids)
+        ).delete(synchronize_session=False)
+    pg_session.query(QueueResource).filter(QueueResource.id.in_(resource_ids)).delete(
+        synchronize_session=False
+    )
 
 
 @pytest.fixture
@@ -1527,3 +1614,79 @@ def test_ghost_incomplete_and_resource_owners_not_selectable(
     assert lab_resource.id not in ids, (
         "resource synthetic (owner role Lab) must not be advertised as a " "doctor card"
     )
+
+
+@pytest.mark.queue
+def test_module_cleanup_spares_rows_owned_by_other_modules(pg_session):
+    """The shared-database cleanup must delete ONLY this module's rows.
+
+    Review #5636848241 P2: other rq09 modules commit departments/resources
+    whose keys also start with rq09 (e.g. rq09bcard from the rq09b
+    specialist-type-resolution module). A broad prefix filter in
+    _delete_module_owned_department_and_resource_rows would destroy their
+    data when sessions share one pre-provisioned database. Foreign rows are
+    simulated with marker keys unique to this guard test and removed again
+    in the finally block, so the shared database keeps no guard residue.
+    """
+    from app.models.department import Department
+    from app.models.online_queue import QueueResource
+
+    foreign_department_key = "rq09-cleanup-guard-foreign-dept"
+    foreign_resource_code = "rq09-cleanup-guard-foreign-resource"
+    pg_session.add(
+        Department(
+            key=foreign_department_key,
+            name_ru="RQ-09 cleanup guard foreign department",
+            active=True,
+        )
+    )
+    pg_session.add(
+        QueueResource(
+            code=foreign_resource_code,
+            queue_tag="rq09_cleanup_guard",
+            display_name="RQ-09 cleanup guard foreign resource",
+            active=True,
+        )
+    )
+    pg_session.commit()
+
+    try:
+        # A module-owned row, seeded through the same path the tests use.
+        pg_session.add(
+            Department(
+                key=_MODULE_DEPARTMENT_KEYS[0],
+                name_ru="RQ-09 Synthetic shared parent",
+                active=True,
+            )
+        )
+        pg_session.commit()
+
+        _delete_module_owned_department_and_resource_rows(pg_session)
+        pg_session.expire_all()
+
+        assert (
+            pg_session.query(Department)
+            .filter(Department.key == foreign_department_key)
+            .one_or_none()
+            is not None
+        ), "cleanup deleted a department owned by another module"
+        assert (
+            pg_session.query(QueueResource)
+            .filter(QueueResource.code == foreign_resource_code)
+            .one_or_none()
+            is not None
+        ), "cleanup deleted a queue resource owned by another module"
+        assert (
+            pg_session.query(Department)
+            .filter(Department.key == _MODULE_DEPARTMENT_KEYS[0])
+            .one_or_none()
+            is None
+        ), "cleanup must still remove this module's own committed rows"
+    finally:
+        pg_session.query(Department).filter(
+            Department.key == foreign_department_key
+        ).delete(synchronize_session=False)
+        pg_session.query(QueueResource).filter(
+            QueueResource.code == foreign_resource_code
+        ).delete(synchronize_session=False)
+        pg_session.commit()

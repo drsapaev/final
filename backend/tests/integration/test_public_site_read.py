@@ -65,6 +65,8 @@ def _doctor(
     specialty: str = "synthetic-public-specialty",
     active: bool = True,
     published: bool = True,
+    experience_years: int | None = None,
+    professional_category: str | None = None,
 ) -> Doctor:
     username = f"synthetic_public_site_{slug.replace('-', '_')}"
     user = User(
@@ -82,6 +84,8 @@ def _doctor(
     row = Doctor(
         user_id=user.id,
         specialty=specialty,
+        experience_years=experience_years,
+        professional_category=professional_category,
         active=active,
         show_on_website=published,
         bio_ru=f"SYNTHETIC биография {slug}",
@@ -130,6 +134,8 @@ def test_public_catalog_filters_and_allowlists(client, db_session):
         "clinic_address": "SYNTHETIC address",
         "clinic_phone": "SYNTHETIC clinic phone",
         "clinic_email": "synthetic@example.test",
+        "clinic_working_hours_start": "09:00",
+        "clinic_working_hours_end": "17:00",
         "clinic_logo_url": "https://private.invalid/logo.png",
         "queue_settings": {"private": "must not be exposed"},
     }
@@ -146,6 +152,8 @@ def test_public_catalog_filters_and_allowlists(client, db_session):
         "phone": "SYNTHETIC clinic phone",
         "email": "synthetic@example.test",
         "logo_url": None,
+        "working_hours_start": "09:00:00",
+        "working_hours_end": "17:00:00",
     }
 
     response = client.get(
@@ -306,7 +314,12 @@ def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
         )
     )
     db_session.commit()
-    doctor = _doctor(db_session, "published-doctor")
+    doctor = _doctor(
+        db_session,
+        "published-doctor",
+        experience_years=18,
+        professional_category="highest",
+    )
     _doctor(db_session, "draft-doctor", published=False)
     _doctor(db_session, "inactive-doctor", active=False)
 
@@ -317,12 +330,16 @@ def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
     assert uzbek.status_code == 200, uzbek.text
     uzbek_body = uzbek.json()
     assert uzbek_body["specialty"] is None
+    assert uzbek_body["experience_years"] == 18
+    assert uzbek_body["professional_category"] == "Oliy malaka toifasi"
     assert uzbek_body["portrait_url"] is None
     assert set(uzbek_body) == {
         "slug",
         "name",
         "bio",
         "specialty",
+        "experience_years",
+        "professional_category",
         "portrait_url",
     }
     assert "synthetic-public-specialty" not in uzbek.text
@@ -335,6 +352,10 @@ def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
     )
     assert russian.status_code == 200
     assert russian.json()["specialty"] == "SYNTHETIC специальность"
+    assert russian.json()["experience_years"] == 18
+    assert (
+        russian.json()["professional_category"] == "Высшая квалификационная категория"
+    )
 
     doctors = client.get(
         "/api/v1/public-site/doctors",
@@ -342,6 +363,8 @@ def test_public_doctor_omits_untranslated_specialty_and_internal_fields(
     )
     assert doctors.status_code == 200
     assert [row["slug"] for row in doctors.json()] == [doctor.slug]
+    assert doctors.json()[0]["experience_years"] == 18
+    assert doctors.json()[0]["professional_category"] == "Oliy malaka toifasi"
 
 
 def test_hidden_and_unknown_details_share_public_not_found_response(client, db_session):
@@ -358,7 +381,12 @@ def test_hidden_and_unknown_details_share_public_not_found_response(client, db_s
     assert hidden_service.status_code == unknown_service.status_code == 404
     assert hidden_service.json() == unknown_service.json() == expected_not_found
 
-    hidden_doctor = _doctor(db_session, "hidden-doctor", published=False)
+    hidden_doctor = _doctor(
+        db_session,
+        "hidden-doctor",
+        published=False,
+        professional_category="highest",
+    )
     hidden_doctor_response = client.get(
         f"/api/v1/public-site/doctors/{hidden_doctor.slug}",
         params={"locale": "ru"},
@@ -385,6 +413,29 @@ def test_public_catalog_requires_a_supported_locale(client):
     )
     assert missing_locale.status_code == 422
     assert unsupported_locale.status_code == 422
+
+
+def test_public_clinic_hours_use_approved_defaults_and_hide_invalid_overrides(
+    client, db_session
+):
+    default_hours = client.get("/api/v1/public-site/clinic").json()
+    assert default_hours["working_hours_start"] == "09:00:00"
+    assert default_hours["working_hours_end"] == "17:00:00"
+
+    db_session.add_all(
+        [
+            ClinicSettings(
+                key="clinic_working_hours_start", value="25:00", category="clinic"
+            ),
+            ClinicSettings(
+                key="clinic_working_hours_end", value="17:00", category="clinic"
+            ),
+        ]
+    )
+    db_session.commit()
+    invalid_hours = client.get("/api/v1/public-site/clinic").json()
+    assert invalid_hours["working_hours_start"] is None
+    assert invalid_hours["working_hours_end"] is None
 
 
 def test_public_site_openapi_contract_is_allowlisted(client):
@@ -417,6 +468,8 @@ def test_public_site_openapi_contract_is_allowlisted(client):
         "phone",
         "email",
         "logo_url",
+        "working_hours_start",
+        "working_hours_end",
     }
     assert set(components["PublicSiteServiceOut"]["properties"]) == {
         "slug",
@@ -431,6 +484,8 @@ def test_public_site_openapi_contract_is_allowlisted(client):
         "name",
         "bio",
         "specialty",
+        "experience_years",
+        "professional_category",
         "portrait_url",
     }
     assert set(components["PublicSiteCategoryOut"]["properties"]) == {"name"}

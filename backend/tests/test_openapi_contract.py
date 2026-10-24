@@ -30,6 +30,47 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
     assert len(schema["paths"]) >= 100
 
 
+def test_doctor_experience_is_published_in_admin_and_doctor_info_contracts(
+    client: TestClient,
+) -> None:
+    components = _get_openapi_schema(client)["components"]["schemas"]
+    admin_doctor = components["app__schemas__clinic__DoctorOut"]["properties"]
+    assert "experience_years" in admin_doctor
+    assert "experience_years" in components["DoctorCreate"]["properties"]
+    assert "experience_years" in components["DoctorUpdate"]["properties"]
+    assert "experience_years" in components["DoctorInfoResponse"]["properties"]
+    for schema_name in ("DoctorCreate", "DoctorUpdate"):
+        experience_schema = components[schema_name]["properties"]["experience_years"]
+        integer_variants = [
+            variant
+            for variant in experience_schema.get("anyOf", [])
+            if variant.get("type") == "integer"
+        ]
+        assert len(integer_variants) == 1
+        assert integer_variants[0]["maximum"] == 100
+
+
+def test_doctor_professional_category_is_typed_in_admin_contracts(
+    client: TestClient,
+) -> None:
+    components = _get_openapi_schema(client)["components"]["schemas"]
+    admin_doctor = components["app__schemas__clinic__DoctorOut"]["properties"]
+    assert "professional_category" in admin_doctor
+
+    expected_values = {"third", "second", "first", "highest"}
+    for schema_name in ("DoctorCreate", "DoctorUpdate"):
+        schema = components[schema_name]
+        assert "professional_category" in schema["properties"]
+        assert "professional_category" not in schema.get("required", [])
+        category_schema = schema["properties"]["professional_category"]
+        enum_values = {
+            value
+            for branch in category_schema.get("anyOf", [category_schema])
+            for value in branch.get("enum", [])
+        }
+        assert enum_values == expected_values
+
+
 def test_openapi_admin_queue_directions_read_contract(client: TestClient) -> None:
     schema = _get_openapi_schema(client)
     path = "/api/v1/queue/admin/directions"

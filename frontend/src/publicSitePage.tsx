@@ -39,6 +39,10 @@ interface Copy {
   emailClinic: string;
   address: string;
   specialty: string;
+  experience: (years: number) => string;
+  workingHours: string;
+  workingDays: string;
+  sundayClosed: string;
   priceOnRequest: string;
   serviceMissing: string;
   doctorMissing: string;
@@ -79,6 +83,21 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     emailClinic: 'Написать по электронной почте',
     address: 'Адрес',
     specialty: 'Специализация',
+    experience: (years) => {
+      const mod100 = years % 100;
+      const mod10 = years % 10;
+      const unit = mod100 >= 11 && mod100 <= 14
+        ? 'лет'
+        : mod10 === 1
+          ? 'год'
+          : mod10 >= 2 && mod10 <= 4
+            ? 'года'
+            : 'лет';
+      return `Стаж: ${years} ${unit}`;
+    },
+    workingHours: 'Часы работы',
+    workingDays: 'Понедельник–суббота',
+    sundayClosed: 'Воскресенье — выходной',
     priceOnRequest: 'Цена по запросу',
     serviceMissing: 'Услуга не найдена или больше не опубликована.',
     doctorMissing: 'Врач не найден или профиль больше не опубликован.',
@@ -117,6 +136,10 @@ const COPY: Record<PublicSiteLocale, Copy> = {
     emailClinic: 'Elektron pochta yuborish',
     address: 'Manzil',
     specialty: 'Mutaxassisligi',
+    experience: (years) => `Ish tajribasi: ${years} yil`,
+    workingHours: 'Ish vaqti',
+    workingDays: 'Dushanba–shanba',
+    sundayClosed: 'Yakshanba — dam olish kuni',
     priceOnRequest: 'Narx so‘rov bo‘yicha',
     serviceMissing: 'Xizmat topilmadi yoki endi e’lon qilinmagan.',
     doctorMissing: 'Shifokor topilmadi yoki profili endi e’lon qilinmagan.',
@@ -153,6 +176,16 @@ function cleanMailtoHref(email?: string | null): string | undefined {
     return undefined;
   }
   return `mailto:${encodeURIComponent(value)}`;
+}
+
+function formatDoctorHeading(doctor: PublicSiteDoctor): string {
+  return doctor.specialty ? `${doctor.specialty} — ${doctor.name}` : doctor.name;
+}
+
+function displayTime(value?: string | null): string | null {
+  if (!value) return null;
+  const match = value.match(/^(\d{2}:\d{2})/);
+  return match?.[1] ?? null;
 }
 
 function formatPrice(service: PublicSiteService, locale: PublicSiteLocale, copy: Copy): string {
@@ -303,7 +336,10 @@ function SiteFooter({ clinicName, locale, copy }: {
 function ContactLinks({ clinic, copy }: { clinic?: PublicSiteClinic; copy: Copy }) {
   const telHref = cleanTelHref(clinic?.phone);
   const mailtoHref = cleanMailtoHref(clinic?.email);
-  const hasContact = Boolean(telHref || mailtoHref || clinic?.address);
+  const start = displayTime(clinic?.working_hours_start);
+  const end = displayTime(clinic?.working_hours_end);
+  const hasHours = Boolean(start && end);
+  const hasContact = Boolean(telHref || mailtoHref || clinic?.address || hasHours);
   if (!hasContact) return <p className="public-site__muted">{copy.contactMissing}</p>;
 
   return (
@@ -311,6 +347,7 @@ function ContactLinks({ clinic, copy }: { clinic?: PublicSiteClinic; copy: Copy 
       {clinic?.address && <p><span>{copy.address}</span>{clinic.address}</p>}
       {telHref && <p><span>{copy.callClinic}</span><a href={telHref}>{clinic?.phone}</a></p>}
       {mailtoHref && <p><span>{copy.emailClinic}</span><a href={mailtoHref}>{clinic?.email}</a></p>}
+      {hasHours && <p><span>{copy.workingHours}</span>{copy.workingDays}, {start}–{end}; {copy.sundayClosed}</p>}
     </address>
   );
 }
@@ -352,8 +389,9 @@ function DoctorList({ doctors, locale, copy }: {
       {doctors.map((doctor) => (
         <li className="public-site__list-item" key={doctor.slug}>
           <div>
-            <a className="public-site__list-title" href={localizePath('doctor', locale, doctor.slug)}>{doctor.name}</a>
-            {doctor.specialty && <p className="public-site__muted">{copy.specialty}: {doctor.specialty}</p>}
+            <a className="public-site__list-title" href={localizePath('doctor', locale, doctor.slug)}>{formatDoctorHeading(doctor)}</a>
+            {doctor.experience_years != null && <p className="public-site__muted">{copy.experience(doctor.experience_years)}</p>}
+            {doctor.professional_category && <p className="public-site__muted">{doctor.professional_category}</p>}
             <p>{doctor.bio}</p>
           </div>
           <a href={localizePath('doctor', locale, doctor.slug)}>{copy.openDoctor}</a>
@@ -415,7 +453,6 @@ function PageContent({ route, data, copy }: PublicSitePageProps & { copy: Copy }
           {data.service.category && <p className="public-site__eyebrow">{data.service.category}</p>}
           <h1>{data.service.name}</h1>
           <p className="public-site__lead">{data.service.description}</p>
-          <p className="public-site__price">{formatPrice(data.service, locale, copy)}</p>
           <a className="public-site__button public-site__button--primary" href={localizePath('contacts', locale)}>{copy.contactClinic}</a>
         </article>
       );
@@ -424,8 +461,9 @@ function PageContent({ route, data, copy }: PublicSitePageProps & { copy: Copy }
       return (
         <article className="public-site__section public-site__detail">
           <p className="public-site__eyebrow">{copy.doctorDetails}</p>
-          <h1>{data.doctor.name}</h1>
-          {data.doctor.specialty && <p className="public-site__lead">{copy.specialty}: {data.doctor.specialty}</p>}
+          <h1>{formatDoctorHeading(data.doctor)}</h1>
+          {data.doctor.experience_years != null && <p className="public-site__muted">{copy.experience(data.doctor.experience_years)}</p>}
+          {data.doctor.professional_category && <p className="public-site__muted">{data.doctor.professional_category}</p>}
           <p>{data.doctor.bio}</p>
           <a className="public-site__button public-site__button--primary" href={localizePath('contacts', locale)}>{copy.contactClinic}</a>
         </article>

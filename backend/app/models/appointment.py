@@ -3,7 +3,17 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -16,6 +26,12 @@ if TYPE_CHECKING:
 
 class Appointment(Base):
     __tablename__ = "appointments"
+    __table_args__ = (
+        CheckConstraint(
+            "duration_minutes_snapshot IS NULL OR duration_minutes_snapshot > 0",
+            name="ck_appointments_duration_snapshot_positive",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     patient_id: Mapped[int] = mapped_column(
@@ -40,6 +56,9 @@ class Appointment(Base):
     appointment_time: Mapped[str | None] = mapped_column(
         String(8), nullable=True
     )  # HH:MM
+    duration_minutes_snapshot: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="scheduled")
 

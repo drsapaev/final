@@ -44,16 +44,16 @@ class ClinicSettings(Base):
     __tablename__ = "clinic_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    key: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    key: Mapped[str] = mapped_column(
+        String(100), unique=True, nullable=False, index=True
+    )
     value: Mapped[Any | None] = mapped_column(JSON, nullable=True)
     category: Mapped[str | None] = mapped_column(
         String(50), nullable=True, index=True
     )  # clinic, queue, ai, print, telegram
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_by: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )  # ✅ SECURITY: SET NULL to preserve audit trail
     updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -63,7 +63,9 @@ class ClinicSettings(Base):
     )
 
     # Relationships
-    updated_by_user: Mapped[User | None] = relationship("User", foreign_keys=[updated_by])
+    updated_by_user: Mapped[User | None] = relationship(
+        "User", foreign_keys=[updated_by]
+    )
 
 
 class Doctor(Base):
@@ -71,6 +73,15 @@ class Doctor(Base):
 
     __tablename__ = "doctors"
     __table_args__ = (
+        CheckConstraint(
+            "experience_years IS NULL OR experience_years >= 0",
+            name="ck_doctors_experience_years_nonnegative",
+        ),
+        CheckConstraint(
+            "professional_category IS NULL OR professional_category IN "
+            "('third', 'second', 'first', 'highest')",
+            name="ck_doctors_professional_category_allowed",
+        ),
         CheckConstraint(
             "slug IS NULL OR slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'",
             name="ck_doctors_website_slug_format",
@@ -114,12 +125,18 @@ class Doctor(Base):
     specialty: Mapped[str] = mapped_column(
         String(100), nullable=False, index=True
     )  # cardiology, dermatology, stomatology
+    experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    professional_category: Mapped[str | None] = mapped_column(String(12), nullable=True)
     cabinet: Mapped[str | None] = mapped_column(String(20), nullable=True)
     price_default: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     start_number_online: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     max_online_per_day: Mapped[int] = mapped_column(Integer, default=15, nullable=False)
-    auto_close_time: Mapped[time | None] = mapped_column(Time, default=time(9, 0), nullable=True)
-    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    auto_close_time: Mapped[time | None] = mapped_column(
+        Time, default=time(9, 0), nullable=True
+    )
+    active: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False, index=True
+    )
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -129,7 +146,9 @@ class Doctor(Base):
 
     # Relationships
     user: Mapped[User | None] = relationship("User", foreign_keys=[user_id])
-    department: Mapped[Department | None] = relationship("Department", back_populates="doctors")
+    department: Mapped[Department | None] = relationship(
+        "Department", back_populates="doctors"
+    )
     schedules: Mapped[list[Schedule]] = relationship(
         "Schedule", back_populates="doctor", cascade="all, delete-orphan"
     )
@@ -174,7 +193,9 @@ class ServiceCategory(Base):
     name_ru: Mapped[str | None] = mapped_column(String(100), nullable=True)
     name_uz: Mapped[str | None] = mapped_column(String(100), nullable=True)
     name_en: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    specialty: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    specialty: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
+    )
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -187,7 +208,8 @@ class ServiceCategory(Base):
 # ===================== ФИЛИАЛЫ КЛИНИКИ =====================
 
 
-class BranchStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
+# manual-review: StrEnum migration needs Python 3.11+ compat check.
+class BranchStatus(str, enum.Enum):  # noqa: UP042
     """Статусы филиалов"""
 
     ACTIVE = "active"
@@ -203,26 +225,30 @@ class Branch(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(
+        String(20), unique=True, nullable=False, index=True
+    )
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     email: Mapped[str | None] = mapped_column(String(100), nullable=True)
     manager_id: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )  # ✅ SECURITY: SET NULL to preserve branch record
     status: Mapped[BranchStatus] = mapped_column(
         Enum(BranchStatus), default=BranchStatus.ACTIVE, nullable=False
     )
-    timezone: Mapped[str] = mapped_column(String(50), default="Asia/Tashkent", nullable=False)
+    timezone: Mapped[str] = mapped_column(
+        String(50), default="Asia/Tashkent", nullable=False
+    )
     working_hours: Mapped[dict[str, Any] | None] = mapped_column(
         JSON, nullable=True
     )  # {"monday": {"start": "08:00", "end": "18:00"}}
     services_available: Mapped[list[str] | None] = mapped_column(
         JSON, nullable=True
     )  # ["cardiology", "dermatology"]
-    capacity: Mapped[int] = mapped_column(Integer, default=50, nullable=False)  # Максимальная вместимость
+    capacity: Mapped[int] = mapped_column(
+        Integer, default=50, nullable=False
+    )  # Максимальная вместимость
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -233,13 +259,16 @@ class Branch(Base):
     # Relationships
     manager: Mapped[User | None] = relationship("User", foreign_keys=[manager_id])
     doctors: Mapped[list[Doctor]] = relationship("Doctor", back_populates="branch")
-    equipment: Mapped[list[Equipment]] = relationship("Equipment", back_populates="branch")
+    equipment: Mapped[list[Equipment]] = relationship(
+        "Equipment", back_populates="branch"
+    )
 
 
 # ===================== ОБОРУДОВАНИЕ =====================
 
 
-class EquipmentStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
+# manual-review: StrEnum migration needs Python 3.11+ compat check.
+class EquipmentStatus(str, enum.Enum):  # noqa: UP042
     """Статусы оборудования"""
 
     ACTIVE = "active"
@@ -249,7 +278,8 @@ class EquipmentStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum 
     REPLACED = "replaced"
 
 
-class EquipmentType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
+# manual-review: StrEnum migration needs Python 3.11+ compat check.
+class EquipmentType(str, enum.Enum):  # noqa: UP042
     """Типы оборудования"""
 
     MEDICAL = "medical"
@@ -271,7 +301,9 @@ class Equipment(Base):
     serial_number: Mapped[str | None] = mapped_column(
         String(100), unique=True, nullable=True, index=True
     )
-    equipment_type: Mapped[EquipmentType] = mapped_column(Enum(EquipmentType), nullable=False)
+    equipment_type: Mapped[EquipmentType] = mapped_column(
+        Enum(EquipmentType), nullable=False
+    )
     branch_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("branches.id", ondelete="CASCADE"), nullable=False
     )
@@ -331,13 +363,16 @@ class EquipmentMaintenance(Base):
     )
 
     # Relationships
-    equipment: Mapped[Equipment] = relationship("Equipment", back_populates="maintenance_records")
+    equipment: Mapped[Equipment] = relationship(
+        "Equipment", back_populates="maintenance_records"
+    )
 
 
 # ===================== ЛИЦЕНЗИИ И АКТИВАЦИЯ =====================
 
 
-class LicenseStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
+# manual-review: StrEnum migration needs Python 3.11+ compat check.
+class LicenseStatus(str, enum.Enum):  # noqa: UP042
     """Статусы лицензий"""
 
     ACTIVE = "active"
@@ -346,7 +381,8 @@ class LicenseStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum mi
     PENDING = "pending"
 
 
-class LicenseType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
+# manual-review: StrEnum migration needs Python 3.11+ compat check.
+class LicenseType(str, enum.Enum):  # noqa: UP042
     """Типы лицензий"""
 
     SOFTWARE = "software"
@@ -363,7 +399,9 @@ class License(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     license_type: Mapped[LicenseType] = mapped_column(Enum(LicenseType), nullable=False)
-    license_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    license_key: Mapped[str] = mapped_column(
+        String(255), unique=True, nullable=False, index=True
+    )
     status: Mapped[LicenseStatus] = mapped_column(
         Enum(LicenseStatus), default=LicenseStatus.ACTIVE, nullable=False
     )
@@ -372,8 +410,12 @@ class License(Base):
     expires_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     renewal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
-    features: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)  # Список доступных функций
-    restrictions: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)  # Ограничения лицензии
+    features: Mapped[list[str] | None] = mapped_column(
+        JSON, nullable=True
+    )  # Список доступных функций
+    restrictions: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )  # Ограничения лицензии
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -398,14 +440,14 @@ class LicenseActivation(Base):
         Integer, ForeignKey("licenses.id", ondelete="CASCADE"), nullable=False
     )
     activated_by: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )  # ✅ SECURITY: SET NULL to preserve audit trail
     activation_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    machine_id: Mapped[str | None] = mapped_column(String(100), nullable=True)  # Уникальный ID машины
+    machine_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )  # Уникальный ID машины
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     status: Mapped[LicenseStatus] = mapped_column(
         Enum(LicenseStatus), default=LicenseStatus.ACTIVE, nullable=False
@@ -414,13 +456,16 @@ class LicenseActivation(Base):
 
     # Relationships
     license: Mapped[License] = relationship("License", back_populates="activations")
-    activated_by_user: Mapped[User | None] = relationship("User", foreign_keys=[activated_by])
+    activated_by_user: Mapped[User | None] = relationship(
+        "User", foreign_keys=[activated_by]
+    )
 
 
 # ===================== РЕЗЕРВНОЕ КОПИРОВАНИЕ =====================
 
 
-class BackupStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
+# manual-review: StrEnum migration needs Python 3.11+ compat check.
+class BackupStatus(str, enum.Enum):  # noqa: UP042
     """Статусы резервного копирования"""
 
     PENDING = "pending"
@@ -430,7 +475,8 @@ class BackupStatus(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum mig
     CANCELLED = "cancelled"
 
 
-class BackupType(str, enum.Enum):  # noqa: UP042  # manual-review: StrEnum migration needs Python 3.11+ compat check
+# manual-review: StrEnum migration needs Python 3.11+ compat check.
+class BackupType(str, enum.Enum):  # noqa: UP042
     """Типы резервного копирования"""
 
     FULL = "full"
@@ -451,24 +497,32 @@ class Backup(Base):
         Enum(BackupStatus), default=BackupStatus.PENDING, nullable=False
     )
     file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Размер в байтах
+    file_size: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )  # Размер в байтах
     created_by: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )  # ✅ SECURITY: SET NULL to preserve audit trail
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     retention_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
-    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     # Relationships
-    created_by_user: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
+    created_by_user: Mapped[User | None] = relationship(
+        "User", foreign_keys=[created_by]
+    )
 
 
 # ===================== СИСТЕМНАЯ ИНФОРМАЦИЯ =====================
@@ -480,7 +534,9 @@ class SystemInfo(Base):
     __tablename__ = "system_info"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    key: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    key: Mapped[str] = mapped_column(
+        String(100), unique=True, nullable=False, index=True
+    )
     value: Mapped[Any | None] = mapped_column(JSON, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime | None] = mapped_column(

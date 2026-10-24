@@ -6,6 +6,7 @@ inherit from the broader operational service or doctor schemas.
 
 from __future__ import annotations
 
+from datetime import time
 from decimal import Decimal
 from typing import Literal
 
@@ -22,6 +23,8 @@ class PublicSiteClinicOut(BaseModel):
     phone: str | None = None
     email: str | None = None
     logo_url: str | None = None
+    working_hours_start: time | None = None
+    working_hours_end: time | None = None
 
 
 class PublicSiteNotFoundDetail(BaseModel):
@@ -62,4 +65,8 @@ class PublicSiteDoctorOut(BaseModel):
     name: str
     bio: str
     specialty: str | None = None
+    experience_years: int | None = Field(None, ge=0)
+    professional_category: str | None = Field(
+        None, description="Localized professional qualification category."
+    )
     portrait_url: str | None = None

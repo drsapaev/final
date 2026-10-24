@@ -1108,7 +1108,7 @@ test.describe('Public-site SSR browser layout smoke', () => {
     expect(html).toContain('Sintetik sinov profili');
     expect(html).toContain('Sinov mutaxassisligi');
     expect(html).toContain('hreflang="ru" href="http://127.0.0.1:5278/ru/doctors/synthetic-profile"');
-    await expect(page.locator('main h1')).toHaveText('Sintetik sinov profili');
+    await expect(page.locator('main h1')).toHaveText('Sinov mutaxassisligi — Sintetik sinov profili');
     await verifyVisibleLayout(page, '.public-site__detail');
   });
 

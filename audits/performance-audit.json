@@ -1,0 +1,391 @@
+{
+  "title": "Doktor KosMed public-site performance baseline",
+  "audit_date": "2026-10-22",
+  "audit_timestamp_tashkent": "2026-10-22T12:09:24+05:00",
+  "measured_origin": "https://finalclinic.fyi",
+  "source_base_sha": "4298419cab7cde00144d051cfef0c4da5744f5df",
+  "application_sha": "4298419cab7cde00144d051cfef0c4da5744f5df",
+  "production_deployment": {
+    "provider": "Vercel",
+    "deployment_id": "dpl_JzcmGJhswSwQVmJxLp2tRxSxygQD",
+    "deployment_sha": "4298419cab7cde00144d051cfef0c4da5744f5df",
+    "target": "production",
+    "status": "READY"
+  },
+  "scope": [
+    "Production public HTML route response and Cache-Control headers",
+    "Representative Uzbek and Russian public pages measured on simulated mobile and desktop profiles",
+    "Lighthouse performance score, FCP, LCP, CLS, TBT, transferred bytes, and server-response-time opportunities"
+  ],
+  "method": {
+    "tool": "Lighthouse CLI",
+    "lighthouse_version": "13.5.0",
+    "chrome_version": "156.0.8078.47",
+    "category": "performance",
+    "runs_per_route_device": 1,
+    "reproduction": {
+      "command_template": "npm exec --yes --package=lighthouse@13.5.0 -- lighthouse <measured_origin><path> <common_options> <profile_options>",
+      "common_options": [
+        "--output=json",
+        "--only-categories=performance",
+        "--disable-full-page-screenshot",
+        "--blocked-url-patterns=static.cloudflareinsights.com,/cdn-cgi/rum"
+      ],
+      "profile_options": {
+        "mobile": "--form-factor=mobile --screenEmulation.mobile --screenEmulation.width=412 --screenEmulation.height=823 --screenEmulation.deviceScaleFactor=1.75 --throttling-method=simulate --throttling.rttMs=150 --throttling.throughputKbps=1638.4 --throttling.requestLatencyMs=562.5 --throttling.downloadThroughputKbps=1474.56 --throttling.uploadThroughputKbps=675 --throttling.cpuSlowdownMultiplier=4",
+        "desktop": "--preset=desktop --screenEmulation.width=1350 --screenEmulation.height=940 --screenEmulation.deviceScaleFactor=1 --throttling-method=simulate --throttling.rttMs=40 --throttling.throughputKbps=10240 --throttling.requestLatencyMs=0 --throttling.downloadThroughputKbps=0 --throttling.uploadThroughputKbps=0 --throttling.cpuSlowdownMultiplier=1"
+      },
+      "source": "Profile values reconstructed from the per-run Lighthouse JSON configSettings. The original shell commands and output paths were not retained as durable files."
+    },
+    "mobile_profile": {
+      "form_factor": "mobile",
+      "viewport": "412x823",
+      "device_scale_factor": 1.75,
+      "cpu_slowdown_multiplier": 4,
+      "throttling": "simulated"
+    },
+    "desktop_profile": {
+      "preset": "desktop",
+      "viewport": "1350x940",
+      "cpu_slowdown_multiplier": 1,
+      "throttling": "simulated"
+    },
+    "lighthouse_error_reporting": "disabled",
+    "full_page_screenshot": "disabled",
+    "raw_report_links": {
+      "available": false,
+      "reason": "No durable Lighthouse report URLs were created for this run. The per-run aggregate values used for this baseline are retained below; raw local reports are not published.",
+      "reproduction": "Use method.reproduction with measured_origin and each measurements[].path; raw report links are unavailable because this run did not publish durable report artifacts."
+    },
+    "cloudflare_rum_blocking": {
+      "patterns": [
+        "static.cloudflareinsights.com",
+        "/cdn-cgi/rum"
+      ],
+      "reason": "A Cloudflare Web Analytics/RUM beacon was observed in the initial probe; later measurements blocked the script and beacon to avoid additional telemetry submissions.",
+      "control_verification": "All 14 blocked measurement reports showed zero transferred bytes for the beacon script and no /cdn-cgi/rum request."
+    }
+  },
+  "production_http_checks": [
+    { "path": "/", "status": 200, "cache_control": "no-store" },
+    { "path": "/services", "status": 200, "cache_control": "no-store" },
+    { "path": "/prices", "status": 200, "cache_control": "no-store" },
+    { "path": "/doctors", "status": 200, "cache_control": "no-store" },
+    { "path": "/ru/services", "status": 200, "cache_control": "no-store" }
+  ],
+  "summary": {
+    "mobile": {
+      "runs": 7,
+      "performance_score_range": [96, 100],
+      "lcp_ms_range": [876, 2185],
+      "lcp_ms_median": 1928,
+      "cls_max": 0,
+      "tbt_ms_max": 4,
+      "transferred_bytes_range": [4912, 6107],
+      "transferred_bytes_median": 5226,
+      "server_response_time_estimated_savings_ms_range": [411, 1104],
+      "server_response_time_estimated_savings_ms_median": 758
+    },
+    "desktop": {
+      "runs": 7,
+      "performance_score_range": [96, 100],
+      "lcp_ms_range": [253, 968],
+      "lcp_ms_median": 889,
+      "cls_max": 0,
+      "tbt_ms_max": 0,
+      "transferred_bytes_range": [4919, 6096],
+      "transferred_bytes_median": 5227,
+      "server_response_time_estimated_savings_ms_range": [433, 1043],
+      "server_response_time_estimated_savings_ms_median": 881
+    }
+  },
+  "measurements": [
+    { "path": "/", "locale": "uz-Latn", "device": "mobile", "performance_score": 97, "fcp_ms": 2040, "lcp_ms": 2040, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5226, "server_response_time_estimated_savings_ms": 836 },
+    { "path": "/", "locale": "uz-Latn", "device": "desktop", "performance_score": 97, "fcp_ms": 946, "lcp_ms": 946, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5227, "server_response_time_estimated_savings_ms": 987 },
+    { "path": "/ru", "locale": "ru", "device": "mobile", "performance_score": 97, "fcp_ms": 1924, "lcp_ms": 1924, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5659, "server_response_time_estimated_savings_ms": 758 },
+    { "path": "/ru", "locale": "ru", "device": "desktop", "performance_score": 96, "fcp_ms": 968, "lcp_ms": 968, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5644, "server_response_time_estimated_savings_ms": 1043 },
+    { "path": "/services", "locale": "uz-Latn", "device": "mobile", "performance_score": 96, "fcp_ms": 2185, "lcp_ms": 2185, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5162, "server_response_time_estimated_savings_ms": 1104 },
+    { "path": "/services", "locale": "uz-Latn", "device": "desktop", "performance_score": 98, "fcp_ms": 889, "lcp_ms": 889, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5157, "server_response_time_estimated_savings_ms": 881 },
+    { "path": "/ru/services", "locale": "ru", "device": "mobile", "performance_score": 98, "fcp_ms": 1802, "lcp_ms": 1802, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5528, "server_response_time_estimated_savings_ms": 502 },
+    { "path": "/ru/services", "locale": "ru", "device": "desktop", "performance_score": 99, "fcp_ms": 669, "lcp_ms": 669, "cls": 0, "tbt_ms": 0, "transferred_bytes": 5530, "server_response_time_estimated_savings_ms": 433 },
+    { "path": "/doctors", "locale": "uz-Latn", "device": "mobile", "performance_score": 97, "fcp_ms": 2083, "lcp_ms": 2083, "cls": 0, "tbt_ms": 0, "transferred_bytes": 4961, "server_response_time_estimated_savings_ms": 1074 },
+    { "path": "/doctors", "locale": "uz-Latn", "device": "desktop", "performance_score": 96, "fcp_ms": 952, "lcp_ms": 952, "cls": 0, "tbt_ms": 0, "transferred_bytes": 4988, "server_response_time_estimated_savings_ms": 992 },
+    { "path": "/prices", "locale": "uz-Latn", "device": "mobile", "performance_score": 98, "fcp_ms": 1928, "lcp_ms": 1928, "cls": 0, "tbt_ms": 0, "transferred_bytes": 4912, "server_response_time_estimated_savings_ms": 596 },
+    { "path": "/prices", "locale": "uz-Latn", "device": "desktop", "performance_score": 98, "fcp_ms": 854, "lcp_ms": 854, "cls": 0, "tbt_ms": 0, "transferred_bytes": 4919, "server_response_time_estimated_savings_ms": 820 },
+    { "path": "/contacts", "locale": "uz-Latn", "device": "mobile", "performance_score": 100, "fcp_ms": 876, "lcp_ms": 876, "cls": 0, "tbt_ms": 4, "transferred_bytes": 6107, "server_response_time_estimated_savings_ms": 411 },
+    { "path": "/contacts", "locale": "uz-Latn", "device": "desktop", "performance_score": 100, "fcp_ms": 253, "lcp_ms": 253, "cls": 0, "tbt_ms": 0, "transferred_bytes": 6096, "server_response_time_estimated_savings_ms": 774 }
+  ],
+  "field_data": {
+    "source": "PageSpeed Insights / Chrome UX Report",
+    "status": "unavailable",
+    "reason": "The PageSpeed Insights API returned HTTP 429 Too Many Requests; no field p75 metrics were retrieved.",
+    "lcp_p75_ms": null,
+    "inp_p75_ms": null,
+    "cls_p75": null,
+    "note": "Lighthouse TBT is a lab metric and is not an INP measurement. Lab samples do not establish Core Web Vitals p75 compliance."
+  },
+  "findings": [
+    {
+      "id": "repeated-server-response-time-opportunity",
+      "severity": "follow_up",
+      "status": "observed_on_14_of_14_lighthouse_runs",
+      "observation": "Lighthouse estimated 411-1104 ms savings from reducing initial server response time across the sampled routes. This is a diagnostic opportunity, not a verified root cause or guaranteed saving.",
+      "verification_needed": "Inspect aggregate Vercel Function and FastAPI request timings before attributing the delay to SSR, backend, database, or network."
+    },
+    {
+      "id": "cloudflare-web-analytics-rum-observed",
+      "severity": "follow_up",
+      "status": "historically_confirmed_before_disable; live_browser_verification_pending",
+      "observation": "The production page loaded static.cloudflareinsights.com/beacon.min.js (10478 transferred bytes) and made a request to /cdn-cgi/rum (HTTP 204). Cloudflare documents these as its Web Analytics/RUM beacon and reporting endpoint. At the initial observation, the Cloudflare dashboard listed finalclinic.fyi in Web Analytics with automatic setup and showed RUM enabled while excluding EU visitors; the selected setting stated that the JS snippet was not injected for EU visitors. The owner later authorized disabling RUM, and the setting now shows Disable after reload. The public-site plan excludes external RUM for the first release. No app-level reference was found in the searched frontend, Vercel, ops, and workflow paths. The dashboard listed 10 page views and 10 visits in the last 24 hours before the setting change; these counts are not field p75 Core Web Vitals data.",
+      "verification_needed": "The owner authorized disabling RUM for finalclinic.fyi, and Cloudflare now shows Disable after a page reload. The first plain post-change GET still contained the beacon script marker; a later GET with Cache-Control: no-cache returned HTTP 200 with no beacon script or /cdn-cgi/rum marker. JavaScript execution and the browser network beacon remain unverified."
+    }
+  ],
+  "unblocked_detection_probe": {
+    "included_in_summary": false,
+    "origin": "https://finalclinic.fyi",
+    "url": "https://finalclinic.fyi/",
+    "path": "/",
+    "device": "mobile",
+    "performance_score": 98,
+    "lcp_ms": 1415,
+    "cls": 0,
+    "tbt_ms": 30,
+    "transferred_bytes": 16083,
+    "cloudflare_beacon_script_transfer_bytes": 10478,
+    "rum_endpoint_path": "/cdn-cgi/rum",
+    "rum_endpoint_status": 204,
+    "note": "One anonymous synthetic browser visit triggered a beacon. No patient account, patient record, or user-entered data was used. This probe is excluded from the blocked-RUM measurement summary."
+  },
+  "core_web_vitals_targets": {
+    "source": "Project plan section 12.2; Google web.dev Core Web Vitals thresholds",
+    "lcp_p75_max_ms": 2500,
+    "inp_p75_max_ms": 200,
+    "cls_p75_max": 0.1
+  },
+  "limitations": [
+    "One Lighthouse run per route and device profile; results are a directional lab snapshot and can vary between runs.",
+    "Routes sampled: Uzbek and Russian home, both localized service catalogs, Uzbek doctor/prices/contacts listings. Russian doctors/prices/contacts and individual service/doctor details were not measured.",
+    "No CrUX or other field p75 data was available.",
+    "INP was not measured; TBT must not be treated as its substitute.",
+    "Cloudflare RUM was blocked during the 14-run summary, so those transfer-size values exclude that script and endpoint.",
+    "The Lighthouse waterfall cannot separate Vercel Function, FastAPI, database, and network time; no backend or database root cause is assigned."
+  ],
+  "references": [
+    {
+      "title": "Lighthouse official release v13.5.0",
+      "url": "https://github.com/GoogleChrome/lighthouse/releases/tag/v13.5.0"
+    },
+    {
+      "title": "Core Web Vitals thresholds",
+      "url": "https://web.dev/articles/defining-core-web-vitals-thresholds"
+    },
+    {
+      "title": "Cloudflare Web Analytics data collection",
+      "url": "https://developers.cloudflare.com/web-analytics/data-metrics/data-origin-and-collection/"
+    }
+  ],
+  "production_follow_up": {
+    "date": "2026-10-22",
+    "deployment": {
+      "provider": "Vercel",
+      "deployment_id": "dpl_DGuCBCVTq6GSJVmwjK5EoziX3J6K",
+      "deployment_sha": "3e45603c6473d720b404b3ad315b158523a310b5",
+      "target": "production",
+      "status": "READY",
+      "change_note": "PR #3734 was docs-only; the public-site runtime code was not changed."
+    },
+    "http_probe": {
+      "client": "Windows host using curl.exe",
+      "method": "Three sequential GET requests per target; curl time_starttransfer, rounded to milliseconds.",
+      "timing_limit": "Client-side time_starttransfer includes DNS, TCP, TLS, network transit, and response time; it is not an isolated server TTFB.",
+      "samples": [
+        {
+          "target": "https://finalclinic.fyi/",
+          "status": [200, 200, 200],
+          "time_starttransfer_ms": [1287, 1072, 791],
+          "range_ms": [791, 1287],
+          "median_ms": 1072,
+          "rum_marker_in_html_before_setting_change": true
+        },
+        {
+          "target": "https://api.finalclinic.fyi/api/v1/public-site/services?locale=ru",
+          "status": [200, 200, 200],
+          "time_starttransfer_ms": [707, 477, 528],
+          "range_ms": [477, 707],
+          "median_ms": 528
+        },
+        {
+          "target": "local loopback FastAPI GET /api/v1/public-site/services?locale=ru",
+          "status": [200, 200, 200],
+          "time_starttransfer_ms": [74, 23, 22],
+          "range_ms": [22, 74],
+          "median_ms": 23,
+          "note": "Same-host measurement bypasses Cloudflare and the Vercel-to-API path; it is not directly comparable to the public API route."
+        }
+      ],
+      "cache_observation": "PowerShell probes observed cfCacheStatus DYNAMIC for the homepage and public API."
+    },
+    "vercel_timing_evidence": {
+      "observability_plus": "not_enabled",
+      "runtime_logs_window": "30m",
+      "runtime_logs_returned": 0,
+      "request_log_records": 11,
+      "request_log_statuses": [200],
+      "request_log_duration_field": "unavailable",
+      "conclusion": "No aggregate Vercel Function duration or request-level FastAPI timing was available; no delay is attributed to Nitro, FastAPI, the database, or the network."
+    },
+    "telemetry_recheck": {
+      "checked_at_utc": "2026-10-22T11:09:31Z",
+      "checked_at_tashkent": "2026-10-22T16:09:31+05:00",
+      "production_deployment": {
+        "provider": "Vercel",
+        "deployment_id": "dpl_Bm6WqeMgN4zDSc2kvDwgsTrcwR6D",
+        "deployment_sha": "757beb4e5f57a553d4aca6d530d568c5e72940e2",
+        "target": "production",
+        "status": "READY",
+        "runtime_code_sha": "4298419cab7cde00144d051cfef0c4da5744f5df",
+        "runtime_change_note": "The merged PR #3738 changed audit documentation only; runtime application code remains at the baseline SHA."
+      },
+      "vercel_metrics": {
+        "cli_version": "59.1.4",
+        "project": "v0-final",
+        "project_id": "prj_QQmq4y7N7KoTKWKXXOcPrfcERUnB",
+        "time_window_utc": {
+          "start": "2026-10-15T11:04:52Z",
+          "end": "2026-10-22T11:04:52Z"
+        },
+        "function_duration_p75": {
+          "metric": "vercel.function_invocation.function_duration_ms",
+          "result": "payment_required",
+          "detail": "Vercel returned that Function duration queries require Observability Plus; no duration value was returned and no upgrade was made."
+        },
+        "speed_insights_p75": {
+          "metrics": [
+            "vercel.speed_insights.lcp_ms",
+            "vercel.speed_insights.inp_ms",
+            "vercel.speed_insights.cls"
+          ],
+          "aggregation": "p75",
+          "environment": "production",
+          "result": "empty",
+          "summary_rows": 0,
+          "data_rows": 0,
+          "interpretation": "No values were available for this query window. Empty results do not establish whether Speed Insights is enabled or disabled and do not prove that the site had no visits."
+        }
+      },
+      "google_field_data": {
+        "pagespeed_insights_api": {
+          "strategies_attempted": ["mobile", "desktop"],
+          "api_key_supplied": false,
+          "http_status": 429,
+          "error_summary": "The API caller's default daily quota was zero; neither CrUX field data nor a Lighthouse report was returned."
+        },
+        "direct_crux_api": {
+          "queried": false,
+          "prerequisite": "The Chrome UX Report API requires a Google Cloud API key provisioned for that API."
+        },
+        "field_values_retrieved": false
+      },
+      "response_header_probe": {
+        "request": "One GET https://finalclinic.fyi/ from the Windows host",
+        "status": 200,
+        "server_timing_header": null,
+        "cache_control": "no-store",
+        "client_elapsed_ms": 2662.1,
+        "interpretation": "This single client-side duration includes network and connection time and is not a server-only timing or a statistical baseline."
+      },
+      "rum_policy": {
+        "approved_first_release_policy": "No external RUM trackers.",
+        "vercel_speed_insights_configuration": "not_inspected",
+        "change_made": false,
+        "decision": "No Vercel Speed Insights instrumentation or paid Observability Plus upgrade was enabled. Vercel documents Speed Insights as real-user measurements and the project plan excludes external RUM for the first release."
+      },
+      "browser_verification": {
+        "attempted": true,
+        "result": "Chrome navigation to https://finalclinic.fyi/ failed with ERR_CONNECTION_RESET; no page JavaScript or beacon network activity could be inspected.",
+        "cloudflare_disable_verification": "still_pending"
+      },
+      "references": [
+        {
+          "title": "Vercel Speed Insights",
+          "url": "https://vercel.com/docs/speed-insights"
+        },
+        {
+          "title": "Vercel Observability Plus limits and pricing",
+          "url": "https://vercel.com/docs/observability/observability-plus"
+        },
+        {
+          "title": "PageSpeed Insights API",
+          "url": "https://developers.google.com/speed/docs/insights/v5/get-started"
+        },
+        {
+          "title": "Chrome UX Report API",
+          "url": "https://developer.chrome.com/docs/crux/api"
+        }
+      ],
+      "conclusion": "No production Function p75 or field Core Web Vitals values were retrievable. One HTTP response exposed no Server-Timing header; its client-side elapsed time is not used to infer server latency. External RUM remains disabled per first-release policy."
+    },
+    "rum_follow_up": {
+      "pre_change_homepage_html_marker_present": true,
+      "application_source_reference_found": false,
+      "cloudflare_account_setting": {
+        "observed_on": "2026-10-22",
+        "site": "finalclinic.fyi",
+        "setup": "automatic",
+        "previous_rum_mode": "enabled_excluding_eu_visitors",
+        "previous_snippet_behavior": "not_injected_for_eu_visitors",
+        "rum_mode": "disabled",
+        "snippet_behavior": "not_injected_and_disabled",
+        "disable_selected_after_reload": true,
+        "dashboard_page_views_last_24h": 10,
+        "dashboard_visits_last_24h": 10,
+        "dashboard_metrics_reflect_pre_change_observation": true,
+        "policy_assessment": "matches_no_external_rum_first_release_policy"
+      },
+      "change_made": true,
+      "change_date": "2026-10-22",
+      "post_change_http_probes": [
+        {
+          "request": "Initial plain GET after saving the Cloudflare setting",
+          "status": 200,
+          "beacon_script_marker_present": true,
+          "rum_endpoint_marker_present": false,
+          "response_headers_recorded": false
+        },
+        {
+          "request": "GET https://finalclinic.fyi/ with Cache-Control: no-cache and Pragma: no-cache; JavaScript was not executed",
+          "status": 200,
+          "response_cache_control": "no-store",
+          "cf_cache_status": "DYNAMIC",
+          "beacon_script_marker_present": false,
+          "rum_endpoint_marker_present": false
+        }
+      ],
+      "note": "The Cloudflare dashboard showed Disable selected for finalclinic.fyi, and that state remained selected after reloading the settings page. A first plain post-change HTML GET still contained the beacon script marker, while a later no-cache GET returned HTTP 200 without the beacon script or endpoint marker. This audit did not execute page JavaScript after the change, so it does not confirm that no browser beacon request can occur. The earlier unblocked synthetic browser probe observed a beacon request before the setting change. Dashboard page-view and visit counts do not establish LCP, INP, or CLS p75."
+    },
+    "limitations": [
+      "Three sequential samples from one Windows host on one date are a point-in-time diagnostic, not a field p75 or performance baseline.",
+      "Direct public API timings cannot be used to infer the Vercel Function's server-to-server API duration.",
+      "Local loopback FastAPI timings do not establish the cause of the public-route delay.",
+      "Cloudflare shows Web Analytics/RUM disabled for finalclinic.fyi. A no-cache HTML GET no longer contained the beacon marker, but post-change JavaScript and beacon requests remain unverified; a Chrome navigation attempt on 2026-10-22 failed with ERR_CONNECTION_RESET."
+    ],
+    "next_actions": [
+      {
+        "id": "review-cloudflare-rum-configuration",
+        "status": "dashboard_disabled; live_browser_verification_pending",
+        "action": "The owner authorized disabling Web Analytics/RUM for finalclinic.fyi. Cloudflare shows Disable selected after reload. Verify after propagation in an ordinary browser that neither the beacon script nor /cdn-cgi/rum request is loaded; the first plain post-change HTML GET still contained the script marker, while a later no-cache GET did not."
+      },
+      {
+        "id": "obtain-server-duration-evidence",
+        "status": "unavailable",
+        "action": "The Vercel Function duration query requires Observability Plus, and no request-level FastAPI timing was available. Do not upgrade or enable telemetry without a separate decision; if attribution remains necessary, design internal aggregate timings without PHI/PII or raw query strings."
+      },
+      {
+        "id": "obtain-field-core-web-vitals",
+        "status": "unavailable_no_samples_or_api_quota",
+        "action": "Vercel Speed Insights returned no p75 samples for the checked week. The PageSpeed Insights API returned HTTP 429 because the caller's default daily quota was zero; direct CrUX API access requires a provisioned Google Cloud API key. Recheck public aggregate field data when access is available, without adding external RUM, and keep p75 separate from Lighthouse lab values."
+      }
+    ]
+  },
+  "result": "Directional Lighthouse baseline captured on production merge SHA. Performance scores were 96-100 and lab LCP 253-2185 ms across representative routes, but this is not field p75 compliance. On 2026-10-22 the owner-authorized Cloudflare setting for finalclinic.fyi was changed to Disable and remained selected after reload. A later no-cache GET returned HTTP 200 without the beacon script or /cdn-cgi/rum marker; ordinary Chrome verification remains pending because navigation failed with ERR_CONNECTION_RESET. Vercel Speed Insights returned no p75 samples, Vercel Function duration required Observability Plus, and PageSpeed Insights returned HTTP 429 due to zero daily quota. No server-only timing or field p75 was obtained, and no external telemetry was enabled."
+}

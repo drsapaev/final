@@ -2,6 +2,7 @@
 CRUD endpoints для управления отделениями в админ-панели
 """
 
+import hashlib
 import logging  # noqa: F401
 from datetime import date  # noqa: F401
 from decimal import Decimal  # noqa: F401
@@ -13,7 +14,11 @@ from sqlalchemy import and_, func, or_  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.api.deps import get_db, require_roles  # noqa: F401
-from app.core.specialties import canonical_specialty, expand_queue_tags, specialty_variants
+from app.core.specialties import (
+    canonical_specialty,
+    expand_queue_tags,
+    specialty_variants,
+)
 from app.models.appointment import Appointment  # noqa: F401
 from app.models.clinic import ClinicSettings, Doctor, ServiceCategory  # noqa: F401
 from app.models.department import (  # noqa: F401
@@ -127,6 +132,7 @@ class DepartmentResponse(BaseModel):
     def _icon_none_to_empty(cls, value: object) -> object:
         return "" if value is None else value
 
+
 class DepartmentResponseWithSettings(DepartmentResponse):
     """Схема ответа отделения с настройками"""
 
@@ -198,9 +204,7 @@ def _reconcile_queue_setting_aliases(
     if not aliases:
         return
     canonical_row = (
-        db.query(ClinicSettings)
-        .filter(ClinicSettings.key == canonical_key)
-        .first()
+        db.query(ClinicSettings).filter(ClinicSettings.key == canonical_key).first()
     )
     if canonical_row is None:
         oldest = aliases[0]
@@ -339,10 +343,31 @@ def _ensure_department_integrations(
 
         lock_profile_link_scopes(db, department_keys=[department.key])
         service_name = opts.get("service_name") or f"Консультация {department.name_ru}"
-        raw_service_code = opts.get("service_code") or f"{department.key}_consult"
+        configured_service_code = opts.get("service_code")
+        raw_service_code = configured_service_code or f"{department.key}_consult"
         normalized_code = normalize_service_code(raw_service_code) or department.key
+        service_code_max_length = Service.__table__.c.service_code.type.length
+        is_generated_default = not configured_service_code
+        if (
+            is_generated_default
+            and service_code_max_length is not None
+            and len(normalized_code) > service_code_max_length
+        ):
+            # Department keys may be up to 50 characters while
+            # services.service_code is String(10). Keep a readable prefix and
+            # a stable digest so long keys remain distinct within the column.
+            digest_length = min(7, max(1, service_code_max_length - 2))
+            digest = hashlib.sha256(normalized_code.encode("utf-8")).hexdigest().upper()
+            prefix_length = service_code_max_length - digest_length - 1
+            if prefix_length < 1:
+                normalized_code = digest[:service_code_max_length]
+            else:
+                normalized_code = (
+                    f"{normalized_code[:prefix_length].rstrip('_')}_"
+                    f"{digest[:digest_length]}"
+                )
 
-        # Гарантируем уникальность service_code
+        # Гарантируем уникальность service_code внутри ограничения колонки.
         suffix = 1
         unique_code = normalized_code.upper()
         while (
@@ -350,7 +375,20 @@ def _ensure_department_integrations(
             is not None
         ):
             suffix += 1
-            unique_code = f"{normalized_code.upper()}_{suffix}"
+            suffix_token = f"_{suffix}"
+            if service_code_max_length is None:
+                unique_code = f"{normalized_code.upper()}{suffix_token}"
+            else:
+                prefix_length = service_code_max_length - len(suffix_token)
+                if prefix_length < 1:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Could not allocate a unique default service code",
+                    )
+                unique_code = (
+                    f"{normalized_code.upper()[:prefix_length].rstrip('_')}"
+                    f"{suffix_token}"
+                )
 
         default_service = Service(
             code=unique_code,
@@ -385,9 +423,7 @@ def _ensure_department_integrations(
     # but no tab appears — they must separately create a QueueProfile via
     # "Вкладки регистратуры" with the same key, which is non-obvious.
     existing_profile = (
-        db.query(QueueProfile)
-        .filter(QueueProfile.key == department.key)
-        .first()
+        db.query(QueueProfile).filter(QueueProfile.key == department.key).first()
     )
     if not existing_profile:
         queue_profile = QueueProfile(
@@ -456,9 +492,7 @@ def _sync_department_rename_to_own_profile(
     """
     if (old_name_ru or None) == (department.name_ru or None):
         return 0
-    profile = (
-        db.query(QueueProfile).filter(QueueProfile.key == department.key).first()
-    )
+    profile = db.query(QueueProfile).filter(QueueProfile.key == department.key).first()
     if profile is None:
         return 0
     new_title = department.name_ru or profile.key
@@ -526,32 +560,32 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
             .scalar()
             or 0
         )
-        stats["queue_entries_today"] = (
-            db.query(func.count(OnlineQueueEntry.id))
-            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-            # QD-2C (Codex round-13 P2): resource-очереди (specialist
-            # NULL — утренний пре-креат / пост-свитч писатель) inner-join
-            # по Doctor выпадал из queue_entries_today и тотала отдела.
-            # Ось тега/профиля: QueueProfile.department_key == department.key
-            # даёт теги отделения (0055: 'laboratory' → ["lab","laboratory"],
-            # 'echokg' → ["ecg"]), плюс прямые variants ключа (отдел без
-            # профиля). Тег-ветка — только строки на resource-оси; врач-ось
-            # неизменна (outerjoin: тот же предикат department_id).
-            .outerjoin(Doctor, DailyQueue.specialist_id == Doctor.id)
-            .filter(
-                DailyQueue.day == today,
-                OnlineQueueEntry.status.in_(["waiting", "called"]),
-                or_(
-                    Doctor.department_id == department.id,
-                    and_(
-                        DailyQueue.queue_resource_id.isnot(None),
-                        DailyQueue.queue_tag.in_(_department_resource_tags(db, department)),
-                    ),
-                ),
-            )
-            .scalar()
-            or 0
+        queue_entries_query = db.query(func.count(OnlineQueueEntry.id)).join(
+            DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
         )
+        # QD-2C (Codex round-13 P2): resource-очереди (specialist
+        # NULL — утренний пре-креат / пост-свитч писатель) inner-join
+        # по Doctor выпадал из queue_entries_today и тотала отдела.
+        # Ось тега/профиля: QueueProfile.department_key == department.key
+        # даёт теги отделения (0055: 'laboratory' → ["lab","laboratory"],
+        # 'echokg' → ["ecg"]), плюс прямые variants ключа (отдел без
+        # профиля). Тег-ветка — только строки на resource-оси; врач-ось
+        # неизменна (outerjoin: тот же предикат department_id).
+        queue_entries_query = queue_entries_query.outerjoin(
+            Doctor, DailyQueue.specialist_id == Doctor.id
+        )
+        queue_entries_query = queue_entries_query.filter(
+            DailyQueue.day == today,
+            OnlineQueueEntry.status.in_(["waiting", "called"]),
+            or_(
+                Doctor.department_id == department.id,
+                and_(
+                    DailyQueue.queue_resource_id.isnot(None),
+                    DailyQueue.queue_tag.in_(_department_resource_tags(db, department)),
+                ),
+            ),
+        )
+        stats["queue_entries_today"] = queue_entries_query.scalar() or 0
 
         integrations = {
             "has_queue_settings": department.queue_settings is not None,
@@ -572,12 +606,17 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
         # and still fall back to legacy alias rows on unmigrated data.
         canonical_segment = canonical_specialty(department.key) or department.key
 
-        def _pick_queue_setting(prefix: str) -> ClinicSettings | None:
-            candidates = [f"{prefix}{canonical_segment}"]
+        def _pick_queue_setting(
+            prefix: str,
+            *,
+            _canonical_segment: str = canonical_segment,
+            _department_key: str = department.key,
+        ) -> ClinicSettings | None:
+            candidates = [f"{prefix}{_canonical_segment}"]
             candidates += [
                 f"{prefix}{spelling}"
-                for spelling in specialty_variants(department.key)
-                if spelling != canonical_segment
+                for spelling in specialty_variants(_department_key)
+                if spelling != _canonical_segment
             ]
             rows = (
                 db.query(ClinicSettings)

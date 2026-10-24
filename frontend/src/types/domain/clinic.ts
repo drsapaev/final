@@ -224,6 +224,8 @@ export interface Doctor {
   availability?: DoctorAvailability[];
   active?: unknown;
   experience?: unknown;
+  experience_years?: number | null;
+  professional_category?: 'third' | 'second' | 'first' | 'highest' | null;
   patientsCount?: unknown;
   specialization?: unknown;
   schedules?: unknown;

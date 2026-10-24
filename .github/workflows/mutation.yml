@@ -156,6 +156,9 @@ jobs:
         working-directory: frontend
         run: npm install --save-dev @stryker-mutator/core@10.0.0 @stryker-mutator/vitest-runner@10.0.0
 
+      - name: Patch vitest-runner for vitest 5
+        run: node scripts/patch-stryker-vitest5.mjs
+
       - name: Run Stryker
         working-directory: frontend
         run: npx stryker run

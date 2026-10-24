@@ -1314,6 +1314,24 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
         color: profile?.color || '#718096',
     });
     const dialogContentRef = useRef<HTMLDivElement>(null);
+    const wasSavingRef = useRef(Boolean(saving));
+
+    useEffect(() => {
+        const wasSaving = wasSavingRef.current;
+        wasSavingRef.current = Boolean(saving);
+        if (!wasSaving || saving) return;
+
+        const dialogContent = dialogContentRef.current;
+        if (!dialogContent || dialogContent.contains(document.activeElement)) return;
+
+        const firstFormControl = dialogContent.querySelector<HTMLElement>(
+            'form input:not([type="hidden"]):not([disabled]), form select:not([disabled]), form textarea:not([disabled])',
+        );
+        const firstFocusable = dialogContent.querySelector<HTMLElement>(
+            'button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        );
+        (firstFormControl || firstFocusable || dialogContent).focus();
+    }, [saving]);
 
     useEffect(() => {
         const previouslyFocused = document.activeElement instanceof HTMLElement
