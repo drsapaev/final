@@ -32,18 +32,22 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    has_duration_snapshots = (
-        op.get_bind()
-        .execute(
-            sa.text(
-                "SELECT EXISTS ("
-                "SELECT 1 FROM appointments "
-                "WHERE duration_minutes_snapshot IS NOT NULL"
-                ")"
-            )
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        # Alembic runs PostgreSQL DDL in a transaction. Acquire this before
+        # checking so writers cannot commit a snapshot between the guard and
+        # DROP COLUMN; the lock remains held until the downgrade transaction
+        # commits or rolls back.
+        bind.execute(sa.text("LOCK TABLE appointments IN ACCESS EXCLUSIVE MODE"))
+
+    has_duration_snapshots = bind.execute(
+        sa.text(
+            "SELECT EXISTS ("
+            "SELECT 1 FROM appointments "
+            "WHERE duration_minutes_snapshot IS NOT NULL"
+            ")"
         )
-        .scalar_one()
-    )
+    ).scalar_one()
     if has_duration_snapshots:
         raise RuntimeError(
             "Refusing to remove appointment duration snapshots after they "
