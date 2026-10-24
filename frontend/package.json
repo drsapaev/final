@@ -124,7 +124,7 @@
   },
   "overrides": {
     "storybook": {
-      "@vitest/mocker": "4.1.11"
+      "@vitest/mocker": "4.1.12"
     },
     "uuid": "11.1.1",
     "ws": "8.21.0",
