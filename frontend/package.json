@@ -120,7 +120,7 @@
     "terser": "^5.51.2",
     "typescript": "^6.0.3",
     "vite": "^7.3.7",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.5"
   },
   "overrides": {
     "storybook": {
