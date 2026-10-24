@@ -60,6 +60,35 @@ from app.models.user import User
 from app.models.visit import Visit
 
 
+@pytest.fixture(scope="session", autouse=True)
+def reset_idempotency_process_state():
+    """Clear process-global idempotency state at the start of every pytest session.
+
+    The idempotency middleware keeps its response cache, execution intents,
+    scope-binding mirror and bridge anchor at module level, and the Redis
+    claim layer in a module singleton. One pytest process can run SEVERAL
+    full sessions (mutmut's stats -> forced-fail -> clean -> per-mutant
+    phases all call pytest.main in one interpreter): a 2xx response stored
+    during an earlier session then replays in a later session against a
+    fresh database, and the same idempotency-keyed test both "passes" its
+    status assertions and fails its persistence assertions. That poisoned
+    every mutmut nightly from 2026-10-07 (clean phase: cabinet apply replay
+    test failed with the seeded cabinet value). One pytest session == one
+    suite run, so clearing at session start restores the single-run
+    semantics the store was designed for. Redis keys are not touched here —
+    the mutation sandbox runs without Redis and CI runs one session per
+    process.
+    """
+    from app.middleware import idempotency_middleware as idem
+
+    idem._idempotency_cache.clear()
+    idem._local_execution_intents.clear()
+    idem._local_scope_bindings.clear()
+    idem._BRIDGE_ANCHOR_CACHE = (False, 0.0)
+    idem._distributed_claim = None
+    yield
+
+
 @pytest.fixture(scope="session")
 def test_db():
     """Создает тестовую базу данных"""
@@ -68,11 +97,13 @@ def test_db():
     import os
 
     # Создаем временный файл БД
-    db_fd, db_path = tempfile.mkstemp(suffix='.db')
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(db_fd)  # Закрываем файловый дескриптор, SQLAlchemy откроет сам
 
     # check_same_thread=False позволяет использовать БД в разных потоках (для TestClient)
-    engine = create_engine(f"sqlite:///{db_path}", echo=False, connect_args={"check_same_thread": False})
+    engine = create_engine(
+        f"sqlite:///{db_path}", echo=False, connect_args={"check_same_thread": False}
+    )
 
     # ✅ КРИТИЧЕСКИ ВАЖНО: Импортируем все модели перед созданием таблиц
     # app.db.base уже импортирует все модели через app.models.__init__
@@ -81,10 +112,13 @@ def test_db():
 
     # Проверяем, что таблицы созданы (для отладки)
     from sqlalchemy import inspect
+
     inspector = inspect(engine)
     tables = inspector.get_table_names()
     if "users" not in tables:
-        raise RuntimeError(f"CRITICAL: Table 'users' not created! Available tables: {tables}")
+        raise RuntimeError(
+            f"CRITICAL: Table 'users' not created! Available tables: {tables}"
+        )
 
     # Medical Specialty Catalog (0051): production seeds the baseline via
     # Alembic; the test world builds schema via create_all, so the same
@@ -141,6 +175,7 @@ def db_session(test_db):
 def db(db_session):
     """Алиас для db_session для совместимости старых тестов."""
     return db_session
+
 
 @pytest.fixture(scope="function")
 def client(db_session):
@@ -365,7 +400,9 @@ def registrar_token(client: TestClient, registrar_user: User) -> str:
 def patient_token(client: TestClient, db_session: Session) -> str:
     """Токен пациента"""
     # Создаём пациента если нет
-    patient_user = db_session.query(User).filter(User.username == "patient_test").first()
+    patient_user = (
+        db_session.query(User).filter(User.username == "patient_test").first()
+    )
     if not patient_user:
         patient_user = User(
             username="patient_test",
@@ -467,8 +504,7 @@ def pytest_pyfunc_call(pyfuncitem):
     if not inspect.iscoroutinefunction(test_function):
         return None
     fixture_args = {
-        arg: pyfuncitem.funcargs[arg]
-        for arg in pyfuncitem._fixtureinfo.argnames
+        arg: pyfuncitem.funcargs[arg] for arg in pyfuncitem._fixtureinfo.argnames
     }
     asyncio.run(test_function(**fixture_args))
     return True
@@ -485,7 +521,9 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "migration: Тесты миграций")
     config.addinivalue_line("markers", "confirmation: Тесты подтверждения визитов")
     config.addinivalue_line("markers", "queue: Тесты очередей")
-    config.addinivalue_line("markers", "redis: tests requiring a reachable Redis (skipped when absent)")
+    config.addinivalue_line(
+        "markers", "redis: tests requiring a reachable Redis (skipped when absent)"
+    )
 
 
 @pytest.fixture(scope="function")
@@ -508,7 +546,7 @@ def prod_env(monkeypatch: pytest.MonkeyPatch):
     # ── Core identity ──────────────────────────────────────────
     monkeypatch.setenv("ENV", "production")
     monkeypatch.setenv("SECRET_KEY", "test-only-prod-secret-key-32chars!!")
-    monkeypatch.delenv("TESTING", raising=False)               # SEC-005
+    monkeypatch.delenv("TESTING", raising=False)  # SEC-005
     monkeypatch.delenv("CORS_ALLOW_ALL", raising=False)
 
     # ── DB ───────────────────────────────────────────────────
@@ -542,12 +580,14 @@ def _clear_replay_cache():
     """Auto-fixture: clear cache_manager before each test."""
     try:
         from app.core.cache import cache_manager
+
         cache_manager.clear()
     except Exception:
         pass
     yield
     try:
         from app.core.cache import cache_manager
+
         cache_manager.clear()
     except Exception:
         pass
