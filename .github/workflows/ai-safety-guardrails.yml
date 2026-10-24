@@ -78,7 +78,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          # Node 24 matches ci-cd-unified NODE_VERSION. The third webServer
+          # (public-site SSR smoke, PR #3647) builds through the nitro vite
+          # plugin, whose config loader needs native TS import (Node >= 22.18)
+          # or jiti — jiti is not installed, so Node 20 aborted the run before
+          # the guardrail spec itself could start (nightlies 2026-10-12..23).
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
