@@ -116,6 +116,25 @@ describe('High-9: staging nginx.conf security headers', () => {
   it('has Content-Security-Policy', () => {
     expect(src).toMatch(/Content-Security-Policy/);
   });
+
+  it('routes the API-prefixed notifications WebSocket through an explicit upgrade proxy before the generic API location', () => {
+    const notificationsLocation = 'location /api/v1/ws/notifications/ {';
+    const genericApiLocation = 'location /api/ {';
+    const notificationsIndex = src.indexOf(notificationsLocation);
+    const genericApiIndex = src.indexOf(genericApiLocation);
+
+    expect(notificationsIndex).toBeGreaterThanOrEqual(0);
+    expect(genericApiIndex).toBeGreaterThan(notificationsIndex);
+
+    const blockEnd = src.indexOf('\n    }', notificationsIndex);
+    expect(blockEnd).toBeGreaterThan(notificationsIndex);
+    const block = src.slice(notificationsIndex, blockEnd);
+    expect(block).toContain('proxy_pass http://backend:18000;');
+    expect(block).toContain('proxy_http_version 1.1;');
+    expect(block).toContain('proxy_set_header Upgrade $http_upgrade;');
+    expect(block).toContain('proxy_set_header Connection "upgrade";');
+    expect(block).toContain('proxy_read_timeout 3600;');
+  });
 });
 
 // ---------- 5. Medium-10: connect-src no unencrypted ws: ----------
