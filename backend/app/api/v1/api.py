@@ -17,6 +17,7 @@ from app.api.v1.endpoints import (
     admin_doctors,
     admin_finance,
     admin_providers,
+    admin_public_booking_calendar,
     admin_public_site_media,
     admin_stats,
     admin_telegram,
@@ -338,6 +339,11 @@ api_router.include_router(
 api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_appointments.router, tags=["admin-appointments"])
 api_router.include_router(admin_clinic.router, prefix="/admin", tags=["admin"])
+api_router.include_router(
+    admin_public_booking_calendar.router,
+    prefix="/admin",
+    tags=["admin-booking-calendar"],
+)
 api_router.include_router(
     clinic_management.router, prefix="/clinic", tags=["clinic-management"]
 )
