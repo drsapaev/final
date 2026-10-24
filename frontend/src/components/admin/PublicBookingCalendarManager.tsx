@@ -167,12 +167,12 @@ const PublicBookingCalendarManager = () => {
       <Card className="p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <CalendarDays aria-hidden="true" className="mt-1 text-[var(--mac-accent-blue)]" size={22} />
+            <CalendarDays aria-hidden="true" className="mt-1 text-[var(--mac-accent-blue, rgb(0 122 255))]" size={22} />
             <div>
-              <h2 className="m-0 text-lg font-semibold text-[var(--mac-text-primary)]">
+              <h2 className="m-0 text-lg font-semibold text-[var(--mac-text-primary, rgb(0 0 0))]">
                 {t('admin2.pbc_title')}
               </h2>
-              <p className="mb-0 mt-1 max-w-3xl text-sm text-[var(--mac-text-secondary)]">
+              <p className="mb-0 mt-1 max-w-3xl text-sm text-[var(--mac-text-secondary, rgb(69 85 104))]">
                 {t('admin2.pbc_description')}
               </p>
             </div>
@@ -221,11 +221,11 @@ const PublicBookingCalendarManager = () => {
 
       <Card className="p-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <label className="flex min-w-40 flex-col gap-1 text-sm font-medium text-[var(--mac-text-primary)]">
+          <label className="flex min-w-40 flex-col gap-1 text-sm font-medium text-[var(--mac-text-primary, rgb(0 0 0))]">
             {t('admin2.pbc_year_label')}
             <select
               aria-label={t('admin2.pbc_year_label')}
-              className="h-10 rounded-lg border border-[var(--mac-border)] bg-[var(--mac-bg-primary)] px-3 text-[var(--mac-text-primary)]"
+              className="h-10 rounded-lg border border-[var(--mac-border, rgb(184 200 218))] bg-[var(--mac-bg-primary, rgb(238 243 250))] px-3 text-[var(--mac-text-primary, rgb(0 0 0))]"
               disabled={loading || saving || confirming || isDirty}
               value={year}
               onChange={(event) => setYear(Number(event.target.value))}
@@ -236,19 +236,19 @@ const PublicBookingCalendarManager = () => {
             </select>
           </label>
           {calendar && !calendar.is_confirmed && (
-            <p className="m-0 max-w-2xl text-sm text-[var(--mac-text-secondary)]">
+            <p className="m-0 max-w-2xl text-sm text-[var(--mac-text-secondary, rgb(69 85 104))]">
               {t('admin2.pbc_closed_hint')}
             </p>
           )}
           {calendar?.is_confirmed && isDirty && (
-            <p className="m-0 max-w-2xl text-sm text-[var(--mac-text-secondary)]">
+            <p className="m-0 max-w-2xl text-sm text-[var(--mac-text-secondary, rgb(69 85 104))]">
               {t('admin2.pbc_reconfirm_after_save')}
             </p>
           )}
         </div>
 
         {loading ? (
-          <div className="mt-5 flex items-center gap-2 text-sm text-[var(--mac-text-secondary)]" role="status">
+          <div className="mt-5 flex items-center gap-2 text-sm text-[var(--mac-text-secondary, rgb(69 85 104))]" role="status">
             <RefreshCw aria-hidden="true" className="animate-spin" size={16} />
             {t('admin2.pbc_loading')}
           </div>
@@ -256,7 +256,7 @@ const PublicBookingCalendarManager = () => {
           <>
             <div className="mt-5 flex flex-col gap-3">
               <div className="flex flex-wrap items-end gap-3">
-                <label className="flex min-w-56 flex-1 flex-col gap-1 text-sm font-medium text-[var(--mac-text-primary)]">
+                <label className="flex min-w-56 flex-1 flex-col gap-1 text-sm font-medium text-[var(--mac-text-primary, rgb(0 0 0))]">
                   {t('admin2.pbc_date_label')}
                   <Input
                     aria-label={t('admin2.pbc_date_label')}
@@ -279,7 +279,7 @@ const PublicBookingCalendarManager = () => {
               </div>
 
               {holidays.length === 0 ? (
-                <p className="m-0 rounded-xl border border-dashed border-[var(--mac-border)] p-4 text-sm text-[var(--mac-text-secondary)]">
+                <p className="m-0 rounded-xl border border-dashed border-[var(--mac-border, rgb(184 200 218))] p-4 text-sm text-[var(--mac-text-secondary, rgb(69 85 104))]">
                   {t('admin2.pbc_empty')}
                 </p>
               ) : (
@@ -287,9 +287,9 @@ const PublicBookingCalendarManager = () => {
                   {normalizeHolidays(holidays).map((holiday) => (
                     <li
                       key={holiday.date}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--mac-border)] bg-[var(--mac-bg-secondary)] p-3"
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--mac-border, rgb(184 200 218))] bg-[var(--mac-bg-secondary, rgb(227 235 245))] p-3"
                     >
-                      <time dateTime={holiday.date} className="font-medium tabular-nums text-[var(--mac-text-primary)]">
+                      <time dateTime={holiday.date} className="font-medium tabular-nums text-[var(--mac-text-primary, rgb(0 0 0))]">
                         {holiday.date}
                       </time>
                       <div className="flex flex-wrap items-center gap-3">
@@ -326,7 +326,7 @@ const PublicBookingCalendarManager = () => {
               )}
             </div>
 
-            <div className="mt-5 flex flex-col gap-4 border-t border-[var(--mac-border)] pt-4">
+            <div className="mt-5 flex flex-col gap-4 border-t border-[var(--mac-border, rgb(184 200 218))] pt-4">
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant="primary"
@@ -339,7 +339,7 @@ const PublicBookingCalendarManager = () => {
                 </Button>
               </div>
 
-              <div className="rounded-xl border border-[var(--mac-border)] p-3">
+              <div className="rounded-xl border border-[var(--mac-border, rgb(184 200 218))] p-3">
                 <Checkbox
                   checked={confirmReviewed}
                   onChange={setConfirmReviewed}
@@ -358,14 +358,14 @@ const PublicBookingCalendarManager = () => {
                     {t('admin2.pbc_confirm_year')}
                   </Button>
                   {isDirty && (
-                    <span className="text-sm text-[var(--mac-text-secondary)]">
+                    <span className="text-sm text-[var(--mac-text-secondary, rgb(69 85 104))]">
                       {t('admin2.pbc_unsaved')}
                     </span>
                   )}
                 </div>
               </div>
 
-              <p className="m-0 flex items-start gap-2 text-sm text-[var(--mac-text-secondary)]">
+              <p className="m-0 flex items-start gap-2 text-sm text-[var(--mac-text-secondary, rgb(69 85 104))]">
                 <AlertCircle aria-hidden="true" className="mt-0.5 shrink-0" size={16} />
                 {t('admin2.pbc_not_activated_hint')}
               </p>
