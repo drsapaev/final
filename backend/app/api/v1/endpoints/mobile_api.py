@@ -10,7 +10,6 @@ import gzip
 import importlib
 import json
 from datetime import UTC, date, datetime
-
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -37,18 +36,18 @@ from app.db.session import get_db
 from app.schemas.authentication import RefreshTokenResponse
 from app.schemas.mobile import (
     AppointmentUpcomingOut,
-    MobileBookAppointmentRequest,
     LabResultOut,
     MobileAppointmentDetailOut,
     MobileAttestRequest,
+    MobileBookAppointmentRequest,
     MobileLoginRequest,
     MobileLoginResponse,
     MobileQuickStats,
     PatientProfileOut,
 )
-from app.services.mobile_api_service import MobileApiService
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
+from app.services.mobile_api_service import MobileApiService
 from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notifications import notification_sender_service
 
@@ -58,7 +57,7 @@ router = APIRouter()
 # Функция для сжатия JSON ответов (будет использоваться в endpoints)
 def compress_json_response(data: dict) -> Response:
     """Сжимает JSON ответ если он большой"""
-    json_data = json.dumps(data, ensure_ascii=False).encode('utf-8')
+    json_data = json.dumps(data, ensure_ascii=False).encode("utf-8")
 
     if len(json_data) > 1024:  # Сжимаем только большие ответы
         compressed_data = gzip.compress(json_data)
@@ -89,6 +88,7 @@ def _get_mobile_notification_rows(
     NotificationEvent/NotificationDelivery (the canonical platform tables).
     """
     from app.models.user import User
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         return []
@@ -104,7 +104,7 @@ def _get_mobile_notification_rows(
     # показывало уведомления.
     items = result.get("items", [])
     # Apply offset manually since get_inbox uses cursor-based pagination
-    return items[offset:offset + limit] if items else []
+    return items[offset : offset + limit] if items else []
 
 
 @router.post("/auth/login", response_model=MobileLoginResponse)
@@ -236,7 +236,9 @@ def mobile_refresh_token(
             "access_token": result["access_token"],
             "refresh_token": result.get("refresh_token") or refresh_token,
             "token_type": result.get("token_type", "bearer"),
-            "expires_in": result.get("expires_in", settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60),
+            "expires_in": result.get(
+                "expires_in", settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            ),
         }
 
     except HTTPException:
@@ -282,10 +284,11 @@ def get_mobile_patient_profile(
     except Exception as e:
         import logging
         import traceback
-        logging.getLogger(__name__).error('GET /patients/me failed: %s\n%s', e, traceback.format_exc())
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
+
+        logging.getLogger(__name__).error(
+            "GET /patients/me failed: %s\n%s", e, traceback.format_exc()
         )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/appointments/upcoming", response_model=list[AppointmentUpcomingOut])
@@ -315,7 +318,9 @@ def get_upcoming_appointments(
             if doctor is not None:
                 specialty = doctor.specialty or "Врач"
                 if doctor.user is not None:
-                    doctor_name = doctor.user.full_name or doctor.user.username or "Врач"
+                    doctor_name = (
+                        doctor.user.full_name or doctor.user.username or "Врач"
+                    )
 
             result.append(
                 AppointmentUpcomingOut(
@@ -335,10 +340,11 @@ def get_upcoming_appointments(
     except Exception as e:
         import logging
         import traceback
-        logging.getLogger(__name__).error('GET /appointments/upcoming failed: %s\n%s', e, traceback.format_exc())
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
+
+        logging.getLogger(__name__).error(
+            "GET /appointments/upcoming failed: %s\n%s", e, traceback.format_exc()
         )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/appointments/{appointment_id}", response_model=MobileAppointmentDetailOut)
@@ -393,9 +399,7 @@ def get_appointment_detail(
         raise
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/appointments/book", response_model=AppointmentUpcomingOut)
@@ -463,6 +467,7 @@ async def book_mobile_appointment(
         # an unavailable service; the former stub loop
         # (add_appointment_service) wrote nothing and is retired.
         service_names: list[str] = []
+        service_rows = []
         if request.services:
             from app.models.service import Service
 
@@ -486,6 +491,24 @@ async def book_mobile_appointment(
                 )
             service_names = [s.name for s in service_rows]
 
+        # Preserve a duration snapshot only when this request resolves to one
+        # authoritative active service that is not pinned to another doctor.
+        # Keep existing mobile booking acceptance unchanged: a pinned-service
+        # mismatch leaves this metadata unknown rather than rejecting booking.
+        # Appointment.services stores display names, so neither old names nor
+        # multiple selected services are a safe basis for guessing duration.
+        duration_minutes_snapshot = None
+        if len(request.services) == 1 and len(service_rows) == 1:
+            service = service_rows[0]
+            if service.doctor_id in (None, request.doctor_id):
+                service_duration = service.duration_minutes
+                if (
+                    isinstance(service_duration, int)
+                    and not isinstance(service_duration, bool)
+                    and service_duration > 0
+                ):
+                    duration_minutes_snapshot = service_duration
+
         # Создаем запись. NOTE: the handler used to bind the wrong request
         # schema and referenced nonexistent Appointment columns (complaint,
         # source) — the endpoint returned 500 for EVERY valid request
@@ -503,12 +526,14 @@ async def book_mobile_appointment(
             "notes": "\n".join(notes_parts) or None,
             "status": "scheduled",
             "services": service_names,
+            "duration_minutes_snapshot": duration_minutes_snapshot,
         }
 
         appointment = crud_appointment.create_appointment(db, appointment_data)
 
         # PR-3: doctor lives in the doctors table, not users. Use clinic CRUD.
         from app.crud import clinic as crud_clinic
+
         doctor = crud_clinic.get_doctor_by_id(db, doctor_id=request.doctor_id)
         doctor_name = "Врач"
         specialty = "Врач"
@@ -520,7 +545,9 @@ async def book_mobile_appointment(
         # Отправляем уведомление
         # Используем notification_sender_service
         try:
-            await notification_sender_service.send_appointment_confirmation(db, appointment.id)
+            await notification_sender_service.send_appointment_confirmation(
+                db, appointment.id
+            )
         except Exception:
             pass  # Don't fail booking if notification fails
 
@@ -579,10 +606,11 @@ def get_lab_results(
     except Exception as e:
         import logging
         import traceback
-        logging.getLogger(__name__).error('GET /lab/results failed: %s\n%s', e, traceback.format_exc())
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
+
+        logging.getLogger(__name__).error(
+            "GET /lab/results failed: %s\n%s", e, traceback.format_exc()
         )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/stats", response_model=MobileQuickStats)
@@ -640,7 +668,10 @@ def get_mobile_quick_stats(
                 ).label("upcoming_count"),
                 func.max(
                     case(
-                        (Appointment.status.in_(completed_status_set), Appointment.appointment_date),
+                        (
+                            Appointment.status.in_(completed_status_set),
+                            Appointment.appointment_date,
+                        ),
                     )
                 ).label("last_visit_date"),
             )
@@ -683,9 +714,7 @@ def get_mobile_quick_stats(
         raise
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/notifications", response_model=list[dict])
@@ -721,9 +750,7 @@ def get_mobile_notifications(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/notifications/{notification_id}/read", response_model=dict[str, Any])
@@ -752,9 +779,7 @@ async def mark_notification_read(
         raise
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/health", response_model=dict[str, Any])
@@ -780,7 +805,7 @@ async def test_push_notification(
             title="Тестовое уведомление",
             message="Это тестовое push-уведомление от мобильного API",
             data={"test": "true", "timestamp": datetime.now(UTC).isoformat()},
-            db=db
+            db=db,
         )
 
         if success:
@@ -798,9 +823,7 @@ async def test_push_notification(
 
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ==================== PR-6: Missing endpoints ====================
@@ -820,6 +843,7 @@ def list_mobile_doctors(
     """
     try:
         from app.crud import clinic as crud_clinic
+
         # Lifecycle eligibility (Codex round-2 P2, refined round-7 P2): the
         # incomplete-profile ("general" sentinel) predicate is applied IN
         # THE DATABASE QUERY (eligible_only=True) — this list feeds the
@@ -828,12 +852,16 @@ def list_mobile_doctors(
         # the requested limit allowed more rows.
         if specialty:
             doctors = crud_clinic.get_doctors_by_specialty(
-                db, specialty=specialty, eligible_only=True,
+                db,
+                specialty=specialty,
+                eligible_only=True,
                 exclude_internal_only=True,
             )
         else:
             doctors = crud_clinic.get_doctors(
-                db, active_only=True, eligible_only=True,
+                db,
+                active_only=True,
+                eligible_only=True,
                 exclude_internal_only=True,
             )
         # Limit
@@ -844,22 +872,22 @@ def list_mobile_doctors(
             name = "Врач"
             if doctor.user is not None:
                 name = doctor.user.full_name or doctor.user.username or "Врач"
-            result.append({
-                "id": doctor.id,
-                "name": name,
-                "specialty": doctor.specialty,
-                "cabinet": doctor.cabinet,
-                "active": doctor.active,
-            })
+            result.append(
+                {
+                    "id": doctor.id,
+                    "name": name,
+                    "specialty": doctor.specialty,
+                    "cabinet": doctor.cabinet,
+                    "active": doctor.active,
+                }
+            )
         return result
 
     except HTTPException:
         raise
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/attest", response_model=dict[str, Any])
@@ -921,6 +949,4 @@ def attest_device(
         raise
     except Exception as exc:
         log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
