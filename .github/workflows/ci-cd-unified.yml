@@ -774,7 +774,7 @@ jobs:
     # chromium + 128 тестов); добавленный блокирующий lab-dirty-guard suite
     # (61 тест, workers=1 на CI) требует запаса, чтобы timeout не убивал
     # валидный прогон на медленных раннерах.
-    timeout-minutes: 25
+    timeout-minutes: 35
     needs: [ci-scope]
     if: |
       needs.ci-scope.outputs.frontend_e2e_required == 'true' &&
