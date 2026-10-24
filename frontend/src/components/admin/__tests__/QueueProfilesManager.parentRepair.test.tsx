@@ -21,7 +21,6 @@ const { apiMock, state } = vi.hoisted(() => {
       reason_codes: ['parent_conflict'],
     },
     icon: 'Heart',
-    color: '#007AFF',
   };
   const preview = {
     success: true,

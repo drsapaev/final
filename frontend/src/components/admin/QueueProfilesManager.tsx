@@ -1107,19 +1107,9 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
 
                 {parentRepairSuccess && (
                     <div
+                        className="admin-p-12-bg-success-bg-bd-1solidvar-mac-success-border-radius-var--mac-radius-md admin-d-flex-ai-center-gap-8-mb-12"
                         role="status"
                         aria-live="polite"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            padding: 12,
-                            marginBottom: 16,
-                            border: '1px solid var(--mac-success, #218454)',
-                            borderRadius: 8,
-                            color: 'var(--mac-success, #218454)',
-                            backgroundColor: 'var(--mac-success-bg)',
-                        }}
                     >
                         <Check size={16} />
                         {parentRepairSuccess}
@@ -1338,8 +1328,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                     </span>{' '}
                                     {profile.effective_availability?.reason_codes?.includes('parent_conflict') && (
                                         <span
-                                            className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-dyn-col-dyn"
-                                            style={{ '--admin-bgc0': 'var(--mac-error-bg, transparent)', '--admin-col1': 'var(--mac-error, currentColor)' } as CSSProperties}
+                                            className="admin-field-error-xs"
                                             role="status"
                                         >
                                             {t('admin2.qp_parent_repair_status_conflict')}
@@ -1571,8 +1560,8 @@ const QueueProfileParentRepairDialog = ({
             onClose={() => { if (!applying) onClose(); }}
             onKeyDown={handleKeyDown}
             aria-labelledby="queue-profile-parent-repair-title"
+            className="admin-modal-body-catalog"
             maxWidth="md"
-            style={{ maxHeight: '90vh', overflowY: 'auto', padding: 0 }}
         >
             <div ref={dialogContentRef} className="admin-qp-modal" tabIndex={-1}>
                 <div className="admin-qp-modal-header">
