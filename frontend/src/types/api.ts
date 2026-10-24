@@ -60,6 +60,13 @@ export type ServiceDto = Schemas['ServiceOut'];
 export type ServiceCreateDto = Schemas['ServiceCreate'];
 export type ServiceUpdateDto = Schemas['ServiceUpdate'];
 
+// Admin-managed public booking calendar (annual holiday dates).
+export type PublicBookingHolidayDto = Schemas['PublicBookingHoliday'];
+export type PublicBookingCalendarUpdateDto = Schemas['PublicBookingCalendarUpdate'];
+export type PublicBookingCalendarConfirmDto = Schemas['PublicBookingCalendarConfirm'];
+export type PublicBookingCalendarYearDto = Schemas['PublicBookingCalendarYearOut'];
+export type PublicBookingCalendarErrorDto = Schemas['PublicBookingCalendarErrorOut'];
+
 export type DepartmentDto = Schemas['DepartmentInfoResponse'];
 export type DepartmentListResponseDto = Schemas['DepartmentListResponse'];
 export type DepartmentUpdateDto = Schemas['DepartmentUpdate'];
