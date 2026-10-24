@@ -1,4 +1,16 @@
-## Latest continuation — T17 PR #3721 exact-head CI passed — 2026-10-20T17:48:01+05:00
+## Latest continuation — T18 targeted parent-repair staging complete; PR #3763 remains Draft — 2026-10-24T14:44+05:00
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-parent-repair\final`, branch `codex/aqs-t18-parent-conflict-repair`. PR #3763 remains OPEN/Draft/MERGEABLE at code HEAD `2a7ea42f12bb64a117050439e9cb32605b000558`, base `2f86605e2f7a77f42c2a00e2ea87c1dc234c27c1`; its validation description now records the targeted synthetic staging result.
+
+Canonical Preflight and Session passed on owned project `clinic-aqs-pr3763-20261024`. Normal Admin password login plus first-time TOTP enrollment/verification passed; the served `/sw.js` contained the exact code SHA. The browser confirmed parent-conflict preview, stale `409 parent_repair_stale`, automatic stale recovery, explicit refresh after Department reactivation, and audited apply `200`. PostgreSQL invariants passed for the QueueProfile repair, Services, DailyQueue and waiting entry, permanent address, audit actor/event, and Admin 2FA. Canonical teardown removed 5 containers, 3 volumes and 1 network; canonical remaining counts and independent exact-project label queries were all zero.
+
+The repeated cycles before the pass were harness-only failures (PowerShell BOM, stale-refresh listener race, native stderr handling, and scalar container-ID indexing); corrected harness behavior is summarized in `EVIDENCE.md`. Cleanup of the private env and harness was blocked by host command policy before execution; they remain in ignored `.scratch/` and were not printed or reused. DevBrain capture revision 2 records this checkpoint; its non-secret input payload also remains in `.scratch/`. Tracked source/tests remain unchanged; the only tracked modifications are local plan checkpoints/evidence. After the PR validation description was updated, PR Review Quality Gate `40083273181` and PR Lifecycle Recommendation `40083273360` both passed; exact-head Unified CI `40074794446` passed.
+
+This is one targeted parent-repair slice only. Other T18 scenarios and named legacy specs were not rerun in this cycle; preserve their earlier recorded results. Full `STAGING_VALIDATION.md` and T18 remain incomplete. No review/merge/deploy action was taken.
+
+After the user's `решай`, continue normal review preparation: commit the four journal documents, merge frozen fresh main `b055a48bfe9b18120ec664918ae13f34b547ba9b` without rewriting branch history, validate the updated frontend dependencies and recurring Admin password/TOTP login in one owned synthetic Session, then make the PR Ready after green checks. Gate output is `narrow_override` (`gate_misroute=true`, `override_used=true`), generated prompt read; backend service is reference-only. A second-agent AI audit found no confirmed P0/P1/P2. Do not submit a human approval or merge.
+
+## Previous continuation — T17 PR #3721 exact-head CI passed — 2026-10-20T17:48:01+05:00
 
 Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. Product commit `e88cc6aa1a7a31339c42455598f03a3f42d57eea` is pushed to PR #3721, which is OPEN/Ready/MERGEABLE. Base/current `origin/main` is `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
 

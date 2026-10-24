@@ -720,6 +720,12 @@ Artifacts established output/playwright/test-results по runbook; auth-state/to
 **Приёмка:** доказательства конкретного deploy commit, без скрытых NOT_RUN; separate ten-point staging validation ниже.
 **Stop:** no required env/check/real patient origin/contract regression. QA не отключает PII masking.
 
+#### T18 targeted parent-repair slice — PR #3763
+
+На `2a7ea42f12bb64a117050439e9cb32605b000558` один синтетический сценарий родительского конфликта QueueProfile прошёл canonical Preflight → Session → teardown. Обычный password-вход Admin с первичной TOTP-настройкой и проверкой кода прошёл; served `/sw.js` подтвердил точный commit. Preview показал конфликт и допустимую цель; stale apply вернул `409 parent_repair_stale`; автоматическое обновление отразило выключенную цель; после включения отделения отдельный refresh показал `active=true`; apply вернул 200 и audit ID. PostgreSQL verifier подтвердил сохранность Service, DailyQueue, ожидающего талона, постоянного адреса и аудита. Teardown: 5 контейнеров, 3 тома, 1 сеть удалены; остаток — 0.
+
+Этот прогон покрывает только parent repair. Повторный password+TOTP login и прочие сценарии здесь не запускались; ранее зафиксированные результаты T18 сохраняются. Полный [STAGING_VALIDATION.md](../../docs/runbooks/STAGING_VALIDATION.md) и T18 ещё не завершены. Текущее продолжение — синхронизация #3763 с обновлениями frontend-зависимостей, целевая проверка и подготовка Ready; merge остаётся за пользователем. Run record находится в `admin-queue-simplification/EVIDENCE.md` и `RESUME.md`.
+
 ## 7. Контракты и обязательные проверки
 
 | Контракт | Изменение |
@@ -798,4 +804,4 @@ Read diagnostic conflict не означает auto production repair. Gate/PG p
 
 T00–T18/подэтапы подтверждённо MERGED; все admissions единая v1 policy; legacy truthful; ambiguities shown/blocked; context survives navigation; UI facts/scope; history/ownership/numbers/queue_time/QR preserved; required evidence для deploy commit.
 
-План/журналы остаются постоянной памятью. Следующий агент начинает с [RESUME.md](admin-queue-simplification/RESUME.md), exact-recall task ID и сверки actual HEAD/diff/PR. Текущая точка — T11/#3639, затем диагностический disposition T11.1; T00–T10 не начинать заново. T12 начинается после закрытия текущего PR-цикла. Deferral не переносить между PR и не подменять им pre-deploy gate.
+План/журналы остаются постоянной памятью. Следующий агент начинает с [RESUME.md](admin-queue-simplification/RESUME.md), exact-recall task ID и сверки actual HEAD/diff/PR. Текущая точка — подготовка PR #3763 к независимому review: целевой сценарий parent repair подтверждён; свежие dependency updates требуют проверки после синхронизации. Полный T18 и pre-deploy checklist не завершены; их неполные результаты не закрывать этим узким прогоном. Не начинать следующий PR до закрытия текущего цикла, не переносить deferral между PR и не подменять им pre-deploy gate.
