@@ -4,6 +4,7 @@ from datetime import date, time
 
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor, Schedule
+from app.models.user import User
 from app.repositories.public_booking_availability_repository import (
     PublicBookingAvailabilityRepository,
 )
@@ -12,6 +13,8 @@ from app.repositories.public_booking_availability_repository import (
 def test_repository_reads_only_active_profile_shift_and_minimal_day_occupancy(
     db_session, test_doctor, test_doctor_user, test_patient
 ):
+    test_doctor.show_on_website = True
+    db_session.flush()
     target_date = date(2026, 10, 26)
     other_doctor = Doctor(user_id=test_doctor_user.id, specialty="Тест")
     db_session.add(other_doctor)
@@ -83,3 +86,64 @@ def test_repository_reads_only_active_profile_shift_and_minimal_day_occupancy(
 
     assert schedules == [(time(9, 10), time(17), [{"start": "12:00", "end": "13:00"}])]
     assert appointments == [(target_date, "09:30", 40, "scheduled")]
+
+
+def test_repository_hides_shifts_for_ineligible_public_doctor(db_session, test_doctor):
+    target_date = date(2026, 10, 26)
+    weekday = target_date.weekday()
+    test_doctor.show_on_website = True
+    db_session.add(
+        Schedule(
+            doctor_id=test_doctor.id,
+            weekday=weekday,
+            start_time=time(9),
+            end_time=time(12),
+            active=True,
+        )
+    )
+    db_session.flush()
+
+    repository = PublicBookingAvailabilityRepository(db_session)
+    assert repository.list_active_schedules_for_weekday(
+        doctor_id=test_doctor.id, weekday=weekday
+    ) == [(time(9), time(12), None)]
+
+    test_doctor.active = False
+    db_session.flush()
+    assert (
+        repository.list_active_schedules_for_weekday(
+            doctor_id=test_doctor.id, weekday=weekday
+        )
+        == []
+    )
+
+    test_doctor.active = True
+    test_doctor.show_on_website = False
+    db_session.flush()
+    assert (
+        repository.list_active_schedules_for_weekday(
+            doctor_id=test_doctor.id, weekday=weekday
+        )
+        == []
+    )
+
+    test_doctor.show_on_website = True
+    doctor_user = db_session.get(User, test_doctor.user_id)
+    assert doctor_user is not None
+    doctor_user.is_active = False
+    db_session.flush()
+    assert (
+        repository.list_active_schedules_for_weekday(
+            doctor_id=test_doctor.id, weekday=weekday
+        )
+        == []
+    )
+
+    test_doctor.user_id = None
+    db_session.flush()
+    assert (
+        repository.list_active_schedules_for_weekday(
+            doctor_id=test_doctor.id, weekday=weekday
+        )
+        == []
+    )

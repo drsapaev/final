@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
-from app.models.clinic import Schedule
+from app.models.clinic import Doctor, Schedule
+from app.models.user import User
 
 
 class PublicBookingAvailabilityRepository:
@@ -22,10 +23,15 @@ class PublicBookingAvailabilityRepository:
     ) -> list[tuple[time | None, time | None, object | None]]:
         statement = (
             select(Schedule.start_time, Schedule.end_time, Schedule.breaks)
+            .join(Doctor, Schedule.doctor_id == Doctor.id)
+            .join(User, Doctor.user_id == User.id)
             .where(
                 Schedule.doctor_id == doctor_id,
                 Schedule.weekday == weekday,
                 Schedule.active.is_(True),
+                Doctor.active.is_(True),
+                Doctor.show_on_website.is_(True),
+                User.is_active.is_(True),
             )
             .order_by(Schedule.id)
         )
