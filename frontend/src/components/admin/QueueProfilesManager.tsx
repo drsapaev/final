@@ -48,6 +48,8 @@ import Dialog from '../ui/macos/Dialog';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 import { notify } from '../../services/notify';
+import { mapQueueProfileParentRepairPreviewDto } from '../../api/mappers/queue';
+import type { QueueProfileParentRepairPreview } from '../../types/domain/queue';
 import {
   QUEUE_PROFILES_CSV_BLOCKING_ISSUES,
   buildQueueProfilesCsv,
@@ -245,6 +247,18 @@ const apiErrorMessage = (error: unknown, fallback: string): string => {
     return parts.filter(Boolean).join(' ') || fallback;
 };
 
+const apiErrorReason = (error: unknown): string | null => {
+    if (typeof error !== 'object' || error === null) return null;
+    const response = (error as { response?: unknown }).response;
+    if (typeof response !== 'object' || response === null) return null;
+    const data = (response as { data?: unknown }).data;
+    if (typeof data !== 'object' || data === null) return null;
+    const detail = (data as { detail?: unknown }).detail;
+    if (typeof detail !== 'object' || detail === null) return null;
+    const reason = (detail as { reason?: unknown }).reason;
+    return typeof reason === 'string' ? reason : null;
+};
+
 const getQueueProfileDisplayName = (profile: QueueProfileDto): string =>
     profile.name?.trim() || profile.title_ru?.trim() || profile.title?.trim() || profile.key;
 
@@ -271,6 +285,16 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     const [operationReport, setOperationReport] = useState<QueueProfileOperationReport | null>(null);
     const [retryOperation, setRetryOperation] = useState<QueueProfileOperation | null>(null);
     const [pendingCsvPublicationKeys, setPendingCsvPublicationKeys] = useState<string[]>(readPendingCsvPublicationKeys);
+    const [parentRepairProfileKey, setParentRepairProfileKey] = useState<string | null>(null);
+    const [parentRepairPreview, setParentRepairPreview] = useState<QueueProfileParentRepairPreview | null>(null);
+    const [parentRepairLoading, setParentRepairLoading] = useState(false);
+    const [parentRepairApplying, setParentRepairApplying] = useState(false);
+    const [parentRepairError, setParentRepairError] = useState<string | null>(null);
+    const [parentRepairSuccess, setParentRepairSuccess] = useState<string | null>(null);
+    const [confirmParentRepairTarget, setConfirmParentRepairTarget] = useState(false);
+    const [confirmParentRepairServices, setConfirmParentRepairServices] = useState(false);
+    const [confirmParentRepairPublicAccess, setConfirmParentRepairPublicAccess] = useState(false);
+    const parentRepairRequestSequence = useRef(0);
 
     // ⭐ New: Search and filter
     const [searchTerm, setSearchTerm] = useState('');
@@ -316,6 +340,103 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             setDepartments(((res.data?.data as unknown[]) || []) as unknown as DepartmentDto[]);
         }).catch(err => logger.error('Failed to load departments:', err));
     }, [loadProfiles]);
+
+    const loadParentRepairPreview = async (
+        profileKey: string,
+        options: { preserveError?: boolean } = {},
+    ) => {
+        const requestSequence = ++parentRepairRequestSequence.current;
+        setParentRepairLoading(true);
+        if (!options.preserveError) setParentRepairError(null);
+        setConfirmParentRepairTarget(false);
+        setConfirmParentRepairServices(false);
+        setConfirmParentRepairPublicAccess(false);
+        try {
+            const response = (await api.get(
+                `/queues/profiles/${encodeURIComponent(profileKey)}/parent-repair-preview`,
+            )) as import('axios').AxiosResponse<QueueProfileParentRepairPreview>;
+            if (requestSequence !== parentRepairRequestSequence.current) return;
+            setParentRepairPreview(mapQueueProfileParentRepairPreviewDto(response.data));
+        } catch (err) {
+            if (requestSequence !== parentRepairRequestSequence.current) return;
+            const reason = apiErrorReason(err);
+            setParentRepairPreview(null);
+            setParentRepairError(reason === 'parent_repair_stale'
+                ? tRef.current('admin2.qp_parent_repair_stale')
+                : apiErrorMessage(err, tRef.current('admin2.qp_parent_repair_load_failed')));
+        } finally {
+            if (requestSequence === parentRepairRequestSequence.current) {
+                setParentRepairLoading(false);
+            }
+        }
+    };
+
+    const openParentRepair = (profileKey: string) => {
+        setParentRepairProfileKey(profileKey);
+        setParentRepairPreview(null);
+        setParentRepairError(null);
+        setParentRepairSuccess(null);
+        void loadParentRepairPreview(profileKey);
+    };
+
+    const closeParentRepair = () => {
+        parentRepairRequestSequence.current += 1;
+        setParentRepairProfileKey(null);
+        setParentRepairPreview(null);
+        setParentRepairError(null);
+        setParentRepairLoading(false);
+        setParentRepairApplying(false);
+    };
+
+    const applyParentRepair = async () => {
+        const target = parentRepairPreview?.target;
+        if (
+            !parentRepairProfileKey
+            || !parentRepairPreview?.can_apply
+            || !parentRepairPreview.preview_token
+            || !target
+            || !confirmParentRepairTarget
+            || (parentRepairPreview.service_scope_confirmation_required && !confirmParentRepairServices)
+            || (parentRepairPreview.public_access_confirmation_required && !confirmParentRepairPublicAccess)
+        ) return;
+        setParentRepairApplying(true);
+        setParentRepairError(null);
+        try {
+            await api.post(
+                `/queues/profiles/${encodeURIComponent(parentRepairProfileKey)}/parent-repair`,
+                {
+                    target_department_key: target.department_key,
+                    preview_token: parentRepairPreview.preview_token,
+                    confirm_target: true,
+                    confirm_service_scope_change: confirmParentRepairServices,
+                    confirm_public_access: confirmParentRepairPublicAccess,
+                    reason_code: 'resolve_parent_conflict_to_own_key',
+                },
+            );
+            const refreshedProfiles = await loadProfiles({ silent: true, clearSelection: false });
+            if (!refreshedProfiles) {
+                setError(tRef.current('admin2.qp_parent_repair_saved_refresh_failed'));
+            }
+            setParentRepairSuccess(tRef.current('admin2.qp_parent_repair_success'));
+            window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
+            closeParentRepair();
+        } catch (err) {
+            const reason = apiErrorReason(err);
+            if (reason === 'parent_repair_stale') {
+                setParentRepairError(tRef.current('admin2.qp_parent_repair_stale'));
+                await loadParentRepairPreview(parentRepairProfileKey, { preserveError: true });
+            } else if (reason === 'parent_repair_confirmation_required') {
+                setParentRepairError(tRef.current('admin2.qp_parent_repair_confirmation_required'));
+            } else if (reason === 'parent_repair_not_applicable') {
+                setParentRepairError(tRef.current('admin2.qp_parent_repair_not_applicable'));
+                await loadParentRepairPreview(parentRepairProfileKey, { preserveError: true });
+            } else {
+                setParentRepairError(apiErrorMessage(err, tRef.current('admin2.qp_parent_repair_apply_failed')));
+            }
+        } finally {
+            setParentRepairApplying(false);
+        }
+    };
 
     // ⭐ New: Filtered profiles
     const filteredProfiles = useMemo(() => {
@@ -984,6 +1105,17 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                     </div>
                 )}
 
+                {parentRepairSuccess && (
+                    <div
+                        className="admin-p-12-bg-success-bg-bd-1solidvar-mac-success-border-radius-var--mac-radius-md admin-d-flex-ai-center-gap-8-mb-12"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        <Check size={16} />
+                        {parentRepairSuccess}
+                    </div>
+                )}
+
                 {(operationReport || pendingCsvPublicationKeys.length > 0) && (
                     <section
                         className="admin-p-16-radius-12-bd-1px-solid-var-mac-bo-mb-16"
@@ -1194,6 +1326,14 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                     >
                                         {profile.is_active !== false ? t('admin2.qp_status_active') : t('admin2.qp_status_hidden')}
                                     </span>{' '}
+                                    {profile.effective_availability?.reason_codes?.includes('parent_conflict') && (
+                                        <span
+                                            className="admin-field-error-xs"
+                                            role="status"
+                                        >
+                                            {t('admin2.qp_parent_repair_status_conflict')}
+                                        </span>
+                                    )}{' '}
                                     <span
                                         className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-dyn-col-dyn"
                                         style={{ '--admin-bgc0': profile.show_on_qr_page === true
@@ -1252,6 +1392,16 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                         >
                                             <Edit2 size={16} />
                                         </button>
+                                        {profile.effective_availability?.reason_codes?.includes('parent_conflict') && (
+                                            <button
+                                                type="button"
+                                                className="admin-qp-button"
+                                                onClick={() => openParentRepair(profile.key)}
+                                                disabled={saving || parentRepairApplying}
+                                            >
+                                                {t('admin2.qp_parent_repair_open')}
+                                            </button>
+                                        )}
                                         <button
                                             className="admin-p-6-bd-none-radius-6-bgc-transparent-cur-pointer-secondary-d-inline-flex-ai-center-jc-center-EF4444"
                                             onClick={() => handleDelete(profile.key)}
@@ -1290,12 +1440,296 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                         departments={departments}
                     />
                 )}
+                {parentRepairProfileKey && (
+                    <QueueProfileParentRepairDialog
+                        profileKey={parentRepairProfileKey}
+                        preview={parentRepairPreview}
+                        loading={parentRepairLoading}
+                        applying={parentRepairApplying}
+                        error={parentRepairError}
+                        confirmTarget={confirmParentRepairTarget}
+                        confirmServices={confirmParentRepairServices}
+                        confirmPublicAccess={confirmParentRepairPublicAccess}
+                        onConfirmTarget={setConfirmParentRepairTarget}
+                        onConfirmServices={setConfirmParentRepairServices}
+                        onConfirmPublicAccess={setConfirmParentRepairPublicAccess}
+                        onRefresh={() => { void loadParentRepairPreview(parentRepairProfileKey); }}
+                        onApply={() => { void applyParentRepair(); }}
+                        onClose={closeParentRepair}
+                    />
+                )}
                 {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
                 {confirmDialog}
             </div>
         </div>
     );
 };
+interface QueueProfileParentRepairDialogProps {
+    profileKey: string;
+    preview: QueueProfileParentRepairPreview | null;
+    loading: boolean;
+    applying: boolean;
+    error: string | null;
+    confirmTarget: boolean;
+    confirmServices: boolean;
+    confirmPublicAccess: boolean;
+    onConfirmTarget: (checked: boolean) => void;
+    onConfirmServices: (checked: boolean) => void;
+    onConfirmPublicAccess: (checked: boolean) => void;
+    onRefresh: () => void;
+    onApply: () => void;
+    onClose: () => void;
+}
+
+const QueueProfileParentRepairDialog = ({
+    profileKey,
+    preview,
+    loading,
+    applying,
+    error,
+    confirmTarget,
+    confirmServices,
+    confirmPublicAccess,
+    onConfirmTarget,
+    onConfirmServices,
+    onConfirmPublicAccess,
+    onRefresh,
+    onApply,
+    onClose,
+}: QueueProfileParentRepairDialogProps) => {
+    const { t: rawT } = useTranslation();
+    const t = rawT;
+    const dialogContentRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const previouslyFocused = document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+        const dialogContent = dialogContentRef.current;
+        if (!dialogContent) return;
+        const firstFocusable = dialogContent.querySelector<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        );
+        (firstFocusable || dialogContent).focus();
+        return () => {
+            if (previouslyFocused?.isConnected) previouslyFocused.focus();
+        };
+    }, []);
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            if (!applying) onClose();
+            return;
+        }
+        if (event.key !== 'Tab') return;
+        const content = dialogContentRef.current;
+        if (!content) return;
+        const focusable = Array.from(content.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ));
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (!first || !last) {
+            event.preventDefault();
+            content.focus();
+        } else if (event.shiftKey && (document.activeElement === first || !content.contains(document.activeElement))) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !content.contains(document.activeElement))) {
+            event.preventDefault();
+            first.focus();
+        }
+    };
+
+    const requiredConfirmationsPresent = Boolean(
+        preview
+        && confirmTarget
+        && (!preview.service_scope_confirmation_required || confirmServices)
+        && (!preview.public_access_confirmation_required || confirmPublicAccess),
+    );
+    const proposedReasonLabels = (preview?.proposed_reason_codes || []).map((reason) => {
+        if (reason === 'parent_inactive') return t('admin2.qp_parent_repair_reason_parent_inactive');
+        if (reason === 'manual_archived') return t('admin2.qp_parent_repair_reason_manual_archived');
+        return reason;
+    });
+
+    return (
+        <Dialog
+            open
+            onClose={() => { if (!applying) onClose(); }}
+            onKeyDown={handleKeyDown}
+            aria-labelledby="queue-profile-parent-repair-title"
+            className="admin-modal-body-catalog"
+            maxWidth="md"
+        >
+            <div ref={dialogContentRef} className="admin-qp-modal" tabIndex={-1}>
+                <div className="admin-qp-modal-header">
+                    <h3 className="admin-qp-modal-title" id="queue-profile-parent-repair-title">
+                        {t('admin2.qp_parent_repair_title')}
+                    </h3>
+                    <button
+                        type="button"
+                        className="admin-qp-close-button"
+                        onClick={onClose}
+                        aria-label={t('admin2.qp_close_form_aria')}
+                        disabled={applying}
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="admin-p-20">
+                    <p>{t('admin2.qp_parent_repair_intro', { key: profileKey })}</p>
+                    {loading && <p role="status" aria-live="polite">{t('admin2.qp_parent_repair_loading')}</p>}
+                    {error && <div className="admin-qp-error" role="alert">{error}</div>}
+                    {!loading && !preview && !error && (
+                        <p role="status">{t('admin2.qp_parent_repair_no_preview')}</p>
+                    )}
+                    {preview && (
+                        <>
+                            <section aria-label={t('admin2.qp_parent_repair_current_binding')}>
+                                <h4>{t('admin2.qp_parent_repair_current_binding')}</h4>
+                                <ul>
+                                    {preview.parent_references.map((parent) => (
+                                        <li key={`${parent.source}:${parent.department_key}`}>
+                                            <strong>{parent.source === 'profile_key'
+                                                ? t('admin2.qp_parent_repair_profile_key_parent')
+                                                : t('admin2.qp_parent_repair_explicit_parent')}</strong>{' '}
+                                            {parent.department_name_ru || parent.department_key} ({parent.department_key}) —{' '}
+                                            {parent.exists
+                                                ? parent.active
+                                                    ? t('admin2.qp_parent_repair_department_active')
+                                                    : t('admin2.qp_parent_repair_department_inactive')
+                                                : t('admin2.qp_parent_repair_department_missing')}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </section>
+                            {preview.target && (
+                                <section aria-label={t('admin2.qp_parent_repair_target')}>
+                                    <h4>{t('admin2.qp_parent_repair_target')}</h4>
+                                    <p>
+                                        <strong>{preview.target.department_name_ru}</strong> ({preview.target.department_key}) —{' '}
+                                        {preview.target.active
+                                            ? t('admin2.qp_parent_repair_department_active')
+                                            : t('admin2.qp_parent_repair_department_inactive')}
+                                    </p>
+                                </section>
+                            )}
+                            <section aria-label={t('admin2.qp_parent_repair_impact')}>
+                                <h4>{t('admin2.qp_parent_repair_impact')}</h4>
+                                <p>{t('admin2.qp_parent_repair_proposed_availability', {
+                                    availability: preview.proposed_availability_state === 'available'
+                                        ? t('admin2.qp_parent_repair_available')
+                                        : t('admin2.qp_parent_repair_unavailable'),
+                                })}</p>
+                                {proposedReasonLabels.length > 0 && (
+                                    <p>{t('admin2.qp_parent_repair_unavailable_reasons', {
+                                        reasons: proposedReasonLabels.join(', '),
+                                    })}</p>
+                                )}
+                                <ul>
+                                    <li>{t('admin2.qp_parent_repair_link_summary', {
+                                        services: preview.links.services,
+                                        departmentServices: preview.links.department_services,
+                                        queues: preview.links.daily_queues,
+                                        waiting: preview.links.entries_waiting,
+                                        addresses: preview.links.active_public_addresses,
+                                    })}</li>
+                                    <li>{t('admin2.qp_parent_repair_service_scope_delta', {
+                                        removed: preview.services_removed_from_parent_scope,
+                                        added: preview.services_added_to_parent_scope,
+                                    })}</li>
+                                    <li>{t('admin2.qp_parent_repair_qr_bookable', {
+                                        value: preview.qr_catalog_would_be_bookable
+                                            ? t('admin2.qp_parent_repair_yes')
+                                            : t('admin2.qp_parent_repair_no'),
+                                    })}</li>
+                                    <li>{t('admin2.qp_parent_repair_address_bookable', {
+                                        value: preview.permanent_address_would_be_bookable
+                                            ? t('admin2.qp_parent_repair_yes')
+                                            : t('admin2.qp_parent_repair_no'),
+                                    })}</li>
+                                </ul>
+                            </section>
+                            {!preview.can_apply && (
+                                <p role="alert" className="admin-qp-error">
+                                    {preview.blocker_code === 'own_key_department_missing'
+                                        ? t('admin2.qp_parent_repair_missing_target')
+                                        : t('admin2.qp_parent_repair_not_applicable')}
+                                </p>
+                            )}
+                            {preview.can_apply && (
+                                <div className="admin-d-grid-gap-12">
+                                    <label className="admin-d-flex-ai-center-gap-8">
+                                        <input
+                                            type="checkbox"
+                                            aria-label={t('admin2.qp_parent_repair_confirm_target', {
+                                                department: preview.target?.department_name_ru || preview.profile_key,
+                                                key: preview.target?.department_key || preview.profile_key,
+                                            })}
+                                            checked={confirmTarget}
+                                            onChange={(event) => onConfirmTarget(event.target.checked)}
+                                        />
+                                        {t('admin2.qp_parent_repair_confirm_target', {
+                                            department: preview.target?.department_name_ru || preview.profile_key,
+                                            key: preview.target?.department_key || preview.profile_key,
+                                        })}
+                                    </label>
+                                    {preview.service_scope_confirmation_required && (
+                                        <label className="admin-d-flex-ai-center-gap-8">
+                                            <input
+                                                type="checkbox"
+                                                aria-label={t('admin2.qp_parent_repair_confirm_services', {
+                                                    removed: preview.services_removed_from_parent_scope,
+                                                    added: preview.services_added_to_parent_scope,
+                                                })}
+                                                checked={confirmServices}
+                                                onChange={(event) => onConfirmServices(event.target.checked)}
+                                            />
+                                            {t('admin2.qp_parent_repair_confirm_services', {
+                                                removed: preview.services_removed_from_parent_scope,
+                                                added: preview.services_added_to_parent_scope,
+                                            })}
+                                        </label>
+                                    )}
+                                    {preview.public_access_confirmation_required && (
+                                        <label className="admin-d-flex-ai-center-gap-8">
+                                            <input
+                                                type="checkbox"
+                                                aria-label={t('admin2.qp_parent_repair_confirm_public')}
+                                                checked={confirmPublicAccess}
+                                                onChange={(event) => onConfirmPublicAccess(event.target.checked)}
+                                            />
+                                            {t('admin2.qp_parent_repair_confirm_public')}
+                                        </label>
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+                <div className="admin-d-flex-gap-8-jc-flex-end-p-12-20-bd-top-1px-solid-var-mac-bo">
+                    <button type="button" className="admin-qp-button" onClick={onRefresh} disabled={loading || applying}>
+                        {t('admin2.qp_parent_repair_refresh')}
+                    </button>
+                    <button type="button" className="admin-qp-button" onClick={onClose} disabled={applying}>
+                        {t('admin2.cancel')}
+                    </button>
+                    <button
+                        type="button"
+                        className="admin-qp-primary-button"
+                        onClick={onApply}
+                        disabled={loading || applying || !preview?.can_apply || !preview.preview_token || !requiredConfirmationsPresent}
+                    >
+                        {applying ? t('admin2.qp_parent_repair_applying') : t('admin2.qp_parent_repair_apply')}
+                    </button>
+                </div>
+            </div>
+        </Dialog>
+    );
+};
+
 // Profile form component with show_on_qr_page support
 const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }: { profile?: Record<string, unknown>; onSubmit?: (data: Record<string, unknown>) => void | Promise<void>; onCancel?: () => void; saving?: boolean; isDark?: boolean; isEdit?: boolean; departments?: DepartmentDto[] }) => {
     const { t: rawT } = useTranslation();

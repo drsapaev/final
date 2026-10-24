@@ -146,6 +146,7 @@ export type AdminQueueDirectionsResponseDto = Schemas['AdminQueueDirectionsRespo
 export type AdminQueueDirectionDto = Schemas['AdminQueueDirection'];
 export type AdminDirectionActionDto = Schemas['AdminDirectionAction'];
 export type AdminDirectionReasonDto = Schemas['AdminDirectionReason'];
+export type QueueProfileParentRepairPreviewDto = Schemas['QueueProfileParentRepairPreview'];
 export type QueueEntryResponse = Schemas['QueueEntryResponse'];
 export type QueueGroupInfo = Schemas['QueueGroupInfo'];
 export type QueueGroupsResponse = Schemas['QueueGroupsResponse'];

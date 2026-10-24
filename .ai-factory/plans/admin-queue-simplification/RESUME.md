@@ -1,4 +1,14 @@
-## Latest continuation — T17 PR #3721 exact-head CI passed — 2026-10-20T17:48:01+05:00
+## Latest continuation — PR #3763 acceptance complete; final evidence and Ready next — 2026-10-24T15:18+05:00
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-parent-repair\final`, branch `codex/aqs-t18-parent-conflict-repair`. Tested source is pushed HEAD `7910963be23c6ebef3a9f70a1c29a9b45c7b9a84`; fresh main `b055a48bfe9b18120ec664918ae13f34b547ba9b` was merged without rewriting history. Its delta from the earlier source is four evidence files plus five already-merged frontend dependency updates; backend/frontend source is identical.
+
+Canonical Preflight and Session passed on new owned project `clinic-aqs-pr3763-close-20261024`, ports 28763/28764/55464. Both first-time TOTP enrollment and recurring password/TOTP challenge in a fresh browser context passed. Served `/sw.js` contained exact SHA `7910963b`; body hash is recorded in EVIDENCE. Parent preview, stale `409 parent_repair_stale`, automatic recovery, explicit active refresh and audited apply `200` passed. PostgreSQL invariants passed for profile, Services, DailyQueue/entry, permanent address, audit and 2FA. Teardown removed 5 containers, 3 volumes and 1 network; canonical and independent resource counts were zero.
+
+Historical harness issues are recorded in EVIDENCE; the closeout cycle passed on its first corrected attempt. Host policy previously blocked cleanup of the private ignored env/harness; they remain local and were reused only through this authorized new Preflight/Session. No alternative cleanup attempt was made. The second-agent AI source audit found no confirmed P0/P1/P2; it is not a human approval. No runtime, tracked test, production, review submission, merge or deployment change.
+
+Next: commit/push the final four-document checkpoint, prove that its delta from tested `7910963b` is documentation-only, wait for CI on the actual pushed HEAD, refresh the PR description, then mark Ready. On resume query actual PR state first; do not repeat a completed Ready transition or run staging again for a docs-only delta. User performs merge. Full T18 and STAGING_VALIDATION remain unfinished integration tasks after the repair is merged; earlier scenario statuses remain intact. Known-root gate returned `narrow_override` (`gate_misroute=true`, `override_used=true`), prompt read; no gate/router change.
+
+## Previous continuation — T17 PR #3721 exact-head CI passed — 2026-10-20T17:48:01+05:00
 
 Continue task `17c471a8-6772-4081-bea0-1e82ad1bcd05` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t17-bulk-csv\final`, branch `codex/aqs-T17-bulk-csv`. Product commit `e88cc6aa1a7a31339c42455598f03a3f42d57eea` is pushed to PR #3721, which is OPEN/Ready/MERGEABLE. Base/current `origin/main` is `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43`.
 

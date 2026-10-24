@@ -66,4 +66,36 @@ describe('Admin remaining STRAT#37 — i18n migration', () => {
       }
     }
   });
+
+  it('QueueProfile parent-repair copy is present in all five locales', () => {
+    const locales = {
+      ru: ruLocale.admin2,
+      en: enLocale.admin2,
+      kk: kkLocale.admin2,
+      'uz-Latn': uzLatnLocale.admin2,
+      'uz-Cyrl': uzCyrlLocale.admin2,
+    };
+    const requiredKeys = [
+      'qp_parent_repair_open',
+      'qp_parent_repair_status_conflict',
+      'qp_parent_repair_title',
+      'qp_parent_repair_intro',
+      'qp_parent_repair_current_binding',
+      'qp_parent_repair_target',
+      'qp_parent_repair_impact',
+      'qp_parent_repair_service_scope_delta',
+      'qp_parent_repair_confirm_target',
+      'qp_parent_repair_confirm_services',
+      'qp_parent_repair_confirm_public',
+      'qp_parent_repair_stale',
+      'qp_parent_repair_apply',
+    ];
+
+    for (const [locale, messages] of Object.entries(locales)) {
+      for (const key of requiredKeys) {
+        expect(messages, `${locale}.${key}`).toHaveProperty(key);
+        expect(String(messages[key as keyof typeof messages]).trim()).not.toBe('');
+      }
+    }
+  });
 });
