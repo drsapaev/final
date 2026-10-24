@@ -485,6 +485,58 @@ def test_openapi_queue_profile_binding_409_variants_are_typed(
     )
 
 
+def test_openapi_queue_profile_parent_repair_is_typed_and_admin_scoped(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    paths = schema["paths"]
+    components = schema["components"]["schemas"]
+
+    preview = paths["/api/v1/queues/profiles/{profile_key}/parent-repair-preview"][
+        "get"
+    ]
+    preview_response = preview["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
+    assert preview_response["$ref"] == (
+        "#/components/schemas/QueueProfileParentRepairPreview"
+    )
+    preview_model = components["QueueProfileParentRepairPreview"]
+    assert {
+        "current_availability_state",
+        "parent_references",
+        "target",
+        "proposed_availability_state",
+        "links",
+        "service_scope_confirmation_required",
+        "public_access_confirmation_required",
+        "can_apply",
+    }.issubset(preview_model["required"])
+    assert "security" in preview
+
+    apply = paths["/api/v1/queues/profiles/{profile_key}/parent-repair"]["post"]
+    request_schema = apply["requestBody"]["content"]["application/json"]["schema"]
+    assert request_schema["$ref"] == (
+        "#/components/schemas/QueueProfileParentRepairApplyRequest"
+    )
+    request_model = components["QueueProfileParentRepairApplyRequest"]
+    assert request_model["properties"]["reason_code"]["const"] == (
+        "resolve_parent_conflict_to_own_key"
+    )
+    assert request_model["properties"]["confirm_target"]["const"] is True
+    result_schema = apply["responses"]["200"]["content"]["application/json"]["schema"]
+    assert result_schema["$ref"] == (
+        "#/components/schemas/QueueProfileParentRepairResult"
+    )
+    for status_code in ("404", "409"):
+        error_schema = apply["responses"][status_code]["content"]["application/json"][
+            "schema"
+        ]
+        assert error_schema["$ref"] == (
+            "#/components/schemas/QueueProfileParentRepairErrorResponse"
+        )
+
+
 def test_openapi_doctor_queue_workflow_exposes_canonical_ids(
     client: TestClient,
 ) -> None:

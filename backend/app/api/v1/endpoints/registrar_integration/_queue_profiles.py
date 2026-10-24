@@ -2,16 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from sqlalchemy import func
+from fastapi import Request
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_integration._helpers import (
     _raise_registrar_internal_error,
 )  # noqa: F401
 from app.core.specialties import (
-    DENTAL_FAMILY_SPELLINGS,
     canonical_specialty,
-    expand_queue_tags,
 )
 from app.crud.clinic import clinic_today
 from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
@@ -19,30 +17,24 @@ from app.schemas.queue_profile_conflicts import (
     QueueProfileBindingChangedResponse,
     QueueProfilePublicationConflictResponse,
 )
+from app.schemas.queue_profile_parent_repair import (
+    QueueProfileParentRepairApplyRequest,
+    QueueProfileParentRepairErrorResponse,
+    QueueProfileParentRepairPreview,
+    QueueProfileParentRepairResult,
+)
+from app.services.queue_profile_parent_repair_service import (
+    QueueProfileParentRepairError,
+    apply_queue_profile_parent_repair,
+    preview_queue_profile_parent_repair,
+)
+from app.services.queue_profile_parent_repair_service import (
+    canonical_profile_tags as _canonical_profile_tags,
+)
+from app.services.queue_profile_parent_repair_service import (
+    queue_profile_link_counts as _profile_link_counts,
+)
 from app.services.queue_service import queue_service
-
-
-def _canonical_profile_tags(tags: list[str] | None, profile_key: str) -> list[str]:
-    """D-1 (Codex round-6/7): the tags a QueueProfile write path persists.
-
-    - omitted/empty tags fall back to ``[profile_key]``;
-    - a dental-family key must always contribute to the expansion (unless
-      the submitted tags already contain a family spelling), so family
-      profiles stay canonical-covered even when the admin sets unrelated
-      tags;
-    - NON-dental profiles keep EXACTLY the tags the admin submitted — the
-      key is never silently re-added after an explicit removal.
-    """
-    tag_list = [t for t in (tags or []) if t]
-    if not tag_list:
-        return expand_queue_tags([profile_key])
-    key_is_family = (profile_key or "").strip().lower() in DENTAL_FAMILY_SPELLINGS
-    tags_are_family = any(
-        (t or "").strip().lower() in DENTAL_FAMILY_SPELLINGS for t in tag_list
-    )
-    if key_is_family and not tags_are_family:
-        tag_list.append(profile_key)
-    return expand_queue_tags(tag_list)
 
 
 def _profile_binding_values_equal(
@@ -211,113 +203,6 @@ def _get_emoji_for_key(key: str) -> str:
     return emoji_map.get(key, "👨‍⚕️")
 
 
-def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
-    """RQ-12.b (D-02, owner decision 2026-09-15): significant-link counts
-    for a QueueProfile, computed from live tables at call time.
-
-    This function is the single SSOT for BOTH the impact preview and the
-    hard-delete guard: the delete endpoint re-computes these numbers in
-    the same transaction that would commit the delete, so a previously
-    rendered preview can never authorize a destructive action (stale
-    preview protection, ACCEPTANCE S-10). Significant links are:
-
-    - services whose queue_tag is owned by this profile, and services
-      assigned through the profile's department_key;
-    - active doctors and QueueResources selected by the profile's tags;
-    - daily queues (ANY day — historical rows included) whose queue_tag
-      is owned by this profile: their entries are the profile's real
-      usage history and possibly still-waiting patients;
-    - waiting entries under those queues (must remain serviceable by
-      staff regardless of the profile's active state);
-    - active permanent public addresses linked to this profile.
-    """
-    from app.models.clinic import Doctor
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
-    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
-    from app.models.service import Service
-
-    # Runtime routing expands dental-family aliases even for legacy rows
-    # seeded before the canonical profile writer. Count links against that
-    # same effective tag set so a legacy alias is not mistaken for an
-    # unused binding.
-    tags = _canonical_profile_tags(profile.queue_tags, profile.key)
-    # Doctor-backed QR admission stores the profile key as its DailyQueue
-    # queue_tag (see join_queue_with_token), while the profile's queue_tags
-    # select eligible doctors. Include that canonical queue identity in the
-    # usage guard without rewriting the profile's persisted routing tags.
-    usage_tags = list(tags)
-    if profile.key and profile.key not in usage_tags:
-        usage_tags.append(profile.key)
-    services = 0
-    department_services = 0
-    active_doctors = 0
-    active_queue_resources = 0
-    daily_queues = 0
-    entries_waiting = 0
-    entries_total = 0
-    active_public_addresses = (
-        db.query(QueueDirectionPublicAddress)
-        .filter(
-            QueueDirectionPublicAddress.queue_profile_id == profile.id,
-            QueueDirectionPublicAddress.retired_at.is_(None),
-        )
-        .count()
-    )
-    if usage_tags:
-        services = db.query(Service).filter(Service.queue_tag.in_(usage_tags)).count()
-        daily_queues = (
-            db.query(DailyQueue).filter(DailyQueue.queue_tag.in_(usage_tags)).count()
-        )
-        if daily_queues:
-            queue_ids = [
-                row.id
-                for row in db.query(DailyQueue.id)
-                .filter(DailyQueue.queue_tag.in_(usage_tags))
-                .all()
-            ]
-            entries_q = db.query(OnlineQueueEntry).filter(
-                OnlineQueueEntry.queue_id.in_(queue_ids)
-            )
-            entries_total = entries_q.count()
-            entries_waiting = entries_q.filter(
-                OnlineQueueEntry.status == "waiting"
-            ).count()
-    if tags:
-        active_doctors = (
-            db.query(Doctor)
-            .filter(
-                Doctor.active.is_(True),
-                func.lower(func.trim(Doctor.specialty)).in_(
-                    {tag.strip().lower() for tag in tags}
-                ),
-            )
-            .count()
-        )
-        active_queue_resources = (
-            db.query(QueueResource)
-            .filter(
-                QueueResource.active.is_(True),
-                QueueResource.queue_tag.in_(tags),
-            )
-            .count()
-        )
-    department_key = _normalize_department_key(profile.department_key)
-    if department_key:
-        department_services = (
-            db.query(Service).filter(Service.department_key == department_key).count()
-        )
-    return {
-        "services": services,
-        "department_services": department_services,
-        "active_doctors": active_doctors,
-        "active_queue_resources": active_queue_resources,
-        "daily_queues": daily_queues,
-        "entries_waiting": entries_waiting,
-        "entries_total": entries_total,
-        "active_public_addresses": active_public_addresses,
-    }
-
-
 @router.get(
     "/queues/profiles/{profile_key}/impact-preview", response_model=dict[str, Any]
 )
@@ -366,6 +251,115 @@ def get_queue_profile_impact_preview(
         logger.error(f"Error building impact preview for {profile_key}: {e}")
         db.rollback()
         _raise_registrar_internal_error("queue profile impact preview", e)
+
+
+@router.get(
+    "/queues/profiles/{profile_key}/parent-repair-preview",
+    response_model=QueueProfileParentRepairPreview,
+    responses={
+        404: {"model": QueueProfileParentRepairErrorResponse},
+        409: {"model": QueueProfileParentRepairErrorResponse},
+    },
+)
+def get_queue_profile_parent_repair_preview(
+    profile_key: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Read-only preview for the explicit own-key parent-conflict repair."""
+    request_id = getattr(request.state, "request_id", None)
+    try:
+        return preview_queue_profile_parent_repair(db, profile_key)
+    except QueueProfileParentRepairError as exc:
+        db.rollback()
+        status_code = 404 if exc.reason == "profile_not_found" else 409
+        logger.warning(
+            "queue_profile_parent_repair.preview_refused reason=%s profile_key=%s user_id=%s request_id=%s",
+            exc.reason,
+            profile_key,
+            current_user.id,
+            request_id,
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail={"reason": exc.reason, "message": exc.message},
+        ) from exc
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "queue_profile_parent_repair.preview_failed profile_key=%s user_id=%s request_id=%s",
+            profile_key,
+            current_user.id,
+            request_id,
+        )
+        _raise_registrar_internal_error("queue profile parent repair preview")
+
+
+@router.post(
+    "/queues/profiles/{profile_key}/parent-repair",
+    response_model=QueueProfileParentRepairResult,
+    responses={
+        404: {"model": QueueProfileParentRepairErrorResponse},
+        409: {"model": QueueProfileParentRepairErrorResponse},
+    },
+)
+def apply_queue_profile_parent_repair_command(
+    profile_key: str,
+    command: QueueProfileParentRepairApplyRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Apply the confirmed parent repair and strict audit in one transaction."""
+    request_id = getattr(request.state, "request_id", None)
+    try:
+        result = apply_queue_profile_parent_repair(
+            db,
+            profile_key=profile_key,
+            target_department_key=command.target_department_key,
+            preview_token=command.preview_token,
+            confirm_target=command.confirm_target,
+            confirm_service_scope_change=command.confirm_service_scope_change,
+            confirm_public_access=command.confirm_public_access,
+            reason_code=command.reason_code,
+            actor_user_id=int(current_user.id),
+            actor_role=str(getattr(current_user, "role", "Admin")),
+            request_id=request_id,
+        )
+        # The profile update and strict AuditLog flush share this one commit.
+        db.commit()
+        logger.info(
+            "queue_profile_parent_repair.completed profile_id=%s actor_user_id=%s result=%s request_id=%s",
+            result["profile_id"],
+            current_user.id,
+            result["result"],
+            request_id,
+        )
+        return result
+    except QueueProfileParentRepairError as exc:
+        db.rollback()
+        status_code = 404 if exc.reason == "profile_not_found" else 409
+        logger.warning(
+            "queue_profile_parent_repair.refused reason=%s profile_key=%s user_id=%s request_id=%s",
+            exc.reason,
+            profile_key,
+            current_user.id,
+            request_id,
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail={"reason": exc.reason, "message": exc.message},
+        ) from exc
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "queue_profile_parent_repair.failed profile_key=%s user_id=%s request_id=%s",
+            profile_key,
+            current_user.id,
+            request_id,
+        )
+        _raise_registrar_internal_error("queue profile parent repair")
 
 
 # ===================== QUEUE PROFILE CRUD (ADMIN) =====================

@@ -18,7 +18,9 @@ import type {
   QueuePayload,
   QrData,
   QueueActionResponse,
+  QueueProfileParentRepairPreview,
 } from '../../types/domain/queue';
+import type { QueueProfileParentRepairPreviewDto } from '../../types/api';
 
 type QueueDtoLike = Record<string, unknown>;
 
@@ -72,4 +74,31 @@ export function mapQueueActionResponseDto(dto: QueueDtoLike): QueueActionRespons
     throw new Error('[mapQueueActionResponseDto] expected object, got ' + typeof dto);
   }
   return { ...(dto as QueueActionResponse) };
+}
+
+export function mapQueueProfileParentRepairPreviewDto(
+  dto: unknown,
+): QueueProfileParentRepairPreview {
+  if (dto == null || typeof dto !== 'object') {
+    throw new Error('[mapQueueProfileParentRepairPreviewDto] expected object');
+  }
+  const raw = dto as QueueProfileParentRepairPreviewDto;
+  if (
+    typeof raw.profile_id !== 'number'
+    || typeof raw.profile_key !== 'string'
+    || !Array.isArray(raw.parent_references)
+    || !Array.isArray(raw.current_reason_codes)
+    || !Array.isArray(raw.proposed_reason_codes)
+    || raw.links == null
+  ) {
+    throw new Error('[mapQueueProfileParentRepairPreviewDto] malformed preview');
+  }
+  return {
+    ...raw,
+    current_reason_codes: [...raw.current_reason_codes],
+    parent_references: raw.parent_references.map((reference) => ({ ...reference })),
+    proposed_reason_codes: [...raw.proposed_reason_codes],
+    links: { ...raw.links },
+    target: raw.target ? { ...raw.target } : null,
+  };
 }

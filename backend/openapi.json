@@ -18413,6 +18413,152 @@
         }
       }
     },
+    "/api/v1/queues/profiles/{profile_key}/parent-repair-preview": {
+      "get": {
+        "tags": [
+          "registrar"
+        ],
+        "summary": "Get Queue Profile Parent Repair Preview",
+        "description": "Read-only preview for the explicit own-key parent-conflict repair.",
+        "operationId": "get_queue_profile_parent_repair_preview_api_v1_queues_profiles__profile_key__parent_repair_preview_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileParentRepairPreview"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileParentRepairErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileParentRepairErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queues/profiles/{profile_key}/parent-repair": {
+      "post": {
+        "tags": [
+          "registrar"
+        ],
+        "summary": "Apply Queue Profile Parent Repair Command",
+        "description": "Apply the confirmed parent repair and strict audit in one transaction.",
+        "operationId": "apply_queue_profile_parent_repair_command_api_v1_queues_profiles__profile_key__parent_repair_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueProfileParentRepairApplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileParentRepairResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileParentRepairErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueProfileParentRepairErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queues/profiles/{profile_key}": {
       "put": {
         "tags": [
@@ -105841,6 +105987,433 @@
           "active_public_addresses"
         ],
         "title": "QueueProfileLinkCounts"
+      },
+      "QueueProfileParentReference": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "profile_key",
+              "department_key"
+            ],
+            "title": "Source"
+          },
+          "department_key": {
+            "type": "string",
+            "title": "Department Key"
+          },
+          "department_name_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Name Ru"
+          },
+          "exists": {
+            "type": "boolean",
+            "title": "Exists"
+          },
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "department_key",
+          "department_name_ru",
+          "exists",
+          "active"
+        ],
+        "title": "QueueProfileParentReference"
+      },
+      "QueueProfileParentRepairApplyRequest": {
+        "properties": {
+          "target_department_key": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Target Department Key"
+          },
+          "preview_token": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Preview Token"
+          },
+          "confirm_target": {
+            "type": "boolean",
+            "const": true,
+            "title": "Confirm Target"
+          },
+          "confirm_service_scope_change": {
+            "type": "boolean",
+            "title": "Confirm Service Scope Change",
+            "default": false
+          },
+          "confirm_public_access": {
+            "type": "boolean",
+            "title": "Confirm Public Access",
+            "default": false
+          },
+          "reason_code": {
+            "type": "string",
+            "const": "resolve_parent_conflict_to_own_key",
+            "title": "Reason Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_department_key",
+          "preview_token",
+          "confirm_target",
+          "reason_code"
+        ],
+        "title": "QueueProfileParentRepairApplyRequest"
+      },
+      "QueueProfileParentRepairErrorDetail": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "profile_not_found",
+              "parent_repair_stale",
+              "parent_repair_not_applicable",
+              "parent_repair_confirmation_required"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "message"
+        ],
+        "title": "QueueProfileParentRepairErrorDetail"
+      },
+      "QueueProfileParentRepairErrorResponse": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/QueueProfileParentRepairErrorDetail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "QueueProfileParentRepairErrorResponse"
+      },
+      "QueueProfileParentRepairLinks": {
+        "properties": {
+          "services": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Services"
+          },
+          "department_services": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Department Services"
+          },
+          "active_doctors": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Active Doctors"
+          },
+          "active_queue_resources": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Active Queue Resources"
+          },
+          "daily_queues": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Daily Queues"
+          },
+          "entries_waiting": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Entries Waiting"
+          },
+          "entries_total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Entries Total"
+          },
+          "active_public_addresses": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Active Public Addresses"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "services",
+          "department_services",
+          "active_doctors",
+          "active_queue_resources",
+          "daily_queues",
+          "entries_waiting",
+          "entries_total",
+          "active_public_addresses"
+        ],
+        "title": "QueueProfileParentRepairLinks"
+      },
+      "QueueProfileParentRepairPreview": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "profile_id": {
+            "type": "integer",
+            "title": "Profile Id"
+          },
+          "profile_key": {
+            "type": "string",
+            "title": "Profile Key"
+          },
+          "current_department_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Department Key"
+          },
+          "current_availability_state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable",
+              "conflict"
+            ],
+            "title": "Current Availability State"
+          },
+          "current_reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Current Reason Codes"
+          },
+          "parent_references": {
+            "items": {
+              "$ref": "#/components/schemas/QueueProfileParentReference"
+            },
+            "type": "array",
+            "title": "Parent References"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QueueProfileParentRepairTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposed_availability_state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "unavailable",
+                  "conflict"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Availability State"
+          },
+          "proposed_reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Proposed Reason Codes"
+          },
+          "links": {
+            "$ref": "#/components/schemas/QueueProfileParentRepairLinks"
+          },
+          "services_removed_from_parent_scope": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Services Removed From Parent Scope"
+          },
+          "services_added_to_parent_scope": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Services Added To Parent Scope"
+          },
+          "service_scope_confirmation_required": {
+            "type": "boolean",
+            "title": "Service Scope Confirmation Required"
+          },
+          "qr_catalog_would_be_bookable": {
+            "type": "boolean",
+            "title": "Qr Catalog Would Be Bookable"
+          },
+          "permanent_address_would_be_bookable": {
+            "type": "boolean",
+            "title": "Permanent Address Would Be Bookable"
+          },
+          "public_access_confirmation_required": {
+            "type": "boolean",
+            "title": "Public Access Confirmation Required"
+          },
+          "can_apply": {
+            "type": "boolean",
+            "title": "Can Apply"
+          },
+          "blocker_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "parent_conflict_absent",
+                  "own_key_department_missing"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocker Code"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "success",
+          "profile_id",
+          "profile_key",
+          "current_department_key",
+          "current_availability_state",
+          "current_reason_codes",
+          "parent_references",
+          "target",
+          "proposed_availability_state",
+          "proposed_reason_codes",
+          "links",
+          "services_removed_from_parent_scope",
+          "services_added_to_parent_scope",
+          "service_scope_confirmation_required",
+          "qr_catalog_would_be_bookable",
+          "permanent_address_would_be_bookable",
+          "public_access_confirmation_required",
+          "can_apply",
+          "blocker_code"
+        ],
+        "title": "QueueProfileParentRepairPreview"
+      },
+      "QueueProfileParentRepairResult": {
+        "properties": {
+          "result": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "already_applied"
+            ],
+            "title": "Result"
+          },
+          "profile_id": {
+            "type": "integer",
+            "title": "Profile Id"
+          },
+          "profile_key": {
+            "type": "string",
+            "title": "Profile Key"
+          },
+          "department_key": {
+            "type": "null",
+            "title": "Department Key"
+          },
+          "audit_event_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audit Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "result",
+          "profile_id",
+          "profile_key",
+          "department_key",
+          "audit_event_id"
+        ],
+        "title": "QueueProfileParentRepairResult"
+      },
+      "QueueProfileParentRepairTarget": {
+        "properties": {
+          "department_key": {
+            "type": "string",
+            "title": "Department Key"
+          },
+          "department_name_ru": {
+            "type": "string",
+            "title": "Department Name Ru"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "department_key",
+          "department_name_ru",
+          "active"
+        ],
+        "title": "QueueProfileParentRepairTarget"
       },
       "QueueProfilePublicationConflictDetail": {
         "properties": {

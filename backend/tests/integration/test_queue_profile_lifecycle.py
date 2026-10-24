@@ -1096,7 +1096,10 @@ def test_doctor_qr_profile_key_queue_blocks_binding_update(
 def test_active_public_address_counts_as_profile_usage(
     pg_client, pg_session, pg_admin_user
 ):
-    from app.models.queue_direction_public_address import QueueDirectionPublicAddress
+    from app.models.queue_direction_public_address import (
+        QueueDirectionPublicAddress,
+        generate_public_code,
+    )
     from app.models.queue_profile import QueueProfile
 
     key = "rq12b-t10-address-only"
@@ -4255,3 +4258,391 @@ def test_department_bulk_delete_blocked_when_active_resource_mapping_exists(
     assert (
         pg_session.query(QueueResource).filter_by(id=resource_id).one().active is True
     )
+
+
+def _parent_repair_headers(admin_user) -> dict[str, str]:
+    from tests.conftest import mint_access_token
+
+    return {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
+
+
+def _seed_parent_conflict(pg_session, suffix: str, *, published: bool = True):
+    from app.models.department import Department
+    from app.models.queue_profile import QueueProfile
+
+    world = _seed_profile_with_queue(pg_session, f"pr{suffix}")
+    profile = pg_session.query(QueueProfile).filter_by(key=world["key"]).one()
+    target = Department(
+        key=profile.key,
+        name_ru="Synthetic own-key Department",
+        active=True,
+    )
+    conflicting = Department(
+        key=f"rq12b-pr-conflict-{suffix}",
+        name_ru="Synthetic conflicting Department",
+        active=True,
+    )
+    profile.department_key = conflicting.key
+    profile.show_on_qr_page = published
+    pg_session.add_all([target, conflicting])
+    pg_session.commit()
+    return {**world, "profile": profile, "target": target, "conflicting": conflicting}
+
+
+def _parent_repair_preview(pg_client, admin_user, profile_key: str):
+    return pg_client.get(
+        f"/api/v1/queues/profiles/{profile_key}/parent-repair-preview",
+        headers=_parent_repair_headers(admin_user),
+    )
+
+
+def _parent_repair_apply(pg_client, admin_user, profile_key: str, payload: dict):
+    return pg_client.post(
+        f"/api/v1/queues/profiles/{profile_key}/parent-repair",
+        headers=_parent_repair_headers(admin_user),
+        json=payload,
+    )
+
+
+def test_parent_repair_preview_is_read_only_and_uses_existing_own_key_target(
+    pg_client, pg_session, pg_admin_user
+):
+    from app.models.audit import AuditLog
+    from app.models.queue_profile import QueueProfile
+
+    world = _seed_parent_conflict(pg_session, uuid.uuid4().hex[:6])
+    profile = world["profile"]
+    before_audits = pg_session.query(AuditLog).count()
+
+    response = _parent_repair_preview(pg_client, pg_admin_user, profile.key)
+
+    assert response.status_code == 200, response.text
+    preview = response.json()
+    assert preview["current_availability_state"] == "conflict"
+    assert "parent_conflict" in preview["current_reason_codes"]
+    assert preview["target"]["department_key"] == profile.key
+    assert preview["target"]["active"] is True
+    assert preview["proposed_availability_state"] == "available"
+    assert preview["can_apply"] is True
+    assert preview["preview_token"]
+    assert preview["qr_catalog_would_be_bookable"] is True
+    assert preview["permanent_address_would_be_bookable"] is False
+    assert preview["public_access_confirmation_required"] is True
+    assert preview["links"]["daily_queues"] == 1
+    assert preview["links"]["entries_waiting"] == 1
+
+    pg_session.refresh(profile)
+    assert profile.department_key == world["conflicting"].key
+    assert pg_session.query(AuditLog).count() == before_audits
+    assert not pg_session.is_modified(profile)
+    assert pg_session.query(QueueProfile).filter_by(key=profile.key).count() == 1
+
+
+def test_parent_repair_requires_own_key_target_and_keeps_t10_put_guard(
+    pg_client, pg_session, pg_admin_user
+):
+    from app.models.queue_profile import QueueProfile
+
+    world = _seed_parent_conflict(pg_session, uuid.uuid4().hex[:6])
+    profile = world["profile"]
+    preview = _parent_repair_preview(pg_client, pg_admin_user, profile.key).json()
+
+    ordinary_update = _put_profile(
+        pg_client,
+        pg_admin_user,
+        profile.key,
+        {"department_key": profile.key},
+    )
+    assert ordinary_update.status_code == 409, ordinary_update.text
+    assert ordinary_update.json()["detail"]["reason"] == (
+        "profile_binding_change_blocked"
+    )
+
+    wrong_target = _parent_repair_apply(
+        pg_client,
+        pg_admin_user,
+        profile.key,
+        {
+            "target_department_key": world["conflicting"].key,
+            "preview_token": preview["preview_token"],
+            "confirm_target": True,
+            "confirm_service_scope_change": True,
+            "confirm_public_access": True,
+            "reason_code": "resolve_parent_conflict_to_own_key",
+        },
+    )
+    assert wrong_target.status_code == 409, wrong_target.text
+    assert wrong_target.json()["detail"]["reason"] == ("parent_repair_not_applicable")
+    pg_session.refresh(profile)
+    assert profile.department_key == world["conflicting"].key
+    assert pg_session.query(QueueProfile).filter_by(key=profile.key).one()
+
+
+def test_parent_repair_rejects_stale_preview_without_mutation(
+    pg_client, pg_session, pg_admin_user
+):
+    world = _seed_parent_conflict(pg_session, uuid.uuid4().hex[:6], published=False)
+    profile = world["profile"]
+    preview = _parent_repair_preview(pg_client, pg_admin_user, profile.key).json()
+    assert preview["public_access_confirmation_required"] is False
+
+    world["target"].active = False
+    pg_session.commit()
+    response = _parent_repair_apply(
+        pg_client,
+        pg_admin_user,
+        profile.key,
+        {
+            "target_department_key": profile.key,
+            "preview_token": preview["preview_token"],
+            "confirm_target": True,
+            "reason_code": "resolve_parent_conflict_to_own_key",
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["reason"] == "parent_repair_stale"
+    pg_session.refresh(profile)
+    assert profile.department_key == world["conflicting"].key
+
+
+def test_parent_repair_applies_only_profile_parent_and_audits_confirmed_impact(
+    pg_client, pg_session, pg_admin_user
+):
+    from app.models.audit import AuditLog
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.queue_direction_public_address import (
+        QueueDirectionPublicAddress,
+        generate_public_code,
+    )
+    from app.models.queue_profile import QueueProfile
+    from app.models.service import Service
+    from app.services.queue_profile_availability import load_queue_profile_availability
+
+    world = _seed_parent_conflict(pg_session, uuid.uuid4().hex[:6])
+    profile = world["profile"]
+    from app.services.queue_service import queue_service
+
+    current_availability = load_queue_profile_availability(pg_session, [profile])[
+        profile
+    ]
+    assert current_availability.state == "conflict"
+    suffix = uuid.uuid4().hex[:6]
+    old_service_id = _add_service(pg_session, suffix, f"PRO{suffix}", world["tag"])
+    target_service_id = _add_service(pg_session, suffix, f"PRT{suffix}", world["tag"])
+    old_service = pg_session.query(Service).filter_by(id=old_service_id).one()
+    target_service = pg_session.query(Service).filter_by(id=target_service_id).one()
+    old_service.department_key = world["conflicting"].key
+    target_service.department_key = world["target"].key
+    address = QueueDirectionPublicAddress(
+        queue_profile_id=profile.id,
+        public_code=generate_public_code(),
+    )
+    pg_session.add(address)
+    pg_session.commit()
+    original_address = (address.id, address.public_code, address.retired_at)
+    pg_session.refresh(profile)
+    preview_response = _parent_repair_preview(pg_client, pg_admin_user, profile.key)
+    assert preview_response.status_code == 200, preview_response.text
+    preview = preview_response.json()
+    assert preview["service_scope_confirmation_required"] is True
+    assert preview["services_removed_from_parent_scope"] == 1
+    assert preview["services_added_to_parent_scope"] == 1
+    assert preview["public_access_confirmation_required"] is True
+    assert preview["qr_catalog_would_be_bookable"] is True
+    assert preview["permanent_address_would_be_bookable"] is True
+    assert preview["can_apply"] is True
+
+    repair_payload = {
+        "target_department_key": profile.key,
+        "preview_token": preview["preview_token"],
+        "confirm_target": True,
+        "reason_code": "resolve_parent_conflict_to_own_key",
+    }
+    missing_service_confirmation = _parent_repair_apply(
+        pg_client, pg_admin_user, profile.key, repair_payload
+    )
+    assert missing_service_confirmation.status_code == 409
+    assert missing_service_confirmation.json()["detail"]["reason"] == (
+        "parent_repair_confirmation_required"
+    )
+    repair_payload["confirm_service_scope_change"] = True
+    missing_public_confirmation = _parent_repair_apply(
+        pg_client, pg_admin_user, profile.key, repair_payload
+    )
+    assert missing_public_confirmation.status_code == 409
+    assert missing_public_confirmation.json()["detail"]["reason"] == (
+        "parent_repair_confirmation_required"
+    )
+    pg_session.refresh(profile)
+    assert profile.department_key == world["conflicting"].key
+
+    queue = pg_session.query(DailyQueue).filter_by(id=world["queue_id"]).one()
+    entry = pg_session.query(OnlineQueueEntry).filter_by(id=world["entry_id"]).one()
+    original_queue = (queue.id, queue.queue_tag, queue.specialist_id, queue.day)
+    original_entry = (entry.id, entry.number, entry.status, entry.queue_time)
+    doctor = pg_session.query(Doctor).filter_by(id=world["doctor_id"]).one()
+    original_doctor = (
+        doctor.id,
+        doctor.user_id,
+        doctor.specialty,
+        doctor.active,
+        doctor.cabinet,
+    )
+    before_audits = (
+        pg_session.query(AuditLog)
+        .filter_by(
+            event_type="QUEUE_PROFILE_PARENT_REPAIR",
+            resource_id=str(profile.id),
+        )
+        .count()
+    )
+
+    repair_payload["confirm_public_access"] = True
+    applied = _parent_repair_apply(
+        pg_client, pg_admin_user, profile.key, repair_payload
+    )
+    assert applied.status_code == 200, applied.text
+    result = applied.json()
+    assert result["result"] == "applied"
+    assert result["department_key"] is None
+    assert result["audit_event_id"] is not None
+
+    pg_session.expire_all()
+    profile = pg_session.query(QueueProfile).filter_by(key=world["key"]).one()
+    assert profile.department_key is None
+    assert profile.queue_tags == [world["tag"]]
+    assert profile.is_active is True
+    assert profile.show_on_qr_page is True
+    availability = load_queue_profile_availability(pg_session, [profile])[profile]
+    assert availability.state == "available"
+    queue = pg_session.query(DailyQueue).filter_by(id=world["queue_id"]).one()
+    entry = pg_session.query(OnlineQueueEntry).filter_by(id=world["entry_id"]).one()
+    assert (queue.id, queue.queue_tag, queue.specialist_id, queue.day) == original_queue
+    assert (entry.id, entry.number, entry.status, entry.queue_time) == original_entry
+    doctor = pg_session.query(Doctor).filter_by(id=world["doctor_id"]).one()
+    assert (
+        doctor.id,
+        doctor.user_id,
+        doctor.specialty,
+        doctor.active,
+        doctor.cabinet,
+    ) == original_doctor
+    address = (
+        pg_session.query(QueueDirectionPublicAddress)
+        .filter_by(queue_profile_id=profile.id)
+        .one()
+    )
+    assert (address.id, address.public_code, address.retired_at) == original_address
+    old_service = pg_session.query(Service).filter_by(id=old_service_id).one()
+    target_service = pg_session.query(Service).filter_by(id=target_service_id).one()
+    assert old_service.department_key == world["conflicting"].key
+    assert old_service.queue_tag == world["tag"]
+    assert target_service.department_key == world["target"].key
+    assert target_service.queue_tag == world["tag"]
+    assert (
+        pg_session.query(AuditLog)
+        .filter_by(
+            event_type="QUEUE_PROFILE_PARENT_REPAIR",
+            resource_id=str(profile.id),
+        )
+        .count()
+        == before_audits + 1
+    )
+    assert (
+        queue_service.direction_resolves_to_bookable_surface(pg_session, profile)
+        is True
+    )
+
+    replay = _parent_repair_apply(pg_client, pg_admin_user, profile.key, repair_payload)
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["result"] == "already_applied"
+    assert (
+        pg_session.query(AuditLog)
+        .filter_by(
+            event_type="QUEUE_PROFILE_PARENT_REPAIR",
+            resource_id=str(profile.id),
+        )
+        .count()
+        == before_audits + 1
+    )
+
+
+def test_parent_repair_audit_failure_rolls_back_profile_change(
+    pg_client, pg_session, pg_admin_user, monkeypatch
+):
+    from app.models.audit import AuditLog
+    from app.models.queue_profile import QueueProfile
+    from app.services import queue_profile_parent_repair_service as repair_service
+
+    world = _seed_parent_conflict(pg_session, uuid.uuid4().hex[:6], published=False)
+    profile = world["profile"]
+    preview = _parent_repair_preview(pg_client, pg_admin_user, profile.key).json()
+    audit_count = (
+        pg_session.query(AuditLog)
+        .filter_by(event_type="QUEUE_PROFILE_PARENT_REPAIR")
+        .count()
+    )
+
+    def fail_audit(*args, **kwargs):
+        raise RuntimeError("synthetic audit insert failure")
+
+    monkeypatch.setattr(repair_service, "_write_parent_repair_audit", fail_audit)
+    response = _parent_repair_apply(
+        pg_client,
+        pg_admin_user,
+        profile.key,
+        {
+            "target_department_key": profile.key,
+            "preview_token": preview["preview_token"],
+            "confirm_target": True,
+            "reason_code": "resolve_parent_conflict_to_own_key",
+        },
+    )
+
+    assert response.status_code == 500, response.text
+    pg_session.refresh(profile)
+    assert profile.department_key == world["conflicting"].key
+    assert (
+        pg_session.query(AuditLog)
+        .filter_by(event_type="QUEUE_PROFILE_PARENT_REPAIR")
+        .count()
+        == audit_count
+    )
+
+
+def test_parent_repair_endpoints_require_admin(pg_client, pg_session):
+    from app.core.security import get_password_hash
+    from app.models.user import User
+    from tests.conftest import mint_access_token
+
+    registrar = User(
+        username=f"rq12b_parent_repair_registrar_{uuid.uuid4().hex[:8]}",
+        email=f"rq12b-parent-repair-{uuid.uuid4().hex[:8]}@example.test",
+        full_name="Synthetic parent repair registrar",
+        hashed_password=get_password_hash("rq12b-parent-repair-synthetic-password"),
+        role="Registrar",
+        is_active=True,
+        is_superuser=False,
+    )
+    pg_session.add(registrar)
+    pg_session.commit()
+    headers = {"Authorization": f"Bearer {mint_access_token(registrar)}"}
+    key = f"rq12b-no-such-parent-{uuid.uuid4().hex[:6]}"
+
+    preview = pg_client.get(
+        f"/api/v1/queues/profiles/{key}/parent-repair-preview", headers=headers
+    )
+    apply = pg_client.post(
+        f"/api/v1/queues/profiles/{key}/parent-repair",
+        headers=headers,
+        json={
+            "target_department_key": key,
+            "preview_token": "0" * 64,
+            "confirm_target": True,
+            "reason_code": "resolve_parent_conflict_to_own_key",
+        },
+    )
+    assert preview.status_code == 403, preview.text
+    assert apply.status_code == 403, apply.text

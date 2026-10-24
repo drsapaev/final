@@ -224,3 +224,54 @@ export interface QueueProfile {
 export interface QueueProfilesResponse {
   profiles?: QueueProfile[];
 }
+
+export type QueueProfileAvailabilityState = 'available' | 'unavailable' | 'conflict';
+
+export interface QueueProfileParentRepairDepartmentReference {
+  source: 'profile_key' | 'department_key';
+  department_key: string;
+  department_name_ru: string | null;
+  exists: boolean;
+  active: boolean | null;
+}
+
+export interface QueueProfileParentRepairTarget {
+  department_key: string;
+  department_name_ru: string;
+  active: boolean;
+}
+
+export interface QueueProfileParentRepairLinks {
+  services: number;
+  department_services: number;
+  active_doctors: number;
+  active_queue_resources: number;
+  daily_queues: number;
+  entries_waiting: number;
+  entries_total: number;
+  active_public_addresses: number;
+}
+
+/** Read-only Admin impact preview for the constrained own-key repair command. */
+export interface QueueProfileParentRepairPreview {
+  success: boolean;
+  profile_id: number;
+  profile_key: string;
+  current_department_key: string | null;
+  current_availability_state: QueueProfileAvailabilityState;
+  current_reason_codes: string[];
+  parent_references: QueueProfileParentRepairDepartmentReference[];
+  target: QueueProfileParentRepairTarget | null;
+  proposed_availability_state: QueueProfileAvailabilityState | null;
+  proposed_reason_codes: string[];
+  links: QueueProfileParentRepairLinks;
+  services_removed_from_parent_scope: number;
+  services_added_to_parent_scope: number;
+  service_scope_confirmation_required: boolean;
+  qr_catalog_would_be_bookable: boolean;
+  permanent_address_would_be_bookable: boolean;
+  public_access_confirmation_required: boolean;
+  can_apply: boolean;
+  blocker_code: 'parent_conflict_absent' | 'own_key_department_missing' | null;
+  preview_token?: string | null;
+}

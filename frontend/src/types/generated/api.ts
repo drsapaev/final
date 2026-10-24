@@ -6183,6 +6183,46 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queues/profiles/{profile_key}/parent-repair-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Queue Profile Parent Repair Preview
+         * @description Read-only preview for the explicit own-key parent-conflict repair.
+         */
+        get: operations["get_queue_profile_parent_repair_preview_api_v1_queues_profiles__profile_key__parent_repair_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queues/profiles/{profile_key}/parent-repair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Queue Profile Parent Repair Command
+         * @description Apply the confirmed parent repair and strict audit in one transaction.
+         */
+        post: operations["apply_queue_profile_parent_repair_command_api_v1_queues_profiles__profile_key__parent_repair_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queues/profiles/{profile_key}": {
         parameters: {
             query?: never;
@@ -36985,6 +37025,151 @@ export type components = {
             /** Active Public Addresses */
             active_public_addresses: number;
         };
+        /** QueueProfileParentReference */
+        QueueProfileParentReference: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "profile_key" | "department_key";
+            /** Department Key */
+            department_key: string;
+            /** Department Name Ru */
+            department_name_ru: string | null;
+            /** Exists */
+            exists: boolean;
+            /** Active */
+            active: boolean | null;
+        };
+        /** QueueProfileParentRepairApplyRequest */
+        QueueProfileParentRepairApplyRequest: {
+            /** Target Department Key */
+            target_department_key: string;
+            /** Preview Token */
+            preview_token: string;
+            /**
+             * Confirm Target
+             * @constant
+             */
+            confirm_target: true;
+            /**
+             * Confirm Service Scope Change
+             * @default false
+             */
+            confirm_service_scope_change: boolean;
+            /**
+             * Confirm Public Access
+             * @default false
+             */
+            confirm_public_access: boolean;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "resolve_parent_conflict_to_own_key";
+        };
+        /** QueueProfileParentRepairErrorDetail */
+        QueueProfileParentRepairErrorDetail: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "profile_not_found" | "parent_repair_stale" | "parent_repair_not_applicable" | "parent_repair_confirmation_required";
+            /** Message */
+            message: string;
+        };
+        /** QueueProfileParentRepairErrorResponse */
+        QueueProfileParentRepairErrorResponse: {
+            detail: components["schemas"]["QueueProfileParentRepairErrorDetail"];
+        };
+        /** QueueProfileParentRepairLinks */
+        QueueProfileParentRepairLinks: {
+            /** Services */
+            services: number;
+            /** Department Services */
+            department_services: number;
+            /** Active Doctors */
+            active_doctors: number;
+            /** Active Queue Resources */
+            active_queue_resources: number;
+            /** Daily Queues */
+            daily_queues: number;
+            /** Entries Waiting */
+            entries_waiting: number;
+            /** Entries Total */
+            entries_total: number;
+            /** Active Public Addresses */
+            active_public_addresses: number;
+        };
+        /** QueueProfileParentRepairPreview */
+        QueueProfileParentRepairPreview: {
+            /** Success */
+            success: boolean;
+            /** Profile Id */
+            profile_id: number;
+            /** Profile Key */
+            profile_key: string;
+            /** Current Department Key */
+            current_department_key: string | null;
+            /**
+             * Current Availability State
+             * @enum {string}
+             */
+            current_availability_state: "available" | "unavailable" | "conflict";
+            /** Current Reason Codes */
+            current_reason_codes: string[];
+            /** Parent References */
+            parent_references: components["schemas"]["QueueProfileParentReference"][];
+            target: components["schemas"]["QueueProfileParentRepairTarget"] | null;
+            /** Proposed Availability State */
+            proposed_availability_state: ("available" | "unavailable" | "conflict") | null;
+            /** Proposed Reason Codes */
+            proposed_reason_codes: string[];
+            links: components["schemas"]["QueueProfileParentRepairLinks"];
+            /** Services Removed From Parent Scope */
+            services_removed_from_parent_scope: number;
+            /** Services Added To Parent Scope */
+            services_added_to_parent_scope: number;
+            /** Service Scope Confirmation Required */
+            service_scope_confirmation_required: boolean;
+            /** Qr Catalog Would Be Bookable */
+            qr_catalog_would_be_bookable: boolean;
+            /** Permanent Address Would Be Bookable */
+            permanent_address_would_be_bookable: boolean;
+            /** Public Access Confirmation Required */
+            public_access_confirmation_required: boolean;
+            /** Can Apply */
+            can_apply: boolean;
+            /** Blocker Code */
+            blocker_code: ("parent_conflict_absent" | "own_key_department_missing") | null;
+            /** Preview Token */
+            preview_token?: string | null;
+        };
+        /** QueueProfileParentRepairResult */
+        QueueProfileParentRepairResult: {
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "applied" | "already_applied";
+            /** Profile Id */
+            profile_id: number;
+            /** Profile Key */
+            profile_key: string;
+            /** Department Key */
+            department_key: null;
+            /** Audit Event Id */
+            audit_event_id: number | null;
+        };
+        /** QueueProfileParentRepairTarget */
+        QueueProfileParentRepairTarget: {
+            /** Department Key */
+            department_key: string;
+            /** Department Name Ru */
+            department_name_ru: string;
+            /** Active */
+            active: boolean;
+        };
         /**
          * QueueProfilePublicationConflictDetail
          * @description A profile cannot be published as one bookable QR direction yet.
@@ -54259,6 +54444,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueProfileHttpError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_profile_parent_repair_preview_api_v1_queues_profiles__profile_key__parent_repair_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileParentRepairPreview"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileParentRepairErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileParentRepairErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_queue_profile_parent_repair_command_api_v1_queues_profiles__profile_key__parent_repair_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueProfileParentRepairApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileParentRepairResult"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileParentRepairErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueProfileParentRepairErrorResponse"];
                 };
             };
             /** @description Validation Error */
