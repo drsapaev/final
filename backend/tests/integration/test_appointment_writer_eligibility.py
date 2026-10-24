@@ -409,6 +409,46 @@ class TestMobileBookingRound4Fixes:
         assert row.services == ["УЗИ сердца"]
         assert row.duration_minutes_snapshot == 45
 
+    def test_book_service_pinned_to_another_doctor_keeps_snapshot_unknown(
+        self, client, db_session, auth_headers
+    ):
+        pinned_doctor = _make_doctor(db_session, "cardiology", active=True)
+        requested_doctor = _make_doctor(db_session, "cardiology", active=True)
+        patient_user, _ = _make_patient_user(db_session)
+
+        from app.models.appointment import Appointment
+        from app.models.service import Service
+
+        service = Service(
+            name="Закреплённая консультация",
+            price=200000,
+            duration_minutes=30,
+            doctor_id=pinned_doctor.id,
+            active=True,
+        )
+        db_session.add(service)
+        db_session.commit()
+        db_session.refresh(service)
+
+        response = client.post(
+            "/api/v1/mobile/appointments/book",
+            json={
+                "doctor_id": requested_doctor.id,
+                "preferred_date": str(date.today() + timedelta(days=3)),
+                "services": [service.id],
+            },
+            headers=_patient_login(client, patient_user),
+        )
+
+        # This PR must not change the existing mobile endpoint's acceptance
+        # contract; the mismatched explicit pin only makes duration unknown.
+        assert response.status_code == 200, response.text
+        row = (
+            db_session.query(Appointment).filter_by(doctor_id=requested_doctor.id).one()
+        )
+        assert row.services == ["Закреплённая консультация"]
+        assert row.duration_minutes_snapshot is None
+
     @pytest.mark.parametrize("duration_minutes", [None, 0, -10])
     def test_book_invalid_service_duration_keeps_snapshot_unknown(
         self, client, db_session, auth_headers, duration_minutes

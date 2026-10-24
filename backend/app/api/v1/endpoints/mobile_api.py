@@ -492,19 +492,22 @@ async def book_mobile_appointment(
             service_names = [s.name for s in service_rows]
 
         # Preserve a duration snapshot only when this request resolves to one
-        # authoritative active service. Appointment.services stores display
-        # names, so neither old names nor multiple selected services are a
-        # safe basis for guessing a duration. Unknown durations remain NULL;
-        # public availability will fail closed for those appointments.
+        # authoritative active service that is not pinned to another doctor.
+        # Keep existing mobile booking acceptance unchanged: a pinned-service
+        # mismatch leaves this metadata unknown rather than rejecting booking.
+        # Appointment.services stores display names, so neither old names nor
+        # multiple selected services are a safe basis for guessing duration.
         duration_minutes_snapshot = None
         if len(request.services) == 1 and len(service_rows) == 1:
-            service_duration = service_rows[0].duration_minutes
-            if (
-                isinstance(service_duration, int)
-                and not isinstance(service_duration, bool)
-                and service_duration > 0
-            ):
-                duration_minutes_snapshot = service_duration
+            service = service_rows[0]
+            if service.doctor_id in (None, request.doctor_id):
+                service_duration = service.duration_minutes
+                if (
+                    isinstance(service_duration, int)
+                    and not isinstance(service_duration, bool)
+                    and service_duration > 0
+                ):
+                    duration_minutes_snapshot = service_duration
 
         # Создаем запись. NOTE: the handler used to bind the wrong request
         # schema and referenced nonexistent Appointment columns (complaint,
