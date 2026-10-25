@@ -14,7 +14,8 @@ import {
   CheckCircle,
   RefreshCw,
   Activity,
-  CalendarDays } from
+  CalendarDays,
+  CalendarClock } from
 
 
 
@@ -35,6 +36,7 @@ import EquipmentManagement from './EquipmentManagement';
 import LicenseManagement from './LicenseManagement';
 import BackupManagement from './BackupManagement';
 import PublicBookingCalendarManager from './PublicBookingCalendarManager';
+import PublicBookingSettingsManager from './PublicBookingSettingsManager';
 import DepartmentManagement from './DepartmentManagement';
 import ClinicSettings from './ClinicSettings';
 
@@ -83,6 +85,7 @@ const ClinicManagement = () => {
   { id: 'licenses', label: t('admin2.cm_tab_licenses'), icon: Key },
   { id: 'backups', label: t('admin2.cm_tab_backups'), icon: HardDrive },
   { id: 'booking-calendar', label: t('admin2.cm_tab_booking_calendar'), icon: CalendarDays },
+  { id: 'booking-settings', label: t('admin2.cm_tab_booking_settings'), icon: CalendarClock },
   { id: 'settings', label: t('admin2.cm_tab_settings'), icon: Settings }];
 
 
@@ -411,6 +414,7 @@ const ClinicManagement = () => {
         {activeTab === 'licenses' && <LicenseManagement />}
         {activeTab === 'backups' && <BackupManagement />}
         {activeTab === 'booking-calendar' && <PublicBookingCalendarManager />}
+        {activeTab === 'booking-settings' && <PublicBookingSettingsManager />}
         {activeTab === 'settings' && <ClinicSettings />}
         </div>
       </Card>

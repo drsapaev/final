@@ -31,6 +31,7 @@ from app.schemas.clinic import (
 from app.services.public_booking_calendar_settings import (
     is_public_booking_calendar_setting_key,
 )
+from app.services.public_booking_settings import is_public_booking_settings_key
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -118,11 +119,22 @@ def _admin_clinic_http_error(exc: Exception) -> HTTPException:
     )
 
 
-def _reject_reserved_calendar_setting_key(key: str) -> None:
+def _is_reserved_public_booking_setting_key(key: str) -> bool:
+    return is_public_booking_calendar_setting_key(
+        key
+    ) or is_public_booking_settings_key(key)
+
+
+def _reject_reserved_public_booking_setting_key(key: str) -> None:
     if is_public_booking_calendar_setting_key(key):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": "use_public_booking_calendar_endpoint"},
+        )
+    if is_public_booking_settings_key(key):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "use_public_booking_settings_endpoint"},
         )
 
 
@@ -146,7 +158,7 @@ def get_clinic_settings(
         return [
             setting
             for setting in settings
-            if not is_public_booking_calendar_setting_key(setting.key)
+            if not _is_reserved_public_booking_setting_key(setting.key)
         ]
     except Exception as e:
         raise _admin_clinic_http_error(e) from e
@@ -159,7 +171,7 @@ def get_clinic_setting(
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить конкретную настройку по ключу"""
-    if is_public_booking_calendar_setting_key(key):
+    if _is_reserved_public_booking_setting_key(key):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Настройка не найдена",
@@ -181,7 +193,7 @@ def update_clinic_settings_batch(
 ):
     """Массовое обновление настроек клиники"""
     for key in settings.settings:
-        _reject_reserved_calendar_setting_key(key)
+        _reject_reserved_public_booking_setting_key(key)
     _validate_clinic_working_hours_update(db, settings.settings)
     _canonicalize_clinic_working_hours_categories(db, settings.settings)
     try:
@@ -201,7 +213,7 @@ def update_clinic_setting(
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить конкретную настройку"""
-    _reject_reserved_calendar_setting_key(key)
+    _reject_reserved_public_booking_setting_key(key)
     existing_setting = crud_clinic.get_setting_by_key(db, key)
     if not existing_setting:
         raise HTTPException(
@@ -229,7 +241,7 @@ def create_clinic_setting(
 ):
     """Создать новую настройку"""
     try:
-        _reject_reserved_calendar_setting_key(setting.key)
+        _reject_reserved_public_booking_setting_key(setting.key)
         # Проверяем, не существует ли уже такая настройка
         existing = crud_clinic.get_setting_by_key(db, setting.key)
         if existing:

@@ -30,6 +30,36 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
     assert len(schema["paths"]) >= 100
 
 
+def test_openapi_admin_public_booking_settings_contract(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    path = "/api/v1/admin/public-booking-settings"
+    get_operation = schema["paths"][path]["get"]
+    put_operation = schema["paths"][path]["put"]
+
+    assert get_operation["operationId"] == "admin_get_public_booking_settings"
+    assert put_operation["operationId"] == "admin_update_public_booking_settings"
+    assert {"200", "503"}.issubset(get_operation["responses"])
+    assert {"200", "409", "422", "503"}.issubset(put_operation["responses"])
+    assert get_operation.get("security") or schema.get("security")
+
+    components = schema["components"]["schemas"]
+    assert set(components["PublicBookingMode"]["enum"]) == {
+        "confirmed_appointment",
+        "registrar_request",
+    }
+    update_schema = components["PublicBookingSettingsUpdate"]
+    assert (
+        update_schema["properties"]["booking_horizon_days"]["anyOf"][0]["maximum"]
+        == 365
+    )
+    assert update_schema["properties"]["service_ids"]["maxItems"] == 500
+    assert update_schema["properties"]["doctor_ids"]["maxItems"] == 500
+    output_schema = components["PublicBookingSettingsOut"]
+    assert {"is_enabled", "is_ready", "services", "doctors"}.issubset(
+        output_schema["required"]
+    )
+
+
 def test_doctor_experience_is_published_in_admin_and_doctor_info_contracts(
     client: TestClient,
 ) -> None:
