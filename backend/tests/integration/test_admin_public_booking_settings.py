@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.clinic import ClinicSettings, Doctor
+from app.models.online_queue import QueueResource
 from app.models.service import Service
 from app.models.user import User
 
@@ -46,6 +47,33 @@ def _published_catalog(db_session: Session) -> tuple[Service, Doctor]:
     db_session.refresh(doctor)
     db_session.refresh(service)
     return service, doctor
+
+
+def _published_doctor(
+    db_session: Session, *, username: str, full_name: str, specialty: str
+) -> Doctor:
+    owner = User(
+        username=username,
+        hashed_password="not-used-in-this-test",
+        role="Doctor",
+        is_active=True,
+        full_name=full_name,
+    )
+    db_session.add(owner)
+    db_session.flush()
+    doctor = Doctor(
+        user_id=owner.id,
+        specialty=specialty,
+        active=True,
+        show_on_website=True,
+        slug=f"{username.replace('_', '-')}-profile",
+        bio_ru="Врач клиники.",
+        bio_uz="Klinika shifokori.",
+    )
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+    return doctor
 
 
 @pytest.mark.integration
@@ -202,5 +230,203 @@ def test_ineligible_catalog_selection_cannot_enable_booking(
             "doctor_ids": [doctor.id],
         },
     )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "booking_settings_incomplete"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("role", "Registrar"),
+        ("role", "Cashier"),
+        ("role", "Lab"),
+        ("specialty", "general"),
+        ("specialty", "   "),
+    ],
+)
+def test_doctor_options_require_doctor_role_and_completed_profile(
+    client: TestClient,
+    auth_headers,
+    db_session: Session,
+    field: str,
+    value: str,
+) -> None:
+    service, doctor = _published_catalog(db_session)
+    saved = client.put(
+        BASE,
+        headers=auth_headers,
+        json={
+            "expected_version": 0,
+            "is_enabled": True,
+            "mode": "confirmed_appointment",
+            "booking_horizon_days": 14,
+            "service_ids": [service.id],
+            "doctor_ids": [doctor.id],
+        },
+    )
+    assert saved.status_code == 200, saved.text
+
+    owner = db_session.get(User, doctor.user_id)
+    assert owner is not None
+    if field == "role":
+        owner.role = value
+    else:
+        doctor.specialty = value
+    db_session.commit()
+
+    response = client.get(BASE, headers=auth_headers)
+
+    assert response.status_code == 200, response.text
+    option = next(
+        item for item in response.json()["doctors"] if item["id"] == doctor.id
+    )
+    assert option["eligible"] is False
+    assert response.json()["is_ready"] is False
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("requires_doctor", "is_consultation", "queue_tag"),
+    [
+        (False, False, None),
+        (False, True, None),
+    ],
+)
+def test_service_must_follow_doctor_booking_contract(
+    client: TestClient,
+    auth_headers,
+    db_session: Session,
+    requires_doctor: bool,
+    is_consultation: bool,
+    queue_tag: str | None,
+) -> None:
+    service, _ = _published_catalog(db_session)
+    service.requires_doctor = requires_doctor
+    service.is_consultation = is_consultation
+    service.queue_tag = queue_tag
+    db_session.commit()
+
+    response = client.get(BASE, headers=auth_headers)
+
+    assert response.status_code == 200, response.text
+    option = next(
+        item for item in response.json()["services"] if item["id"] == service.id
+    )
+    assert option["eligible"] is False
+
+
+@pytest.mark.integration
+def test_resource_owned_service_is_not_bookable_as_doctor_appointment(
+    client: TestClient, auth_headers, db_session: Session
+) -> None:
+    service, doctor = _published_catalog(db_session)
+    saved = client.put(
+        BASE,
+        headers=auth_headers,
+        json={
+            "expected_version": 0,
+            "is_enabled": True,
+            "mode": "confirmed_appointment",
+            "booking_horizon_days": 14,
+            "service_ids": [service.id],
+            "doctor_ids": [doctor.id],
+        },
+    )
+    assert saved.status_code == 200, saved.text
+
+    service.queue_tag = "booking-test-ecg"
+    db_session.add(
+        QueueResource(
+            code="booking_test_ecg",
+            queue_tag="booking-test-ecg",
+            display_name="Test ECG Resource",
+            active=True,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(BASE, headers=auth_headers)
+
+    assert response.status_code == 200, response.text
+    option = next(
+        item for item in response.json()["services"] if item["id"] == service.id
+    )
+    assert option["eligible"] is False
+    assert response.json()["is_ready"] is False
+
+
+@pytest.mark.integration
+def test_pinned_service_requires_its_selected_doctor(
+    client: TestClient, auth_headers, db_session: Session
+) -> None:
+    service, doctor = _published_catalog(db_session)
+    other_doctor = _published_doctor(
+        db_session,
+        username="booking_settings_other_doctor",
+        full_name="Other Test Doctor",
+        specialty="dermatology",
+    )
+    service.doctor_id = doctor.id
+    db_session.commit()
+
+    mismatched = client.put(
+        BASE,
+        headers=auth_headers,
+        json={
+            "expected_version": 0,
+            "is_enabled": True,
+            "mode": "confirmed_appointment",
+            "booking_horizon_days": 14,
+            "service_ids": [service.id],
+            "doctor_ids": [other_doctor.id],
+        },
+    )
+    assert mismatched.status_code == 422
+    assert mismatched.json()["detail"]["code"] == "booking_settings_incomplete"
+
+    matching = client.put(
+        BASE,
+        headers=auth_headers,
+        json={
+            "expected_version": 0,
+            "is_enabled": True,
+            "mode": "confirmed_appointment",
+            "booking_horizon_days": 14,
+            "service_ids": [service.id],
+            "doctor_ids": [doctor.id],
+        },
+    )
+    assert matching.status_code == 200, matching.text
+    assert matching.json()["is_ready"] is True
+
+
+@pytest.mark.integration
+def test_department_service_requires_a_compatible_selected_specialty(
+    client: TestClient, auth_headers, db_session: Session
+) -> None:
+    service, _ = _published_catalog(db_session)
+    service.department_key = "cardiology"
+    dermatologist = _published_doctor(
+        db_session,
+        username="booking_settings_dermatologist",
+        full_name="Test Dermatologist",
+        specialty="dermatology",
+    )
+    db_session.commit()
+
+    response = client.put(
+        BASE,
+        headers=auth_headers,
+        json={
+            "expected_version": 0,
+            "is_enabled": True,
+            "mode": "confirmed_appointment",
+            "booking_horizon_days": 14,
+            "service_ids": [service.id],
+            "doctor_ids": [dermatologist.id],
+        },
+    )
+
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "booking_settings_incomplete"

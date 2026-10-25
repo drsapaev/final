@@ -79,6 +79,9 @@ class PublicBookingSettingsService:
                 doctor_by_id.get(item) and doctor_by_id[item].eligible
                 for item in update.doctor_ids
             )
+            and self.repository.selected_services_match_doctors(
+                update.service_ids, update.doctor_ids
+            )
         )
         ready = bool(
             update.mode is not None
@@ -168,6 +171,7 @@ class PublicBookingSettingsService:
                 doctor_by_id.get(item) and doctor_by_id[item].eligible
                 for item in doctor_ids
             )
+            and self.repository.selected_services_match_doctors(service_ids, doctor_ids)
         )
         return PublicBookingSettingsOut(
             version=stored.version if stored is not None else 0,
