@@ -28904,6 +28904,78 @@
         }
       }
     },
+    "/api/v1/admin/public-booking-settings": {
+      "get": {
+        "tags": [
+          "admin-booking-settings"
+        ],
+        "summary": "Get clinic-wide public booking configuration",
+        "operationId": "admin_get_public_booking_settings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingSettingsOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The stored booking settings are invalid."
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "admin-booking-settings"
+        ],
+        "summary": "Replace clinic-wide public booking configuration",
+        "operationId": "admin_update_public_booking_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingSettingsOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The settings changed; reload before saving."
+          },
+          "422": {
+            "description": "The requested booking configuration is incomplete."
+          },
+          "503": {
+            "description": "The stored booking settings are invalid."
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/clinic/branches": {
       "post": {
         "tags": [
@@ -104216,6 +104288,209 @@
           "date"
         ],
         "title": "PublicBookingHoliday"
+      },
+      "PublicBookingMode": {
+        "type": "string",
+        "enum": [
+          "confirmed_appointment",
+          "registrar_request"
+        ],
+        "title": "PublicBookingMode"
+      },
+      "PublicBookingOptionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "eligible": {
+            "type": "boolean",
+            "title": "Eligible"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "eligible"
+        ],
+        "title": "PublicBookingOptionOut"
+      },
+      "PublicBookingSettingsOut": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "is_enabled": {
+            "type": "boolean",
+            "title": "Is Enabled"
+          },
+          "is_ready": {
+            "type": "boolean",
+            "title": "Is Ready"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicBookingMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "booking_horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking Horizon Days"
+          },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Service Ids"
+          },
+          "doctor_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Doctor Ids"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingOptionOut"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "doctors": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingOptionOut"
+            },
+            "type": "array",
+            "title": "Doctors"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "is_enabled",
+          "is_ready",
+          "mode",
+          "booking_horizon_days",
+          "service_ids",
+          "doctor_ids",
+          "services",
+          "doctors"
+        ],
+        "title": "PublicBookingSettingsOut"
+      },
+      "PublicBookingSettingsUpdate": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version"
+          },
+          "is_enabled": {
+            "type": "boolean",
+            "title": "Is Enabled"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicBookingMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "booking_horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 365.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking Horizon Days"
+          },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Service Ids"
+          },
+          "doctor_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Doctor Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "is_enabled",
+          "mode",
+          "service_ids",
+          "doctor_ids"
+        ],
+        "title": "PublicBookingSettingsUpdate"
       },
       "PublicDirectionAddressInfo": {
         "properties": {

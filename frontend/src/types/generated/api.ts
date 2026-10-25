@@ -9920,6 +9920,24 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/public-booking-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get clinic-wide public booking configuration */
+        get: operations["admin_get_public_booking_settings"];
+        /** Replace clinic-wide public booking configuration */
+        put: operations["admin_update_public_booking_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/clinic/branches": {
         parameters: {
             query?: never;
@@ -36271,6 +36289,58 @@ export type components = {
             is_working_day: boolean;
         };
         /**
+         * PublicBookingMode
+         * @enum {string}
+         */
+        PublicBookingMode: "confirmed_appointment" | "registrar_request";
+        /** PublicBookingOptionOut */
+        PublicBookingOptionOut: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string | null;
+            /** Eligible */
+            eligible: boolean;
+        };
+        /** PublicBookingSettingsOut */
+        PublicBookingSettingsOut: {
+            /** Version */
+            version: number;
+            /** Is Enabled */
+            is_enabled: boolean;
+            /** Is Ready */
+            is_ready: boolean;
+            mode: components["schemas"]["PublicBookingMode"] | null;
+            /** Booking Horizon Days */
+            booking_horizon_days: number | null;
+            /** Service Ids */
+            service_ids: number[];
+            /** Doctor Ids */
+            doctor_ids: number[];
+            /** Services */
+            services: components["schemas"]["PublicBookingOptionOut"][];
+            /** Doctors */
+            doctors: components["schemas"]["PublicBookingOptionOut"][];
+            /** Updated At */
+            updated_at?: string | null;
+            /** Updated By */
+            updated_by?: number | null;
+        };
+        /** PublicBookingSettingsUpdate */
+        PublicBookingSettingsUpdate: {
+            /** Expected Version */
+            expected_version: number;
+            /** Is Enabled */
+            is_enabled: boolean;
+            mode: components["schemas"]["PublicBookingMode"] | null;
+            /** Booking Horizon Days */
+            booking_horizon_days?: number | null;
+            /** Service Ids */
+            service_ids: number[];
+            /** Doctor Ids */
+            doctor_ids: number[];
+        };
+        /**
          * PublicDirectionAddressInfo
          * @description The direction a permanent-address session is scoped to.
          */
@@ -60923,6 +60993,78 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PublicBookingCalendarErrorOut"];
                 };
+            };
+        };
+    };
+    admin_get_public_booking_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingSettingsOut"];
+                };
+            };
+            /** @description The stored booking settings are invalid. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_update_public_booking_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingSettingsOut"];
+                };
+            };
+            /** @description The settings changed; reload before saving. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The requested booking configuration is incomplete. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The stored booking settings are invalid. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

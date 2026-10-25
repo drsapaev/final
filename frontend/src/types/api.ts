@@ -67,6 +67,12 @@ export type PublicBookingCalendarConfirmDto = Schemas['PublicBookingCalendarConf
 export type PublicBookingCalendarYearDto = Schemas['PublicBookingCalendarYearOut'];
 export type PublicBookingCalendarErrorDto = Schemas['PublicBookingCalendarErrorOut'];
 
+// Admin-managed clinic-wide public booking configuration.
+export type PublicBookingModeDto = Schemas['PublicBookingMode'];
+export type PublicBookingOptionOutDto = Schemas['PublicBookingOptionOut'];
+export type PublicBookingSettingsUpdateDto = Schemas['PublicBookingSettingsUpdate'];
+export type PublicBookingSettingsOutDto = Schemas['PublicBookingSettingsOut'];
+
 export type DepartmentDto = Schemas['DepartmentInfoResponse'];
 export type DepartmentListResponseDto = Schemas['DepartmentListResponse'];
 export type DepartmentUpdateDto = Schemas['DepartmentUpdate'];

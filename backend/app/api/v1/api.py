@@ -18,6 +18,7 @@ from app.api.v1.endpoints import (
     admin_finance,
     admin_providers,
     admin_public_booking_calendar,
+    admin_public_booking_settings,
     admin_public_site_media,
     admin_stats,
     admin_telegram,
@@ -343,6 +344,11 @@ api_router.include_router(
     admin_public_booking_calendar.router,
     prefix="/admin",
     tags=["admin-booking-calendar"],
+)
+api_router.include_router(
+    admin_public_booking_settings.router,
+    prefix="/admin",
+    tags=["admin-booking-settings"],
 )
 api_router.include_router(
     clinic_management.router, prefix="/clinic", tags=["clinic-management"]
