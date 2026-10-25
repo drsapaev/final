@@ -9885,6 +9885,41 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/public-booking-calendar/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an annual public booking calendar */
+        get: operations["admin_get_public_booking_calendar_year"];
+        /** Replace official holidays for a booking calendar year */
+        put: operations["admin_update_public_booking_calendar_year"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/public-booking-calendar/{year}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm that an annual holiday calendar is complete */
+        post: operations["admin_confirm_public_booking_calendar_year"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/clinic/branches": {
         parameters: {
             query?: never;
@@ -36184,6 +36219,57 @@ export type components = {
              */
             provisioned_at?: string | null;
         };
+        /** PublicBookingCalendarConfirm */
+        PublicBookingCalendarConfirm: {
+            /** Expected Version */
+            expected_version: number;
+        };
+        /** PublicBookingCalendarErrorOut */
+        PublicBookingCalendarErrorOut: {
+            /** Detail */
+            detail: {
+                [key: string]: string;
+            };
+        };
+        /** PublicBookingCalendarUpdate */
+        PublicBookingCalendarUpdate: {
+            /** Expected Version */
+            expected_version: number;
+            /** Holidays */
+            holidays: components["schemas"]["PublicBookingHoliday"][];
+        };
+        /** PublicBookingCalendarYearOut */
+        PublicBookingCalendarYearOut: {
+            /** Year */
+            year: number;
+            /** Version */
+            version: number;
+            /** Is Confirmed */
+            is_confirmed: boolean;
+            /** Holidays */
+            holidays: components["schemas"]["PublicBookingHoliday"][];
+            /** Confirmed At */
+            confirmed_at?: string | null;
+            /** Confirmed By */
+            confirmed_by?: number | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Updated By */
+            updated_by?: number | null;
+        };
+        /** PublicBookingHoliday */
+        PublicBookingHoliday: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Is Working Day
+             * @default false
+             */
+            is_working_day: boolean;
+        };
         /**
          * PublicDirectionAddressInfo
          * @description The direction a permanent-address session is scoped to.
@@ -60681,6 +60767,161 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_get_public_booking_calendar_year: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingCalendarYearOut"];
+                };
+            };
+            /** @description The calendar changed or must be saved before confirmation. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingCalendarErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The saved calendar settings are invalid. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingCalendarErrorOut"];
+                };
+            };
+        };
+    };
+    admin_update_public_booking_calendar_year: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingCalendarUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingCalendarYearOut"];
+                };
+            };
+            /** @description The calendar changed or must be saved before confirmation. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingCalendarErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The saved calendar settings are invalid. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingCalendarErrorOut"];
+                };
+            };
+        };
+    };
+    admin_confirm_public_booking_calendar_year: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingCalendarConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingCalendarYearOut"];
+                };
+            };
+            /** @description The calendar changed or must be saved before confirmation. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingCalendarErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The saved calendar settings are invalid. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingCalendarErrorOut"];
                 };
             };
         };

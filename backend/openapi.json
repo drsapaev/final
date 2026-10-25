@@ -28679,6 +28679,231 @@
         }
       }
     },
+    "/api/v1/admin/public-booking-calendar/{year}": {
+      "get": {
+        "tags": [
+          "admin-booking-calendar"
+        ],
+        "summary": "Get an annual public booking calendar",
+        "operationId": "admin_get_public_booking_calendar_year",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2200,
+              "minimum": 2000,
+              "title": "Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingCalendarYearOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The calendar changed or must be saved before confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingCalendarErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The saved calendar settings are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingCalendarErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin-booking-calendar"
+        ],
+        "summary": "Replace official holidays for a booking calendar year",
+        "operationId": "admin_update_public_booking_calendar_year",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2200,
+              "minimum": 2000,
+              "title": "Year"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingCalendarUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingCalendarYearOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The calendar changed or must be saved before confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingCalendarErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The saved calendar settings are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingCalendarErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/public-booking-calendar/{year}/confirm": {
+      "post": {
+        "tags": [
+          "admin-booking-calendar"
+        ],
+        "summary": "Confirm that an annual holiday calendar is complete",
+        "operationId": "admin_confirm_public_booking_calendar_year",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2200,
+              "minimum": 2000,
+              "title": "Year"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingCalendarConfirm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingCalendarYearOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The calendar changed or must be saved before confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingCalendarErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The saved calendar settings are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingCalendarErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/clinic/branches": {
       "post": {
         "tags": [
@@ -103838,6 +104063,159 @@
         ],
         "title": "PublicAddressProvisionResponse",
         "description": "Result of the Admin provision/enable of a permanent address."
+      },
+      "PublicBookingCalendarConfirm": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version"
+        ],
+        "title": "PublicBookingCalendarConfirm"
+      },
+      "PublicBookingCalendarErrorOut": {
+        "properties": {
+          "detail": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicBookingCalendarErrorOut"
+      },
+      "PublicBookingCalendarUpdate": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version"
+          },
+          "holidays": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingHoliday"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Holidays"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "holidays"
+        ],
+        "title": "PublicBookingCalendarUpdate"
+      },
+      "PublicBookingCalendarYearOut": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "is_confirmed": {
+            "type": "boolean",
+            "title": "Is Confirmed"
+          },
+          "holidays": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingHoliday"
+            },
+            "type": "array",
+            "title": "Holidays"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "confirmed_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed By"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "year",
+          "version",
+          "is_confirmed",
+          "holidays"
+        ],
+        "title": "PublicBookingCalendarYearOut"
+      },
+      "PublicBookingHoliday": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "is_working_day": {
+            "type": "boolean",
+            "title": "Is Working Day",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "date"
+        ],
+        "title": "PublicBookingHoliday"
       },
       "PublicDirectionAddressInfo": {
         "properties": {
