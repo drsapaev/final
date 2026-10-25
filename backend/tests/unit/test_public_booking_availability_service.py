@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, datetime, time
+from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -37,6 +39,60 @@ class StubAvailabilityRepository:
     ) -> list[tuple[date, str | None, int | None, str | None]]:
         self.appointment_query = (doctor_id, target_date)
         return self.appointments
+
+
+class StubPublicSiteRepository:
+    def __init__(self):
+        self.service = SimpleNamespace(id=11, duration_minutes=20)
+        self.doctor = SimpleNamespace(id=22)
+        self.lookups: list[tuple[str, str]] = []
+
+    def get_public_service_by_slug(self, slug: str):
+        self.lookups.append(("service", slug))
+        return self.service
+
+    def get_public_doctor_by_slug(self, slug: str):
+        self.lookups.append(("doctor", slug))
+        return self.doctor
+
+
+class StubBookingSettingsRepository:
+    def __init__(self, pair_is_allowed: bool = True):
+        self.pair_is_allowed = pair_is_allowed
+        self.pair_queries: list[tuple[list[int], list[int]]] = []
+
+    def selected_services_match_doctors(
+        self, service_ids: list[int], doctor_ids: list[int]
+    ) -> bool:
+        self.pair_queries.append((service_ids, doctor_ids))
+        return self.pair_is_allowed
+
+
+class StubBookingSettingsService:
+    def __init__(self, *, enabled: bool = True, horizon_days: int = 30):
+        self.settings = SimpleNamespace(
+            is_enabled=enabled,
+            is_ready=True,
+            booking_horizon_days=horizon_days,
+            service_ids=[11],
+            doctor_ids=[22],
+        )
+        self.repository = StubBookingSettingsRepository()
+        self.read_count = 0
+
+    def get_settings(self):
+        self.read_count += 1
+        return self.settings
+
+
+class StubCalendarSettingsService:
+    def __init__(self, calendar: BookingCalendar):
+        self.calendar = calendar
+        self.read_count = 0
+
+    def load_policy_calendar(self) -> BookingCalendar:
+        self.read_count += 1
+        return self.calendar
 
 
 def calendar_for(target_date: date = TARGET_DATE) -> BookingCalendar:
@@ -155,3 +211,125 @@ def test_known_existing_duration_is_mapped_to_the_occupied_interval():
         "10:20",
         "10:40",
     ]
+
+
+def test_public_starts_require_enabled_allowlists_exact_pair_and_confirmed_calendar():
+    repository = StubAvailabilityRepository(
+        schedules=[(time(9, 10), time(11), [{"start": "09:50", "end": "10:10"}])]
+    )
+    public_site = StubPublicSiteRepository()
+    settings = StubBookingSettingsService(horizon_days=2)
+    calendar_settings = StubCalendarSettingsService(calendar_for())
+    service = PublicBookingAvailabilityService(
+        repository,  # type: ignore[arg-type]
+        public_site_repository=public_site,  # type: ignore[arg-type]
+        booking_settings_service=settings,  # type: ignore[arg-type]
+        calendar_settings_service=calendar_settings,  # type: ignore[arg-type]
+    )
+
+    starts = service.public_starts_for_day(
+        service_slug="cardiology-consultation",
+        doctor_slug="test-doctor",
+        target_date=TARGET_DATE,
+        now=datetime(2026, 10, 25, 8, tzinfo=ZoneInfo("Asia/Tashkent")),
+    )
+
+    assert [value.strftime("%H:%M") for value in starts or []] == [
+        "09:10",
+        "09:30",
+        "10:10",
+        "10:30",
+    ]
+    assert public_site.lookups == [
+        ("service", "cardiology-consultation"),
+        ("doctor", "test-doctor"),
+    ]
+    assert settings.repository.pair_queries == [([11], [22])]
+    assert calendar_settings.read_count == 1
+
+
+def test_public_availability_hides_past_starts_on_today():
+    repository = StubAvailabilityRepository(schedules=[(time(9), time(10), None)])
+    service = PublicBookingAvailabilityService(
+        repository,  # type: ignore[arg-type]
+        public_site_repository=StubPublicSiteRepository(),  # type: ignore[arg-type]
+        booking_settings_service=StubBookingSettingsService(),  # type: ignore[arg-type]
+        calendar_settings_service=StubCalendarSettingsService(calendar_for()),  # type: ignore[arg-type]
+    )
+
+    starts = service.public_starts_for_day(
+        service_slug="cardiology-consultation",
+        doctor_slug="test-doctor",
+        target_date=TARGET_DATE,
+        now=datetime(2026, 10, 26, 9, 30, tzinfo=ZoneInfo("Asia/Tashkent")),
+    )
+
+    assert [value.strftime("%H:%M") for value in starts or []] == ["09:40"]
+
+
+def test_public_availability_hides_a_pair_outside_the_exact_admin_policy():
+    repository = StubAvailabilityRepository(schedules=[(time(9), time(10), None)])
+    public_site = StubPublicSiteRepository()
+    settings = StubBookingSettingsService()
+    settings.repository.pair_is_allowed = False
+    calendar_settings = StubCalendarSettingsService(calendar_for())
+    service = PublicBookingAvailabilityService(
+        repository,  # type: ignore[arg-type]
+        public_site_repository=public_site,  # type: ignore[arg-type]
+        booking_settings_service=settings,  # type: ignore[arg-type]
+        calendar_settings_service=calendar_settings,  # type: ignore[arg-type]
+    )
+
+    result = service.public_starts_for_day(
+        service_slug="cardiology-consultation",
+        doctor_slug="test-doctor",
+        target_date=TARGET_DATE,
+        now=datetime(2026, 10, 25, 8, tzinfo=ZoneInfo("Asia/Tashkent")),
+    )
+
+    assert result is None
+    assert settings.repository.pair_queries == [([11], [22])]
+    assert calendar_settings.read_count == 0
+
+
+def test_public_availability_fails_closed_when_channel_is_off_or_date_is_outside_horizon():
+    repository = StubAvailabilityRepository(schedules=[(time(9), time(10), None)])
+    public_site = StubPublicSiteRepository()
+    settings = StubBookingSettingsService(enabled=False, horizon_days=1)
+    calendar_settings = StubCalendarSettingsService(calendar_for())
+    service = PublicBookingAvailabilityService(
+        repository,  # type: ignore[arg-type]
+        public_site_repository=public_site,  # type: ignore[arg-type]
+        booking_settings_service=settings,  # type: ignore[arg-type]
+        calendar_settings_service=calendar_settings,  # type: ignore[arg-type]
+    )
+
+    disabled = service.public_starts_for_day(
+        service_slug="cardiology-consultation",
+        doctor_slug="test-doctor",
+        target_date=TARGET_DATE,
+        now=datetime(2026, 10, 25, 8, tzinfo=ZoneInfo("Asia/Tashkent")),
+    )
+    assert disabled == []
+    assert public_site.lookups == []
+
+    settings.settings.is_enabled = True
+    settings.settings.is_ready = False
+    not_ready = service.public_starts_for_day(
+        service_slug="cardiology-consultation",
+        doctor_slug="test-doctor",
+        target_date=TARGET_DATE,
+        now=datetime(2026, 10, 25, 8, tzinfo=ZoneInfo("Asia/Tashkent")),
+    )
+    assert not_ready == []
+    assert public_site.lookups == []
+
+    settings.settings.is_ready = True
+    outside_horizon = service.public_starts_for_day(
+        service_slug="cardiology-consultation",
+        doctor_slug="test-doctor",
+        target_date=TARGET_DATE,
+        now=datetime(2026, 10, 24, 8, tzinfo=ZoneInfo("Asia/Tashkent")),
+    )
+    assert outside_horizon == []
+    assert public_site.lookups == []

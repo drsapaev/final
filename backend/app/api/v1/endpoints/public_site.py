@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.repositories.public_booking_availability_repository import (
+    PublicBookingAvailabilityRepository,
+)
 from app.repositories.public_site_read_repository import PublicSiteReadRepository
+from app.schemas.public_booking_availability import (
+    PublicBookingAvailabilityErrorOut,
+    PublicBookingAvailabilityOut,
+)
 from app.schemas.public_site import (
     PublicSiteCategoryOut,
     PublicSiteClinicOut,
@@ -16,6 +25,16 @@ from app.schemas.public_site import (
     PublicSiteServiceOut,
 )
 from app.schemas.public_site_media import PublicSiteMediaErrorOut
+from app.services.public_booking_availability_service import (
+    PublicBookingAvailabilityService,
+)
+from app.services.public_booking_calendar_settings import (
+    PublicBookingCalendarSettingsService,
+)
+from app.services.public_booking_settings import (
+    PublicBookingSettingsError,
+    PublicBookingSettingsService,
+)
 from app.services.public_site_media_service import (
     PublicSiteMediaError,
     PublicSiteMediaService,
@@ -27,6 +46,15 @@ router = APIRouter()
 
 def _read_service(db: Session) -> PublicSiteReadService:
     return PublicSiteReadService(PublicSiteReadRepository(db))
+
+
+def _availability_service(db: Session) -> PublicBookingAvailabilityService:
+    return PublicBookingAvailabilityService(
+        PublicBookingAvailabilityRepository(db),
+        public_site_repository=PublicSiteReadRepository(db),
+        booking_settings_service=PublicBookingSettingsService(db),
+        calendar_settings_service=PublicBookingCalendarSettingsService(db),
+    )
 
 
 def _public_not_found() -> HTTPException:
@@ -174,3 +202,74 @@ def get_public_doctor(
     if doctor is None:
         raise _public_not_found()
     return doctor
+
+
+@router.get(
+    "/availability",
+    response_model=PublicBookingAvailabilityOut,
+    responses={
+        200: {
+            "description": "Current candidate start times; no time is reserved.",
+            "headers": {
+                "Cache-Control": {
+                    "description": "Availability is dynamic and must not be cached.",
+                    "schema": {"type": "string", "example": "no-store"},
+                }
+            },
+        },
+        404: {
+            "model": PublicSiteNotFoundOut,
+            "description": "The published service and doctor pair is unavailable.",
+            "headers": {
+                "Cache-Control": {
+                    "description": "Availability responses must not be cached.",
+                    "schema": {"type": "string", "example": "no-store"},
+                }
+            },
+        },
+        503: {
+            "model": PublicBookingAvailabilityErrorOut,
+            "description": "Public booking settings are unavailable.",
+            "headers": {
+                "Cache-Control": {
+                    "description": "Availability responses must not be cached.",
+                    "schema": {"type": "string", "example": "no-store"},
+                }
+            },
+        },
+    },
+    operation_id="public_site_get_booking_availability",
+    summary="Получить свободное время для опубликованной услуги и врача",
+    description=(
+        "Returns candidate start times only. A returned time is not reserved; "
+        "the booking operation must revalidate availability."
+    ),
+)
+def get_public_booking_availability(
+    response: Response,
+    service_slug: str = Query(..., min_length=1, max_length=120),
+    doctor_slug: str = Query(..., min_length=1, max_length=120),
+    target_date: date = Query(..., alias="date"),
+    db: Session = Depends(get_db),
+) -> PublicBookingAvailabilityOut:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        starts = _availability_service(db).public_starts_for_day(
+            service_slug=service_slug,
+            doctor_slug=doctor_slug,
+            target_date=target_date,
+        )
+    except PublicBookingSettingsError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "public_booking_unavailable"},
+            headers={"Cache-Control": "no-store"},
+        ) from exc
+
+    if starts is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "public_content_not_found"},
+            headers={"Cache-Control": "no-store"},
+        )
+    return PublicBookingAvailabilityOut(date=target_date, slots=starts)

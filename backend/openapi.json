@@ -3661,6 +3661,119 @@
         }
       }
     },
+    "/api/v1/public-site/availability": {
+      "get": {
+        "tags": [
+          "public-site"
+        ],
+        "summary": "Получить свободное время для опубликованной услуги и врача",
+        "description": "Returns candidate start times only. A returned time is not reserved; the booking operation must revalidate availability.",
+        "operationId": "public_site_get_booking_availability",
+        "parameters": [
+          {
+            "name": "service_slug",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "title": "Service Slug"
+            }
+          },
+          {
+            "name": "doctor_slug",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "title": "Doctor Slug"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current candidate start times; no time is reserved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingAvailabilityOut"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Availability is dynamic and must not be cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The published service and doctor pair is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Availability responses must not be cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteNotFoundOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Public booking settings are unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Availability responses must not be cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingAvailabilityErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/departments": {
       "get": {
         "tags": [
@@ -104135,6 +104248,64 @@
         ],
         "title": "PublicAddressProvisionResponse",
         "description": "Result of the Admin provision/enable of a permanent address."
+      },
+      "PublicBookingAvailabilityErrorDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "public_booking_unavailable",
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "PublicBookingAvailabilityErrorDetail"
+      },
+      "PublicBookingAvailabilityErrorOut": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/PublicBookingAvailabilityErrorDetail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicBookingAvailabilityErrorOut"
+      },
+      "PublicBookingAvailabilityOut": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "timezone": {
+            "type": "string",
+            "const": "Asia/Tashkent",
+            "title": "Timezone",
+            "default": "Asia/Tashkent"
+          },
+          "slots": {
+            "items": {
+              "type": "string",
+              "format": "time"
+            },
+            "type": "array",
+            "title": "Slots"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "date",
+          "slots"
+        ],
+        "title": "PublicBookingAvailabilityOut"
       },
       "PublicBookingCalendarConfirm": {
         "properties": {

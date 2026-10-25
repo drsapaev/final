@@ -2,26 +2,105 @@
 
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, datetime, time
 
 from app.repositories.public_booking_availability_repository import (
     PublicBookingAvailabilityRepository,
 )
+from app.repositories.public_site_read_repository import PublicSiteReadRepository
 from app.services.public_booking_availability import (
     MAX_SERVICE_DURATION_MINUTES,
+    PUBLIC_BOOKING_TIMEZONE,
     BookingCalendar,
     DoctorShift,
     ExistingAppointment,
     TimeWindow,
     available_starts_for_day,
 )
+from app.services.public_booking_calendar_settings import (
+    PublicBookingCalendarSettingsService,
+)
+from app.services.public_booking_settings import PublicBookingSettingsService
 
 
 class PublicBookingAvailabilityService:
     """Calculate candidate starts using the doctor's configured profile shift."""
 
-    def __init__(self, repository: PublicBookingAvailabilityRepository) -> None:
+    def __init__(
+        self,
+        repository: PublicBookingAvailabilityRepository,
+        *,
+        public_site_repository: PublicSiteReadRepository | None = None,
+        booking_settings_service: PublicBookingSettingsService | None = None,
+        calendar_settings_service: PublicBookingCalendarSettingsService | None = None,
+    ) -> None:
         self.repository = repository
+        self.public_site_repository = public_site_repository
+        self.booking_settings_service = booking_settings_service
+        self.calendar_settings_service = calendar_settings_service
+
+    def public_starts_for_day(
+        self,
+        *,
+        service_slug: str,
+        doctor_slug: str,
+        target_date: date,
+        now: datetime | None = None,
+    ) -> list[time] | None:
+        """Return public candidate starts, or ``None`` for an unavailable pair.
+
+        Candidates do not reserve a slot. A future writer must revalidate all
+        policy and occupancy facts when the patient confirms an operation.
+        """
+        if (
+            self.public_site_repository is None
+            or self.booking_settings_service is None
+            or self.calendar_settings_service is None
+        ):
+            raise RuntimeError("Public availability dependencies are not configured.")
+
+        local_now = now or datetime.now(PUBLIC_BOOKING_TIMEZONE)
+        if local_now.tzinfo is None or local_now.utcoffset() is None:
+            return []
+        local_now = local_now.astimezone(PUBLIC_BOOKING_TIMEZONE)
+
+        settings = self.booking_settings_service.get_settings()
+        if (
+            not settings.is_enabled
+            or not settings.is_ready
+            or settings.booking_horizon_days is None
+        ):
+            return []
+
+        days_ahead = (target_date - local_now.date()).days
+        if days_ahead < 0 or days_ahead > settings.booking_horizon_days:
+            return []
+
+        service = self.public_site_repository.get_public_service_by_slug(service_slug)
+        doctor = self.public_site_repository.get_public_doctor_by_slug(doctor_slug)
+        if service is None or doctor is None:
+            return None
+        if (
+            service.id not in settings.service_ids
+            or doctor.id not in settings.doctor_ids
+        ):
+            return None
+        if not self.booking_settings_service.repository.selected_services_match_doctors(
+            [service.id], [doctor.id]
+        ):
+            return None
+
+        calendar = self.calendar_settings_service.load_policy_calendar()
+        starts = self.available_starts_for_day(
+            doctor_id=doctor.id,
+            target_date=target_date,
+            service_duration_minutes=service.duration_minutes,
+            calendar=calendar,
+        )
+        if target_date == local_now.date():
+            current_time = local_now.timetz().replace(tzinfo=None)
+            starts = [start for start in starts if start > current_time]
+        return starts
 
     def available_starts_for_day(
         self,

@@ -1123,6 +1123,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public-site/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Получить свободное время для опубликованной услуги и врача
+         * @description Returns candidate start times only. A returned time is not reserved; the booking operation must revalidate availability.
+         */
+        get: operations["public_site_get_booking_availability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/departments": {
         parameters: {
             query?: never;
@@ -36237,6 +36257,34 @@ export type components = {
              */
             provisioned_at?: string | null;
         };
+        /** PublicBookingAvailabilityErrorDetail */
+        PublicBookingAvailabilityErrorDetail: {
+            /**
+             * Code
+             * @constant
+             */
+            code: "public_booking_unavailable";
+        };
+        /** PublicBookingAvailabilityErrorOut */
+        PublicBookingAvailabilityErrorOut: {
+            detail: components["schemas"]["PublicBookingAvailabilityErrorDetail"];
+        };
+        /** PublicBookingAvailabilityOut */
+        PublicBookingAvailabilityOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Timezone
+             * @default Asia/Tashkent
+             * @constant
+             */
+            timezone: "Asia/Tashkent";
+            /** Slots */
+            slots: string[];
+        };
         /** PublicBookingCalendarConfirm */
         PublicBookingCalendarConfirm: {
             /** Expected Version */
@@ -45582,6 +45630,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_site_get_booking_availability: {
+        parameters: {
+            query: {
+                service_slug: string;
+                doctor_slug: string;
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current candidate start times; no time is reserved. */
+            200: {
+                headers: {
+                    /** @description Availability is dynamic and must not be cached. */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingAvailabilityOut"];
+                };
+            };
+            /** @description The published service and doctor pair is unavailable. */
+            404: {
+                headers: {
+                    /** @description Availability responses must not be cached. */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSiteNotFoundOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Public booking settings are unavailable. */
+            503: {
+                headers: {
+                    /** @description Availability responses must not be cached. */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingAvailabilityErrorOut"];
                 };
             };
         };
