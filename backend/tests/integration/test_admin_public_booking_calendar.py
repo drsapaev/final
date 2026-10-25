@@ -147,3 +147,66 @@ def test_calendar_management_is_admin_only(
 ) -> None:
     response = client.get(f"{BASE}/2095", headers=registrar_auth_headers)
     assert response.status_code == 403
+
+
+@pytest.mark.integration
+def test_calendar_management_rejects_deactivated_admin_with_existing_token(
+    client: TestClient, auth_headers, admin_user, db_session
+) -> None:
+    # The fixture is a superuser; the active-account rule must still apply.
+    assert admin_user.is_superuser is True
+    admin_user.is_active = False
+    db_session.commit()
+
+    read = client.get(f"{BASE}/2096", headers=auth_headers)
+    update = client.put(
+        f"{BASE}/2096",
+        headers=auth_headers,
+        json={"expected_version": 0, "holidays": []},
+    )
+    confirm = client.post(
+        f"{BASE}/2096/confirm",
+        headers=auth_headers,
+        json={"expected_version": 0},
+    )
+
+    assert read.status_code == 403
+    assert update.status_code == 403
+    assert confirm.status_code == 403
+
+
+@pytest.mark.integration
+def test_reserved_calendar_rows_are_hidden_from_generic_settings_reads(
+    client: TestClient, auth_headers, registrar_auth_headers
+) -> None:
+    year = 2097
+    key = f"public_booking_calendar_year_{year}"
+    saved = client.put(
+        f"{BASE}/{year}",
+        headers=auth_headers,
+        json={"expected_version": 0, "holidays": []},
+    )
+    assert saved.status_code == 200, saved.text
+
+    registrar_list = client.get(
+        "/api/v1/admin/clinic/settings",
+        params={"category": "booking_calendar"},
+        headers=registrar_auth_headers,
+    )
+    admin_list = client.get(
+        "/api/v1/admin/clinic/settings",
+        params={"category": "booking_calendar"},
+        headers=auth_headers,
+    )
+    generic_detail = client.get(
+        f"/api/v1/admin/clinic/settings/{key}", headers=auth_headers
+    )
+    typed_detail = client.get(f"{BASE}/{year}", headers=auth_headers)
+
+    assert registrar_list.status_code == 200
+    assert registrar_list.json() == []
+    assert admin_list.status_code == 200
+    assert admin_list.json() == []
+    assert generic_detail.status_code == 404
+    assert typed_detail.status_code == 200
+    assert typed_detail.json()["year"] == year

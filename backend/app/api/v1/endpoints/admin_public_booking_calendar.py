@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_db, require_active_roles
 from app.models.user import User
 from app.schemas.public_booking_calendar import (
     PublicBookingCalendarConfirm,
@@ -51,7 +51,7 @@ def _raise_calendar_error(exc: PublicBookingCalendarSettingsError) -> None:
 def get_public_booking_calendar_year(
     year: Annotated[int, Path(ge=2000, le=2200)],
     db: Session = Depends(get_db),
-    _current_user: User = Depends(require_roles("Admin")),
+    _current_user: User = Depends(require_active_roles("Admin")),
 ) -> PublicBookingCalendarYearOut:
     try:
         return PublicBookingCalendarSettingsService(db).get_year(year)
@@ -70,7 +70,7 @@ def update_public_booking_calendar_year(
     year: Annotated[int, Path(ge=2000, le=2200)],
     update: PublicBookingCalendarUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: User = Depends(require_active_roles("Admin")),
 ) -> PublicBookingCalendarYearOut:
     try:
         return PublicBookingCalendarSettingsService(db).update_holidays(
@@ -93,7 +93,7 @@ def confirm_public_booking_calendar_year(
     year: Annotated[int, Path(ge=2000, le=2200)],
     confirmation: PublicBookingCalendarConfirm,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: User = Depends(require_active_roles("Admin")),
 ) -> PublicBookingCalendarYearOut:
     try:
         return PublicBookingCalendarSettingsService(db).confirm_year(

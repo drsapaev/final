@@ -152,6 +152,24 @@ describe('PublicBookingCalendarManager', () => {
     expect(await screen.findByText('admin2.pbc_status_closed')).toBeInTheDocument();
   });
 
+  it('shows the retryable load state for a structured invalid-calendar response', async () => {
+    const year = currentClinicYear();
+    const invalidCalendarError = Object.assign(new Error('invalid calendar settings'), {
+      response: {
+        status: 503,
+        data: { detail: { code: 'booking_calendar_settings_invalid' } },
+      },
+    });
+    mocks.get.mockRejectedValueOnce(invalidCalendarError).mockResolvedValueOnce(emptyCalendar(year));
+    render(<PublicBookingCalendarManager />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('admin2.pbc_error_load');
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.pbc_retry_load' }));
+
+    await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('admin2.pbc_status_closed')).toBeInTheDocument();
+  });
+
   it('shows that editing a confirmed calendar will require confirmation again', async () => {
     const year = currentClinicYear();
     mocks.get.mockResolvedValueOnce({

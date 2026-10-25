@@ -143,7 +143,11 @@ def get_clinic_settings(
     """
     try:
         settings = crud_clinic.get_settings_by_category(db, category)
-        return settings
+        return [
+            setting
+            for setting in settings
+            if not is_public_booking_calendar_setting_key(setting.key)
+        ]
     except Exception as e:
         raise _admin_clinic_http_error(e) from e
 
@@ -155,6 +159,11 @@ def get_clinic_setting(
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить конкретную настройку по ключу"""
+    if is_public_booking_calendar_setting_key(key):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Настройка не найдена",
+        )
     setting = crud_clinic.get_setting_by_key(db, key)
     if not setting:
         raise HTTPException(

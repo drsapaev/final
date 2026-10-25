@@ -81,9 +81,12 @@ const PublicBookingCalendarManager = () => {
           is_working_day: holiday.is_working_day,
         })));
       })
-      .catch((error: unknown) => {
+      .catch(() => {
         if (!active) return;
-        setErrorCode(getErrorCode(error) ?? 'load');
+        // Any GET failure leaves the screen without a usable calendar draft.
+        // Keep it in the retryable load state even when the API supplies a
+        // structured domain error such as booking_calendar_settings_invalid.
+        setErrorCode('load');
       })
       .finally(() => {
         if (active) setLoading(false);
