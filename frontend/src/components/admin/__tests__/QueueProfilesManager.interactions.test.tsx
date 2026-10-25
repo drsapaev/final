@@ -174,6 +174,7 @@ describe('QueueProfilesManager interactions', () => {
     const overlay = dialog.parentElement;
 
     expect(overlay?.style.zIndex).toBe('1200');
+    expect(overlay?.parentElement).toBe(document.body);
     expect(overlay?.style.padding).toBe('16px');
     expect(dialog.style.maxHeight).toBe('min(90vh, calc(100dvh - 32px))');
     expect(dialog.style.overflowY).toBe('auto');

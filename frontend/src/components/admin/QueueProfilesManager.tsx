@@ -13,6 +13,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * - CRUD for individual profiles
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { CSSProperties } from 'react';
 import {
     Plus,
@@ -1828,7 +1829,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
             });
         }
     };
-    return (
+    return createPortal((
         <Dialog
             open
             onClose={() => onCancel?.()}
@@ -2050,7 +2051,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                 </form>
             </div>
         </Dialog>
-    );
+    ), document.body);
 };
 
 
