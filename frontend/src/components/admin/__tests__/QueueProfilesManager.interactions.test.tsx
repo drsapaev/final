@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import i18n from '@/i18n';
 import QueueProfilesManager from '../QueueProfilesManager';
 
 const { apiMock, syntheticProfiles } = vi.hoisted(() => {
@@ -118,9 +119,10 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.clearAllMocks();
   window.sessionStorage.removeItem('admin.queueProfiles.pendingCsvPublication.v1');
+  await i18n.changeLanguage('ru');
 });
 
 describe('QueueProfilesManager interactions', () => {
@@ -145,6 +147,36 @@ describe('QueueProfilesManager interactions', () => {
 
     expect(titleInput).toHaveValue('Новое направление');
     expect(screen.getByRole('dialog', { name: 'Новая вкладка' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['en', 'Queue profiles', 'Add'],
+    ['kk', 'Кезек профильдері', 'Қосу'],
+    ['uz-Cyrl', 'Навбат профиллари', 'Қўшиш'],
+  ])('shows a localized title and add action for %s', async (locale, title, addAction) => {
+    await i18n.changeLanguage(locale);
+    render(
+      <ThemeProvider>
+        <QueueProfilesManager />
+      </ThemeProvider>,
+    );
+
+    expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: addAction })).toBeInTheDocument();
+  });
+
+  it('keeps the create dialog above the sticky header and within the dynamic viewport', async () => {
+    const user = userEvent.setup();
+    await renderManager();
+    await openCreateDialog(user);
+
+    const dialog = screen.getByRole('dialog', { name: 'Новая вкладка' });
+    const overlay = dialog.parentElement;
+
+    expect(overlay?.style.zIndex).toBe('1200');
+    expect(overlay?.style.padding).toBe('16px');
+    expect(dialog.style.maxHeight).toBe('min(90vh, calc(100dvh - 32px))');
+    expect(dialog.style.overflowY).toBe('auto');
   });
 
   it('creates new profiles hidden and keeps QR publication for the edit action', async () => {

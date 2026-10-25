@@ -1835,9 +1835,10 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
             onKeyDown={handleDialogKeyDown}
             aria-labelledby="queue-profile-dialog-title"
             maxWidth="sm"
+            overlayStyle={{ zIndex: 1200, padding: 16, boxSizing: 'border-box' }}
             style={{
                 maxWidth: '500px',
-                maxHeight: '90vh',
+                maxHeight: 'min(90vh, calc(100dvh - 32px))',
                 overflowY: 'auto',
                 padding: 0,
             }}
