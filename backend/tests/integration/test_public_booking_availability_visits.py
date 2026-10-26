@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, time
 
+from app.models.clinic import Schedule
+from app.models.service import Service
 from app.models.visit import Visit, VisitService
 from app.repositories.public_booking_availability_repository import (
     PublicBookingAvailabilityRepository,
@@ -67,6 +69,72 @@ def test_unknown_or_multiple_visit_services_close_the_day():
             )
             == []
         )
+
+
+def test_qr_live_visit_without_assigned_time_does_not_close_public_day(
+    db_session, test_patient, test_doctor
+):
+    """QR queue presence is not a reservation of a scheduled clock hour."""
+    from app.services.qr_queue import QRQueueService
+
+    test_doctor.active = True
+    test_doctor.show_on_website = True
+    service = Service(
+        name="Synthetic QR consultation",
+        price=100000,
+        duration_minutes=20,
+        active=True,
+    )
+    db_session.add_all(
+        [
+            service,
+            Schedule(
+                doctor_id=test_doctor.id,
+                weekday=TARGET_DATE.weekday(),
+                start_time=time(9),
+                end_time=time(10),
+                active=True,
+            ),
+        ]
+    )
+    db_session.flush()
+
+    visit = QRQueueService(db_session)._create_visit_for_qr(
+        patient_id=test_patient.id,
+        visit_date=TARGET_DATE,
+        services=[
+            {
+                "service_id": service.id,
+                "name": service.name,
+                "quantity": 1,
+                "price": 100000,
+            }
+        ],
+        doctor_id=test_doctor.id,
+    )
+    db_session.flush()
+    assert visit.visit_time is None
+
+    repository = PublicBookingAvailabilityRepository(db_session)
+    assert (
+        repository.list_visit_occupancy_for_day(
+            doctor_id=test_doctor.id,
+            target_date=TARGET_DATE,
+        )
+        == []
+    )
+
+    starts = PublicBookingAvailabilityService(repository).available_starts_for_day(
+        doctor_id=test_doctor.id,
+        target_date=TARGET_DATE,
+        service_duration_minutes=20,
+        calendar=BookingCalendar(confirmed_years=frozenset({TARGET_DATE.year})),
+    )
+    assert [value.strftime("%H:%M") for value in starts] == [
+        "09:00",
+        "09:20",
+        "09:40",
+    ]
 
 
 def test_repository_excludes_both_spellings_of_cancelled_visits(

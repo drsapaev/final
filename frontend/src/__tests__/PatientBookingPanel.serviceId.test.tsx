@@ -62,4 +62,35 @@ describe('PatientBookingPanel exact service selection', () => {
       );
     });
   });
+
+  it('filters service choices to the selected department', async () => {
+    apiGet.mockResolvedValue({
+      data: [
+        { id: 81, name: 'Кардиология', department_key: 'cardiology' },
+        { id: 82, name: 'Дерматология', department_key: 'dermatology' },
+        { id: 83, name: 'Общая услуга', department_key: null },
+      ],
+    });
+    apiPost.mockImplementation((url: string) => {
+      if (url.endsWith('/booking/departments')) {
+        return Promise.resolve({
+          data: { departments: [{ key: 'cardio', name: 'Кардиология' }, { key: 'derma', name: 'Дерматология' }] },
+        });
+      }
+      return Promise.resolve({ data: {} });
+    });
+    render(
+      <ThemeProvider>
+        <PatientBookingPanel />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(await screen.findByLabelText('Отделение'));
+    fireEvent.click(await screen.findByRole('option', { name: 'Кардиология' }));
+    fireEvent.click(await screen.findByLabelText('Услуги'));
+
+    expect(await screen.findByRole('option', { name: 'Кардиология' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Общая услуга' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Дерматология' })).not.toBeInTheDocument();
+  });
 });

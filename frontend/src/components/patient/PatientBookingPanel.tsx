@@ -41,6 +41,26 @@ interface BookingDepartmentOption {
 interface BookingServiceOption {
   id: number;
   name: string;
+  doctor_id?: number | null;
+  department_key?: string | null;
+}
+
+const BOOKING_DEPARTMENT_ALIAS_GROUPS = [
+  ['cardiology', 'cardio', 'cardiology_common', 'cardiologist', 'кардиология'],
+  ['derma', 'dermatology', 'dermatologist'],
+  ['dentist', 'dental', 'dentistry', 'stomatology'],
+  ['lab', 'laboratory'],
+  ['general', 'therapy', 'therapist', 'general_practice'],
+];
+
+function serviceMatchesBookingDepartment(service: BookingServiceOption, departmentKey: string) {
+  const serviceKey = String(service.department_key || '').trim().toLowerCase();
+  const selectedKey = String(departmentKey || '').trim().toLowerCase();
+  if (!serviceKey) return true;
+  if (!selectedKey) return false;
+  if (serviceKey === selectedKey) return true;
+  const group = BOOKING_DEPARTMENT_ALIAS_GROUPS.find((values) => values.includes(serviceKey));
+  return group ? group.includes(selectedKey) : false;
 }
 
 /**
@@ -129,11 +149,16 @@ function PatientBookingPanel() {
           return typeof candidate.id === 'number'
             && Number.isInteger(candidate.id)
             && typeof candidate.name === 'string'
-            && Boolean(candidate.name.trim());
+            && Boolean(candidate.name.trim())
+            && (candidate.doctor_id == null || typeof candidate.doctor_id === 'number')
+            && (candidate.department_key == null || typeof candidate.department_key === 'string');
         });
         setServiceOptions(nextOptions);
         setBookingForm((current) => (
-          current.serviceId && !nextOptions.some((service) => String(service.id) === current.serviceId)
+          current.serviceId && !nextOptions.some((service) => (
+            String(service.id) === current.serviceId
+            && serviceMatchesBookingDepartment(service, current.department)
+          ))
             ? { ...current, serviceId: '' }
             : current
         ));
@@ -160,10 +185,16 @@ function PatientBookingPanel() {
   }
 
   const handleChange = (field: string, value: string) => {
-    setBookingForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
+    setBookingForm((current) => {
+      const next = { ...current, [field]: value };
+      if (field === 'department' && current.serviceId) {
+        const selectedService = serviceOptions.find((service) => String(service.id) === current.serviceId);
+        if (selectedService && !serviceMatchesBookingDepartment(selectedService, value)) {
+          next.serviceId = '';
+        }
+      }
+      return next;
+    });
     setBookingError('');
   };
 
@@ -265,7 +296,9 @@ function PatientBookingPanel() {
             value={bookingForm.serviceId}
             disabled={isBusy}
             placeholder={t('patient.pat_book_placeholder_services')}
-            options={serviceOptions.map((service) => ({
+            options={serviceOptions.filter((service) => (
+              serviceMatchesBookingDepartment(service, bookingForm.department)
+            )).map((service) => ({
               value: String(service.id),
               label: service.name,
             }))}

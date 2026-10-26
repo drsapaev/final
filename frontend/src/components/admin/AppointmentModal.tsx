@@ -23,6 +23,26 @@ type AppointmentItem = Record<string, any>;
 interface AppointmentServiceOption {
   id: number;
   name: string;
+  doctor_id?: number | null;
+  department_key?: string | null;
+}
+
+const SERVICE_DOCTOR_SPECIALTY_GROUPS = [
+  ['cardiology', 'cardio', 'cardiologist', 'cardiology_common', 'кардиология'],
+  ['derma', 'dermatology', 'dermatologist'],
+  ['dentist', 'dental', 'dentistry', 'stomatology'],
+  ['lab', 'laboratory'],
+  ['general', 'therapy', 'therapist', 'general_practice', 'терапия', 'терапевт'],
+];
+
+function isServiceCompatibleWithDoctor(service: AppointmentServiceOption, doctor: DoctorItem | null) {
+  if (!doctor) return true;
+  if (service.doctor_id != null && Number(service.doctor_id) !== Number(doctor.id)) return false;
+  const serviceDepartment = String(service.department_key || '').trim().toLowerCase();
+  const doctorSpecialty = String(doctor.specialty || doctor.specialization || '').trim().toLowerCase();
+  if (!serviceDepartment || !doctorSpecialty || serviceDepartment === doctorSpecialty) return true;
+  const group = SERVICE_DOCTOR_SPECIALTY_GROUPS.find((values) => values.includes(serviceDepartment));
+  return group ? group.includes(doctorSpecialty) : false;
 }
 
 interface AppointmentModalProps {
@@ -67,6 +87,10 @@ const AppointmentModal = ({
     () => doctors.find((doctor) => doctor.id === parseInt(formData.doctorId, 10)) || null,
     [doctors, formData.doctorId]
   );
+  const compatibleServiceOptions = useMemo(
+    () => serviceOptions.filter((service) => isServiceCompatibleWithDoctor(service, selectedDoctor)),
+    [serviceOptions, selectedDoctor],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -82,7 +106,9 @@ const AppointmentModal = ({
           return typeof candidate.id === 'number'
             && Number.isInteger(candidate.id)
             && typeof candidate.name === 'string'
-            && Boolean(candidate.name.trim());
+            && Boolean(candidate.name.trim())
+            && (candidate.doctor_id == null || typeof candidate.doctor_id === 'number')
+            && (candidate.department_key == null || typeof candidate.department_key === 'string');
         }));
       })
       .catch(() => {
@@ -211,7 +237,18 @@ const AppointmentModal = ({
 
   // TECH-DEBT(appt-modal-value-any): value is `any` — multiple input types
   const handleChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      if (field !== 'doctorId') return { ...prev, [field]: value };
+      const nextDoctor = doctors.find((doctor) => String(doctor.id) === String(value)) || null;
+      const selectedService = serviceOptions.find((service) => String(service.id) === String(prev.serviceId));
+      return {
+        ...prev,
+        [field]: value,
+        ...(selectedService && !isServiceCompatibleWithDoctor(selectedService, nextDoctor)
+          ? { serviceId: '' }
+          : {}),
+      };
+    });
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: null }));
     }
@@ -415,12 +452,12 @@ const AppointmentModal = ({
                   label={appointment ? t('services') : `${t('services')} *`}
                   value={formData.serviceId}
                   placeholder={t('no_services')}
-                  options={serviceOptions.map((service) => ({
+                  options={compatibleServiceOptions.map((service) => ({
                     value: String(service.id),
                     label: service.name,
                   }))}
                   onValueChange={(value) => handleChange('serviceId', String(value))}
-                  disabled={servicesUnavailable || serviceOptions.length === 0 || isSubmitting}
+                  disabled={servicesUnavailable || compatibleServiceOptions.length === 0 || isSubmitting}
                   error={errors.serviceId}
                   size="large"
                 />

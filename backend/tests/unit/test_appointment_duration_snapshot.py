@@ -7,7 +7,11 @@ from fastapi import HTTPException
 
 from app.crud.appointment import appointment as appointment_crud
 from app.models.service import Service
-from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
+from app.schemas.appointment import (
+    AppointmentCreate,
+    AppointmentUpdate,
+    PatientPortalAppointmentCreate,
+)
 
 
 def test_create_resolves_catalog_name_and_captures_duration_once(
@@ -83,7 +87,7 @@ def test_invalid_exact_service_selection_is_rejected_before_insert(
     assert exc_info.value.status_code == 422
 
 
-def test_ambiguous_or_doctor_incompatible_selection_keeps_duration_unknown(
+def test_incompatible_doctor_selection_is_rejected_but_ambiguous_duration_stays_unknown(
     db_session, test_patient, test_doctor, test_doctor_user
 ):
     from app.models.clinic import Doctor
@@ -108,27 +112,108 @@ def test_ambiguous_or_doctor_incompatible_selection_keeps_duration_unknown(
         duration_minutes=20,
         active=True,
     )
-    db_session.add_all([pinned, second])
+    third = Service(
+        name="Третья услуга",
+        price=100000,
+        duration_minutes=25,
+        active=True,
+    )
+    db_session.add_all([pinned, second, third])
     db_session.flush()
 
-    incompatible = appointment_crud.create(
-        db_session,
-        obj_in=AppointmentCreate(
-            patient_id=test_patient.id,
-            doctor_id=test_doctor.id,
-            appointment_date=date.today() + timedelta(days=3),
-            service_ids=[pinned.id],
-        ),
-    )
+    with pytest.raises(HTTPException) as exc_info:
+        appointment_crud.create(
+            db_session,
+            obj_in=AppointmentCreate(
+                patient_id=test_patient.id,
+                doctor_id=test_doctor.id,
+                appointment_date=date.today() + timedelta(days=3),
+                service_ids=[pinned.id],
+            ),
+        )
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail["code"] == "service_incompatible_with_doctor"
     ambiguous = appointment_crud.create(
         db_session,
         obj_in=AppointmentCreate(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
             appointment_date=date.today() + timedelta(days=4),
-            service_ids=[pinned.id, second.id],
+            service_ids=[second.id, third.id],
         ),
     )
 
-    assert incompatible.duration_minutes_snapshot is None
     assert ambiguous.duration_minutes_snapshot is None
+
+
+def test_exact_service_selection_rejects_mismatched_canonical_department(
+    db_session, test_patient
+):
+    from uuid import uuid4
+
+    from app.models.department import Department
+
+    suffix = uuid4().hex[:8]
+    service_department = Department(
+        key=f"service-dept-{suffix}", name_ru="Synthetic service department"
+    )
+    selected_department = Department(
+        key=f"selected-dept-{suffix}", name_ru="Synthetic selected department"
+    )
+    db_session.add_all([service_department, selected_department])
+    db_session.flush()
+    service = Service(
+        name="Department-bound service",
+        price=100000,
+        duration_minutes=30,
+        department_id=service_department.id,
+        department_key=service_department.key,
+        active=True,
+    )
+    db_session.add(service)
+    db_session.flush()
+
+    with pytest.raises(HTTPException) as exc_info:
+        appointment_crud.create(
+            db_session,
+            obj_in=PatientPortalAppointmentCreate(
+                patient_id=test_patient.id,
+                department_id=selected_department.id,
+                appointment_date=date.today() + timedelta(days=3),
+                service_ids=[service.id],
+            ),
+        )
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail["code"] == "service_incompatible_with_department"
+
+
+def test_exact_service_selection_accepts_department_aliases(db_session, test_patient):
+    from app.models.department import Department
+
+    department = Department(key="cardio", name_ru="Synthetic cardiology")
+    db_session.add(department)
+    db_session.flush()
+    # The real clinic uses aliases such as Department.key=cardio and
+    # Service.department_key=cardiology; keep the shared canonical alias case.
+    service = Service(
+        name="Cardiology service",
+        price=100000,
+        duration_minutes=30,
+        department_key="cardiology",
+        active=True,
+    )
+    db_session.add(service)
+    db_session.flush()
+
+    row = appointment_crud.create(
+        db_session,
+        obj_in=PatientPortalAppointmentCreate(
+            patient_id=test_patient.id,
+            department_id=department.id,
+            appointment_date=date.today() + timedelta(days=3),
+            service_ids=[service.id],
+        ),
+    )
+
+    assert row.services == ["Cardiology service"]

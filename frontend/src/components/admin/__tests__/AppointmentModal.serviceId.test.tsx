@@ -53,4 +53,33 @@ describe('AppointmentModal exact service selection', () => {
       );
     });
   });
+
+  it('filters pinned services to the selected doctor before saving', async () => {
+    apiGet.mockResolvedValue({
+      data: [
+        { id: 91, name: 'Услуга другого врача', doctor_id: 7 },
+        { id: 92, name: 'Услуга выбранного врача', doctor_id: 6 },
+        { id: 93, name: 'Общая услуга', doctor_id: null },
+      ],
+    });
+    render(
+      <ThemeProvider>
+        <AppointmentModal
+          isOpen
+          onClose={vi.fn()}
+          onSave={vi.fn()}
+          patients={[{ id: 4, full_name: 'Тестовый пациент' }]}
+          doctors={[{ id: 6, user: { full_name: 'Тестовый врач' }, specialty: 'Терапия' }]}
+        />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Выберите врача' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Тестовый врач/ }));
+    fireEvent.click(await screen.findByLabelText(/services|услуги/i));
+
+    expect(await screen.findByRole('option', { name: 'Услуга выбранного врача' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Общая услуга' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Услуга другого врача' })).not.toBeInTheDocument();
+  });
 });

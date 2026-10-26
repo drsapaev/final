@@ -1,5 +1,5 @@
 import i18n from '../i18n';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -243,6 +243,26 @@ interface MiniAppDepartmentOption {
 interface MiniAppServiceOption {
   id: number;
   name: string;
+  doctor_id?: number | null;
+  department_key?: string | null;
+}
+
+const MINI_APP_BOOKING_DEPARTMENT_ALIAS_GROUPS = [
+  ['cardiology', 'cardio', 'cardiology_common', 'cardiologist', 'кардиология'],
+  ['derma', 'dermatology', 'dermatologist'],
+  ['dentist', 'dental', 'dentistry', 'stomatology'],
+  ['lab', 'laboratory'],
+  ['general', 'therapy', 'therapist', 'general_practice'],
+];
+
+function miniAppServiceMatchesDepartment(service: MiniAppServiceOption, departmentKey: string) {
+  const serviceKey = String(service.department_key || '').trim().toLowerCase();
+  const selectedKey = String(departmentKey || '').trim().toLowerCase();
+  if (!serviceKey) return true;
+  if (!selectedKey) return false;
+  if (serviceKey === selectedKey) return true;
+  const group = MINI_APP_BOOKING_DEPARTMENT_ALIAS_GROUPS.find((values) => values.includes(serviceKey));
+  return group ? group.includes(selectedKey) : false;
 }
 
 // Round-15 (owner P2): selector display name follows the shell display
@@ -514,6 +534,7 @@ function TelegramMiniAppPatientShell() {
   const [bookingDepartmentOptions, setBookingDepartmentOptions] = useState<MiniAppDepartmentOption[]>([]);
   const [bookingDepartmentsUnavailable, setBookingDepartmentsUnavailable] = useState(false);
   const [bookingServiceOptions, setBookingServiceOptions] = useState<MiniAppServiceOption[]>([]);
+  const bookingServiceOptionsRef = useRef<MiniAppServiceOption[]>([]);
   const [bookingServicesUnavailable, setBookingServicesUnavailable] = useState(false);
   const [appointmentPreview, setAppointmentPreview] = useState<{
     status: string;
@@ -823,9 +844,17 @@ function TelegramMiniAppPatientShell() {
         // the failure branch below.
         setAppointmentPreviewForm((prev) => {
           if (!prev.department) return prev;
-          return nextOptions.some((row) => row.key === prev.department)
-            ? prev
-            : { ...prev, department: '' };
+          if (nextOptions.some((row) => row.key === prev.department)) return prev;
+          const selectedService = bookingServiceOptionsRef.current.find(
+            (service) => String(service.id) === prev.serviceId,
+          );
+          return {
+            ...prev,
+            department: '',
+            ...(selectedService && !miniAppServiceMatchesDepartment(selectedService, '')
+              ? { serviceId: '', serviceName: '' }
+              : {}),
+          };
         });
       })
       .catch(() => {
@@ -837,7 +866,19 @@ function TelegramMiniAppPatientShell() {
         // riding along in the preview/create payload while the UI claims
         // "можно без отделения". Clear it so form state and the visible
         // selector never diverge.
-        setAppointmentPreviewForm((prev) => (prev.department ? { ...prev, department: '' } : prev));
+        setAppointmentPreviewForm((prev) => {
+          if (!prev.department) return prev;
+          const selectedService = bookingServiceOptionsRef.current.find(
+            (service) => String(service.id) === prev.serviceId,
+          );
+          return {
+            ...prev,
+            department: '',
+            ...(selectedService && !miniAppServiceMatchesDepartment(selectedService, '')
+              ? { serviceId: '', serviceName: '' }
+              : {}),
+          };
+        });
       });
     return () => {
       isMounted = false;
@@ -859,12 +900,18 @@ function TelegramMiniAppPatientShell() {
           return typeof candidate.id === 'number'
             && Number.isInteger(candidate.id)
             && typeof candidate.name === 'string'
-            && Boolean(candidate.name.trim());
+            && Boolean(candidate.name.trim())
+            && (candidate.doctor_id == null || typeof candidate.doctor_id === 'number')
+            && (candidate.department_key == null || typeof candidate.department_key === 'string');
         });
         setBookingServiceOptions(nextOptions);
+        bookingServiceOptionsRef.current = nextOptions;
         setAppointmentPreviewForm((current) => {
           if (!current.serviceId) return current;
-          const selected = nextOptions.find((service) => String(service.id) === current.serviceId);
+          const selected = nextOptions.find((service) => (
+            String(service.id) === current.serviceId
+            && miniAppServiceMatchesDepartment(service, current.department)
+          ));
           return selected
             ? { ...current, serviceName: selected.name }
             : { ...current, serviceId: '', serviceName: '' };
@@ -873,6 +920,7 @@ function TelegramMiniAppPatientShell() {
       .catch(() => {
         if (!isMounted) return;
         setBookingServiceOptions([]);
+        bookingServiceOptionsRef.current = [];
         setBookingServicesUnavailable(true);
         setAppointmentPreviewForm((current) => (
           current.serviceId ? { ...current, serviceId: '', serviceName: '' } : current
@@ -959,10 +1007,17 @@ function TelegramMiniAppPatientShell() {
   };
 
   const handleAppointmentPreviewFieldChange = (field: string) => (event: { target: { value: string } }) => {
-    setAppointmentPreviewForm((current) => ({
-      ...current,
-      [field]: event.target.value,
-    }));
+    setAppointmentPreviewForm((current) => {
+      const next = { ...current, [field]: event.target.value };
+      if (field === 'department' && current.serviceId) {
+        const selectedService = bookingServiceOptions.find((service) => String(service.id) === current.serviceId);
+        if (selectedService && !miniAppServiceMatchesDepartment(selectedService, event.target.value)) {
+          next.serviceId = '';
+          next.serviceName = '';
+        }
+      }
+      return next;
+    });
     setAppointmentPreview({
       status: 'idle',
       payload: null,
@@ -1966,7 +2021,9 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                         label={t('desiredService')}
                         value={appointmentPreviewForm.serviceId}
                         placeholder={t('optional')}
-                        options={bookingServiceOptions.map((service) => ({
+                        options={bookingServiceOptions.filter((service) => (
+                          miniAppServiceMatchesDepartment(service, appointmentPreviewForm.department)
+                        )).map((service) => ({
                           value: String(service.id),
                           label: service.name,
                         }))}

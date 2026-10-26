@@ -433,7 +433,7 @@ class TestMobileBookingRound4Fixes:
         assert row.services == ["УЗИ сердца"]
         assert row.duration_minutes_snapshot == 45
 
-    def test_book_service_pinned_to_another_doctor_keeps_snapshot_unknown(
+    def test_book_service_pinned_to_another_doctor_is_rejected(
         self, client, db_session, auth_headers
     ):
         pinned_doctor = _make_doctor(db_session, "cardiology", active=True)
@@ -464,14 +464,17 @@ class TestMobileBookingRound4Fixes:
             headers=_patient_login(client, patient_user),
         )
 
-        # This PR must not change the existing mobile endpoint's acceptance
-        # contract; the mismatched explicit pin only makes duration unknown.
-        assert response.status_code == 200, response.text
-        row = (
-            db_session.query(Appointment).filter_by(doctor_id=requested_doctor.id).one()
+        assert response.status_code == 422, response.text
+        assert response.json()["detail"] == {
+            "code": "service_incompatible_with_doctor",
+            "field": "services",
+        }
+        assert (
+            db_session.query(Appointment)
+            .filter_by(doctor_id=requested_doctor.id)
+            .count()
+            == 0
         )
-        assert row.services == ["Закреплённая консультация"]
-        assert row.duration_minutes_snapshot is None
 
     @pytest.mark.parametrize("duration_minutes", [None, 0, -10, 481, 9000])
     def test_book_invalid_service_duration_keeps_snapshot_unknown(

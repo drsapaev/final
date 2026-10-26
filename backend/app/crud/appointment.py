@@ -21,6 +21,24 @@ from app.services.appointment_duration_snapshot import (
 )
 
 
+def _department_id_for_service_selection(
+    db: Session, data: dict[str, Any]
+) -> int | None:
+    """Return only a server-owned or canonical department context."""
+    department_id = data.get("department_id")
+    if department_id is not None:
+        return int(department_id)
+    department_key = data.get("department")
+    if isinstance(department_key, str) and department_key.strip():
+        row = (
+            db.query(Department)
+            .filter(Department.key == department_key.strip())
+            .first()
+        )
+        return int(row.id) if row is not None else None
+    return None
+
+
 class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate]):
     def create(self, db: Session, *, obj_in: AppointmentCreate) -> Appointment:
         data = obj_in.model_dump(exclude_unset=True)
@@ -28,7 +46,10 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         if service_ids is not None:
             try:
                 selection = resolve_exact_service_selection(
-                    db, service_ids, doctor_id=data.get("doctor_id")
+                    db,
+                    service_ids,
+                    doctor_id=data.get("doctor_id"),
+                    department_id=_department_id_for_service_selection(db, data),
                 )
             except InvalidServiceSelection as exc:
                 raise HTTPException(
@@ -59,9 +80,15 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         service_ids = data.pop("service_ids", None)
         if service_ids is not None:
             doctor_id = data.get("doctor_id", db_obj.doctor_id)
+            department_id = _department_id_for_service_selection(db, data)
+            if department_id is None and doctor_id == db_obj.doctor_id:
+                department_id = db_obj.department_id
             try:
                 selection = resolve_exact_service_selection(
-                    db, service_ids, doctor_id=doctor_id
+                    db,
+                    service_ids,
+                    doctor_id=doctor_id,
+                    department_id=department_id,
                 )
             except InvalidServiceSelection as exc:
                 raise HTTPException(

@@ -311,6 +311,26 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
     });
   });
 
+  it('filters service choices to the selected canonical department', async () => {
+    (window as unknown as { Telegram?: unknown }).Telegram = {
+      WebApp: { initData: 'test-init-data-payload' },
+    };
+    apiGet.mockResolvedValue({
+      data: [
+        { id: 73, name: 'УЗИ сердца', department_key: 'cardiology' },
+        { id: 74, name: 'УЗИ кожи', department_key: 'dermatology' },
+        { id: 75, name: 'Общая услуга', department_key: null },
+      ],
+    });
+    renderBookSurface('?section=appointments');
+    await selectDepartmentByName('Кардиология');
+    fireEvent.click(await screen.findByLabelText(/услуг|xizmat|service/i));
+
+    expect(await screen.findByRole('option', { name: 'УЗИ сердца' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Общая услуга' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'УЗИ кожи' })).not.toBeInTheDocument();
+  });
+
   it('clears a stale selected department when the reference refetch fails after a section switch (round-15 P2)', async () => {
     (window as unknown as { Telegram?: unknown }).Telegram = {
       WebApp: { initData: 'test-init-data-payload' },

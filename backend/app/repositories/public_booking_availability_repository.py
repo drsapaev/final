@@ -75,6 +75,12 @@ class PublicBookingAvailabilityRepository:
             .where(
                 Visit.doctor_id == doctor_id,
                 Visit.visit_date == target_date,
+                # A live queue entry can have a Visit row before any clock
+                # time is assigned (for example, QR registration). It is not
+                # a reservation of a scheduled hour. Never substitute
+                # created_at/registration time for visit_time; only Visits
+                # with an explicit scheduled time participate in slot overlap.
+                Visit.visit_time.is_not(None),
                 func.lower(Visit.status).notin_(
                     {"closed", "canceled", "cancelled", "expired"}
                 ),

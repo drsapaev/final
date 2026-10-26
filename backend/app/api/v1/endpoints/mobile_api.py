@@ -45,7 +45,10 @@ from app.schemas.mobile import (
     MobileQuickStats,
     PatientProfileOut,
 )
-from app.services.appointment_duration_snapshot import MAX_SNAPSHOT_DURATION_MINUTES
+from app.services.appointment_duration_snapshot import (
+    InvalidServiceSelection,
+    resolve_exact_service_selection,
+)
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.mobile_api_service import MobileApiService
@@ -467,48 +470,27 @@ async def book_mobile_appointment(
         # only Service.active == True rows, so a booking must never persist
         # an unavailable service; the former stub loop
         # (add_appointment_service) wrote nothing and is retired.
-        service_names: list[str] = []
-        service_rows = []
-        if request.services:
-            from app.models.service import Service
-
-            service_rows = (
-                db.query(Service)
-                .filter(
-                    Service.id.in_(request.services),
-                    Service.active.is_(True),
-                )
-                .all()
+        try:
+            service_selection = resolve_exact_service_selection(
+                db,
+                request.services,
+                doctor_id=request.doctor_id,
             )
-            found_ids = {s.id for s in service_rows}
-            unavailable = [sid for sid in request.services if sid not in found_ids]
-            if unavailable:
+        except InvalidServiceSelection as exc:
+            if str(exc) == "service_not_found_or_inactive":
                 raise HTTPException(
                     status_code=400,
                     detail=(
                         "Услуги недоступны (не найдены или деактивированы): "
-                        f"{sorted(unavailable)}"
+                        f"{sorted(request.services)}"
                     ),
-                )
-            service_names = [s.name for s in service_rows]
-
-        # Preserve a duration snapshot only when this request resolves to one
-        # authoritative active service that is not pinned to another doctor.
-        # Keep existing mobile booking acceptance unchanged: a pinned-service
-        # mismatch leaves this metadata unknown rather than rejecting booking.
-        # Appointment.services stores display names, so neither old names nor
-        # multiple selected services are a safe basis for guessing duration.
-        duration_minutes_snapshot = None
-        if len(request.services) == 1 and len(service_rows) == 1:
-            service = service_rows[0]
-            if service.doctor_id in (None, request.doctor_id):
-                service_duration = service.duration_minutes
-                if (
-                    isinstance(service_duration, int)
-                    and not isinstance(service_duration, bool)
-                    and 1 <= service_duration <= MAX_SNAPSHOT_DURATION_MINUTES
-                ):
-                    duration_minutes_snapshot = service_duration
+                ) from exc
+            raise HTTPException(
+                status_code=422,
+                detail={"code": str(exc), "field": "services"},
+            ) from exc
+        service_names = list(service_selection.names)
+        duration_minutes_snapshot = service_selection.duration_minutes_snapshot
 
         # Создаем запись. NOTE: the handler used to bind the wrong request
         # schema and referenced nonexistent Appointment columns (complaint,
