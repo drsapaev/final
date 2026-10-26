@@ -6,7 +6,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0085_visit_service_duration_snapshot"
+revision = "0085_visit_service_duration"
 down_revision = "0084_public_booking_requests"
 branch_labels = None
 depends_on = None
