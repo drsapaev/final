@@ -119,9 +119,15 @@ def test_public_availability_returns_local_candidate_times_without_reserving(
     assert response.json() == {
         "date": target_date.isoformat(),
         "timezone": "Asia/Tashkent",
+        "settings_version": 1,
         "slots": ["09:00:00", "09:20:00", "10:00:00", "10:20:00", "10:40:00"],
     }
-    assert set(response.json()) == {"date", "timezone", "slots"}
+    assert set(response.json()) == {
+        "date",
+        "timezone",
+        "settings_version",
+        "slots",
+    }
 
     # An existing non-cancelled appointment with unknown duration closes that
     # doctor/date; the read endpoint neither creates nor reserves appointments.

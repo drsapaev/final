@@ -69,8 +69,18 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -88,6 +98,15 @@ from app.models.clinic import Doctor
 from app.models.department import Department
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
+from app.schemas.public_booking_request import (
+    PublicBookingRequestAction,
+    PublicBookingRequestCreate,
+    PublicBookingRequestErrorOut,
+    PublicBookingRequestListOut,
+    PublicBookingRequestOut,
+    PublicBookingRequestPatientProfileErrorOut,
+    PublicBookingRequestResubmit,
+)
 from app.services.appointment_booking_routing import (
     attach_department_id,
     lock_department_for_booking,
@@ -97,6 +116,10 @@ from app.services.appointment_booking_routing import (
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.patient_access_audit import log_patient_access
+from app.services.public_booking_request_service import (
+    PublicBookingRequestError,
+    PublicBookingRequestService,
+)
 from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppSessionScope,
     TelegramMiniAppSessionScopeError,
@@ -336,9 +359,7 @@ def _active_portal_user_audited(resource_type: str, action: str) -> Callable[...
                 resource_type=resource_type,
                 action=action,
                 reason="user_deactivated",
-                subject_patient_id=(
-                    int(patient.id) if patient is not None else None
-                ),
+                subject_patient_id=(int(patient.id) if patient is not None else None),
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1021,3 +1042,275 @@ def get_patient_portal_forms(
         request=request,
     )
     return forms_preview.to_response_payload()
+
+
+def _raise_public_booking_request_error(exc: PublicBookingRequestError) -> None:
+    raise HTTPException(
+        status_code=exc.status_code,
+        detail={"code": exc.code},
+        headers={"Cache-Control": "no-store"},
+    ) from exc
+
+
+@router.post(
+    "/booking-requests",
+    response_model=PublicBookingRequestOut,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        401: _PORTAL_401,
+        403: _PORTAL_403,
+        404: {
+            "model": (
+                PublicBookingRequestErrorOut
+                | PublicBookingRequestPatientProfileErrorOut
+            )
+        },
+        409: {"model": PublicBookingRequestErrorOut},
+        503: {"model": PublicBookingRequestErrorOut},
+    },
+    operation_id="patient_create_public_booking_request",
+    summary="Submit a non-reserving request for a public booking time",
+)
+def create_patient_public_booking_request(
+    body: PublicBookingRequestCreate,
+    request: Request,
+    response: Response,
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=128,
+        description="Required for safe retries of the same request submission.",
+    ),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(
+        _active_portal_user_audited("public_booking_request", "create")
+    ),
+) -> PublicBookingRequestOut:
+    """Create a request for the authenticated patient's own linked card.
+
+    This endpoint never creates an Appointment and does not reserve its
+    requested time. The current availability is checked for a useful patient
+    response; staff must review the request separately.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    patient_id = _require_patient_audited(
+        db,
+        request,
+        current_user,
+        resource_type="public_booking_request",
+        action="create",
+    )
+    scope = _patient_portal_scope(patient_id)
+    try:
+        result = PublicBookingRequestService(db).create_for_patient(
+            patient_id=patient_id,
+            actor_user_id=current_user.id,
+            service_slug=body.service_slug,
+            doctor_slug=body.doctor_slug,
+            appointment_date=body.appointment_date,
+            appointment_time=body.appointment_time,
+            expected_settings_version=body.expected_settings_version,
+            idempotency_key=idempotency_key,
+        )
+    except PublicBookingRequestError as exc:
+        _log_portal_denied(
+            db,
+            request=request,
+            current_user=current_user,
+            resource_type="public_booking_request",
+            action="create",
+            reason=exc.code,
+            scope=scope,
+        )
+        _raise_public_booking_request_error(exc)
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="public_booking_request",
+        resource_id=str(result.id),
+        action="create",
+        outcome="success",
+        request=request,
+    )
+    return result
+
+
+@router.get(
+    "/booking-requests",
+    response_model=PublicBookingRequestListOut,
+    responses={401: _PORTAL_401, 403: _PORTAL_403, 404: _PORTAL_404},
+    operation_id="patient_list_public_booking_requests",
+    summary="List the authenticated patient's public booking requests",
+)
+def list_patient_public_booking_requests(
+    request: Request,
+    response: Response,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(
+        _active_portal_user_audited("public_booking_request", "view")
+    ),
+) -> PublicBookingRequestListOut:
+    response.headers["Cache-Control"] = "no-store"
+    patient_id = _require_patient_audited(
+        db, request, current_user, resource_type="public_booking_request", action="view"
+    )
+    scope = _patient_portal_scope(patient_id)
+    items = PublicBookingRequestService(db).list_for_patient(
+        patient_id=patient_id, limit=limit, offset=offset
+    )
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="public_booking_request",
+        action="list",
+        outcome="success",
+        request=request,
+    )
+    return PublicBookingRequestListOut(items=items)
+
+
+@router.post(
+    "/booking-requests/{request_id}/withdraw",
+    response_model=PublicBookingRequestOut,
+    responses={
+        401: _PORTAL_401,
+        403: _PORTAL_403,
+        404: {
+            "model": (
+                PublicBookingRequestErrorOut
+                | PublicBookingRequestPatientProfileErrorOut
+            )
+        },
+        409: {"model": PublicBookingRequestErrorOut},
+    },
+    operation_id="patient_withdraw_public_booking_request",
+    summary="Withdraw a request before staff has decided it",
+)
+def withdraw_patient_public_booking_request(
+    request_id: UUID,
+    body: PublicBookingRequestAction,
+    request: Request,
+    response: Response,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(
+        _active_portal_user_audited("public_booking_request", "withdraw")
+    ),
+) -> PublicBookingRequestOut:
+    response.headers["Cache-Control"] = "no-store"
+    patient_id = _require_patient_audited(
+        db,
+        request,
+        current_user,
+        resource_type="public_booking_request",
+        action="withdraw",
+    )
+    scope = _patient_portal_scope(patient_id)
+    try:
+        result = PublicBookingRequestService(db).withdraw_for_patient(
+            request_id=request_id,
+            patient_id=patient_id,
+            actor_user_id=current_user.id,
+            expected_version=body.expected_version,
+        )
+    except PublicBookingRequestError as exc:
+        _log_portal_denied(
+            db,
+            request=request,
+            current_user=current_user,
+            resource_type="public_booking_request",
+            action="withdraw",
+            reason=exc.code,
+            scope=scope,
+        )
+        _raise_public_booking_request_error(exc)
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="public_booking_request",
+        resource_id=str(result.id),
+        action="withdraw",
+        outcome="success",
+        request=request,
+    )
+    return result
+
+
+@router.post(
+    "/booking-requests/{request_id}/resubmit",
+    response_model=PublicBookingRequestOut,
+    responses={
+        401: _PORTAL_401,
+        403: _PORTAL_403,
+        404: {
+            "model": (
+                PublicBookingRequestErrorOut
+                | PublicBookingRequestPatientProfileErrorOut
+            )
+        },
+        409: {"model": PublicBookingRequestErrorOut},
+        503: {"model": PublicBookingRequestErrorOut},
+    },
+    operation_id="patient_resubmit_public_booking_request",
+    summary="Choose a different time after staff requested one",
+)
+def resubmit_patient_public_booking_request(
+    request_id: UUID,
+    body: PublicBookingRequestResubmit,
+    request: Request,
+    response: Response,
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=128,
+        description="Required for safe retries of the same time selection.",
+    ),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(
+        _active_portal_user_audited("public_booking_request", "resubmit")
+    ),
+) -> PublicBookingRequestOut:
+    response.headers["Cache-Control"] = "no-store"
+    patient_id = _require_patient_audited(
+        db,
+        request,
+        current_user,
+        resource_type="public_booking_request",
+        action="resubmit",
+    )
+    scope = _patient_portal_scope(patient_id)
+    try:
+        result = PublicBookingRequestService(db).resubmit_for_patient(
+            request_id=request_id,
+            patient_id=patient_id,
+            actor_user_id=current_user.id,
+            expected_version=body.expected_version,
+            appointment_date=body.appointment_date,
+            appointment_time=body.appointment_time,
+            expected_settings_version=body.expected_settings_version,
+            idempotency_key=idempotency_key,
+        )
+    except PublicBookingRequestError as exc:
+        _log_portal_denied(
+            db,
+            request=request,
+            current_user=current_user,
+            resource_type="public_booking_request",
+            action="resubmit",
+            reason=exc.code,
+            scope=scope,
+        )
+        _raise_public_booking_request_error(exc)
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="public_booking_request",
+        resource_id=str(result.id),
+        action="resubmit",
+        outcome="success",
+        request=request,
+    )
+    return result

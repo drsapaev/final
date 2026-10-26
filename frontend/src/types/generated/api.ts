@@ -221,6 +221,65 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/patients/booking-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the authenticated patient's public booking requests */
+        get: operations["patient_list_public_booking_requests"];
+        put?: never;
+        /**
+         * Submit a non-reserving request for a public booking time
+         * @description Create a request for the authenticated patient's own linked card.
+         *
+         *     This endpoint never creates an Appointment and does not reserve its
+         *     requested time. The current availability is checked for a useful patient
+         *     response; staff must review the request separately.
+         */
+        post: operations["patient_create_public_booking_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/booking-requests/{request_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw a request before staff has decided it */
+        post: operations["patient_withdraw_public_booking_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/booking-requests/{request_id}/resubmit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Choose a different time after staff requested one */
+        post: operations["patient_resubmit_public_booking_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/patients/appointments": {
         parameters: {
             query?: never;
@@ -1137,6 +1196,57 @@ export type paths = {
         get: operations["public_site_get_booking_availability"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/public-booking-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List public booking requests for staff review */
+        get: operations["staff_list_public_booking_requests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/public-booking-requests/{request_id}/request-new-time": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask the patient to choose another time without reserving one */
+        post: operations["staff_request_new_public_booking_time"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/public-booking-requests/{request_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject a pending public booking request */
+        post: operations["staff_reject_public_booking_request"];
         delete?: never;
         options?: never;
         head?: never;
@@ -36282,6 +36392,8 @@ export type components = {
              * @constant
              */
             timezone: "Asia/Tashkent";
+            /** Settings Version */
+            settings_version: number;
             /** Slots */
             slots: string[];
         };
@@ -36350,6 +36462,214 @@ export type components = {
             /** Eligible */
             eligible: boolean;
         };
+        /** PublicBookingRequestAction */
+        PublicBookingRequestAction: {
+            /** Expected Version */
+            expected_version: number;
+        };
+        /** PublicBookingRequestCreate */
+        PublicBookingRequestCreate: {
+            /** Service Slug */
+            service_slug: string;
+            /** Doctor Slug */
+            doctor_slug: string;
+            /**
+             * Appointment Date
+             * Format: date
+             */
+            appointment_date: string;
+            /**
+             * Appointment Time
+             * Format: time
+             */
+            appointment_time: string;
+            /** Expected Settings Version */
+            expected_settings_version: number;
+        };
+        /** PublicBookingRequestErrorDetail */
+        PublicBookingRequestErrorDetail: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "public_content_not_found" | "public_booking_unavailable" | "booking_settings_version_conflict" | "booking_mode_changed" | "booking_time_unavailable" | "booking_request_not_found" | "booking_request_state_conflict" | "booking_request_version_conflict" | "booking_request_idempotency_conflict";
+        };
+        /** PublicBookingRequestErrorOut */
+        PublicBookingRequestErrorOut: {
+            /** Detail */
+            detail: components["schemas"]["PublicBookingRequestErrorDetail"] | string;
+        };
+        /** PublicBookingRequestEventOut */
+        PublicBookingRequestEventOut: {
+            /**
+             * Event Type
+             * @enum {string}
+             */
+            event_type: "submitted" | "resubmitted" | "staff_requested_new_time" | "rejected" | "withdrawn";
+            from_status: components["schemas"]["PublicBookingRequestStatus"] | null;
+            to_status: components["schemas"]["PublicBookingRequestStatus"];
+            /** Previous Appointment Date */
+            previous_appointment_date: string | null;
+            /** Previous Appointment Time */
+            previous_appointment_time: string | null;
+            /**
+             * Requested Appointment Date
+             * Format: date
+             */
+            requested_appointment_date: string;
+            /**
+             * Requested Appointment Time
+             * Format: time
+             */
+            requested_appointment_time: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** PublicBookingRequestListOut */
+        PublicBookingRequestListOut: {
+            /** Items */
+            items: components["schemas"]["PublicBookingRequestOut"][];
+        };
+        /** PublicBookingRequestOut */
+        PublicBookingRequestOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Service Slug */
+            service_slug: string;
+            /** Doctor Slug */
+            doctor_slug: string;
+            /**
+             * Appointment Date
+             * Format: date
+             */
+            appointment_date: string;
+            /**
+             * Appointment Time
+             * Format: time
+             */
+            appointment_time: string;
+            /**
+             * Timezone
+             * @default Asia/Tashkent
+             * @constant
+             */
+            timezone: "Asia/Tashkent";
+            status: components["schemas"]["PublicBookingRequestStatus"];
+            /** Settings Version */
+            settings_version: number;
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** History */
+            history: components["schemas"]["PublicBookingRequestEventOut"][];
+        };
+        /** PublicBookingRequestPatientOut */
+        PublicBookingRequestPatientOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Patient Id */
+            patient_id: number;
+            /** Patient Display Name */
+            patient_display_name: string;
+            /** Service Name */
+            service_name: string;
+            /** Doctor Display Name */
+            doctor_display_name: string;
+            /** Service Slug */
+            service_slug: string;
+            /** Doctor Slug */
+            doctor_slug: string;
+            /**
+             * Appointment Date
+             * Format: date
+             */
+            appointment_date: string;
+            /**
+             * Appointment Time
+             * Format: time
+             */
+            appointment_time: string;
+            /**
+             * Timezone
+             * @default Asia/Tashkent
+             * @constant
+             */
+            timezone: "Asia/Tashkent";
+            status: components["schemas"]["PublicBookingRequestStatus"];
+            /** Settings Version */
+            settings_version: number;
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** History */
+            history: components["schemas"]["PublicBookingRequestEventOut"][];
+        };
+        /** PublicBookingRequestPatientProfileErrorDetail */
+        PublicBookingRequestPatientProfileErrorDetail: {
+            /**
+             * Reason
+             * @constant
+             */
+            reason: "patient_profile_required";
+        };
+        /** PublicBookingRequestPatientProfileErrorOut */
+        PublicBookingRequestPatientProfileErrorOut: {
+            detail: components["schemas"]["PublicBookingRequestPatientProfileErrorDetail"];
+        };
+        /** PublicBookingRequestResubmit */
+        PublicBookingRequestResubmit: {
+            /** Expected Version */
+            expected_version: number;
+            /**
+             * Appointment Date
+             * Format: date
+             */
+            appointment_date: string;
+            /**
+             * Appointment Time
+             * Format: time
+             */
+            appointment_time: string;
+            /** Expected Settings Version */
+            expected_settings_version: number;
+        };
+        /** PublicBookingRequestStaffListOut */
+        PublicBookingRequestStaffListOut: {
+            /** Items */
+            items: components["schemas"]["PublicBookingRequestPatientOut"][];
+        };
+        /**
+         * PublicBookingRequestStatus
+         * @enum {string}
+         */
+        PublicBookingRequestStatus: "pending" | "needs_new_time" | "rejected" | "withdrawn";
         /** PublicBookingSettingsOut */
         PublicBookingSettingsOut: {
             /** Version */
@@ -43874,6 +44194,300 @@ export interface operations {
             };
         };
     };
+    patient_list_public_booking_requests: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestListOut"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description JWT user has no linked Patient profile */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_create_public_booking_request: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required for safe retries of the same request submission. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestOut"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"] | components["schemas"]["PublicBookingRequestPatientProfileErrorOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+        };
+    };
+    patient_withdraw_public_booking_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingRequestAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestOut"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"] | components["schemas"]["PublicBookingRequestPatientProfileErrorOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_resubmit_public_booking_request: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required for safe retries of the same time selection. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingRequestResubmit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestOut"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"] | components["schemas"]["PublicBookingRequestPatientProfileErrorOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+        };
+    };
     get_my_appointments_api_v1_patients_appointments_get: {
         parameters: {
             query?: never;
@@ -45687,6 +46301,187 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicBookingAvailabilityErrorOut"];
+                };
+            };
+        };
+    };
+    staff_list_public_booking_requests: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["PublicBookingRequestStatus"] | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestStaffListOut"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin or Registrar role required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staff_request_new_public_booking_time: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingRequestAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestPatientOut"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin or Registrar role required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staff_reject_public_booking_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingRequestAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestPatientOut"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin or Registrar role required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

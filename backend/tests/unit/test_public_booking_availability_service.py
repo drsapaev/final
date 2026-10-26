@@ -71,6 +71,7 @@ class StubBookingSettingsRepository:
 class StubBookingSettingsService:
     def __init__(self, *, enabled: bool = True, horizon_days: int = 30):
         self.settings = SimpleNamespace(
+            version=1,
             is_enabled=enabled,
             is_ready=True,
             booking_horizon_days=horizon_days,

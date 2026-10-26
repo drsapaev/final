@@ -512,6 +512,450 @@
         ]
       }
     },
+    "/api/v1/patients/booking-requests": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Submit a non-reserving request for a public booking time",
+        "description": "Create a request for the authenticated patient's own linked card.\n\nThis endpoint never creates an Appointment and does not reserve its\nrequested time. The current availability is checked for a useful patient\nresponse; staff must review the request separately.",
+        "operationId": "patient_create_public_booking_request",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Required for safe retries of the same request submission.",
+              "title": "Idempotency-Key"
+            },
+            "description": "Required for safe retries of the same request submission."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingRequestCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestPatientProfileErrorOut"
+                    }
+                  ],
+                  "title": "Response 404 Patient Create Public Booking Request"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "List the authenticated patient's public booking requests",
+        "operationId": "patient_list_public_booking_requests",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestListOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "JWT user has no linked Patient profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/booking-requests/{request_id}/withdraw": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Withdraw a request before staff has decided it",
+        "operationId": "patient_withdraw_public_booking_request",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingRequestAction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestPatientProfileErrorOut"
+                    }
+                  ],
+                  "title": "Response 404 Patient Withdraw Public Booking Request"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/booking-requests/{request_id}/resubmit": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Choose a different time after staff requested one",
+        "operationId": "patient_resubmit_public_booking_request",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Required for safe retries of the same time selection.",
+              "title": "Idempotency-Key"
+            },
+            "description": "Required for safe retries of the same time selection."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingRequestResubmit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestPatientProfileErrorOut"
+                    }
+                  ],
+                  "title": "Response 404 Patient Resubmit Public Booking Request"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/patients/appointments": {
       "get": {
         "tags": [
@@ -3760,6 +4204,258 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/public-booking-requests": {
+      "get": {
+        "tags": [
+          "public-booking-requests"
+        ],
+        "summary": "List public booking requests for staff review",
+        "operationId": "staff_list_public_booking_requests",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PublicBookingRequestStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "pending",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestStaffListOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required."
+          },
+          "403": {
+            "description": "Admin or Registrar role required."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/public-booking-requests/{request_id}/request-new-time": {
+      "post": {
+        "tags": [
+          "public-booking-requests"
+        ],
+        "summary": "Ask the patient to choose another time without reserving one",
+        "operationId": "staff_request_new_public_booking_time",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingRequestAction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestPatientOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required."
+          },
+          "403": {
+            "description": "Admin or Registrar role required."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/public-booking-requests/{request_id}/reject": {
+      "post": {
+        "tags": [
+          "public-booking-requests"
+        ],
+        "summary": "Reject a pending public booking request",
+        "operationId": "staff_reject_public_booking_request",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingRequestAction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestPatientOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required."
+          },
+          "403": {
+            "description": "Admin or Registrar role required."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "description": "Validation Error",
@@ -104290,6 +104986,10 @@
             "title": "Timezone",
             "default": "Asia/Tashkent"
           },
+          "settings_version": {
+            "type": "integer",
+            "title": "Settings Version"
+          },
           "slots": {
             "items": {
               "type": "string",
@@ -104303,6 +105003,7 @@
         "type": "object",
         "required": [
           "date",
+          "settings_version",
           "slots"
         ],
         "title": "PublicBookingAvailabilityOut"
@@ -104498,6 +105199,467 @@
           "eligible"
         ],
         "title": "PublicBookingOptionOut"
+      },
+      "PublicBookingRequestAction": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version"
+        ],
+        "title": "PublicBookingRequestAction"
+      },
+      "PublicBookingRequestCreate": {
+        "properties": {
+          "service_slug": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Service Slug"
+          },
+          "doctor_slug": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Doctor Slug"
+          },
+          "appointment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Appointment Date"
+          },
+          "appointment_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Appointment Time"
+          },
+          "expected_settings_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Settings Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "service_slug",
+          "doctor_slug",
+          "appointment_date",
+          "appointment_time",
+          "expected_settings_version"
+        ],
+        "title": "PublicBookingRequestCreate"
+      },
+      "PublicBookingRequestErrorDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "public_content_not_found",
+              "public_booking_unavailable",
+              "booking_settings_version_conflict",
+              "booking_mode_changed",
+              "booking_time_unavailable",
+              "booking_request_not_found",
+              "booking_request_state_conflict",
+              "booking_request_version_conflict",
+              "booking_request_idempotency_conflict"
+            ],
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "PublicBookingRequestErrorDetail"
+      },
+      "PublicBookingRequestErrorOut": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicBookingRequestErrorDetail"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicBookingRequestErrorOut"
+      },
+      "PublicBookingRequestEventOut": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "resubmitted",
+              "staff_requested_new_time",
+              "rejected",
+              "withdrawn"
+            ],
+            "title": "Event Type"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicBookingRequestStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "to_status": {
+            "$ref": "#/components/schemas/PublicBookingRequestStatus"
+          },
+          "previous_appointment_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Appointment Date"
+          },
+          "previous_appointment_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Appointment Time"
+          },
+          "requested_appointment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Requested Appointment Date"
+          },
+          "requested_appointment_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Requested Appointment Time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_type",
+          "from_status",
+          "to_status",
+          "previous_appointment_date",
+          "previous_appointment_time",
+          "requested_appointment_date",
+          "requested_appointment_time",
+          "created_at"
+        ],
+        "title": "PublicBookingRequestEventOut"
+      },
+      "PublicBookingRequestListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingRequestOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "PublicBookingRequestListOut"
+      },
+      "PublicBookingRequestOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "service_slug": {
+            "type": "string",
+            "title": "Service Slug"
+          },
+          "doctor_slug": {
+            "type": "string",
+            "title": "Doctor Slug"
+          },
+          "appointment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Appointment Date"
+          },
+          "appointment_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Appointment Time"
+          },
+          "timezone": {
+            "type": "string",
+            "const": "Asia/Tashkent",
+            "title": "Timezone",
+            "default": "Asia/Tashkent"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PublicBookingRequestStatus"
+          },
+          "settings_version": {
+            "type": "integer",
+            "title": "Settings Version"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingRequestEventOut"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "service_slug",
+          "doctor_slug",
+          "appointment_date",
+          "appointment_time",
+          "status",
+          "settings_version",
+          "version",
+          "created_at",
+          "updated_at",
+          "history"
+        ],
+        "title": "PublicBookingRequestOut"
+      },
+      "PublicBookingRequestPatientOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "patient_display_name": {
+            "type": "string",
+            "title": "Patient Display Name"
+          },
+          "service_name": {
+            "type": "string",
+            "title": "Service Name"
+          },
+          "doctor_display_name": {
+            "type": "string",
+            "title": "Doctor Display Name"
+          },
+          "service_slug": {
+            "type": "string",
+            "title": "Service Slug"
+          },
+          "doctor_slug": {
+            "type": "string",
+            "title": "Doctor Slug"
+          },
+          "appointment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Appointment Date"
+          },
+          "appointment_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Appointment Time"
+          },
+          "timezone": {
+            "type": "string",
+            "const": "Asia/Tashkent",
+            "title": "Timezone",
+            "default": "Asia/Tashkent"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PublicBookingRequestStatus"
+          },
+          "settings_version": {
+            "type": "integer",
+            "title": "Settings Version"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingRequestEventOut"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "patient_id",
+          "patient_display_name",
+          "service_name",
+          "doctor_display_name",
+          "service_slug",
+          "doctor_slug",
+          "appointment_date",
+          "appointment_time",
+          "status",
+          "settings_version",
+          "version",
+          "created_at",
+          "updated_at",
+          "history"
+        ],
+        "title": "PublicBookingRequestPatientOut"
+      },
+      "PublicBookingRequestPatientProfileErrorDetail": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "const": "patient_profile_required",
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "PublicBookingRequestPatientProfileErrorDetail"
+      },
+      "PublicBookingRequestPatientProfileErrorOut": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/PublicBookingRequestPatientProfileErrorDetail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicBookingRequestPatientProfileErrorOut"
+      },
+      "PublicBookingRequestResubmit": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "appointment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Appointment Date"
+          },
+          "appointment_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Appointment Time"
+          },
+          "expected_settings_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Settings Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "appointment_date",
+          "appointment_time",
+          "expected_settings_version"
+        ],
+        "title": "PublicBookingRequestResubmit"
+      },
+      "PublicBookingRequestStaffListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingRequestPatientOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "PublicBookingRequestStaffListOut"
+      },
+      "PublicBookingRequestStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "needs_new_time",
+          "rejected",
+          "withdrawn"
+        ],
+        "title": "PublicBookingRequestStatus"
       },
       "PublicBookingSettingsOut": {
         "properties": {

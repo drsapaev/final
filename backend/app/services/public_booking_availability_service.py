@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date, datetime, time
 
 from app.models.service import Service
@@ -10,6 +11,7 @@ from app.repositories.public_booking_availability_repository import (
     PublicBookingAvailabilityRepository,
 )
 from app.repositories.public_site_read_repository import PublicSiteReadRepository
+from app.schemas.public_booking_settings import PublicBookingSettingsOut
 from app.services.public_booking_availability import (
     MAX_SERVICE_DURATION_MINUTES,
     PUBLIC_BOOKING_TIMEZONE,
@@ -25,6 +27,14 @@ from app.services.public_booking_calendar_settings import (
 from app.services.public_booking_settings import PublicBookingSettingsService
 
 ResourceQueueRoutePolicy = Callable[[Service, date], bool]
+
+
+@dataclass(frozen=True)
+class PublicBookingAvailabilitySnapshot:
+    """Availability and policy version read from the same settings snapshot."""
+
+    slots: list[time] | None
+    settings_version: int
 
 
 class PublicBookingAvailabilityService:
@@ -53,6 +63,22 @@ class PublicBookingAvailabilityService:
         target_date: date,
         now: datetime | None = None,
     ) -> list[time] | None:
+        return self.public_availability_for_day(
+            service_slug=service_slug,
+            doctor_slug=doctor_slug,
+            target_date=target_date,
+            now=now,
+        ).slots
+
+    def public_availability_for_day(
+        self,
+        *,
+        service_slug: str,
+        doctor_slug: str,
+        target_date: date,
+        now: datetime | None = None,
+        settings: PublicBookingSettingsOut | None = None,
+    ) -> PublicBookingAvailabilitySnapshot:
         """Return public candidate starts, or ``None`` for an unavailable pair.
 
         Candidates do not reserve a slot. A future writer must revalidate all
@@ -68,36 +94,48 @@ class PublicBookingAvailabilityService:
 
         local_now = now or datetime.now(PUBLIC_BOOKING_TIMEZONE)
         if local_now.tzinfo is None or local_now.utcoffset() is None:
-            return []
+            return PublicBookingAvailabilitySnapshot(slots=[], settings_version=0)
         local_now = local_now.astimezone(PUBLIC_BOOKING_TIMEZONE)
 
-        settings = self.booking_settings_service.get_settings()
+        settings = settings or self.booking_settings_service.get_settings()
         if (
             not settings.is_enabled
             or not settings.is_ready
             or settings.booking_horizon_days is None
         ):
-            return []
+            return PublicBookingAvailabilitySnapshot(
+                slots=[], settings_version=settings.version
+            )
 
         days_ahead = (target_date - local_now.date()).days
         if days_ahead < 0 or days_ahead > settings.booking_horizon_days:
-            return []
+            return PublicBookingAvailabilitySnapshot(
+                slots=[], settings_version=settings.version
+            )
 
         service = self.public_site_repository.get_public_service_by_slug(service_slug)
         doctor = self.public_site_repository.get_public_doctor_by_slug(doctor_slug)
         if service is None or doctor is None:
-            return None
+            return PublicBookingAvailabilitySnapshot(
+                slots=None, settings_version=settings.version
+            )
         if (
             service.id not in settings.service_ids
             or doctor.id not in settings.doctor_ids
         ):
-            return None
+            return PublicBookingAvailabilitySnapshot(
+                slots=None, settings_version=settings.version
+            )
         if not self.booking_settings_service.repository.selected_services_match_doctors(
             [service.id], [doctor.id]
         ):
-            return None
+            return PublicBookingAvailabilitySnapshot(
+                slots=None, settings_version=settings.version
+            )
         if self.resource_queue_route_policy(service, target_date):
-            return None
+            return PublicBookingAvailabilitySnapshot(
+                slots=None, settings_version=settings.version
+            )
 
         calendar = self.calendar_settings_service.load_policy_calendar()
         starts = self.available_starts_for_day(
@@ -109,7 +147,9 @@ class PublicBookingAvailabilityService:
         if target_date == local_now.date():
             current_time = local_now.timetz().replace(tzinfo=None)
             starts = [start for start in starts if start > current_time]
-        return starts
+        return PublicBookingAvailabilitySnapshot(
+            slots=starts, settings_version=settings.version
+        )
 
     def available_starts_for_day(
         self,
