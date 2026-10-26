@@ -169,18 +169,31 @@ def _validate_service_eligibility(
 def duration_snapshot_for_service_id(
     db: Session, service_id: int | None, *, doctor_id: int | None
 ) -> int | None:
-    """Capture one VisitService duration from its active catalog row."""
+    """Capture one VisitService duration from its active catalog row.
+
+    ``doctor_id`` remains accepted for existing writer call sites, but a
+    VisitService snapshot records the catalog service's own duration. Doctor
+    and department compatibility is validated by appointment writers, where
+    a selected service determines whether an appointment may be created.
+    """
     if (
         not isinstance(service_id, int)
         or isinstance(service_id, bool)
         or service_id <= 0
-        or doctor_id is None
     ):
         return None
-    try:
-        resolved = resolve_exact_service_selection(
-            db, [service_id], doctor_id=doctor_id
-        )
-    except InvalidServiceSelection:
+    service = (
+        db.query(Service)
+        .filter(Service.id == service_id, Service.active.is_(True))
+        .one_or_none()
+    )
+    if service is None:
         return None
-    return resolved.duration_minutes_snapshot
+    candidate = service.duration_minutes
+    if (
+        isinstance(candidate, int)
+        and not isinstance(candidate, bool)
+        and 1 <= candidate <= MAX_SNAPSHOT_DURATION_MINUTES
+    ):
+        return candidate
+    return None

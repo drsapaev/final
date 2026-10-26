@@ -12,6 +12,7 @@ from app.schemas.appointment import (
     AppointmentUpdate,
     PatientPortalAppointmentCreate,
 )
+from app.services.appointment_duration_snapshot import duration_snapshot_for_service_id
 
 
 def test_create_resolves_catalog_name_and_captures_duration_once(
@@ -217,3 +218,24 @@ def test_exact_service_selection_accepts_department_aliases(db_session, test_pat
     )
 
     assert row.services == ["Cardiology service"]
+
+
+def test_visit_service_snapshot_uses_catalog_duration_across_department_owners(
+    db_session, test_doctor
+):
+    service = Service(
+        name="Laboratory service",
+        price=100000,
+        duration_minutes=35,
+        department_key="laboratory_general",
+        active=True,
+    )
+    db_session.add(service)
+    db_session.flush()
+
+    assert (
+        duration_snapshot_for_service_id(
+            db_session, service.id, doctor_id=test_doctor.id
+        )
+        == 35
+    )
