@@ -309,8 +309,10 @@ def _seed_pre_0073_world(engine) -> dict:
     # 0085. Insert these rows with the historical 0072 column shape so this
     # test remains focused on the 0073 backfill.
     visit_service_insert = text(
-        "INSERT INTO visit_services (visit_id, service_id, code, name, qty) "
-        "VALUES (:visit_id, :service_id, :code, :name, 1) RETURNING id"
+        "INSERT INTO visit_services "
+        "(visit_id, service_id, code, name, qty, created_at) "
+        "VALUES (:visit_id, :service_id, :code, :name, 1, CURRENT_TIMESTAMP) "
+        "RETURNING id"
     )
 
     def insert_visit_service(service_id: int, code: str) -> int:
