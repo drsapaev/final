@@ -10,6 +10,8 @@ from typing import Any
 
 from app.api.v1.endpoints.telegram_webhook._clinic_bot import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._clinic_bot import (  # noqa: F401
+    TelegramMiniAppBookingDepartmentsRequest,
+    TelegramMiniAppBookingServicesRequest,
     _build_mini_app_appointment_booking_preview_from_request,
     _build_mini_app_patient_cabinet_summary_from_request,
     _build_mini_app_patient_forms_preview_from_request,
@@ -24,7 +26,6 @@ from app.api.v1.endpoints.telegram_webhook._clinic_bot import (  # noqa: F401
     _telegram_bot_info_failure,
     _telegram_user_from_onboarding_request_auth,
     _validate_webhook_secret,
-    TelegramMiniAppBookingDepartmentsRequest,
 )
 
 # Import everything from all submodules (wildcard for backward compat)
@@ -50,6 +51,15 @@ from app.schemas.notifications import (
     SendMessageRequest,
     TelegramWebhookUpdateRequest,
 )
+from app.schemas.public_booking_settings import (
+    PublicBookingServiceErrorOut,
+    PublicBookingServiceIdsOut,
+)
+
+# PR-3: referenced via module namespace (not from-imported) so tests can
+# monkeypatch telegram_webhook_dedup.* the same way they patch
+# telegram_webhook.get_telegram_bot_service.
+from app.services import telegram_webhook_dedup
 from app.services.appointment_booking_routing import (
     attach_department_id,
     lock_department_for_booking,
@@ -58,10 +68,10 @@ from app.services.appointment_booking_routing import (
 )
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
-# PR-3: referenced via module namespace (not from-imported) so tests can
-# monkeypatch telegram_webhook_dedup.* the same way they patch
-# telegram_webhook.get_telegram_bot_service.
-from app.services import telegram_webhook_dedup
+from app.services.public_booking_settings import (
+    PublicBookingSettingsError,
+    PublicBookingSettingsService,
+)
 
 
 def _release_claim_after_failure(
@@ -492,15 +502,13 @@ def revoke_all_mini_app_patient_sessions(
 
     # Revoke all patient sessions (patient sessions use negative user_id)
     patient_session_user_id = -int(scope.patient_id)
-    revoked_count = (
-        db.query(UserSession).filter(
-            UserSession.user_id == patient_session_user_id,
-            UserSession.revoked == False,
-        )
-        # UserSession has no revoked_at column (#2924) — writing it here
-        # raises UnconsumedColumnError and the revocation silently fails.
-        .update({"revoked": True})
+    patient_sessions = db.query(UserSession).filter(
+        UserSession.user_id == patient_session_user_id,
+        UserSession.revoked == False,
     )
+    # UserSession has no revoked_at column (#2924) — writing it here
+    # raises UnconsumedColumnError and the revocation silently fails.
+    revoked_count = patient_sessions.update({"revoked": True})
     db.commit()
 
     # M4-P0-1: Audit log the session revocation
@@ -564,9 +572,70 @@ def list_mini_app_booking_departments(
 
 
 @router.post(
+    "/mini-app/booking/services",
+    response_model=PublicBookingServiceIdsOut,
+    responses={
+        400: {
+            "model": PublicBookingServiceErrorOut,
+            "description": "Patient booking request scope is invalid.",
+        },
+        403: {
+            "model": PublicBookingServiceErrorOut,
+            "description": "Patient identity or scope is invalid.",
+        },
+        503: {
+            "model": PublicBookingServiceErrorOut,
+            "description": "Booking settings are unavailable.",
+        },
+    },
+    operation_id="telegram_mini_app_list_booking_services",
+    summary="Получить услуги, разрешённые для онлайн-записи",
+)
+def list_mini_app_booking_services(
+    request_body: TelegramMiniAppBookingServicesRequest,
+    db: Session = Depends(get_db),
+) -> PublicBookingServiceIdsOut:
+    """Return the current eligible Admin allowlist to an authenticated patient."""
+    try:
+        _resolve_mini_app_patient_scope_from_auth(
+            db,
+            init_data_payload=request_body.init_data,
+            entry_token=request_body.entry_token,
+            expected_section=request_body.section or "appointments",
+        )
+        service_ids = PublicBookingSettingsService(db).get_patient_booking_service_ids()
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=_mini_app_booking_scope_status_code(exc.reason),
+            detail={"reason": exc.reason},
+        ) from exc
+    except PublicBookingSettingsError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"reason": exc.code},
+        ) from exc
+    return PublicBookingServiceIdsOut(service_ids=service_ids)
+
+
+@router.post(
     "/mini-app/appointments/preview",
     operation_id="telegram_mini_app_preview_appointment_booking",
     response_model=dict[str, Any],
+    responses={
+        400: {
+            "model": PublicBookingServiceErrorOut,
+            "description": "Request is invalid or service is not approved for online booking.",
+        },
+        503: {
+            "model": PublicBookingServiceErrorOut,
+            "description": "Booking settings are unavailable.",
+        },
+    },
 )
 def preview_mini_app_appointment_booking(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
@@ -688,6 +757,16 @@ def preview_mini_app_patient_forms(
     status_code=status.HTTP_201_CREATED,
     operation_id="telegram_mini_app_create_appointment_booking",
     response_model=dict[str, Any],
+    responses={
+        400: {
+            "model": PublicBookingServiceErrorOut,
+            "description": "Request is invalid or service is not approved for online booking.",
+        },
+        503: {
+            "model": PublicBookingServiceErrorOut,
+            "description": "Booking settings are unavailable.",
+        },
+    },
 )
 def create_mini_app_appointment_booking(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
@@ -712,6 +791,7 @@ def create_mini_app_appointment_booking(
         allow_entry_token=True,
         request=request,  # M4-P0-1: pass request for audit logging
         resolve_routing=False,
+        audit_action="create",
     )
     draft_payload = preview.draft.to_appointment_create_payload()
     department_row: Department | None = None
@@ -770,9 +850,7 @@ def create_mini_app_appointment_booking(
                     action="create",
                     outcome="denied",
                     request=request,
-                    extra_data={
-                        "reason": _mini_app_booking_deny_reason(exc.detail)
-                    },
+                    extra_data={"reason": _mini_app_booking_deny_reason(exc.detail)},
                 )
                 raise
         else:
@@ -791,9 +869,7 @@ def create_mini_app_appointment_booking(
                     action="create",
                     outcome="denied",
                     request=request,
-                    extra_data={
-                        "reason": _mini_app_booking_deny_reason(exc.detail)
-                    },
+                    extra_data={"reason": _mini_app_booking_deny_reason(exc.detail)},
                 )
                 raise
 
@@ -866,9 +942,7 @@ def create_mini_app_appointment_booking(
     return {
         "created": True,
         "appointment_id": int(appointment.id),
-        "preview": attach_department_id(
-            preview.to_response_payload(), department_row
-        ),
+        "preview": attach_department_id(preview.to_response_payload(), department_row),
     }
 
 
@@ -924,9 +998,7 @@ async def telegram_webhook(
             # back to the service's (possibly env) token would claim an
             # update authenticated by THIS secret under ANOTHER bot's
             # identity.
-            snapshot_token = getattr(
-                validated_config, "decrypted_bot_token", None
-            )
+            snapshot_token = getattr(validated_config, "decrypted_bot_token", None)
             if not snapshot_token:
                 logger.warning(
                     "Telegram webhook validated credential failed to "
@@ -940,9 +1012,7 @@ async def telegram_webhook(
         # from the process-static env fallback — it cannot change
         # mid-process, so falling back to the service's token there is
         # race-free.
-        identity_source = snapshot_token or getattr(
-            bot_service, "bot_token", None
-        )
+        identity_source = snapshot_token or getattr(bot_service, "bot_token", None)
         claimed_bot_identity = await telegram_webhook_dedup.resolve_ledger_bot_identity(
             identity_source
         )

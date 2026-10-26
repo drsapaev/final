@@ -55,3 +55,25 @@ class PublicBookingSettingsOut(BaseModel):
     doctors: list[PublicBookingOptionOut]
     updated_at: datetime | None = None
     updated_by: int | None = None
+
+
+class PublicBookingServiceIdsOut(BaseModel):
+    """Current eligible Admin-approved services for patient booking forms."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    service_ids: list[int]
+
+
+class PublicBookingServiceErrorDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str
+
+
+class PublicBookingServiceErrorOut(BaseModel):
+    """Machine-readable reason returned by patient booking service reads/writes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    detail: PublicBookingServiceErrorDetail

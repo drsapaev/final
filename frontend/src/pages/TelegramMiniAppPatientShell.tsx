@@ -888,17 +888,41 @@ function TelegramMiniAppPatientShell() {
   useEffect(() => {
     if (selectedSection !== 'appointments') return;
     if (!state.manifest?.capabilities?.appointments?.preview_enabled) return;
+    const authPayload = getTelegramMiniAppAuthPayload(location.search, 'appointments');
+    if (!authPayload) {
+      setBookingServiceOptions([]);
+      bookingServiceOptionsRef.current = [];
+      setBookingServicesUnavailable(true);
+      return;
+    }
     let isMounted = true;
     setBookingServicesUnavailable(false);
-    api.get('/services?active=true&limit=1000')
-      .then((response) => {
+    Promise.all([
+      api.get('/services?active=true&limit=1000'),
+      api.post(
+        '/telegram/mini-app/booking/services',
+        authPayload,
+        MINI_APP_HANDLED_ERROR_REQUEST_CONFIG,
+      ),
+    ])
+      .then(([response, allowlistResponse]) => {
         if (!isMounted) return;
+        const allowedServiceIds = allowlistResponse.data?.service_ids;
+        if (!Array.isArray(allowedServiceIds)) {
+          throw new Error('booking_service_allowlist_invalid');
+        }
+        const allowedIds = new Set(
+          allowedServiceIds.filter(
+            (id: unknown): id is number => typeof id === 'number' && Number.isInteger(id),
+          ),
+        );
         const rows = Array.isArray(response.data) ? response.data : [];
         const nextOptions = rows.filter((row: unknown): row is MiniAppServiceOption => {
           if (!row || typeof row !== 'object') return false;
           const candidate = row as Record<string, unknown>;
           return typeof candidate.id === 'number'
             && Number.isInteger(candidate.id)
+            && allowedIds.has(candidate.id as number)
             && typeof candidate.name === 'string'
             && Boolean(candidate.name.trim())
             && (candidate.doctor_id == null || typeof candidate.doctor_id === 'number')
@@ -929,7 +953,7 @@ function TelegramMiniAppPatientShell() {
     return () => {
       isMounted = false;
     };
-  }, [selectedSection, state.manifest]);
+  }, [location.search, selectedSection, state.manifest]);
 
   const capabilities = state.manifest?.capabilities || {};
   const capabilityLabels = MINI_APP_CAPABILITY_SECTIONS.reduce<Record<string, string>>((acc, section) => {

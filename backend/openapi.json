@@ -301,7 +301,7 @@
             }
           },
           "503": {
-            "description": "Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery",
+            "description": "Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid.",
             "content": {
               "application/json": {
                 "schema": {
@@ -423,7 +423,7 @@
             }
           },
           "503": {
-            "description": "Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery",
+            "description": "Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid.",
             "content": {
               "application/json": {
                 "schema": {
@@ -45035,6 +45035,78 @@
         }
       }
     },
+    "/api/v1/telegram/mini-app/booking/services": {
+      "post": {
+        "tags": [
+          "telegram-webhook"
+        ],
+        "summary": "Получить услуги, разрешённые для онлайн-записи",
+        "description": "Return the current eligible Admin allowlist to an authenticated patient.",
+        "operationId": "telegram_mini_app_list_booking_services",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramMiniAppBookingServicesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceIdsOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Patient booking request scope is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Patient identity or scope is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Booking settings are unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/telegram/mini-app/appointments/preview": {
       "post": {
         "tags": [
@@ -45062,6 +45134,26 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Telegram Mini App Preview Appointment Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request is invalid or service is not approved for online booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Booking settings are unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
                 }
               }
             }
@@ -45326,6 +45418,26 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Telegram Mini App Create Appointment Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request is invalid or service is not approved for online booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Booking settings are unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
                 }
               }
             }
@@ -105723,6 +105835,52 @@
         ],
         "title": "PublicBookingRequestStatus"
       },
+      "PublicBookingServiceErrorDetail": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "PublicBookingServiceErrorDetail"
+      },
+      "PublicBookingServiceErrorOut": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/PublicBookingServiceErrorDetail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicBookingServiceErrorOut",
+        "description": "Machine-readable reason returned by patient booking service reads/writes."
+      },
+      "PublicBookingServiceIdsOut": {
+        "properties": {
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Service Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "service_ids"
+        ],
+        "title": "PublicBookingServiceIdsOut",
+        "description": "Current eligible Admin-approved services for patient booking forms."
+      },
       "PublicBookingSettingsOut": {
         "properties": {
           "version": {
@@ -115621,6 +115779,46 @@
         "type": "object",
         "title": "TelegramMiniAppBookingDepartmentsRequest",
         "description": "Round-12 (owner P1, PR #3386 review): auth shape for the booking\ndepartments reference endpoint.\n\nThe Mini App booking form no longer free-types a department name (a\nlocalized label like \"Кардиология\" is NOT the canonical `Department.key`\nthe routing contract resolves); it picks from THIS endpoint's list, so\nthe submitted value is always a canonical key. Same identity contract\nas the booking endpoints themselves (initData primary, entry token\nallowed) — the reference data rides the SAME authenticated surface it\nfeeds, and the error reasons match the booking scope contract."
+      },
+      "TelegramMiniAppBookingServicesRequest": {
+        "properties": {
+          "initData": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initdata"
+          },
+          "entryToken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entrytoken"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          }
+        },
+        "type": "object",
+        "title": "TelegramMiniAppBookingServicesRequest",
+        "description": "Authenticated reference read for Admin-approved booking service IDs."
       },
       "TelegramMiniAppPatientCabinetSummaryRequest": {
         "properties": {

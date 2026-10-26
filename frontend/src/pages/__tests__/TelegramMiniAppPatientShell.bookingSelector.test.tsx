@@ -65,6 +65,7 @@ vi.mock('../../api/client', () => ({ api: { post: apiPost, get: apiGet } }));
 import TelegramMiniAppPatientShell from '../TelegramMiniAppPatientShell';
 
 const DEPARTMENTS_URL = '/telegram/mini-app/booking/departments';
+const SERVICES_URL = '/telegram/mini-app/booking/services';
 const PREVIEW_URL = '/telegram/mini-app/appointments/preview';
 const CREATE_URL = '/telegram/mini-app/appointments';
 const MANIFEST_URL = '/telegram/mini-app/patient/manifest';
@@ -106,6 +107,9 @@ function routeApiPostByUrl(url: string, body: Record<string, any>) {
   }
   if (url === DEPARTMENTS_URL) {
     return Promise.resolve({ data: { departments: departmentRows } });
+  }
+  if (url === SERVICES_URL) {
+    return Promise.resolve({ data: { service_ids: [73] } });
   }
   if (url === PREVIEW_URL) {
     return Promise.resolve({
@@ -287,6 +291,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
       WebApp: { initData: 'test-init-data-payload' },
     };
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: uzManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRowsUz } });
       if (url === PREVIEW_URL) return routeApiPostByUrl(PREVIEW_URL, body);
@@ -322,6 +327,12 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
         { id: 75, name: 'Общая услуга', department_key: null },
       ],
     });
+    apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) {
+        return Promise.resolve({ data: { service_ids: [73, 74, 75] } });
+      }
+      return routeApiPostByUrl(url, body);
+    });
     renderBookSurface('?section=appointments');
     await selectDepartmentByName('Кардиология');
     fireEvent.click(await screen.findByLabelText(/услуг|xizmat|service/i));
@@ -331,12 +342,37 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
     expect(screen.queryByRole('option', { name: 'УЗИ кожи' })).not.toBeInTheDocument();
   });
 
+  it('lists only services approved for online booking', async () => {
+    (window as unknown as { Telegram?: unknown }).Telegram = {
+      WebApp: { initData: 'test-init-data-payload' },
+    };
+    apiGet.mockResolvedValue({
+      data: [
+        { id: 73, name: 'Разрешённая консультация', department_key: null },
+        { id: 76, name: 'Не разрешённая консультация', department_key: null },
+      ],
+    });
+    apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
+      return routeApiPostByUrl(url, body);
+    });
+
+    renderBookSurface('?section=appointments');
+    const serviceTrigger = await screen.findByLabelText(/услуг|xizmat|service/i);
+    await waitFor(() => expect(serviceTrigger).toBeEnabled());
+    fireEvent.click(serviceTrigger);
+
+    expect(await screen.findByRole('option', { name: 'Разрешённая консультация' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Не разрешённая консультация' })).not.toBeInTheDocument();
+  });
+
   it('clears a stale selected department when the reference refetch fails after a section switch (round-15 P2)', async () => {
     (window as unknown as { Telegram?: unknown }).Telegram = {
       WebApp: { initData: 'test-init-data-payload' },
     };
     let departmentsCalls = 0;
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) {
         departmentsCalls += 1;
@@ -379,6 +415,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
     };
     let departmentsCalls = 0;
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) {
         departmentsCalls += 1;
@@ -421,6 +458,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
       WebApp: { initData: 'test-init-data-payload' },
     };
     apiPost.mockImplementation((url: string) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === DEPARTMENTS_URL) {
         return Promise.reject({ response: { status: 503, data: { detail: { reason: 'bot_token_required' } } } });
       }
@@ -457,6 +495,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
   it('maps preview department_unknown to the patient-safe wording instead of the machine reason', async () => {
     apiPost.mockImplementation((url: string, _body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
       if (url === PREVIEW_URL) return rejectWithReason(400, 'department_unknown');
@@ -476,6 +515,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
   it('maps create doctor_not_eligible to the patient-safe wording instead of the machine reason', async () => {
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
       if (url === PREVIEW_URL) return routeApiPostByUrl(PREVIEW_URL, body);
@@ -500,6 +540,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
   it('maps preview telegram_link_inactive to the patient-safe wording instead of the machine reason (round-15 P2)', async () => {
     apiPost.mockImplementation((url: string, _body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
       if (url === PREVIEW_URL) return rejectWithReason(403, 'telegram_link_inactive');
@@ -519,6 +560,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
   it('maps create telegram_link_blocked to the patient-safe wording instead of the machine reason (round-15 P2)', async () => {
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
       if (url === PREVIEW_URL) return routeApiPostByUrl(PREVIEW_URL, body);
@@ -542,6 +584,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
   it('keeps the reason visible for genuinely unknown backend codes (diagnostics preserved)', async () => {
     apiPost.mockImplementation((url: string, _body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
       if (url === PREVIEW_URL) return rejectWithReason(400, 'brand_new_future_reason');

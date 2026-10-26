@@ -15,9 +15,6 @@ from app.api.v1.endpoints import admin_telegram, telegram_webhook
 from app.models.appointment import Appointment
 from app.models.audit import AuditLog
 from app.models.department import Department
-from app.schemas.notifications import SendMessageRequest
-from app.services import telegram_bot
-from app.services.telegram_templates import TelegramTemplatesService
 from app.models.lab import (
     LabReportInstance,
     LabReportTemplate,
@@ -33,6 +30,9 @@ from app.models.telegram_config import (
     TelegramStaffLinkToken,
     TelegramUser,
 )
+from app.schemas.notifications import SendMessageRequest
+from app.services import telegram_bot
+from app.services.telegram_templates import TelegramTemplatesService
 
 
 class FakeTelegramBotService:
@@ -151,6 +151,46 @@ def _link_patient_to_chat(
     db_session.commit()
     db_session.refresh(telegram_user)
     return telegram_user
+
+
+def _published_booking_service(db_session, *, name: str, slug: str):
+    from app.models.service import Service
+
+    row = Service(
+        name=name,
+        name_uz=f"Uz {name}",
+        description_ru="Опубликованная услуга.",
+        description_uz="Ommaviy xizmat.",
+        slug=slug,
+        duration_minutes=30,
+        active=True,
+        show_on_website=True,
+        requires_doctor=True,
+        department_key="cardio",
+    )
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def _store_booking_service_allowlist(db_session, service_ids: list[int]) -> None:
+    from app.models.clinic import ClinicSettings
+
+    db_session.add(
+        ClinicSettings(
+            key="public_booking_settings",
+            category="booking_settings",
+            value={
+                "version": 1,
+                "is_enabled": False,
+                "mode": None,
+                "booking_horizon_days": None,
+                "service_ids": service_ids,
+                "doctor_ids": [],
+            },
+        )
+    )
+    db_session.commit()
 
 
 def _reply_keyboard_texts(reply_markup):
@@ -373,7 +413,6 @@ class TestTelegramWebhookSecurity:
                 "appointmentTime": "09:30",
                 "department": cardio.key,
                 "notes": "Mini App request",
-                "services": ["Consultation"],
             },
         )
 
@@ -931,7 +970,6 @@ class TestTelegramWebhookSecurity:
                 "appointmentTime": "09:30",
                 "department": cardio.key,
                 "notes": "Mini App create request",
-                "services": ["Consultation"],
             },
         )
 
@@ -1071,11 +1109,20 @@ class TestMiniAppBookingRoutingParity:
         _bind_doctor_department(db_session, test_doctor, cardio)
         service = Service(
             name="Каталожная услуга Mini App",
+            name_uz="Mini App katalog xizmati",
+            description_ru="Опубликованная услуга.",
+            description_uz="Ommaviy xizmat.",
+            slug="mini-app-catalog-service",
             price=100000,
             duration_minutes=25,
             active=True,
+            show_on_website=True,
+            requires_doctor=True,
+            department_key="cardio",
         )
         db_session.add(service)
+        db_session.flush()
+        _store_booking_service_allowlist(db_session, [service.id])
         db_session.commit()
 
         body = {
@@ -1099,6 +1146,95 @@ class TestMiniAppBookingRoutingParity:
         assert row is not None
         assert row.services == ["Каталожная услуга Mini App"]
         assert row.duration_minutes_snapshot == 25
+
+    def test_booking_service_reference_returns_only_admin_allowlisted_services(
+        self, client, db_session, test_patient
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880239
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        approved = _published_booking_service(
+            db_session,
+            name="Разрешённая консультация",
+            slug="approved-telegram-service",
+        )
+        unapproved = _published_booking_service(
+            db_session, name="Другая консультация", slug="unapproved-telegram-service"
+        )
+        inactive = _published_booking_service(
+            db_session, name="Снятая услуга", slug="inactive-telegram-service"
+        )
+        inactive.active = False
+        _store_booking_service_allowlist(db_session, [approved.id, inactive.id])
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/booking/services",
+            json={"initData": _signed_mini_app_init_data(chat_id)},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json() == {"service_ids": [approved.id]}
+        assert unapproved.id not in response.json()["service_ids"]
+        assert inactive.id not in response.json()["service_ids"]
+
+    def test_booking_service_reference_requires_patient_authentication(self, client):
+        response = client.post(
+            "/api/v1/telegram/mini-app/booking/services",
+            json={},
+        )
+
+        assert response.status_code == 403, response.text
+
+    @pytest.mark.parametrize(
+        ("services", "service_ids", "reason"),
+        [
+            (["Не разрешённая услуга"], [999999], "booking_service_not_approved"),
+            (["Старая заявка только с названием"], [], "booking_service_id_required"),
+            ([" "], [], "booking_service_id_required"),
+        ],
+    )
+    def test_mini_app_booking_rejects_service_selection_without_allowlist_proof(
+        self,
+        client,
+        db_session,
+        test_patient,
+        services,
+        service_ids,
+        reason,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880240
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        before = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "appointmentDate": self.future_date,
+                "services": services,
+                "serviceIds": service_ids,
+            },
+        )
+
+        assert response.status_code == 400, response.text
+        assert response.json()["detail"]["reason"] == reason
+        assert db_session.query(Appointment).count() == before
+        from app.models.patient_access_audit import PatientAccessAuditLog
+
+        denial_audit = (
+            db_session.query(PatientAccessAuditLog)
+            .filter_by(
+                subject_patient_id=test_patient.id,
+                resource_type="appointment",
+                action="create",
+                outcome="denied",
+            )
+            .order_by(PatientAccessAuditLog.id.desc())
+            .first()
+        )
+        assert denial_audit is not None
 
     def test_foreign_submitted_department_rejected_400(
         self, client, db_session, test_patient, test_doctor

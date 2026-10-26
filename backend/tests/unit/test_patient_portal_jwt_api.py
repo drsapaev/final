@@ -1431,11 +1431,35 @@ class TestDoctorDepartmentRouting:
         self._bind_doctor(db_session, test_doctor, portal_department)
         service = Service(
             name="Каталожная консультация",
+            name_uz="Katalog maslahat xizmati",
+            description_ru="Консультация врача.",
+            description_uz="Shifokor maslahati.",
+            slug="catalog-consultation-portal",
             price=100000,
             duration_minutes=40,
             active=True,
+            show_on_website=True,
+            requires_doctor=True,
+            department_key=portal_department.key,
         )
         db_session.add(service)
+        db_session.flush()
+        from app.models.clinic import ClinicSettings
+
+        db_session.add(
+            ClinicSettings(
+                key="public_booking_settings",
+                category="booking_settings",
+                value={
+                    "version": 1,
+                    "is_enabled": False,
+                    "mode": None,
+                    "booking_horizon_days": None,
+                    "service_ids": [service.id],
+                    "doctor_ids": [],
+                },
+            )
+        )
         db_session.commit()
 
         created = client.post(
@@ -1457,6 +1481,75 @@ class TestDoctorDepartmentRouting:
         assert row.services == ["Каталожная консультация"]
         assert row.duration_minutes_snapshot == 40
         assert created.json()["preview"]["appointment"]["service_ids"] == [service.id]
+
+    @pytest.mark.parametrize(
+        ("path", "services", "service_ids", "reason"),
+        [
+            (
+                "/api/v1/patients/booking/preview",
+                ["Не разрешённая услуга"],
+                [999999],
+                "booking_service_not_approved",
+            ),
+            (
+                "/api/v1/patients/booking",
+                ["Не разрешённая услуга"],
+                [999999],
+                "booking_service_not_approved",
+            ),
+            (
+                "/api/v1/patients/booking/preview",
+                [" "],
+                [],
+                "booking_service_id_required",
+            ),
+            (
+                "/api/v1/patients/booking",
+                [" "],
+                [],
+                "booking_service_id_required",
+            ),
+            (
+                "/api/v1/patients/booking/preview",
+                ["Старая заявка только с названием"],
+                [],
+                "booking_service_id_required",
+            ),
+            (
+                "/api/v1/patients/booking",
+                ["Старая заявка только с названием"],
+                [],
+                "booking_service_id_required",
+            ),
+        ],
+    )
+    def test_patient_portal_booking_rejects_service_without_allowlist_proof(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        path,
+        services,
+        service_ids,
+        reason,
+    ):
+        headers = linked_patient_headers
+        if path.endswith("/booking"):
+            headers = {**headers, "Idempotency-Key": "allowlist-rejection-1"}
+
+        response = client.post(
+            path,
+            headers=headers,
+            json={
+                "appointmentDate": self.future_date,
+                "services": services,
+                "serviceIds": service_ids,
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"]["reason"] == reason
+        assert db_session.query(Appointment).count() == 0
 
     def test_preview_and_create_agree_on_routing_context(
         self,

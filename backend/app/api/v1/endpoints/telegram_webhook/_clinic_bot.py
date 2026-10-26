@@ -30,6 +30,10 @@ from app.services.appointment_booking_routing import (
     resolve_doctor_routing_department,
 )
 from app.services.patient_onboarding_service import PatientOnboardingService
+from app.services.public_booking_settings import (
+    PublicBookingSettingsError,
+    PublicBookingSettingsService,
+)
 
 logger = logging.getLogger(__name__)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
@@ -546,6 +550,16 @@ class TelegramMiniAppBookingDepartmentsRequest(BaseModel):
     section: str | None = None
 
 
+class TelegramMiniAppBookingServicesRequest(BaseModel):
+    """Authenticated reference read for Admin-approved booking service IDs."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
+    section: str | None = None
+
+
 class TelegramMiniAppPatientFormsPreviewRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -720,6 +734,7 @@ def _build_mini_app_appointment_booking_preview_from_request(
     allow_entry_token: bool = False,
     request: Request | None = None,  # M4-P0-1: for audit logging
     resolve_routing: bool = True,
+    audit_action: str = "preview",
 ):
     from app.services.patient_access_audit import log_patient_access
 
@@ -738,6 +753,26 @@ def _build_mini_app_appointment_booking_preview_from_request(
                 db,
                 request_body.init_data,
             )
+
+        try:
+            PublicBookingSettingsService(db).validate_patient_booking_service_selection(
+                service_ids=request_body.service_ids,
+                services=request_body.services,
+            )
+        except PublicBookingSettingsError as exc:
+            log_patient_access(
+                db=db,
+                scope=scope,
+                resource_type="appointment",
+                action=audit_action,
+                outcome="denied",
+                request=request,
+                extra_data={"reason": exc.code},
+            )
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"reason": exc.code},
+            ) from exc
 
         preview = build_telegram_mini_app_appointment_booking_preview(
             scope,
@@ -763,7 +798,7 @@ def _build_mini_app_appointment_booking_preview_from_request(
             db=db,
             subject_patient_id=request_body.patient_id,
             resource_type="appointment",
-            action="preview",
+            action=audit_action,
             outcome="denied",
             request=request,
             extra_data={"reason": exc.reason},
@@ -778,7 +813,7 @@ def _build_mini_app_appointment_booking_preview_from_request(
             db=db,
             subject_patient_id=request_body.patient_id,
             resource_type="appointment",
-            action="preview",
+            action=audit_action,
             outcome="denied",
             request=request,
             extra_data={"reason": exc.reason},
@@ -824,7 +859,7 @@ def _build_mini_app_appointment_booking_preview_from_request(
                 db=db,
                 scope=scope,
                 resource_type="appointment",
-                action="preview",
+                action=audit_action,
                 outcome="denied",
                 request=request,
                 extra_data={"reason": _mini_app_booking_deny_reason(exc.detail)},

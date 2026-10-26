@@ -139,9 +139,24 @@ function PatientBookingPanel() {
     if (!initData) return;
     let cancelled = false;
     setServicesUnavailable(false);
-    api.get('/services?active=true&limit=1000')
-      .then((response) => {
+    Promise.all([
+      api.get('/services?active=true&limit=1000'),
+      api.post('/telegram/mini-app/booking/services', {
+        initData,
+        section: 'appointments',
+      }),
+    ])
+      .then(([response, allowlistResponse]) => {
         if (cancelled) return;
+        const allowedServiceIds = allowlistResponse.data?.service_ids;
+        if (!Array.isArray(allowedServiceIds)) {
+          throw new Error('booking_service_allowlist_invalid');
+        }
+        const allowedIds = new Set(
+          allowedServiceIds.filter(
+            (id: unknown): id is number => typeof id === 'number' && Number.isInteger(id),
+          ),
+        );
         const rows = Array.isArray(response.data) ? response.data : [];
         const nextOptions = rows.filter((row: unknown): row is BookingServiceOption => {
           if (!row || typeof row !== 'object') return false;
@@ -150,6 +165,7 @@ function PatientBookingPanel() {
             && Number.isInteger(candidate.id)
             && typeof candidate.name === 'string'
             && Boolean(candidate.name.trim())
+            && allowedIds.has(candidate.id as number)
             && (candidate.doctor_id == null || typeof candidate.doctor_id === 'number')
             && (candidate.department_key == null || typeof candidate.department_key === 'string');
         });

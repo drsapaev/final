@@ -120,6 +120,10 @@ from app.services.public_booking_request_service import (
     PublicBookingRequestError,
     PublicBookingRequestService,
 )
+from app.services.public_booking_settings import (
+    PublicBookingSettingsError,
+    PublicBookingSettingsService,
+)
 from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppSessionScope,
     TelegramMiniAppSessionScopeError,
@@ -502,6 +506,21 @@ _PORTAL_BOOKING_REQUEST_ERROR_REASONS = frozenset(
 ) | {"department_unknown", "department_inactive"}
 
 
+def _validate_portal_booking_service_selection(
+    db: Session, request_body: PatientPortalBookingRequest
+) -> None:
+    try:
+        PublicBookingSettingsService(db).validate_patient_booking_service_selection(
+            service_ids=request_body.service_ids,
+            services=request_body.services,
+        )
+    except PublicBookingSettingsError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"reason": exc.code},
+        ) from exc
+
+
 def _booking_scope_status_code(reason: str) -> int:
     # Same public contract as the Mini App booking endpoints: request-shaped
     # problems are 400, identity/scope problems are 403.
@@ -604,9 +623,10 @@ _PORTAL_409 = {
 }
 _PORTAL_503 = {
     "description": (
-        "Required distributed idempotency coordination is temporarily "
-        "unavailable (code=idempotency_unavailable). Non-executing: retry "
-        "the SAME Idempotency-Key after recovery"
+        "Required distributed idempotency coordination or public booking "
+        "settings are temporarily unavailable. Idempotency failures carry "
+        "code=idempotency_unavailable; settings failures carry "
+        "detail.reason=booking_settings_invalid."
     ),
     "model": PatientPortalErrorResponse,
 }
@@ -704,6 +724,7 @@ def preview_patient_portal_booking(
     scope = _patient_portal_scope(patient_id)
     try:
         try:
+            _validate_portal_booking_service_selection(db, request_body)
             preview = build_telegram_mini_app_appointment_booking_preview(
                 scope,
                 patient_id=patient_id,
@@ -837,6 +858,7 @@ def create_patient_portal_booking(
     scope = _patient_portal_scope(patient_id)
     try:
         try:
+            _validate_portal_booking_service_selection(db, request_body)
             preview = build_telegram_mini_app_appointment_booking_preview(
                 scope,
                 patient_id=patient_id,

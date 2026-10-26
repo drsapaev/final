@@ -13,6 +13,9 @@ describe('PatientBookingPanel exact service selection', () => {
     apiGet.mockResolvedValue({ data: [{ id: 81, name: 'Консультация терапевта' }] });
     apiPost.mockReset();
     apiPost.mockImplementation((url: string, body: Record<string, unknown>) => {
+      if (url.endsWith('/booking/services')) {
+        return Promise.resolve({ data: { service_ids: [81] } });
+      }
       if (url.endsWith('/booking/departments')) {
         return Promise.resolve({ data: { departments: [] } });
       }
@@ -72,6 +75,9 @@ describe('PatientBookingPanel exact service selection', () => {
       ],
     });
     apiPost.mockImplementation((url: string) => {
+      if (url.endsWith('/booking/services')) {
+        return Promise.resolve({ data: { service_ids: [81, 82, 83] } });
+      }
       if (url.endsWith('/booking/departments')) {
         return Promise.resolve({
           data: { departments: [{ key: 'cardio', name: 'Кардиология' }, { key: 'derma', name: 'Дерматология' }] },
@@ -92,5 +98,24 @@ describe('PatientBookingPanel exact service selection', () => {
     expect(await screen.findByRole('option', { name: 'Кардиология' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Общая услуга' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Дерматология' })).not.toBeInTheDocument();
+  });
+
+  it('shows only services approved in the online-booking settings', async () => {
+    apiGet.mockResolvedValue({
+      data: [
+        { id: 81, name: 'Разрешённая услуга' },
+        { id: 82, name: 'Не разрешённая услуга' },
+      ],
+    });
+    render(
+      <ThemeProvider>
+        <PatientBookingPanel />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(await screen.findByLabelText('Услуги'));
+
+    expect(await screen.findByRole('option', { name: 'Разрешённая услуга' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Не разрешённая услуга' })).not.toBeInTheDocument();
   });
 });

@@ -15118,6 +15118,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram/mini-app/booking/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Получить услуги, разрешённые для онлайн-записи
+         * @description Return the current eligible Admin allowlist to an authenticated patient.
+         */
+        post: operations["telegram_mini_app_list_booking_services"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/telegram/mini-app/appointments/preview": {
         parameters: {
             query?: never;
@@ -36681,6 +36701,26 @@ export type components = {
          * @enum {string}
          */
         PublicBookingRequestStatus: "pending" | "needs_new_time" | "rejected" | "withdrawn";
+        /** PublicBookingServiceErrorDetail */
+        PublicBookingServiceErrorDetail: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * PublicBookingServiceErrorOut
+         * @description Machine-readable reason returned by patient booking service reads/writes.
+         */
+        PublicBookingServiceErrorOut: {
+            detail: components["schemas"]["PublicBookingServiceErrorDetail"];
+        };
+        /**
+         * PublicBookingServiceIdsOut
+         * @description Current eligible Admin-approved services for patient booking forms.
+         */
+        PublicBookingServiceIdsOut: {
+            /** Service Ids */
+            service_ids: number[];
+        };
         /** PublicBookingSettingsOut */
         PublicBookingSettingsOut: {
             /** Version */
@@ -40403,6 +40443,18 @@ export type components = {
             /** Section */
             section?: string | null;
         };
+        /**
+         * TelegramMiniAppBookingServicesRequest
+         * @description Authenticated reference read for Admin-approved booking service IDs.
+         */
+        TelegramMiniAppBookingServicesRequest: {
+            /** Initdata */
+            initData?: string | null;
+            /** Entrytoken */
+            entryToken?: string | null;
+            /** Section */
+            section?: string | null;
+        };
         /** TelegramMiniAppPatientCabinetSummaryRequest */
         TelegramMiniAppPatientCabinetSummaryRequest: {
             /** Initdata */
@@ -44050,7 +44102,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery */
+            /** @description Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -44140,7 +44192,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery */
+            /** @description Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -71183,6 +71235,66 @@ export interface operations {
             };
         };
     };
+    telegram_mini_app_list_booking_services: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramMiniAppBookingServicesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceIdsOut"];
+                };
+            };
+            /** @description Patient booking request scope is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
+                };
+            };
+            /** @description Patient identity or scope is invalid. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Booking settings are unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
+                };
+            };
+        };
+    };
     telegram_mini_app_preview_appointment_booking: {
         parameters: {
             query?: never;
@@ -71207,6 +71319,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description Request is invalid or service is not approved for online booking. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71214,6 +71335,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Booking settings are unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
                 };
             };
         };
@@ -71417,6 +71547,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description Request is invalid or service is not approved for online booking. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71424,6 +71563,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Booking settings are unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
                 };
             };
         };
