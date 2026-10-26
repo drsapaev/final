@@ -61,7 +61,7 @@ from sqlalchemy.orm import sessionmaker
 from app.models.online_queue import OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
 from app.models.user import User
-from app.models.visit import Visit, VisitService
+from app.models.visit import Visit
 
 pytestmark = pytest.mark.integration
 
@@ -305,40 +305,32 @@ def _seed_pre_0073_world(engine) -> dict:
     session.commit()
     session.refresh(visit)
 
-    vs_routed = VisitService(
-        visit_id=visit.id,
-        service_id=routed_service_id,
-        code="N23BF_ROUTED",
-        name="Service N23BF_ROUTED",
-        qty=1,
+    # The current VisitService model includes the duration snapshot added in
+    # 0085. Insert these rows with the historical 0072 column shape so this
+    # test remains focused on the 0073 backfill.
+    visit_service_insert = text(
+        "INSERT INTO visit_services (visit_id, service_id, code, name, qty) "
+        "VALUES (:visit_id, :service_id, :code, :name, 1) RETURNING id"
     )
-    vs_retagged = VisitService(
-        visit_id=visit.id,
-        service_id=retagged_service_id,
-        code="N23BF_RETAGGED",
-        name="Service N23BF_RETAGGED",
-        qty=1,
-    )
-    vs_orphan = VisitService(
-        visit_id=visit.id,
-        service_id=routed_service_id,
-        code="N23BF_ROUTED",
-        name="Service N23BF_ROUTED",
-        qty=1,
-    )
+
+    def insert_visit_service(service_id: int, code: str) -> int:
+        return session.execute(
+            visit_service_insert,
+            {
+                "visit_id": visit.id,
+                "service_id": service_id,
+                "code": code,
+                "name": f"Service {code}",
+            },
+        ).scalar_one()
+
+    vs_routed_id = insert_visit_service(routed_service_id, "N23BF_ROUTED")
+    vs_retagged_id = insert_visit_service(retagged_service_id, "N23BF_RETAGGED")
+    vs_orphan_id = insert_visit_service(routed_service_id, "N23BF_ROUTED")
     # A separate LINE of the same routed service for the tag-axis row —
     # one in_progress attempt per VisitService (the 0072 partial index).
-    vs_tag_axis = VisitService(
-        visit_id=visit.id,
-        service_id=routed_service_id,
-        code="N23BF_ROUTED",
-        name="Service N23BF_ROUTED",
-        qty=1,
-    )
-    session.add_all([vs_routed, vs_retagged, vs_orphan, vs_tag_axis])
+    vs_tag_axis_id = insert_visit_service(routed_service_id, "N23BF_ROUTED")
     session.commit()
-    for row in (vs_routed, vs_retagged, vs_orphan, vs_tag_axis):
-        session.refresh(row)
 
     entry_owner = OnlineQueueEntry(
         queue_id=owner_queue_id,
@@ -377,10 +369,10 @@ def _seed_pre_0073_world(engine) -> dict:
     # Capture plain ints BEFORE close — ORM instances detach + expire.
     ids = {
         "nurse_id": nurse.id,
-        "vs_routed_id": vs_routed.id,
-        "vs_retagged_id": vs_retagged.id,
-        "vs_orphan_id": vs_orphan.id,
-        "vs_tag_axis_id": vs_tag_axis.id,
+        "vs_routed_id": vs_routed_id,
+        "vs_retagged_id": vs_retagged_id,
+        "vs_orphan_id": vs_orphan_id,
+        "vs_tag_axis_id": vs_tag_axis_id,
         "entry_owner_id": entry_owner.id,
         "entry_tag_axis_id": entry_tag_axis.id,
         "entry_retagged_id": entry_retagged.id,

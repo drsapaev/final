@@ -22,11 +22,16 @@ class StubAvailabilityRepository:
         appointments: (
             list[tuple[date, str | None, int | None, str | None]] | None
         ) = None,
+        visits: (
+            list[tuple[int, date | None, str | None, int | None, int | None]] | None
+        ) = None,
     ) -> None:
         self.schedules = schedules
         self.appointments = appointments or []
+        self.visits = visits or []
         self.schedule_query: tuple[int, int] | None = None
         self.appointment_query: tuple[int, date] | None = None
+        self.visit_query: tuple[int, date] | None = None
 
     def list_active_schedules_for_weekday(
         self, *, doctor_id: int, weekday: int
@@ -39,6 +44,12 @@ class StubAvailabilityRepository:
     ) -> list[tuple[date, str | None, int | None, str | None]]:
         self.appointment_query = (doctor_id, target_date)
         return self.appointments
+
+    def list_visit_occupancy_for_day(
+        self, *, doctor_id: int, target_date: date
+    ) -> list[tuple[int, date | None, str | None, int | None, int | None]]:
+        self.visit_query = (doctor_id, target_date)
+        return self.visits
 
 
 class StubPublicSiteRepository:
