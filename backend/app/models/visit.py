@@ -4,7 +4,16 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -24,9 +33,11 @@ class Visit(Base):
     # Patient deletion should be prevented if visits exist, or use soft delete
     patient_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("patients.id", ondelete="RESTRICT"),  # Prevent deletion if visits exist
+        ForeignKey(
+            "patients.id", ondelete="RESTRICT"
+        ),  # Prevent deletion if visits exist
         nullable=False,
-        index=True
+        index=True,
     )
 
     status: Mapped[str] = mapped_column(
@@ -52,7 +63,10 @@ class Visit(Base):
     )  # none|pending|approved|rejected
     doctor_price_override: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     doctor_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("doctors.id", ondelete="SET NULL"), nullable=True, index=True
+        Integer,
+        ForeignKey("doctors.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )  # ✅ SECURITY: SET NULL to preserve visit if doctor deleted
     visit_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     visit_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
@@ -140,6 +154,12 @@ class Visit(Base):
 
 class VisitService(Base):
     __tablename__ = "visit_services"
+    __table_args__ = (
+        CheckConstraint(
+            "duration_minutes_snapshot IS NULL OR duration_minutes_snapshot > 0",
+            name="ck_visit_services_duration_snapshot_positive",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     visit_id: Mapped[int] = mapped_column(
@@ -148,6 +168,9 @@ class VisitService(Base):
     service_id: Mapped[int] = mapped_column(Integer, index=True)
     code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    duration_minutes_snapshot: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
 
     qty: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)

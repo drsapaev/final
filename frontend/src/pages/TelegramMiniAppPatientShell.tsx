@@ -221,6 +221,8 @@ function createMiniAppAppointmentPreviewForm() {
     appointmentDate: getDefaultMiniAppAppointmentDate(),
     appointmentTime: '09:30',
     department: '',
+    serviceId: '',
+    serviceName: '',
     notes: '',
   };
 }
@@ -236,6 +238,11 @@ interface MiniAppDepartmentOption {
   key: string;
   name: string;
   name_uz?: string | null;
+}
+
+interface MiniAppServiceOption {
+  id: number;
+  name: string;
 }
 
 // Round-15 (owner P2): selector display name follows the shell display
@@ -257,6 +264,8 @@ function buildMiniAppAppointmentRequestBody(authPayload: Record<string, any>, fo
     appointmentDate: form.appointmentDate,
     appointmentTime: form.appointmentTime || undefined,
     department: form.department.trim() || undefined,
+    services: form.serviceName ? [form.serviceName] : [],
+    serviceIds: form.serviceId ? [Number(form.serviceId)] : [],
     notes: form.notes.trim() || undefined,
   };
 }
@@ -504,6 +513,8 @@ function TelegramMiniAppPatientShell() {
   // modes work: initData AND entryToken.
   const [bookingDepartmentOptions, setBookingDepartmentOptions] = useState<MiniAppDepartmentOption[]>([]);
   const [bookingDepartmentsUnavailable, setBookingDepartmentsUnavailable] = useState(false);
+  const [bookingServiceOptions, setBookingServiceOptions] = useState<MiniAppServiceOption[]>([]);
+  const [bookingServicesUnavailable, setBookingServicesUnavailable] = useState(false);
   const [appointmentPreview, setAppointmentPreview] = useState<{
     status: string;
     payload: Record<string, any> | null;
@@ -833,6 +844,45 @@ function TelegramMiniAppPatientShell() {
     };
   }, [location.search, selectedSection, state.manifest]);
 
+  useEffect(() => {
+    if (selectedSection !== 'appointments') return;
+    if (!state.manifest?.capabilities?.appointments?.preview_enabled) return;
+    let isMounted = true;
+    setBookingServicesUnavailable(false);
+    api.get('/services?active=true&limit=1000')
+      .then((response) => {
+        if (!isMounted) return;
+        const rows = Array.isArray(response.data) ? response.data : [];
+        const nextOptions = rows.filter((row: unknown): row is MiniAppServiceOption => {
+          if (!row || typeof row !== 'object') return false;
+          const candidate = row as Record<string, unknown>;
+          return typeof candidate.id === 'number'
+            && Number.isInteger(candidate.id)
+            && typeof candidate.name === 'string'
+            && Boolean(candidate.name.trim());
+        });
+        setBookingServiceOptions(nextOptions);
+        setAppointmentPreviewForm((current) => {
+          if (!current.serviceId) return current;
+          const selected = nextOptions.find((service) => String(service.id) === current.serviceId);
+          return selected
+            ? { ...current, serviceName: selected.name }
+            : { ...current, serviceId: '', serviceName: '' };
+        });
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setBookingServiceOptions([]);
+        setBookingServicesUnavailable(true);
+        setAppointmentPreviewForm((current) => (
+          current.serviceId ? { ...current, serviceId: '', serviceName: '' } : current
+        ));
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSection, state.manifest]);
+
   const capabilities = state.manifest?.capabilities || {};
   const capabilityLabels = MINI_APP_CAPABILITY_SECTIONS.reduce<Record<string, string>>((acc, section) => {
     acc[section] = translateMiniAppText(languageCode, `capabilities.${section}`);
@@ -928,6 +978,15 @@ function TelegramMiniAppPatientShell() {
       payload: null,
       error: null,
     });
+  };
+
+  const handleAppointmentServiceChange = (value: string) => {
+    handleAppointmentPreviewFieldChange('serviceId')({ target: { value } });
+    const service = bookingServiceOptions.find((option) => String(option.id) === value);
+    setAppointmentPreviewForm((current) => ({
+      ...current,
+      serviceName: service?.name || '',
+    }));
   };
 
   const handleAppointmentPreviewSubmit = (event: { preventDefault: () => void }) => {
@@ -1903,6 +1962,18 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                         disabled={appointmentPreview.status === 'loading'}
                         style={miniAppAppointmentInputStyle}
                       />
+                      <Select
+                        label={t('desiredService')}
+                        value={appointmentPreviewForm.serviceId}
+                        placeholder={t('optional')}
+                        options={bookingServiceOptions.map((service) => ({
+                          value: String(service.id),
+                          label: service.name,
+                        }))}
+                        onValueChange={(value) => handleAppointmentServiceChange(String(value))}
+                        disabled={appointmentPreview.status === 'loading' || bookingServicesUnavailable || bookingServiceOptions.length === 0}
+                        style={miniAppAppointmentInputStyle}
+                      />
                     </div>
                     <Textarea
                       label={t('registrarNote')}
@@ -1917,7 +1988,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                       variant="primary"
                       size="small"
                       loading={appointmentPreview.status === 'loading'}
-                      disabled={appointmentPreview.status === 'loading'}
+                      disabled={appointmentPreview.status === 'loading' || !appointmentPreviewForm.serviceId}
                     >
                       {t('checkDraft')}
                     </Button>
@@ -2036,7 +2107,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                         <Textarea
                           key={field.key}
                           label={field.label}
-                          value={String(getMiniAppFormFieldValue(formAnswers, form.id, field) ?? "")}
+                          value={String(getMiniAppFormFieldValue(formAnswers, form.id, field) ?? '')}
                           onChange={handlePatientFormFieldChange(form.id, field)}
                           maxLength={field.max_length || undefined}
                           minRows={2}
@@ -2154,7 +2225,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                       <div style={miniAppCapabilityHeaderStyle}>
                         <h2 style={miniAppCapabilityTitleStyle}>{label}</h2>
                         <Badge variant={enabled ? 'primary' : 'secondary'} size="small">
-                          {String(enabled ? t("available") : t("statusOnly"))}
+                          {String(enabled ? t('available') : t('statusOnly'))}
                         </Badge>
                       </div>
                       <p style={miniAppCapabilityTextStyle}>

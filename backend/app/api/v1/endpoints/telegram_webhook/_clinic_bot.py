@@ -1,6 +1,7 @@
 """
 Split from telegram_webhook.py (5647 LOC → modular).
 """
+
 from __future__ import annotations
 
 import hmac
@@ -178,7 +179,9 @@ async def _handle_clinic_bot_update(
         reply_markup = _localized_main_menu(language)
         template_key = "telegram_patient_language_selected"
         linked_telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
-        if not settings_context and not getattr(linked_telegram_user, "patient_id", None):
+        if not settings_context and not getattr(
+            linked_telegram_user, "patient_id", None
+        ):
             reply_text = f"{reply_text}\n\n{_localized_text('share_contact', language)}"
             template_key = "telegram_patient_language_selected_needs_contact"
         if settings_context:
@@ -296,7 +299,9 @@ async def _handle_clinic_bot_update(
 
     async def book_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
-        reply_markup = _telegram_booking_entry_markup(db, chat_id) or _localized_main_menu(language)
+        reply_markup = _telegram_booking_entry_markup(
+            db, chat_id
+        ) or _localized_main_menu(language)
         await _send_patient_bot_reply(
             db,
             bot_service,
@@ -314,10 +319,9 @@ async def _handle_clinic_bot_update(
             if telegram_user and telegram_user.patient_id
             else _localized_text("unlinked_protected_action", language)
         )
-        reply_markup = (
-            _telegram_patient_forms_entry_markup(db, chat_id)
-            or _localized_services_menu(language)
-        )
+        reply_markup = _telegram_patient_forms_entry_markup(
+            db, chat_id
+        ) or _localized_services_menu(language)
         await _send_patient_bot_reply(
             db,
             bot_service,
@@ -335,10 +339,9 @@ async def _handle_clinic_bot_update(
             if telegram_user and telegram_user.patient_id
             else _localized_text("unlinked_protected_action", language)
         )
-        reply_markup = (
-            _telegram_patient_documents_entry_markup(db, chat_id)
-            or _localized_services_menu(language)
-        )
+        reply_markup = _telegram_patient_documents_entry_markup(
+            db, chat_id
+        ) or _localized_services_menu(language)
         await _send_patient_bot_reply(
             db,
             bot_service,
@@ -350,10 +353,9 @@ async def _handle_clinic_bot_update(
 
     async def doctor_schedule_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
-        reply_markup = (
-            _telegram_patient_doctors_entry_markup(db, chat_id)
-            or _localized_services_menu(language)
-        )
+        reply_markup = _telegram_patient_doctors_entry_markup(
+            db, chat_id
+        ) or _localized_services_menu(language)
         await _send_patient_bot_reply(
             db,
             bot_service,
@@ -371,10 +373,9 @@ async def _handle_clinic_bot_update(
             if telegram_user and telegram_user.patient_id
             else _localized_text("unlinked_protected_action", language)
         )
-        reply_markup = (
-            _telegram_patient_cabinet_entry_markup(db, chat_id)
-            or _localized_services_menu(language)
-        )
+        reply_markup = _telegram_patient_cabinet_entry_markup(
+            db, chat_id
+        ) or _localized_services_menu(language)
         await _send_patient_bot_reply(
             db,
             bot_service,
@@ -501,7 +502,6 @@ async def _handle_clinic_bot_update(
     )
 
 
-
 class TelegramMiniAppAppointmentPreviewRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -515,6 +515,7 @@ class TelegramMiniAppAppointmentPreviewRequest(BaseModel):
     department: str | None = None
     notes: str | None = None
     services: list[str] | None = None
+    service_ids: list[int] | None = Field(default=None, alias="serviceIds")
 
 
 class TelegramMiniAppPatientManifestRequest(BaseModel):
@@ -596,7 +597,9 @@ def _validate_webhook_secret(request: Request, db: Session):
     config = crud_telegram.get_telegram_config(db)
     expected_secret = getattr(config, "webhook_secret", None)
     if not expected_secret:
-        logger.error("Telegram webhook rejected because webhook secret is not configured")
+        logger.error(
+            "Telegram webhook rejected because webhook secret is not configured"
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Telegram webhook secret is not configured",
@@ -617,9 +620,13 @@ def _validate_webhook_secret(request: Request, db: Session):
 def _acknowledge_webhook_error(operation: str, exc: Exception) -> JSONResponse:
     logger.error(
         "Telegram webhook error operation=%s error_type=%s: %s",
-        operation, type(exc).__name__, exc,
+        operation,
+        type(exc).__name__,
+        exc,
     )
-    return JSONResponse(status_code=200, content={"status": "error", "message": "Internal error logged"})
+    return JSONResponse(
+        status_code=200, content={"status": "error", "message": "Internal error logged"}
+    )
 
 
 def _raise_telegram_webhook_internal_error(
@@ -711,7 +718,7 @@ def _build_mini_app_appointment_booking_preview_from_request(
     db: Session,
     *,
     allow_entry_token: bool = False,
-    request: "Request | None" = None,  # M4-P0-1: for audit logging
+    request: Request | None = None,  # M4-P0-1: for audit logging
     resolve_routing: bool = True,
 ):
     from app.services.patient_access_audit import log_patient_access
@@ -741,6 +748,7 @@ def _build_mini_app_appointment_booking_preview_from_request(
             department=request_body.department,
             notes=request_body.notes,
             services=request_body.services,
+            service_ids=request_body.service_ids,
             # Round-11 (owner P2 parity, PR #3340): the past-day check
             # follows the CLINIC's calendar (Asia/Tashkent queue-settings
             # SSOT `clinic_today`), not the UTC host's `date.today()` — the
@@ -801,7 +809,9 @@ def _build_mini_app_appointment_booking_preview_from_request(
             department_row = resolve_booking_department(db, preview.draft.department)
             if preview.draft.doctor_id is not None:
                 doctor_row = (
-                    db.query(Doctor).filter(Doctor.id == preview.draft.doctor_id).first()
+                    db.query(Doctor)
+                    .filter(Doctor.id == preview.draft.doctor_id)
+                    .first()
                 )
                 if doctor_row is not None:
                     department_row = resolve_doctor_routing_department(
@@ -911,18 +921,24 @@ def _resolve_mini_app_patient_scope_from_auth(
 ) -> tuple[TelegramMiniAppSessionScope, str]:
     normalized_init_data = str(init_data_payload or "").strip()
     if normalized_init_data:
-        return _resolve_mini_app_patient_scope_from_init_data(
-            db,
-            normalized_init_data,
-        ), "init_data"
+        return (
+            _resolve_mini_app_patient_scope_from_init_data(
+                db,
+                normalized_init_data,
+            ),
+            "init_data",
+        )
 
     normalized_entry_token = str(entry_token or "").strip()
     if normalized_entry_token:
-        return _resolve_mini_app_patient_scope_from_entry_token(
-            db,
-            normalized_entry_token,
-            expected_section=expected_section,
-        ), "entry_token"
+        return (
+            _resolve_mini_app_patient_scope_from_entry_token(
+                db,
+                normalized_entry_token,
+                expected_section=expected_section,
+            ),
+            "entry_token",
+        )
 
     raise TelegramMiniAppInitDataError("init_data_required")
 
@@ -1015,18 +1031,24 @@ def _resolve_mini_app_onboarding_scope_from_auth(
 ) -> tuple[TelegramMiniAppSessionScope, str]:
     normalized_init_data = str(init_data_payload or "").strip()
     if normalized_init_data:
-        return _resolve_mini_app_onboarding_scope_from_init_data(
-            db,
-            normalized_init_data,
-        ), "init_data"
+        return (
+            _resolve_mini_app_onboarding_scope_from_init_data(
+                db,
+                normalized_init_data,
+            ),
+            "init_data",
+        )
 
     normalized_entry_token = str(entry_token or "").strip()
     if normalized_entry_token:
-        return _resolve_mini_app_onboarding_scope_from_entry_token(
-            db,
-            normalized_entry_token,
-            expected_section=expected_section,
-        ), "entry_token"
+        return (
+            _resolve_mini_app_onboarding_scope_from_entry_token(
+                db,
+                normalized_entry_token,
+                expected_section=expected_section,
+            ),
+            "entry_token",
+        )
 
     raise TelegramMiniAppInitDataError("init_data_required")
 
@@ -1056,9 +1078,9 @@ def _mini_app_patient_manifest_payload(
         },
         "language": {
             "code": language_code,
-            "label": "O'zbekcha"
-            if language_code == TELEGRAM_LANGUAGE_UZ
-            else "Русский",
+            "label": (
+                "O'zbekcha" if language_code == TELEGRAM_LANGUAGE_UZ else "Русский"
+            ),
         },
         "patient": {
             "linked": True,
@@ -1138,9 +1160,9 @@ def _mini_app_patient_onboarding_manifest_payload(
         },
         "language": {
             "code": language_code,
-            "label": "O'zbekcha"
-            if language_code == TELEGRAM_LANGUAGE_UZ
-            else "Русский",
+            "label": (
+                "O'zbekcha" if language_code == TELEGRAM_LANGUAGE_UZ else "Русский"
+            ),
         },
         "patient": {
             "linked": False,
@@ -1176,7 +1198,7 @@ def _build_mini_app_patient_manifest_from_request(
     request_body: TelegramMiniAppPatientManifestRequest,
     db: Session,
     *,
-    request: "Request | None" = None,  # M4-P0-1: for audit logging
+    request: Request | None = None,  # M4-P0-1: for audit logging
 ) -> dict[str, Any]:
     from app.services.patient_access_audit import log_patient_access
 
@@ -1245,7 +1267,9 @@ def _build_mini_app_patient_manifest_from_request(
 def _iso_date_value(value: date | datetime | None) -> str | None:
     if value is None:
         return None
-    return value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
+    return (
+        value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
+    )
 
 
 def _iso_datetime_value(value: datetime | None) -> str | None:
@@ -1293,9 +1317,14 @@ def _mini_app_patient_cabinet_summary_payload(
     appointments = _mini_app_patient_appointments(db, patient_id)
     recent_visits = _patient_recent_visits(db, patient_id)
     queue_entries = _patient_today_queue_entries(db, patient_id)
-    entries, visits_for_billing, expected_total, paid_total, pending_total, debt_total = (
-        _billing_totals(db, patient_id)
-    )
+    (
+        entries,
+        visits_for_billing,
+        expected_total,
+        paid_total,
+        pending_total,
+        debt_total,
+    ) = _billing_totals(db, patient_id)
     reports = _latest_ready_lab_report_instances(db, patient_id)
 
     return {
@@ -1328,7 +1357,9 @@ def _mini_app_patient_cabinet_summary_payload(
             {
                 "number": entry.number,
                 "status": entry.status,
-                "cabinet": getattr(getattr(entry, "queue", None), "cabinet_number", None),
+                "cabinet": getattr(
+                    getattr(entry, "queue", None), "cabinet_number", None
+                ),
             }
             for entry in queue_entries[:5]
         ],
@@ -1343,8 +1374,12 @@ def _mini_app_patient_cabinet_summary_payload(
         "reports": [
             {
                 "id": int(report.id),
-                "name": getattr(getattr(report, "template", None), "name", "Lab report"),
-                "ready_at": _iso_datetime_value(report.finalized_at or report.created_at),
+                "name": getattr(
+                    getattr(report, "template", None), "name", "Lab report"
+                ),
+                "ready_at": _iso_datetime_value(
+                    report.finalized_at or report.created_at
+                ),
                 "status": report.status,
             }
             for report in reports
@@ -1361,11 +1396,11 @@ def _build_mini_app_patient_cabinet_summary_from_request(
     request_body: TelegramMiniAppPatientCabinetSummaryRequest,
     db: Session,
     *,
-    request: "Request | None" = None,  # M4-P0-1: for audit logging
+    request: Request | None = None,  # M4-P0-1: for audit logging
 ) -> dict[str, Any]:
-    from app.services.patient_access_audit import log_patient_access
     # M4-P1-1: Centralized ABAC authorization
-    from app.services.authorization import AuthorizationError, can_access_phi
+    from app.services.authorization import can_access_phi
+    from app.services.patient_access_audit import log_patient_access
 
     try:
         scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
@@ -1375,7 +1410,11 @@ def _build_mini_app_patient_cabinet_summary_from_request(
             expected_section=request_body.section or "cabinet",
         )
         # M4-P1-1: Use centralized authorization instead of inline patient_id check
-        subject_patient_id = request_body.patient_id if request_body.patient_id is not None else scope.patient_id
+        subject_patient_id = (
+            request_body.patient_id
+            if request_body.patient_id is not None
+            else scope.patient_id
+        )
         if not can_access_phi(
             scope,
             subject_patient_id=subject_patient_id,
@@ -1461,11 +1500,11 @@ def _build_mini_app_patient_report_download_response(
     request_body: TelegramMiniAppPatientReportDownloadRequest,
     db: Session,
     *,
-    request: "Request | None" = None,  # M4-P0-1: for audit logging
+    request: Request | None = None,  # M4-P0-1: for audit logging
 ) -> Response:
-    from app.services.patient_access_audit import log_patient_access
     # M4-P1-1: Centralized ABAC authorization
     from app.services.authorization import can_access_phi
+    from app.services.patient_access_audit import log_patient_access
 
     try:
         scope = _resolve_mini_app_patient_scope_for_optional_patient(
@@ -1476,7 +1515,11 @@ def _build_mini_app_patient_report_download_response(
             expected_section=request_body.section or "results",
         )
         # M4-P1-1: Use centralized authorization
-        subject_patient_id = request_body.patient_id if request_body.patient_id is not None else scope.patient_id
+        subject_patient_id = (
+            request_body.patient_id
+            if request_body.patient_id is not None
+            else scope.patient_id
+        )
         if not can_access_phi(
             scope,
             subject_patient_id=subject_patient_id,
@@ -1561,7 +1604,9 @@ def _build_mini_app_patient_report_download_response(
     try:
         from app.api.v1.endpoints import telegram_webhook
 
-        filename, pdf_bytes, _caption = telegram_webhook._build_lab_report_pdf(db, report)
+        filename, pdf_bytes, _caption = telegram_webhook._build_lab_report_pdf(
+            db, report
+        )
     except Exception as exc:
         # M4-P0-1: Log generation error
         log_patient_access(
@@ -1603,7 +1648,7 @@ def _build_mini_app_patient_forms_preview_from_request(
     request_body: TelegramMiniAppPatientFormsPreviewRequest,
     db: Session,
     *,
-    request: "Request | None" = None,  # M4-P0-1: for audit logging
+    request: Request | None = None,  # M4-P0-1: for audit logging
 ):
     from app.services.patient_access_audit import log_patient_access
 
@@ -1668,7 +1713,7 @@ def _save_mini_app_patient_form_submission_from_request(
     request_body: TelegramMiniAppPatientFormSubmissionRequest,
     db: Session,
     *,
-    request: "Request | None" = None,  # M4-P0-1: for audit logging
+    request: Request | None = None,  # M4-P0-1: for audit logging
 ):
     from app.services.patient_access_audit import log_patient_access
 
@@ -1771,4 +1816,3 @@ def _telegram_user_from_onboarding_request_auth(
             detail={"reason": "telegram_link_required"},
         )
     return telegram_user
-

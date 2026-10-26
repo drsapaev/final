@@ -13,11 +13,17 @@ import {
   Alert,
 } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
+import { api } from '../../api/client';
 
 type DoctorItem = Record<string, any>;
 type PatientItem = Record<string, any>;
 type AppointmentItem = Record<string, any>;
+
+interface AppointmentServiceOption {
+  id: number;
+  name: string;
+}
 
 interface AppointmentModalProps {
   isOpen: boolean;
@@ -46,6 +52,7 @@ const AppointmentModal = ({
     appointmentTime: '',
     duration: 30,
     status: '',
+    serviceId: '',
     reason: '',
     notes: '',
     phone: '',
@@ -54,10 +61,39 @@ const AppointmentModal = ({
   const [errors, setErrors] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [serviceOptions, setServiceOptions] = useState<AppointmentServiceOption[]>([]);
+  const [servicesUnavailable, setServicesUnavailable] = useState(false);
   const selectedDoctor = useMemo<DoctorItem | null>(
     () => doctors.find((doctor) => doctor.id === parseInt(formData.doctorId, 10)) || null,
     [doctors, formData.doctorId]
   );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setServicesUnavailable(false);
+    api.get('/services?active=true&limit=1000')
+      .then((response) => {
+        if (cancelled) return;
+        const rows = Array.isArray(response.data) ? response.data : [];
+        setServiceOptions(rows.filter((row: unknown): row is AppointmentServiceOption => {
+          if (!row || typeof row !== 'object') return false;
+          const candidate = row as Record<string, unknown>;
+          return typeof candidate.id === 'number'
+            && Number.isInteger(candidate.id)
+            && typeof candidate.name === 'string'
+            && Boolean(candidate.name.trim());
+        }));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setServiceOptions([]);
+        setServicesUnavailable(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   // Инициализация формы при открытии
   useEffect(() => {
@@ -70,6 +106,7 @@ const AppointmentModal = ({
           appointmentTime: appointment.appointmentTime || '',
           duration: appointment.duration || 30,
           status: appointment.status || '',
+          serviceId: '',
           reason: appointment.reason || appointment.notes || '',
           notes: appointment.notes || '',
           phone: appointment.phone || '',
@@ -83,6 +120,7 @@ const AppointmentModal = ({
           appointmentTime: '',
           duration: 30,
           status: '',
+          serviceId: '',
           reason: '',
           notes: '',
           phone: '',
@@ -125,6 +163,10 @@ const AppointmentModal = ({
       newErrors.reason = t('admin2.am_err_reason_required');
     }
 
+    if (!appointment && !formData.serviceId) {
+      newErrors.serviceId = t('required_aria');
+    }
+
     if (formData.duration < 15 || formData.duration > 120) {
       newErrors.duration = t('admin2.am_err_duration_range');
     }
@@ -146,6 +188,7 @@ const AppointmentModal = ({
         appointmentDate: formData.appointmentDate,
         appointmentTime: formData.appointmentTime,
         duration: parseInt(formData.duration),
+        serviceId: formData.serviceId,
         reason: formData.reason.trim(),
         notes: formData.notes.trim() || null,
         phone: formData.phone.trim() || null,
@@ -208,7 +251,7 @@ const AppointmentModal = ({
       onClose={onClose}
       title={appointment ? t('admin2.am_title_edit') : t('admin2.am_title_create')}
       size="large">
-      
+
           {/* Submit error (P1 fix: show save errors instead of swallowing) */}
           {submitError ? (
             <Alert type="error" className="admin-mb-12">{submitError}</Alert>
@@ -239,7 +282,7 @@ const AppointmentModal = ({
                 }
                 error={errors.patientId}
                 size="large" />
-              
+
                   {errors.patientId &&
               <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-5">
                       <AlertCircle className="admin-icon-14" />
@@ -265,7 +308,7 @@ const AppointmentModal = ({
                 }
                 error={errors.doctorId}
                 size="large" />
-              
+
                   {errors.doctorId &&
               <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-4">
                       <AlertCircle className="admin-icon-14" />
@@ -287,7 +330,7 @@ const AppointmentModal = ({
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('appointmentDate', e.target.value)}
                 error={errors.appointmentDate}
                 icon={Calendar} />
-              
+
                   {errors.appointmentDate &&
               <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-3">
                       <AlertCircle className="admin-icon-14" />
@@ -307,7 +350,7 @@ const AppointmentModal = ({
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('appointmentTime', e.target.value)}
                 error={errors.appointmentTime}
                 icon={Clock} />
-              
+
                   {errors.appointmentTime &&
               <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-2">
                       <AlertCircle className="admin-icon-14" />
@@ -329,7 +372,7 @@ const AppointmentModal = ({
                 min="15"
                 max="120"
                 step="15" />
-              
+
                   {errors.duration &&
               <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-1">
                       <AlertCircle className="admin-icon-14" />
@@ -358,7 +401,7 @@ const AppointmentModal = ({
               { value: 'no_show', label: t('admin2.am_status_no_show') }]
               }
               size="large" />
-            
+
               </div>
             </div>
 
@@ -367,6 +410,21 @@ const AppointmentModal = ({
               <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
                 {t('admin2.am_section_details')}
               </h3>
+              <div className="admin-mb-16">
+                <Select
+                  label={appointment ? t('services') : `${t('services')} *`}
+                  value={formData.serviceId}
+                  placeholder={t('no_services')}
+                  options={serviceOptions.map((service) => ({
+                    value: String(service.id),
+                    label: service.name,
+                  }))}
+                  onValueChange={(value) => handleChange('serviceId', String(value))}
+                  disabled={servicesUnavailable || serviceOptions.length === 0 || isSubmitting}
+                  error={errors.serviceId}
+                  size="large"
+                />
+              </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
                   {t('admin2.am_label_reason')}
@@ -377,7 +435,7 @@ const AppointmentModal = ({
               error={errors.reason}
               rows={3}
               placeholder={t('admin2.am_placeholder_reason')} />
-            
+
                 {errors.reason &&
             <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4">
                     <AlertCircle className="admin-icon-14" />
@@ -395,7 +453,7 @@ const AppointmentModal = ({
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('notes', e.target.value)}
               rows={2}
               placeholder={t('admin2.am_placeholder_notes')} />
-            
+
               </div>
             </div>
 
@@ -415,7 +473,7 @@ const AppointmentModal = ({
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('phone', e.target.value)}
                 placeholder="+998 90 123 45 67"
                 icon={Phone} />
-              
+
                 </div>
                 <div>
                   <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
@@ -427,7 +485,7 @@ const AppointmentModal = ({
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('email', e.target.value)}
                 placeholder="patient@example.com"
                 icon={Mail} />
-              
+
                 </div>
               </div>
             </div>
@@ -489,7 +547,7 @@ const AppointmentModal = ({
             aria-label={appointment ? 'Save appointment changes' : 'Create appointment'}
             className="flex-1 admin-bg-var-accent-color-white"
             >
-            
+
                 {isSubmitting ?
             <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
@@ -507,7 +565,7 @@ const AppointmentModal = ({
             variant="outline"
             onClick={onClose}
             disabled={isSubmitting}>
-            
+
                 {t('admin2.am_btn_cancel')}
               </Button>
             </div>

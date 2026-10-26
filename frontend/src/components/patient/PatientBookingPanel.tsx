@@ -8,12 +8,11 @@ import {
   readTelegramMiniAppInitData,
   getDefaultAppointmentDate,
   getTodayDateInputValue,
-  splitBookingServices,
   describePatientError,
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
 import { AlertTriangle, Calendar, CheckCircle2, FileText } from 'lucide-react';
 
 interface BookingAppointment {
@@ -37,6 +36,11 @@ interface BookingDepartmentOption {
   // Round-15 (owner P2): clinic's own Uzbek name — uz-Latn UI renders the
   // selector in the same language as the rest of the form.
   name_uz?: string | null;
+}
+
+interface BookingServiceOption {
+  id: number;
+  name: string;
 }
 
 /**
@@ -66,7 +70,7 @@ function PatientBookingPanel() {
     appointmentDate: getDefaultAppointmentDate(),
     appointmentTime: '',
     department: '',
-    servicesText: '',
+    serviceId: '',
     notes: '',
   }));
   const [bookingStatus, setBookingStatus] = useState('idle');
@@ -75,6 +79,8 @@ function PatientBookingPanel() {
   const [bookingError, setBookingError] = useState('');
   const [departmentOptions, setDepartmentOptions] = useState<BookingDepartmentOption[]>([]);
   const [departmentsUnavailable, setDepartmentsUnavailable] = useState(false);
+  const [serviceOptions, setServiceOptions] = useState<BookingServiceOption[]>([]);
+  const [servicesUnavailable, setServicesUnavailable] = useState(false);
   const initData = readTelegramMiniAppInitData();
   const isBusy = bookingStatus === 'previewing' || bookingStatus === 'creating';
   const appointment = bookingPreview?.appointment || createdBooking?.preview?.appointment || null;
@@ -109,6 +115,40 @@ function PatientBookingPanel() {
     };
   }, [initData]);
 
+  useEffect(() => {
+    if (!initData) return;
+    let cancelled = false;
+    setServicesUnavailable(false);
+    api.get('/services?active=true&limit=1000')
+      .then((response) => {
+        if (cancelled) return;
+        const rows = Array.isArray(response.data) ? response.data : [];
+        const nextOptions = rows.filter((row: unknown): row is BookingServiceOption => {
+          if (!row || typeof row !== 'object') return false;
+          const candidate = row as Record<string, unknown>;
+          return typeof candidate.id === 'number'
+            && Number.isInteger(candidate.id)
+            && typeof candidate.name === 'string'
+            && Boolean(candidate.name.trim());
+        });
+        setServiceOptions(nextOptions);
+        setBookingForm((current) => (
+          current.serviceId && !nextOptions.some((service) => String(service.id) === current.serviceId)
+            ? { ...current, serviceId: '' }
+            : current
+        ));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setServiceOptions([]);
+        setServicesUnavailable(true);
+        setBookingForm((current) => (current.serviceId ? { ...current, serviceId: '' } : current));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initData]);
+
   if (!initData) {
     return (
       <PanelEmptyState
@@ -127,14 +167,20 @@ function PatientBookingPanel() {
     setBookingError('');
   };
 
-  const buildBookingPayload = () => ({
-    initData,
-    appointmentDate: bookingForm.appointmentDate,
-    appointmentTime: bookingForm.appointmentTime || null,
-    department: bookingForm.department.trim() || null,
-    notes: bookingForm.notes.trim() || null,
-    services: splitBookingServices(bookingForm.servicesText),
-  });
+  const buildBookingPayload = () => {
+    const selectedService = serviceOptions.find(
+      (service) => String(service.id) === bookingForm.serviceId,
+    );
+    return {
+      initData,
+      appointmentDate: bookingForm.appointmentDate,
+      appointmentTime: bookingForm.appointmentTime || null,
+      department: bookingForm.department.trim() || null,
+      notes: bookingForm.notes.trim() || null,
+      services: selectedService ? [selectedService.name] : [],
+      serviceIds: selectedService ? [selectedService.id] : [],
+    };
+  };
 
   const previewBooking = async () => {
     setBookingStatus('previewing');
@@ -214,12 +260,16 @@ function PatientBookingPanel() {
             ]}
             onValueChange={(value) => handleChange('department', String(value))}
           />
-          <Input
+          <Select
             label={t('patient.pat_book_label_services')}
-            value={bookingForm.servicesText}
+            value={bookingForm.serviceId}
             disabled={isBusy}
             placeholder={t('patient.pat_book_placeholder_services')}
-            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('servicesText', event.target.value)}
+            options={serviceOptions.map((service) => ({
+              value: String(service.id),
+              label: service.name,
+            }))}
+            onValueChange={(value) => handleChange('serviceId', String(value))}
           />
           <div className="pp-grid-span-2">
             <Textarea
@@ -266,12 +316,17 @@ function PatientBookingPanel() {
               {t('patient.pat_book_departments_unavailable')}
             </div>
           )}
+          {(servicesUnavailable || serviceOptions.length === 0) && (
+            <div className="pp-grid-span-2 pp-summary-services" role="note">
+              {t('no_services')}
+            </div>
+          )}
 
           <div className="pp-grid-span-2 pp-actions-row">
             <Button
               variant="outline"
               size="small"
-              disabled={isBusy || !bookingForm.appointmentDate}
+              disabled={isBusy || !bookingForm.appointmentDate || !bookingForm.serviceId}
               loading={bookingStatus === 'previewing'}
               onClick={previewBooking}
             >
@@ -281,7 +336,7 @@ function PatientBookingPanel() {
             <Button
               variant="primary"
               size="small"
-              disabled={isBusy || !bookingForm.appointmentDate}
+              disabled={isBusy || !bookingForm.appointmentDate || !bookingForm.serviceId}
               loading={bookingStatus === 'creating'}
               onClick={createBooking}
             >

@@ -73979,6 +73979,20 @@
               }
             ],
             "title": "Payment Processed At"
+          },
+          "service_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Ids"
           }
         },
         "type": "object",
@@ -74469,6 +74483,20 @@
               }
             ],
             "title": "Services"
+          },
+          "service_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Ids"
           },
           "payment_amount": {
             "anyOf": [
@@ -100353,6 +100381,14 @@
             "title": "Services",
             "default": []
           },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Service Ids",
+            "default": []
+          },
           "payment_amount": {
             "anyOf": [
               {
@@ -100547,6 +100583,20 @@
               }
             ],
             "title": "Services"
+          },
+          "serviceIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serviceids"
           }
         },
         "type": "object",
@@ -115510,6 +115560,20 @@
               }
             ],
             "title": "Services"
+          },
+          "serviceIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serviceids"
           }
         },
         "type": "object",

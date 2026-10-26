@@ -45,6 +45,7 @@ from app.schemas.mobile import (
     MobileQuickStats,
     PatientProfileOut,
 )
+from app.services.appointment_duration_snapshot import MAX_SNAPSHOT_DURATION_MINUTES
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.mobile_api_service import MobileApiService
@@ -505,7 +506,7 @@ async def book_mobile_appointment(
                 if (
                     isinstance(service_duration, int)
                     and not isinstance(service_duration, bool)
-                    and service_duration > 0
+                    and 1 <= service_duration <= MAX_SNAPSHOT_DURATION_MINUTES
                 ):
                     duration_minutes_snapshot = service_duration
 

@@ -2,6 +2,7 @@
 
 Split from doctor_integration.py (1900 LOC god file → modular).
 """
+
 from __future__ import annotations
 
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
@@ -23,6 +24,9 @@ from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     _serialize_queue_doctor,
     _visit_filter_doctor_id,
     router,
+)
+from app.services.appointment_duration_snapshot import (
+    duration_snapshot_for_service_id,
 )
 
 
@@ -140,6 +144,9 @@ async def schedule_next_visit(
             visit_service = VisitService(
                 visit_id=visit.id,
                 service_id=service.id,
+                duration_minutes_snapshot=duration_snapshot_for_service_id(
+                    db, service.id, doctor_id=visit.doctor_id
+                ),
                 name=service.name,
                 # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
                 code=service.service_code or get_service_code(service.id, db),
@@ -190,7 +197,7 @@ async def schedule_next_visit(
             "services_count": len(request.services),
             "notification_sent": (
                 notification_result.get("success", False)
-                if 'notification_result' in locals()
+                if "notification_result" in locals()
                 else False
             ),
         }
@@ -295,9 +302,7 @@ def get_today_visits(
 
 @router.get("/doctor/visits/statistics", response_model=dict[str, Any])
 def get_visit_statistics(
-    date_from: str | None = Query(
-        None, description="Дата начала в формате YYYY-MM-DD"
-    ),
+    date_from: str | None = Query(None, description="Дата начала в формате YYYY-MM-DD"),
     date_to: str | None = Query(
         None, description="Дата окончания в формате YYYY-MM-DD"
     ),
@@ -333,15 +338,6 @@ def get_visit_statistics(
         }
 
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
-
-    except HTTPException:
-        raise
-    except Exception:  # noqa: B025  # manual-review: duplicate exception in try block — manual review
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -389,7 +385,11 @@ def get_visit_details(
                 "id": vs.id,
                 "service_id": vs.service_id,
                 "service_name": service.name if service else f"Услуга #{vs.service_id}",
-                "service_code": (service.service_code or get_service_code(service.id, db)) if service else None,
+                "service_code": (
+                    (service.service_code or get_service_code(service.id, db))
+                    if service
+                    else None
+                ),
                 "quantity": vs.quantity,
                 "price": vs.price,
                 "custom_price": vs.custom_price,
@@ -495,7 +495,10 @@ def add_service_to_visit(
         )
 
 
-@router.delete("/doctor/visits/{visit_id}/services/{visit_service_id}", response_model=dict[str, Any])
+@router.delete(
+    "/doctor/visits/{visit_id}/services/{visit_service_id}",
+    response_model=dict[str, Any],
+)
 def remove_service_from_visit(
     visit_id: int,
     visit_service_id: int,
@@ -544,5 +547,3 @@ def remove_service_from_visit(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
-
-

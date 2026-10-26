@@ -24917,6 +24917,8 @@ export type components = {
             payment_webhook_id?: number | null;
             /** Payment Processed At */
             payment_processed_at?: string | null;
+            /** Service Ids */
+            service_ids?: number[] | null;
         };
         /**
          * AppointmentData
@@ -25073,6 +25075,8 @@ export type components = {
             payment_type?: string | null;
             /** Services */
             services?: string[] | null;
+            /** Service Ids */
+            service_ids?: number[] | null;
             /** Payment Amount */
             payment_amount?: number | null;
             /** Payment Currency */
@@ -34553,6 +34557,11 @@ export type components = {
              * @default []
              */
             services: string[];
+            /**
+             * Service Ids
+             * @default []
+             */
+            service_ids: number[];
             /** Payment Amount */
             payment_amount?: number | null;
             /** Payment Currency */
@@ -34605,6 +34614,8 @@ export type components = {
             notes?: string | null;
             /** Services */
             services?: string[] | null;
+            /** Serviceids */
+            serviceIds?: number[] | null;
         };
         /** PatientPortalCabinetAppointmentsItem */
         PatientPortalCabinetAppointmentsItem: {
@@ -40368,6 +40379,8 @@ export type components = {
             notes?: string | null;
             /** Services */
             services?: string[] | null;
+            /** Serviceids */
+            serviceIds?: number[] | null;
         };
         /**
          * TelegramMiniAppBookingDepartmentsRequest

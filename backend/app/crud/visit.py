@@ -10,6 +10,9 @@ from sqlalchemy.orm import Session
 
 from app.models.service import Service
 from app.models.visit import Visit, VisitService
+from app.services.appointment_duration_snapshot import (
+    duration_snapshot_for_service_id,
+)
 from app.services.service_mapping import normalize_service_code
 
 
@@ -190,6 +193,11 @@ def create_visit(
             visit_service = VisitService(
                 visit_id=visit.id,
                 service_id=service_data.get("service_id") or service_data.get("id"),
+                duration_minutes_snapshot=duration_snapshot_for_service_id(
+                    db,
+                    service_data.get("service_id") or service_data.get("id"),
+                    doctor_id=visit.doctor_id,
+                ),
                 qty=service_data.get("quantity", service_data.get("qty", 1)),
                 price=service_data.get("price", 0),
                 code=(
@@ -253,14 +261,19 @@ def add_visit_service(
 
     # Получаем и нормализуем код услуги
     service_code = None
-    if service and hasattr(service, 'code') and service.code:
+    if service and hasattr(service, "code") and service.code:
         service_code = normalize_service_code(service.code)
-    elif service and hasattr(service, 'service_code') and service.service_code:
+    elif service and hasattr(service, "service_code") and service.service_code:
         service_code = normalize_service_code(service.service_code)
+
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
 
     visit_service = VisitService(
         visit_id=visit_id,
         service_id=service_id,
+        duration_minutes_snapshot=duration_snapshot_for_service_id(
+            db, service_id, doctor_id=visit.doctor_id if visit is not None else None
+        ),
         quantity=quantity,
         price=price,
         code=service_code,
@@ -270,7 +283,6 @@ def add_visit_service(
     db.add(visit_service)
 
     # PR-10: bump visit.updated_at so frontend "Изменено" indicator fires.
-    visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if visit is not None:
         visit.updated_at = datetime.now(UTC)
 

@@ -27,6 +27,7 @@ from app.services.public_booking_calendar_settings import (
 from app.services.public_booking_settings import PublicBookingSettingsService
 
 ResourceQueueRoutePolicy = Callable[[Service, date], bool]
+VisitOccupancyRow = tuple[int, date | None, str | None, int | None, int | None]
 
 
 @dataclass(frozen=True)
@@ -186,6 +187,37 @@ class PublicBookingAvailabilityService:
                 target_date=target_date,
             )
         ]
+        visit_rows = self.repository.list_visit_occupancy_for_day(
+            doctor_id=doctor_id,
+            target_date=target_date,
+        )
+        grouped_visits: dict[int, list[VisitOccupancyRow]] = {}
+        for row in visit_rows:
+            grouped_visits.setdefault(row[0], []).append(row)
+
+        for rows in grouped_visits.values():
+            _, visit_date, visit_time, qty, duration = rows[0]
+            snapshot = None
+            if len(rows) == 1 and qty == 1:
+                candidate = duration
+                if (
+                    isinstance(candidate, int)
+                    and not isinstance(candidate, bool)
+                    and 1 <= candidate <= MAX_SERVICE_DURATION_MINUTES
+                ):
+                    snapshot = candidate
+            # The repository already excludes canonical terminal visit states.
+            # Keep this read-only occupancy separate from the Appointment row;
+            # a converted visit may appear in both, which is harmless.
+            if visit_date is not None:
+                appointments.append(
+                    ExistingAppointment(
+                        appointment_date=visit_date,
+                        appointment_time=visit_time,
+                        duration_minutes_snapshot=snapshot,
+                        status="scheduled",
+                    )
+                )
         return available_starts_for_day(
             target_date=target_date,
             shift=shift,

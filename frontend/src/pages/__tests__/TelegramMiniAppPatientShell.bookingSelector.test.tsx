@@ -58,9 +58,9 @@ afterAll(() => {
   vi.restoreAllMocks();
 });
 
-const { apiPost } = vi.hoisted(() => ({ apiPost: vi.fn() }));
+const { apiPost, apiGet } = vi.hoisted(() => ({ apiPost: vi.fn(), apiGet: vi.fn() }));
 
-vi.mock('../../api/client', () => ({ api: { post: apiPost } }));
+vi.mock('../../api/client', () => ({ api: { post: apiPost, get: apiGet } }));
 
 import TelegramMiniAppPatientShell from '../TelegramMiniAppPatientShell';
 
@@ -93,6 +93,7 @@ const departmentRows = [
 const departmentRowsUz = [
   { key: 'cardio', name: 'Кардиология', name_uz: 'Kardiologiya' },
 ];
+const serviceRows = [{ id: 73, name: 'УЗИ сердца' }];
 
 const uzManifest = {
   ...linkedManifest,
@@ -169,10 +170,19 @@ async function selectDepartmentByName(label: string, triggerLabel = 'Отдел�
   fireEvent.click(option);
 }
 
+async function selectServiceByName(label: string) {
+  const trigger = await screen.findByLabelText(/услуг|xizmat|service/i);
+  await waitFor(() => expect(trigger).toBeEnabled());
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole('option', { name: label }));
+}
+
 describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)', () => {
   beforeEach(() => {
     apiPost.mockReset();
     apiPost.mockImplementation((url: string, body: Record<string, any>) => routeApiPostByUrl(url, body));
+    apiGet.mockReset();
+    apiGet.mockResolvedValue({ data: serviceRows });
   });
 
   afterEach(() => {
@@ -202,6 +212,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
 
     // …and the canonical Department.key ("cardio") is what reaches the
     // backend — not the free-text label.
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     await waitFor(() => {
@@ -229,12 +240,40 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
     });
 
     await selectDepartmentByName('Кардиология');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         PREVIEW_URL,
         expect.objectContaining({ department: 'cardio' }),
+        expect.anything(),
+      );
+    });
+  });
+
+  it('submits the selected service ID in both preview and create requests', async () => {
+    (window as unknown as { Telegram?: unknown }).Telegram = {
+      WebApp: { initData: 'test-init-data-payload' },
+    };
+    renderBookSurface('?section=appointments');
+
+    await selectServiceByName('УЗИ сердца');
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
+
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith(
+        PREVIEW_URL,
+        expect.objectContaining({ serviceIds: [73], services: ['УЗИ сердца'] }),
+        expect.anything(),
+      );
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Отправить заявку' }));
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith(
+        CREATE_URL,
+        expect.objectContaining({ serviceIds: [73], services: ['УЗИ сердца'] }),
         expect.anything(),
       );
     });
@@ -258,8 +297,9 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
 
     // The uz-Latn form must list the clinic's own Uzbek name — not the
     // Russian label — while still submitting the canonical key.
-    await selectDepartmentByName("Kardiologiya", "Bo'lim");
-    expect(screen.getByLabelText("Bo'lim")).toHaveTextContent('Kardiologiya');
+    await selectDepartmentByName('Kardiologiya', 'Bo\'lim');
+    await selectServiceByName('УЗИ сердца');
+    expect(screen.getByLabelText('Bo\'lim')).toHaveTextContent('Kardiologiya');
 
     fireEvent.click(screen.getByRole('button', { name: 'Qoralamani tekshirish' }));
     await waitFor(() => {
@@ -291,6 +331,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
 
     renderBookSurface('?section=appointments');
     await selectDepartmentByName('Кардиология');
+    await selectServiceByName('УЗИ сердца');
 
     // Leave the booking section (the departments effect is gated to
     // appointments, so no refetch happens there) and come back — the shell
@@ -334,6 +375,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
 
     renderBookSurface('?section=appointments');
     await selectDepartmentByName('Кардиология');
+    await selectServiceByName('УЗИ сердца');
 
     // Leave the booking section (no refetch happens there) and come back —
     // the refetch succeeds, so the selector no longer offers "Кардиология".
@@ -369,6 +411,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
 
     // Selector renders (with the "no department" escape hatch), submit still works.
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
@@ -402,6 +445,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
     renderBookSurface('?section=appointments');
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     await waitFor(() => {
@@ -421,6 +465,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
     renderBookSurface('?section=appointments');
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     // After a successful preview the create action becomes available.
@@ -443,6 +488,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
     renderBookSurface('?section=appointments');
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     await waitFor(() => {
@@ -462,6 +508,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
     renderBookSurface('?section=appointments');
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     const createButton = await screen.findByRole('button', { name: 'Отправить заявку' });
@@ -483,6 +530,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
     renderBookSurface('?section=appointments');
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     await waitFor(() => {

@@ -167,6 +167,30 @@ class TestMobileBookingEligibility:
         row = db_session.query(Appointment).filter_by(doctor_id=owner.id).one()
         assert row.duration_minutes_snapshot is None
 
+    def test_patient_cannot_change_exact_service_selection(self, client, db_session):
+        owner = _make_doctor(db_session, "cardiology", active=True)
+        patient_user, _ = _make_patient_user(db_session)
+        headers = _patient_login(client, patient_user)
+
+        booking = client.post(
+            "/api/v1/mobile/appointments/book",
+            json={
+                "doctor_id": owner.id,
+                "preferred_date": str(date.today() + timedelta(days=2)),
+                "complaint": "тест",
+            },
+            headers=headers,
+        )
+        assert booking.status_code == 200, booking.text
+
+        response = client.put(
+            f"/api/v1/appointments/{booking.json()['id']}",
+            json={"service_ids": [1]},
+            headers=headers,
+        )
+
+        assert response.status_code == 403, response.text
+
 
 class TestPatientFacingSelectors:
     def test_mobile_doctors_hides_incomplete(self, client, db_session, auth_headers):
@@ -449,7 +473,7 @@ class TestMobileBookingRound4Fixes:
         assert row.services == ["Закреплённая консультация"]
         assert row.duration_minutes_snapshot is None
 
-    @pytest.mark.parametrize("duration_minutes", [None, 0, -10])
+    @pytest.mark.parametrize("duration_minutes", [None, 0, -10, 481, 9000])
     def test_book_invalid_service_duration_keeps_snapshot_unknown(
         self, client, db_session, auth_headers, duration_minutes
     ):

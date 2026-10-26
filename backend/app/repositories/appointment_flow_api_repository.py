@@ -22,13 +22,16 @@ class AppointmentFlowApiRepository:
     def get_visit(self, visit_id: int) -> Visit | None:
         return self.db.query(Visit).filter(Visit.id == visit_id).first()
 
-    def get_existing_appointment_for_visit(self, visit: Visit) -> AppointmentModel | None:
+    def get_existing_appointment_for_visit(
+        self, visit: Visit
+    ) -> AppointmentModel | None:
         return (
             self.db.query(AppointmentModel)
             .filter(
                 and_(
                     AppointmentModel.patient_id == visit.patient_id,
-                    AppointmentModel.appointment_date == (visit.visit_date or date.today()),
+                    AppointmentModel.appointment_date
+                    == (visit.visit_date or date.today()),
                     AppointmentModel.doctor_id == visit.doctor_id,
                 )
             )
@@ -36,6 +39,19 @@ class AppointmentFlowApiRepository:
         )
 
     def create_appointment_from_visit(self, visit: Visit) -> AppointmentModel:
+        services = list(visit.services or [])
+        duration_snapshot: int | None = None
+        if len(services) == 1:
+            service = services[0]
+            candidate = service.duration_minutes_snapshot
+            if (
+                service.qty == 1
+                and isinstance(candidate, int)
+                and not isinstance(candidate, bool)
+                and 1 <= candidate <= 480
+            ):
+                duration_snapshot = candidate
+
         appointment = AppointmentModel(
             patient_id=visit.patient_id,
             appointment_date=visit.visit_date or date.today(),
@@ -48,6 +64,7 @@ class AppointmentFlowApiRepository:
             doctor_id=visit.doctor_id,
             department=visit.department,
             notes=visit.notes,
+            duration_minutes_snapshot=duration_snapshot,
             created_at=visit.created_at,
         )
         self.db.add(appointment)

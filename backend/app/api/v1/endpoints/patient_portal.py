@@ -144,6 +144,7 @@ class PatientPortalBookingRequest(BaseModel):
     department: str | None = None
     notes: str | None = None
     services: list[str] | None = None
+    service_ids: list[int] | None = Field(default=None, alias="serviceIds")
 
     model_config = {"populate_by_name": True}
 
@@ -195,6 +196,7 @@ class PatientPortalBookingAppointment(BaseModel):
     visit_type: str | None = None
     payment_type: str | None = None
     services: list[str] = []
+    service_ids: list[int] = []
     payment_amount: float | None = None
     payment_currency: str | None = None
     payment_provider: str | None = None
@@ -711,6 +713,7 @@ def preview_patient_portal_booking(
                 department=request_body.department,
                 notes=request_body.notes,
                 services=request_body.services,
+                service_ids=request_body.service_ids,
                 # Round-9 (owner P2, PR #3340): the past-day check follows
                 # the CLINIC's calendar (Asia/Tashkent queue-settings SSOT
                 # `clinic_today`), not the UTC host's `date.today()` — on a
@@ -843,6 +846,7 @@ def create_patient_portal_booking(
                 department=request_body.department,
                 notes=request_body.notes,
                 services=request_body.services,
+                service_ids=request_body.service_ids,
                 # Round-9 (owner P2): clinic-local calendar — see preview.
                 today=clinic_today(db),
             )

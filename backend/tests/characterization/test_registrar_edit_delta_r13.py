@@ -19,6 +19,7 @@
 Каждый сохраняющий кейс проверяет СОСТОЯНИЕ повторным чтением DB.
 Данные синтетические; production DB не используется.
 """
+
 from __future__ import annotations
 
 import json
@@ -111,7 +112,9 @@ def _post_edit_delta(
 
 def _payload(db_session, entry_id: int) -> list[dict]:
     db_session.expire_all()
-    entry = db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).one()
+    entry = (
+        db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).one()
+    )
     raw = entry.services
     return json.loads(raw) if isinstance(raw, str) else list(raw)
 
@@ -128,7 +131,11 @@ def test_readd_after_per_service_cancel_is_full_growth(
     cancelled=true, total пересчитан до 0). Повторное добавление той же
     услуги — ПОЛНЫЙ рост (новый активный слой, total = цена), а не no-op."""
     service = _create_service(db_session, code="R13-CXL-1", price=25000)
-    queue = _create_queue(db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general")
+    service.duration_minutes = 35
+    db_session.commit()
+    queue = _create_queue(
+        db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general"
+    )
     cancelled_row = {
         "id": service.id,
         "service_id": service.id,
@@ -141,27 +148,41 @@ def test_readd_after_per_service_cancel_is_full_growth(
         "cancel_reason": "отменено регистратором",
     }
     entry = _create_entry(
-        db_session, queue=queue, patient=test_patient, services_payload=[cancelled_row],
+        db_session,
+        queue=queue,
+        patient=test_patient,
+        services_payload=[cancelled_row],
         total_amount=0,
     )
 
     response = _post_edit_delta(
-        client, registrar_auth_headers,
+        client,
+        registrar_auth_headers,
         patient_id=test_patient.id,
         services=[{"service_id": service.id, "quantity": 1}],
         entry_ids=[entry.id],
     )
     assert response.status_code == 200, response.text
 
-    rows = [r for r in _payload(db_session, entry.id) if r.get("service_id") == service.id]
+    rows = [
+        r for r in _payload(db_session, entry.id) if r.get("service_id") == service.id
+    ]
     active = [r for r in rows if not r.get("cancelled")]
-    assert len(active) == 1, "a NEW active layer must be added on top of the cancelled one"
+    assert (
+        len(active) == 1
+    ), "a NEW active layer must be added on top of the cancelled one"
     assert active[0]["quantity"] == 1
     db_session.expire_all()
     db_session.refresh(entry)
-    assert entry.total_amount == 25000, (
-        "re-adding a cancelled service must bill the FULL quantity (no-op was the defect)"
+    assert (
+        entry.total_amount == 25000
+    ), "re-adding a cancelled service must bill the FULL quantity (no-op was the defect)"
+    visit_service = (
+        db_session.query(VisitService)
+        .filter(VisitService.visit_id == entry.visit_id)
+        .one()
     )
+    assert visit_service.duration_minutes_snapshot == 35
 
 
 @pytest.mark.integration
@@ -172,7 +193,9 @@ def test_quote_billable_ignores_cancelled_layer(
     """Квота edit_delta зеркалит команду: отменённый слой НЕ уменьшает
     биллейбл-количество — квота подтверждает ПОЛНОЕ количество."""
     service = _create_service(db_session, code="R13-CXL-Q", price=25000)
-    queue = _create_queue(db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general")
+    queue = _create_queue(
+        db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general"
+    )
     cancelled_row = {
         "id": service.id,
         "service_id": service.id,
@@ -184,7 +207,10 @@ def test_quote_billable_ignores_cancelled_layer(
         "cancelled": True,
     }
     entry = _create_entry(
-        db_session, queue=queue, patient=test_patient, services_payload=[cancelled_row],
+        db_session,
+        queue=queue,
+        patient=test_patient,
+        services_payload=[cancelled_row],
         total_amount=0,
     )
 
@@ -203,9 +229,9 @@ def test_quote_billable_ignores_cancelled_layer(
     )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["items"][0]["quantity"] == 1, (
-        "cancelled layers must not reduce the billable quantity (old code quoted 0)"
-    )
+    assert (
+        body["items"][0]["quantity"] == 1
+    ), "cancelled layers must not reduce the billable quantity (old code quoted 0)"
     assert float(body["total_amount"]) == 25000
 
 
@@ -224,7 +250,9 @@ def test_partial_decrease_renormalizes_legacy_line_total_layer(
     (unit_price=100, price=100 — line-total остатка), VisitService ==
     entry.total_amount == invoice."""
     service = _create_service(db_session, code="R13-LTOT-1", price=30000)
-    queue = _create_queue(db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general")
+    queue = _create_queue(
+        db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general"
+    )
     legacy_row = {
         "id": service.id,
         "service_id": service.id,
@@ -259,7 +287,10 @@ def test_partial_decrease_renormalizes_legacy_line_total_layer(
         )
     )
     entry = _create_entry(
-        db_session, queue=queue, patient=test_patient, services_payload=[legacy_row],
+        db_session,
+        queue=queue,
+        patient=test_patient,
+        services_payload=[legacy_row],
         total_amount=90000,
     )
     entry.visit_id = visit.id
@@ -267,17 +298,22 @@ def test_partial_decrease_renormalizes_legacy_line_total_layer(
     db_session.refresh(entry)
 
     response = _post_edit_delta(
-        client, registrar_auth_headers,
+        client,
+        registrar_auth_headers,
         patient_id=test_patient.id,
         services=[{"service_id": service.id, "quantity": 1}],
         entry_ids=[entry.id],
     )
     assert response.status_code == 200, response.text
 
-    rows = [r for r in _payload(db_session, entry.id) if r.get("service_id") == service.id]
+    rows = [
+        r for r in _payload(db_session, entry.id) if r.get("service_id") == service.id
+    ]
     assert len(rows) == 1
     assert rows[0]["quantity"] == 1
-    assert rows[0]["unit_price"] == 30000, "recorded unit charge must be explicit after consumption"
+    assert (
+        rows[0]["unit_price"] == 30000
+    ), "recorded unit charge must be explicit after consumption"
     assert rows[0]["price"] == 30000, "line-total convention: remaining × unit charge"
     db_session.expire_all()
     db_session.refresh(entry)
@@ -286,11 +322,13 @@ def test_partial_decrease_renormalizes_legacy_line_total_layer(
     db_session.expire_all()
     vs = (
         db_session.query(VisitService)
-        .filter(VisitService.visit_id == visit.id, VisitService.service_id == service.id)
+        .filter(
+            VisitService.visit_id == visit.id, VisitService.service_id == service.id
+        )
         .one()
     )
     assert vs.qty == 1
-    assert float(vs.price) == 30000, (
-        "VisitService must mirror the renormalized layer, not the stale line total"
-    )
+    assert (
+        float(vs.price) == 30000
+    ), "VisitService must mirror the renormalized layer, not the stale line total"
     assert entry.total_amount == int(Decimal(str(vs.price)) * vs.qty)
