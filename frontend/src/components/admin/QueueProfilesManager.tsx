@@ -13,6 +13,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * - CRUD for individual profiles
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { CSSProperties } from 'react';
 import {
     Plus,
@@ -1828,16 +1829,17 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
             });
         }
     };
-    return (
+    return createPortal((
         <Dialog
             open
             onClose={() => onCancel?.()}
             onKeyDown={handleDialogKeyDown}
             aria-labelledby="queue-profile-dialog-title"
             maxWidth="sm"
+            overlayStyle={{ zIndex: 1200, padding: 16, boxSizing: 'border-box' }}
             style={{
                 maxWidth: '500px',
-                maxHeight: '90vh',
+                maxHeight: 'min(90vh, calc(100dvh - 32px))',
                 overflowY: 'auto',
                 padding: 0,
             }}
@@ -2049,7 +2051,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                 </form>
             </div>
         </Dialog>
-    );
+    ), document.body);
 };
 
 
