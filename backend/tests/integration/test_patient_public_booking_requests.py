@@ -510,6 +510,15 @@ def test_public_booking_request_openapi_routes_and_idempotency_contract(
     assert create["responses"]["429"]["content"]["application/json"]["schema"][
         "$ref"
     ].endswith("PublicBookingRequestErrorOut")
+    error_codes = set(
+        schema["components"]["schemas"]["PublicBookingRequestErrorDetail"][
+            "properties"
+        ]["code"]["enum"]
+    )
+    assert {
+        "booking_request_duplicate",
+        "booking_request_rate_limited",
+    } <= error_codes
     not_found_schema = create["responses"]["404"]["content"]["application/json"][
         "schema"
     ]

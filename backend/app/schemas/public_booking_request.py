@@ -138,6 +138,8 @@ class PublicBookingRequestErrorDetail(BaseModel):
         "booking_request_state_conflict",
         "booking_request_version_conflict",
         "booking_request_idempotency_conflict",
+        "booking_request_duplicate",
+        "booking_request_rate_limited",
     ]
 
 
