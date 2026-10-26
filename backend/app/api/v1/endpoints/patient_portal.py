@@ -1045,11 +1045,21 @@ def get_patient_portal_forms(
 
 
 def _raise_public_booking_request_error(exc: PublicBookingRequestError) -> None:
+    headers = {"Cache-Control": "no-store"}
+    if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+        headers["Retry-After"] = "60"
     raise HTTPException(
         status_code=exc.status_code,
         detail={"code": exc.code},
-        headers={"Cache-Control": "no-store"},
+        headers=headers,
     ) from exc
+
+
+def _patient_request_idempotency_scope(request: Request) -> str:
+    # Match IdempotencyMiddleware._normalize_idem_path: preserve the route
+    # identity and collapse only trailing slashes.
+    normalized_path = request.url.path.rstrip("/") or "/"
+    return f"{request.method.upper()}:{normalized_path}"
 
 
 @router.post(
@@ -1066,6 +1076,10 @@ def _raise_public_booking_request_error(exc: PublicBookingRequestError) -> None:
             )
         },
         409: {"model": PublicBookingRequestErrorOut},
+        429: {
+            "model": PublicBookingRequestErrorOut,
+            "description": "The patient has reached the new-request limit.",
+        },
         503: {"model": PublicBookingRequestErrorOut},
     },
     operation_id="patient_create_public_booking_request",
@@ -1112,6 +1126,7 @@ def create_patient_public_booking_request(
             appointment_time=body.appointment_time,
             expected_settings_version=body.expected_settings_version,
             idempotency_key=idempotency_key,
+            operation_scope=_patient_request_idempotency_scope(request),
         )
     except PublicBookingRequestError as exc:
         _log_portal_denied(
@@ -1292,6 +1307,7 @@ def resubmit_patient_public_booking_request(
             appointment_time=body.appointment_time,
             expected_settings_version=body.expected_settings_version,
             idempotency_key=idempotency_key,
+            operation_scope=_patient_request_idempotency_scope(request),
         )
     except PublicBookingRequestError as exc:
         _log_portal_denied(

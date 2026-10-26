@@ -11,11 +11,12 @@ from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
 from app.models.clinic import ClinicSettings, Doctor, Schedule
+from app.models.patient import Patient
+from app.models.patient_access_audit import PatientAccessAuditLog
 from app.models.public_booking_request import (
     PublicBookingRequest,
     PublicBookingRequestEvent,
 )
-from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
 from app.services.public_booking_availability import PUBLIC_BOOKING_TIMEZONE
@@ -186,6 +187,7 @@ def test_patient_submission_is_idempotent_and_never_creates_appointment(
         appointment_time=time(9),
         expected_settings_version=1,
         idempotency_key=idempotency_key,
+        operation_scope=f"POST:{PATIENT_REQUESTS}",
     )
     assert str(replayed.id) == first.json()["id"]
     with pytest.raises(PublicBookingRequestError) as exc_info:
@@ -198,8 +200,21 @@ def test_patient_submission_is_idempotent_and_never_creates_appointment(
             appointment_time=time(9, 20),
             expected_settings_version=1,
             idempotency_key=idempotency_key,
+            operation_scope=f"POST:{PATIENT_REQUESTS}",
         )
     assert exc_info.value.code == "booking_request_idempotency_conflict"
+
+    duplicate = client.post(
+        PATIENT_REQUESTS,
+        headers={
+            **case["patient_headers"],
+            "Idempotency-Key": uuid4().hex,
+        },
+        json=body,
+    )
+    assert duplicate.status_code == 409, duplicate.text
+    assert duplicate.json()["detail"]["code"] == "booking_request_duplicate"
+    assert db_session.query(PublicBookingRequest).count() == 1
 
     changed = client.post(
         PATIENT_REQUESTS,
@@ -212,6 +227,43 @@ def test_patient_submission_is_idempotent_and_never_creates_appointment(
     patient_list = client.get(PATIENT_REQUESTS, headers=case["patient_headers"])
     assert patient_list.status_code == 200
     assert [item["id"] for item in patient_list.json()["items"]] == [first.json()["id"]]
+
+
+@pytest.mark.integration
+def test_patient_request_creation_is_limited_per_patient(
+    client: TestClient, db_session: Session, public_booking_case
+):
+    case = public_booking_case
+    for minute in (0, 20, 40, 60, 80):
+        hour = 9 + minute // 60
+        minute_of_hour = minute % 60
+        response = client.post(
+            PATIENT_REQUESTS,
+            headers={
+                **case["patient_headers"],
+                "Idempotency-Key": uuid4().hex,
+            },
+            json=_create_body(
+                case,
+                hour=f"{hour:02d}:{minute_of_hour:02d}",
+            ),
+        )
+        assert response.status_code == 201, response.text
+
+    limited = client.post(
+        PATIENT_REQUESTS,
+        headers={
+            **case["patient_headers"],
+            "Idempotency-Key": uuid4().hex,
+        },
+        json=_create_body(case, hour="10:40"),
+    )
+
+    assert limited.status_code == 429, limited.text
+    assert limited.json()["detail"]["code"] == "booking_request_rate_limited"
+    assert limited.headers["retry-after"] == "60"
+    assert db_session.query(PublicBookingRequest).count() == 5
+    assert db_session.query(Appointment).count() == 0
 
 
 @pytest.mark.integration
@@ -229,6 +281,15 @@ def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
         json=_create_body(case),
     )
     assert created.status_code == 201, created.text
+    second_created = client.post(
+        PATIENT_REQUESTS,
+        headers={
+            **case["patient_headers"],
+            "Idempotency-Key": uuid4().hex,
+        },
+        json=_create_body(case, hour="10:40"),
+    )
+    assert second_created.status_code == 201, second_created.text
 
     registrar_token = mint_access_token(registrar_user)
 
@@ -237,12 +298,37 @@ def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
         headers={"Authorization": f"Bearer {registrar_token}"},
     )
     assert staff_list.status_code == 200, staff_list.text
-    assert len(staff_list.json()["items"]) == 1
+    assert len(staff_list.json()["items"]) == 2
     request_id = created.json()["id"]
+    audited = (
+        db_session.query(PatientAccessAuditLog)
+        .filter(
+            PatientAccessAuditLog.resource_type == "public_booking_request",
+            PatientAccessAuditLog.action == "view",
+        )
+        .all()
+    )
+    assert {row.resource_id for row in audited} == {
+        request_id,
+        second_created.json()["id"],
+    }
+    assert all(row.subject_patient_id == case["patient"].id for row in audited)
     needs_new_time = _request_new_time(client, request_id, registrar_token)
     assert needs_new_time.status_code == 200, needs_new_time.text
     assert needs_new_time.json()["status"] == "needs_new_time"
     assert len(needs_new_time.json()["history"]) == 2
+    duplicate_while_waiting = client.post(
+        PATIENT_REQUESTS,
+        headers={
+            **case["patient_headers"],
+            "Idempotency-Key": uuid4().hex,
+        },
+        json=_create_body(case),
+    )
+    assert duplicate_while_waiting.status_code == 409
+    assert (
+        duplicate_while_waiting.json()["detail"]["code"] == "booking_request_duplicate"
+    )
 
     unchanged = client.post(
         f"{PATIENT_REQUESTS}/{request_id}/resubmit",
@@ -277,7 +363,7 @@ def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
         f"{PATIENT_REQUESTS}/{request_id}/resubmit",
         headers={
             **case["patient_headers"],
-            "Idempotency-Key": uuid4().hex,
+            "Idempotency-Key": idempotency_key,
         },
         json={
             "expected_version": 2,
@@ -294,7 +380,7 @@ def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
         "staff_requested_new_time",
         "resubmitted",
     ]
-    assert db_session.query(PublicBookingRequest).count() == 1
+    assert db_session.query(PublicBookingRequest).count() == 2
     assert db_session.query(Appointment).count() == 1
 
     rejected = client.post(
@@ -305,6 +391,16 @@ def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
     assert rejected.status_code == 200, rejected.text
     assert rejected.json()["status"] == "rejected"
     assert len(rejected.json()["history"]) == 4
+    released_slot = client.post(
+        PATIENT_REQUESTS,
+        headers={
+            **case["patient_headers"],
+            "Idempotency-Key": uuid4().hex,
+        },
+        json=_create_body(case, hour="09:20"),
+    )
+    assert released_slot.status_code == 201, released_slot.text
+    assert db_session.query(PublicBookingRequest).count() == 3
 
 
 @pytest.mark.integration
@@ -410,6 +506,10 @@ def test_public_booking_request_openapi_routes_and_idempotency_contract(
     }
     assert "201" in create["responses"]
     assert "409" in create["responses"]
+    assert "429" in create["responses"]
+    assert create["responses"]["429"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("PublicBookingRequestErrorOut")
     not_found_schema = create["responses"]["404"]["content"]["application/json"][
         "schema"
     ]

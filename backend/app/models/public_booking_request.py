@@ -48,6 +48,17 @@ class PublicBookingRequest(Base):
             "status",
             "created_at",
         ),
+        Index(
+            "uq_public_booking_requests_active_slot",
+            "patient_id",
+            "service_id",
+            "doctor_id",
+            "appointment_date",
+            "appointment_time",
+            unique=True,
+            postgresql_where=text("status IN ('pending', 'needs_new_time')"),
+            sqlite_where=text("status IN ('pending', 'needs_new_time')"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(

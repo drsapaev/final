@@ -17,7 +17,10 @@ from app.schemas.public_booking_request import (
     PublicBookingRequestStaffListOut,
     PublicBookingRequestStatus,
 )
-from app.services.patient_access_audit import log_patient_access
+from app.services.patient_access_audit import (
+    log_patient_access,
+    log_patient_access_many,
+)
 from app.services.public_booking_request_service import (
     PublicBookingRequestError,
     PublicBookingRequestService,
@@ -82,15 +85,16 @@ def list_public_booking_requests(
         limit=limit,
         offset=offset,
     )
-    for item in items:
-        _audit_staff_request(
-            db=db,
-            request=request,
-            actor=current_user,
-            result=item,
-            action="view",
-        )
-    return PublicBookingRequestStaffListOut(items=items)
+    result = PublicBookingRequestStaffListOut(items=items)
+    log_patient_access_many(
+        db=db,
+        actor_user=current_user,
+        resource_entries=[(item.patient_id, str(item.id)) for item in items],
+        resource_type="public_booking_request",
+        action="view",
+        request=request,
+    )
+    return result
 
 
 @router.post(

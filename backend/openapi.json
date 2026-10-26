@@ -609,6 +609,16 @@
             },
             "description": "Conflict"
           },
+          "429": {
+            "description": "The patient has reached the new-request limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            }
+          },
           "503": {
             "content": {
               "application/json": {

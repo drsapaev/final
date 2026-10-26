@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime, time
 from uuid import UUID
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.clinic import ClinicSettings, Doctor
@@ -30,6 +32,41 @@ class PublicBookingRequestRepository:
         self.db.add(request)
         self.db.flush()
         return request
+
+    def has_active_request_for_slot(
+        self,
+        *,
+        patient_id: int,
+        service_id: int,
+        doctor_id: int,
+        appointment_date: date,
+        appointment_time: time,
+        excluding_request_id: UUID | None = None,
+    ) -> bool:
+        query = self.db.query(PublicBookingRequest.id).filter(
+            PublicBookingRequest.patient_id == patient_id,
+            PublicBookingRequest.service_id == service_id,
+            PublicBookingRequest.doctor_id == doctor_id,
+            PublicBookingRequest.appointment_date == appointment_date,
+            PublicBookingRequest.appointment_time == appointment_time,
+            PublicBookingRequest.status.in_(("pending", "needs_new_time")),
+        )
+        if excluding_request_id is not None:
+            query = query.filter(PublicBookingRequest.id != excluding_request_id)
+        return query.first() is not None
+
+    def count_patient_requests_since(
+        self, *, patient_id: int, created_since: datetime
+    ) -> int:
+        return int(
+            self.db.query(func.count(PublicBookingRequest.id))
+            .filter(
+                PublicBookingRequest.patient_id == patient_id,
+                PublicBookingRequest.created_at >= created_since,
+            )
+            .scalar()
+            or 0
+        )
 
     def get_event_by_idempotency_key_hash(
         self, key_hash: str

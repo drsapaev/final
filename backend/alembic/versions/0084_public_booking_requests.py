@@ -80,6 +80,20 @@ def upgrade() -> None:
         "public_booking_requests",
         ["status", "created_at"],
     )
+    op.create_index(
+        "uq_public_booking_requests_active_slot",
+        "public_booking_requests",
+        [
+            "patient_id",
+            "service_id",
+            "doctor_id",
+            "appointment_date",
+            "appointment_time",
+        ],
+        unique=True,
+        postgresql_where=sa.text("status IN ('pending', 'needs_new_time')"),
+        sqlite_where=sa.text("status IN ('pending', 'needs_new_time')"),
+    )
 
     op.create_table(
         "public_booking_request_events",
@@ -172,6 +186,10 @@ def downgrade() -> None:
     )
     op.drop_index(
         "ix_public_booking_requests_patient_created",
+        table_name="public_booking_requests",
+    )
+    op.drop_index(
+        "uq_public_booking_requests_active_slot",
         table_name="public_booking_requests",
     )
     op.drop_table("public_booking_requests")

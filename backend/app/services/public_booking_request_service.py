@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import date, time
+from datetime import UTC, date, datetime, time, timedelta
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.public_booking_request import (
@@ -45,6 +46,9 @@ from app.services.registrar_doctor_eligibility import (
     service_routes_to_resource_queue,
 )
 
+REQUEST_CREATION_LIMIT_PER_PATIENT = 5
+REQUEST_CREATION_WINDOW = timedelta(minutes=1)
+
 
 class PublicBookingRequestError(Exception):
     def __init__(self, status_code: int, code: str) -> None:
@@ -82,10 +86,12 @@ class PublicBookingRequestService:
         appointment_time: time,
         expected_settings_version: int,
         idempotency_key: str,
+        operation_scope: str,
     ) -> PublicBookingRequestOut:
         key_hash, payload_hash = self._idempotency_hashes(
             patient_id=patient_id,
             idempotency_key=idempotency_key,
+            operation_scope=operation_scope,
             payload={
                 "operation": "create",
                 "service_slug": service_slug,
@@ -113,10 +119,18 @@ class PublicBookingRequestService:
         if replay is not None:
             return self._patient_out(replay)
         self._require_request_settings(settings, expected_settings_version)
+        self._require_request_creation_limit(patient_id)
         service_id, doctor_id = self._validate_slot(
             settings=settings,
             service_slug=service_slug,
             doctor_slug=doctor_slug,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time,
+        )
+        self._require_no_active_duplicate(
+            patient_id=patient_id,
+            service_id=service_id,
+            doctor_id=doctor_id,
             appointment_date=appointment_date,
             appointment_time=appointment_time,
         )
@@ -130,19 +144,33 @@ class PublicBookingRequestService:
             settings_version=settings.version,
             version=1,
         )
-        self.repository.create(request)
-        self._add_event(
-            request=request,
-            actor_user_id=actor_user_id,
-            event_type="submitted",
-            from_status=None,
-            to_status=PublicBookingRequestStatus.PENDING.value,
-            previous_date=None,
-            previous_time=None,
-            idempotency_key_hash=key_hash,
-            payload_hash=payload_hash,
-        )
-        self.db.commit()
+        try:
+            self.repository.create(request)
+            self._add_event(
+                request=request,
+                actor_user_id=actor_user_id,
+                event_type="submitted",
+                from_status=None,
+                to_status=PublicBookingRequestStatus.PENDING.value,
+                previous_date=None,
+                previous_time=None,
+                idempotency_key_hash=key_hash,
+                payload_hash=payload_hash,
+            )
+            self.db.commit()
+        except IntegrityError as exc:
+            self.db.rollback()
+            if self.repository.has_active_request_for_slot(
+                patient_id=patient_id,
+                service_id=service_id,
+                doctor_id=doctor_id,
+                appointment_date=appointment_date,
+                appointment_time=appointment_time,
+            ):
+                raise PublicBookingRequestError(
+                    409, "booking_request_duplicate"
+                ) from exc
+            raise
         stored = self.repository.get_for_patient(
             request_id=request.id, patient_id=patient_id
         )
@@ -208,6 +236,7 @@ class PublicBookingRequestService:
         appointment_time: time,
         expected_settings_version: int,
         idempotency_key: str,
+        operation_scope: str,
     ) -> PublicBookingRequestOut:
         request = self.repository.get_for_patient(
             request_id=request_id, patient_id=patient_id, lock=True
@@ -217,6 +246,7 @@ class PublicBookingRequestService:
         key_hash, payload_hash = self._idempotency_hashes(
             patient_id=patient_id,
             idempotency_key=idempotency_key,
+            operation_scope=operation_scope,
             payload={
                 "operation": "resubmit",
                 "request_id": str(request_id),
@@ -264,6 +294,14 @@ class PublicBookingRequestService:
         old_time = request.appointment_time
         if service_id != request.service_id or doctor_id != request.doctor_id:
             raise PublicBookingRequestError(409, "booking_request_state_conflict")
+        self._require_no_active_duplicate(
+            patient_id=patient_id,
+            service_id=service_id,
+            doctor_id=doctor_id,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time,
+            excluding_request_id=request.id,
+        )
         request.appointment_date = appointment_date
         request.appointment_time = appointment_time
         request.settings_version = settings.version
@@ -280,7 +318,22 @@ class PublicBookingRequestService:
             idempotency_key_hash=key_hash,
             payload_hash=payload_hash,
         )
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError as exc:
+            self.db.rollback()
+            if self.repository.has_active_request_for_slot(
+                patient_id=patient_id,
+                service_id=service_id,
+                doctor_id=doctor_id,
+                appointment_date=appointment_date,
+                appointment_time=appointment_time,
+                excluding_request_id=request_id,
+            ):
+                raise PublicBookingRequestError(
+                    409, "booking_request_duplicate"
+                ) from exc
+            raise
         stored = self.repository.get_for_patient(
             request_id=request.id, patient_id=patient_id
         )
@@ -371,6 +424,37 @@ class PublicBookingRequestService:
 
         return settings
 
+    def _require_request_creation_limit(self, patient_id: int) -> None:
+        created_since = datetime.now(UTC) - REQUEST_CREATION_WINDOW
+        if (
+            self.repository.count_patient_requests_since(
+                patient_id=patient_id,
+                created_since=created_since,
+            )
+            >= REQUEST_CREATION_LIMIT_PER_PATIENT
+        ):
+            raise PublicBookingRequestError(429, "booking_request_rate_limited")
+
+    def _require_no_active_duplicate(
+        self,
+        *,
+        patient_id: int,
+        service_id: int,
+        doctor_id: int,
+        appointment_date: date,
+        appointment_time: time,
+        excluding_request_id: UUID | None = None,
+    ) -> None:
+        if self.repository.has_active_request_for_slot(
+            patient_id=patient_id,
+            service_id=service_id,
+            doctor_id=doctor_id,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time,
+            excluding_request_id=excluding_request_id,
+        ):
+            raise PublicBookingRequestError(409, "booking_request_duplicate")
+
     @staticmethod
     def _require_request_settings(
         settings: PublicBookingSettingsOut, expected_settings_version: int
@@ -384,10 +468,14 @@ class PublicBookingRequestService:
 
     @staticmethod
     def _idempotency_hashes(
-        *, patient_id: int, idempotency_key: str, payload: dict[str, object]
+        *,
+        patient_id: int,
+        idempotency_key: str,
+        operation_scope: str,
+        payload: dict[str, object],
     ) -> tuple[str, str]:
         key_hash = hashlib.sha256(
-            f"{patient_id}\0{idempotency_key}".encode()
+            f"{patient_id}\0{operation_scope}\0{idempotency_key}".encode()
         ).hexdigest()
         payload_hash = hashlib.sha256(
             json.dumps(
