@@ -188,6 +188,7 @@ def test_openapi_ai_v2_medical_responses_require_doctor_confirmation(
         ("/api/v1/public-site/categories", "get"),
         ("/api/v1/public-site/doctors", "get"),
         ("/api/v1/public-site/doctors/{slug}", "get"),
+        ("/api/v1/public-site/availability", "get"),
         ("/api/v1/health", "get"),
     ],
 )
@@ -227,6 +228,44 @@ def test_openapi_documents_public_site_detail_not_found_contract(
     detail = components[detail_name]
     assert detail["required"] == ["code"]
     assert detail["properties"]["code"]["const"] == "public_content_not_found"
+
+
+def test_openapi_public_booking_availability_contract_is_read_only_and_redacted(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    path = "/api/v1/public-site/availability"
+    operation = schema["paths"][path]["get"]
+    assert operation["operationId"] == "public_site_get_booking_availability"
+    assert {"200", "404", "422", "503"}.issubset(operation["responses"])
+    assert not operation.get("security")
+    for status in ("200", "404", "503"):
+        assert (
+            operation["responses"][status]["headers"]["Cache-Control"]["schema"][
+                "example"
+            ]
+            == "no-store"
+        )
+
+    parameters = {item["name"]: item for item in operation["parameters"]}
+    assert set(parameters) == {"service_slug", "doctor_slug", "date"}
+    assert all(
+        item["in"] == "query" and item["required"] for item in parameters.values()
+    )
+
+    response_schema = operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
+    assert (
+        response_schema["$ref"] == "#/components/schemas/PublicBookingAvailabilityOut"
+    )
+    output = schema["components"]["schemas"]["PublicBookingAvailabilityOut"]
+    assert set(output["properties"]) == {"date", "timezone", "slots"}
+    assert output["properties"]["timezone"]["const"] == "Asia/Tashkent"
+    assert output["properties"]["slots"]["items"]["format"] == "time"
+    assert not {"doctor_id", "service_id", "patient_id", "appointment_id"}.intersection(
+        output["properties"]
+    )
 
 
 def test_openapi_documents_admin_media_preview_storage_and_doctor_options(
