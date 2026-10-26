@@ -99,6 +99,10 @@ def calendar_for(target_date: date = TARGET_DATE) -> BookingCalendar:
     return BookingCalendar(confirmed_years=frozenset({target_date.year}))
 
 
+def _not_resource_routed(_service, _target_date: date) -> bool:
+    return False
+
+
 def test_uses_doctor_profile_shift_breaks_and_shift_relative_twenty_minute_grid():
     repository = StubAvailabilityRepository(
         schedules=[(time(9, 10), time(11), [{"start": "09:50", "end": "10:10"}])]
@@ -225,6 +229,7 @@ def test_public_starts_require_enabled_allowlists_exact_pair_and_confirmed_calen
         public_site_repository=public_site,  # type: ignore[arg-type]
         booking_settings_service=settings,  # type: ignore[arg-type]
         calendar_settings_service=calendar_settings,  # type: ignore[arg-type]
+        resource_queue_route_policy=_not_resource_routed,
     )
 
     starts = service.public_starts_for_day(
@@ -255,6 +260,7 @@ def test_public_availability_hides_past_starts_on_today():
         public_site_repository=StubPublicSiteRepository(),  # type: ignore[arg-type]
         booking_settings_service=StubBookingSettingsService(),  # type: ignore[arg-type]
         calendar_settings_service=StubCalendarSettingsService(calendar_for()),  # type: ignore[arg-type]
+        resource_queue_route_policy=_not_resource_routed,
     )
 
     starts = service.public_starts_for_day(
@@ -278,6 +284,7 @@ def test_public_availability_hides_a_pair_outside_the_exact_admin_policy():
         public_site_repository=public_site,  # type: ignore[arg-type]
         booking_settings_service=settings,  # type: ignore[arg-type]
         calendar_settings_service=calendar_settings,  # type: ignore[arg-type]
+        resource_queue_route_policy=_not_resource_routed,
     )
 
     result = service.public_starts_for_day(
@@ -292,6 +299,38 @@ def test_public_availability_hides_a_pair_outside_the_exact_admin_policy():
     assert calendar_settings.read_count == 0
 
 
+def test_public_availability_hides_resource_routed_pair_for_requested_date():
+    repository = StubAvailabilityRepository(schedules=[(time(9), time(10), None)])
+    public_site = StubPublicSiteRepository()
+    settings = StubBookingSettingsService()
+    calendar_settings = StubCalendarSettingsService(calendar_for())
+    routing_checks = []
+
+    def routes_to_resource(service, target_date):
+        routing_checks.append((service, target_date))
+        return True
+
+    availability = PublicBookingAvailabilityService(
+        repository,  # type: ignore[arg-type]
+        public_site_repository=public_site,  # type: ignore[arg-type]
+        booking_settings_service=settings,  # type: ignore[arg-type]
+        calendar_settings_service=calendar_settings,  # type: ignore[arg-type]
+        resource_queue_route_policy=routes_to_resource,
+    )
+
+    result = availability.public_starts_for_day(
+        service_slug="cardiology-consultation",
+        doctor_slug="test-doctor",
+        target_date=TARGET_DATE,
+        now=datetime(2026, 10, 25, 8, tzinfo=ZoneInfo("Asia/Tashkent")),
+    )
+
+    assert result is None
+    assert routing_checks == [(public_site.service, TARGET_DATE)]
+    assert calendar_settings.read_count == 0
+    assert repository.schedule_query is None
+
+
 def test_public_availability_fails_closed_when_channel_is_off_or_date_is_outside_horizon():
     repository = StubAvailabilityRepository(schedules=[(time(9), time(10), None)])
     public_site = StubPublicSiteRepository()
@@ -302,6 +341,7 @@ def test_public_availability_fails_closed_when_channel_is_off_or_date_is_outside
         public_site_repository=public_site,  # type: ignore[arg-type]
         booking_settings_service=settings,  # type: ignore[arg-type]
         calendar_settings_service=calendar_settings,  # type: ignore[arg-type]
+        resource_queue_route_policy=_not_resource_routed,
     )
 
     disabled = service.public_starts_for_day(

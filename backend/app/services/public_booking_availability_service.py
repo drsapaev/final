@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, datetime, time
 
+from app.models.service import Service
 from app.repositories.public_booking_availability_repository import (
     PublicBookingAvailabilityRepository,
 )
@@ -22,6 +24,8 @@ from app.services.public_booking_calendar_settings import (
 )
 from app.services.public_booking_settings import PublicBookingSettingsService
 
+ResourceQueueRoutePolicy = Callable[[Service, date], bool]
+
 
 class PublicBookingAvailabilityService:
     """Calculate candidate starts using the doctor's configured profile shift."""
@@ -33,11 +37,13 @@ class PublicBookingAvailabilityService:
         public_site_repository: PublicSiteReadRepository | None = None,
         booking_settings_service: PublicBookingSettingsService | None = None,
         calendar_settings_service: PublicBookingCalendarSettingsService | None = None,
+        resource_queue_route_policy: ResourceQueueRoutePolicy | None = None,
     ) -> None:
         self.repository = repository
         self.public_site_repository = public_site_repository
         self.booking_settings_service = booking_settings_service
         self.calendar_settings_service = calendar_settings_service
+        self.resource_queue_route_policy = resource_queue_route_policy
 
     def public_starts_for_day(
         self,
@@ -56,6 +62,7 @@ class PublicBookingAvailabilityService:
             self.public_site_repository is None
             or self.booking_settings_service is None
             or self.calendar_settings_service is None
+            or self.resource_queue_route_policy is None
         ):
             raise RuntimeError("Public availability dependencies are not configured.")
 
@@ -88,6 +95,8 @@ class PublicBookingAvailabilityService:
         if not self.booking_settings_service.repository.selected_services_match_doctors(
             [service.id], [doctor.id]
         ):
+            return None
+        if self.resource_queue_route_policy(service, target_date):
             return None
 
         calendar = self.calendar_settings_service.load_policy_calendar()

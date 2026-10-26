@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from functools import partial
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
@@ -40,6 +41,9 @@ from app.services.public_site_media_service import (
     PublicSiteMediaService,
 )
 from app.services.public_site_read_service import PublicSiteReadService
+from app.services.registrar_doctor_eligibility import (
+    service_routes_to_resource_queue,
+)
 
 router = APIRouter()
 
@@ -54,6 +58,7 @@ def _availability_service(db: Session) -> PublicBookingAvailabilityService:
         public_site_repository=PublicSiteReadRepository(db),
         booking_settings_service=PublicBookingSettingsService(db),
         calendar_settings_service=PublicBookingCalendarSettingsService(db),
+        resource_queue_route_policy=partial(service_routes_to_resource_queue, db),
     )
 
 

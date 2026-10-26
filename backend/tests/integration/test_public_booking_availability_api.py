@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
 from app.models.clinic import ClinicSettings, Doctor, Schedule
+from app.models.online_queue import DailyQueue, QueueResource
 from app.models.service import Service
 from app.models.user import User
 from app.services.public_booking_availability import PUBLIC_BOOKING_TIMEZONE
@@ -181,6 +182,41 @@ def test_public_availability_hides_unknown_pair_with_no_store(
 
     response = client.get(
         _availability_url("cardiology-consultation", "unknown-doctor", target_date)
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": {"code": "public_content_not_found"}}
+    assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.integration
+def test_public_availability_hides_doctor_pair_when_day_is_resource_routed(
+    client: TestClient, db_session: Session
+) -> None:
+    target_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+    service, doctor, _ = _configured_public_booking(db_session, target_date=target_date)
+    resource = QueueResource(
+        code="public_booking_resource_test",
+        queue_tag="public_booking_resource_test",
+        display_name="Public booking test resource",
+        active=False,
+    )
+    db_session.add(resource)
+    db_session.flush()
+    service.queue_tag = resource.queue_tag
+    db_session.add(
+        DailyQueue(
+            day=target_date,
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=resource.queue_tag,
+            active=True,
+        )
+    )
+    db_session.flush()
+
+    response = client.get(
+        _availability_url("cardiology-consultation", doctor.slug, target_date)
     )
 
     assert response.status_code == 404
