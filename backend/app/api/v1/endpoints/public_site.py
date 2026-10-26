@@ -259,7 +259,7 @@ def get_public_booking_availability(
 ) -> PublicBookingAvailabilityOut:
     response.headers["Cache-Control"] = "no-store"
     try:
-        starts = _availability_service(db).public_starts_for_day(
+        snapshot = _availability_service(db).public_availability_for_day(
             service_slug=service_slug,
             doctor_slug=doctor_slug,
             target_date=target_date,
@@ -271,10 +271,14 @@ def get_public_booking_availability(
             headers={"Cache-Control": "no-store"},
         ) from exc
 
-    if starts is None:
+    if snapshot.slots is None:
         raise HTTPException(
             status_code=404,
             detail={"code": "public_content_not_found"},
             headers={"Cache-Control": "no-store"},
         )
-    return PublicBookingAvailabilityOut(date=target_date, slots=starts)
+    return PublicBookingAvailabilityOut(
+        date=target_date,
+        settings_version=snapshot.settings_version,
+        slots=snapshot.slots,
+    )

@@ -12,6 +12,7 @@ Covers:
 - IP/User-Agent extraction from FastAPI Request
 - subject_patient_id derivation from scope
 """
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -21,6 +22,7 @@ from app.services.patient_access_audit import (
     _get_client_ip,
     _get_user_agent,
     log_patient_access,
+    log_patient_access_many,
 )
 
 
@@ -226,6 +228,29 @@ class TestPatientAccessAuditService:
 
         # Verify rollback was attempted
         assert db.rollback.called
+
+    def test_batched_resource_audit_preserves_ids_for_same_patient(self):
+        db = MagicMock()
+        actor = SimpleNamespace(id=100, role="Registrar", patient=None)
+
+        log_patient_access_many(
+            db,
+            actor_user=actor,
+            resource_entries=[(42, "request-a"), (42, "request-b")],
+            resource_type="public_booking_request",
+            action="view",
+            request=None,
+        )
+
+        entries = [mock_call.args[0] for mock_call in db.add.call_args_list]
+        assert len(entries) == 2
+        assert [entry.subject_patient_id for entry in entries] == [42, 42]
+        assert [entry.resource_id for entry in entries] == [
+            "request-a",
+            "request-b",
+        ]
+        assert db.commit.call_count == 1
+        db.rollback.assert_not_called()
 
     def test_log_patient_access_captures_extra_data(self):
         """Extra data is stored in audit log entry."""

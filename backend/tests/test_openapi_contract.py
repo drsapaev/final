@@ -260,8 +260,14 @@ def test_openapi_public_booking_availability_contract_is_read_only_and_redacted(
         response_schema["$ref"] == "#/components/schemas/PublicBookingAvailabilityOut"
     )
     output = schema["components"]["schemas"]["PublicBookingAvailabilityOut"]
-    assert set(output["properties"]) == {"date", "timezone", "slots"}
+    assert set(output["properties"]) == {
+        "date",
+        "timezone",
+        "settings_version",
+        "slots",
+    }
     assert output["properties"]["timezone"]["const"] == "Asia/Tashkent"
+    assert output["properties"]["settings_version"]["type"] == "integer"
     assert output["properties"]["slots"]["items"]["format"] == "time"
     assert not {"doctor_id", "service_id", "patient_id", "appointment_id"}.intersection(
         output["properties"]

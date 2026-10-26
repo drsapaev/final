@@ -13,6 +13,7 @@ class PublicBookingAvailabilityOut(BaseModel):
 
     date: date
     timezone: Literal["Asia/Tashkent"] = "Asia/Tashkent"
+    settings_version: int
     slots: list[time]
 
 

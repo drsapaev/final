@@ -97,6 +97,7 @@ from app.api.v1.endpoints import (
     phrase_suggest,
     print_api,
     print_templates,
+    public_booking_requests,
     public_site,
     push_devices,
     qr_queue,
@@ -190,6 +191,11 @@ api_router.include_router(visits.router, prefix="/visits", tags=["visits"])
 api_router.include_router(services.router, prefix="/services")
 api_router.include_router(
     public_site.router, prefix="/public-site", tags=["public-site"]
+)
+api_router.include_router(
+    public_booking_requests.router,
+    prefix="/admin/public-booking-requests",
+    tags=["public-booking-requests"],
 )
 api_router.include_router(
     departments.router, prefix="/departments", tags=["departments"]
