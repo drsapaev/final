@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
 import app.db.base  # noqa: F401 - register all models before create_all
+from app.db.base_class import Base
 from app.api import deps
 from app.main import app
 from app.models.clinic import ClinicSettings, Doctor, Schedule
@@ -64,7 +65,7 @@ def booking_request_pg_engine():
         },
     )
     try:
-        app.db.base.Base.metadata.create_all(engine)
+        Base.metadata.create_all(engine)
         yield engine
     finally:
         engine.dispose()
