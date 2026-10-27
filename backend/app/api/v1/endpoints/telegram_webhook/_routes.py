@@ -54,6 +54,7 @@ from app.schemas.notifications import (
 from app.schemas.public_booking_settings import (
     PublicBookingServiceErrorOut,
     PublicBookingServiceIdsOut,
+    PublicBookingValidationErrorOut,
 )
 
 # PR-3: referenced via module namespace (not from-imported) so tests can
@@ -72,6 +73,14 @@ from app.services.public_booking_settings import (
     PublicBookingSettingsError,
     PublicBookingSettingsService,
 )
+
+_MINI_APP_BOOKING_SELECTION_422 = {
+    "model": PublicBookingValidationErrorOut,
+    "description": (
+        "Request validation failed or the exact service IDs are incompatible "
+        "with the selected doctor or department."
+    ),
+}
 
 
 def _release_claim_after_failure(
@@ -627,6 +636,7 @@ def list_mini_app_booking_services(
     operation_id="telegram_mini_app_preview_appointment_booking",
     response_model=dict[str, Any],
     responses={
+        422: _MINI_APP_BOOKING_SELECTION_422,
         400: {
             "model": PublicBookingServiceErrorOut,
             "description": "Request is invalid or service is not approved for online booking.",
@@ -758,6 +768,7 @@ def preview_mini_app_patient_forms(
     operation_id="telegram_mini_app_create_appointment_booking",
     response_model=dict[str, Any],
     responses={
+        422: _MINI_APP_BOOKING_SELECTION_422,
         400: {
             "model": PublicBookingServiceErrorOut,
             "description": "Request is invalid or service is not approved for online booking.",

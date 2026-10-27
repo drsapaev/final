@@ -300,22 +300,30 @@
               }
             }
           },
+          "422": {
+            "description": "Request validation failed or the exact service IDs are incompatible with the selected doctor or department.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestValidationErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingServiceSelectionErrorOut"
+                    }
+                  ],
+                  "title": "Response 422 Preview Patient Portal Booking Api V1 Patients Booking Preview Post"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PatientPortalErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -422,22 +430,30 @@
               }
             }
           },
+          "422": {
+            "description": "Request validation failed or the exact service IDs are incompatible with the selected doctor or department.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestValidationErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingServiceSelectionErrorOut"
+                    }
+                  ],
+                  "title": "Response 422 Create Patient Portal Booking Api V1 Patients Booking Post"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PatientPortalErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -45138,6 +45154,24 @@
               }
             }
           },
+          "422": {
+            "description": "Request validation failed or the exact service IDs are incompatible with the selected doctor or department.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestValidationErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingServiceSelectionErrorOut"
+                    }
+                  ],
+                  "title": "Response 422 Telegram Mini App Preview Appointment Booking"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Request is invalid or service is not approved for online booking.",
             "content": {
@@ -45154,16 +45188,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -45422,6 +45446,24 @@
               }
             }
           },
+          "422": {
+            "description": "Request validation failed or the exact service IDs are incompatible with the selected doctor or department.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestValidationErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingServiceSelectionErrorOut"
+                    }
+                  ],
+                  "title": "Response 422 Telegram Mini App Create Appointment Booking"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Request is invalid or service is not approved for online booking.",
             "content": {
@@ -45438,16 +45480,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -105835,6 +105867,78 @@
         ],
         "title": "PublicBookingRequestStatus"
       },
+      "PublicBookingRequestValidationErrorItem": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Loc"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "input": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input"
+          },
+          "ctx": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ctx"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "PublicBookingRequestValidationErrorItem",
+        "description": "One standard FastAPI request-validation issue."
+      },
+      "PublicBookingRequestValidationErrorOut": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingRequestValidationErrorItem"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicBookingRequestValidationErrorOut",
+        "description": "Standard FastAPI 422 validation response used by booking endpoints."
+      },
       "PublicBookingServiceErrorDetail": {
         "properties": {
           "reason": {
@@ -105880,6 +105984,49 @@
         ],
         "title": "PublicBookingServiceIdsOut",
         "description": "Current eligible Admin-approved services for patient booking forms."
+      },
+      "PublicBookingServiceSelectionErrorDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "service_ids_invalid",
+              "service_ids_duplicate",
+              "service_not_found_or_inactive",
+              "service_incompatible_with_doctor",
+              "department_not_found",
+              "service_incompatible_with_department"
+            ],
+            "title": "Code"
+          },
+          "field": {
+            "type": "string",
+            "const": "service_ids",
+            "title": "Field"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "field"
+        ],
+        "title": "PublicBookingServiceSelectionErrorDetail",
+        "description": "Exact service-ID validation error used by patient booking writers."
+      },
+      "PublicBookingServiceSelectionErrorOut": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/PublicBookingServiceSelectionErrorDetail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicBookingServiceSelectionErrorOut",
+        "description": "Stable error body returned when an exact service selection is invalid."
       },
       "PublicBookingSettingsOut": {
         "properties": {

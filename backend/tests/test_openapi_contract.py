@@ -86,6 +86,50 @@ def test_openapi_patient_booking_service_allowlist_contract(client: TestClient) 
         assert error_schema["$ref"].rsplit("/", 1)[-1] == "PublicBookingServiceErrorOut"
 
 
+def test_openapi_patient_booking_preview_create_share_service_selection_errors(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    paths = (
+        "/api/v1/patients/booking/preview",
+        "/api/v1/patients/booking",
+        "/api/v1/telegram/mini-app/appointments/preview",
+        "/api/v1/telegram/mini-app/appointments",
+    )
+
+    def refs(value: object) -> set[str]:
+        if isinstance(value, dict):
+            found = {value["$ref"]} if isinstance(value.get("$ref"), str) else set()
+            return found.union(*(refs(item) for item in value.values()))
+        if isinstance(value, list):
+            return set().union(*(refs(item) for item in value))
+        return set()
+
+    for path in paths:
+        response = schema["paths"][path]["post"]["responses"]["422"]
+        response_refs = refs(response)
+        assert (
+            "#/components/schemas/PublicBookingServiceSelectionErrorOut"
+            in response_refs
+        )
+        assert (
+            "#/components/schemas/PublicBookingRequestValidationErrorOut"
+            in response_refs
+        )
+
+    error_codes = schema["components"]["schemas"][
+        "PublicBookingServiceSelectionErrorDetail"
+    ]["properties"]["code"]["enum"]
+    assert set(error_codes) == {
+        "service_ids_invalid",
+        "service_ids_duplicate",
+        "service_not_found_or_inactive",
+        "service_incompatible_with_doctor",
+        "department_not_found",
+        "service_incompatible_with_department",
+    }
+
+
 def test_doctor_experience_is_published_in_admin_and_doctor_info_contracts(
     client: TestClient,
 ) -> None:

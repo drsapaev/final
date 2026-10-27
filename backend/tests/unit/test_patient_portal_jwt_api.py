@@ -1482,6 +1482,170 @@ class TestDoctorDepartmentRouting:
         assert row.duration_minutes_snapshot == 40
         assert created.json()["preview"]["appointment"]["service_ids"] == [service.id]
 
+    def _assert_preview_and_create_reject_incompatible_service(
+        self, client, linked_patient_headers, db_session, body, expected_code
+    ):
+        initial_count = db_session.query(Appointment).count()
+        preview = client.post(
+            "/api/v1/patients/booking/preview",
+            headers=linked_patient_headers,
+            json=body,
+        )
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={
+                **linked_patient_headers,
+                "Idempotency-Key": f"incompatible-service-{expected_code}",
+            },
+            json=body,
+        )
+
+        assert preview.status_code == created.status_code == 422, (
+            f"preview={preview.status_code} {preview.json()} "
+            f"create={created.status_code} {created.json()}"
+        )
+        assert preview.json() == created.json()
+        assert preview.json()["detail"] == {
+            "code": expected_code,
+            "field": "service_ids",
+        }
+        assert db_session.query(Appointment).count() == initial_count
+
+    def test_preview_and_create_reject_service_pinned_to_another_doctor(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_doctor,
+        test_doctor_user,
+        portal_department,
+    ):
+        from app.models.clinic import ClinicSettings, Doctor
+        from app.models.service import Service
+
+        self._bind_doctor(db_session, test_doctor, portal_department)
+        other_doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="Кардиология",
+            active=True,
+            show_on_website=True,
+            bio_ru="Синтетическая публичная биография.",
+            bio_uz="Sintetik ommaviy tarjimai hol.",
+            slug="synthetic-pinned-doctor-portal",
+        )
+        db_session.add(other_doctor)
+        db_session.flush()
+        service = Service(
+            name="Закреплённая консультация",
+            name_uz="Biriktirilgan konsultatsiya",
+            description_ru="Синтетическая публичная услуга.",
+            description_uz="Sintetik ommaviy xizmat.",
+            slug="pinned-consultation-portal",
+            price=100000,
+            duration_minutes=30,
+            doctor_id=other_doctor.id,
+            department_key=portal_department.key,
+            active=True,
+            show_on_website=True,
+            requires_doctor=True,
+        )
+        db_session.add(service)
+        db_session.flush()
+        db_session.add(
+            ClinicSettings(
+                key="public_booking_settings",
+                category="booking_settings",
+                value={
+                    "version": 1,
+                    "is_enabled": False,
+                    "mode": None,
+                    "booking_horizon_days": None,
+                    "service_ids": [service.id],
+                    "doctor_ids": [],
+                },
+            )
+        )
+        db_session.commit()
+
+        self._assert_preview_and_create_reject_incompatible_service(
+            client,
+            linked_patient_headers,
+            db_session,
+            {
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": portal_department.key,
+                "serviceIds": [service.id],
+            },
+            "service_incompatible_with_doctor",
+        )
+
+    def test_preview_and_create_reject_service_bound_to_another_department(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_doctor,
+        portal_department,
+    ):
+        from uuid import uuid4
+
+        from app.models.clinic import ClinicSettings
+        from app.models.department import Department
+        from app.models.service import Service
+
+        self._bind_doctor(db_session, test_doctor, portal_department)
+        other_department = Department(
+            key=f"other-portal-{uuid4().hex[:8]}",
+            name_ru="Другое отделение",
+        )
+        db_session.add(other_department)
+        db_session.flush()
+        service = Service(
+            name="Услуга другого отделения",
+            name_uz="Boshqa bo‘lim xizmati",
+            description_ru="Синтетическая публичная услуга.",
+            description_uz="Sintetik ommaviy xizmat.",
+            slug="other-department-service-portal",
+            price=100000,
+            duration_minutes=30,
+            department_id=other_department.id,
+            department_key=None,
+            active=True,
+            show_on_website=True,
+            requires_doctor=True,
+        )
+        db_session.add(service)
+        db_session.flush()
+        db_session.add(
+            ClinicSettings(
+                key="public_booking_settings",
+                category="booking_settings",
+                value={
+                    "version": 1,
+                    "is_enabled": False,
+                    "mode": None,
+                    "booking_horizon_days": None,
+                    "service_ids": [service.id],
+                    "doctor_ids": [],
+                },
+            )
+        )
+        db_session.commit()
+
+        self._assert_preview_and_create_reject_incompatible_service(
+            client,
+            linked_patient_headers,
+            db_session,
+            {
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": portal_department.key,
+                "serviceIds": [service.id],
+            },
+            "service_incompatible_with_department",
+        )
+
     @pytest.mark.parametrize(
         ("path", "services", "service_ids", "reason"),
         [

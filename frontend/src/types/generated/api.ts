@@ -36701,6 +36701,32 @@ export type components = {
          * @enum {string}
          */
         PublicBookingRequestStatus: "pending" | "needs_new_time" | "rejected" | "withdrawn";
+        /**
+         * PublicBookingRequestValidationErrorItem
+         * @description One standard FastAPI request-validation issue.
+         */
+        PublicBookingRequestValidationErrorItem: {
+            /** Loc */
+            loc: (string | number)[];
+            /** Msg */
+            msg: string;
+            /** Type */
+            type: string;
+            /** Input */
+            input?: unknown | null;
+            /** Ctx */
+            ctx?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * PublicBookingRequestValidationErrorOut
+         * @description Standard FastAPI 422 validation response used by booking endpoints.
+         */
+        PublicBookingRequestValidationErrorOut: {
+            /** Detail */
+            detail: components["schemas"]["PublicBookingRequestValidationErrorItem"][];
+        };
         /** PublicBookingServiceErrorDetail */
         PublicBookingServiceErrorDetail: {
             /** Reason */
@@ -36720,6 +36746,29 @@ export type components = {
         PublicBookingServiceIdsOut: {
             /** Service Ids */
             service_ids: number[];
+        };
+        /**
+         * PublicBookingServiceSelectionErrorDetail
+         * @description Exact service-ID validation error used by patient booking writers.
+         */
+        PublicBookingServiceSelectionErrorDetail: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "service_ids_invalid" | "service_ids_duplicate" | "service_not_found_or_inactive" | "service_incompatible_with_doctor" | "department_not_found" | "service_incompatible_with_department";
+            /**
+             * Field
+             * @constant
+             */
+            field: "service_ids";
+        };
+        /**
+         * PublicBookingServiceSelectionErrorOut
+         * @description Stable error body returned when an exact service selection is invalid.
+         */
+        PublicBookingServiceSelectionErrorOut: {
+            detail: components["schemas"]["PublicBookingServiceSelectionErrorDetail"];
         };
         /** PublicBookingSettingsOut */
         PublicBookingSettingsOut: {
@@ -44093,13 +44142,13 @@ export interface operations {
                     "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request validation failed or the exact service IDs are incompatible with the selected doctor or department. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PublicBookingRequestValidationErrorOut"] | components["schemas"]["PublicBookingServiceSelectionErrorOut"];
                 };
             };
             /** @description Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid. */
@@ -44183,13 +44232,13 @@ export interface operations {
                     "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request validation failed or the exact service IDs are incompatible with the selected doctor or department. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PublicBookingRequestValidationErrorOut"] | components["schemas"]["PublicBookingServiceSelectionErrorOut"];
                 };
             };
             /** @description Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid. */
@@ -71328,13 +71377,13 @@ export interface operations {
                     "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request validation failed or the exact service IDs are incompatible with the selected doctor or department. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PublicBookingRequestValidationErrorOut"] | components["schemas"]["PublicBookingServiceSelectionErrorOut"];
                 };
             };
             /** @description Booking settings are unavailable. */
@@ -71556,13 +71605,13 @@ export interface operations {
                     "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request validation failed or the exact service IDs are incompatible with the selected doctor or department. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PublicBookingRequestValidationErrorOut"] | components["schemas"]["PublicBookingServiceSelectionErrorOut"];
                 };
             };
             /** @description Booking settings are unavailable. */

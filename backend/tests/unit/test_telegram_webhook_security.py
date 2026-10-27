@@ -1147,6 +1147,104 @@ class TestMiniAppBookingRoutingParity:
         assert row.services == ["Каталожная услуга Mini App"]
         assert row.duration_minutes_snapshot == 25
 
+    def _assert_preview_and_create_reject_incompatible_service(
+        self, client, db_session, body, expected_code
+    ):
+        initial_count = db_session.query(Appointment).count()
+        preview = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview", json=body
+        )
+        created = client.post("/api/v1/telegram/mini-app/appointments", json=body)
+
+        assert preview.status_code == created.status_code == 422, (
+            f"preview={preview.status_code} {preview.json()} "
+            f"create={created.status_code} {created.json()}"
+        )
+        assert preview.json() == created.json()
+        assert preview.json()["detail"] == {
+            "code": expected_code,
+            "field": "service_ids",
+        }
+        assert db_session.query(Appointment).count() == initial_count
+
+    def test_preview_and_create_reject_service_pinned_to_another_doctor(
+        self, client, db_session, test_patient, test_doctor, test_doctor_user
+    ):
+        from app.models.clinic import Doctor
+
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880241
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session)
+        _bind_doctor_department(db_session, test_doctor, cardio)
+        other_doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="Кардиология",
+            active=True,
+            show_on_website=True,
+            bio_ru="Синтетическая публичная биография.",
+            bio_uz="Sintetik ommaviy tarjimai hol.",
+            slug="synthetic-pinned-doctor-telegram",
+        )
+        db_session.add(other_doctor)
+        db_session.flush()
+        service = _published_booking_service(
+            db_session,
+            name="Закреплённая услуга Mini App",
+            slug="pinned-mini-app-service",
+        )
+        service.doctor_id = other_doctor.id
+        _store_booking_service_allowlist(db_session, [service.id])
+
+        body = {
+            "initData": _signed_mini_app_init_data(chat_id),
+            "patientId": test_patient.id,
+            "doctorId": test_doctor.id,
+            "appointmentDate": self.future_date,
+            "department": cardio.key,
+            "serviceIds": [service.id],
+        }
+        self._assert_preview_and_create_reject_incompatible_service(
+            client, db_session, body, "service_incompatible_with_doctor"
+        )
+
+    def test_preview_and_create_reject_service_bound_to_another_department(
+        self, client, db_session, test_patient, test_doctor
+    ):
+        from uuid import uuid4
+
+        other_department = Department(
+            key=f"other-mini-app-{uuid4().hex[:8]}",
+            name_ru="Другое отделение",
+        )
+        db_session.add(other_department)
+        db_session.flush()
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880242
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session)
+        _bind_doctor_department(db_session, test_doctor, cardio)
+        service = _published_booking_service(
+            db_session,
+            name="Услуга другого отделения Mini App",
+            slug="other-department-mini-app-service",
+        )
+        service.department_id = other_department.id
+        service.department_key = None
+        _store_booking_service_allowlist(db_session, [service.id])
+
+        body = {
+            "initData": _signed_mini_app_init_data(chat_id),
+            "patientId": test_patient.id,
+            "doctorId": test_doctor.id,
+            "appointmentDate": self.future_date,
+            "department": cardio.key,
+            "serviceIds": [service.id],
+        }
+        self._assert_preview_and_create_reject_incompatible_service(
+            client, db_session, body, "service_incompatible_with_department"
+        )
+
     def test_booking_service_reference_returns_only_admin_allowlisted_services(
         self, client, db_session, test_patient
     ):

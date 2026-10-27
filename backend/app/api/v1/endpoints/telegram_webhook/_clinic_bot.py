@@ -29,6 +29,11 @@ from app.services.appointment_booking_routing import (
     resolve_booking_department,
     resolve_doctor_routing_department,
 )
+from app.services.appointment_duration_snapshot import (
+    InvalidServiceSelection,
+    resolve_exact_service_selection,
+)
+from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.patient_onboarding_service import PatientOnboardingService
 from app.services.public_booking_settings import (
     PublicBookingSettingsError,
@@ -839,6 +844,7 @@ def _build_mini_app_appointment_booking_preview_from_request(
     # FOR UPDATE next to the INSERT (lock_department_for_booking). Only the
     # non-mutating preview keeps the early resolution here.
     department_row: Department | None = None
+    doctor_row: Doctor | None = None
     if resolve_routing:
         try:
             department_row = resolve_booking_department(db, preview.draft.department)
@@ -865,6 +871,46 @@ def _build_mini_app_appointment_booking_preview_from_request(
                 extra_data={"reason": _mini_app_booking_deny_reason(exc.detail)},
             )
             raise
+        # Use the same exact-ID doctor/department compatibility policy as
+        # Create, after resolving the identical canonical department. The
+        # existing Mini App contract keeps lifecycle failures (missing or
+        # ineligible doctor) ahead of service compatibility in Create.
+        validate_service_compatibility = preview.draft.doctor_id is None
+        if preview.draft.doctor_id is not None and doctor_row is not None:
+            try:
+                ensure_doctor_eligible_for_appointment(db, preview.draft.doctor_id)
+            except HTTPException as exc:
+                if exc.status_code not in {
+                    status.HTTP_404_NOT_FOUND,
+                    status.HTTP_409_CONFLICT,
+                }:
+                    raise
+            else:
+                validate_service_compatibility = True
+        if validate_service_compatibility:
+            try:
+                resolve_exact_service_selection(
+                    db,
+                    preview.draft.service_ids,
+                    doctor_id=preview.draft.doctor_id,
+                    department_id=(
+                        int(department_row.id) if department_row is not None else None
+                    ),
+                )
+            except InvalidServiceSelection as exc:
+                log_patient_access(
+                    db=db,
+                    scope=scope,
+                    resource_type="appointment",
+                    action=audit_action,
+                    outcome="denied",
+                    request=request,
+                    extra_data={"reason": str(exc)},
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={"code": str(exc), "field": "service_ids"},
+                ) from exc
     # M4-P0-1: Log successful appointment preview access
     # (audit for actual creation happens in _routes.py create_mini_app_appointment_booking)
     log_patient_access(
