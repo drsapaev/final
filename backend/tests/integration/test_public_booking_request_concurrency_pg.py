@@ -388,10 +388,21 @@ def test_concurrent_staff_confirmations_create_one_appointment_for_slot(
             release_first_create = threading.Event()
             original_create = booking_request_service_module.appointment_crud.create
 
+            create_calls = 0
+            create_calls_lock = threading.Lock()
+            second_create_started = threading.Event()
+
             def pause_first_create(*, db, obj_in, commit=True):
-                first_create_started.set()
-                if not release_first_create.wait(timeout=10):
-                    raise TimeoutError("test did not release first confirmation")
+                nonlocal create_calls
+                with create_calls_lock:
+                    create_calls += 1
+                    should_pause = create_calls == 1
+                    if create_calls == 2:
+                        second_create_started.set()
+                if should_pause:
+                    first_create_started.set()
+                    if not release_first_create.wait(timeout=10):
+                        raise TimeoutError("test did not release first confirmation")
                 return original_create(db=db, obj_in=obj_in, commit=commit)
 
             monkeypatch.setattr(
@@ -400,51 +411,78 @@ def test_concurrent_staff_confirmations_create_one_appointment_for_slot(
                 pause_first_create,
             )
             second_confirmation_started = threading.Event()
+            second_service_entered = threading.Event()
+            original_confirm = (
+                booking_request_service_module.PublicBookingRequestService.confirm_for_staff
+            )
+
+            def observe_second_service_entry(
+                service, *, request_id, actor_user_id, expected_version
+            ):
+                if str(request_id) == requests[1]:
+                    second_service_entered.set()
+                return original_confirm(
+                    service,
+                    request_id=request_id,
+                    actor_user_id=actor_user_id,
+                    expected_version=expected_version,
+                )
+
+            monkeypatch.setattr(
+                booking_request_service_module.PublicBookingRequestService,
+                "confirm_for_staff",
+                observe_second_service_entry,
+            )
 
             def confirm(label: str, request_id: str):
                 if label == "second":
                     second_confirmation_started.set()
-                return client.post(
-                    f"/api/v1/admin/public-booking-requests/{request_id}/confirm",
-                    headers={"Authorization": f"Bearer {registrar_token}"},
-                    json={"expected_version": 1},
-                )
-
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                first_future = executor.submit(confirm, "first", requests[0])
-                assert first_create_started.wait(timeout=5)
-                second_future = executor.submit(confirm, "second", requests[1])
-                assert second_confirmation_started.wait(timeout=5)
-                deadline = time_module.monotonic() + 5
-                observed_wait = False
-                with engine.connect() as observer:
-                    while time_module.monotonic() < deadline:
-                        if second_future.done():
-                            break
-                        lock_waiters = observer.execute(
-                            text(
-                                "SELECT count(*) FROM pg_stat_activity "
-                                "WHERE datname = current_database() "
-                                "AND pid <> pg_backend_pid() "
-                                "AND state = 'active' "
-                                "AND wait_event_type = 'Lock'"
-                            )
-                        ).scalar_one()
-                        if lock_waiters > 0:
-                            observed_wait = True
-                            break
-                        time_module.sleep(0.02)
-
-                assert (
-                    observed_wait
-                ), "second confirmation did not wait on a PostgreSQL lock"
-                assert not second_future.done()
+                request_client = TestClient(app)
                 try:
+                    return request_client.post(
+                        f"/api/v1/admin/public-booking-requests/{request_id}/confirm",
+                        headers={"Authorization": f"Bearer {registrar_token}"},
+                        json={"expected_version": 1},
+                    )
+                finally:
+                    request_client.close()
+
+            try:
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    first_future = executor.submit(confirm, "first", requests[0])
+                    assert first_create_started.wait(timeout=5)
+                    second_future = executor.submit(confirm, "second", requests[1])
+                    assert second_confirmation_started.wait(timeout=5)
+                    second_entered = second_service_entered.wait(timeout=5)
+                    deadline = time_module.monotonic() + 5
+                    observed_wait = False
+                    activity_summary = []
+                    with engine.connect() as observer:
+                        while time_module.monotonic() < deadline:
+                            if second_future.done():
+                                break
+                            activity = observer.execute(
+                                text(
+                                    "SELECT state, wait_event_type, wait_event "
+                                    "FROM pg_stat_activity "
+                                    "WHERE datname = current_database() "
+                                    "AND pid <> pg_backend_pid() "
+                                    "AND state = 'active' "
+                                )
+                            ).all()
+                            activity_summary = [tuple(row) for row in activity]
+                            if any(row[1] == "Lock" for row in activity_summary):
+                                observed_wait = True
+                                break
+                            time_module.sleep(0.02)
+
+                    second_was_pending = not second_future.done()
                     release_first_create.set()
+
                     first_response = first_future.result(timeout=10)
                     second_response = second_future.result(timeout=10)
-                finally:
-                    release_first_create.set()
+            finally:
+                release_first_create.set()
 
         assert first_response.status_code == 200, first_response.text
         assert second_response.status_code == 200, second_response.text
@@ -475,6 +513,13 @@ def test_concurrent_staff_confirmations_create_one_appointment_for_slot(
             assert requests_by_id[requests[0]].status == "confirmed"
             assert requests_by_id[requests[0]].appointment_id == appointments[0].id
             assert requests_by_id[requests[1]].status == "needs_new_time"
+            assert observed_wait, (
+                "second confirmation did not wait on a PostgreSQL lock; "
+                f"service_entered={second_entered}; "
+                f"second_create_started={second_create_started.is_set()}; "
+                f"second_pending={second_was_pending}; "
+                f"active_activity={activity_summary}"
+            )
             assert requests_by_id[requests[1]].appointment_id is None
     finally:
         if "release_first_create" in locals():
