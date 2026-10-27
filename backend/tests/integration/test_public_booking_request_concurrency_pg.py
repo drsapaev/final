@@ -459,7 +459,7 @@ def test_concurrent_staff_confirmations_create_one_appointment_for_slot(
                 .filter(
                     Appointment.doctor_id == doctor_id,
                     Appointment.appointment_date == target_date,
-                    Appointment.appointment_time == time(9),
+                    Appointment.appointment_time == "09:00",
                 )
                 .all()
             )
