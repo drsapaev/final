@@ -26,6 +26,7 @@ from app.schemas.clinic import (
     ServiceCategoryCreate,
     ServiceCategoryUpdate,
 )
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
 
 logger = logging.getLogger(__name__)
@@ -482,8 +483,20 @@ def get_doctor_schedules(db: Session, doctor_id: int) -> list[Schedule]:
     )
 
 
+def _lock_doctor_schedule_mutation(db: Session, doctor_id: int) -> None:
+    """Serialize clinic Schedule writes with appointment slot confirmation.
+
+    Public availability reads ``clinic.Schedule`` while holding the same
+    Doctor row lock used by appointment writers. Acquiring that lock before
+    every schedule mutation prevents a schedule edit from committing between
+    a booking confirmation's availability recheck and Appointment commit.
+    """
+    lock_doctor_for_slot_reservation(db, doctor_id)
+
+
 def create_schedule(db: Session, schedule: ScheduleCreate) -> Schedule:
     """Создать расписание"""
+    _lock_doctor_schedule_mutation(db, schedule.doctor_id)
     db_schedule = Schedule(**schedule.model_dump())
     db.add(db_schedule)
     db.commit()
@@ -499,6 +512,17 @@ def update_schedule(
     if not db_schedule:
         return None
 
+    _lock_doctor_schedule_mutation(db, db_schedule.doctor_id)
+    db_schedule = (
+        db.query(Schedule)
+        .filter(Schedule.id == schedule_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+    if not db_schedule:
+        return None
+
     for field, value in schedule.model_dump(exclude_unset=True).items():
         setattr(db_schedule, field, value)
 
@@ -511,6 +535,7 @@ def update_weekly_schedule(
     db: Session, doctor_id: int, schedules: list[dict]
 ) -> list[Schedule]:
     """Обновить недельное расписание врача"""
+    _lock_doctor_schedule_mutation(db, doctor_id)
     # Деактивируем старые расписания
     db.query(Schedule).filter(Schedule.doctor_id == doctor_id).update({"active": False})
 
@@ -531,6 +556,17 @@ def update_weekly_schedule(
 def delete_schedule(db: Session, schedule_id: int) -> bool:
     """Удалить расписание"""
     db_schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
+    if not db_schedule:
+        return False
+
+    _lock_doctor_schedule_mutation(db, db_schedule.doctor_id)
+    db_schedule = (
+        db.query(Schedule)
+        .filter(Schedule.id == schedule_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if not db_schedule:
         return False
 

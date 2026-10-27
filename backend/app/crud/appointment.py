@@ -40,7 +40,13 @@ def _department_id_for_service_selection(
 
 
 class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate]):
-    def create(self, db: Session, *, obj_in: AppointmentCreate) -> Appointment:
+    def create(
+        self,
+        db: Session,
+        *,
+        obj_in: AppointmentCreate,
+        commit: bool = True,
+    ) -> Appointment:
         data = obj_in.model_dump(exclude_unset=True)
         service_ids = data.pop("service_ids", None)
         if service_ids is not None:
@@ -61,8 +67,14 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
 
         appointment = self.model(**data)
         db.add(appointment)
-        db.commit()
-        db.refresh(appointment)
+        if commit:
+            db.commit()
+            db.refresh(appointment)
+        else:
+            # Some domain operations (for example confirming a public request)
+            # must commit the appointment and their source-state transition as
+            # one transaction. Flush assigns the id without ending that unit.
+            db.flush()
         return appointment
 
     def update(

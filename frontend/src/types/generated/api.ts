@@ -1219,6 +1219,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/public-booking-requests/{request_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a request as a regular appointment if its slot remains available
+         * @description Rechecks current service/doctor eligibility, schedule, holiday calendar, and slot occupancy. A changed booking mode or disabled channel affects new requests only. If the requested time is no longer available, no appointment is created and the request changes to needs_new_time.
+         */
+        post: operations["staff_confirm_public_booking_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/public-booking-requests/{request_id}/request-new-time": {
         parameters: {
             query?: never;
@@ -36523,7 +36543,7 @@ export type components = {
              * Code
              * @enum {string}
              */
-            code: "public_content_not_found" | "public_booking_unavailable" | "booking_settings_version_conflict" | "booking_mode_changed" | "booking_time_unavailable" | "booking_request_not_found" | "booking_request_state_conflict" | "booking_request_version_conflict" | "booking_request_idempotency_conflict" | "booking_request_duplicate" | "booking_request_rate_limited";
+            code: "public_content_not_found" | "public_booking_unavailable" | "booking_settings_version_conflict" | "booking_mode_changed" | "booking_time_unavailable" | "booking_request_not_found" | "booking_request_state_conflict" | "booking_request_version_conflict" | "booking_request_idempotency_conflict" | "booking_request_duplicate" | "booking_request_rate_limited" | "booking_request_unavailable";
         };
         /** PublicBookingRequestErrorOut */
         PublicBookingRequestErrorOut: {
@@ -36536,7 +36556,7 @@ export type components = {
              * Event Type
              * @enum {string}
              */
-            event_type: "submitted" | "resubmitted" | "staff_requested_new_time" | "rejected" | "withdrawn";
+            event_type: "submitted" | "resubmitted" | "staff_requested_new_time" | "confirmation_slot_unavailable" | "confirmed" | "rejected" | "withdrawn";
             from_status: components["schemas"]["PublicBookingRequestStatus"] | null;
             to_status: components["schemas"]["PublicBookingRequestStatus"];
             /** Previous Appointment Date */
@@ -36585,6 +36605,8 @@ export type components = {
              * Format: time
              */
             appointment_time: string;
+            /** Appointment Id */
+            appointment_id?: number | null;
             /**
              * Timezone
              * @default Asia/Tashkent
@@ -36638,6 +36660,8 @@ export type components = {
              * Format: time
              */
             appointment_time: string;
+            /** Appointment Id */
+            appointment_id?: number | null;
             /**
              * Timezone
              * @default Asia/Tashkent
@@ -36700,7 +36724,7 @@ export type components = {
          * PublicBookingRequestStatus
          * @enum {string}
          */
-        PublicBookingRequestStatus: "pending" | "needs_new_time" | "rejected" | "withdrawn";
+        PublicBookingRequestStatus: "pending" | "needs_new_time" | "confirmed" | "rejected" | "withdrawn";
         /**
          * PublicBookingRequestValidationErrorItem
          * @description One standard FastAPI request-validation issue.
@@ -46471,6 +46495,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staff_confirm_public_booking_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingRequestAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestPatientOut"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin or Registrar role required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingRequestErrorOut"];
                 };
             };
         };

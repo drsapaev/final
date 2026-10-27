@@ -4328,6 +4328,101 @@
         }
       }
     },
+    "/api/v1/admin/public-booking-requests/{request_id}/confirm": {
+      "post": {
+        "tags": [
+          "public-booking-requests"
+        ],
+        "summary": "Confirm a request as a regular appointment if its slot remains available",
+        "description": "Rechecks current service/doctor eligibility, schedule, holiday calendar, and slot occupancy. A changed booking mode or disabled channel affects new requests only. If the requested time is no longer available, no appointment is created and the request changes to needs_new_time.",
+        "operationId": "staff_confirm_public_booking_request",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingRequestAction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestPatientOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required."
+          },
+          "403": {
+            "description": "Admin or Registrar role required."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingRequestErrorOut"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/public-booking-requests/{request_id}/request-new-time": {
       "post": {
         "tags": [
@@ -105475,7 +105570,8 @@
               "booking_request_version_conflict",
               "booking_request_idempotency_conflict",
               "booking_request_duplicate",
-              "booking_request_rate_limited"
+              "booking_request_rate_limited",
+              "booking_request_unavailable"
             ],
             "title": "Code"
           }
@@ -105516,6 +105612,8 @@
               "submitted",
               "resubmitted",
               "staff_requested_new_time",
+              "confirmation_slot_unavailable",
+              "confirmed",
               "rejected",
               "withdrawn"
             ],
@@ -105630,6 +105728,17 @@
             "format": "time",
             "title": "Appointment Time"
           },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
           "timezone": {
             "type": "string",
             "const": "Asia/Tashkent",
@@ -105722,6 +105831,17 @@
             "type": "string",
             "format": "time",
             "title": "Appointment Time"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
           },
           "timezone": {
             "type": "string",
@@ -105862,6 +105982,7 @@
         "enum": [
           "pending",
           "needs_new_time",
+          "confirmed",
           "rejected",
           "withdrawn"
         ],
