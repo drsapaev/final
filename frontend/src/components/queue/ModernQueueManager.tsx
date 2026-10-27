@@ -578,7 +578,7 @@ const ModernQueueManager = ({
                 id="modern-queue-doctor"
                 aria-label={t('misc.mqm_select_doctor')}
                 value={effectiveDoctor === '' ? '' : String(effectiveDoctor)}
-                onChange={(newDoctor: unknown) => {
+                onValueChange={(newDoctor) => {
                   const v = String(newDoctor);
                   setInternalDoctor(v);
                   if (onDoctorChange) {
