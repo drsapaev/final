@@ -6,7 +6,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0086_public_booking_request_confirmation"
+# alembic_version.version_num is VARCHAR(32) on PostgreSQL.
+revision = "0086_public_booking_confirm"
 down_revision = "0085_visit_service_duration"
 branch_labels = None
 depends_on = None
