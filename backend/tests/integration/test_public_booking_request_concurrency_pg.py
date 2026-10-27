@@ -28,6 +28,7 @@ from app.models.patient import Patient
 from app.models.public_booking_request import PublicBookingRequest
 from app.models.service import Service
 from app.models.user import User
+from app.repositories.services_api_repository import ServicesApiRepository
 from app.services import (
     public_booking_request_service as booking_request_service_module,
 )
@@ -412,9 +413,8 @@ def test_concurrent_staff_confirmations_create_one_appointment_for_slot(
             )
             second_confirmation_started = threading.Event()
             second_service_entered = threading.Event()
-            original_confirm = (
-                booking_request_service_module.PublicBookingRequestService.confirm_for_staff
-            )
+            request_service = booking_request_service_module.PublicBookingRequestService
+            original_confirm = request_service.confirm_for_staff
 
             def observe_second_service_entry(
                 service, *, request_id, actor_user_id, expected_version
@@ -788,3 +788,364 @@ def test_telegram_schedule_update_waits_for_doctor_booking_lock(
         updated = verify.query(Schedule).filter(Schedule.id == schedule_id).one()
         assert updated.start_time == time(10)
         assert updated.end_time == time(11)
+
+
+def test_delete_cancels_linked_public_booking_appointment_and_keeps_link(
+    booking_request_pg_engine,
+):
+    engine = booking_request_pg_engine
+    unique = uuid.uuid4().hex[:12]
+    with Session(engine) as setup:
+        doctor_user = User(
+            username=f"booking-delete-doctor-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Doctor",
+            is_active=True,
+            full_name="Synthetic Doctor",
+        )
+        patient_user = User(
+            username=f"booking-delete-patient-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Patient",
+            is_active=True,
+            full_name="Synthetic Patient",
+        )
+        registrar = User(
+            username=f"booking-delete-registrar-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Registrar",
+            is_active=True,
+            full_name="Synthetic Registrar",
+        )
+        setup.add_all([doctor_user, patient_user, registrar])
+        setup.flush()
+        patient = Patient(
+            user_id=patient_user.id,
+            first_name="Synthetic",
+            last_name=f"Patient {unique}",
+        )
+        doctor = Doctor(
+            user_id=doctor_user.id,
+            specialty="cardiology",
+            active=True,
+            show_on_website=True,
+            slug=f"booking-delete-doctor-{unique}",
+            bio_ru="Synthetic cardiologist.",
+            bio_uz="Synthetic cardiologist.",
+        )
+        service = Service(
+            name="Synthetic consultation",
+            name_uz="Synthetic consultation",
+            slug=f"booking-delete-service-{unique}",
+            duration_minutes=20,
+            active=True,
+            show_on_website=True,
+            requires_doctor=True,
+        )
+        setup.add_all([patient, doctor, service])
+        setup.flush()
+        appointment_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(
+            days=2
+        )
+        linked_appointment = Appointment(
+            patient_id=patient.id,
+            doctor_id=doctor.id,
+            appointment_date=appointment_date,
+            appointment_time="09:00",
+            status="pending",
+        )
+        unlinked_appointment = Appointment(
+            patient_id=patient.id,
+            doctor_id=doctor.id,
+            appointment_date=appointment_date,
+            appointment_time="09:20",
+            status="pending",
+        )
+        setup.add_all([linked_appointment, unlinked_appointment])
+        setup.flush()
+        request = PublicBookingRequest(
+            patient_id=patient.id,
+            service_id=service.id,
+            doctor_id=doctor.id,
+            appointment_id=linked_appointment.id,
+            appointment_date=appointment_date,
+            appointment_time=time(9),
+            status="confirmed",
+            settings_version=1,
+        )
+        setup.add(request)
+        setup.commit()
+        linked_appointment_id = int(linked_appointment.id)
+        unlinked_appointment_id = int(unlinked_appointment.id)
+        request_id = request.id
+        registrar_token = mint_access_token(registrar)
+
+    previous_override = app.dependency_overrides.get(deps.get_db)
+
+    def override_get_db():
+        with Session(engine) as db:
+            yield db
+
+    app.dependency_overrides[deps.get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            headers = {"Authorization": f"Bearer {registrar_token}"}
+            linked_response = client.delete(
+                f"/api/v1/appointments/{linked_appointment_id}", headers=headers
+            )
+            unlinked_response = client.delete(
+                f"/api/v1/appointments/{unlinked_appointment_id}", headers=headers
+            )
+
+        assert linked_response.status_code == 200, linked_response.text
+        assert unlinked_response.status_code == 200, unlinked_response.text
+        with Session(engine) as verify:
+            linked = verify.get(Appointment, linked_appointment_id)
+            unlinked = verify.get(Appointment, unlinked_appointment_id)
+            stored_request = verify.get(PublicBookingRequest, request_id)
+            assert linked is not None
+            assert linked.status == "cancelled"
+            assert unlinked is None
+            assert stored_request is not None
+            assert stored_request.status == "confirmed"
+            assert stored_request.appointment_id == linked_appointment_id
+    finally:
+        if previous_override is None:
+            app.dependency_overrides.pop(deps.get_db, None)
+        else:
+            app.dependency_overrides[deps.get_db] = previous_override
+
+
+def test_staff_confirmation_waits_for_service_update_and_uses_new_duration(
+    booking_request_pg_engine, monkeypatch
+):
+    engine = booking_request_pg_engine
+    unique = uuid.uuid4().hex[:12]
+    with Session(engine) as setup:
+        doctor_user = User(
+            username=f"booking-duration-doctor-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Doctor",
+            is_active=True,
+            full_name="Synthetic Doctor",
+        )
+        patient_user = User(
+            username=f"booking-duration-patient-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Patient",
+            is_active=True,
+            full_name="Synthetic Patient",
+        )
+        registrar = User(
+            username=f"booking-duration-registrar-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Registrar",
+            is_active=True,
+            full_name="Synthetic Registrar",
+        )
+        setup.add_all([doctor_user, patient_user, registrar])
+        setup.flush()
+        department = Department(
+            key=f"booking-duration-{unique}",
+            name_ru="Synthetic department",
+            name_uz="Synthetic department",
+            active=True,
+        )
+        setup.add(department)
+        setup.flush()
+        doctor = Doctor(
+            user_id=doctor_user.id,
+            department_id=department.id,
+            specialty="cardiology",
+            active=True,
+            show_on_website=True,
+            slug=f"booking-duration-doctor-{unique}",
+            bio_ru="Synthetic cardiologist.",
+            bio_uz="Synthetic cardiologist.",
+        )
+        service = Service(
+            name="Synthetic consultation",
+            name_uz="Synthetic consultation",
+            description_ru="Synthetic service description.",
+            description_uz="Synthetic service description.",
+            slug=f"booking-duration-service-{unique}",
+            duration_minutes=20,
+            active=True,
+            show_on_website=True,
+            requires_doctor=True,
+        )
+        patient = Patient(
+            user_id=patient_user.id,
+            first_name="Synthetic",
+            last_name=f"Patient {unique}",
+        )
+        setup.add_all([doctor, service, patient])
+        setup.flush()
+        target_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+        setup.add_all(
+            [
+                Schedule(
+                    doctor_id=doctor.id,
+                    weekday=target_date.weekday(),
+                    start_time=time(9),
+                    end_time=time(10),
+                    breaks=[],
+                    active=True,
+                ),
+                ClinicSettings(
+                    key="public_booking_settings",
+                    category="booking_settings",
+                    value={
+                        "version": 1,
+                        "is_enabled": True,
+                        "mode": "registrar_request",
+                        "booking_horizon_days": 30,
+                        "service_ids": [service.id],
+                        "doctor_ids": [doctor.id],
+                    },
+                    updated_by=doctor_user.id,
+                ),
+                ClinicSettings(
+                    key=f"public_booking_calendar_year_{target_date.year:04d}",
+                    category="booking_calendar",
+                    value={
+                        "year": target_date.year,
+                        "version": 1,
+                        "is_confirmed": True,
+                        "holidays": [],
+                        "confirmed_at": datetime.now(UTC).isoformat(),
+                        "confirmed_by": doctor_user.id,
+                    },
+                    updated_by=doctor_user.id,
+                ),
+            ]
+        )
+        setup.commit()
+        doctor_id = int(doctor.id)
+        service_id = int(service.id)
+        doctor_slug = doctor.slug
+        service_slug = service.slug
+        patient_token = mint_access_token(patient_user)
+        registrar_token = mint_access_token(registrar)
+
+    previous_override = app.dependency_overrides.get(deps.get_db)
+
+    def override_get_db():
+        with Session(engine) as db:
+            yield db
+
+    app.dependency_overrides[deps.get_db] = override_get_db
+    release_service_update = threading.Event()
+    try:
+        with TestClient(app) as client:
+            created = client.post(
+                PATIENT_REQUESTS,
+                headers={
+                    "Authorization": f"Bearer {patient_token}",
+                    "Idempotency-Key": uuid.uuid4().hex,
+                },
+                json={
+                    "service_slug": service_slug,
+                    "doctor_slug": doctor_slug,
+                    "appointment_date": target_date.isoformat(),
+                    "appointment_time": "09:40",
+                    "expected_settings_version": 1,
+                },
+            )
+        assert created.status_code == 201, created.text
+        request_id = created.json()["id"]
+
+        service_update_locked = threading.Event()
+        confirmation_service_lock_attempted = threading.Event()
+        confirmation_pid: list[int] = []
+        original_lock_service = ServicesApiRepository.get_service_for_update
+
+        def observe_confirmation_service_lock(repository, locked_service_id):
+            if locked_service_id == service_id:
+                pid = repository.db.execute(
+                    text("SELECT pg_backend_pid()")
+                ).scalar_one()
+                confirmation_pid.append(int(pid))
+                confirmation_service_lock_attempted.set()
+            return original_lock_service(repository, locked_service_id)
+
+        monkeypatch.setattr(
+            ServicesApiRepository,
+            "get_service_for_update",
+            observe_confirmation_service_lock,
+        )
+
+        def update_service_and_hold_lock():
+            with Session(engine) as update_db:
+                locked_service = (
+                    update_db.query(Service)
+                    .filter(Service.id == service_id)
+                    .with_for_update()
+                    .populate_existing()
+                    .one()
+                )
+                locked_service.duration_minutes = 30
+                service_update_locked.set()
+                if not release_service_update.wait(timeout=10):
+                    raise TimeoutError("test did not release service update lock")
+                update_db.commit()
+
+        def confirm_request():
+            with TestClient(app) as client:
+                return client.post(
+                    f"/api/v1/admin/public-booking-requests/{request_id}/confirm",
+                    headers={"Authorization": f"Bearer {registrar_token}"},
+                    json={"expected_version": 1},
+                )
+
+        observed_service_lock_wait = False
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            update_future = executor.submit(update_service_and_hold_lock)
+            confirmation_future = None
+            try:
+                assert service_update_locked.wait(timeout=5)
+                confirmation_future = executor.submit(confirm_request)
+                assert confirmation_service_lock_attempted.wait(timeout=5)
+                deadline = time_module.monotonic() + 5
+                with engine.connect() as observer:
+                    while time_module.monotonic() < deadline:
+                        wait_type = observer.execute(
+                            text(
+                                "SELECT wait_event_type FROM pg_stat_activity "
+                                "WHERE pid = :pid"
+                            ),
+                            {"pid": confirmation_pid[0]},
+                        ).scalar_one_or_none()
+                        if wait_type == "Lock":
+                            observed_service_lock_wait = True
+                            break
+                        if confirmation_future.done():
+                            break
+                        time_module.sleep(0.05)
+            finally:
+                release_service_update.set()
+
+            update_future.result(timeout=10)
+            assert confirmation_future is not None
+            response = confirmation_future.result(timeout=10)
+
+        if not observed_service_lock_wait:
+            raise AssertionError("confirmation did not wait on the Service row")
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == "needs_new_time"
+        with Session(engine) as verify:
+            request = verify.get(PublicBookingRequest, uuid.UUID(request_id))
+            appointments = verify.query(Appointment).all()
+            current_service = verify.get(Service, service_id)
+            assert request is not None
+            assert request.status == "needs_new_time"
+            assert request.appointment_id is None
+            assert appointments == []
+            assert current_service is not None
+            assert current_service.duration_minutes == 30
+    finally:
+        release_service_update.set()
+        if previous_override is None:
+            app.dependency_overrides.pop(deps.get_db, None)
+        else:
+            app.dependency_overrides[deps.get_db] = previous_override

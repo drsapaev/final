@@ -16,6 +16,9 @@ from app.models.department import Department
 from app.models.patient import Patient
 from app.models.setting import Setting
 from app.models.user import User
+from app.repositories.public_booking_request_repository import (
+    PublicBookingRequestRepository,
+)
 from app.schemas import appointment as appointment_schemas
 from app.services.appointment_eligibility import (
     ensure_doctor_eligible_for_appointment as _ensure_appointment_doctor_eligible,
@@ -808,7 +811,16 @@ def delete_appointment(
 
     _ensure_appointment_record_access(db, appointment, current_user)
 
-    appointment_crud.remove(db=db, id=appointment_id)
+    if PublicBookingRequestRepository(db).has_appointment_link(
+        appointment_id=appointment_id
+    ):
+        # Keep the appointment row referenced by the confirmed request. This
+        # endpoint represents cancellation, so linked appointments transition
+        # through the normal lifecycle instead of being physically deleted.
+        if appointment.status != "cancelled":
+            appointment_crud.cancel_appointment(db, appointment_id=appointment_id)
+    else:
+        appointment_crud.remove(db=db, id=appointment_id)
     return {"message": "Запись успешно отменена"}
 
 

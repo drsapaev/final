@@ -19,6 +19,14 @@ class PublicBookingRequestRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    def has_appointment_link(self, *, appointment_id: int) -> bool:
+        return (
+            self.db.query(PublicBookingRequest.id)
+            .filter(PublicBookingRequest.appointment_id == appointment_id)
+            .first()
+            is not None
+        )
+
     def lock_settings(self, key: str) -> ClinicSettings | None:
         return (
             self.db.query(ClinicSettings)

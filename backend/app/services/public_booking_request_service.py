@@ -23,6 +23,7 @@ from app.repositories.public_booking_request_repository import (
     PublicBookingRequestRepository,
 )
 from app.repositories.public_site_read_repository import PublicSiteReadRepository
+from app.repositories.services_api_repository import ServicesApiRepository
 from app.schemas.appointment import PatientPortalAppointmentCreate
 from app.schemas.public_booking_request import (
     PublicBookingRequestEventOut,
@@ -407,8 +408,14 @@ class PublicBookingRequestService:
         if department is None:
             raise PublicBookingRequestError(409, "booking_request_unavailable")
 
+        service = ServicesApiRepository(self.db).get_service_for_update(
+            request.service_id
+        )
+        if service is None or not service.slug:
+            raise PublicBookingRequestError(409, "booking_request_unavailable")
+
         snapshot = self.availability_service.public_availability_for_day(
-            service_slug=request.service.slug,
+            service_slug=service.slug,
             doctor_slug=request.doctor.slug,
             target_date=request.appointment_date,
             settings=confirmation_settings,
