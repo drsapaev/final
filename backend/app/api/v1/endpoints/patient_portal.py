@@ -107,11 +107,16 @@ from app.schemas.public_booking_request import (
     PublicBookingRequestPatientProfileErrorOut,
     PublicBookingRequestResubmit,
 )
+from app.schemas.public_booking_settings import PublicBookingValidationErrorOut
 from app.services.appointment_booking_routing import (
     attach_department_id,
     lock_department_for_booking,
     resolve_booking_department,
     resolve_doctor_routing_department,
+)
+from app.services.appointment_duration_snapshot import (
+    InvalidServiceSelection,
+    resolve_exact_service_selection,
 )
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
@@ -119,6 +124,10 @@ from app.services.patient_access_audit import log_patient_access
 from app.services.public_booking_request_service import (
     PublicBookingRequestError,
     PublicBookingRequestService,
+)
+from app.services.public_booking_settings import (
+    PublicBookingSettingsError,
+    PublicBookingSettingsService,
 )
 from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppSessionScope,
@@ -144,6 +153,7 @@ class PatientPortalBookingRequest(BaseModel):
     department: str | None = None
     notes: str | None = None
     services: list[str] | None = None
+    service_ids: list[int] | None = Field(default=None, alias="serviceIds")
 
     model_config = {"populate_by_name": True}
 
@@ -195,6 +205,7 @@ class PatientPortalBookingAppointment(BaseModel):
     visit_type: str | None = None
     payment_type: str | None = None
     services: list[str] = []
+    service_ids: list[int] = []
     payment_amount: float | None = None
     payment_currency: str | None = None
     payment_provider: str | None = None
@@ -500,6 +511,21 @@ _PORTAL_BOOKING_REQUEST_ERROR_REASONS = frozenset(
 ) | {"department_unknown", "department_inactive"}
 
 
+def _validate_portal_booking_service_selection(
+    db: Session, request_body: PatientPortalBookingRequest
+) -> None:
+    try:
+        PublicBookingSettingsService(db).validate_patient_booking_service_selection(
+            service_ids=request_body.service_ids,
+            services=request_body.services,
+        )
+    except PublicBookingSettingsError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"reason": exc.code},
+        ) from exc
+
+
 def _booking_scope_status_code(reason: str) -> int:
     # Same public contract as the Mini App booking endpoints: request-shaped
     # problems are 400, identity/scope problems are 403.
@@ -602,11 +628,20 @@ _PORTAL_409 = {
 }
 _PORTAL_503 = {
     "description": (
-        "Required distributed idempotency coordination is temporarily "
-        "unavailable (code=idempotency_unavailable). Non-executing: retry "
-        "the SAME Idempotency-Key after recovery"
+        "Required distributed idempotency coordination or public booking "
+        "settings are temporarily unavailable. Idempotency failures carry "
+        "code=idempotency_unavailable; settings failures carry "
+        "detail.reason=booking_settings_invalid."
     ),
     "model": PatientPortalErrorResponse,
+}
+
+_PORTAL_BOOKING_SELECTION_422 = {
+    "model": PublicBookingValidationErrorOut,
+    "description": (
+        "Request validation failed or the exact service IDs are incompatible "
+        "with the selected doctor or department."
+    ),
 }
 # Round-7 (owner P2, PR #3340): the preview endpoint is processed by the
 # same opt-in middleware whenever it carries an Idempotency-Key (the PR's
@@ -666,6 +701,7 @@ def get_patient_cabinet_summary(
         403: _PORTAL_403,
         404: _PORTAL_404,
         409: _PORTAL_PREVIEW_409,
+        422: _PORTAL_BOOKING_SELECTION_422,
         503: _PORTAL_503,
     },
 )
@@ -702,6 +738,7 @@ def preview_patient_portal_booking(
     scope = _patient_portal_scope(patient_id)
     try:
         try:
+            _validate_portal_booking_service_selection(db, request_body)
             preview = build_telegram_mini_app_appointment_booking_preview(
                 scope,
                 patient_id=patient_id,
@@ -711,6 +748,7 @@ def preview_patient_portal_booking(
                 department=request_body.department,
                 notes=request_body.notes,
                 services=request_body.services,
+                service_ids=request_body.service_ids,
                 # Round-9 (owner P2, PR #3340): the past-day check follows
                 # the CLINIC's calendar (Asia/Tashkent queue-settings SSOT
                 # `clinic_today`), not the UTC host's `date.today()` — on a
@@ -743,6 +781,37 @@ def preview_patient_portal_booking(
                 department_row = _resolve_doctor_routing_department(
                     doctor_row, department_row
                 )
+        # Match the exact-ID validation used by appointment_crud.create after
+        # resolving the same canonical department. Keep the established
+        # preview shape for missing/ineligible doctors; Create reports those
+        # lifecycle errors before it reaches service compatibility.
+        validate_service_compatibility = preview.draft.doctor_id is None
+        if preview.draft.doctor_id is not None and doctor_row is not None:
+            try:
+                ensure_doctor_eligible_for_appointment(db, preview.draft.doctor_id)
+            except HTTPException as exc:
+                if exc.status_code not in {
+                    status.HTTP_404_NOT_FOUND,
+                    status.HTTP_409_CONFLICT,
+                }:
+                    raise
+            else:
+                validate_service_compatibility = True
+        if validate_service_compatibility:
+            try:
+                resolve_exact_service_selection(
+                    db,
+                    preview.draft.service_ids,
+                    doctor_id=preview.draft.doctor_id,
+                    department_id=(
+                        int(department_row.id) if department_row is not None else None
+                    ),
+                )
+            except InvalidServiceSelection as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={"code": str(exc), "field": "service_ids"},
+                ) from exc
     except HTTPException as exc:
         # Round-3 (owner P2): denial leaves a trail row (SSOT parity).
         _log_portal_denied(
@@ -782,6 +851,7 @@ def preview_patient_portal_booking(
         403: _PORTAL_403,
         404: _PORTAL_404_BOOKING,
         409: _PORTAL_409,
+        422: _PORTAL_BOOKING_SELECTION_422,
         503: _PORTAL_503,
     },
 )
@@ -834,6 +904,7 @@ def create_patient_portal_booking(
     scope = _patient_portal_scope(patient_id)
     try:
         try:
+            _validate_portal_booking_service_selection(db, request_body)
             preview = build_telegram_mini_app_appointment_booking_preview(
                 scope,
                 patient_id=patient_id,
@@ -843,6 +914,7 @@ def create_patient_portal_booking(
                 department=request_body.department,
                 notes=request_body.notes,
                 services=request_body.services,
+                service_ids=request_body.service_ids,
                 # Round-9 (owner P2): clinic-local calendar — see preview.
                 today=clinic_today(db),
             )

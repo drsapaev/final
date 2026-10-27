@@ -295,6 +295,12 @@ def test_full_update_all_free_without_visit_id_does_not_reuse_unrelated_visit(
     linked_visit = db_session.query(Visit).filter(Visit.id == entry.visit_id).one()
     assert linked_visit.discount_mode == "all_free"
     assert linked_visit.approval_status == "pending"
+    linked_service = (
+        db_session.query(VisitService)
+        .filter(VisitService.visit_id == linked_visit.id)
+        .one()
+    )
+    assert linked_service.duration_minutes_snapshot == test_service.duration_minutes
 
 
 @pytest.mark.integration
@@ -481,9 +487,10 @@ def test_full_update_visit_id_aggregation_ignores_other_patient_queue_entry(
     current_services = json.loads(current_entry.services)
     other_services = json.loads(other_entry.services)
     assert [service["service_id"] for service in current_services] == [test_service.id]
-    assert current_services[0]["queue_time"] == current_queue_time.replace(
-        tzinfo=None
-    ).isoformat()
+    assert (
+        current_services[0]["queue_time"]
+        == current_queue_time.replace(tzinfo=None).isoformat()
+    )
     assert current_services[0]["queue_time"] != other_queue_time.isoformat()
     assert other_services[0]["queue_time"] == other_queue_time.isoformat()
 
@@ -730,7 +737,9 @@ def test_full_update_frontend_aggregated_ids_ignore_unrelated_queue_entry(
     current_services = json.loads(current_entry.services)
     unrelated_services = json.loads(unrelated_entry.services)
     assert [service["service_id"] for service in current_services] == [test_service.id]
-    assert [service["service_id"] for service in unrelated_services] == [test_service.id]
+    assert [service["service_id"] for service in unrelated_services] == [
+        test_service.id
+    ]
 
 
 @pytest.mark.integration
@@ -888,7 +897,9 @@ def test_full_update_rejects_zero_quantity_before_quote_revalidation(
     assert "не меньше 1" in response.json()["detail"]
     # Nothing persisted: the entry is untouched by the rejected command
     db_session.expire_all()
-    fresh = db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry.id).one()
+    fresh = (
+        db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry.id).one()
+    )
     assert fresh.visit_id is None
     visits = db_session.query(Visit).filter(Visit.patient_id == test_patient.id).count()
     assert visits == 0, "a rejected command must not create visits"

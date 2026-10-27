@@ -300,22 +300,30 @@
               }
             }
           },
-          "503": {
-            "description": "Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery",
+          "422": {
+            "description": "Request validation failed or the exact service IDs are incompatible with the selected doctor or department.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestValidationErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingServiceSelectionErrorOut"
+                    }
+                  ],
+                  "title": "Response 422 Preview Patient Portal Booking Api V1 Patients Booking Preview Post"
                 }
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "503": {
+            "description": "Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
                 }
               }
             }
@@ -422,22 +430,30 @@
               }
             }
           },
-          "503": {
-            "description": "Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery",
+          "422": {
+            "description": "Request validation failed or the exact service IDs are incompatible with the selected doctor or department.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestValidationErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingServiceSelectionErrorOut"
+                    }
+                  ],
+                  "title": "Response 422 Create Patient Portal Booking Api V1 Patients Booking Post"
                 }
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "503": {
+            "description": "Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
                 }
               }
             }
@@ -45035,6 +45051,78 @@
         }
       }
     },
+    "/api/v1/telegram/mini-app/booking/services": {
+      "post": {
+        "tags": [
+          "telegram-webhook"
+        ],
+        "summary": "Получить услуги, разрешённые для онлайн-записи",
+        "description": "Return the current eligible Admin allowlist to an authenticated patient.",
+        "operationId": "telegram_mini_app_list_booking_services",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramMiniAppBookingServicesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceIdsOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Patient booking request scope is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Patient identity or scope is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Booking settings are unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/telegram/mini-app/appointments/preview": {
       "post": {
         "tags": [
@@ -45067,11 +45155,39 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Request validation failed or the exact service IDs are incompatible with the selected doctor or department.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestValidationErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingServiceSelectionErrorOut"
+                    }
+                  ],
+                  "title": "Response 422 Telegram Mini App Preview Appointment Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request is invalid or service is not approved for online booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Booking settings are unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
                 }
               }
             }
@@ -45331,11 +45447,39 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Request validation failed or the exact service IDs are incompatible with the selected doctor or department.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PublicBookingRequestValidationErrorOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicBookingServiceSelectionErrorOut"
+                    }
+                  ],
+                  "title": "Response 422 Telegram Mini App Create Appointment Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request is invalid or service is not approved for online booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Booking settings are unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingServiceErrorOut"
                 }
               }
             }
@@ -73979,6 +74123,20 @@
               }
             ],
             "title": "Payment Processed At"
+          },
+          "service_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Ids"
           }
         },
         "type": "object",
@@ -74469,6 +74627,20 @@
               }
             ],
             "title": "Services"
+          },
+          "service_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Ids"
           },
           "payment_amount": {
             "anyOf": [
@@ -100353,6 +100525,14 @@
             "title": "Services",
             "default": []
           },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Service Ids",
+            "default": []
+          },
           "payment_amount": {
             "anyOf": [
               {
@@ -100547,6 +100727,20 @@
               }
             ],
             "title": "Services"
+          },
+          "serviceIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serviceids"
           }
         },
         "type": "object",
@@ -105672,6 +105866,167 @@
           "withdrawn"
         ],
         "title": "PublicBookingRequestStatus"
+      },
+      "PublicBookingRequestValidationErrorItem": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Loc"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "input": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input"
+          },
+          "ctx": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ctx"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "PublicBookingRequestValidationErrorItem",
+        "description": "One standard FastAPI request-validation issue."
+      },
+      "PublicBookingRequestValidationErrorOut": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingRequestValidationErrorItem"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicBookingRequestValidationErrorOut",
+        "description": "Standard FastAPI 422 validation response used by booking endpoints."
+      },
+      "PublicBookingServiceErrorDetail": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "PublicBookingServiceErrorDetail"
+      },
+      "PublicBookingServiceErrorOut": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/PublicBookingServiceErrorDetail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicBookingServiceErrorOut",
+        "description": "Machine-readable reason returned by patient booking service reads/writes."
+      },
+      "PublicBookingServiceIdsOut": {
+        "properties": {
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Service Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "service_ids"
+        ],
+        "title": "PublicBookingServiceIdsOut",
+        "description": "Current eligible Admin-approved services for patient booking forms."
+      },
+      "PublicBookingServiceSelectionErrorDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "service_ids_invalid",
+              "service_ids_duplicate",
+              "service_not_found_or_inactive",
+              "service_incompatible_with_doctor",
+              "department_not_found",
+              "service_incompatible_with_department"
+            ],
+            "title": "Code"
+          },
+          "field": {
+            "type": "string",
+            "const": "service_ids",
+            "title": "Field"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "field"
+        ],
+        "title": "PublicBookingServiceSelectionErrorDetail",
+        "description": "Exact service-ID validation error used by patient booking writers."
+      },
+      "PublicBookingServiceSelectionErrorOut": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/PublicBookingServiceSelectionErrorDetail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PublicBookingServiceSelectionErrorOut",
+        "description": "Stable error body returned when an exact service selection is invalid."
       },
       "PublicBookingSettingsOut": {
         "properties": {
@@ -115510,6 +115865,20 @@
               }
             ],
             "title": "Services"
+          },
+          "serviceIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serviceids"
           }
         },
         "type": "object",
@@ -115557,6 +115926,46 @@
         "type": "object",
         "title": "TelegramMiniAppBookingDepartmentsRequest",
         "description": "Round-12 (owner P1, PR #3386 review): auth shape for the booking\ndepartments reference endpoint.\n\nThe Mini App booking form no longer free-types a department name (a\nlocalized label like \"Кардиология\" is NOT the canonical `Department.key`\nthe routing contract resolves); it picks from THIS endpoint's list, so\nthe submitted value is always a canonical key. Same identity contract\nas the booking endpoints themselves (initData primary, entry token\nallowed) — the reference data rides the SAME authenticated surface it\nfeeds, and the error reasons match the booking scope contract."
+      },
+      "TelegramMiniAppBookingServicesRequest": {
+        "properties": {
+          "initData": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initdata"
+          },
+          "entryToken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entrytoken"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          }
+        },
+        "type": "object",
+        "title": "TelegramMiniAppBookingServicesRequest",
+        "description": "Authenticated reference read for Admin-approved booking service IDs."
       },
       "TelegramMiniAppPatientCabinetSummaryRequest": {
         "properties": {

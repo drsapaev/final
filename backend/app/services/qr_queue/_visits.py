@@ -2,6 +2,7 @@
 
 Split from qr_queue_service.py.
 """
+
 from __future__ import annotations
 
 from app.services.qr_queue._base import *  # noqa: F401, F403
@@ -16,6 +17,7 @@ class VisitsMixin(QRQueueServiceMixinBase):
         patient_id: int,
         visit_date: date,
         services: list[dict[str, Any]],
+        doctor_id: int | None = None,
         visit_type: str = "paid",
         discount_mode: str = "none",
         notes: str | None = None,
@@ -40,11 +42,15 @@ class VisitsMixin(QRQueueServiceMixinBase):
         from decimal import Decimal
 
         from app.models.visit import Visit, VisitService
+        from app.services.appointment_duration_snapshot import (
+            duration_snapshot_for_service_id,
+        )
 
         # Создаём Visit
         # ✅ SSOT: source='online' для QR/Telegram регистрации
         visit = Visit(
             patient_id=patient_id,
+            doctor_id=doctor_id,
             visit_date=visit_date,
             status="open",
             discount_mode=discount_mode,
@@ -60,10 +66,19 @@ class VisitsMixin(QRQueueServiceMixinBase):
             visit_service = VisitService(
                 visit_id=visit.id,
                 service_id=svc_data.get("service_id"),
+                duration_minutes_snapshot=duration_snapshot_for_service_id(
+                    self.db,
+                    svc_data.get("service_id"),
+                    doctor_id=visit.doctor_id,
+                ),
                 code=svc_data.get("code"),
                 name=svc_data.get("name", "Услуга"),
                 qty=svc_data.get("quantity", 1),
-                price=Decimal(str(svc_data.get("price", 0))) if svc_data.get("price") else None,
+                price=(
+                    Decimal(str(svc_data.get("price", 0)))
+                    if svc_data.get("price")
+                    else None
+                ),
             )
             self.db.add(visit_service)
 
@@ -80,5 +95,3 @@ class VisitsMixin(QRQueueServiceMixinBase):
     # ============================================================
     # === QR TOKEN MANAGEMENT ===
     # ============================================================
-
-

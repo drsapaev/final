@@ -15118,6 +15118,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram/mini-app/booking/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Получить услуги, разрешённые для онлайн-записи
+         * @description Return the current eligible Admin allowlist to an authenticated patient.
+         */
+        post: operations["telegram_mini_app_list_booking_services"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/telegram/mini-app/appointments/preview": {
         parameters: {
             query?: never;
@@ -24917,6 +24937,8 @@ export type components = {
             payment_webhook_id?: number | null;
             /** Payment Processed At */
             payment_processed_at?: string | null;
+            /** Service Ids */
+            service_ids?: number[] | null;
         };
         /**
          * AppointmentData
@@ -25073,6 +25095,8 @@ export type components = {
             payment_type?: string | null;
             /** Services */
             services?: string[] | null;
+            /** Service Ids */
+            service_ids?: number[] | null;
             /** Payment Amount */
             payment_amount?: number | null;
             /** Payment Currency */
@@ -34553,6 +34577,11 @@ export type components = {
              * @default []
              */
             services: string[];
+            /**
+             * Service Ids
+             * @default []
+             */
+            service_ids: number[];
             /** Payment Amount */
             payment_amount?: number | null;
             /** Payment Currency */
@@ -34605,6 +34634,8 @@ export type components = {
             notes?: string | null;
             /** Services */
             services?: string[] | null;
+            /** Serviceids */
+            serviceIds?: number[] | null;
         };
         /** PatientPortalCabinetAppointmentsItem */
         PatientPortalCabinetAppointmentsItem: {
@@ -36670,6 +36701,75 @@ export type components = {
          * @enum {string}
          */
         PublicBookingRequestStatus: "pending" | "needs_new_time" | "rejected" | "withdrawn";
+        /**
+         * PublicBookingRequestValidationErrorItem
+         * @description One standard FastAPI request-validation issue.
+         */
+        PublicBookingRequestValidationErrorItem: {
+            /** Loc */
+            loc: (string | number)[];
+            /** Msg */
+            msg: string;
+            /** Type */
+            type: string;
+            /** Input */
+            input?: unknown | null;
+            /** Ctx */
+            ctx?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * PublicBookingRequestValidationErrorOut
+         * @description Standard FastAPI 422 validation response used by booking endpoints.
+         */
+        PublicBookingRequestValidationErrorOut: {
+            /** Detail */
+            detail: components["schemas"]["PublicBookingRequestValidationErrorItem"][];
+        };
+        /** PublicBookingServiceErrorDetail */
+        PublicBookingServiceErrorDetail: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * PublicBookingServiceErrorOut
+         * @description Machine-readable reason returned by patient booking service reads/writes.
+         */
+        PublicBookingServiceErrorOut: {
+            detail: components["schemas"]["PublicBookingServiceErrorDetail"];
+        };
+        /**
+         * PublicBookingServiceIdsOut
+         * @description Current eligible Admin-approved services for patient booking forms.
+         */
+        PublicBookingServiceIdsOut: {
+            /** Service Ids */
+            service_ids: number[];
+        };
+        /**
+         * PublicBookingServiceSelectionErrorDetail
+         * @description Exact service-ID validation error used by patient booking writers.
+         */
+        PublicBookingServiceSelectionErrorDetail: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "service_ids_invalid" | "service_ids_duplicate" | "service_not_found_or_inactive" | "service_incompatible_with_doctor" | "department_not_found" | "service_incompatible_with_department";
+            /**
+             * Field
+             * @constant
+             */
+            field: "service_ids";
+        };
+        /**
+         * PublicBookingServiceSelectionErrorOut
+         * @description Stable error body returned when an exact service selection is invalid.
+         */
+        PublicBookingServiceSelectionErrorOut: {
+            detail: components["schemas"]["PublicBookingServiceSelectionErrorDetail"];
+        };
         /** PublicBookingSettingsOut */
         PublicBookingSettingsOut: {
             /** Version */
@@ -40368,6 +40468,8 @@ export type components = {
             notes?: string | null;
             /** Services */
             services?: string[] | null;
+            /** Serviceids */
+            serviceIds?: number[] | null;
         };
         /**
          * TelegramMiniAppBookingDepartmentsRequest
@@ -40383,6 +40485,18 @@ export type components = {
          *     feeds, and the error reasons match the booking scope contract.
          */
         TelegramMiniAppBookingDepartmentsRequest: {
+            /** Initdata */
+            initData?: string | null;
+            /** Entrytoken */
+            entryToken?: string | null;
+            /** Section */
+            section?: string | null;
+        };
+        /**
+         * TelegramMiniAppBookingServicesRequest
+         * @description Authenticated reference read for Admin-approved booking service IDs.
+         */
+        TelegramMiniAppBookingServicesRequest: {
             /** Initdata */
             initData?: string | null;
             /** Entrytoken */
@@ -44028,16 +44142,16 @@ export interface operations {
                     "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request validation failed or the exact service IDs are incompatible with the selected doctor or department. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PublicBookingRequestValidationErrorOut"] | components["schemas"]["PublicBookingServiceSelectionErrorOut"];
                 };
             };
-            /** @description Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery */
+            /** @description Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -44118,16 +44232,16 @@ export interface operations {
                     "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Request validation failed or the exact service IDs are incompatible with the selected doctor or department. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PublicBookingRequestValidationErrorOut"] | components["schemas"]["PublicBookingServiceSelectionErrorOut"];
                 };
             };
-            /** @description Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery */
+            /** @description Required distributed idempotency coordination or public booking settings are temporarily unavailable. Idempotency failures carry code=idempotency_unavailable; settings failures carry detail.reason=booking_settings_invalid. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -71170,6 +71284,66 @@ export interface operations {
             };
         };
     };
+    telegram_mini_app_list_booking_services: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramMiniAppBookingServicesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceIdsOut"];
+                };
+            };
+            /** @description Patient booking request scope is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
+                };
+            };
+            /** @description Patient identity or scope is invalid. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Booking settings are unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
+                };
+            };
+        };
+    };
     telegram_mini_app_preview_appointment_booking: {
         parameters: {
             query?: never;
@@ -71194,13 +71368,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Request is invalid or service is not approved for online booking. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
+                };
+            };
+            /** @description Request validation failed or the exact service IDs are incompatible with the selected doctor or department. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PublicBookingRequestValidationErrorOut"] | components["schemas"]["PublicBookingServiceSelectionErrorOut"];
+                };
+            };
+            /** @description Booking settings are unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
                 };
             };
         };
@@ -71404,13 +71596,31 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description Request is invalid or service is not approved for online booking. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
+                };
+            };
+            /** @description Request validation failed or the exact service IDs are incompatible with the selected doctor or department. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PublicBookingRequestValidationErrorOut"] | components["schemas"]["PublicBookingServiceSelectionErrorOut"];
+                };
+            };
+            /** @description Booking settings are unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingServiceErrorOut"];
                 };
             };
         };

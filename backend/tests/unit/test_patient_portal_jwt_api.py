@@ -447,7 +447,14 @@ class TestOpenAPIContract:
         # Round-6 (owner P2): 503 is real — required idempotency coordination
         # down (code=idempotency_unavailable) — and must be published too.
         assert set(booking) == {
-            "201", "400", "401", "403", "404", "409", "422", "503",
+            "201",
+            "400",
+            "401",
+            "403",
+            "404",
+            "409",
+            "422",
+            "503",
         }
         assert (
             booking["201"]["content"]["application/json"]["schema"]["$ref"]
@@ -491,18 +498,22 @@ class TestOpenAPIContract:
         props = schema["properties"]
         assert "code" in props
         # `str | None` serializes as anyOf(string, null) under Pydantic v2.
-        code_types = {
-            variant.get("type") for variant in props["code"].get("anyOf", [])
-        }
+        code_types = {variant.get("type") for variant in props["code"].get("anyOf", [])}
         assert "string" in code_types, "code must be a string-typed discriminator"
         # Optional: endpoint-level errors (slot occupied) carry no code.
         assert "code" not in schema.get("required", [])
-        assert "idempotency_scope_mismatch" in self._responses(
-            openapi, "/api/v1/patients/booking", "post"
-        )["409"]["description"]
-        assert "idempotency_uncertain_outcome" in self._responses(
-            openapi, "/api/v1/patients/booking", "post"
-        )["409"]["description"]
+        assert (
+            "idempotency_scope_mismatch"
+            in self._responses(openapi, "/api/v1/patients/booking", "post")["409"][
+                "description"
+            ]
+        )
+        assert (
+            "idempotency_uncertain_outcome"
+            in self._responses(openapi, "/api/v1/patients/booking", "post")["409"][
+                "description"
+            ]
+        )
 
     def test_preview_publishes_typed_success_and_errors(self, openapi):
         preview = self._responses(openapi, "/api/v1/patients/booking/preview", "post")
@@ -651,9 +662,7 @@ class TestReplayPatientPolicy:
         current card), so the retry re-executed the booking for the NEW
         card — two appointments for two patients from one logical submit.
         The stable key→card binding must refuse the retry instead."""
-        user = (
-            db_session.query(User).filter(User.username == "portal_patient").first()
-        )
+        user = db_session.query(User).filter(User.username == "portal_patient").first()
         assert user is not None
         key = "replay-relink-2"
         body = {"appointmentDate": self.future_date}
@@ -702,7 +711,10 @@ class TestReplayPatientPolicy:
         # and works exactly like a first booking.
         second = client.post(
             "/api/v1/patients/booking",
-            headers={**linked_patient_headers, "Idempotency-Key": "replay-relink-2-new-card"},
+            headers={
+                **linked_patient_headers,
+                "Idempotency-Key": "replay-relink-2-new-card",
+            },
             json=body,
         )
         assert second.status_code == 201, second.text
@@ -735,9 +747,9 @@ class TestKeyOperationScoping:
             headers={**linked_patient_headers, "Idempotency-Key": key},
             json=body,
         )
-        assert created.status_code == 201, (
-            "create must EXECUTE — a cached 200 preview must never satisfy the create"
-        )
+        assert (
+            created.status_code == 201
+        ), "create must EXECUTE — a cached 200 preview must never satisfy the create"
         assert created.json()["created"] is True
         assert db_session.query(Appointment).count() == 1
 
@@ -760,9 +772,7 @@ class TestKeyOperationScoping:
         )
         assert preview.status_code == 200
         payload = preview.json()
-        assert "created" not in payload, (
-            "preview must not replay the create snapshot"
-        )
+        assert "created" not in payload, "preview must not replay the create snapshot"
         assert "appointment" in payload
         # And the preview must not have double-booked either.
         assert db_session.query(Appointment).count() == 1
@@ -773,9 +783,7 @@ class TestCabinetPolicySSOT:
     payload as the Mini App SSOT builder — no silent response-filter
     drops."""
 
-    def test_cabinet_policy_payload_full_parity(
-        self, client, linked_patient_headers
-    ):
+    def test_cabinet_policy_payload_full_parity(self, client, linked_patient_headers):
         response = client.get(
             "/api/v1/patients/cabinet/summary", headers=linked_patient_headers
         )
@@ -1025,9 +1033,9 @@ class TestDeactivatedUserAuditTrail:
             .order_by(PatientAccessAuditLog.id.desc())
             .first()
         )
-        assert row is not None, (
-            "the deactivated attempt must leave a row in the per-patient trail"
-        )
+        assert (
+            row is not None
+        ), "the deactivated attempt must leave a row in the per-patient trail"
         assert row.extra_data["reason"] == "user_deactivated"
         assert row.extra_data["surface"] == "jwt_portal"
         assert row.resource_type == "cabinet_summary"
@@ -1093,7 +1101,9 @@ class TestDepartmentNormalization:
         assert row is not None
         assert row.department_id == portal_department.id
 
-    def test_whitespace_only_department_stays_empty(self, client, linked_patient_headers):
+    def test_whitespace_only_department_stays_empty(
+        self, client, linked_patient_headers
+    ):
         # "   " normalizes to None — no department context, no 400.
         response = client.post(
             "/api/v1/patients/booking/preview",
@@ -1130,9 +1140,7 @@ class TestCabinetDepartmentLabel:
         )
         assert summary.status_code == 200
         booked = [
-            a
-            for a in summary.json()["appointments"]
-            if a["id"] == appointment_id
+            a for a in summary.json()["appointments"] if a["id"] == appointment_id
         ]
         assert len(booked) == 1
         assert booked[0]["department"] == portal_department.name_ru
@@ -1173,9 +1181,9 @@ class TestDeactivatedKeyedBookingAudit:
             .order_by(PatientAccessAuditLog.id.desc())
             .first()
         )
-        assert row is not None, (
-            "the keyed booking refusal must leave a row in the per-patient trail"
-        )
+        assert (
+            row is not None
+        ), "the keyed booking refusal must leave a row in the per-patient trail"
         assert row.extra_data["reason"] == "user_deactivated"
         assert row.extra_data["surface"] == "jwt_portal"
         assert row.resource_type == "appointment"
@@ -1252,7 +1260,10 @@ class TestRegistrarReadModelDepartmentContract:
     ):
         created = client.post(
             "/api/v1/patients/booking",
-            headers={**linked_patient_headers, "Idempotency-Key": "registrar-contract-1"},
+            headers={
+                **linked_patient_headers,
+                "Idempotency-Key": "registrar-contract-1",
+            },
             json={
                 "appointmentDate": self.future_date,
                 "department": portal_department.key,
@@ -1296,7 +1307,8 @@ class TestRegistrarReadModelDepartmentContract:
             (
                 r
                 for r in visits.json()
-                if r["id"] == appointment_id + 10000 and r["patient_id"] == test_patient.id
+                if r["id"] == appointment_id + 10000
+                and r["patient_id"] == test_patient.id
             ),
             None,
         )
@@ -1405,6 +1417,304 @@ class TestDoctorDepartmentRouting:
         # Pre-round-9 this row was created with department_id = NULL.
         assert row.department_id == portal_department.id
 
+    def test_create_uses_exact_service_id_for_name_and_duration(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_patient,
+        test_doctor,
+        portal_department,
+    ):
+        from app.models.service import Service
+
+        self._bind_doctor(db_session, test_doctor, portal_department)
+        service = Service(
+            name="Каталожная консультация",
+            name_uz="Katalog maslahat xizmati",
+            description_ru="Консультация врача.",
+            description_uz="Shifokor maslahati.",
+            slug="catalog-consultation-portal",
+            price=100000,
+            duration_minutes=40,
+            active=True,
+            show_on_website=True,
+            requires_doctor=True,
+            department_key=portal_department.key,
+        )
+        db_session.add(service)
+        db_session.flush()
+        from app.models.clinic import ClinicSettings
+
+        db_session.add(
+            ClinicSettings(
+                key="public_booking_settings",
+                category="booking_settings",
+                value={
+                    "version": 1,
+                    "is_enabled": False,
+                    "mode": None,
+                    "booking_horizon_days": None,
+                    "service_ids": [service.id],
+                    "doctor_ids": [],
+                },
+            )
+        )
+        db_session.commit()
+
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "exact-service-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": portal_department.key,
+                "services": ["client supplied label"],
+                "serviceIds": [service.id],
+            },
+        )
+
+        assert created.status_code == 201, created.text
+        row = db_session.get(Appointment, created.json()["appointment_id"])
+        assert row is not None
+        assert row.patient_id == test_patient.id
+        assert row.services == ["Каталожная консультация"]
+        assert row.duration_minutes_snapshot == 40
+        assert created.json()["preview"]["appointment"]["service_ids"] == [service.id]
+
+    def _assert_preview_and_create_reject_incompatible_service(
+        self, client, linked_patient_headers, db_session, body, expected_code
+    ):
+        initial_count = db_session.query(Appointment).count()
+        preview = client.post(
+            "/api/v1/patients/booking/preview",
+            headers=linked_patient_headers,
+            json=body,
+        )
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={
+                **linked_patient_headers,
+                "Idempotency-Key": f"incompatible-service-{expected_code}",
+            },
+            json=body,
+        )
+
+        assert preview.status_code == created.status_code == 422, (
+            f"preview={preview.status_code} {preview.json()} "
+            f"create={created.status_code} {created.json()}"
+        )
+        assert preview.json() == created.json()
+        assert preview.json()["detail"] == {
+            "code": expected_code,
+            "field": "service_ids",
+        }
+        assert db_session.query(Appointment).count() == initial_count
+
+    def test_preview_and_create_reject_service_pinned_to_another_doctor(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_doctor,
+        test_doctor_user,
+        portal_department,
+    ):
+        from app.models.clinic import ClinicSettings, Doctor
+        from app.models.service import Service
+
+        self._bind_doctor(db_session, test_doctor, portal_department)
+        other_doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="Кардиология",
+            active=True,
+            show_on_website=True,
+            bio_ru="Синтетическая публичная биография.",
+            bio_uz="Sintetik ommaviy tarjimai hol.",
+            slug="synthetic-pinned-doctor-portal",
+        )
+        db_session.add(other_doctor)
+        db_session.flush()
+        service = Service(
+            name="Закреплённая консультация",
+            name_uz="Biriktirilgan konsultatsiya",
+            description_ru="Синтетическая публичная услуга.",
+            description_uz="Sintetik ommaviy xizmat.",
+            slug="pinned-consultation-portal",
+            price=100000,
+            duration_minutes=30,
+            doctor_id=other_doctor.id,
+            department_key=portal_department.key,
+            active=True,
+            show_on_website=True,
+            requires_doctor=True,
+        )
+        db_session.add(service)
+        db_session.flush()
+        db_session.add(
+            ClinicSettings(
+                key="public_booking_settings",
+                category="booking_settings",
+                value={
+                    "version": 1,
+                    "is_enabled": False,
+                    "mode": None,
+                    "booking_horizon_days": None,
+                    "service_ids": [service.id],
+                    "doctor_ids": [],
+                },
+            )
+        )
+        db_session.commit()
+
+        self._assert_preview_and_create_reject_incompatible_service(
+            client,
+            linked_patient_headers,
+            db_session,
+            {
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": portal_department.key,
+                "serviceIds": [service.id],
+            },
+            "service_incompatible_with_doctor",
+        )
+
+    def test_preview_and_create_reject_service_bound_to_another_department(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_doctor,
+        portal_department,
+    ):
+        from uuid import uuid4
+
+        from app.models.clinic import ClinicSettings
+        from app.models.department import Department
+        from app.models.service import Service
+
+        self._bind_doctor(db_session, test_doctor, portal_department)
+        other_department = Department(
+            key=f"other-portal-{uuid4().hex[:8]}",
+            name_ru="Другое отделение",
+        )
+        db_session.add(other_department)
+        db_session.flush()
+        service = Service(
+            name="Услуга другого отделения",
+            name_uz="Boshqa bo‘lim xizmati",
+            description_ru="Синтетическая публичная услуга.",
+            description_uz="Sintetik ommaviy xizmat.",
+            slug="other-department-service-portal",
+            price=100000,
+            duration_minutes=30,
+            department_id=other_department.id,
+            department_key=None,
+            active=True,
+            show_on_website=True,
+            requires_doctor=True,
+        )
+        db_session.add(service)
+        db_session.flush()
+        db_session.add(
+            ClinicSettings(
+                key="public_booking_settings",
+                category="booking_settings",
+                value={
+                    "version": 1,
+                    "is_enabled": False,
+                    "mode": None,
+                    "booking_horizon_days": None,
+                    "service_ids": [service.id],
+                    "doctor_ids": [],
+                },
+            )
+        )
+        db_session.commit()
+
+        self._assert_preview_and_create_reject_incompatible_service(
+            client,
+            linked_patient_headers,
+            db_session,
+            {
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": portal_department.key,
+                "serviceIds": [service.id],
+            },
+            "service_incompatible_with_department",
+        )
+
+    @pytest.mark.parametrize(
+        ("path", "services", "service_ids", "reason"),
+        [
+            (
+                "/api/v1/patients/booking/preview",
+                ["Не разрешённая услуга"],
+                [999999],
+                "booking_service_not_approved",
+            ),
+            (
+                "/api/v1/patients/booking",
+                ["Не разрешённая услуга"],
+                [999999],
+                "booking_service_not_approved",
+            ),
+            (
+                "/api/v1/patients/booking/preview",
+                [" "],
+                [],
+                "booking_service_id_required",
+            ),
+            (
+                "/api/v1/patients/booking",
+                [" "],
+                [],
+                "booking_service_id_required",
+            ),
+            (
+                "/api/v1/patients/booking/preview",
+                ["Старая заявка только с названием"],
+                [],
+                "booking_service_id_required",
+            ),
+            (
+                "/api/v1/patients/booking",
+                ["Старая заявка только с названием"],
+                [],
+                "booking_service_id_required",
+            ),
+        ],
+    )
+    def test_patient_portal_booking_rejects_service_without_allowlist_proof(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        path,
+        services,
+        service_ids,
+        reason,
+    ):
+        headers = linked_patient_headers
+        if path.endswith("/booking"):
+            headers = {**headers, "Idempotency-Key": "allowlist-rejection-1"}
+
+        response = client.post(
+            path,
+            headers=headers,
+            json={
+                "appointmentDate": self.future_date,
+                "services": services,
+                "serviceIds": service_ids,
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"]["reason"] == reason
+        assert db_session.query(Appointment).count() == 0
+
     def test_preview_and_create_agree_on_routing_context(
         self,
         client,
@@ -1423,9 +1733,9 @@ class TestDoctorDepartmentRouting:
             },
         )
         assert preview.status_code == 200, preview.json()
-        assert preview.json()["appointment"]["department_id"] == portal_department.id, (
-            "the preview echoes the doctor's canonical routing context"
-        )
+        assert (
+            preview.json()["appointment"]["department_id"] == portal_department.id
+        ), "the preview echoes the doctor's canonical routing context"
 
         created = client.post(
             "/api/v1/patients/booking",
@@ -1477,9 +1787,9 @@ class TestDoctorDepartmentRouting:
         )
         assert created.status_code == 400, created.json()
         assert created.json()["detail"]["reason"] == "doctor_department_mismatch"
-        assert db_session.query(Appointment).count() == 0, (
-            "a routing contradiction never materializes an appointment"
-        )
+        assert (
+            db_session.query(Appointment).count() == 0
+        ), "a routing contradiction never materializes an appointment"
 
     def test_departmentless_doctor_explicitly_refused(
         self, client, linked_patient_headers, db_session, test_doctor
@@ -1569,9 +1879,9 @@ class TestClinicCalendarDateValidation:
         assert preview.status_code == 400, preview.json()
         assert preview.json()["detail"]["reason"] == "appointment_date_in_past"
 
-        assert db_session.query(Appointment).count() == 0, (
-            "an already-past (by the clinic calendar) day never books"
-        )
+        assert (
+            db_session.query(Appointment).count() == 0
+        ), "an already-past (by the clinic calendar) day never books"
 
     def test_clinic_today_is_still_accepted(
         self,
@@ -1954,9 +2264,7 @@ class TestInactiveCanonicalDepartmentRouting:
             for row in denied
             if (row.extra_data or {}).get("reason") == "department_inactive"
         ]
-        assert len(reasons) >= 2, (
-            "both the preview and the create refusal are audited"
-        )
+        assert len(reasons) >= 2, "both the preview and the create refusal are audited"
 
     def test_reactivated_canonical_department_books_again(
         self,
@@ -2051,14 +2359,14 @@ class TestReplayAuditTrail:
         assert replay.status_code == 201, replay.json()
         assert replay.json() == first.json(), "the committed response is replayed"
 
-        assert db_session.query(Appointment).count() == 1, (
-            "the replay never re-executes the handler"
-        )
+        assert (
+            db_session.query(Appointment).count() == 1
+        ), "the replay never re-executes the handler"
 
         rows_after_replay = self._success_create_rows(db_session, test_patient)
-        assert len(rows_after_replay) == 2, (
-            "two HTTP attempts = two audited rows (execution + replay)"
-        )
+        assert (
+            len(rows_after_replay) == 2
+        ), "two HTTP attempts = two audited rows (execution + replay)"
         replay_rows = [
             row for row in rows_after_replay if (row.extra_data or {}).get("replayed")
         ]
@@ -2080,9 +2388,13 @@ class TestReplayAuditTrail:
         key = "replay-audit-preview-1"
         headers = {**linked_patient_headers, "Idempotency-Key": key}
 
-        first = client.post("/api/v1/patients/booking/preview", headers=headers, json=body)
+        first = client.post(
+            "/api/v1/patients/booking/preview", headers=headers, json=body
+        )
         assert first.status_code == 200, first.json()
-        replay = client.post("/api/v1/patients/booking/preview", headers=headers, json=body)
+        replay = client.post(
+            "/api/v1/patients/booking/preview", headers=headers, json=body
+        )
         assert replay.status_code == 200, replay.json()
         assert replay.json() == first.json()
 
@@ -2101,9 +2413,9 @@ class TestReplayAuditTrail:
             and row.action == "preview"
             and row.resource_type == "appointment"
         ]
-        assert len(marked) == 1, (
-            "the keyed preview replay is audited under its own action"
-        )
+        assert (
+            len(marked) == 1
+        ), "the keyed preview replay is audited under its own action"
 
 
 class TestAnalyticsDepartmentContractE2E:
@@ -2149,7 +2461,11 @@ class TestAnalyticsDepartmentContractE2E:
         test_doctor.department_id = portal_department.id
         db_session.commit()
         appointment_id = self._book(
-            client, linked_patient_headers, portal_department, test_doctor, "analytics-e2e-1"
+            client,
+            linked_patient_headers,
+            portal_department,
+            test_doctor,
+            "analytics-e2e-1",
         )
 
         # 1. appointment-flow analytics — the flagged relationship-vs-string
@@ -2261,7 +2577,13 @@ class TestAnalyticsDepartmentContractE2E:
 
         test_doctor.department_id = portal_department.id
         db_session.commit()
-        self._book(client, linked_patient_headers, portal_department, test_doctor, "analytics-svc-1")
+        self._book(
+            client,
+            linked_patient_headers,
+            portal_department,
+            test_doctor,
+            "analytics-svc-1",
+        )
 
         start = datetime.combine(date.today(), datetime.min.time())
         end = datetime.combine(date.today() + timedelta(days=7), datetime.min.time())
@@ -2279,6 +2601,6 @@ class TestAnalyticsDepartmentContractE2E:
             db_session, start, end, department="definitely-not-a-key"
         )
         assert "error" not in unknown, unknown.get("error")
-        assert unknown.get("doctor_performance") == [], (
-            "an unknown key answers an EMPTY result (exact-key semantics)"
-        )
+        assert (
+            unknown.get("doctor_performance") == []
+        ), "an unknown key answers an EMPTY result (exact-key semantics)"

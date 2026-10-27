@@ -15,9 +15,97 @@ from app.models.enums import (
     normalize_appointment_status,
 )
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
+from app.services.appointment_duration_snapshot import (
+    InvalidServiceSelection,
+    resolve_exact_service_selection,
+)
+
+
+def _department_id_for_service_selection(
+    db: Session, data: dict[str, Any]
+) -> int | None:
+    """Return only a server-owned or canonical department context."""
+    department_id = data.get("department_id")
+    if department_id is not None:
+        return int(department_id)
+    department_key = data.get("department")
+    if isinstance(department_key, str) and department_key.strip():
+        row = (
+            db.query(Department)
+            .filter(Department.key == department_key.strip())
+            .first()
+        )
+        return int(row.id) if row is not None else None
+    return None
 
 
 class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate]):
+    def create(self, db: Session, *, obj_in: AppointmentCreate) -> Appointment:
+        data = obj_in.model_dump(exclude_unset=True)
+        service_ids = data.pop("service_ids", None)
+        if service_ids is not None:
+            try:
+                selection = resolve_exact_service_selection(
+                    db,
+                    service_ids,
+                    doctor_id=data.get("doctor_id"),
+                    department_id=_department_id_for_service_selection(db, data),
+                )
+            except InvalidServiceSelection as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"code": str(exc), "field": "service_ids"},
+                ) from exc
+            data["services"] = list(selection.names)
+            data["duration_minutes_snapshot"] = selection.duration_minutes_snapshot
+
+        appointment = self.model(**data)
+        db.add(appointment)
+        db.commit()
+        db.refresh(appointment)
+        return appointment
+
+    def update(
+        self,
+        db: Session,
+        *,
+        db_obj: Appointment,
+        obj_in: AppointmentUpdate | dict[str, Any],
+    ) -> Appointment:
+        if isinstance(obj_in, AppointmentUpdate):
+            data = obj_in.model_dump(exclude_unset=True)
+        else:
+            data = dict(obj_in)
+
+        service_ids = data.pop("service_ids", None)
+        if service_ids is not None:
+            doctor_id = data.get("doctor_id", db_obj.doctor_id)
+            department_id = _department_id_for_service_selection(db, data)
+            if department_id is None and doctor_id == db_obj.doctor_id:
+                department_id = db_obj.department_id
+            try:
+                selection = resolve_exact_service_selection(
+                    db,
+                    service_ids,
+                    doctor_id=doctor_id,
+                    department_id=department_id,
+                )
+            except InvalidServiceSelection as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"code": str(exc), "field": "service_ids"},
+                ) from exc
+            data["services"] = list(selection.names)
+            data["duration_minutes_snapshot"] = selection.duration_minutes_snapshot
+        elif "services" in data or (
+            "doctor_id" in data and data["doctor_id"] != db_obj.doctor_id
+        ):
+            # Display names cannot prove which catalog row was selected. Do
+            # not keep an old duration if the service list or doctor changes.
+            data["duration_minutes_snapshot"] = None
+
+        return super().update(db, db_obj=db_obj, obj_in=data)
+
     def get_patient_history(
         self,
         db: Session,
@@ -271,9 +359,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
             db, appointment_id=appointment_id, new_status=AppointmentStatus.IN_VISIT
         )
 
-    def complete_visit(
-        self, db: Session, *, appointment_id: int
-    ) -> Appointment | None:
+    def complete_visit(self, db: Session, *, appointment_id: int) -> Appointment | None:
         """
         Завершить прием (переход in_visit -> completed)
         """
@@ -305,9 +391,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
             db, appointment_id=appointment_id, new_status=AppointmentStatus.CANCELLED
         )
 
-    def mark_no_show(
-        self, db: Session, *, appointment_id: int
-    ) -> Appointment | None:
+    def mark_no_show(self, db: Session, *, appointment_id: int) -> Appointment | None:
         """
         Отметить как неявку
         """
@@ -419,9 +503,7 @@ def get_upcoming_appointments(
     today = datetime.now().date()
     return (
         db.query(Appointment)
-        .options(
-            selectinload(Appointment.doctor).selectinload(Doctor.user)
-        )
+        .options(selectinload(Appointment.doctor).selectinload(Doctor.user))
         .filter(
             and_(
                 Appointment.patient_id == patient_id,

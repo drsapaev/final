@@ -54,6 +54,39 @@ class PublicBookingSettingsService:
         stored = self._load(row.value) if row is not None else None
         return self._to_output(stored=stored, row=row)
 
+    def get_patient_booking_service_ids(self) -> list[int]:
+        """Return only selected services that remain eligible for publication.
+
+        Website publication and online-booking approval are separate facts:
+        membership in the Admin allowlist is required, and current service
+        eligibility removes stale entries that are now inactive or unpublished.
+        """
+        settings = self.get_settings()
+        eligible_ids = {option.id for option in settings.services if option.eligible}
+        return [
+            service_id
+            for service_id in settings.service_ids
+            if service_id in eligible_ids
+        ]
+
+    def validate_patient_booking_service_selection(
+        self,
+        *,
+        service_ids: list[int] | None,
+        services: list[str] | None,
+    ) -> None:
+        """Reject selected services without exact IDs or outside the Admin allowlist."""
+        requested_ids = service_ids or []
+        has_named_services = bool(services)
+        if not requested_ids and not has_named_services:
+            return
+        if has_named_services and not requested_ids:
+            raise PublicBookingSettingsError(400, "booking_service_id_required")
+
+        allowed_ids = set(self.get_patient_booking_service_ids())
+        if any(service_id not in allowed_ids for service_id in requested_ids):
+            raise PublicBookingSettingsError(400, "booking_service_not_approved")
+
     def update_settings(
         self, *, update: PublicBookingSettingsUpdate, actor_user_id: int
     ) -> PublicBookingSettingsOut:

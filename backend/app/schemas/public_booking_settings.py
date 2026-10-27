@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -55,3 +56,70 @@ class PublicBookingSettingsOut(BaseModel):
     doctors: list[PublicBookingOptionOut]
     updated_at: datetime | None = None
     updated_by: int | None = None
+
+
+class PublicBookingServiceIdsOut(BaseModel):
+    """Current eligible Admin-approved services for patient booking forms."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    service_ids: list[int]
+
+
+class PublicBookingServiceErrorDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str
+
+
+class PublicBookingServiceErrorOut(BaseModel):
+    """Machine-readable reason returned by patient booking service reads/writes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    detail: PublicBookingServiceErrorDetail
+
+
+class PublicBookingServiceSelectionErrorDetail(BaseModel):
+    """Exact service-ID validation error used by patient booking writers."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: Literal[
+        "service_ids_invalid",
+        "service_ids_duplicate",
+        "service_not_found_or_inactive",
+        "service_incompatible_with_doctor",
+        "department_not_found",
+        "service_incompatible_with_department",
+    ]
+    field: Literal["service_ids"]
+
+
+class PublicBookingServiceSelectionErrorOut(BaseModel):
+    """Stable error body returned when an exact service selection is invalid."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    detail: PublicBookingServiceSelectionErrorDetail
+
+
+class PublicBookingRequestValidationErrorItem(BaseModel):
+    """One standard FastAPI request-validation issue."""
+
+    loc: list[str | int]
+    msg: str
+    type: str
+    input: Any | None = None
+    ctx: dict[str, Any] | None = None
+
+
+class PublicBookingRequestValidationErrorOut(BaseModel):
+    """Standard FastAPI 422 validation response used by booking endpoints."""
+
+    detail: list[PublicBookingRequestValidationErrorItem]
+
+
+PublicBookingValidationErrorOut = (
+    PublicBookingRequestValidationErrorOut | PublicBookingServiceSelectionErrorOut
+)

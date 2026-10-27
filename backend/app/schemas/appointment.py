@@ -20,9 +20,7 @@ class AppointmentBase(ORMModel):
     )  # scheduled, confirmed, cancelled, completed
 
     # Дополнительные поля для регистратуры
-    visit_type: str | None = Field(
-        default="paid", max_length=16
-    )  # paid, repeat, free
+    visit_type: str | None = Field(default="paid", max_length=16)  # paid, repeat, free
     payment_type: str | None = Field(
         default="cash", max_length=16
     )  # cash, card, online
@@ -38,7 +36,9 @@ class AppointmentBase(ORMModel):
 
 
 class AppointmentCreate(AppointmentBase):
-    pass
+    # Exact catalog identity is optional for older clients. When supplied,
+    # the server resolves service names and captures duration at write time.
+    service_ids: list[int] | None = None
 
 
 class PatientPortalAppointmentCreate(AppointmentCreate):
@@ -72,6 +72,7 @@ class AppointmentUpdate(ORMModel):
     visit_type: str | None = Field(None, max_length=16)  # paid, repeat, free
     payment_type: str | None = Field(None, max_length=16)  # cash, card, online
     services: list[str] | None = None  # Список услуг
+    service_ids: list[int] | None = None
 
     # Поля для интеграции с платежами
     payment_amount: float | None = None

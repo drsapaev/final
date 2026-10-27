@@ -58,13 +58,14 @@ afterAll(() => {
   vi.restoreAllMocks();
 });
 
-const { apiPost } = vi.hoisted(() => ({ apiPost: vi.fn() }));
+const { apiPost, apiGet } = vi.hoisted(() => ({ apiPost: vi.fn(), apiGet: vi.fn() }));
 
-vi.mock('../../api/client', () => ({ api: { post: apiPost } }));
+vi.mock('../../api/client', () => ({ api: { post: apiPost, get: apiGet } }));
 
 import TelegramMiniAppPatientShell from '../TelegramMiniAppPatientShell';
 
 const DEPARTMENTS_URL = '/telegram/mini-app/booking/departments';
+const SERVICES_URL = '/telegram/mini-app/booking/services';
 const PREVIEW_URL = '/telegram/mini-app/appointments/preview';
 const CREATE_URL = '/telegram/mini-app/appointments';
 const MANIFEST_URL = '/telegram/mini-app/patient/manifest';
@@ -93,6 +94,7 @@ const departmentRows = [
 const departmentRowsUz = [
   { key: 'cardio', name: 'Кардиология', name_uz: 'Kardiologiya' },
 ];
+const serviceRows = [{ id: 73, name: 'УЗИ сердца' }];
 
 const uzManifest = {
   ...linkedManifest,
@@ -105,6 +107,9 @@ function routeApiPostByUrl(url: string, body: Record<string, any>) {
   }
   if (url === DEPARTMENTS_URL) {
     return Promise.resolve({ data: { departments: departmentRows } });
+  }
+  if (url === SERVICES_URL) {
+    return Promise.resolve({ data: { service_ids: [73] } });
   }
   if (url === PREVIEW_URL) {
     return Promise.resolve({
@@ -169,10 +174,19 @@ async function selectDepartmentByName(label: string, triggerLabel = 'Отдел�
   fireEvent.click(option);
 }
 
+async function selectServiceByName(label: string) {
+  const trigger = await screen.findByLabelText(/услуг|xizmat|service/i);
+  await waitFor(() => expect(trigger).toBeEnabled());
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole('option', { name: label }));
+}
+
 describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)', () => {
   beforeEach(() => {
     apiPost.mockReset();
     apiPost.mockImplementation((url: string, body: Record<string, any>) => routeApiPostByUrl(url, body));
+    apiGet.mockReset();
+    apiGet.mockResolvedValue({ data: serviceRows });
   });
 
   afterEach(() => {
@@ -202,6 +216,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
 
     // …and the canonical Department.key ("cardio") is what reaches the
     // backend — not the free-text label.
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     await waitFor(() => {
@@ -229,12 +244,40 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
     });
 
     await selectDepartmentByName('Кардиология');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
         PREVIEW_URL,
         expect.objectContaining({ department: 'cardio' }),
+        expect.anything(),
+      );
+    });
+  });
+
+  it('submits the selected service ID in both preview and create requests', async () => {
+    (window as unknown as { Telegram?: unknown }).Telegram = {
+      WebApp: { initData: 'test-init-data-payload' },
+    };
+    renderBookSurface('?section=appointments');
+
+    await selectServiceByName('УЗИ сердца');
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
+
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith(
+        PREVIEW_URL,
+        expect.objectContaining({ serviceIds: [73], services: ['УЗИ сердца'] }),
+        expect.anything(),
+      );
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Отправить заявку' }));
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith(
+        CREATE_URL,
+        expect.objectContaining({ serviceIds: [73], services: ['УЗИ сердца'] }),
         expect.anything(),
       );
     });
@@ -248,6 +291,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
       WebApp: { initData: 'test-init-data-payload' },
     };
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: uzManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRowsUz } });
       if (url === PREVIEW_URL) return routeApiPostByUrl(PREVIEW_URL, body);
@@ -258,8 +302,9 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
 
     // The uz-Latn form must list the clinic's own Uzbek name — not the
     // Russian label — while still submitting the canonical key.
-    await selectDepartmentByName("Kardiologiya", "Bo'lim");
-    expect(screen.getByLabelText("Bo'lim")).toHaveTextContent('Kardiologiya');
+    await selectDepartmentByName('Kardiologiya', 'Bo\'lim');
+    await selectServiceByName('УЗИ сердца');
+    expect(screen.getByLabelText('Bo\'lim')).toHaveTextContent('Kardiologiya');
 
     fireEvent.click(screen.getByRole('button', { name: 'Qoralamani tekshirish' }));
     await waitFor(() => {
@@ -271,12 +316,63 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
     });
   });
 
+  it('filters service choices to the selected canonical department', async () => {
+    (window as unknown as { Telegram?: unknown }).Telegram = {
+      WebApp: { initData: 'test-init-data-payload' },
+    };
+    apiGet.mockResolvedValue({
+      data: [
+        { id: 73, name: 'УЗИ сердца', department_key: 'cardiology' },
+        { id: 74, name: 'УЗИ кожи', department_key: 'dermatology' },
+        { id: 75, name: 'Общая услуга', department_key: null },
+      ],
+    });
+    apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) {
+        return Promise.resolve({ data: { service_ids: [73, 74, 75] } });
+      }
+      return routeApiPostByUrl(url, body);
+    });
+    renderBookSurface('?section=appointments');
+    await selectDepartmentByName('Кардиология');
+    fireEvent.click(await screen.findByLabelText(/услуг|xizmat|service/i));
+
+    expect(await screen.findByRole('option', { name: 'УЗИ сердца' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Общая услуга' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'УЗИ кожи' })).not.toBeInTheDocument();
+  });
+
+  it('lists only services approved for online booking', async () => {
+    (window as unknown as { Telegram?: unknown }).Telegram = {
+      WebApp: { initData: 'test-init-data-payload' },
+    };
+    apiGet.mockResolvedValue({
+      data: [
+        { id: 73, name: 'Разрешённая консультация', department_key: null },
+        { id: 76, name: 'Не разрешённая консультация', department_key: null },
+      ],
+    });
+    apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
+      return routeApiPostByUrl(url, body);
+    });
+
+    renderBookSurface('?section=appointments');
+    const serviceTrigger = await screen.findByLabelText(/услуг|xizmat|service/i);
+    await waitFor(() => expect(serviceTrigger).toBeEnabled());
+    fireEvent.click(serviceTrigger);
+
+    expect(await screen.findByRole('option', { name: 'Разрешённая консультация' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Не разрешённая консультация' })).not.toBeInTheDocument();
+  });
+
   it('clears a stale selected department when the reference refetch fails after a section switch (round-15 P2)', async () => {
     (window as unknown as { Telegram?: unknown }).Telegram = {
       WebApp: { initData: 'test-init-data-payload' },
     };
     let departmentsCalls = 0;
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) {
         departmentsCalls += 1;
@@ -291,6 +387,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
 
     renderBookSurface('?section=appointments');
     await selectDepartmentByName('Кардиология');
+    await selectServiceByName('УЗИ сердца');
 
     // Leave the booking section (the departments effect is gated to
     // appointments, so no refetch happens there) and come back — the shell
@@ -318,6 +415,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
     };
     let departmentsCalls = 0;
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) {
         departmentsCalls += 1;
@@ -334,6 +432,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
 
     renderBookSurface('?section=appointments');
     await selectDepartmentByName('Кардиология');
+    await selectServiceByName('УЗИ сердца');
 
     // Leave the booking section (no refetch happens there) and come back —
     // the refetch succeeds, so the selector no longer offers "Кардиология".
@@ -359,6 +458,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
       WebApp: { initData: 'test-init-data-payload' },
     };
     apiPost.mockImplementation((url: string) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === DEPARTMENTS_URL) {
         return Promise.reject({ response: { status: 503, data: { detail: { reason: 'bot_token_required' } } } });
       }
@@ -369,6 +469,7 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
 
     // Selector renders (with the "no department" escape hatch), submit still works.
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith(
@@ -394,6 +495,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
   it('maps preview department_unknown to the patient-safe wording instead of the machine reason', async () => {
     apiPost.mockImplementation((url: string, _body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
       if (url === PREVIEW_URL) return rejectWithReason(400, 'department_unknown');
@@ -402,6 +504,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
     renderBookSurface('?section=appointments');
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     await waitFor(() => {
@@ -412,6 +515,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
   it('maps create doctor_not_eligible to the patient-safe wording instead of the machine reason', async () => {
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
       if (url === PREVIEW_URL) return routeApiPostByUrl(PREVIEW_URL, body);
@@ -421,6 +525,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
     renderBookSurface('?section=appointments');
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     // After a successful preview the create action becomes available.
@@ -435,6 +540,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
   it('maps preview telegram_link_inactive to the patient-safe wording instead of the machine reason (round-15 P2)', async () => {
     apiPost.mockImplementation((url: string, _body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
       if (url === PREVIEW_URL) return rejectWithReason(403, 'telegram_link_inactive');
@@ -443,6 +549,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
     renderBookSurface('?section=appointments');
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     await waitFor(() => {
@@ -453,6 +560,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
   it('maps create telegram_link_blocked to the patient-safe wording instead of the machine reason (round-15 P2)', async () => {
     apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
       if (url === PREVIEW_URL) return routeApiPostByUrl(PREVIEW_URL, body);
@@ -462,6 +570,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
     renderBookSurface('?section=appointments');
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     const createButton = await screen.findByRole('button', { name: 'Отправить заявку' });
@@ -475,6 +584,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
   it('keeps the reason visible for genuinely unknown backend codes (diagnostics preserved)', async () => {
     apiPost.mockImplementation((url: string, _body: Record<string, any>) => {
+      if (url === SERVICES_URL) return Promise.resolve({ data: { service_ids: [73] } });
       if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
       if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
       if (url === PREVIEW_URL) return rejectWithReason(400, 'brand_new_future_reason');
@@ -483,6 +593,7 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
 
     renderBookSurface('?section=appointments');
     await screen.findByLabelText('Отделение');
+    await selectServiceByName('УЗИ сердца');
     fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
 
     await waitFor(() => {

@@ -15,10 +15,11 @@ from app.api.v1.endpoints import admin_telegram, telegram_webhook
 from app.models.appointment import Appointment
 from app.models.audit import AuditLog
 from app.models.department import Department
-from app.schemas.notifications import SendMessageRequest
-from app.services import telegram_bot
-from app.services.telegram_templates import TelegramTemplatesService
-from app.models.lab import LabReportInstance, LabReportTemplate, LabReportTemplateVersion
+from app.models.lab import (
+    LabReportInstance,
+    LabReportTemplate,
+    LabReportTemplateVersion,
+)
 from app.models.online_queue import OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment
@@ -29,6 +30,9 @@ from app.models.telegram_config import (
     TelegramStaffLinkToken,
     TelegramUser,
 )
+from app.schemas.notifications import SendMessageRequest
+from app.services import telegram_bot
+from app.services.telegram_templates import TelegramTemplatesService
 
 
 class FakeTelegramBotService:
@@ -149,11 +153,49 @@ def _link_patient_to_chat(
     return telegram_user
 
 
+def _published_booking_service(db_session, *, name: str, slug: str):
+    from app.models.service import Service
+
+    row = Service(
+        name=name,
+        name_uz=f"Uz {name}",
+        description_ru="Опубликованная услуга.",
+        description_uz="Ommaviy xizmat.",
+        slug=slug,
+        duration_minutes=30,
+        active=True,
+        show_on_website=True,
+        requires_doctor=True,
+        department_key="cardio",
+    )
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def _store_booking_service_allowlist(db_session, service_ids: list[int]) -> None:
+    from app.models.clinic import ClinicSettings
+
+    db_session.add(
+        ClinicSettings(
+            key="public_booking_settings",
+            category="booking_settings",
+            value={
+                "version": 1,
+                "is_enabled": False,
+                "mode": None,
+                "booking_horizon_days": None,
+                "service_ids": service_ids,
+                "doctor_ids": [],
+            },
+        )
+    )
+    db_session.commit()
+
+
 def _reply_keyboard_texts(reply_markup):
     return [
-        button["text"]
-        for row in reply_markup.get("keyboard", [])
-        for button in row
+        button["text"] for row in reply_markup.get("keyboard", []) for button in row
     ]
 
 
@@ -236,9 +278,7 @@ class TestTelegramWebhookSecurity:
         assert "allowed_updates" not in str(response)
         assert "raw-provider-secret" not in str(response)
 
-    def test_webhook_rejects_missing_secret_configuration(
-        self, client, monkeypatch
-    ):
+    def test_webhook_rejects_missing_secret_configuration(self, client, monkeypatch):
         fake_service = FakeTelegramBotService(active=True)
         monkeypatch.setattr(
             telegram_webhook,
@@ -373,7 +413,6 @@ class TestTelegramWebhookSecurity:
                 "appointmentTime": "09:30",
                 "department": cardio.key,
                 "notes": "Mini App request",
-                "services": ["Consultation"],
             },
         )
 
@@ -552,7 +591,9 @@ class TestTelegramWebhookSecurity:
         _add_mini_app_telegram_config(db_session)
         patient_chat_id = 880212
         staff_chat_id = 880213
-        _link_patient_to_chat(db_session, chat_id=patient_chat_id, patient_id=test_patient.id)
+        _link_patient_to_chat(
+            db_session, chat_id=patient_chat_id, patient_id=test_patient.id
+        )
         db_session.add(
             TelegramUser(
                 chat_id=staff_chat_id,
@@ -593,7 +634,9 @@ class TestTelegramWebhookSecurity:
         assert staff_response.status_code == 403
         assert staff_response.json()["detail"] == {"reason": "patient_scope_required"}
         assert wrong_patient_response.status_code == 403
-        assert wrong_patient_response.json()["detail"] == {"reason": "patient_scope_mismatch"}
+        assert wrong_patient_response.json()["detail"] == {
+            "reason": "patient_scope_mismatch"
+        }
         assert db_session.query(Appointment).count() == initial_appointments
 
     def test_mini_app_patient_form_submission_endpoint_creates_and_updates_submission(
@@ -629,7 +672,10 @@ class TestTelegramWebhookSecurity:
         created_payload = create_response.json()
         assert created_payload["stored"] is True
         assert created_payload["created"] is True
-        assert created_payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
+        assert created_payload["scope"] == {
+            "type": "patient",
+            "patient_id": test_patient.id,
+        }
         assert created_payload["submission"]["form_id"] == "patient_intake"
         assert created_payload["submission"]["status"] == "draft"
         assert created_payload["submission"]["answers"] == {
@@ -667,9 +713,14 @@ class TestTelegramWebhookSecurity:
         assert update_response.status_code == 200
         updated_payload = update_response.json()
         assert updated_payload["created"] is False
-        assert updated_payload["submission"]["id"] == created_payload["submission"]["id"]
+        assert (
+            updated_payload["submission"]["id"] == created_payload["submission"]["id"]
+        )
         assert updated_payload["submission"]["status"] == "submitted"
-        assert updated_payload["submission"]["answers"]["chief_complaint"] == "Headache improved"
+        assert (
+            updated_payload["submission"]["answers"]["chief_complaint"]
+            == "Headache improved"
+        )
         assert updated_payload["submission"]["submitted_at"] is not None
         assert db_session.query(TelegramPatientFormSubmission).count() == 1
 
@@ -687,7 +738,10 @@ class TestTelegramWebhookSecurity:
         assert hydrated_form["submission"]["id"] == created_payload["submission"]["id"]
         assert hydrated_form["submission"]["form_id"] == "patient_intake"
         assert hydrated_form["submission"]["status"] == "submitted"
-        assert hydrated_form["submission"]["answers"]["chief_complaint"] == "Headache improved"
+        assert (
+            hydrated_form["submission"]["answers"]["chief_complaint"]
+            == "Headache improved"
+        )
         assert hydrated_form["submission"]["submitted_at"] is not None
         assert "telegram_chat_id" not in hydrated_form["submission"]
         assert "telegram_user_id" not in hydrated_form["submission"]
@@ -881,7 +935,9 @@ class TestTelegramWebhookSecurity:
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/pdf"
         assert response.content == b"%PDF-1.4 mini app"
-        assert f"report-{ready_report.id}.pdf" in response.headers["content-disposition"]
+        assert (
+            f"report-{ready_report.id}.pdf" in response.headers["content-disposition"]
+        )
         assert other_patient_response.status_code == 404
         assert other_patient_response.json()["detail"] == {
             "reason": "report_not_ready_or_not_found"
@@ -914,7 +970,6 @@ class TestTelegramWebhookSecurity:
                 "appointmentTime": "09:30",
                 "department": cardio.key,
                 "notes": "Mini App create request",
-                "services": ["Consultation"],
             },
         )
 
@@ -1038,9 +1093,246 @@ class TestMiniAppBookingRoutingParity:
         )
         assert created.status_code == 201, created.json()
         row = db_session.get(Appointment, created.json()["appointment_id"])
-        assert row.department_id == cardio.id, (
-            "a doctor-booking never persists a NULL routing context"
+        assert (
+            row.department_id == cardio.id
+        ), "a doctor-booking never persists a NULL routing context"
+
+    def test_mini_app_create_uses_exact_service_id_for_name_and_duration(
+        self, client, db_session, test_patient, test_doctor
+    ):
+        from app.models.service import Service
+
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880229
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session)
+        _bind_doctor_department(db_session, test_doctor, cardio)
+        service = Service(
+            name="Каталожная услуга Mini App",
+            name_uz="Mini App katalog xizmati",
+            description_ru="Опубликованная услуга.",
+            description_uz="Ommaviy xizmat.",
+            slug="mini-app-catalog-service",
+            price=100000,
+            duration_minutes=25,
+            active=True,
+            show_on_website=True,
+            requires_doctor=True,
+            department_key="cardio",
         )
+        db_session.add(service)
+        db_session.flush()
+        _store_booking_service_allowlist(db_session, [service.id])
+        db_session.commit()
+
+        body = {
+            "initData": _signed_mini_app_init_data(chat_id),
+            "patientId": test_patient.id,
+            "doctorId": test_doctor.id,
+            "appointmentDate": self.future_date,
+            "department": cardio.key,
+            "services": ["подменённое клиентом название"],
+            "serviceIds": [service.id],
+        }
+        preview = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview", json=body
+        )
+        assert preview.status_code == 200, preview.text
+        assert preview.json()["appointment"]["service_ids"] == [service.id]
+
+        created = client.post("/api/v1/telegram/mini-app/appointments", json=body)
+        assert created.status_code == 201, created.text
+        row = db_session.get(Appointment, created.json()["appointment_id"])
+        assert row is not None
+        assert row.services == ["Каталожная услуга Mini App"]
+        assert row.duration_minutes_snapshot == 25
+
+    def _assert_preview_and_create_reject_incompatible_service(
+        self, client, db_session, body, expected_code
+    ):
+        initial_count = db_session.query(Appointment).count()
+        preview = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview", json=body
+        )
+        created = client.post("/api/v1/telegram/mini-app/appointments", json=body)
+
+        assert preview.status_code == created.status_code == 422, (
+            f"preview={preview.status_code} {preview.json()} "
+            f"create={created.status_code} {created.json()}"
+        )
+        assert preview.json() == created.json()
+        assert preview.json()["detail"] == {
+            "code": expected_code,
+            "field": "service_ids",
+        }
+        assert db_session.query(Appointment).count() == initial_count
+
+    def test_preview_and_create_reject_service_pinned_to_another_doctor(
+        self, client, db_session, test_patient, test_doctor, test_doctor_user
+    ):
+        from app.models.clinic import Doctor
+
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880241
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session)
+        _bind_doctor_department(db_session, test_doctor, cardio)
+        other_doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="Кардиология",
+            active=True,
+            show_on_website=True,
+            bio_ru="Синтетическая публичная биография.",
+            bio_uz="Sintetik ommaviy tarjimai hol.",
+            slug="synthetic-pinned-doctor-telegram",
+        )
+        db_session.add(other_doctor)
+        db_session.flush()
+        service = _published_booking_service(
+            db_session,
+            name="Закреплённая услуга Mini App",
+            slug="pinned-mini-app-service",
+        )
+        service.doctor_id = other_doctor.id
+        _store_booking_service_allowlist(db_session, [service.id])
+
+        body = {
+            "initData": _signed_mini_app_init_data(chat_id),
+            "patientId": test_patient.id,
+            "doctorId": test_doctor.id,
+            "appointmentDate": self.future_date,
+            "department": cardio.key,
+            "serviceIds": [service.id],
+        }
+        self._assert_preview_and_create_reject_incompatible_service(
+            client, db_session, body, "service_incompatible_with_doctor"
+        )
+
+    def test_preview_and_create_reject_service_bound_to_another_department(
+        self, client, db_session, test_patient, test_doctor
+    ):
+        from uuid import uuid4
+
+        other_department = Department(
+            key=f"other-mini-app-{uuid4().hex[:8]}",
+            name_ru="Другое отделение",
+        )
+        db_session.add(other_department)
+        db_session.flush()
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880242
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session)
+        _bind_doctor_department(db_session, test_doctor, cardio)
+        service = _published_booking_service(
+            db_session,
+            name="Услуга другого отделения Mini App",
+            slug="other-department-mini-app-service",
+        )
+        service.department_id = other_department.id
+        service.department_key = None
+        _store_booking_service_allowlist(db_session, [service.id])
+
+        body = {
+            "initData": _signed_mini_app_init_data(chat_id),
+            "patientId": test_patient.id,
+            "doctorId": test_doctor.id,
+            "appointmentDate": self.future_date,
+            "department": cardio.key,
+            "serviceIds": [service.id],
+        }
+        self._assert_preview_and_create_reject_incompatible_service(
+            client, db_session, body, "service_incompatible_with_department"
+        )
+
+    def test_booking_service_reference_returns_only_admin_allowlisted_services(
+        self, client, db_session, test_patient
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880239
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        approved = _published_booking_service(
+            db_session,
+            name="Разрешённая консультация",
+            slug="approved-telegram-service",
+        )
+        unapproved = _published_booking_service(
+            db_session, name="Другая консультация", slug="unapproved-telegram-service"
+        )
+        inactive = _published_booking_service(
+            db_session, name="Снятая услуга", slug="inactive-telegram-service"
+        )
+        inactive.active = False
+        _store_booking_service_allowlist(db_session, [approved.id, inactive.id])
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/booking/services",
+            json={"initData": _signed_mini_app_init_data(chat_id)},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json() == {"service_ids": [approved.id]}
+        assert unapproved.id not in response.json()["service_ids"]
+        assert inactive.id not in response.json()["service_ids"]
+
+    def test_booking_service_reference_requires_patient_authentication(self, client):
+        response = client.post(
+            "/api/v1/telegram/mini-app/booking/services",
+            json={},
+        )
+
+        assert response.status_code == 403, response.text
+
+    @pytest.mark.parametrize(
+        ("services", "service_ids", "reason"),
+        [
+            (["Не разрешённая услуга"], [999999], "booking_service_not_approved"),
+            (["Старая заявка только с названием"], [], "booking_service_id_required"),
+            ([" "], [], "booking_service_id_required"),
+        ],
+    )
+    def test_mini_app_booking_rejects_service_selection_without_allowlist_proof(
+        self,
+        client,
+        db_session,
+        test_patient,
+        services,
+        service_ids,
+        reason,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880240
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        before = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "appointmentDate": self.future_date,
+                "services": services,
+                "serviceIds": service_ids,
+            },
+        )
+
+        assert response.status_code == 400, response.text
+        assert response.json()["detail"]["reason"] == reason
+        assert db_session.query(Appointment).count() == before
+        from app.models.patient_access_audit import PatientAccessAuditLog
+
+        denial_audit = (
+            db_session.query(PatientAccessAuditLog)
+            .filter_by(
+                subject_patient_id=test_patient.id,
+                resource_type="appointment",
+                action="create",
+                outcome="denied",
+            )
+            .order_by(PatientAccessAuditLog.id.desc())
+            .first()
+        )
+        assert denial_audit is not None
 
     def test_foreign_submitted_department_rejected_400(
         self, client, db_session, test_patient, test_doctor
@@ -1072,9 +1364,9 @@ class TestMiniAppBookingRoutingParity:
         )
         assert created.status_code == 400, created.json()
         assert created.json()["detail"]["reason"] == "doctor_department_mismatch"
-        assert db_session.query(Appointment).count() == 0, (
-            "a routing contradiction never materializes an appointment"
-        )
+        assert (
+            db_session.query(Appointment).count() == 0
+        ), "a routing contradiction never materializes an appointment"
 
     def test_departmentless_doctor_explicitly_refused(
         self, client, db_session, test_patient, test_doctor
@@ -1302,9 +1594,9 @@ class TestMiniAppBookingRound12:
         )
         assert response.status_code == 201, response.json()
         row = db_session.get(Appointment, response.json()["appointment_id"])
-        assert locked_ids == [cardio.id], (
-            "the FINAL (canonical) department row is re-validated under lock"
-        )
+        assert locked_ids == [
+            cardio.id
+        ], "the FINAL (canonical) department row is re-validated under lock"
         assert row.department_id == cardio.id
 
     def test_routing_follows_doctor_not_eligible(
@@ -1378,9 +1670,9 @@ class TestMiniAppClinicCalendarDateValidation:
         assert preview.status_code == 400, preview.json()
         assert preview.json()["detail"]["reason"] == "appointment_date_in_past"
 
-        assert db_session.query(Appointment).count() == 0, (
-            "an already-past (by the clinic calendar) day never books"
-        )
+        assert (
+            db_session.query(Appointment).count() == 0
+        ), "an already-past (by the clinic calendar) day never books"
 
     def test_clinic_today_is_still_accepted(
         self, client, db_session, test_patient, monkeypatch
@@ -1456,9 +1748,7 @@ class TestMiniAppClinicCalendarDateValidation:
             == telegram_webhook.TELEGRAM_CONTACT_REJECTED_MESSAGE
         )
         assert (
-            db_session.query(TelegramUser)
-            .filter(TelegramUser.chat_id == 7001)
-            .first()
+            db_session.query(TelegramUser).filter(TelegramUser.chat_id == 7001).first()
             is None
         )
 
@@ -1558,9 +1848,7 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         telegram_user = (
-            db_session.query(TelegramUser)
-            .filter(TelegramUser.chat_id == 7006)
-            .one()
+            db_session.query(TelegramUser).filter(TelegramUser.chat_id == 7006).one()
         )
         assert telegram_user.language_code == "uz-Latn"
         assert telegram_user.notifications_enabled is False
@@ -1602,9 +1890,7 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         telegram_user = (
-            db_session.query(TelegramUser)
-            .filter(TelegramUser.chat_id == 7018)
-            .one()
+            db_session.query(TelegramUser).filter(TelegramUser.chat_id == 7018).one()
         )
         assert telegram_user.patient_id is None
         assert telegram_user.notifications_enabled is False
@@ -1645,9 +1931,7 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         telegram_user = (
-            db_session.query(TelegramUser)
-            .filter(TelegramUser.chat_id == 7020)
-            .one()
+            db_session.query(TelegramUser).filter(TelegramUser.chat_id == 7020).one()
         )
         assert telegram_user.language_code == "uz-Latn"
         reply_text = fake_service._send_message.await_args.args[1]
@@ -1656,8 +1940,7 @@ class TestMiniAppClinicCalendarDateValidation:
             in reply_text
         )
         assert (
-            telegram_webhook._localized_text("share_contact", "uz-Latn")
-            in reply_text
+            telegram_webhook._localized_text("share_contact", "uz-Latn") in reply_text
         )
         assert fake_service._send_message.await_args.args[2] == (
             telegram_webhook._localized_main_menu("uz-Latn")
@@ -1963,8 +2246,7 @@ class TestMiniAppClinicCalendarDateValidation:
             in reply_text
         )
         assert (
-            telegram_webhook._telegram_settings_message(db_session, 7022)
-            in reply_text
+            telegram_webhook._telegram_settings_message(db_session, 7022) in reply_text
         )
         assert fake_service._send_message.await_args.args[2] == (
             telegram_webhook._localized_settings_menu("ru")
@@ -2105,9 +2387,12 @@ class TestMiniAppClinicCalendarDateValidation:
             "inline_keyboard": [
                 [
                     {
-                        "text": telegram_webhook._localized_text("booking_entry_button", "uz-Latn"),
+                        "text": telegram_webhook._localized_text(
+                            "booking_entry_button", "uz-Latn"
+                        ),
                         "web_app": {
-                            "url": "https://clinic.example" + admin_telegram.PATIENT_BOOKING_ENTRY_ROUTE,
+                            "url": "https://clinic.example"
+                            + admin_telegram.PATIENT_BOOKING_ENTRY_ROUTE,
                         },
                     }
                 ]
@@ -2205,7 +2490,9 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         fake_service._send_message.assert_awaited_once()
-        reply_chat_id, message, reply_markup = fake_service._send_message.await_args.args
+        reply_chat_id, message, reply_markup = (
+            fake_service._send_message.await_args.args
+        )
         assert reply_chat_id == chat_id
         assert message == telegram_webhook._localized_text(text_key, "uz-Latn")
         assert reply_markup == {
@@ -2234,7 +2521,13 @@ class TestMiniAppClinicCalendarDateValidation:
     @pytest.mark.parametrize(
         "command,text_key,template_key,chat_id,update_id",
         [
-            ("/forms", "patient_forms", "telegram_patient_forms_placeholder", 7054, 1274),
+            (
+                "/forms",
+                "patient_forms",
+                "telegram_patient_forms_placeholder",
+                7054,
+                1274,
+            ),
             (
                 "/documents",
                 "patient_documents",
@@ -2362,10 +2655,13 @@ class TestMiniAppClinicCalendarDateValidation:
             expected_section="appointments",
         )
         assert parsed_onboarding["chat_id"] == 7030
-        assert telegram_webhook._parse_patient_mini_app_entry_token(
-            entry_token,
-            expected_section="appointments",
-        ) is None
+        assert (
+            telegram_webhook._parse_patient_mini_app_entry_token(
+                entry_token,
+                expected_section="appointments",
+            )
+            is None
+        )
         db_session.refresh(telegram_user)
         assert telegram_user.patient_id is None
         log = (
@@ -2434,7 +2730,9 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         fake_service._send_message.assert_awaited_once()
-        reply_chat_id, message, reply_markup = fake_service._send_message.await_args.args
+        reply_chat_id, message, reply_markup = (
+            fake_service._send_message.await_args.args
+        )
         assert reply_chat_id == chat_id
         assert message == telegram_webhook._localized_text(
             "unlinked_protected_action",
@@ -2459,10 +2757,13 @@ class TestMiniAppClinicCalendarDateValidation:
             expected_section="appointments",
         )
         assert parsed_onboarding["chat_id"] == chat_id
-        assert telegram_webhook._parse_patient_mini_app_entry_token(
-            entry_token,
-            expected_section="appointments",
-        ) is None
+        assert (
+            telegram_webhook._parse_patient_mini_app_entry_token(
+                entry_token,
+                expected_section="appointments",
+            )
+            is None
+        )
         db_session.refresh(telegram_user)
         assert telegram_user.patient_id is None
         log = (
@@ -2507,9 +2808,7 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         telegram_user = (
-            db_session.query(TelegramUser)
-            .filter(TelegramUser.chat_id == 7010)
-            .one()
+            db_session.query(TelegramUser).filter(TelegramUser.chat_id == 7010).one()
         )
         assert telegram_user.user_id == admin_user.id
         assert telegram_user.patient_id is None
@@ -2622,9 +2921,7 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         assert (
-            db_session.query(TelegramUser)
-            .filter(TelegramUser.chat_id == 7013)
-            .first()
+            db_session.query(TelegramUser).filter(TelegramUser.chat_id == 7013).first()
             is None
         )
         fake_service._send_message.assert_awaited_once_with(
@@ -2711,9 +3008,7 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         telegram_user = (
-            db_session.query(TelegramUser)
-            .filter(TelegramUser.chat_id == 7024)
-            .one()
+            db_session.query(TelegramUser).filter(TelegramUser.chat_id == 7024).one()
         )
         assert telegram_user.patient_id == test_patient.id
         assert telegram_user.notifications_enabled is False
@@ -2753,9 +3048,7 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         telegram_user = (
-            db_session.query(TelegramUser)
-            .filter(TelegramUser.chat_id == 7025)
-            .one()
+            db_session.query(TelegramUser).filter(TelegramUser.chat_id == 7025).one()
         )
         assert telegram_user.patient_id == test_patient.id
         assert telegram_user.notifications_enabled is False
@@ -2763,13 +3056,9 @@ class TestMiniAppClinicCalendarDateValidation:
         assert telegram_user.lab_notifications is False
         chat_id, text, reply_markup = fake_service._send_message.await_args.args
         assert chat_id == 7025
+        assert telegram_webhook._localized_text("ticket_qr_linked", "uz-Latn") in text
         assert (
-            telegram_webhook._localized_text("ticket_qr_linked", "uz-Latn")
-            in text
-        )
-        assert (
-            telegram_webhook._localized_text("notification_consent", "uz-Latn")
-            in text
+            telegram_webhook._localized_text("notification_consent", "uz-Latn") in text
         )
         assert reply_markup == telegram_webhook._localized_notification_consent_menu(
             "uz-Latn"
@@ -2819,9 +3108,7 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         telegram_user = (
-            db_session.query(TelegramUser)
-            .filter(TelegramUser.chat_id == chat_id)
-            .one()
+            db_session.query(TelegramUser).filter(TelegramUser.chat_id == chat_id).one()
         )
         assert telegram_user.language_code == "uz-Latn"
         assert telegram_user.patient_id is None
@@ -2829,13 +3116,9 @@ class TestMiniAppClinicCalendarDateValidation:
         chat_arg, text_arg, reply_markup = fake_service._send_message.await_args.args
         assert chat_arg == chat_id
         assert (
-            telegram_webhook._localized_text("language_selected", "uz-Latn")
-            in text_arg
+            telegram_webhook._localized_text("language_selected", "uz-Latn") in text_arg
         )
-        assert (
-            telegram_webhook._localized_text("share_contact", "uz-Latn")
-            in text_arg
-        )
+        assert telegram_webhook._localized_text("share_contact", "uz-Latn") in text_arg
         assert reply_markup == telegram_webhook._localized_main_menu("uz-Latn")
         fake_service._send_message.reset_mock()
 
@@ -3296,7 +3579,9 @@ class TestMiniAppClinicCalendarDateValidation:
         assert log.message_id == 77
 
     @pytest.mark.asyncio
-    async def test_telegram_bot_service_send_document_posts_pdf_bytes(self, monkeypatch):
+    async def test_telegram_bot_service_send_document_posts_pdf_bytes(
+        self, monkeypatch
+    ):
         captured = {}
 
         class FakeResponse:
@@ -3340,7 +3625,9 @@ class TestMiniAppClinicCalendarDateValidation:
         assert captured["timeout"] == 20
 
     @pytest.mark.asyncio
-    async def test_telegram_bot_service_blocks_corrupted_send_message(self, monkeypatch):
+    async def test_telegram_bot_service_blocks_corrupted_send_message(
+        self, monkeypatch
+    ):
         captured = []
 
         class FakeResponse:

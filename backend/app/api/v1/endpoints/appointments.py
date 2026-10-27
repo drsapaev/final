@@ -17,16 +17,16 @@ from app.models.patient import Patient
 from app.models.setting import Setting
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
-from app.services.patient_access_audit import log_patient_access
+from app.services.appointment_eligibility import (
+    ensure_doctor_eligible_for_appointment as _ensure_appointment_doctor_eligible,
+)
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.online_queue import (
     _broadcast,  # Добавляем _broadcast
     get_or_create_day,
     load_stats,
 )
-from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
-from app.services.appointment_eligibility import (
-    ensure_doctor_eligible_for_appointment as _ensure_appointment_doctor_eligible,
-)
+from app.services.patient_access_audit import log_patient_access
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +61,10 @@ APPOINTMENT_BROAD_ACCESS_ROLES_LOWER = frozenset(
 
 def _has_broad_appointment_access(current_user: User) -> bool:
     """Admin/Registrar or superuser."""
-    return (
-        _normalized_role_value(getattr(current_user, "role", None))
-        in APPOINTMENT_BROAD_ACCESS_ROLES_LOWER
-        or bool(getattr(current_user, "is_superuser", False))
+    return _normalized_role_value(
+        getattr(current_user, "role", None)
+    ) in APPOINTMENT_BROAD_ACCESS_ROLES_LOWER or bool(
+        getattr(current_user, "is_superuser", False)
     )
 
 
@@ -79,19 +79,18 @@ def _has_broad_appointment_access(current_user: User) -> bool:
 # - cardio.py CARDIO_ROLES / derma.py DERMA_ROLES (specialist surfaces).
 # Membership is case-insensitive via _normalized_role_value so any case
 # variant of a recognized spelling resolves to the same gate.
-_APPOINTMENT_DOCTOR_ROLE_VOCABULARY = (
-    {str(getattr(r, "value", r)) for r in DOCTOR_ROLES}
-    | {
-        "Cardiologist",
-        "cardiology",
-        "cardiologist",
-        "Dermatologist",
-        "dermatology",
-        "dermatologist",
-        "Dentist",
-        "dentistry",
-    }
-)
+_APPOINTMENT_DOCTOR_ROLE_VOCABULARY = {
+    str(getattr(r, "value", r)) for r in DOCTOR_ROLES
+} | {
+    "Cardiologist",
+    "cardiology",
+    "cardiologist",
+    "Dermatologist",
+    "dermatology",
+    "dermatologist",
+    "Dentist",
+    "dentistry",
+}
 APPOINTMENT_DOCTOR_ROLES = {
     value.strip().lower() for value in _APPOINTMENT_DOCTOR_ROLE_VOCABULARY
 }
@@ -106,6 +105,7 @@ APPOINTMENT_RESTRICTED_UPDATE_FIELDS = {
     "payment_type",
     "payment_webhook_id",
     "services",
+    "service_ids",
     "status",
     "visit_type",
 }
@@ -248,9 +248,7 @@ def _ensure_appointment_create_access(
         return
 
     if role in APPOINTMENT_PATIENT_ROLES:
-        if appointment_in.patient_id != _appointment_patient_scope_id(
-            db, current_user
-        ):
+        if appointment_in.patient_id != _appointment_patient_scope_id(db, current_user):
             raise HTTPException(status_code=403, detail="Access denied")
         return
 
@@ -406,14 +404,14 @@ def list_appointments(
                         services_with_names.append(service_item)  # Fallback на код
                 elif isinstance(service_item, dict):
                     # Если это объект с данными услуги
-                    if 'name' in service_item:
-                        services_with_names.append(service_item['name'])
-                    elif 'code' in service_item:
+                    if "name" in service_item:
+                        services_with_names.append(service_item["name"])
+                    elif "code" in service_item:
                         service = (
                             db.query(Service)
                             .filter(
-                                (Service.code == service_item['code'])
-                                | (Service.service_code == service_item['code'])
+                                (Service.code == service_item["code"])
+                                | (Service.service_code == service_item["code"])
                             )
                             .first()
                         )
@@ -421,7 +419,7 @@ def list_appointments(
                             services_with_names.append(service.name)
                         else:
                             services_with_names.append(
-                                service_item.get('code', 'Услуга')
+                                service_item.get("code", "Услуга")
                             )
                     else:
                         services_with_names.append(str(service_item))
@@ -432,9 +430,9 @@ def list_appointments(
         apt_schema = appointment_schemas.Appointment.model_validate(apt)
         # Добавляем patient_name и обновленные services через model_dump
         apt_dict = apt_schema.model_dump()
-        apt_dict['patient_name'] = patient_name
+        apt_dict["patient_name"] = patient_name
         if services_with_names:
-            apt_dict['services'] = (
+            apt_dict["services"] = (
                 services_with_names  # Заменяем коды на полные наименования
             )
 
@@ -479,7 +477,9 @@ def create_appointment(
     return appointment
 
 
-@router.get("/pending-payments", include_in_schema=False, response_model=list[dict[str, Any]])
+@router.get(
+    "/pending-payments", include_in_schema=False, response_model=list[dict[str, Any]]
+)
 async def get_pending_payments(
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
@@ -568,34 +568,34 @@ async def get_pending_payments(
 
             result.append(
                 {
-                    'id': apt.id,
-                    'patient_id': apt.patient_id,
-                    'patient_name': patient_name,
-                    'patient_last_name': patient_last_name,
-                    'patient_first_name': patient_first_name,
-                    'doctor_id': apt.doctor_id,
+                    "id": apt.id,
+                    "patient_id": apt.patient_id,
+                    "patient_name": patient_name,
+                    "patient_last_name": patient_last_name,
+                    "patient_first_name": patient_first_name,
+                    "doctor_id": apt.doctor_id,
                     # Round-6 (owner P1, PR #3340): `apt.department` is the
                     # ORM RELATIONSHIP — the first portal-created row put a
                     # Department OBJECT into this dict and response encoding
                     # broke. Map the canonical key instead.
-                    'department': apt.department_key,
-                    'appointment_date': (
+                    "department": apt.department_key,
+                    "appointment_date": (
                         apt.appointment_date.isoformat()
                         if apt.appointment_date
                         else None
                     ),
-                    'appointment_time': apt.appointment_time,
-                    'status': apt.status,
-                    'services': services_codes,
-                    'services_names': services_names,
-                    'payment_amount': (
+                    "appointment_time": apt.appointment_time,
+                    "status": apt.status,
+                    "services": services_codes,
+                    "services_names": services_names,
+                    "payment_amount": (
                         float(apt.payment_amount) if apt.payment_amount else None
                     ),
-                    'created_at': (
+                    "created_at": (
                         apt.created_at.isoformat() if apt.created_at else None
                     ),
-                    'record_type': 'appointment',
-                    'visit_ids': [],
+                    "record_type": "appointment",
+                    "visit_ids": [],
                 }
             )
 
@@ -623,21 +623,21 @@ async def get_pending_payments(
         # Группируем visits по patient_id и дате
         visits_by_patient = defaultdict(
             lambda: {
-                'patient_id': None,
-                'patient_name': None,
-                'patient_last_name': None,
-                'patient_first_name': None,
-                'doctor_id': None,
-                'department': None,
-                'appointment_date': None,
-                'appointment_time': None,
-                'status': 'pending',
-                'services': [],
-                'services_names': [],
-                'payment_amount': None,
-                'created_at': None,
-                'record_type': 'visit',
-                'visit_ids': [],
+                "patient_id": None,
+                "patient_name": None,
+                "patient_last_name": None,
+                "patient_first_name": None,
+                "doctor_id": None,
+                "department": None,
+                "appointment_date": None,
+                "appointment_time": None,
+                "status": "pending",
+                "services": [],
+                "services_names": [],
+                "payment_amount": None,
+                "created_at": None,
+                "record_type": "visit",
+                "visit_ids": [],
             }
         )
 
@@ -682,27 +682,27 @@ async def get_pending_payments(
                         patient_first_name = patient.first_name
 
                 visits_by_patient[group_key] = {
-                    'patient_id': visit.patient_id,
-                    'patient_name': patient_name,
-                    'patient_last_name': patient_last_name,
-                    'patient_first_name': patient_first_name,
-                    'doctor_id': visit.doctor_id,
-                    'department': visit.department,
-                    'appointment_date': visit_date.isoformat() if visit_date else None,
-                    'appointment_time': (
-                        visit.visit_time.strftime('%H:%M')
-                        if visit.visit_time and hasattr(visit.visit_time, 'strftime')
+                    "patient_id": visit.patient_id,
+                    "patient_name": patient_name,
+                    "patient_last_name": patient_last_name,
+                    "patient_first_name": patient_first_name,
+                    "doctor_id": visit.doctor_id,
+                    "department": visit.department,
+                    "appointment_date": visit_date.isoformat() if visit_date else None,
+                    "appointment_time": (
+                        visit.visit_time.strftime("%H:%M")
+                        if visit.visit_time and hasattr(visit.visit_time, "strftime")
                         else (visit.visit_time if visit.visit_time else None)
                     ),
-                    'status': visit.status,
-                    'services': [],
-                    'services_names': [],
-                    'payment_amount': None,
-                    'created_at': (
+                    "status": visit.status,
+                    "services": [],
+                    "services_names": [],
+                    "payment_amount": None,
+                    "created_at": (
                         visit.created_at.isoformat() if visit.created_at else None
                     ),
-                    'record_type': 'visit',
-                    'visit_ids': [],
+                    "record_type": "visit",
+                    "visit_ids": [],
                 }
 
             # Добавляем услуги визита
@@ -710,18 +710,19 @@ async def get_pending_payments(
                 db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
             )
             for vs in visit_services:
-                if vs.code and vs.code not in visits_by_patient[group_key]['services']:
-                    visits_by_patient[group_key]['services'].append(vs.code)
-                    visits_by_patient[group_key]['services_names'].append(vs.name)
+                if vs.code and vs.code not in visits_by_patient[group_key]["services"]:
+                    visits_by_patient[group_key]["services"].append(vs.code)
+                    visits_by_patient[group_key]["services_names"].append(vs.name)
 
-            visits_by_patient[group_key]['visit_ids'].append(visit.id)
+            visits_by_patient[group_key]["visit_ids"].append(visit.id)
 
         # Добавляем сгруппированные visits в результат
         for group_data in visits_by_patient.values():
             result.append(group_data)
 
         # Применяем пагинацию
-        total = len(result)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
+        # manual-review: retained for debugging/future use.
+        total = len(result)  # noqa: F841
         result = result[skip : skip + limit]
 
         return result
@@ -769,7 +770,10 @@ def update_appointment(
         # REASSIGNMENT to an eligible doctor. A payload that keeps the current
         # doctor_id (time-only reschedule of an existing row) is not a new
         # booking and stays legal even if that doctor was deactivated later.
-        if appointment_in.doctor_id and appointment_in.doctor_id != appointment.doctor_id:
+        if (
+            appointment_in.doctor_id
+            and appointment_in.doctor_id != appointment.doctor_id
+        ):
             _ensure_appointment_doctor_eligible(db, appointment_in.doctor_id)
         if appointment_crud.is_time_slot_occupied(
             db,
@@ -881,9 +885,7 @@ def get_doctor_schedule(
     """
     Получить расписание врача на определенную дату
     """
-    _ensure_doctor_schedule_access(
-        db, doctor_id=doctor_id, current_user=current_user
-    )
+    _ensure_doctor_schedule_access(db, doctor_id=doctor_id, current_user=current_user)
     schedule = appointment_crud.get_doctor_schedule(db, doctor_id=doctor_id, date=date)
 
     # Threat model (AGENTS.md "Threat model"): "Audit log on every patient
@@ -932,9 +934,7 @@ def get_department_schedule(
     # to a numeric-id lookup — the previous id-first order silently
     # returned another department's schedule (or a false 404) for a
     # numeric-key department.
-    department_row = (
-        db.query(Department).filter(Department.key == department).first()
-    )
+    department_row = db.query(Department).filter(Department.key == department).first()
     if department_row is None and department.strip().isdigit():
         department_row = (
             db.query(Department)
@@ -982,7 +982,9 @@ def get_department_schedule(
 
 # Сохраняем существующие endpoints для совместимости
 @router.post(
-    "/open-day", name="open_day", dependencies=[Depends(deps.require_roles("Admin"))],
+    "/open-day",
+    name="open_day",
+    dependencies=[Depends(deps.require_roles("Admin"))],
     response_model=dict[str, Any],
 )
 def open_day(
@@ -1061,7 +1063,9 @@ def stats(
 
 
 @router.post(
-    "/close", name="close_day", dependencies=[Depends(deps.require_roles("Admin"))],
+    "/close",
+    name="close_day",
+    dependencies=[Depends(deps.require_roles("Admin"))],
     response_model=dict[str, Any],
 )
 def close_day(
