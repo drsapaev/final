@@ -113,10 +113,11 @@ errors. Patients see white screens, you see nothing.
 
 ```bash
 cd backend
-python -c "
-import os
-os.environ['SENTRY_DSN'] = 'https://65b5195082de2f0522c27dd6695536b7@o4511673323749376.ingest.us.sentry.io/4511673347670016'
-os.environ['SENTRY_ENV'] = 'staging-validation-test'
+(
+ : "${STAGING_SENTRY_DSN:?Set a dedicated staging-only Sentry DSN in this shell}"
+ export SENTRY_DSN="$STAGING_SENTRY_DSN"
+ export SENTRY_ENV=staging-validation-test
+ python -c "
 from app.core.sentry import init_sentry, capture_exception
 init_sentry()
 try:
@@ -125,7 +126,11 @@ except RuntimeError as e:
     capture_exception(e)
 print('Sent. Check Sentry dashboard in 10 seconds.')
 "
+)
 ```
+
+`STAGING_SENTRY_DSN` must belong to the dedicated staging Sentry project. Do
+not copy a production DSN into this variable or commit it to the repository.
 
 **Expected**: console prints `Sent. Check Sentry dashboard in 10 seconds.`
 Within 10 seconds, Sentry dashboard (https://sentry.io) → Issues should
@@ -133,18 +138,20 @@ show a new `RuntimeError: staging validation smoke test - backend`.
 
 ### Frontend
 
-After deploying to Vercel with `VITE_SENTRY_DSN` env var set:
+Build and serve the isolated staging frontend with `VITE_SENTRY_DSN` set to
+the dedicated staging Sentry project. Do not deploy to Vercel for this check.
 
-1. Open production URL in browser
+1. Open `http://127.0.0.1:<STAGING_FRONTEND_PORT>` in the browser, using the
+   frontend port from this worktree's `ops/staging.env`
 2. Open DevTools Console (F12)
 3. Run: `setTimeout(() => { throw new Error("staging validation smoke test - frontend") }, 1000)`
 4. Within 10 seconds, Sentry dashboard should show the new error
 
 ### If it fails
 
-- **No event in Sentry**: check `SENTRY_DSN` env var is set correctly
+- **No event in Sentry**: check the dedicated staging `STAGING_SENTRY_DSN` is configured correctly
 - **Backend "sentry-sdk not installed"**: `pip install -r backend/requirements-monitoring.txt`
-- **Frontend "VITE_SENTRY_DSN is undefined"**: env var not set in Vercel
+- **Frontend "VITE_SENTRY_DSN is undefined"**: the isolated staging frontend was not built with its staging DSN
 - **Network error**: Sentry ingest URL blocked by firewall
 
 See `docs/runbooks/SENTRY_SETUP.md` section 9 for full troubleshooting.
