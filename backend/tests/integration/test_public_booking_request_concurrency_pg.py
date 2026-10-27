@@ -43,7 +43,7 @@ pytestmark = pytest.mark.integration
 PATIENT_REQUESTS = "/api/v1/patients/booking-requests"
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def booking_request_pg_engine():
     raw_url = os.environ.get("DATABASE_URL", "").strip()
     if not raw_url:
