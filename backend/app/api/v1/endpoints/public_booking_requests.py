@@ -98,6 +98,52 @@ def list_public_booking_requests(
 
 
 @router.post(
+    "/{request_id}/confirm",
+    response_model=PublicBookingRequestPatientOut,
+    responses={
+        401: {"description": "Authentication required."},
+        403: {"description": "Admin or Registrar role required."},
+        404: {"model": PublicBookingRequestErrorOut},
+        409: {"model": PublicBookingRequestErrorOut},
+        503: {"model": PublicBookingRequestErrorOut},
+    },
+    operation_id="staff_confirm_public_booking_request",
+    summary="Confirm a request as a regular appointment if its slot remains available",
+    description=(
+        "Rechecks current service/doctor eligibility, schedule, holiday calendar, "
+        "and slot occupancy. A changed booking mode or disabled channel affects "
+        "new requests only. If the requested time is no longer available, no "
+        "appointment is created and the request changes to needs_new_time."
+    ),
+)
+def confirm_public_booking_request(
+    request_id: UUID,
+    body: PublicBookingRequestAction,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_active_roles("Admin", "Registrar")),
+) -> PublicBookingRequestPatientOut:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        result = PublicBookingRequestService(db).confirm_for_staff(
+            request_id=request_id,
+            actor_user_id=current_user.id,
+            expected_version=body.expected_version,
+        )
+    except PublicBookingRequestError as exc:
+        _raise_request_error(exc)
+    _audit_staff_request(
+        db=db,
+        request=request,
+        actor=current_user,
+        result=result,
+        action="confirm",
+    )
+    return result
+
+
+@router.post(
     "/{request_id}/request-new-time",
     response_model=PublicBookingRequestPatientOut,
     responses={

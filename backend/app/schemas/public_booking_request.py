@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class PublicBookingRequestStatus(StrEnum):
     PENDING = "pending"
     NEEDS_NEW_TIME = "needs_new_time"
+    CONFIRMED = "confirmed"
     REJECTED = "rejected"
     WITHDRAWN = "withdrawn"
 
@@ -63,6 +64,8 @@ class PublicBookingRequestEventOut(BaseModel):
         "submitted",
         "resubmitted",
         "staff_requested_new_time",
+        "confirmation_slot_unavailable",
+        "confirmed",
         "rejected",
         "withdrawn",
     ]
@@ -83,6 +86,7 @@ class PublicBookingRequestOut(BaseModel):
     doctor_slug: str
     appointment_date: date
     appointment_time: time
+    appointment_id: int | None = None
     timezone: Literal["Asia/Tashkent"] = "Asia/Tashkent"
     status: PublicBookingRequestStatus
     settings_version: int
@@ -104,6 +108,7 @@ class PublicBookingRequestPatientOut(BaseModel):
     doctor_slug: str
     appointment_date: date
     appointment_time: time
+    appointment_id: int | None = None
     timezone: Literal["Asia/Tashkent"] = "Asia/Tashkent"
     status: PublicBookingRequestStatus
     settings_version: int
@@ -140,6 +145,7 @@ class PublicBookingRequestErrorDetail(BaseModel):
         "booking_request_idempotency_conflict",
         "booking_request_duplicate",
         "booking_request_rate_limited",
+        "booking_request_unavailable",
     ]
 
 

@@ -4,27 +4,33 @@ from __future__ import annotations
 
 import os
 import threading
+import time as time_module
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, time, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
 import app.db.base  # noqa: F401 - register all models before create_all
-from app.db.base_class import Base
 from app.api import deps
+from app.crud.clinic import update_weekly_schedule
+from app.db.base_class import Base
 from app.main import app
 from app.models.clinic import ClinicSettings, Doctor, Schedule
 from app.models.patient import Patient
 from app.models.public_booking_request import PublicBookingRequest
 from app.models.service import Service
 from app.models.user import User
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.public_booking_availability import PUBLIC_BOOKING_TIMEZONE
+from app.services.telegram_staff_action_adapter_service import (
+    TelegramStaffActionAdapterService,
+)
 from tests.conftest import mint_access_token
 
 pytestmark = pytest.mark.integration
@@ -59,8 +65,7 @@ def booking_request_pg_engine():
         pool_pre_ping=True,
         connect_args={
             "options": (
-                f"-csearch_path={schema} "
-                "-cstatement_timeout=15000 -clock_timeout=15000"
+                f"-csearch_path={schema} -cstatement_timeout=15000 -clock_timeout=15000"
             )
         },
     )
@@ -224,3 +229,263 @@ def test_concurrent_different_keys_create_one_active_request(
             .all()
         )
         assert len(active) == 1
+
+
+def test_doctor_slot_lock_refreshes_preloaded_doctor_after_admin_change(
+    booking_request_pg_engine,
+):
+    engine = booking_request_pg_engine
+    unique = uuid.uuid4().hex[:12]
+    with Session(engine) as setup:
+        doctor_user = User(
+            username=f"booking-lock-doctor-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Doctor",
+            is_active=True,
+        )
+        setup.add(doctor_user)
+        setup.flush()
+        doctor = Doctor(
+            user_id=doctor_user.id,
+            specialty="cardiology",
+            active=True,
+            show_on_website=True,
+            slug=f"booking-lock-doctor-{unique}",
+            bio_ru="Synthetic doctor.",
+            bio_uz="Synthetic doctor.",
+        )
+        setup.add(doctor)
+        setup.commit()
+        doctor_id = doctor.id
+
+    with Session(engine) as preloaded_session:
+        preloaded = preloaded_session.query(Doctor).filter(Doctor.id == doctor_id).one()
+        assert preloaded.active is True
+
+        with Session(engine) as admin_session:
+            admin_session.query(Doctor).filter(Doctor.id == doctor_id).update(
+                {Doctor.active: False}, synchronize_session=False
+            )
+            admin_session.commit()
+
+        locked = lock_doctor_for_slot_reservation(preloaded_session, doctor_id)
+
+        assert locked is not None
+        assert locked is preloaded
+        assert locked.active is False
+
+
+def test_admin_weekly_schedule_update_waits_for_doctor_booking_lock(
+    booking_request_pg_engine,
+):
+    """Admin schedule edits serialize behind a pending booking confirmation."""
+    engine = booking_request_pg_engine
+    unique = uuid.uuid4().hex[:12]
+    weekday = (
+        datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+    ).weekday()
+    with Session(engine) as setup:
+        doctor_user = User(
+            username=f"booking-schedule-lock-doctor-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Doctor",
+            is_active=True,
+        )
+        setup.add(doctor_user)
+        setup.flush()
+        doctor = Doctor(
+            user_id=doctor_user.id,
+            specialty="cardiology",
+            active=True,
+            show_on_website=True,
+            slug=f"booking-schedule-lock-doctor-{unique}",
+            bio_ru="Synthetic doctor.",
+            bio_uz="Synthetic doctor.",
+        )
+        setup.add(doctor)
+        setup.flush()
+        setup.add(
+            Schedule(
+                doctor_id=doctor.id,
+                weekday=weekday,
+                start_time=time(9),
+                end_time=time(11),
+                breaks=[],
+                active=True,
+            )
+        )
+        setup.commit()
+        doctor_id = int(doctor.id)
+
+    confirmer = Session(engine)
+    locked_doctor = lock_doctor_for_slot_reservation(confirmer, doctor_id)
+    assert locked_doctor is not None
+
+    update_started = threading.Event()
+    update_pid: dict[str, int] = {}
+
+    def update_schedule():
+        with Session(engine) as admin_session:
+            update_pid["pid"] = int(
+                admin_session.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            )
+            update_started.set()
+            return update_weekly_schedule(
+                admin_session,
+                doctor_id,
+                [
+                    {
+                        "weekday": weekday,
+                        "start_time": time(10),
+                        "end_time": time(12),
+                        "breaks": [],
+                        "active": True,
+                    }
+                ],
+            )
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(update_schedule)
+            assert update_started.wait(timeout=5)
+            deadline = time_module.monotonic() + 5
+            observed_lock_wait = False
+            with engine.connect() as observer:
+                while time_module.monotonic() < deadline:
+                    if future.done():
+                        break
+                    wait_type = observer.execute(
+                        text(
+                            "SELECT wait_event_type FROM pg_stat_activity "
+                            "WHERE pid = :pid"
+                        ),
+                        {"pid": update_pid["pid"]},
+                    ).scalar_one_or_none()
+                    if wait_type == "Lock":
+                        observed_lock_wait = True
+                        break
+                    time_module.sleep(0.02)
+
+            assert observed_lock_wait, "schedule write did not wait on the doctor lock"
+            assert not future.done()
+            confirmer.commit()
+            updated = future.result(timeout=10)
+            assert len(updated) == 1
+    finally:
+        confirmer.rollback()
+        confirmer.close()
+
+    with Session(engine) as verify:
+        schedules = (
+            verify.query(Schedule)
+            .filter(Schedule.doctor_id == doctor_id)
+            .order_by(Schedule.id)
+            .all()
+        )
+        assert len(schedules) == 2
+        assert schedules[0].active is False
+        assert schedules[1].active is True
+        assert schedules[1].start_time == time(10)
+
+
+def test_telegram_schedule_update_waits_for_doctor_booking_lock(
+    booking_request_pg_engine,
+):
+    """Telegram's alternate Schedule writer shares the booking row lock."""
+    engine = booking_request_pg_engine
+    unique = uuid.uuid4().hex[:12]
+    weekday = (
+        datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+    ).weekday()
+    with Session(engine) as setup:
+        doctor_user = User(
+            username=f"booking-telegram-lock-doctor-{unique}",
+            hashed_password="synthetic-test-only",
+            role="Doctor",
+            is_active=True,
+        )
+        setup.add(doctor_user)
+        setup.flush()
+        doctor = Doctor(
+            user_id=doctor_user.id,
+            specialty="cardiology",
+            active=True,
+            show_on_website=True,
+            slug=f"booking-telegram-lock-doctor-{unique}",
+            bio_ru="Synthetic doctor.",
+            bio_uz="Synthetic doctor.",
+        )
+        setup.add(doctor)
+        setup.flush()
+        schedule = Schedule(
+            doctor_id=doctor.id,
+            weekday=weekday,
+            start_time=time(9),
+            end_time=time(11),
+            breaks=[],
+            active=True,
+        )
+        setup.add(schedule)
+        setup.commit()
+        doctor_id = int(doctor.id)
+        schedule_id = int(schedule.id)
+
+    confirmer = Session(engine)
+    locked_doctor = lock_doctor_for_slot_reservation(confirmer, doctor_id)
+    assert locked_doctor is not None
+
+    update_started = threading.Event()
+    update_pid: dict[str, int] = {}
+
+    def update_schedule():
+        with Session(engine) as adapter_session:
+            update_pid["pid"] = int(
+                adapter_session.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            )
+            adapter = TelegramStaffActionAdapterService(adapter_session)
+            # Exercise the DB/lock boundary without requiring Telegram action
+            # confirmation state or creating test audit events.
+            adapter._confirmed = lambda **_kwargs: None
+            adapter._completed = lambda **_kwargs: None
+            update_started.set()
+            return adapter.staff_change_doctor_schedule(
+                schedule_id=schedule_id,
+                actor_user_id=1,
+                start_time=time(10),
+            )
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(update_schedule)
+            assert update_started.wait(timeout=5)
+            deadline = time_module.monotonic() + 5
+            observed_lock_wait = False
+            with engine.connect() as observer:
+                while time_module.monotonic() < deadline:
+                    if future.done():
+                        break
+                    wait_type = observer.execute(
+                        text(
+                            "SELECT wait_event_type FROM pg_stat_activity "
+                            "WHERE pid = :pid"
+                        ),
+                        {"pid": update_pid["pid"]},
+                    ).scalar_one_or_none()
+                    if wait_type == "Lock":
+                        observed_lock_wait = True
+                        break
+                    time_module.sleep(0.02)
+
+            assert observed_lock_wait, "Telegram schedule write skipped the doctor lock"
+            assert not future.done()
+            confirmer.commit()
+            result = future.result(timeout=10)
+            assert result["success"] is True
+    finally:
+        confirmer.rollback()
+        confirmer.close()
+
+    with Session(engine) as verify:
+        updated = verify.query(Schedule).filter(Schedule.id == schedule_id).one()
+        assert updated.start_time == time(10)
+        assert updated.end_time == time(11)

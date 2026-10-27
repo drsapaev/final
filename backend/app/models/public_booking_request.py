@@ -30,7 +30,7 @@ class PublicBookingRequest(Base):
     __tablename__ = "public_booking_requests"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('pending', 'needs_new_time', 'rejected', 'withdrawn')",
+            "status IN ('pending', 'needs_new_time', 'confirmed', 'rejected', 'withdrawn')",
             name="ck_public_booking_requests_status",
         ),
         CheckConstraint("version > 0", name="ck_public_booking_requests_version"),
@@ -59,6 +59,13 @@ class PublicBookingRequest(Base):
             postgresql_where=text("status IN ('pending', 'needs_new_time')"),
             sqlite_where=text("status IN ('pending', 'needs_new_time')"),
         ),
+        Index(
+            "uq_public_booking_requests_appointment_id",
+            "appointment_id",
+            unique=True,
+            postgresql_where=text("appointment_id IS NOT NULL"),
+            sqlite_where=text("appointment_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -78,6 +85,11 @@ class PublicBookingRequest(Base):
         Integer,
         ForeignKey("doctors.id", ondelete="RESTRICT"),
         nullable=False,
+    )
+    appointment_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("appointments.id", ondelete="RESTRICT"),
+        nullable=True,
     )
     appointment_date: Mapped[date] = mapped_column(Date, nullable=False)
     appointment_time: Mapped[time] = mapped_column(Time, nullable=False)
@@ -101,6 +113,7 @@ class PublicBookingRequest(Base):
     patient = relationship("Patient", foreign_keys=[patient_id])
     service = relationship("Service", foreign_keys=[service_id])
     doctor = relationship("Doctor", foreign_keys=[doctor_id])
+    appointment = relationship("Appointment", foreign_keys=[appointment_id])
     events = relationship(
         "PublicBookingRequestEvent",
         back_populates="request",
@@ -116,7 +129,7 @@ class PublicBookingRequestEvent(Base):
     __table_args__ = (
         CheckConstraint(
             "event_type IN ('submitted', 'resubmitted', 'staff_requested_new_time', "
-            "'rejected', 'withdrawn')",
+            "'confirmation_slot_unavailable', 'confirmed', 'rejected', 'withdrawn')",
             name="ck_public_booking_request_events_type",
         ),
         CheckConstraint(
