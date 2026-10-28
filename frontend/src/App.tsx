@@ -81,6 +81,7 @@ const ClinicManagement = lazy(() => import('./components/admin/ClinicManagement'
 const QueueCabinetManagement = lazy(() => import('./components/admin/QueueCabinetManagement'));
 const AdminDoctors = lazy(() => import('./components/admin/AdminDoctors'));
 const PublicSiteMediaManager = lazy(() => import('./components/admin/PublicSiteMediaManager'));
+const PublicBookingRequestsManager = lazy(() => import('./components/admin/PublicBookingRequestsManager'));
 const AdminPatients = lazy(() => import('./components/admin/AdminPatients'));
 const AdminAppointments = lazy(() => import('./components/admin/AdminAppointments'));
 const AdminServices = lazy(() => import('./components/admin/AdminServices'));
@@ -153,6 +154,7 @@ const ROUTE_COMPONENTS = {
   QueueCabinetManagement,
   AdminDoctors,
   PublicSiteMediaManager,
+  PublicBookingRequestsManager,
   AdminPatients,
   AdminAppointments,
   AdminServices,

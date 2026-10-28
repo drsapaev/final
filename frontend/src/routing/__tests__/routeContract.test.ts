@@ -142,6 +142,42 @@ function assertRouteSpecificChromeHeadings(routeHeadingContract: RouteHeadingCon
 }
 
 describe('route contract invariants', () => {
+  it('exposes separate Admin and Registrar booking-request worklists with staff-only access', () => {
+    const adminPath = '/admin/public-booking-requests';
+    const registrarPath = '/registrar/booking-requests';
+    const adminRoute = getEffectiveRouteByPath(adminPath);
+    const registrarRoute = getEffectiveRouteByPath(registrarPath);
+
+    expect(adminRoute).toMatchObject({
+      id: 'admin-public-booking-requests',
+      component: 'PublicBookingRequestsManager',
+      auth: 'role-scoped',
+      roles: ['Admin'],
+      shell: 'app-shell',
+    });
+    expect(registrarRoute).toMatchObject({
+      id: 'registrar-booking-requests',
+      component: 'PublicBookingRequestsManager',
+      auth: 'role-scoped',
+      roles: ['Admin', 'Registrar'],
+      shell: 'app-shell',
+    });
+    expect(isRouteAccessibleToProfile(adminRoute as never, { role: 'Admin' })).toBe(true);
+    expect(isRouteAccessibleToProfile(adminRoute as never, { role: 'Registrar' })).toBe(false);
+    expect(isRouteAccessibleToProfile(registrarRoute as never, { role: 'Registrar' })).toBe(true);
+    expect(isRouteAccessibleToProfile(registrarRoute as never, { role: 'Doctor' })).toBe(false);
+    expect(getRouteChromeState(registrarPath, '', { role: 'Registrar' }).activeSidebarItem)
+      .toBe('registrar-booking-requests');
+
+    const adminItems = getAdminNavSections({ role: 'Admin' }).flatMap((section) => section.items);
+    expect(adminItems.find((item) => item.id === 'admin-public-booking-requests')).toMatchObject({
+      to: adminPath,
+      labelKey: 'nav.public_booking_requests',
+    });
+    expect(SIDEBAR_PRESETS.registrar.items.find((item) => item.id === 'registrar-booking-requests'))
+      .toMatchObject({ to: registrarPath, labelKey: 'nav.public_booking_requests' });
+  });
+
   it('keeps the queue administration URLs Admin-owned and linked from the correct sidebar entries', () => {
     const adminProfile = { role: 'Admin' };
     const routeContracts = [

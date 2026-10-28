@@ -3,6 +3,17 @@ import { hasRouteAccess, routeToRoles } from '../../constants/routes';
 import { SIDEBAR_PRESETS } from '../../routing/routeRegistry';
 
 describe('RBAC route parity', () => {
+  it('restricts public booking request worklists to the staff API roles', () => {
+    expect(routeToRoles('/admin/public-booking-requests')).toEqual(['Admin']);
+    expect(routeToRoles('/registrar/booking-requests')).toEqual(['Admin', 'Registrar']);
+    expect(hasRouteAccess({ role: 'Admin' }, '/admin/public-booking-requests')).toBe(true);
+    expect(hasRouteAccess({ role: 'Registrar' }, '/admin/public-booking-requests')).toBe(false);
+    expect(hasRouteAccess({ role: 'Registrar' }, '/registrar/booking-requests')).toBe(true);
+    for (const role of ['Doctor', 'Patient', 'Cashier', 'Lab']) {
+      expect(hasRouteAccess({ role }, '/registrar/booking-requests')).toBe(false);
+    }
+  });
+
   it('uses backend-aligned role set for registrar routes', () => {
     const roles = routeToRoles('/registrar');
     expect(roles).toEqual(['Admin', 'Registrar']);
