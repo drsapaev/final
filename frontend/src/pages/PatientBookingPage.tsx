@@ -222,8 +222,24 @@ export default function PatientBookingPage() {
   const [unknownOutcome, setUnknownOutcome] = useState(false);
   const attemptRef = useRef<{ body: PublicBookingRequestBody; key: string } | null>(null);
   const resumeConsumed = useRef(false);
+  const availabilityRequestGeneration = useRef(0);
   const selectedTimeRef = useRef(time);
   selectedTimeRef.current = time;
+  const availabilitySelectionRef = useRef({
+    serviceSlug,
+    doctorSlug,
+    date,
+    settingsVersion: options?.settings_version ?? null,
+  });
+  availabilitySelectionRef.current = {
+    serviceSlug,
+    doctorSlug,
+    date,
+    settingsVersion: options?.settings_version ?? null,
+  };
+  const invalidateAvailabilityRequests = () => {
+    availabilityRequestGeneration.current += 1;
+  };
   const today = tashkentToday();
   const bookingHorizon = options?.booking_horizon_days;
   const maxDate = Number.isInteger(bookingHorizon) && (bookingHorizon ?? -1) >= 0
@@ -249,6 +265,10 @@ export default function PatientBookingPage() {
     }
     setResumeLoaded(true);
   }, [copy.expired]);
+
+  useEffect(() => () => {
+    availabilityRequestGeneration.current += 1;
+  }, []);
 
   useEffect(() => {
     if (!resumeLoaded) return undefined;
@@ -540,11 +560,19 @@ export default function PatientBookingPage() {
 
   const retryAvailability = async () => {
     if (!serviceSlug || !doctorSlug || !date || !options) return;
+    const requestGeneration = ++availabilityRequestGeneration.current;
+    const requestedSelection = { serviceSlug, doctorSlug, date, settingsVersion: options.settings_version };
+    const isCurrentRequest = () => requestGeneration === availabilityRequestGeneration.current
+      && availabilitySelectionRef.current.serviceSlug === requestedSelection.serviceSlug
+      && availabilitySelectionRef.current.doctorSlug === requestedSelection.doctorSlug
+      && availabilitySelectionRef.current.date === requestedSelection.date
+      && availabilitySelectionRef.current.settingsVersion === requestedSelection.settingsVersion;
     setError('');
     setAvailability(null);
     setAvailabilityLoading(true);
     try {
       const latest = await getPublicBookingAvailability({ serviceSlug, doctorSlug, date });
+      if (!isCurrentRequest()) return;
       if (!isDateWithinHorizon(date, today, maxDate)
         || latest.date !== date || latest.timezone !== 'Asia/Tashkent') {
         setAvailability(null);
@@ -557,9 +585,9 @@ export default function PatientBookingPage() {
         setAvailability(latest);
       }
     } catch {
-      setError(copy.slotsError);
+      if (isCurrentRequest()) setError(copy.slotsError);
     } finally {
-      setAvailabilityLoading(false);
+      if (isCurrentRequest()) setAvailabilityLoading(false);
     }
   };
 
@@ -614,7 +642,7 @@ export default function PatientBookingPage() {
             <label className="public-site__booking-field" htmlFor="public-booking-service">
               {copy.service}
               <select id="public-booking-service" className="public-site__booking-control" value={serviceSlug} disabled={formLocked} required
-                onChange={(event) => { setServiceSlug(event.target.value); setDoctorSlug(''); setDate(''); setTime(''); setAvailability(null); setError(''); setNotice(''); }}>
+                onChange={(event) => { invalidateAvailabilityRequests(); setServiceSlug(event.target.value); setDoctorSlug(''); setDate(''); setTime(''); setAvailability(null); setError(''); setNotice(''); }}>
                 <option value="">{copy.choose}</option>
                 {options.services.map((service) => <option key={service.slug} value={service.slug}>{service.name}</option>)}
               </select>
@@ -622,7 +650,7 @@ export default function PatientBookingPage() {
             <label className="public-site__booking-field" htmlFor="public-booking-doctor">
               {copy.doctor}
               <select id="public-booking-doctor" className="public-site__booking-control" value={doctorSlug} disabled={formLocked || !serviceSlug} required
-                onChange={(event) => { setDoctorSlug(event.target.value); setDate(''); setTime(''); setAvailability(null); setError(''); setNotice(''); }}>
+                onChange={(event) => { invalidateAvailabilityRequests(); setDoctorSlug(event.target.value); setDate(''); setTime(''); setAvailability(null); setError(''); setNotice(''); }}>
                 <option value="">{copy.choose}</option>
                 {eligibleDoctors.map((doctor) => <option key={doctor.slug} value={doctor.slug}>{doctor.name}</option>)}
               </select>
@@ -632,7 +660,7 @@ export default function PatientBookingPage() {
               {copy.date}
             <input id="public-booking-date" aria-label={copy.date} className="public-site__booking-control" type="date" value={date} min={today} max={maxDate}
                 disabled={formLocked || !doctorSlug || !maxDate} required
-                onChange={(event) => { setDate(event.target.value); setTime(''); setError(''); setNotice(''); }} />
+                onChange={(event) => { invalidateAvailabilityRequests(); setDate(event.target.value); setTime(''); setError(''); setNotice(''); }} />
             </label>
             {availabilityLoading ? <p role="status">{copy.loadingSlots}</p> : null}
             {!availability && !availabilityLoading && serviceSlug && doctorSlug && date ? (

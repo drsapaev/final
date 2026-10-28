@@ -103,4 +103,24 @@ describe('publicBooking API adapter', () => {
     expect(getPublicBookingPath('ru')).toBe('/ru/booking');
     expect(getPublicBookingPath('uz-Latn')).toBe('/booking');
   });
+
+  it('recognizes the backend patient-profile-required error reason', () => {
+    const missingPatientProfile = {
+      isAxiosError: true,
+      response: {
+        status: 404,
+        data: { detail: { reason: 'patient_profile_required' } },
+      },
+    };
+    const unrelatedReason = {
+      isAxiosError: true,
+      response: {
+        status: 404,
+        data: { detail: { reason: 'unrelated_not_found' } },
+      },
+    };
+
+    expect(getPublicBookingErrorCode(missingPatientProfile)).toBe('patient_profile_required');
+    expect(getPublicBookingErrorCode(unrelatedReason)).toBeNull();
+  });
 });

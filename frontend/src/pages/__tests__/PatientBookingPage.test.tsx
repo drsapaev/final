@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -51,6 +51,18 @@ function todayInTashkent() {
   }).formatToParts(new Date());
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
+}
+
+function nextCalendarDay(date: string) {
+  const next = new Date(`${date}T00:00:00.000Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise; });
+  return { promise, resolve };
 }
 
 function renderPage(path = '/ru/booking') {
@@ -120,6 +132,56 @@ describe('PatientBookingPage', () => {
     expect(key).toMatch(/^[0-9a-f-]{36}$/i);
     expect(body).not.toHaveProperty('patient_id');
     expect(screen.getByText(/не резервирует время/i)).toBeInTheDocument();
+  });
+
+  it('shows patient-card guidance for the backend detail.reason response', async () => {
+    mockedCreateRequest.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 404, data: { detail: { reason: 'patient_profile_required' } } },
+    });
+    renderPage();
+    await chooseSlot();
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить заявку' }));
+
+    expect(await screen.findByText(/нужна собственная карточка пациента/i)).toBeInTheDocument();
+  });
+
+  it('ignores a manual availability response after the selected date changes', async () => {
+    const staleRetry = deferred<Awaited<ReturnType<typeof getPublicBookingAvailability>>>();
+    mockedAvailability
+      .mockRejectedValueOnce(new Error('Initial availability failure'))
+      .mockImplementationOnce(() => staleRetry.promise)
+      .mockImplementationOnce(async ({ date }) => ({
+        date,
+        timezone: 'Asia/Tashkent',
+        settings_version: 1,
+        slots: ['10:00:00'],
+      }) as never);
+    renderPage();
+    await screen.findByLabelText('Услуга');
+    fireEvent.change(screen.getByLabelText('Услуга'), { target: { value: 'cardiology' } });
+    fireEvent.change(screen.getByLabelText('Врач'), { target: { value: 'doctor-one' } });
+    const originalDate = todayInTashkent();
+    fireEvent.change(screen.getByLabelText('Дата'), { target: { value: originalDate } });
+    const refreshButton = await screen.findByRole('button', { name: 'Проверить актуальные варианты' });
+    fireEvent.click(refreshButton);
+    expect(mockedAvailability).toHaveBeenCalledTimes(2);
+
+    fireEvent.change(screen.getByLabelText('Дата'), { target: { value: nextCalendarDay(originalDate) } });
+    expect(await screen.findByLabelText('10:00')).toBeInTheDocument();
+
+    await act(async () => {
+      staleRetry.resolve({
+        date: originalDate,
+        timezone: 'Asia/Tashkent',
+        settings_version: 1,
+        slots: ['09:30:00'],
+      });
+      await staleRetry.promise;
+    });
+
+    expect(screen.getByLabelText('10:00')).toBeInTheDocument();
+    expect(screen.queryByLabelText('09:30')).not.toBeInTheDocument();
   });
 
   it('requires explicit reconfirmation when booking settings changed after selection', async () => {

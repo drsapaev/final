@@ -155,10 +155,10 @@ export function getPublicBookingErrorCode(error: unknown): string | null {
   if (!data || typeof data !== 'object') return null;
   const payload = data as { code?: unknown; detail?: unknown };
   if (typeof payload.code === 'string') return payload.code;
-  if (payload.detail && typeof payload.detail === 'object'
-    && 'code' in payload.detail
-    && typeof (payload.detail as { code?: unknown }).code === 'string') {
-    return (payload.detail as { code: string }).code;
+  if (payload.detail && typeof payload.detail === 'object') {
+    const detail = payload.detail as { code?: unknown; reason?: unknown };
+    if (typeof detail.code === 'string') return detail.code;
+    if (detail.reason === 'patient_profile_required') return detail.reason;
   }
   return null;
 }
