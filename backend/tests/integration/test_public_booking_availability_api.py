@@ -14,6 +14,7 @@ from app.models.user import User
 from app.services.public_booking_availability import PUBLIC_BOOKING_TIMEZONE
 
 BASE = "/api/v1/public-site/availability"
+OPTIONS = "/api/v1/public-site/booking-options"
 
 
 def _configured_public_booking(
@@ -101,6 +102,135 @@ def _availability_url(service_slug: str, doctor_slug: str, target_date) -> str:
         f"{BASE}?service_slug={service_slug}&doctor_slug={doctor_slug}"
         f"&date={target_date.isoformat()}"
     )
+
+
+@pytest.mark.integration
+def test_public_booking_options_expose_only_approved_compatible_public_choices(
+    client: TestClient, db_session: Session
+) -> None:
+    target_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+    service, doctor, doctor_user = _configured_public_booking(
+        db_session, target_date=target_date
+    )
+    service.doctor_id = doctor.id
+
+    other_user = User(
+        username="unapproved_public_booking_doctor",
+        hashed_password="not-used-in-this-test",
+        role="Doctor",
+        is_active=True,
+        full_name="Unapproved Doctor",
+    )
+    db_session.add(other_user)
+    db_session.flush()
+    other_doctor = Doctor(
+        user_id=other_user.id,
+        specialty="cardiology",
+        active=True,
+        show_on_website=True,
+        slug="unapproved-doctor",
+        bio_ru="Врач-кардиолог",
+        bio_uz="Kardiolog shifokor",
+    )
+    unapproved_service = Service(
+        name="Unapproved service",
+        name_uz="Tasdiqlanmagan xizmat",
+        description_ru="Не утверждена для онлайн-записи.",
+        description_uz="Onlayn yozuv uchun tasdiqlanmagan.",
+        slug="unapproved-service",
+        duration_minutes=20,
+        active=True,
+        show_on_website=True,
+        requires_doctor=True,
+    )
+    db_session.add_all([other_doctor, unapproved_service])
+    db_session.flush()
+    settings = (
+        db_session.query(ClinicSettings)
+        .filter(ClinicSettings.key == "public_booking_settings")
+        .one()
+    )
+    settings.value = {**settings.value, "doctor_ids": [doctor.id, other_doctor.id]}
+    db_session.flush()
+
+    response = client.get(f"{OPTIONS}?locale=ru")
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json() == {
+        "settings_version": 1,
+        "available": True,
+        "mode": "registrar_request",
+        "booking_horizon_days": 30,
+        "services": [{"slug": service.slug, "name": "Cardiology consultation"}],
+        "doctors": [{"slug": doctor.slug, "name": doctor_user.full_name}],
+        "compatible_pairs": [
+            {"service_slug": service.slug, "doctor_slug": doctor.slug}
+        ],
+    }
+    assert response.json()["services"][0]["slug"] != unapproved_service.slug
+    assert response.json()["doctors"][0]["slug"] != other_doctor.slug
+    assert set(response.json()) == {
+        "settings_version",
+        "available",
+        "mode",
+        "booking_horizon_days",
+        "services",
+        "doctors",
+        "compatible_pairs",
+    }
+
+    uzbek_response = client.get(f"{OPTIONS}?locale=uz-Latn")
+    assert uzbek_response.status_code == 200, uzbek_response.text
+    assert uzbek_response.json()["services"] == [
+        {"slug": service.slug, "name": "Kardiolog maslahati"}
+    ]
+    assert uzbek_response.json()["doctors"] == [
+        {"slug": doctor.slug, "name": doctor_user.full_name}
+    ]
+
+
+@pytest.mark.integration
+def test_public_booking_options_fail_closed_when_booking_is_disabled(
+    client: TestClient, db_session: Session
+) -> None:
+    target_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+    _configured_public_booking(db_session, target_date=target_date, enabled=False)
+
+    response = client.get(f"{OPTIONS}?locale=ru")
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json() == {
+        "settings_version": 1,
+        "available": False,
+        "mode": "registrar_request",
+        "booking_horizon_days": 30,
+        "services": [],
+        "doctors": [],
+        "compatible_pairs": [],
+    }
+
+
+@pytest.mark.integration
+def test_public_booking_options_returns_no_store_error_for_invalid_settings(
+    client: TestClient, db_session: Session
+) -> None:
+    target_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+    _configured_public_booking(db_session, target_date=target_date)
+    settings = (
+        db_session.query(ClinicSettings)
+        .filter(ClinicSettings.key == "public_booking_settings")
+        .one()
+    )
+    settings.category = "unexpected_category"
+    db_session.flush()
+
+    response = client.get(f"{OPTIONS}?locale=ru")
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"code": "public_booking_unavailable"}}
+    assert response.headers["cache-control"] == "no-store"
 
 
 @pytest.mark.integration
