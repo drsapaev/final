@@ -10,12 +10,20 @@ from app.models.clinic import ClinicSettings
 from app.repositories.public_booking_settings_repository import (
     PublicBookingSettingsRepository,
 )
+from app.repositories.public_site_read_repository import PublicSiteReadRepository
+from app.schemas.public_booking_availability import (
+    PublicBookingCatalogOptionOut,
+    PublicBookingCompatiblePairOut,
+    PublicBookingOptionsOut,
+)
 from app.schemas.public_booking_settings import (
     PublicBookingMode,
     PublicBookingOptionOut,
     PublicBookingSettingsOut,
     PublicBookingSettingsUpdate,
 )
+from app.schemas.public_site import PublicSiteLocale
+from app.services.public_site_read_service import PublicSiteReadService
 
 PUBLIC_BOOKING_SETTINGS_KEY = "public_booking_settings"
 PUBLIC_BOOKING_SETTINGS_CATEGORY = "booking_settings"
@@ -68,6 +76,102 @@ class PublicBookingSettingsService:
             for service_id in settings.service_ids
             if service_id in eligible_ids
         ]
+
+    def get_public_booking_options(
+        self, locale: PublicSiteLocale
+    ) -> PublicBookingOptionsOut:
+        """Return only current, Admin-approved public booking choices.
+
+        The public contract intentionally contains slugs and localized public
+        labels, never database IDs or Admin-only settings metadata. Invalid or
+        disabled configuration fails closed with an empty choice list.
+        """
+        settings = self.get_settings()
+        base = {
+            "settings_version": settings.version,
+            "available": False,
+            "mode": settings.mode,
+            "booking_horizon_days": settings.booking_horizon_days,
+            "services": [],
+            "doctors": [],
+            "compatible_pairs": [],
+        }
+        if not settings.is_enabled or not settings.is_ready:
+            return PublicBookingOptionsOut(**base)
+
+        approved_service_ids = set(settings.service_ids)
+        approved_doctor_ids = set(settings.doctor_ids)
+        selected_service_slugs = {
+            option.id: option.slug
+            for option in self.repository.list_service_options(settings.service_ids)
+            if option.id in approved_service_ids and option.eligible and option.slug
+        }
+        selected_doctor_slugs = {
+            option.id: option.slug
+            for option in self.repository.list_doctor_options(settings.doctor_ids)
+            if option.id in approved_doctor_ids and option.eligible and option.slug
+        }
+        candidate_pairs = self.repository.compatible_service_doctor_pairs(
+            list(selected_service_slugs), list(selected_doctor_slugs)
+        )
+
+        public_read = PublicSiteReadService(PublicSiteReadRepository(self.db))
+        public_services = {
+            option.slug: option
+            for option in public_read.list_services(locale)
+            if option.slug
+        }
+        public_doctors = {
+            option.slug: option
+            for option in public_read.list_doctors(locale)
+            if option.slug
+        }
+        pairs = {
+            (
+                selected_service_slugs[service_id],
+                selected_doctor_slugs[doctor_id],
+            )
+            for service_id, doctor_id in candidate_pairs
+            if service_id in selected_service_slugs
+            and doctor_id in selected_doctor_slugs
+            and selected_service_slugs[service_id] in public_services
+            and selected_doctor_slugs[doctor_id] in public_doctors
+        }
+        if not pairs:
+            return PublicBookingOptionsOut(**base)
+
+        service_slugs = {service_slug for service_slug, _ in pairs}
+        doctor_slugs = {doctor_slug for _, doctor_slug in pairs}
+        return PublicBookingOptionsOut(
+            **{
+                **base,
+                "available": True,
+                "services": [
+                    PublicBookingCatalogOptionOut(
+                        slug=slug, name=public_services[slug].name
+                    )
+                    for slug in sorted(
+                        service_slugs,
+                        key=lambda value: public_services[value].name.casefold(),
+                    )
+                ],
+                "doctors": [
+                    PublicBookingCatalogOptionOut(
+                        slug=slug, name=public_doctors[slug].name
+                    )
+                    for slug in sorted(
+                        doctor_slugs,
+                        key=lambda value: public_doctors[value].name.casefold(),
+                    )
+                ],
+                "compatible_pairs": [
+                    PublicBookingCompatiblePairOut(
+                        service_slug=service_slug, doctor_slug=doctor_slug
+                    )
+                    for service_slug, doctor_slug in sorted(pairs)
+                ],
+            }
+        )
 
     def validate_patient_booking_service_selection(
         self,

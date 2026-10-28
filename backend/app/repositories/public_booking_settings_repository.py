@@ -26,6 +26,7 @@ class BookingCatalogOption:
     id: int
     label: str | None
     eligible: bool
+    slug: str | None = None
 
 
 class PublicBookingSettingsRepository:
@@ -113,6 +114,7 @@ class PublicBookingSettingsRepository:
                         or row.doctor_id in eligible_pinned_doctor_ids
                     )
                 ),
+                slug=_clean(row.slug),
             )
             for row in rows
         ]
@@ -130,40 +132,52 @@ class PublicBookingSettingsRepository:
         """
         if not service_ids or not doctor_ids:
             return False
+        pairs = self.compatible_service_doctor_pairs(service_ids, doctor_ids)
+        compatible_service_ids = {service_id for service_id, _ in pairs}
+        return all(
+            service_id in compatible_service_ids for service_id in set(service_ids)
+        )
 
+    def compatible_service_doctor_pairs(
+        self, service_ids: list[int], doctor_ids: list[int]
+    ) -> list[tuple[int, int]]:
+        """Return exact eligible service/doctor pairs used by booking writes."""
+        if not service_ids or not doctor_ids:
+            return []
+
+        unique_service_ids = set(service_ids)
+        unique_doctor_ids = set(doctor_ids)
         service_rows = self.db.execute(
             select(Service.id, Service.doctor_id, Service.department_key).where(
-                Service.id.in_(service_ids)
+                Service.id.in_(unique_service_ids)
             )
         ).all()
-        if len(service_rows) != len(set(service_ids)):
-            return False
+        if len(service_rows) != len(unique_service_ids):
+            return []
 
         doctor_rows = self.db.execute(
-            select(Doctor.id, Doctor.specialty).where(Doctor.id.in_(doctor_ids))
+            select(Doctor.id, Doctor.specialty).where(Doctor.id.in_(unique_doctor_ids))
         ).all()
         specialties = {row.id: row.specialty for row in doctor_rows}
-        if len(specialties) != len(set(doctor_ids)):
-            return False
+        if len(specialties) != len(unique_doctor_ids):
+            return []
 
-        allowed_doctors = set(doctor_ids)
-        for row in service_rows:
-            if row.doctor_id is not None:
-                if row.doctor_id not in allowed_doctors:
-                    return False
-                candidate_doctor_ids = (row.doctor_id,)
-            else:
-                candidate_doctor_ids = tuple(doctor_ids)
-
+        pairs: list[tuple[int, int]] = []
+        for service in service_rows:
             accepted_specialties = accepted_specialty_variants_for_department_key(
-                row.department_key
+                service.department_key
             )
-            if accepted_specialties is not None and not any(
-                (specialties[doctor_id] or "").strip().lower() in accepted_specialties
-                for doctor_id in candidate_doctor_ids
-            ):
-                return False
-        return True
+            for doctor_id in unique_doctor_ids:
+                if service.doctor_id is not None and service.doctor_id != doctor_id:
+                    continue
+                if (
+                    accepted_specialties is not None
+                    and (specialties[doctor_id] or "").strip().lower()
+                    not in accepted_specialties
+                ):
+                    continue
+                pairs.append((service.id, doctor_id))
+        return pairs
 
     def list_doctor_options(
         self, selected_ids: list[int]
@@ -218,6 +232,7 @@ class PublicBookingSettingsRepository:
                         for value in (row.full_name, row.bio_ru, row.bio_uz, row.slug)
                     )
                 ),
+                slug=_clean(row.slug),
             )
             for row in rows
         ]
@@ -236,7 +251,7 @@ def _append_missing(
 ) -> list[BookingCatalogOption]:
     present = {option.id for option in options}
     options.extend(
-        BookingCatalogOption(id=item, label=None, eligible=False)
+        BookingCatalogOption(id=item, label=None, eligible=False, slug=None)
         for item in selected_ids
         if item not in present
     )

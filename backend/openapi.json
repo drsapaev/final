@@ -4131,6 +4131,81 @@
         }
       }
     },
+    "/api/v1/public-site/booking-options": {
+      "get": {
+        "tags": [
+          "public-site"
+        ],
+        "summary": "Получить разрешённые для публичной записи услуги и врачей",
+        "description": "Returns only currently enabled, Admin-approved published choices and compatible service/doctor pairs. The response contains public slugs and localized names, not internal database IDs.",
+        "operationId": "public_site_get_booking_options",
+        "parameters": [
+          {
+            "name": "locale",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "uz-Latn",
+                "ru"
+              ],
+              "type": "string",
+              "title": "Locale"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current public booking choices; no time is reserved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingOptionsOut"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Booking options are dynamic and must not be cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Public booking settings are unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Booking options must not be cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingAvailabilityErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public-site/availability": {
       "get": {
         "tags": [
@@ -105440,6 +105515,53 @@
         ],
         "title": "PublicBookingCalendarYearOut"
       },
+      "PublicBookingCatalogOptionOut": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slug",
+          "name"
+        ],
+        "title": "PublicBookingCatalogOptionOut",
+        "description": "One currently approved, publicly published booking choice."
+      },
+      "PublicBookingCompatiblePairOut": {
+        "properties": {
+          "service_slug": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Service Slug"
+          },
+          "doctor_slug": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Doctor Slug"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "service_slug",
+          "doctor_slug"
+        ],
+        "title": "PublicBookingCompatiblePairOut",
+        "description": "A service/doctor pair accepted by the current booking policy."
+      },
       "PublicBookingHoliday": {
         "properties": {
           "date": {
@@ -105498,6 +105620,74 @@
           "eligible"
         ],
         "title": "PublicBookingOptionOut"
+      },
+      "PublicBookingOptionsOut": {
+        "properties": {
+          "settings_version": {
+            "type": "integer",
+            "title": "Settings Version"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicBookingMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "booking_horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 365.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking Horizon Days"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingCatalogOptionOut"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "doctors": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingCatalogOptionOut"
+            },
+            "type": "array",
+            "title": "Doctors"
+          },
+          "compatible_pairs": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBookingCompatiblePairOut"
+            },
+            "type": "array",
+            "title": "Compatible Pairs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "settings_version",
+          "available",
+          "mode",
+          "services",
+          "doctors",
+          "compatible_pairs"
+        ],
+        "title": "PublicBookingOptionsOut",
+        "description": "Safe public projection of Admin-approved booking options."
       },
       "PublicBookingRequestAction": {
         "properties": {

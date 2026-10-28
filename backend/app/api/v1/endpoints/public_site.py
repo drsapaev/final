@@ -16,6 +16,7 @@ from app.repositories.public_site_read_repository import PublicSiteReadRepositor
 from app.schemas.public_booking_availability import (
     PublicBookingAvailabilityErrorOut,
     PublicBookingAvailabilityOut,
+    PublicBookingOptionsOut,
 )
 from app.schemas.public_site import (
     PublicSiteCategoryOut,
@@ -207,6 +208,54 @@ def get_public_doctor(
     if doctor is None:
         raise _public_not_found()
     return doctor
+
+
+@router.get(
+    "/booking-options",
+    response_model=PublicBookingOptionsOut,
+    responses={
+        200: {
+            "description": "Current public booking choices; no time is reserved.",
+            "headers": {
+                "Cache-Control": {
+                    "description": "Booking options are dynamic and must not be cached.",
+                    "schema": {"type": "string", "example": "no-store"},
+                }
+            },
+        },
+        503: {
+            "model": PublicBookingAvailabilityErrorOut,
+            "description": "Public booking settings are unavailable.",
+            "headers": {
+                "Cache-Control": {
+                    "description": "Booking options must not be cached.",
+                    "schema": {"type": "string", "example": "no-store"},
+                }
+            },
+        },
+    },
+    operation_id="public_site_get_booking_options",
+    summary="Получить разрешённые для публичной записи услуги и врачей",
+    description=(
+        "Returns only currently enabled, Admin-approved published choices and "
+        "compatible service/doctor pairs. The response contains public slugs "
+        "and localized names, not internal database IDs."
+    ),
+)
+def get_public_booking_options(
+    response: Response,
+    locale: PublicSiteLocale = Query(...),
+    db: Session = Depends(get_db),
+) -> PublicBookingOptionsOut:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return PublicBookingSettingsService(db).get_public_booking_options(locale)
+    except PublicBookingSettingsError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "public_booking_unavailable"},
+            headers={"Cache-Control": "no-store"},
+        ) from exc
 
 
 @router.get(

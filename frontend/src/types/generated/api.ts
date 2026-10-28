@@ -1182,6 +1182,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public-site/booking-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Получить разрешённые для публичной записи услуги и врачей
+         * @description Returns only currently enabled, Admin-approved published choices and compatible service/doctor pairs. The response contains public slugs and localized names, not internal database IDs.
+         */
+        get: operations["public_site_get_booking_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public-site/availability": {
         parameters: {
             query?: never;
@@ -36486,6 +36506,26 @@ export type components = {
             /** Updated By */
             updated_by?: number | null;
         };
+        /**
+         * PublicBookingCatalogOptionOut
+         * @description One currently approved, publicly published booking choice.
+         */
+        PublicBookingCatalogOptionOut: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * PublicBookingCompatiblePairOut
+         * @description A service/doctor pair accepted by the current booking policy.
+         */
+        PublicBookingCompatiblePairOut: {
+            /** Service Slug */
+            service_slug: string;
+            /** Doctor Slug */
+            doctor_slug: string;
+        };
         /** PublicBookingHoliday */
         PublicBookingHoliday: {
             /**
@@ -36512,6 +36552,25 @@ export type components = {
             label: string | null;
             /** Eligible */
             eligible: boolean;
+        };
+        /**
+         * PublicBookingOptionsOut
+         * @description Safe public projection of Admin-approved booking options.
+         */
+        PublicBookingOptionsOut: {
+            /** Settings Version */
+            settings_version: number;
+            /** Available */
+            available: boolean;
+            mode: components["schemas"]["PublicBookingMode"] | null;
+            /** Booking Horizon Days */
+            booking_horizon_days?: number | null;
+            /** Services */
+            services: components["schemas"]["PublicBookingCatalogOptionOut"][];
+            /** Doctors */
+            doctors: components["schemas"]["PublicBookingCatalogOptionOut"][];
+            /** Compatible Pairs */
+            compatible_pairs: components["schemas"]["PublicBookingCompatiblePairOut"][];
         };
         /** PublicBookingRequestAction */
         PublicBookingRequestAction: {
@@ -46391,6 +46450,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_site_get_booking_options: {
+        parameters: {
+            query: {
+                locale: "uz-Latn" | "ru";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current public booking choices; no time is reserved. */
+            200: {
+                headers: {
+                    /** @description Booking options are dynamic and must not be cached. */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingOptionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Public booking settings are unavailable. */
+            503: {
+                headers: {
+                    /** @description Booking options must not be cached. */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookingAvailabilityErrorOut"];
                 };
             };
         };
