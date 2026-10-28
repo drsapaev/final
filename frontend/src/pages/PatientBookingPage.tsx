@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, FormEvent } from 'react';
+import type { FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   createPublicBookingIdempotencyKey,
@@ -149,24 +149,6 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     home: 'Bosh sahifa',
     switchLanguage: 'Русский',
   },
-};
-
-const fieldStyle: CSSProperties = {
-  display: 'grid',
-  gap: 7,
-  marginBlock: 18,
-  fontWeight: 600,
-};
-
-const controlStyle: CSSProperties = {
-  width: '100%',
-  minHeight: 44,
-  border: '1px solid var(--mac-border, rgb(184, 200, 218))',
-  borderRadius: 10,
-  padding: '9px 12px',
-  background: 'var(--mac-bg-primary, rgb(255, 255, 255))',
-  color: 'var(--mac-text-primary, rgb(0, 0, 0))',
-  font: 'inherit',
 };
 
 function tashkentToday(): string {
@@ -628,27 +610,27 @@ export default function PatientBookingPage() {
           </section>
         ) : null}
         {!optionsLoading && bookingConfigurationUsable && options && !completed ? (
-          <form onSubmit={handleSubmit} aria-label={copy.title}>
-            <label style={fieldStyle} htmlFor="public-booking-service">
+          <form className="public-site__booking-form" onSubmit={handleSubmit} aria-label={copy.title}>
+            <label className="public-site__booking-field" htmlFor="public-booking-service">
               {copy.service}
-              <select id="public-booking-service" style={controlStyle} value={serviceSlug} disabled={formLocked} required
+              <select id="public-booking-service" className="public-site__booking-control" value={serviceSlug} disabled={formLocked} required
                 onChange={(event) => { setServiceSlug(event.target.value); setDoctorSlug(''); setDate(''); setTime(''); setAvailability(null); setError(''); setNotice(''); }}>
                 <option value="">{copy.choose}</option>
                 {options.services.map((service) => <option key={service.slug} value={service.slug}>{service.name}</option>)}
               </select>
             </label>
-            <label style={fieldStyle} htmlFor="public-booking-doctor">
+            <label className="public-site__booking-field" htmlFor="public-booking-doctor">
               {copy.doctor}
-              <select id="public-booking-doctor" style={controlStyle} value={doctorSlug} disabled={formLocked || !serviceSlug} required
+              <select id="public-booking-doctor" className="public-site__booking-control" value={doctorSlug} disabled={formLocked || !serviceSlug} required
                 onChange={(event) => { setDoctorSlug(event.target.value); setDate(''); setTime(''); setAvailability(null); setError(''); setNotice(''); }}>
                 <option value="">{copy.choose}</option>
                 {eligibleDoctors.map((doctor) => <option key={doctor.slug} value={doctor.slug}>{doctor.name}</option>)}
               </select>
             </label>
             {serviceSlug && eligibleDoctors.length === 0 ? <p className="public-site__muted">{copy.choosePair}</p> : null}
-            <label style={fieldStyle} htmlFor="public-booking-date">
+            <label className="public-site__booking-field" htmlFor="public-booking-date">
               {copy.date}
-            <input id="public-booking-date" aria-label={copy.date} style={controlStyle} type="date" value={date} min={today} max={maxDate}
+            <input id="public-booking-date" aria-label={copy.date} className="public-site__booking-control" type="date" value={date} min={today} max={maxDate}
                 disabled={formLocked || !doctorSlug || !maxDate} required
                 onChange={(event) => { setDate(event.target.value); setTime(''); setError(''); setNotice(''); }} />
             </label>
@@ -657,13 +639,13 @@ export default function PatientBookingPage() {
               <button type="button" className="public-site__button" onClick={retryAvailability}>{copy.refresh}</button>
             ) : null}
             {availability && !availabilityLoading ? (
-              <fieldset className="public-site__section" style={{ border: 0, paddingInline: 0 }} disabled={formLocked}>
+              <fieldset className="public-site__section public-site__booking-fieldset" disabled={formLocked}>
                 <legend>{copy.time}</legend>
                 <p className="public-site__muted">{copy.timezone}</p>
                 {slots.length === 0 ? <p className="public-site__muted">{copy.noSlots}</p> : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBlock: 12 }}>
+                  <div className="public-site__booking-times">
                     {slots.map((slot) => (
-                      <label key={slot} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: '1px solid var(--mac-border, rgb(184, 200, 218))', borderRadius: 10, padding: '8px 12px' }}>
+                      <label key={slot} className="public-site__booking-time">
                         <input type="radio" aria-label={slot} name="public-booking-time" value={slot} checked={time === slot} required
                           onChange={() => { setTime(slot); setError(''); }} />
                         {slot}
@@ -674,10 +656,10 @@ export default function PatientBookingPage() {
               </fieldset>
             ) : null}
             {needsPolicyReview ? (
-              <fieldset className="public-site__section" style={{ border: 0, paddingInline: 0 }}>
+              <fieldset className="public-site__section public-site__booking-policy">
                 <legend>{copy.policyConfirm}</legend>
                 <p>{copy.policyChanged}</p>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+                <label className="public-site__booking-policy-ack">
                   <input type="checkbox" aria-label={copy.policyAck} checked={policyAcknowledgedVersion === options.settings_version}
                     onChange={(event) => setPolicyAcknowledgedVersion(event.target.checked ? options.settings_version : null)} />
                   {copy.policyAck}
@@ -688,7 +670,7 @@ export default function PatientBookingPage() {
               <section className="public-site__section" aria-labelledby="booking-login-title">
                 <h2 id="booking-login-title">{otherRoleSignedIn ? copy.profileRequired : copy.loginRequired}</h2>
                 {serviceSlug && doctorSlug && date && time ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                  <div className="public-site__booking-actions">
                     <button type="button" className="public-site__button public-site__button--primary" disabled={formLocked}
                       onClick={() => saveSelectionAndNavigate('/patient/login')}>{copy.login}</button>
                     {!otherRoleSignedIn ? <button type="button" className="public-site__button" disabled={formLocked}
