@@ -73,6 +73,13 @@ export type PublicBookingOptionOutDto = Schemas['PublicBookingOptionOut'];
 export type PublicBookingSettingsUpdateDto = Schemas['PublicBookingSettingsUpdate'];
 export type PublicBookingSettingsOutDto = Schemas['PublicBookingSettingsOut'];
 
+// Public patient booking selection and non-reserving request contracts.
+export type PublicBookingCatalogOptionDto = Schemas['PublicBookingCatalogOptionOut'];
+export type PublicBookingCompatiblePairDto = Schemas['PublicBookingCompatiblePairOut'];
+export type PublicBookingOptionsDto = Schemas['PublicBookingOptionsOut'];
+export type PublicBookingAvailabilityDto = Schemas['PublicBookingAvailabilityOut'];
+export type PublicBookingRequestCreateDto = Schemas['PublicBookingRequestCreate'];
+
 // Staff worklist for non-reserving public booking requests.
 export type PublicBookingRequestStatusDto = Schemas['PublicBookingRequestStatus'];
 export type PublicBookingRequestActionDto = Schemas['PublicBookingRequestAction'];

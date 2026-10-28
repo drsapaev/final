@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '../../../contexts/ThemeContext';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -27,6 +27,11 @@ vi.mock('../../../stores/auth', () => ({
   replaceAccessOnlySession: vi.fn(),
 }));
 
+vi.mock('../../../api/publicBooking', () => ({
+  getPendingPublicBookingLocale: vi.fn(() => null),
+  getPublicBookingPath: (locale: string) => locale === 'ru' ? '/ru/booking' : '/booking',
+}));
+
 vi.mock('../../../i18n/useTranslation', () => ({
   useTranslation: () => ({
     language: 'ru',
@@ -44,15 +49,21 @@ import {
 } from '../../../api/patientAccess';
 import { ensureCSRFToken } from '../../../api/client';
 import { replaceAccessOnlySession, setProfile, setToken } from '../../../stores/auth';
+import { getPendingPublicBookingLocale } from '../../../api/publicBooking';
 
 const mockedRequestOtp = vi.mocked(requestPatientOtp);
 const mockedVerifyOtp = vi.mocked(verifyPatientOtp);
 const mockedPatientLogin = vi.mocked(patientLogin);
 
 function renderPage() {
+  const LocationProbe = () => {
+    const location = useLocation();
+    return <output data-testid="current-path">{location.pathname}</output>;
+  };
   return render(
     <MemoryRouter>
       <ThemeProvider>
+        <LocationProbe />
         <PatientLoginPage />
       </ThemeProvider>
     </MemoryRouter>
@@ -88,6 +99,7 @@ describe('PatientLoginPage (Phase 0 PR-B)', () => {
       expires_in: 120,
     });
     mockedPatientLogin.mockResolvedValue(PATIENT_SESSION);
+    vi.mocked(getPendingPublicBookingLocale).mockReturnValue(null);
   });
 
   it('renders the phone step and rejects an invalid phone client-side', async () => {
@@ -170,5 +182,20 @@ describe('PatientLoginPage (Phase 0 PR-B)', () => {
 
     expect(await screen.findByText('patientPortal.pl_code_invalid')).toBeInTheDocument();
     expect(mockedVerifyOtp).not.toHaveBeenCalled();
+  });
+
+  it('returns to the selected booking after patient login when a selection is pending', async () => {
+    vi.mocked(getPendingPublicBookingLocale).mockReturnValue('ru');
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('patientPortal.pl_phone_label'), {
+      target: { value: '+998901234567' },
+    });
+    fireEvent.submit(screen.getByLabelText('patientPortal.pl_send_code').closest('form')!);
+    await screen.findByLabelText('patientPortal.pl_code_label');
+    fireEvent.change(screen.getByLabelText('patientPortal.pl_code_label'), { target: { value: '123456' } });
+    fireEvent.submit(screen.getByLabelText('patientPortal.pl_verify').closest('form')!);
+
+    await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/ru/booking'));
   });
 });

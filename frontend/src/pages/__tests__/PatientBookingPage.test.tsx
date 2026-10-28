@@ -1,0 +1,192 @@
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../api/publicBooking', async () => {
+  const actual = await vi.importActual<typeof import('../../api/publicBooking')>('../../api/publicBooking');
+  return {
+    ...actual,
+    getPublicBookingOptions: vi.fn(),
+    getPublicBookingAvailability: vi.fn(),
+    createPatientPublicBookingRequest: vi.fn(),
+  };
+});
+
+vi.mock('../../stores/auth', () => ({
+  getState: vi.fn(() => ({ token: 'patient-token', profile: { role: 'Patient' } })),
+}));
+
+import {
+  clearPendingPublicBookingSelection,
+  createPatientPublicBookingRequest,
+  getPendingPublicBookingLocale,
+  getPublicBookingAvailability,
+  getPublicBookingOptions,
+} from '../../api/publicBooking';
+import { getState } from '../../stores/auth';
+import PatientBookingPage from '../PatientBookingPage';
+
+const mockedOptions = vi.mocked(getPublicBookingOptions);
+const mockedAvailability = vi.mocked(getPublicBookingAvailability);
+const mockedCreateRequest = vi.mocked(createPatientPublicBookingRequest);
+const mockedAuthState = vi.mocked(getState);
+
+const OPTIONS = {
+  settings_version: 1,
+  available: true,
+  mode: 'registrar_request' as const,
+  booking_horizon_days: 90,
+  services: [{ slug: 'cardiology', name: 'Кардиология' }],
+  doctors: [
+    { slug: 'doctor-one', name: 'Врач Один' },
+    { slug: 'doctor-two', name: 'Врач Два' },
+  ],
+  compatible_pairs: [{ service_slug: 'cardiology', doctor_slug: 'doctor-one' }],
+};
+
+function todayInTashkent() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tashkent', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function renderPage(path = '/ru/booking') {
+  const LocationProbe = () => {
+    const location = useLocation();
+    return <output data-testid="current-path">{location.pathname + location.search}</output>;
+  };
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <LocationProbe />
+      <PatientBookingPage />
+    </MemoryRouter>,
+  );
+}
+
+async function chooseSlot(locale: 'ru' | 'uz-Latn' = 'ru') {
+  const labels = locale === 'ru'
+    ? { service: 'Услуга', doctor: 'Врач', date: 'Дата' }
+    : { service: 'Xizmat', doctor: 'Shifokor', date: 'Sana' };
+  await screen.findByLabelText(labels.service);
+  fireEvent.change(screen.getByLabelText(labels.service), { target: { value: 'cardiology' } });
+  fireEvent.change(screen.getByLabelText(labels.doctor), { target: { value: 'doctor-one' } });
+  fireEvent.change(screen.getByLabelText(labels.date), { target: { value: todayInTashkent() } });
+  fireEvent.click(await screen.findByLabelText('09:00'));
+}
+
+describe('PatientBookingPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearPendingPublicBookingSelection();
+    mockedAuthState.mockReturnValue({ token: 'patient-token', profile: { role: 'Patient' } } as never);
+    mockedOptions.mockResolvedValue(OPTIONS as never);
+    mockedAvailability.mockImplementation(async ({ date }) => ({
+      date,
+      timezone: 'Asia/Tashkent',
+      settings_version: 1,
+      slots: ['09:00:00'],
+    }) as never);
+    mockedCreateRequest.mockResolvedValue({ id: 'request-id' } as never);
+  });
+
+  it('shows only service/doctor pairs approved by the current public policy', async () => {
+    renderPage();
+    await screen.findByLabelText('Услуга');
+    fireEvent.change(screen.getByLabelText('Услуга'), { target: { value: 'cardiology' } });
+
+    const doctorSelect = screen.getByLabelText('Врач') as HTMLSelectElement;
+    expect(Array.from(doctorSelect.options).map((option) => option.value)).toEqual(['', 'doctor-one']);
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+  });
+
+  it('revalidates settings and slots before submitting a non-reserving request', async () => {
+    renderPage();
+    await chooseSlot();
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить заявку' }));
+
+    await screen.findByRole('heading', { name: /Заявка отправлена регистратору/ });
+    expect(mockedCreateRequest).toHaveBeenCalledTimes(1);
+    const [body, key] = mockedCreateRequest.mock.calls[0];
+    expect(body).toEqual({
+      service_slug: 'cardiology',
+      doctor_slug: 'doctor-one',
+      appointment_date: todayInTashkent(),
+      appointment_time: '09:00',
+      expected_settings_version: 1,
+    });
+    expect(key).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(body).not.toHaveProperty('patient_id');
+    expect(screen.getByText(/не резервирует время/i)).toBeInTheDocument();
+  });
+
+  it('requires explicit reconfirmation when booking settings changed after selection', async () => {
+    renderPage();
+    await chooseSlot();
+    mockedOptions.mockResolvedValue({ ...OPTIONS, settings_version: 2 } as never);
+    mockedAvailability.mockImplementation(async ({ date }) => ({
+      date,
+      timezone: 'Asia/Tashkent',
+      settings_version: 2,
+      slots: ['09:00:00'],
+    }) as never);
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить заявку' }));
+
+    expect(await screen.findByLabelText(/Я проверил/)).toBeInTheDocument();
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+    const acknowledgement = screen.getByLabelText(/Я проверил/);
+    fireEvent.click(acknowledgement);
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить заявку' }));
+
+    await screen.findByRole('heading', { name: /Заявка отправлена регистратору/ });
+    expect(mockedCreateRequest).toHaveBeenCalledTimes(1);
+    expect(mockedCreateRequest.mock.calls[0][0].expected_settings_version).toBe(2);
+  });
+
+  it('retries an ambiguous send with the exact same body and idempotency key', async () => {
+    mockedCreateRequest.mockRejectedValueOnce({ isAxiosError: true, request: {} });
+    renderPage();
+    await chooseSlot();
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить заявку' }));
+
+    const retry = await screen.findByRole('button', { name: 'Повторно проверить ту же заявку' });
+    expect(screen.getByLabelText('Услуга')).toBeDisabled();
+    const firstAttempt = mockedCreateRequest.mock.calls[0];
+    fireEvent.click(retry);
+    await screen.findByRole('heading', { name: /Заявка отправлена регистратору/ });
+
+    expect(mockedCreateRequest).toHaveBeenCalledTimes(2);
+    expect(mockedCreateRequest.mock.calls[1]).toEqual(firstAttempt);
+  });
+
+  it('keeps the selected route out of the URL while handing off to patient login', async () => {
+    mockedAuthState.mockReturnValue({ token: null, profile: null } as never);
+    renderPage('/booking');
+    await chooseSlot('uz-Latn');
+    fireEvent.click(screen.getByRole('button', { name: 'Bemor sifatida kirish' }));
+
+    expect(screen.getByTestId('current-path')).toHaveTextContent('/patient/login');
+    expect(screen.getByTestId('current-path')).not.toHaveTextContent('cardiology');
+    expect(getPendingPublicBookingLocale()).toBe('uz-Latn');
+  });
+
+  it('fails closed when the selected mode requires a different booking API', async () => {
+    mockedOptions.mockResolvedValue({ ...OPTIONS, mode: 'confirmed_appointment' } as never);
+    renderPage();
+    expect(await screen.findByText(/Этот способ записи пока не подключён/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Услуга')).not.toBeInTheDocument();
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the server has not configured a booking horizon', async () => {
+    mockedOptions.mockResolvedValue({ ...OPTIONS, booking_horizon_days: null } as never);
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: /Онлайн-запись сейчас недоступна/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Услуга')).not.toBeInTheDocument();
+    expect(mockedAvailability).not.toHaveBeenCalled();
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+  });
+});

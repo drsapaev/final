@@ -35,6 +35,7 @@ import { confirmActivation, requestActivationOtp } from '../../api/patientAccess
 import { replaceAccessOnlySession } from '../../stores/auth';
 import { takePatientActivationFragmentToken } from '../../utils/patientActivateDeepLink';
 import { getRouteForProfile } from '../../constants/routes';
+import { getPendingPublicBookingLocale, getPublicBookingPath } from '../../api/publicBooking';
 import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
 import type { HttpApiError } from '../../types/errors';
@@ -175,7 +176,12 @@ const PatientActivatePage = () => {
         // Non-fatal — the request interceptor fetches CSRF on demand.
       });
 
-      const target = getRouteForProfile(session.user as unknown as Record<string, unknown>);
+      const user = session.user as unknown as Record<string, unknown>;
+      const pendingBookingLocale = getPendingPublicBookingLocale();
+      const isPatient = String(user.role ?? '').toLowerCase() === 'patient';
+      const target = pendingBookingLocale && isPatient
+        ? getPublicBookingPath(pendingBookingLocale)
+        : getRouteForProfile(user);
       navigate(target, { replace: true });
     } catch (err) {
       logger.warn('[PatientActivate] confirm failed:', err);

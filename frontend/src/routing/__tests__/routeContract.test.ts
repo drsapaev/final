@@ -142,6 +142,21 @@ function assertRouteSpecificChromeHeadings(routeHeadingContract: RouteHeadingCon
 }
 
 describe('route contract invariants', () => {
+  it('registers public booking entry points in Russian and Uzbek without exposing selections in paths', () => {
+    for (const [path, id] of [['/booking', 'public-booking-uz'], ['/ru/booking', 'public-booking-ru']] as const) {
+      const route = getEffectiveRouteByPath(path);
+      expect(route).toMatchObject({
+        id,
+        path,
+        component: 'PatientBookingPage',
+        group: 'public',
+        auth: 'public',
+        roles: [],
+        shell: 'landing',
+      });
+    }
+  });
+
   it('exposes separate Admin and Registrar booking-request worklists with staff-only access', () => {
     const adminPath = '/admin/public-booking-requests';
     const registrarPath = '/registrar/booking-requests';
