@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import { useTranslation } from '../../i18n/useTranslation';
 import {
@@ -89,6 +89,7 @@ export default function PublicBookingRequestsManager() {
   const { t, language } = useTranslation();
   const [confirm, confirmDialog] = useConfirm();
   const [status, setStatus] = useState<StaffBookingRequestStatus>('pending');
+  const requestGeneration = useRef(0);
   const [items, setItems] = useState<StaffPublicBookingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -100,39 +101,54 @@ export default function PublicBookingRequestsManager() {
   const locale = getLocale(language || 'ru');
 
   useEffect(() => {
+    const generation = ++requestGeneration.current;
     let active = true;
     setItems([]);
     setLoading(true);
+    setLoadingMore(false);
     setHasMore(false);
 
     listStaffPublicBookingRequests({ status, offset: 0 })
       .then((page) => {
-        if (!active) return;
+        if (!active || generation !== requestGeneration.current) return;
         setItems(page);
         setHasMore(page.length === STAFF_BOOKING_REQUEST_PAGE_SIZE);
       })
       .catch(() => {
-        if (active) setErrorKey('admin2.pbr_error_load');
+        if (active && generation === requestGeneration.current) {
+          setErrorKey('admin2.pbr_error_load');
+        }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active && generation === requestGeneration.current) setLoading(false);
       });
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+      if (generation === requestGeneration.current) requestGeneration.current += 1;
+    };
   }, [status, reloadToken]);
+
+  const requestReload = useCallback(() => {
+    // Invalidate pagination immediately, before React runs the new effect.
+    requestGeneration.current += 1;
+    setReloadToken((current) => current + 1);
+  }, []);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
+    const generation = requestGeneration.current;
     setLoadingMore(true);
     setErrorKey(null);
     try {
       const page = await listStaffPublicBookingRequests({ status, offset: items.length });
+      if (generation !== requestGeneration.current) return;
       setItems((current) => [...current, ...page]);
       setHasMore(page.length === STAFF_BOOKING_REQUEST_PAGE_SIZE);
     } catch {
-      setErrorKey('admin2.pbr_error_load_more');
+      if (generation === requestGeneration.current) setErrorKey('admin2.pbr_error_load_more');
     } finally {
-      setLoadingMore(false);
+      if (generation === requestGeneration.current) setLoadingMore(false);
     }
   }, [hasMore, items.length, loadingMore, status]);
 
@@ -178,22 +194,22 @@ export default function PublicBookingRequestsManager() {
       } else {
         setNoticeKey('admin2.pbr_notice_rejected');
       }
-      setReloadToken((current) => current + 1);
+      requestReload();
     } catch (actionError) {
       setErrorKey(getActionErrorKey(actionError));
       const code = getStaffBookingRequestErrorCode(actionError);
       if (code === 'booking_request_version_conflict' || code === 'booking_request_state_conflict') {
-        setReloadToken((current) => current + 1);
+        requestReload();
       }
     } finally {
       setBusyRequestId(null);
     }
-  }, [busyRequestId, confirm, t]);
+  }, [busyRequestId, confirm, requestReload, t]);
 
   const retry = () => {
     setErrorKey(null);
     setNoticeKey(null);
-    setReloadToken((current) => current + 1);
+    requestReload();
   };
 
   return (
@@ -210,25 +226,41 @@ export default function PublicBookingRequestsManager() {
         </p>
       </header>
 
-      <div className="flex flex-col gap-2 sm:max-w-sm">
-        <label htmlFor="public-booking-request-status" className="text-sm font-medium text-[var(--mac-text-primary, rgb(0 0 0))]">
-          {t('admin2.pbr_filter_label')}
-        </label>
-        <select
-          id="public-booking-request-status"
-          value={status}
-          onChange={(event) => {
-            setNoticeKey(null);
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-2 sm:max-w-sm">
+          <label htmlFor="public-booking-request-status" className="text-sm font-medium text-[var(--mac-text-primary, rgb(0 0 0))]">
+            {t('admin2.pbr_filter_label')}
+          </label>
+          <select
+            id="public-booking-request-status"
+            value={status}
+            onChange={(event) => {
+              requestGeneration.current += 1;
+              setNoticeKey(null);
+              setErrorKey(null);
+              setStatus(event.target.value as StaffBookingRequestStatus);
+            }}
+            disabled={loading || loadingMore || Boolean(busyRequestId)}
+            className="min-h-11 rounded-lg border border-[var(--mac-border, rgb(184 200 218))] bg-[var(--mac-bg-primary, rgb(255 255 255))] px-3 text-sm text-[var(--mac-text-primary, rgb(0 0 0))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--mac-accent-blue, rgb(0 122 255))]"
+          >
+            {STATUS_FILTERS.map((option) => (
+              <option key={option} value={option}>{t(STATUS_KEYS[option])}</option>
+            ))}
+          </select>
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="small"
+          onClick={() => {
             setErrorKey(null);
-            setStatus(event.target.value as StaffBookingRequestStatus);
+            requestReload();
           }}
-          disabled={loading || loadingMore || Boolean(busyRequestId)}
-          className="min-h-11 rounded-lg border border-[var(--mac-border, rgb(184 200 218))] bg-[var(--mac-bg-primary, rgb(255 255 255))] px-3 text-sm text-[var(--mac-text-primary, rgb(0 0 0))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--mac-accent-blue, rgb(0 122 255))]"
+          disabled={loading || Boolean(busyRequestId)}
+          loading={loading}
         >
-          {STATUS_FILTERS.map((option) => (
-            <option key={option} value={option}>{t(STATUS_KEYS[option])}</option>
-          ))}
-        </select>
+          {t('common.refresh')}
+        </Button>
       </div>
 
       {noticeKey && (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffPublicBookingRequest } from '../../../api/adminPublicBookingRequests';
 
@@ -90,6 +90,72 @@ describe('PublicBookingRequestsManager', () => {
     expect(screen.getByRole('button', { name: 'admin2.pbr_confirm' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'admin2.pbr_request_new_time' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'admin2.pbr_reject' })).toBeEnabled();
+  });
+
+  it('shows newly arrived requests after a manual refresh', async () => {
+    const newlyArrivedRequest = {
+      ...pendingRequest,
+      id: 'newly-arrived-request',
+      patientDisplayName: 'SYNTHETIC New Patient',
+    };
+    mocks.list
+      .mockResolvedValueOnce([pendingRequest])
+      .mockResolvedValueOnce([newlyArrivedRequest]);
+    render(<PublicBookingRequestsManager />);
+
+    expect(await screen.findByText('SYNTHETIC Patient')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'common.refresh' }));
+
+    expect(await screen.findByText('SYNTHETIC New Patient')).toBeInTheDocument();
+    expect(mocks.list).toHaveBeenCalledTimes(2);
+    expect(mocks.list).toHaveBeenLastCalledWith({ status: 'pending', offset: 0 });
+  });
+
+  it('ignores a load-more response from before an action refresh', async () => {
+    const firstPage = Array.from({ length: 50 }, (_, index) => ({
+      ...pendingRequest,
+      id: `request-${index}`,
+      patientDisplayName: `SYNTHETIC Patient ${index}`,
+    }));
+    const refreshedRequest = {
+      ...firstPage[0],
+      patientDisplayName: 'SYNTHETIC Refreshed Patient',
+      version: pendingRequest.version + 1,
+    };
+    const staleRequest = {
+      ...pendingRequest,
+      id: 'stale-load-more-request',
+      patientDisplayName: 'SYNTHETIC Stale Patient',
+    };
+    let resolveLoadMore!: (page: StaffPublicBookingRequest[]) => void;
+    const loadMoreResponse = new Promise<StaffPublicBookingRequest[]>((resolve) => {
+      resolveLoadMore = resolve;
+    });
+    mocks.list
+      .mockResolvedValueOnce(firstPage)
+      .mockReturnValueOnce(loadMoreResponse)
+      .mockResolvedValueOnce([refreshedRequest]);
+    render(<PublicBookingRequestsManager />);
+
+    expect(await screen.findByText('SYNTHETIC Patient 0')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'admin2.pbr_load_more' }));
+    await waitFor(() => expect(mocks.list).toHaveBeenNthCalledWith(
+      2,
+      { status: 'pending', offset: 50 },
+    ));
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'admin2.pbr_confirm' })[0]);
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledWith(firstPage[0].id, 7));
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(3));
+    expect(await screen.findByText('SYNTHETIC Refreshed Patient')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveLoadMore([staleRequest]);
+      await loadMoreResponse;
+    });
+
+    expect(screen.queryByText('SYNTHETIC Stale Patient')).not.toBeInTheDocument();
+    expect(screen.getByText('SYNTHETIC Refreshed Patient')).toBeInTheDocument();
   });
 
   it('rechecks and confirms using the request version, then keeps the result visible during refresh', async () => {
