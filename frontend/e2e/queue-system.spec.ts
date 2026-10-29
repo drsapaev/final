@@ -341,8 +341,14 @@ test.describe('Queue System Tests', () => {
   test('should display queue management interface', async ({ page }) => {
     await page.goto(REGISTRAR_QUEUE_PATH);
     await expect(page).toHaveURL(/\/registrar\/queue(?:\?.*)?$/);
-    await expect(page.locator('text=Очередь')).toBeVisible();
-    await expect(page.locator('text=Онлайн-очередь')).toBeVisible();
+    // Structural roles and control IDs avoid duplicate, locale-specific visible copy.
+    const registrarMain = page.getByRole('main');
+    await expect(registrarMain.getByRole('heading', { level: 1 })).toBeVisible();
+
+    const queueControls = registrarMain.locator('.mqm-controls-card');
+    await expect(queueControls.getByRole('heading', { level: 3 })).toBeVisible();
+    await expect(queueControls.locator('#modern-queue-date')).toBeVisible();
+    await expect(queueControls.locator('#modern-queue-doctor')).toBeVisible();
   });
 
   test('should keep doctor-scoped actions disabled until a doctor is selected', async ({ page }) => {
