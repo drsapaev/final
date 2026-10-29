@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -216,7 +216,10 @@ describe('PatientBookingPage', () => {
     });
     renderPage();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Отправить новое время' }));
+    const submitButton = await screen.findByRole('button', { name: 'Отправить новое время' });
+    await waitFor(() => expect(submitButton).toBeEnabled());
+    fireEvent.click(submitButton);
+    await waitFor(() => expect(mockedResubmitRequest).toHaveBeenCalledTimes(1));
     await screen.findByRole('heading', { name: /Новое время отправлено регистратору/ });
 
     expect(mockedResubmitRequest).toHaveBeenCalledTimes(1);

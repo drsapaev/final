@@ -296,7 +296,9 @@ describe('PatientLoginPage (Phase 0 PR-B)', () => {
     expect(returnedState.publicBookingResubmit.requestId).toBe(requestId);
     expect(returnedState.publicBookingResubmit.expectedVersion).toBe(6);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Отправить новое время' }));
+    const resubmitButton = screen.getByRole('button', { name: 'Отправить новое время' });
+    await waitFor(() => expect(resubmitButton).toBeEnabled());
+    fireEvent.click(resubmitButton);
     await screen.findByRole('heading', { name: /Новое время отправлено регистратору/ });
 
     expect(resubmitPatientPublicBookingRequest).toHaveBeenCalledTimes(1);
