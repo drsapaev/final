@@ -35,6 +35,7 @@ import { ROUTE_REGISTRY } from './routing/routeRegistry';
 import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards';
 import { getRouteChromeState, type RouteProfile } from './routing/routeSelectors';
 import { sanitizeSpeedInsightsEvent } from './utils/speedInsightsPrivacy';
+import { clearPendingPublicBookingSelection } from './api/publicBooking';
 
 bootstrapStoredColorScheme();
 
@@ -66,6 +67,7 @@ const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage'));
 const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired'));
 const PatientLoginPage = lazy(() => import('./pages/auth/PatientLoginPage'));
 const PatientActivatePage = lazy(() => import('./pages/auth/PatientActivatePage'));
+const PatientBookingPage = lazy(() => import('./pages/PatientBookingPage'));
 const PatientPickupView = lazy(() => import('./pages/PatientPickupView'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
 const NurseTabletPage = lazy(() => import('./pages/nurse/NurseTabletPage'));
@@ -109,6 +111,7 @@ const ROUTE_COMPONENTS = {
   ChangePasswordRequired,
   PatientLoginPage,
   PatientActivatePage,
+  PatientBookingPage,
   Health,
   QueueJoin,
   ConfirmVisitPage,
@@ -433,6 +436,12 @@ function RouteRenderer({ route }: { route: { component: string; shell?: string; 
 function AppContent() {
   const location = useLocation();
   const setupStatus = useSetupStatus();
+
+  useEffect(() => {
+    const path = location.pathname.replace(/\/$/, '') || '/';
+    const selectionFlowPaths = new Set(['/booking', '/ru/booking', '/patient/login', '/patient/activate']);
+    if (!selectionFlowPaths.has(path)) clearPendingPublicBookingSelection();
+  }, [location.pathname]);
 
   if (setupStatus.isLoading && location.pathname !== '/health') {
     return <LoadingScreen />;

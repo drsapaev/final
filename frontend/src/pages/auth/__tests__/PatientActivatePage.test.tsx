@@ -27,6 +27,11 @@ vi.mock('../../../stores/auth', () => ({
   replaceAccessOnlySession: vi.fn(),
 }));
 
+vi.mock('../../../api/publicBooking', () => ({
+  getPendingPublicBookingLocale: vi.fn(() => null),
+  getPublicBookingPath: (locale: string) => locale === 'ru' ? '/ru/booking' : '/booking',
+}));
+
 vi.mock('../../../i18n/useTranslation', () => ({
   useTranslation: () => ({
     language: 'ru',
@@ -42,6 +47,7 @@ import {
   requestActivationOtp,
 } from '../../../api/patientAccess';
 import { replaceAccessOnlySession, setProfile, setToken } from '../../../stores/auth';
+import { getPendingPublicBookingLocale } from '../../../api/publicBooking';
 import { extractPatientActivationCredential, takePatientActivationFragmentToken } from '../../../utils/patientActivateDeepLink';
 
 const mockedRequestOtp = vi.mocked(requestActivationOtp);
@@ -50,9 +56,14 @@ const mockedConfirm = vi.mocked(confirmActivation);
 const TOKEN = 'a'.repeat(64);
 
 function renderPage(initialEntries?: string[]) {
+  const LocationProbe = () => {
+    const location = useLocation();
+    return <output data-testid="current-path">{location.pathname}</output>;
+  };
   return render(
     <MemoryRouter initialEntries={initialEntries ?? ['/patient/activate']}>
       <ThemeProvider>
+        <LocationProbe />
         <PatientActivatePage />
       </ThemeProvider>
     </MemoryRouter>
@@ -84,6 +95,7 @@ describe('PatientActivatePage (Phase 0 PR-B)', () => {
       resend_after_seconds: 60,
     });
     mockedConfirm.mockResolvedValue(PATIENT_SESSION);
+    vi.mocked(getPendingPublicBookingLocale).mockReturnValue(null);
   });
 
   it('prefills the token from the ?token= deep-link but never auto-submits', () => {
@@ -253,5 +265,18 @@ describe('PatientActivatePage (Phase 0 PR-B)', () => {
       expect(setToken).not.toHaveBeenCalled();
       expect(setProfile).not.toHaveBeenCalled();
     });
+  });
+
+  it('returns to the selected booking after patient-card activation', async () => {
+    vi.mocked(getPendingPublicBookingLocale).mockReturnValue('uz-Latn');
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('patientPortal.pa_token_label'), { target: { value: TOKEN } });
+    fireEvent.submit(screen.getByLabelText('patientPortal.pa_continue').closest('form')!);
+    await screen.findByLabelText('patientPortal.pa_code_label');
+    fireEvent.change(screen.getByLabelText('patientPortal.pa_code_label'), { target: { value: '654321' } });
+    fireEvent.submit(screen.getByLabelText('patientPortal.pa_confirm').closest('form')!);
+
+    await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/booking'));
   });
 });

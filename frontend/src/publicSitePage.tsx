@@ -16,6 +16,7 @@ import type {
 interface Copy {
   services: string;
   doctors: string;
+  booking: string;
   prices: string;
   contacts: string;
   staffLogin: string;
@@ -60,6 +61,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
   ru: {
     services: 'Услуги',
     doctors: 'Врачи',
+    booking: 'Записаться онлайн',
     prices: 'Цены',
     contacts: 'Контакты',
     staffLogin: 'Вход для персонала',
@@ -113,6 +115,7 @@ const COPY: Record<PublicSiteLocale, Copy> = {
   'uz-Latn': {
     services: 'Xizmatlar',
     doctors: 'Shifokorlar',
+    booking: 'Onlayn yozilish',
     prices: 'Narxlar',
     contacts: 'Kontaktlar',
     staffLogin: 'Xodimlar uchun kirish',
@@ -313,6 +316,7 @@ function PublicSiteLinks({ className, locale, copy }: {
       <a href={localizePath('doctors', locale)}>{copy.doctors}</a>
       <a href={localizePath('prices', locale)}>{copy.prices}</a>
       <a href={localizePath('contacts', locale)}>{copy.contacts}</a>
+      <a href={locale === 'ru' ? '/ru/booking' : '/booking'}>{copy.booking}</a>
     </nav>
   );
 }

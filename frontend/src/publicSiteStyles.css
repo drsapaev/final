@@ -202,7 +202,8 @@
   margin-top: 26px;
 }
 
-.public-site a.public-site__button {
+.public-site a.public-site__button,
+.public-site button.public-site__button {
   display: inline-flex;
   min-height: 46px;
   align-items: center;
@@ -215,12 +216,24 @@
   font-weight: 700;
   text-align: center;
   text-decoration: none;
+  cursor: pointer;
 }
 
-.public-site a.public-site__button--primary {
+.public-site button.public-site__button {
+  font: inherit;
+  font-weight: 700;
+}
+
+.public-site a.public-site__button--primary,
+.public-site button.public-site__button--primary {
   border-color: var(--mac-success-strong, rgb(20, 122, 56));
   background: var(--mac-success-strong, rgb(20, 122, 56));
   color: var(--mac-text-on-accent, rgb(255, 255, 255));
+}
+
+.public-site button.public-site__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .public-site__section {
@@ -294,6 +307,76 @@
   border: 1px solid var(--mac-border, rgb(184, 200, 218));
   border-radius: 14px;
   background: var(--mac-bg-content, rgb(244, 247, 251));
+}
+
+.public-site__booking-form {
+  max-width: 760px;
+}
+
+.public-site__booking-field {
+  display: grid;
+  gap: 7px;
+  margin-block: 18px;
+  font-weight: 600;
+}
+
+.public-site__booking-control {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: var(--mac-bg-primary, rgb(255, 255, 255));
+  color: var(--mac-text-primary, rgb(0, 0, 0));
+  font: inherit;
+}
+
+.public-site__booking-fieldset,
+.public-site__booking-policy {
+  border: 0;
+  padding: 0;
+}
+
+.public-site__booking-fieldset legend,
+.public-site__booking-policy legend {
+  font-weight: 700;
+}
+
+.public-site__booking-times,
+.public-site__booking-actions {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.public-site__booking-times {
+  gap: 10px;
+  margin-block: 12px;
+}
+
+.public-site__booking-actions {
+  gap: 12px;
+}
+
+.public-site__booking-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--mac-border, rgb(184, 200, 218));
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.public-site__booking-policy-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.public-site :is(button, input, select):focus-visible {
+  outline: 3px solid var(--mac-warning-strong, rgb(168, 98, 0));
+  outline-offset: 3px;
 }
 
 .public-site__contact-list {

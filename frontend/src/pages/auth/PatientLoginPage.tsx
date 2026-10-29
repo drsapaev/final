@@ -22,6 +22,7 @@ import { ensureCSRFToken } from '../../api/client';
 import { patientLogin, requestPatientOtp, verifyPatientOtp } from '../../api/patientAccess';
 import { replaceAccessOnlySession } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
+import { getPendingPublicBookingLocale, getPublicBookingPath } from '../../api/publicBooking';
 import { isValidUzbekPhone, normalizeUzbekPhoneForApi } from '../../utils/phoneUtils';
 import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
@@ -154,7 +155,12 @@ const PatientLoginPage = () => {
         // Non-fatal — the request interceptor fetches CSRF on demand.
       });
 
-      const target = getRouteForProfile(session.user as unknown as Record<string, unknown>);
+      const user = session.user as unknown as Record<string, unknown>;
+      const pendingBookingLocale = getPendingPublicBookingLocale();
+      const isPatient = String(user.role ?? '').toLowerCase() === 'patient';
+      const target = pendingBookingLocale && isPatient
+        ? getPublicBookingPath(pendingBookingLocale)
+        : getRouteForProfile(user);
       navigate(target, { replace: true });
     } catch (err) {
       logger.warn('[PatientLogin] verify/login failed:', err);
