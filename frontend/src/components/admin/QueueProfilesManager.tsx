@@ -260,6 +260,21 @@ const apiErrorReason = (error: unknown): string | null => {
     return typeof reason === 'string' ? reason : null;
 };
 
+const queueProfileDeleteErrorMessage = (
+    error: unknown,
+    fallback: string,
+    translate: (key: string) => string,
+): string => {
+    switch (apiErrorReason(error)) {
+        case 'profile_has_significant_links':
+            return translate('admin2.qp_delete_refused_in_use');
+        case 'profile_binding_changed':
+            return translate('admin2.qp_delete_refused_binding_changed');
+        default:
+            return apiErrorMessage(error, fallback);
+    }
+};
+
 const getQueueProfileDisplayName = (profile: QueueProfileDto): string =>
     profile.name?.trim() || profile.title_ru?.trim() || profile.title?.trim() || profile.key;
 
@@ -597,9 +612,12 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                         }
                     }
                 } catch (operationError) {
-                    // Keep the server's structured refusal text; do not log
-                    // arbitrary CSV rows or raw request/response payloads.
-                    writeErrors.set(key, apiErrorMessage(operationError, t('admin2.qp_operation_row_failed')));
+                    // Localize known delete refusal codes; preserve other
+                    // structured server details without logging raw payloads.
+                    const errorMessage = operation.kind === 'delete'
+                        ? queueProfileDeleteErrorMessage(operationError, t('admin2.qp_operation_row_failed'), t)
+                        : apiErrorMessage(operationError, t('admin2.qp_operation_row_failed'));
+                    writeErrors.set(key, errorMessage);
                 }
             }
 
@@ -816,7 +834,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error deleting profile:', err);
-            setError(apiErrorMessage(err, t('admin2.qp_delete_error')));
+            setError(queueProfileDeleteErrorMessage(err, t('admin2.qp_delete_error'), t));
         } finally {
             setSaving(false);
         }

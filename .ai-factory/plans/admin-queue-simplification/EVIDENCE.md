@@ -4878,3 +4878,65 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PostgreSQL assertions preserved profile active/public flags/tags, both Department states, Service parent links, DailyQueue identity/day/cabinet/active snapshot, waiting entry number/status/source/queue_time/patient association, permanent public-code hash and active address, strict success audit actor/event and verified Admin TOTP. Only the explicit profile parent-binding repair was applied.
 - Teardown PASS: 5 containers, 3 volumes and 1 network removed; remaining all zero. Separate exact-label container/volume/network queries returned no resources. Boot ID stable through this cycle; no warnings. Private ignored env/harness remain because the earlier host cleanup rejection is respected.
 - Scope/result: targeted parent-repair acceptance and recurring Admin TOTP are PASS after synchronizing dependencies. No feature source or tracked tests changed. The final evidence-only commit may have a different Git SHA; prove a documentation-only delta from tested `7910963b` and require its CI before Ready. Do not rerun unchanged staging solely for that evidence commit. Other T18 scenario evidence remains unchanged; full T18/STAGING_VALIDATION and production acceptance are unfinished. No deferral, human approval, merge or deployment is claimed.
+
+## T18 — current-main route review and user-directed partial status — 2026-10-29T15:32+05:00
+
+- Commit under inspection: `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`; `origin/main` matched. Worktree was clean before this documentation checkpoint.
+- Environment / mode: read-only source review in the isolated Windows worktree; `gate_known_root_cause` for plan journals. Gate result: `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated prompt read. First-touch paths were exactly `PROGRESS.md`, `RESUME.md`, `DECISIONS.md`, and `EVIDENCE.md`. Basis: user's explicit instruction to retain partial Tier-2 and continue the plan. No gate/router change.
+- Source delta reviewed: `routeRegistry.ts` adds `/booking` and `/ru/booking`; no Admin queue route definition changed between `ff0f03b9bb690d15eb751ceb96396056f08d2253` and the inspected HEAD. Existing tests describe the four Admin queue entry points and queue-profile tab/history navigation.
+- Validation: route-source comparison/manual review PASS. Focused route Vitest and frontend build `NOT_RUN` because `frontend/node_modules` is absent. GitHub lookup showed a Vercel status only and no PR-triggered workflow run for this commit; no CI PASS is claimed. Synthetic Compose/staging `NOT_RUN` in this checkpoint.
+- User disposition: Tier-2 remains `PARTIAL`; no deferral or waiver accepted. The three legacy live specs and full `docs/runbooks/STAGING_VALIDATION.md` remain outstanding, and T18 is not complete.
+- Scope: only these four journals were updated. No application source, tracked tests, PR, review, staging, production, merge, or deployment changed. `git diff --check` is the local validation for this documentation patch.
+- Next: do not repeat already-passed scenarios or create another Compose project solely for additive public-booking routes. Continue only against a distinct bounded T18 gap; preserve full staging validation as a separate pre-deployment gate.
+
+## T18 — PR #3790 merge confirmation — 2026-10-29T15:35+05:00
+
+- GitHub confirmed PR #3790, `fix(queue): preserve Registrar doctor selection`, merged at `2026-10-27T10:32:57Z`; reviewed code HEAD `00e0dbf633fe68576008c1bbabfbf85f5f476afa`, merge commit `17c0a6b694cd8150e918f026baae78ab5d2e1317`.
+- Local ancestry check: `git merge-base --is-ancestor 17c0a6b694cd8150e918f026baae78ab5d2e1317 HEAD` exited 0 on `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`.
+- PR evidence: exact-head Unified CI run `40476497527` passed applicable frontend unit/E2E/build/lint/type-check, parity, PR Required Gate, and notification checks. Backend, Docker, integration, readiness, load and DAST were skipped; no staging/Tier-2 result is inferred.
+- Disposition: the Registrar selector code follow-up is merged. T18 remains `PARTIAL`; the three legacy live specs and full `STAGING_VALIDATION.md` remain outstanding. No new staging run or runtime change occurred.
+
+## T18 — localized QueueProfile delete refusals — 2026-10-29T15:42+05:00
+
+- Task memory: `481fdb95-b9e6-48fd-b813-572932858920`. Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`; branch `codex/aqs-t18-localize-profile-delete-refusals`; base `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`, confirmed equal to freshly fetched `origin/main` before the branch was created.
+- Confirmed defect: delete endpoint returns stable structured 409 reasons, but `QueueProfilesManager` displayed the backend's Russian `message` verbatim in every locale. Only known deletion reasons are mapped; other operation/error messages and API behavior are unchanged.
+- Scope/mode: `gate_known_root_cause`, root `frontend/src/components/admin/QueueProfilesManager.tsx`. The gate returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. First-touch scope matched the component, focused test, five locale files, and four plan journals. Basis is the user's instruction to continue the plan while retaining partial Tier-2; no gate/router changes.
+- Change: localized both known refusal reasons for single and bulk deletion, preserving raw structured server messages for unknown reasons. Added English UI regressions for both paths; existing Russian structured-refusal coverage remains.
+- Validation: `git diff --check` PASS. TypeScript 6.0.3 parser check PASS for the component, test, and all five locale files (syntax only). Focused Vitest `NOT_RUN`: worktree has no `node_modules`; main checkout has Vitest 3.2.7 while this branch's lockfile requires 5.0.3, so incompatible shared dependencies were not used and nothing was installed. Frontend build `NOT_RUN`; exact-head CI is pending PR creation. Staging `NOT_RUN`; Tier-2 remains PARTIAL.
+- Actual changed paths: `frontend/src/components/admin/QueueProfilesManager.tsx`; `frontend/src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx`; `frontend/src/i18n/locales/{en,ru,kk,uz-Cyrl,uz-Latn}.ts`; `PROGRESS.md`, `RESUME.md`, `DECISIONS.md`, and `EVIDENCE.md`.
+- Scope check: no backend/API/OpenAPI/DB/route, production, staging, other-worktree, merge, or deployment changes. No dependencies installed. `.scratch/t18-delete-error-localization-scope.md` is this worktree's ignored scope record.
+- PR/merge: not created yet; no CI result is claimed.
+
+## T18 localization source and parity follow-up — 2026-10-29T15:44+05:00
+
+- Canonical locale-source review: `ru.ts` is marked the base locale; `scripts/i18n/validate_locales.py` prefers tracked `.ts` files as current canonical; the referenced `ru.js` and `generate_locales.py` are absent; `uz-Cyrl.ts` explicitly notes the old generator is no longer in the repo. Recent PR #3780 also changed locale `.ts` directly. No extra generator/source scope exists for this patch.
+- `scripts/i18n/validate_locales.py --strict` PASS with `PYTHONUTF8=1`: all five locales have 10,709 keys. The first invocation without UTF-8 mode failed while decoding Windows cp1251; no source was changed for that environment issue.
+- TypeScript syntax parser PASS on the seven changed TS/TSX files. Static AST key check PASS for both new keys in all five locale catalogs.
+- Exact focused Vitest remains NOT_RUN due absent compatible worktree dependencies; the installed main-tree Vitest is 3.2.7 while the lockfile is 5.0.3. Build remains NOT_RUN; exact-head CI will provide the compatible test/build environment.
+
+## T18 — focused UI checks and exact frontend build — 2026-10-29T15:49+05:00
+
+- Dependency setup: `npm ci --prefer-offline --no-audit --no-fund` in this worktree PASS; installed 900 lockfile packages in 59 seconds. No lockfile changed; no WSL/staging.
+- Focused Vitest: `npm run test:run -- src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx` PASS, 1 file / 20 tests.
+- Frontend build: `npm run build` PASS in 1m06s. Vite emitted existing upstream CSS-property and Rollup annotation warnings; no build errors.
+- The first normal commit attempt stopped at ESLint because worktree dependencies were absent. No hook was skipped. Dependencies are now installed from the exact lockfile; the normal commit hook is to be rerun.
+- `git diff --check`, TypeScript syntax parse, AST locale-key check and strict locale parity (10,709 keys each) PASS. CI remains pending PR creation. Tier-2 remains PARTIAL; staging was not run.
+## T18 — PR #3800 CI selector correction — 2026-10-29T15:58+05:00
+
+- PR: #3800, `fix(admin): localize queue profile deletion refusals`; initial pushed HEAD under CI: `c3ecbc0d9c3b6a4818a6b224f36e23c644e9fd02`; base: `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`.
+- Original failure: Unified CI run `40860981153`, Frontend lint job failed only at TypeScript type-check: `QueueProfilesManager.interactions.test.tsx(439,68)` passed unsupported `exact` in `ByRoleOptions`. The same run's frontend build passed; frontend unit and E2E were still running at the last query. These are results for the original SHA, not the corrected head.
+- Correction: use anchored role-name matcher `/^Удалить$/` in the bulk-delete regression. No product behavior changed.
+- Local revalidation after correction: `npm run type-check` PASS; focused `QueueProfilesManager.interactions.test.tsx` PASS, 1 file / 20 tests; scoped ESLint PASS; `git diff --check` PASS.
+- Follow-up correction and checkpoint were committed locally with normal hooks; push and new exact-head CI: pending at this checkpoint. Do not attribute the initial run's build result to a later SHA.
+- Tier-2 remains `PARTIAL` by explicit user instruction. Staging NOT RUN; this correction is frontend-only. No waiver, deferral, merge or deployment.
+
+## T18 — PR #3800 exact-head CI pass and body-gate correction — 2026-10-29T16:20+05:00
+
+- Exact code HEAD: `bc47a4d915e25a78baca9b067e20562b0932602a`; PR #3800 remains OPEN/Draft, mergeable. Base is `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`.
+- Unified CI run `40861817672` PASS: frontend unit tests, frontend lint and type-check (including generated API freshness, node config, type-debt and icon-control sweeps), build, configured E2E groups (Registrar time, UX/visual, lab dirty-guard, lab full-path, business/security/concurrency, load/chaos), and PR Required Gate. Separate PR Review Quality, Lifecycle, Regression Audit, i18n, Security, Gitleaks and Agent Workflow Guards passed for the code head.
+- The previous head's TypeScript error in a test selector (`exact` unsupported by repository `ByRoleOptions`) was corrected with an anchored role-name regex. Corrected exact-head type-check, unit, E2E and build all passed.
+- Local checks: focused Vitest 20/20; full type-check; scoped ESLint; frontend build; strict locale parity (10,709 keys each); `npm run check-theme`; `npm run audit:icon-controls` (zero findings); TypeScript syntax/key check; normal commit hooks; `git diff --check` — all PASS.
+- PR description update initially omitted body-gate required labels and hosted PR Review Quality Gate `40864380339` failed against that snapshot. The current description now includes `Targeted tests or smoke run`, `Result`, and `Not checked`; local `scripts/run_pr_review_gate_checks.py --body-file` PASS (19 tests plus sample/current bodies). GitHub workflows do not re-evaluate the edited body automatically; an evidence-only synchronize commit is needed to obtain a fresh hosted body-gate result.
+- Backend/integration/Docker/parity/readiness/k6/DAST paths were skipped or out of scope; not reported as PASS. Tier-2 for this UI slice NOT RUN; overall T18 remains `PARTIAL` by user instruction. No staging, deferral/waiver, merge or deployment.
+- Scope: only existing frontend code/test/locales and plan journals; no backend/API/OpenAPI/DB/route or staging changes. Ignored local dependency/build/scratch artifacts remain because host policy blocked cleanup; no alternate cleanup method used.
+- Next: push the evidence-only journal update to trigger fresh PR review-body/lifecycle gates; verify the current body passes on the new PR event. Keep PR Draft; user performs merge. Continue T18 only after that PR cycle ends.
