@@ -1,16 +1,16 @@
-## Latest continuation — PR #3800 merged; T18 queue-system route spec — 2026-10-29T17:12+05:00
+## Latest continuation — PR #3800 merged; PR #3801 source-head CI passed — 2026-10-29T17:33+05:00
 
-Continue task 481fdb95-b9e6-48fd-b813-572932858920 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/aqs-t18-queue-system-route-spec; Draft PR #3801 is open at exact branch HEAD bb1e8eaf3d356cd6176f74babf513034365d82f2. PR #3800 was merged at 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1; current origin/main and this branch base match that SHA. Do not edit C:\final or another worktree.
+Continue task 481fdb95-b9e6-48fd-b813-572932858920 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/aqs-t18-queue-system-route-spec. PR #3800 is merged at 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1; this branch is based on that fresh origin/main. Draft PR #3801 is open; source commit is bb28a6c73a96327ef7e0045e5e8ccd90eb06e479. PR head ac02dc2798a74fa4b27f972259cc66ba1fbf4aba differs only by checkpoint documentation commits after the source patch.
 
-User direction: keep Tier-2 PARTIAL and continue the plan; this is not a deferral or waiver. No staging, merge, or deployment is authorized by this checkpoint.
+The user directed that Tier-2 remain PARTIAL while work continues; this is not a deferral or waiver. No staging, merge, or deployment was performed. User retains merge.
 
-Current narrow follow-up fixes the stale route in frontend/e2e/queue-system.spec.ts: /registrar is the Registrar worklist; /registrar/queue is QueueView. All ten scenarios now use the queue path. The first test asserts the resolved URL; the stats and doctor-filter tests use current ModernQueueManager selectors and meaningful assertions instead of silently passing after logging.
+The queue-system E2E spec now uses the correct /registrar/queue route rather than the worklist /registrar. All ten cases collect; scoped ESLint passes. The live scenarios remain NOT_RUN because this spec mutates queue/patient records; no synthetic environment was started.
 
-Gate was run as gate_known_root_cause with root frontend/e2e/queue-system.spec.ts; it returned narrow_override, gate_misroute=true, override_used=true, handoff_required=true. The generated execution prompt was read. The explicit standing instruction to continue plan/T18 with partial Tier-2 is the narrow basis; no gate/router changes.
+Exact PR source/evidence head ac02dc2: Unified CI 40872202007 PASS, including Frontend E2E groups, unit tests, lint/type-check, build and PR Required Gate. PR Review Quality Gate 40873786628 PASS after PR-body correction; Lifecycle 40873786607 PASS; Gitleaks, Security and Agent Workflow Guards PASS. The CI E2E groups do not execute this legacy queue-system spec, so that spec remains NOT_RUN and T18 stays PARTIAL.
 
-Validation after commit bb28a6c73: scoped ESLint PASS; Playwright --list --project=chromium PASS, 10 tests collected and none executed; commit diff-check PASS using core.whitespace=cr-at-eol because this tracked spec uses CRLF; normal commit hooks PASS on the successful retry. Full live Playwright execution is NOT_RUN because the spec writes queue/patient records; no synthetic staging environment was started under the current disposition. Build NOT_RUN for this test-only slice; application source is unchanged. Confirm test prerequisites before any future synthetic execution.
+The first PR Review Quality Gate run 40872202016 failed because required PR-body sections were omitted. The body was corrected and the local validator passed 19 tests, sample bodies and the live PR body. A rerun attempt was cancelled; a subsequent body edit triggered the passing run 40873786628.
 
-Next exact action: verify PR #3801 CI on exact head bb1e8eaf3d356cd6176f74babf513034365d82f2; if checks fail, fix only within the authorized test/journal scope. User retains merge. Keep Tier-2 PARTIAL; no deferral, waiver, staging, or claim that T18 is complete. The other two legacy live specs and full docs/runbooks/STAGING_VALIDATION.md remain outstanding.
+Next exact action: commit and push this evidence-only update; verify exact-head CI on the documentation checkpoint, then leave PR #3801 Draft for the user to merge. The other two legacy live specs and full docs/runbooks/STAGING_VALIDATION.md remain outstanding.
 ## Latest continuation — T18 explicitly remains partial; no repeated staging cycle — 2026-10-29T15:35+05:00
 
 Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final` at current `origin/main` `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Do not edit `C:\final` or another worktree.

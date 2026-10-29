@@ -4963,3 +4963,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR body lists only verified local results and clearly marks live Playwright, synthetic staging, and full T18 as NOT_RUN / PARTIAL.
 - PR attached to the current Codex task. User retains merge; no review, merge, deployment, staging, deferral, or waiver action was taken.
 - Next: poll exact-head checks, fix any in-scope failure, update this journal, and leave PR Draft for user disposition.
+
+## T18 — PR #3801 checks and PR-body gate corrected — 2026-10-29T17:33+05:00
+
+- Exact source/evidence head: ac02dc2798a74fa4b27f972259cc66ba1fbf4aba; source-bearing commit bb28a6c73a96327ef7e0045e5e8ccd90eb06e479. PR #3800 merge/base is 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1.
+- Unified CI run 40872202007: SUCCESS. Frontend unit tests, lint/type-check, build, PR Required Gate and Frontend E2E job passed. E2E groups Registrar time, UX/visual, Lab dirty-guard, Lab full-path, Business/Security/Concurrency and Load/Chaos passed; visual baseline update was skipped by design.
+- PR Review Quality Gate 40872202016 initially failed because the PR body omitted required sections. The corrected body passed the local validator (19 unit tests, two documented samples, and live PR body). One explicit failed-job rerun was cancelled; a later PR body edit caused fresh Quality Gate run 40873786628, which passed. Lifecycle run 40873786607 passed. Security, Gitleaks and Agent Workflow Guards passed.
+- Important limit: CI type-checked the Playwright spec and passed unrelated configured E2E groups; it did not execute frontend/e2e/queue-system.spec.ts. That live/mutating spec is NOT_RUN; Tier-2 remains PARTIAL.
+- Scope: no application changes beyond the test-only spec committed as bb28a6c73. No local staging, production, live queue/patient data, deferral, waiver, merge, or deployment.
+- Current PR state: https://github.com/drsapaev/final/pull/3801 is OPEN/Draft and awaits an evidence-only docs commit plus exact-head checks; user retains merge.
+- Next: run normal hooks, push the docs-only evidence update, and verify checks on the resulting exact head before leaving the PR for user merge.
