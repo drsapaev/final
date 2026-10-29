@@ -1,22 +1,22 @@
-## Latest checkpoint — PR #3800 exact-head CI pass; body gate refresh pending — 2026-10-29T16:20+05:00
+## Latest checkpoint — PR #3800 merged; bounded T18 queue-route spec correction — 2026-10-29T17:12+05:00
 
 Plan version: 1.0
-Current task: T18 bounded QueueProfile delete-error localization
-Current status: PR_OPEN / Draft; exact-head code CI passed
-Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
-Branch: `codex/aqs-t18-localize-profile-delete-refusals`
-Base commit: `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`
-Current code commit: `bc47a4d915e25a78baca9b067e20562b0932602a`
-Last updated: 2026-10-29T16:20+05:00
+Current task: T18 bounded Registrar queue-system spec route correction
+Current status: IN_PROGRESS; local validation passed; PR not created
+Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final
+Branch: codex/aqs-t18-queue-system-route-spec
+Base commit: 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1 (origin/main)
+Current code commit: 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1 plus one uncommitted focused spec change
+Last updated: 2026-10-29T17:12+05:00
 
-- Completed: PR #3800 remains Draft. Exact-head Unified CI `40861817672` passed on `bc47a4d9`; frontend unit, type-check/lint and auxiliary lint gates, build, configured E2E groups, and PR Required Gate passed. PR body was updated with truthful exact-head results and passes the local review-body gate.
-- Completed locally: `npm run check-theme`, `npm run audit:icon-controls` (zero findings), focused Vitest 20/20, type-check, scoped ESLint, build, locale parity and `git diff --check` pass.
-- Changed but not verified: the hosted PR Review Quality Gate failed on its earlier body snapshot, which lacked required validation labels. The current body has those labels and passes locally, but a new PR synchronize event is needed to refresh the hosted gate.
-- Remaining: commit/push the current evidence checkpoint to trigger fresh PR gates, verify the exact new head, keep PR Draft for review/merge by the user, then continue after the user merges.
-- Blocker: no new hosted review-body gate result yet. Backend/integration/staging jobs were skipped, not passed. Host policy blocked local artifact cleanup; do not retry through alternate methods.
-- Next exact action: commit and push this evidence-only journal update using normal hooks; verify new-head PR gates.
-- Tier-2 disposition: `PARTIAL` by explicit user instruction; no deferral, waiver, staging, merge, or deployment.
-
+- Completed: PR #3800 merged at 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1; freshly fetched origin/main matches this commit. Previous branch/worktree was clean; a new isolated branch was created from this base.
+- Current change: frontend/e2e/queue-system.spec.ts sends all ten scenarios to canonical /registrar/queue instead of /registrar (the worklist), asserts route and actual stats/specialist controls, and removes vacuous console-log fallbacks. This is test-only; live scenarios were not run.
+- Local validation: Playwright collection PASS (10 tests, --list only); scoped ESLint PASS; git diff --check PASS. Full Playwright execution NOT_RUN because this legacy spec creates/changes queue and patient records; build not rerun for this spec-only slice.
+- Gate: gate_known_root_cause returned narrow_override, gate_misroute=true, override_used=true, handoff_required=true; generated prompt was read. User's standing direction to continue T18 while keeping Tier-2 partial is the narrow basis. No gate/router change.
+- Remaining: inspect final diff, commit with normal hooks, push a one-purpose PR, verify exact-head CI, then leave merge to the user. Do not run this mutating live spec or staging; Tier-2 remains PARTIAL, not deferred or complete.
+- Blocker: test data prerequisites (at least one doctor and available queue stats) have not been verified against a synthetic environment; execution remains NOT_RUN.
+- Next exact action: finish scope review, commit the focused spec/journal update, push, and monitor exact-head CI.
+- Tier-2 disposition: PARTIAL by explicit user instruction; no deferral, waiver, staging, merge, or deployment.
 ## Latest checkpoint — T18 remains PARTIAL by user direction — 2026-10-29T15:35+05:00
 
 - Task memory: `481fdb95-b9e6-48fd-b813-572932858920`. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`; detached HEAD and `origin/main` both `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Tracked tree was clean before this journal update.

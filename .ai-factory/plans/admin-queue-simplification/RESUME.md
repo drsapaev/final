@@ -1,15 +1,16 @@
-## Latest continuation — PR #3800 exact-head CI pass, Tier-2 remains PARTIAL — 2026-10-29T16:20+05:00
+## Latest continuation — PR #3800 merged; T18 queue-system route spec — 2026-10-29T17:12+05:00
 
-Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-localize-profile-delete-refusals`, PR #3800. Base `origin/main` at branch start was `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Do not edit `C:\final` or another worktree.
+Continue task 481fdb95-b9e6-48fd-b813-572932858920 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/aqs-t18-queue-system-route-spec. PR #3800 was merged at 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1; current origin/main and this branch base match that SHA. Do not edit C:\final or another worktree.
 
-The PR localizes only the two existing QueueProfile deletion refusal codes across five active locales and adds single/bulk UI regressions. User direction: keep Tier-2 `PARTIAL` and continue the plan; no staging, deferral, waiver, merge, or deployment.
+User direction: keep Tier-2 PARTIAL and continue the plan; this is not a deferral or waiver. No staging, merge, or deployment is authorized by this checkpoint.
 
-Initial PR HEAD `c3ecbc0d9c3b6a4818a6b224f36e23c644e9fd02` had one CI TypeScript error in the new test. Exact head `bc47a4d915e25a78baca9b067e20562b0932602a` corrected the test selector and passed Unified CI `40861817672`, including frontend unit, lint/type-check, build, configured E2E and PR Required Gate. Local focused tests (20/20), type-check, scoped ESLint, build, theme, icon audit, locale parity and diff-check also pass.
+Current narrow follow-up fixes the stale route in frontend/e2e/queue-system.spec.ts: /registrar is the Registrar worklist; /registrar/queue is QueueView. All ten scenarios now use the queue path. The first test asserts the resolved URL; the stats and doctor-filter tests use current ModernQueueManager selectors and meaningful assertions instead of silently passing after logging.
 
-The PR body now records exact-head results and remains truthful about skipped backend/staging checks and Tier-2 PARTIAL. The hosted PR Review Quality Gate failure was for the earlier body snapshot, which omitted required `Targeted tests or smoke run`, `Result`, and `Not checked` labels. The corrected body passes the local gate; create a new PR synchronize event through the evidence checkpoint commit and verify the hosted gate. Keep PR #3800 Draft for user review/merge; do not run staging or mark Tier-2 complete.
+Gate was run as gate_known_root_cause with root frontend/e2e/queue-system.spec.ts; it returned narrow_override, gate_misroute=true, override_used=true, handoff_required=true. The generated execution prompt was read. The explicit standing instruction to continue plan/T18 with partial Tier-2 is the narrow basis; no gate/router changes.
 
-Preserve Tier-2 as partial; the three legacy live specs and full `docs/runbooks/STAGING_VALIDATION.md` remain outstanding. No deferral/waiver, staging, merge or deployment.
+Validation: scoped ESLint PASS; Playwright --list --project=chromium PASS, 10 tests collected and none executed; git diff --check PASS using core.whitespace=cr-at-eol because this tracked spec uses CRLF. Full live Playwright execution is NOT_RUN because the spec writes queue/patient records; no synthetic staging environment was started under the current disposition. Build NOT_RUN for this test-only slice; application source is unchanged. Confirm test prerequisites before any future synthetic execution.
 
+Next exact action: inspect scope/diff, commit with normal hooks, push a one-purpose PR, and verify CI on the exact head. User retains merge. Keep Tier-2 PARTIAL; no deferral, waiver, staging, or claim that T18 is complete. The other two legacy live specs and full docs/runbooks/STAGING_VALIDATION.md remain outstanding.
 ## Latest continuation — T18 explicitly remains partial; no repeated staging cycle — 2026-10-29T15:35+05:00
 
 Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final` at current `origin/main` `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Do not edit `C:\final` or another worktree.
