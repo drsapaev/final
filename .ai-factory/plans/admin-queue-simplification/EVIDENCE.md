@@ -4921,3 +4921,11 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Frontend build: `npm run build` PASS in 1m06s. Vite emitted existing upstream CSS-property and Rollup annotation warnings; no build errors.
 - The first normal commit attempt stopped at ESLint because worktree dependencies were absent. No hook was skipped. Dependencies are now installed from the exact lockfile; the normal commit hook is to be rerun.
 - `git diff --check`, TypeScript syntax parse, AST locale-key check and strict locale parity (10,709 keys each) PASS. CI remains pending PR creation. Tier-2 remains PARTIAL; staging was not run.
+## T18 — PR #3800 CI selector correction — 2026-10-29T15:58+05:00
+
+- PR: #3800, `fix(admin): localize queue profile deletion refusals`; initial pushed HEAD under CI: `c3ecbc0d9c3b6a4818a6b224f36e23c644e9fd02`; base: `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`.
+- Original failure: Unified CI run `40860981153`, Frontend lint job failed only at TypeScript type-check: `QueueProfilesManager.interactions.test.tsx(439,68)` passed unsupported `exact` in `ByRoleOptions`. The same run's frontend build passed; frontend unit and E2E were still running at the last query. These are results for the original SHA, not the corrected head.
+- Correction: use anchored role-name matcher `/^Удалить$/` in the bulk-delete regression. No product behavior changed.
+- Local revalidation after correction: `npm run type-check` PASS; focused `QueueProfilesManager.interactions.test.tsx` PASS, 1 file / 20 tests; scoped ESLint PASS; `git diff --check` PASS.
+- Follow-up correction and checkpoint were committed locally with normal hooks; push and new exact-head CI: pending at this checkpoint. Do not attribute the initial run's build result to a later SHA.
+- Tier-2 remains `PARTIAL` by explicit user instruction. Staging NOT RUN; this correction is frontend-only. No waiver, deferral, merge or deployment.

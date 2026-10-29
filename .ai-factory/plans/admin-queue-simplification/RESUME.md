@@ -1,3 +1,13 @@
+## Latest continuation — PR #3800 type-check repair, Tier-2 remains PARTIAL — 2026-10-29T15:58+05:00
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-localize-profile-delete-refusals`, PR #3800. Base `origin/main` at branch start was `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Do not edit `C:\final` or another worktree.
+
+The PR localizes only the two existing QueueProfile deletion refusal codes across five active locales and adds single/bulk UI regressions. User direction: keep Tier-2 `PARTIAL` and continue the plan; no staging, deferral, waiver, merge, or deployment.
+
+Initial PR HEAD `c3ecbc0d9c3b6a4818a6b224f36e23c644e9fd02` had one CI TypeScript error in the new test: `getByRole(..., { exact: true })` is unsupported by this repository's `ByRoleOptions`. The test now uses an anchored name regex. Local `npm run type-check` PASS; focused Vitest PASS (20/20); scoped ESLint PASS; `git diff --check` PASS. Original run `40860981153` had frontend build PASS; unit/E2E were still in progress when inspected. The selector fix and this checkpoint are committed locally using normal hooks; push and new exact-head CI remain pending.
+
+Do not mark the PR ready or merge. Preserve Tier-2 as partial; the three legacy live specs and full `docs/runbooks/STAGING_VALIDATION.md` remain outstanding.
+
 ## Latest continuation — T18 explicitly remains partial; no repeated staging cycle — 2026-10-29T15:35+05:00
 
 Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final` at current `origin/main` `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Do not edit `C:\final` or another worktree.

@@ -436,7 +436,7 @@ describe('QueueProfilesManager interactions', () => {
     await renderManager();
 
     await user.click(screen.getByRole('button', { name: 'Выбрать вкладку Синтетическая активная очередь' }));
-    await user.click(screen.getByRole('button', { name: 'Удалить', exact: true }));
+    await user.click(screen.getByRole('button', { name: /^Удалить$/ }));
     const confirmation = screen.getByRole('dialog', { name: 'Массовое удаление вкладок' });
     await user.click(within(confirmation).getByRole('button', { name: 'Удалить все' }));
 

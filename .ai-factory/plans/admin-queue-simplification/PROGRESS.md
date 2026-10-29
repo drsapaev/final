@@ -1,3 +1,21 @@
+## Latest checkpoint — PR #3800 type-check repair — 2026-10-29T15:58+05:00
+
+Plan version: 1.0
+Current task: T18 bounded QueueProfile delete-error localization
+Current status: PR_OPEN / follow-up validation
+Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
+Branch: `codex/aqs-t18-localize-profile-delete-refusals`
+Base commit: `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`
+Current commit: PR #3800 branch tip; resolve exact SHA from GitHub before resuming edits
+Last updated: 2026-10-29T15:58+05:00
+
+- Completed: PR #3800 opened as Draft; exact-head CI found a test-only TypeScript error because Testing Library's `ByRoleOptions` does not support `exact` in the installed types. Replaced the selector option with an anchored name regex. Local type-check, focused interactions suite (20/20), scoped ESLint, and `git diff --check` pass.
+- Changed but not verified: the selector correction and this checkpoint are committed locally using normal hooks; the follow-up push and exact-head CI are pending.
+- Remaining: push the follow-up, verify CI on the new exact HEAD, update PR evidence, and remove only this worktree's ignored dependency/build artifacts when checks are complete.
+- Blocker: first PR CI run `40860981153` reported the now-corrected TS2769 test selector error; local type-check, focused test and ESLint now pass. New-head CI is required. No staging was run.
+- Next exact action: push the committed test correction and checkpoint to PR #3800, then verify the new exact-head checks.
+- Tier-2 disposition: `PARTIAL` by explicit user instruction; no deferral, waiver, staging, merge, or deployment.
+
 ## Latest checkpoint — T18 remains PARTIAL by user direction — 2026-10-29T15:35+05:00
 
 - Task memory: `481fdb95-b9e6-48fd-b813-572932858920`. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`; detached HEAD and `origin/main` both `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Tracked tree was clean before this journal update.
