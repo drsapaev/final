@@ -1,3 +1,32 @@
+## T18 — PR #3801 review fixes locally validated — 2026-10-29T20:43+05:00
+
+- Commit under test: local working-tree delta based on PR HEAD `ebf2715790bb484d0df62bc943edd77bab81abb4`; base/current `origin/main` `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
+- Environment: Windows PowerShell; isolated worktree `aqs-t18-live-specs`; branch `codex/aqs-t18-queue-system-route-spec`.
+- Execution mode: prior `gate_known_root_cause` for the same source/journal scope; result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt read. No gate/router change.
+- Allowed and actual changed paths: `frontend/e2e/queue-system.spec.ts`; plan `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: application/runtime, backend/API/DB/auth/route, Playwright config/credentials, staging/Compose/WSL, production/deploy, other worktrees, live execution of this mutating spec, merge.
+- Original findings: review #5700225111 reports action buttons clicked without a doctor, stale/vacuous queue selectors and unsupported guarded cases, and doctor-specific coverage that checked only the URL.
+- Changes: doctor selection is required before scoped controls; action enabled/disabled states are asserted; obsolete patient creation/duplicate-phone/visit-completion scenarios and browser-mocked 07:00 window are removed because those are not QueueView/server contracts; canonical DataTable rows are checked against the selected doctor's queue snapshot; switching doctors requires and verifies two distinct synthetic doctor queues; call-next checks successful response and waiting-to-called state transition.
+- Privacy/safety: visible synthetic patient labels are compared only in memory to confirm the correct rows; assertions report booleans and generic messages, not names/phones. The call-next E2E is mutating but was not run; when enabled it requires a disposable synthetic database seeded with waiting entries. No staging or patient data was used in this validation.
+- Validation commands and results: `npm.cmd exec -- eslint e2e/queue-system.spec.ts` PASS; `npm.cmd exec -- tsc --noEmit -p e2e/tsconfig.json` PASS; `npm.cmd exec -- playwright test e2e/queue-system.spec.ts --list --project=chromium` PASS (6 collected, 0 executed); `npm.cmd run build` PASS (43.88s; existing dependency annotation/CSS warnings); `git -c core.whitespace=cr-at-eol diff --check` PASS.
+- Result: local source checks PASS. Exact-head GitHub CI is NOT_RUN/PENDING until this delta is committed and pushed. The named queue-system scenarios remain NOT_RUN; collection is not execution.
+- Remaining limitation: Tier-2 stays PARTIAL by user direction; no deferral/waiver. Full T18 and staging validation remain incomplete.
+- PR: `https://github.com/drsapaev/final/pull/3801`, OPEN / Ready for review at base HEAD.
+- Merge: none; user retains merge.
+
+## T18 — PR #3801 review P1/P2 correction pre-edit checkpoint — 2026-10-29T20:36+05:00
+
+- Commit under review: exact PR/local HEAD `ebf2715790bb484d0df62bc943edd77bab81abb4`; base/current `origin/main` `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
+- Environment: Windows PowerShell; isolated worktree `aqs-t18-live-specs`; branch `codex/aqs-t18-queue-system-route-spec`; worktree clean before this record.
+- Execution mode: previously run `gate_known_root_cause` for `frontend/e2e/queue-system.spec.ts` and the three plan journals. Gate result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; prompt read. No gate/router edit.
+- Allowed paths: `frontend/e2e/queue-system.spec.ts`; `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: runtime/backend/API/DB/auth/route, Playwright configuration/credentials, staging/Compose/WSL, production/deploy, other worktrees, live execution of the mutating spec, merge.
+- Original findings: review #5700225111 reports clicks against disabled reception/call controls before doctor selection; stale queue table locators and guarded false-green cases; specialist selection asserted only the URL. Source review additionally confirms patient creation/duplicate validation/visit completion controls are absent from `/registrar/queue`, and the backend reception endpoint has no 07:00–08:00 restriction that browser Date mocking could validate.
+- Planned source change: replace obsolete cases with actual QueueView behavior; select a doctor before action checks; require explicit synthetic queue seed prerequisites; compare visible ticket/name signatures to the selected doctor-owned API queue without printing patient values; keep this test-only.
+- Validation target: scoped ESLint, `tsc --noEmit -p e2e/tsconfig.json`, Playwright collection (`--list`, zero execution), frontend build, CRLF-aware `git diff --check`, normal hooks and GitHub exact-head CI.
+- Result: NOT_RUN at pre-edit checkpoint; source edit has not started.
+- Remaining limitation: do not execute `queue-system.spec.ts` or start staging under the current Tier-2 PARTIAL decision; no deferral/waiver.
+- PR: `https://github.com/drsapaev/final/pull/3801`, OPEN / Ready for review at recorded HEAD.
+- Merge: none; user retains merge.
+
 ## T18 — PR #3801 statistics E2E P2 correction — 2026-10-29T19:31+05:00
 
 - Commit under test: source commit `9cc0cabf8035f4a8b7f577eadc1531770f9fc59c`; PR HEAD `b02e1f15a1478def02be4e7f70f34be69849ae62` at checkpoint time includes the plan checkpoint. This evidence update will advance the PR head.

@@ -1,3 +1,27 @@
+## Latest continuation — PR #3801 review fixes locally validated — 2026-10-29T20:43+05:00
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. PR #3801 is OPEN / Ready for review at base HEAD `ebf2715790bb484d0df62bc943edd77bab81abb4`; main/base `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
+
+The user asked to fix review #5700225111. `frontend/e2e/queue-system.spec.ts` now has six meaningful QueueView scenarios. It selects doctors before scoped controls, uses the canonical table and API snapshots, proves two doctor queues display distinct rows, and removes legacy patient-create/duplicate/completion controls and unsupported 07:00 browser-clock assumptions. The call-next scenario requires a waiting synthetic row and asserts the real status transition. It is mutating and was NOT_RUN.
+
+Local validation PASS: scoped ESLint; E2E TS check; Playwright `--list` (6 collected, 0 executed); frontend build (43.88s; only existing third-party/CSS warnings); CRLF-aware diff check. No live E2E/staging/Compose/WSL execution. The previous `gate_known_root_cause` covered the exact scope and returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt read.
+
+Only the queue E2E spec and T18 `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md` changed. Exact-head CI is pending until commit/push. Tier-2 remains PARTIAL by explicit user direction, no waiver/deferral. User retains merge.
+
+Next: commit and push the reviewed test/evidence slice to PR #3801, verify exact-head CI, then reply to/resolve only the addressed review threads and update the PR description with six collected tests and accurate NOT_RUN status. Do not execute the mutating spec or staging.
+
+## Latest continuation — PR #3801 review findings accepted for scoped test correction — 2026-10-29T20:36+05:00
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. PR #3801 is OPEN / Ready for review at exact HEAD `ebf2715790bb484d0df62bc943edd77bab81abb4`; base/current `origin/main` is `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
+
+The user asked to fix the current review findings. Review #5700225111 reports: (1) action controls are clicked before selecting a doctor; (2) old selectors and conditional guards allow false-green results, and add-patient/duplicate-phone/completion cases do not exist on QueueView; (3) the specialist test only checks the URL. Source inspection also confirmed browser Date mocking cannot prove a backend 07:00–08:00 reception rule; that endpoint does not enforce this window.
+
+Only `frontend/e2e/queue-system.spec.ts` and this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md` are in scope. No runtime/backend/API/DB/auth/route, Playwright configuration/credentials, staging/Compose/WSL, production, other worktree, merge, or deployment changes. Do not execute this mutating live spec. Tier-2 remains PARTIAL; no deferral/waiver.
+
+Previously run `gate_known_root_cause` covers the same spec and journals; result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`, prompt read. Required validation after edits: scoped ESLint, E2E TS check, Playwright `--list` only, build, CRLF-aware diff check, normal hooks and exact-head CI. Do not describe collection/CI as execution of this spec.
+
+Next: implement meaningful checks for current queue UI, doctor-owned synthetic queue snapshots and action prerequisites; then validate and update this checkpoint. User retains merge.
+
 ## Latest continuation — PR #3801 statistics E2E P2 pushed; final checkpoint pending — 2026-10-29T19:31+05:00
 
 Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. PR #3801 is OPEN / Ready for review at exact HEAD `b02e1f15a1478def02be4e7f70f34be69849ae62`; base and `origin/main` are `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`. Direct GitHub checks report `merged=false` and mergeable; the user performs merge.

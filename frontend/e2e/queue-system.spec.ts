@@ -2,6 +2,40 @@ import { test, expect, type Page } from '@playwright/test';
 
 const REGISTRAR_USERNAME = process.env.QA_REGISTRAR_USERNAME || 'registrar@clinic.com';
 const REGISTRAR_QUEUE_PATH = '/registrar/queue';
+const QUEUE_SNAPSHOT_PATH = '/registrar/queues/today';
+const QUEUE_ROW_SELECTOR = '.qt-table-container tbody tr.mac-table-row';
+
+interface QueueEntrySnapshot {
+  queue_number?: string | number | null;
+  number?: string | number | null;
+  patient_name?: string | null;
+  name?: string | null;
+  source?: string | null;
+  source_kind?: string | null;
+  status?: string | null;
+}
+
+interface DoctorQueueSnapshot {
+  specialist_id?: string | number | null;
+  queue_resource_id?: string | number | null;
+  is_open?: boolean;
+  entries?: QueueEntrySnapshot[];
+}
+
+interface QueueSnapshotPayload {
+  queues?: DoctorQueueSnapshot[];
+}
+
+interface QueueDoctorSelection {
+  doctorId: string;
+  payload: QueueSnapshotPayload;
+}
+
+interface VisibleQueueSignature {
+  number: string;
+  patient: string;
+  source: string;
+}
 
 function requiredRegistrarPassword() {
   const password = process.env.QA_REGISTRAR_PASSWORD;
@@ -11,233 +45,222 @@ function requiredRegistrarPassword() {
   return password;
 }
 
-async function selectFirstAvailableDoctor(page: Page) {
+function isQueueSnapshotResponse(response: { url(): string; request(): { method(): string } }) {
+  return response.request().method() === 'GET' && response.url().includes(QUEUE_SNAPSHOT_PATH);
+}
+
+async function waitForQueueSnapshot(page: Page): Promise<QueueSnapshotPayload> {
+  const response = await page.waitForResponse(isQueueSnapshotResponse, { timeout: 15_000 });
+  expect(response.ok(), 'Registrar queue snapshot request must succeed.').toBe(true);
+  return await response.json() as QueueSnapshotPayload;
+}
+
+async function selectableDoctorOptionCount(page: Page): Promise<number> {
   const doctorFilter = page.locator('#modern-queue-doctor');
   await expect(doctorFilter).toBeVisible();
   await doctorFilter.click();
 
-  // The first option is the prompt; the next option is the first available doctor.
-  const firstDoctor = page.getByRole('option').nth(1);
+  const options = page.getByRole('listbox').getByRole('option');
   await expect(
-    firstDoctor,
-    'Queue system E2E requires at least one available synthetic doctor; seed a doctor for the Registrar test account.'
+    options.nth(1),
+    'Queue system E2E requires at least one available synthetic doctor.'
   ).toBeVisible({ timeout: 15_000 });
-  await firstDoctor.click();
-  await expect(page).toHaveURL(/[?&]doctor=[^&]+(?:&|$)/);
+
+  const count = await options.count();
+  await doctorFilter.click();
+  return count;
+}
+
+async function selectDoctorOption(page: Page, optionIndex: number): Promise<QueueDoctorSelection> {
+  const doctorFilter = page.locator('#modern-queue-doctor');
+  await expect(doctorFilter).toBeVisible();
+  await doctorFilter.click();
+
+  const doctorOption = page.getByRole('listbox').getByRole('option').nth(optionIndex);
+  await expect(
+    doctorOption,
+    'Queue system E2E requires the expected synthetic doctor option to exist.'
+  ).toBeVisible({ timeout: 15_000 });
+
+  const snapshotPromise = waitForQueueSnapshot(page);
+  await doctorOption.click();
+
+  await expect.poll(
+    () => new URL(page.url()).searchParams.get('doctor'),
+    { message: 'Selecting a doctor must persist its ID in the canonical route.' }
+  ).not.toBeNull();
+
+  const doctorId = new URL(page.url()).searchParams.get('doctor');
+  expect(doctorId, 'The selected doctor ID must be present in the route.').toMatch(/^\d+$/);
+
+  const payload = await snapshotPromise;
+  await expect(page.locator('.mqm-stats-grid')).toBeVisible();
+  return { doctorId: doctorId!, payload };
+}
+
+async function selectFirstAvailableDoctor(page: Page): Promise<QueueDoctorSelection> {
+  const count = await selectableDoctorOptionCount(page);
+  expect(count, 'Queue system E2E requires at least one available synthetic doctor.').toBeGreaterThan(1);
+  return selectDoctorOption(page, 1);
+}
+
+function queueOwnedByDoctor(
+  payload: QueueSnapshotPayload,
+  doctorId: string
+): DoctorQueueSnapshot | undefined {
+  return payload.queues?.find((queue) =>
+    String(queue.specialist_id) === doctorId
+    && (queue.queue_resource_id === null || queue.queue_resource_id === undefined)
+  );
+}
+
+function normalizedText(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function visibleQueueSignatures(queue: DoctorQueueSnapshot | undefined): VisibleQueueSignature[] | null {
+  const entries = queue?.entries ?? [];
+  if (entries.length === 0) return null;
+
+  const signatures: VisibleQueueSignature[] = [];
+  for (const entry of entries) {
+    const number = entry.queue_number ?? entry.number;
+    const patient = normalizedText(entry.patient_name ?? entry.name ?? '');
+    if (
+      number === null
+      || number === undefined
+      || !/^\d+$/.test(String(number))
+      || !patient
+      || patient === '—'
+      || patient === 'Неизвестный пациент'
+    ) {
+      return null;
+    }
+
+    const isOnline = entry.source === 'online'
+      || entry.source === 'qr'
+      || entry.source_kind === 'online_queue';
+    signatures.push({
+      number: String(number),
+      patient,
+      source: isOnline ? 'QR' : 'Desk',
+    });
+  }
+
+  return signatures;
+}
+
+function signatureKey(signature: VisibleQueueSignature): string {
+  return [signature.number, signature.patient, signature.source].join('|');
+}
+
+async function expectVisibleQueueToMatch(
+  page: Page,
+  expected: VisibleQueueSignature[],
+  message: string
+): Promise<void> {
+  await expect.poll(async () => {
+    const actual = await page.locator(QUEUE_ROW_SELECTOR).evaluateAll((rows) =>
+      rows.map((row) => {
+        const number = row.querySelector('.qt-table-cell-number')?.textContent?.trim() ?? '';
+        const patientCell = row.querySelector('.qt-table-cell-primary');
+        const patient = Array.from(patientCell?.childNodes ?? [])
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent ?? '')
+          .join('')
+          .replace(/\s+/g, ' ')
+          .trim();
+        const source = patientCell?.querySelector('.qt-source-badge')?.textContent?.trim() ?? '';
+        return { number, patient, source };
+      })
+    );
+
+    return actual.length === expected.length && actual.every((row, index) =>
+      row.number === expected[index].number
+      && row.patient === expected[index].patient
+      && row.source === expected[index].source
+    );
+  }, { message, timeout: 15_000 }).toBe(true);
+}
+
+async function selectDoctorWithQueue(
+  page: Page,
+  requiresWaitingEntry = false
+): Promise<{ selection: QueueDoctorSelection; queue: DoctorQueueSnapshot; signatures: VisibleQueueSignature[] }> {
+  const optionCount = await selectableDoctorOptionCount(page);
+
+  for (let optionIndex = 1; optionIndex < optionCount; optionIndex += 1) {
+    const selection = await selectDoctorOption(page, optionIndex);
+    const queue = queueOwnedByDoctor(selection.payload, selection.doctorId);
+    const signatures = visibleQueueSignatures(queue);
+    const hasWaitingEntry = (queue?.entries ?? []).some((entry) => entry.status === 'waiting');
+
+    if (queue && signatures && (!requiresWaitingEntry || hasWaitingEntry)) {
+      return { selection, queue, signatures };
+    }
+  }
+
+  const requiredData = requiresWaitingEntry
+    ? 'a doctor-owned queue with a waiting synthetic entry'
+    : 'a doctor-owned queue with numbered synthetic entries';
+  throw new Error('Queue system E2E requires ' + requiredData + '; seed the disposable test database before running this spec.');
 }
 
 test.describe('Queue System Tests', () => {
+  // Some queue scenarios change synthetic queue state. Keep this file serial so
+  // those actions cannot race with the read-only queue assertions below.
+  test.describe.configure({ mode: 'serial' });
+
   test.beforeEach(async ({ page }) => {
-    // Логинимся как регистратор
     await page.goto('/login');
     await page.fill('input[type="text"]', REGISTRAR_USERNAME);
     await page.fill('input[type="password"]', requiredRegistrarPassword());
     await page.click('button[type="submit"]');
-
-    // Ждем загрузки панели регистратора
     await page.waitForLoadState('networkidle');
   });
 
   test('should display queue management interface', async ({ page }) => {
-    // Переходим на страницу управления очередью
     await page.goto(REGISTRAR_QUEUE_PATH);
     await expect(page).toHaveURL(/\/registrar\/queue(?:\?.*)?$/);
-
-    // Проверяем наличие элементов управления очередью
     await expect(page.locator('text=Очередь')).toBeVisible();
     await expect(page.locator('text=Онлайн-очередь')).toBeVisible();
   });
 
-  test('should create morning queue at 07:00', async ({ page }) => {
-    // Имитируем время 07:00
-    await page.addInitScript(() => {
-      // Переопределяем Date для имитации времени 07:00
-      const mockDate = new Date();
-      mockDate.setHours(7, 0, 0, 0);
-
-      const OriginalDate = Date;
-      global.Date = class extends OriginalDate {
-        constructor(...args: unknown[]) {
-          if (args.length === 0) {
-            super();
-            return mockDate;
-          }
-          return new OriginalDate(...(args as ConstructorParameters<typeof Date>));
-        }
-
-        static now() {
-          return mockDate.getTime();
-        }
-        // Type-level only: the mock class's shape is not assignable to the
-        // overloaded DateConstructor type, but the runtime behavior is exact.
-      } as unknown as DateConstructor;
-    });
-
+  test('should keep doctor-scoped actions disabled until a doctor is selected', async ({ page }) => {
     await page.goto(REGISTRAR_QUEUE_PATH);
 
-    // Ищем кнопку "Открыть прием"
-    const openQueueButton = page.locator('button:has-text("Открыть прием"), button:has-text("Открыть очередь")');
+    const openReceptionButton = page.getByRole('button', { name: /Открыть при[её]м/ });
+    const callNextButton = page.locator('button[title="Backend call-next command"]');
 
-    if (await openQueueButton.count() > 0) {
-      await openQueueButton.first().click();
+    await expect(page.locator('.qt-empty-state')).toBeVisible();
+    await expect(openReceptionButton).toBeDisabled();
+    await expect(callNextButton).toBeDisabled();
 
-      // Проверяем что очередь открылась
-      await expect(page.locator('text=Очередь открыта')).toBeVisible({ timeout: 10000 });
-    }
+    await selectFirstAvailableDoctor(page);
+    await expect(callNextButton).toBeEnabled();
+
+    // The page does not currently expose is_open in its queue snapshot. In this
+    // registrar view, selecting a doctor must enable its open-reception action.
+    await expect(openReceptionButton).toBeEnabled();
   });
 
-  test('should prevent queue creation outside 07:00-08:00 window', async ({ page }) => {
-    // Имитируем время 09:00 (вне окна)
-    await page.addInitScript(() => {
-      const mockDate = new Date();
-      mockDate.setHours(9, 0, 0, 0);
-
-      const OriginalDate = Date;
-      global.Date = class extends OriginalDate {
-        constructor(...args: unknown[]) {
-          if (args.length === 0) {
-            super();
-            return mockDate;
-          }
-          return new OriginalDate(...(args as ConstructorParameters<typeof Date>));
-        }
-
-        static now() {
-          return mockDate.getTime();
-        }
-        // Type-level only: the mock class's shape is not assignable to the
-        // overloaded DateConstructor type, but the runtime behavior is exact.
-      } as unknown as DateConstructor;
-    });
-
+  test('should display backend-assigned queue numbering for the selected doctor', async ({ page }) => {
     await page.goto(REGISTRAR_QUEUE_PATH);
 
-    // Пытаемся открыть очередь
-    const openQueueButton = page.locator('button:has-text("Открыть прием")');
+    const { signatures } = await selectDoctorWithQueue(page);
+    expect(
+      signatures.every((signature) => /^\d+$/.test(signature.number)),
+      'Synthetic queue entries must include backend-assigned numeric queue numbers.'
+    ).toBe(true);
 
-    if (await openQueueButton.count() > 0) {
-      await openQueueButton.first().click();
-
-      // Должно показать ошибку о времени
-      await expect(page.locator('text=Время для открытия очереди: 07:00-08:00')).toBeVisible({ timeout: 5000 });
-    }
+    await expectVisibleQueueToMatch(
+      page,
+      signatures,
+      'Visible queue numbers and patient labels must match the selected synthetic doctor queue.'
+    );
   });
 
-  test('should add patient to queue', async ({ page }) => {
-    await page.goto(REGISTRAR_QUEUE_PATH);
-
-    // Ищем форму добавления в очередь
-    const addToQueueButton = page.locator('button:has-text("Добавить в очередь"), button:has-text("Записать")');
-
-    if (await addToQueueButton.count() > 0) {
-      await addToQueueButton.first().click();
-
-      // Заполняем форму
-      await page.fill('input[placeholder*="Телефон"], input[name="phone"]', '+998900000000');
-      await page.fill('input[placeholder*="Имя"], input[name="name"]', 'Тестовый Пациент');
-
-      // Выбираем специалиста
-      const specialistSelect = page.locator('select[name="specialist"], .specialist-select');
-      if (await specialistSelect.count() > 0) {
-        await specialistSelect.first().selectOption({ index: 1 });
-      }
-
-      // Подтверждаем
-      await page.click('button[type="submit"], button:has-text("Добавить")');
-
-      // Проверяем что пациент добавлен
-      await expect(page.locator('text=Пациент добавлен в очередь')).toBeVisible({ timeout: 10000 });
-    }
-  });
-
-  test('should prevent duplicate phone numbers in queue', async ({ page }) => {
-    await page.goto(REGISTRAR_QUEUE_PATH);
-
-    const addButton = page.locator('button:has-text("Добавить в очередь")');
-
-    if (await addButton.count() > 0) {
-      // Добавляем первого пациента
-      await addButton.first().click();
-      await page.fill('input[name="phone"]', '+998900000000');
-      await page.fill('input[name="name"]', 'Первый Пациент');
-      await page.click('button[type="submit"]');
-
-      // Ждем подтверждения
-      await page.waitForTimeout(2000);
-
-      // Пытаемся добавить с тем же номером
-      await addButton.first().click();
-      await page.fill('input[name="phone"]', '+998900000000');
-      await page.fill('input[name="name"]', 'Второй Пациент');
-      await page.click('button[type="submit"]');
-
-      // Должна показаться ошибка
-      await expect(page.locator('text=Пациент уже в очереди')).toBeVisible({ timeout: 5000 });
-    }
-  });
-
-  test('should display queue with correct numbering', async ({ page }) => {
-    await page.goto(REGISTRAR_QUEUE_PATH);
-
-    // Проверяем отображение очереди
-    const queueList = page.locator('.queue-list, [data-testid="queue-list"]');
-
-    if (await queueList.count() > 0) {
-      // Проверяем что номера идут по порядку
-      const queueItems = page.locator('.queue-item, [data-testid="queue-item"]');
-      const count = await queueItems.count();
-
-      if (count > 0) {
-        for (let i = 0; i < Math.min(count, 3); i++) {
-          const item = queueItems.nth(i);
-          await expect(item).toBeVisible();
-
-          // Проверяем что есть номер очереди
-          const numberElement = item.locator('.queue-number, [data-testid="queue-number"]');
-          if (await numberElement.count() > 0) {
-            const number = await numberElement.textContent();
-            expect(number).toMatch(/\d+/);
-          }
-        }
-      }
-    }
-  });
-
-  test('should call next patient', async ({ page }) => {
-    await page.goto(REGISTRAR_QUEUE_PATH);
-
-    // Ищем кнопку "Вызвать следующего"
-    const callNextButton = page.locator('button:has-text("Вызвать"), button:has-text("Следующий")');
-
-    if (await callNextButton.count() > 0) {
-      await callNextButton.first().click();
-
-      // Проверяем что пациент вызван
-      await expect(page.locator('text=Пациент вызван')).toBeVisible({ timeout: 5000 });
-    }
-  });
-
-  test('should handle queue completion', async ({ page }) => {
-    await page.goto(REGISTRAR_QUEUE_PATH);
-
-    // Ищем кнопку завершения приема
-    const completeButton = page.locator('button:has-text("Завершить прием"), button:has-text("Закрыть очередь")');
-
-    if (await completeButton.count() > 0) {
-      await completeButton.first().click();
-
-      // Подтверждаем завершение
-      const confirmButton = page.locator('button:has-text("Подтвердить"), button:has-text("Да")');
-      if (await confirmButton.count() > 0) {
-        await confirmButton.first().click();
-      }
-
-      // Проверяем что прием завершен
-      await expect(page.locator('text=Прием завершен')).toBeVisible({ timeout: 5000 });
-    }
-  });
-
-  test('should display queue statistics', async ({ page }) => {
+  test('should display queue statistics after selecting a doctor', async ({ page }) => {
     await page.goto(REGISTRAR_QUEUE_PATH);
     await selectFirstAvailableDoctor(page);
 
@@ -246,8 +269,80 @@ test.describe('Queue System Tests', () => {
     await expect(statsGrid.locator('.mqm-stat-card')).toHaveCount(3);
   });
 
-  test('should handle specialist-specific queues', async ({ page }) => {
+  test('should show the correct queue after switching between doctors', async ({ page }) => {
     await page.goto(REGISTRAR_QUEUE_PATH);
-    await selectFirstAvailableDoctor(page);
+    const optionCount = await selectableDoctorOptionCount(page);
+
+    let firstDoctor: { id: string; signatures: VisibleQueueSignature[] } | null = null;
+    let secondDoctor: { id: string; signatures: VisibleQueueSignature[] } | null = null;
+    const visitedDoctorIds = new Set<string>();
+
+    for (let optionIndex = 1; optionIndex < optionCount; optionIndex += 1) {
+      const selection = await selectDoctorOption(page, optionIndex);
+      if (visitedDoctorIds.has(selection.doctorId)) continue;
+      visitedDoctorIds.add(selection.doctorId);
+
+      const queue = queueOwnedByDoctor(selection.payload, selection.doctorId);
+      const signatures = visibleQueueSignatures(queue);
+      if (!signatures) continue;
+
+      if (!firstDoctor) {
+        firstDoctor = { id: selection.doctorId, signatures };
+        await expectVisibleQueueToMatch(
+          page,
+          signatures,
+          'Visible queue rows must match the first selected synthetic doctor queue.'
+        );
+        continue;
+      }
+
+      const displaysDifferentQueue = JSON.stringify(
+        signatures.map(signatureKey)
+      ) !== JSON.stringify(firstDoctor.signatures.map(signatureKey));
+      if (!displaysDifferentQueue) continue;
+
+      secondDoctor = { id: selection.doctorId, signatures };
+      await expectVisibleQueueToMatch(
+        page,
+        signatures,
+        'Switching doctors must replace the visible rows with the newly selected synthetic doctor queue.'
+      );
+      break;
+    }
+
+    expect(
+      Boolean(firstDoctor && secondDoctor && firstDoctor.id !== secondDoctor.id),
+      'Seed two doctors with non-empty, visibly distinct synthetic queues to verify doctor-specific filtering.'
+    ).toBe(true);
+  });
+
+  test('should call the next waiting patient for the selected doctor', async ({ page }) => {
+    await page.goto(REGISTRAR_QUEUE_PATH);
+    const { selection, queue } = await selectDoctorWithQueue(page, true);
+    const waitingBefore = (queue.entries ?? []).filter((entry) => entry.status === 'waiting').length;
+    const calledBefore = (queue.entries ?? []).filter((entry) => entry.status === 'called').length;
+    expect(waitingBefore, 'The selected synthetic queue must contain a waiting entry.').toBeGreaterThan(0);
+
+    const callNextButton = page.locator('button[title="Backend call-next command"]');
+    await expect(callNextButton).toBeVisible();
+    await expect(callNextButton).toBeEnabled();
+
+    const callResponsePromise = page.waitForResponse((response) =>
+      response.request().method() === 'POST'
+      && response.url().includes('/queue/' + selection.doctorId + '/call-next')
+    );
+    const updatedSnapshotPromise = waitForQueueSnapshot(page);
+    await callNextButton.click();
+
+    const callResponse = await callResponsePromise;
+    expect(callResponse.ok(), 'The call-next command must succeed for the seeded synthetic queue.').toBe(true);
+    const updatedPayload = await updatedSnapshotPromise;
+    const updatedQueue = queueOwnedByDoctor(updatedPayload, selection.doctorId);
+    expect(updatedQueue, 'The selected doctor queue must remain available after call-next.').toBeDefined();
+
+    const waitingAfter = (updatedQueue?.entries ?? []).filter((entry) => entry.status === 'waiting').length;
+    const calledAfter = (updatedQueue?.entries ?? []).filter((entry) => entry.status === 'called').length;
+    expect(waitingAfter < waitingBefore, 'A successful call must remove one entry from the waiting state.').toBe(true);
+    expect(calledAfter > calledBefore, 'A successful call must place an entry in the called state.').toBe(true);
   });
 });

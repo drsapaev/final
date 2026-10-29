@@ -1,3 +1,41 @@
+## Latest checkpoint — PR #3801 review fixes locally validated — 2026-10-29T20:43+05:00
+
+- Plan version: 1.0
+- Current task: T18 bounded `queue-system.spec.ts` review correction
+- Current status: source and local validation PASS; commit/push and exact-head CI pending
+- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
+- Branch: `codex/aqs-t18-queue-system-route-spec`
+- Base commit: `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`
+- Source under test: working-tree delta on PR HEAD `ebf2715790bb484d0df62bc943edd77bab81abb4`
+- Last updated: 2026-10-29T20:43+05:00
+
+- Review #5700225111 findings addressed in the spec: all action checks now select a doctor; obsolete add-patient, duplicate-phone, completion and browser-mocked 07:00-window scenarios were removed/replaced because this route has no such controls or server time rule; real DataTable locators compare rows to the selected doctor API snapshot; specialist switching requires two distinct synthetic doctor queues and verifies visible rows.
+- The call-next scenario requires a waiting synthetic entry, executes only when the spec is later run in disposable staging, and checks the actual API response plus waiting/called status transition. Assertions compare queue labels only in memory and do not print patient values.
+- Actual changed paths: `frontend/e2e/queue-system.spec.ts`; this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md` only.
+- Local validation PASS: scoped ESLint; `tsc --noEmit -p e2e/tsconfig.json`; Playwright collection (6 collected, 0 executed); `npm run build` (43.88s; existing third-party annotation/CSS warnings); CRLF-aware `git diff --check`.
+- Gate: prior `gate_known_root_cause` for the same test file/journals returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; prompt read. No gate/router change.
+- Exact-head CI is pending because the validated working-tree delta has not yet been committed/pushed. User's explicit Tier-2 direction remains PARTIAL; the named spec and staging remain NOT_RUN, with no deferral/waiver. User retains merge.
+- Next exact action: commit this single-purpose test/evidence change through normal hooks, push the existing PR branch, then verify checks on the resulting exact PR HEAD before updating review threads/body.
+
+## Latest checkpoint — PR #3801 queue-system E2E review corrections — 2026-10-29T20:36+05:00
+
+- Plan version: 1.0
+- Current task: T18 bounded Playwright queue-system review correction
+- Current status: IN_PROGRESS; source edit not started
+- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
+- Branch: `codex/aqs-t18-queue-system-route-spec`
+- Base commit: `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`
+- Current PR/local HEAD: `ebf2715790bb484d0df62bc943edd77bab81abb4`
+- Last updated: 2026-10-29T20:36+05:00
+
+- New review #5700225111 has three open findings: P1 action buttons are used without selecting a doctor; P2 numbering uses stale/vacuous selectors and legacy tests target controls absent from QueueView; P2 specialist test checks only URL selection.
+- Source inspection confirms the canonical page exposes doctor selection, queue statistics/table, reception open/close, and call-next. It does not expose patient creation, duplicate-phone validation, or visit completion. The Registrar reception endpoint does not enforce the old browser-mocked 07:00–08:00 window.
+- Chosen scope: update only `frontend/e2e/queue-system.spec.ts` and this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied scope: application/runtime, backend/API/DB/auth/route policy, Playwright config/credentials, staging/Compose/WSL, production/deploy, other worktrees, live execution of this mutating spec, merge.
+- Execution mode: continue the previously run `gate_known_root_cause` for the exact E2E spec and journals. It returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt was read. This remains test-only and does not authorize live execution.
+- Planned validation: scoped ESLint, E2E TypeScript check, Playwright collection only, frontend build, CRLF-aware diff check, normal hooks and exact-head CI. Named `queue-system.spec.ts` execution and staging remain NOT_RUN.
+- Tier-2 remains PARTIAL by explicit user decision; no deferral or waiver. User retains merge.
+- Next exact action: replace unsupported/vacuous scenarios with checks against actual QueueView controls, add explicit synthetic queue-data prerequisites, and verify doctor-specific rows against the backend queue snapshot without printing patient values.
+
 ## Latest checkpoint — PR #3801 statistics E2E review fix — 2026-10-29T19:31+05:00
 
 - Plan version: 1.0
