@@ -15,6 +15,7 @@ from app.crud.appointment import appointment as appointment_crud
 from app.models.public_booking_request import (
     PublicBookingRequest,
     PublicBookingRequestEvent,
+    PublicBookingRequestNotificationOutbox,
 )
 from app.repositories.public_booking_availability_repository import (
     PublicBookingAvailabilityRepository,
@@ -169,6 +170,10 @@ class PublicBookingRequestService:
                 previous_time=None,
                 idempotency_key_hash=key_hash,
                 payload_hash=payload_hash,
+            )
+            self._enqueue_registrar_notification(
+                request=request,
+                event_type="public_booking_request_submitted",
             )
             self.db.commit()
         except IntegrityError as exc:
@@ -330,6 +335,10 @@ class PublicBookingRequestService:
             previous_time=old_time,
             idempotency_key_hash=key_hash,
             payload_hash=payload_hash,
+        )
+        self._enqueue_registrar_notification(
+            request=request,
+            event_type="public_booking_request_resubmitted",
         )
         try:
             self.db.commit()
@@ -722,6 +731,18 @@ class PublicBookingRequestService:
                 requested_appointment_time=request.appointment_time,
                 idempotency_key_hash=idempotency_key_hash,
                 payload_hash=payload_hash,
+            )
+        )
+
+    def _enqueue_registrar_notification(
+        self, *, request: PublicBookingRequest, event_type: str
+    ) -> None:
+        """Persist the inbox delivery intent in the request's transaction."""
+        self.db.add(
+            PublicBookingRequestNotificationOutbox(
+                request_id=request.id,
+                request_version=request.version,
+                event_type=event_type,
             )
         )
 

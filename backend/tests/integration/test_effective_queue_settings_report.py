@@ -161,7 +161,9 @@ def pg_engine():
 
         engine = create_engine(sa_url, future=True)
         with engine.connect() as conn:
-            version = conn.execute(text("select version_num from alembic_version")).scalar()
+            version = conn.execute(
+                text("select version_num from alembic_version")
+            ).scalar()
         assert version, "alembic_version must be present after upgrade"
         yield engine
     finally:
@@ -191,9 +193,7 @@ def pg_admin_user(pg_session):
     from app.core.security import get_password_hash
     from app.models.user import User
 
-    user = (
-        pg_session.query(User).filter(User.username == "rq23a_admin").first()
-    )
+    user = pg_session.query(User).filter(User.username == "rq23a_admin").first()
     if user:
         return user
     user = User(
@@ -238,25 +238,19 @@ def _auth_headers(pg_admin_user) -> dict[str, str]:
 def _set_queue_setting(pg_session, key: str, value: Any) -> None:
     from app.models.clinic import ClinicSettings
 
-    row = (
-        pg_session.query(ClinicSettings).filter(ClinicSettings.key == key).first()
-    )
+    row = pg_session.query(ClinicSettings).filter(ClinicSettings.key == key).first()
     if row:
         row.value = value
         row.category = "queue"
     else:
-        pg_session.add(
-            ClinicSettings(key=key, value=value, category="queue")
-        )
+        pg_session.add(ClinicSettings(key=key, value=value, category="queue"))
     pg_session.commit()
 
 
 def _seed_department(pg_session, key: str) -> Any:
     from app.models.department import Department, DepartmentQueueSettings
 
-    dept = (
-        pg_session.query(Department).filter(Department.key == key).first()
-    )
+    dept = pg_session.query(Department).filter(Department.key == key).first()
     if not dept:
         dept = Department(
             key=key,
@@ -336,10 +330,23 @@ def test_report_shape_and_chain(pg_client, pg_admin_user):
     assert report["clinic_today"], "clinic_today (tz SSOT) must be present"
 
     fields = {f["field"]: f for f in report["fields"]}
-    for required in ("timezone", "queue_start_hour", "auto_close_time", "start_numbers", "max_per_day"):
+    for required in (
+        "timezone",
+        "queue_start_hour",
+        "auto_close_time",
+        "start_numbers",
+        "max_per_day",
+    ):
         assert required in fields, f"missing clinic field entry: {required}"
     for entry in fields.values():
-        assert set(entry) >= {"field", "level", "value", "live", "applied_when", "note"}, entry
+        assert set(entry) >= {
+            "field",
+            "level",
+            "value",
+            "live",
+            "applied_when",
+            "note",
+        }, entry
 
     assert fields["timezone"]["level"] == "clinic"
     assert fields["timezone"]["live"] is True
@@ -347,7 +354,10 @@ def test_report_shape_and_chain(pg_client, pg_admin_user):
     assert fields["queue_start_hour"]["live"] is True
     # dual semantics: live gate for online entry + frozen snapshot at day creation
     assert "day_creation_snapshot" in fields["queue_start_hour"]["applied_when"]
-    assert fields["queue_start_hour"].get("snapshot_field") == "DailyQueue.online_start_time"
+    assert (
+        fields["queue_start_hour"].get("snapshot_field")
+        == "DailyQueue.online_start_time"
+    )
 
 
 # ---------------------------------------------------------------
@@ -437,7 +447,9 @@ def test_department_fields_live_flags(pg_client, pg_admin_user, pg_session):
         assert qs[dead]["note"], f"dead field must explain itself: {dead}"
 
 
-def test_clinic_auto_close_time_is_v1_creation_cutoff(pg_client, pg_admin_user, pg_session):
+def test_clinic_auto_close_time_is_v1_creation_cutoff(
+    pg_client, pg_admin_user, pg_session
+):
     headers = _auth_headers(pg_admin_user)
     _set_queue_setting(pg_session, "auto_close_time", "11:30")
 
@@ -492,11 +504,7 @@ def test_active_day_snapshot_not_rewritten(pg_client, pg_admin_user, pg_session)
 
     report = _report(pg_client, headers, department_id=dept.id, tag=tag)
 
-    day_rows = [
-        r
-        for r in report["active_day"]
-        if r["daily_queue_id"] == frozen.id
-    ]
+    day_rows = [r for r in report["active_day"] if r["daily_queue_id"] == frozen.id]
     assert day_rows, "today's frozen row must be reported"
     row = day_rows[0]
     assert row["source"] == "day_snapshot"
@@ -507,9 +515,7 @@ def test_active_day_snapshot_not_rewritten(pg_client, pg_admin_user, pg_session)
     # The DB row itself is untouched — D-06: «Новые настройки не меняют
     # выданные номера и историю текущего дня».
     pg_session.expire_all()
-    reloaded = (
-        pg_session.query(DailyQueue).filter(DailyQueue.id == frozen.id).first()
-    )
+    reloaded = pg_session.query(DailyQueue).filter(DailyQueue.id == frozen.id).first()
     assert reloaded.start_number == 5
     assert reloaded.online_start_time == "07:00"
     assert reloaded.max_online_entries == 15
@@ -519,3 +525,37 @@ def test_active_day_snapshot_not_rewritten(pg_client, pg_admin_user, pg_session)
     fields = {f["field"]: f for f in report["fields"]}
     assert fields["start_numbers"]["value"][tag] == 99
     assert fields["queue_start_hour"]["value"] == 9
+
+
+def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_engine):
+    table = "public_booking_request_notification_outbox"
+    with pg_engine.connect() as conn:
+        revision = conn.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+        rls_enabled = conn.execute(
+            text(
+                "SELECT relrowsecurity FROM pg_class "
+                "WHERE oid = to_regclass(:table_name)"
+            ),
+            {"table_name": f"public.{table}"},
+        ).scalar_one()
+        constraints = set(
+            conn.execute(
+                text(
+                    "SELECT conname FROM pg_constraint "
+                    "WHERE conrelid = to_regclass(:table_name)"
+                ),
+                {"table_name": f"public.{table}"},
+            ).scalars()
+        )
+
+    assert revision == "0087_public_booking_notification_outbox"
+    assert rls_enabled is True
+    assert {
+        "pk_public_booking_notification_outbox",
+        "uq_public_booking_notification_outbox_request_version",
+        "ck_public_booking_notification_outbox_version",
+        "ck_public_booking_notification_outbox_attempts",
+        "ck_public_booking_notification_outbox_type",
+    } <= constraints

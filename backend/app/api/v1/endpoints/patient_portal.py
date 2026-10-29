@@ -122,6 +122,9 @@ from app.services.appointment_duration_snapshot import (
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.patient_access_audit import log_patient_access
+from app.services.public_booking_request_notification_outbox import (
+    PublicBookingRequestNotificationOutboxService,
+)
 from app.services.public_booking_request_service import (
     PublicBookingRequestError,
     PublicBookingRequestService,
@@ -130,7 +133,6 @@ from app.services.public_booking_settings import (
     PublicBookingSettingsError,
     PublicBookingSettingsService,
 )
-from app.services.registrar_notification_service import RegistrarNotificationService
 from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppSessionScope,
     TelegramMiniAppSessionScopeError,
@@ -1137,7 +1139,7 @@ def _execute_public_booking_request_mutation(
     action: str,
     operation: Callable[[int], PublicBookingRequestOut],
 ) -> PublicBookingRequestOut:
-    """Run a request mutation and its audit writes as one synchronous DB unit."""
+    """Run request persistence, audit, and outbox attempt in one worker thread."""
     patient_id = _require_patient_audited(
         db,
         request,
@@ -1167,6 +1169,10 @@ def _execute_public_booking_request_mutation(
         action=action,
         outcome="success",
         request=request,
+    )
+    PublicBookingRequestNotificationOutboxService(db).dispatch_request_now(
+        request_id=result.id,
+        request_version=result.version,
     )
     return result
 
@@ -1241,9 +1247,6 @@ async def create_patient_public_booking_request(
             idempotency_key=idempotency_key,
             operation_scope=_patient_request_idempotency_scope(request),
         ),
-    )
-    await RegistrarNotificationService(db).notify_public_booking_request(
-        request_id=str(result.id), request_version=result.version
     )
     return result
 
@@ -1405,10 +1408,5 @@ async def resubmit_patient_public_booking_request(
             idempotency_key=idempotency_key,
             operation_scope=_patient_request_idempotency_scope(request),
         ),
-    )
-    await RegistrarNotificationService(db).notify_public_booking_request(
-        request_id=str(result.id),
-        request_version=result.version,
-        resubmitted=True,
     )
     return result
