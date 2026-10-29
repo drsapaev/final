@@ -1,19 +1,20 @@
-## Latest checkpoint — PR #3800 type-check repair — 2026-10-29T15:58+05:00
+## Latest checkpoint — PR #3800 exact-head CI pass; body gate refresh pending — 2026-10-29T16:20+05:00
 
 Plan version: 1.0
 Current task: T18 bounded QueueProfile delete-error localization
-Current status: PR_OPEN / follow-up validation
+Current status: PR_OPEN / Draft; exact-head code CI passed
 Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
 Branch: `codex/aqs-t18-localize-profile-delete-refusals`
 Base commit: `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`
-Current commit: PR #3800 branch tip; resolve exact SHA from GitHub before resuming edits
-Last updated: 2026-10-29T15:58+05:00
+Current code commit: `bc47a4d915e25a78baca9b067e20562b0932602a`
+Last updated: 2026-10-29T16:20+05:00
 
-- Completed: PR #3800 opened as Draft; exact-head CI found a test-only TypeScript error because Testing Library's `ByRoleOptions` does not support `exact` in the installed types. Replaced the selector option with an anchored name regex. Local type-check, focused interactions suite (20/20), scoped ESLint, and `git diff --check` pass.
-- Changed but not verified: the selector correction and this checkpoint are committed locally using normal hooks; the follow-up push and exact-head CI are pending.
-- Remaining: push the follow-up, verify CI on the new exact HEAD, update PR evidence, and remove only this worktree's ignored dependency/build artifacts when checks are complete.
-- Blocker: first PR CI run `40860981153` reported the now-corrected TS2769 test selector error; local type-check, focused test and ESLint now pass. New-head CI is required. No staging was run.
-- Next exact action: push the committed test correction and checkpoint to PR #3800, then verify the new exact-head checks.
+- Completed: PR #3800 remains Draft. Exact-head Unified CI `40861817672` passed on `bc47a4d9`; frontend unit, type-check/lint and auxiliary lint gates, build, configured E2E groups, and PR Required Gate passed. PR body was updated with truthful exact-head results and passes the local review-body gate.
+- Completed locally: `npm run check-theme`, `npm run audit:icon-controls` (zero findings), focused Vitest 20/20, type-check, scoped ESLint, build, locale parity and `git diff --check` pass.
+- Changed but not verified: the hosted PR Review Quality Gate failed on its earlier body snapshot, which lacked required validation labels. The current body has those labels and passes locally, but a new PR synchronize event is needed to refresh the hosted gate.
+- Remaining: commit/push the current evidence checkpoint to trigger fresh PR gates, verify the exact new head, keep PR Draft for review/merge by the user, then continue after the user merges.
+- Blocker: no new hosted review-body gate result yet. Backend/integration/staging jobs were skipped, not passed. Host policy blocked local artifact cleanup; do not retry through alternate methods.
+- Next exact action: commit and push this evidence-only journal update using normal hooks; verify new-head PR gates.
 - Tier-2 disposition: `PARTIAL` by explicit user instruction; no deferral, waiver, staging, merge, or deployment.
 
 ## Latest checkpoint — T18 remains PARTIAL by user direction — 2026-10-29T15:35+05:00

@@ -1,12 +1,14 @@
-## Latest continuation — PR #3800 type-check repair, Tier-2 remains PARTIAL — 2026-10-29T15:58+05:00
+## Latest continuation — PR #3800 exact-head CI pass, Tier-2 remains PARTIAL — 2026-10-29T16:20+05:00
 
 Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-localize-profile-delete-refusals`, PR #3800. Base `origin/main` at branch start was `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Do not edit `C:\final` or another worktree.
 
 The PR localizes only the two existing QueueProfile deletion refusal codes across five active locales and adds single/bulk UI regressions. User direction: keep Tier-2 `PARTIAL` and continue the plan; no staging, deferral, waiver, merge, or deployment.
 
-Initial PR HEAD `c3ecbc0d9c3b6a4818a6b224f36e23c644e9fd02` had one CI TypeScript error in the new test: `getByRole(..., { exact: true })` is unsupported by this repository's `ByRoleOptions`. The test now uses an anchored name regex. Local `npm run type-check` PASS; focused Vitest PASS (20/20); scoped ESLint PASS; `git diff --check` PASS. Original run `40860981153` had frontend build PASS; unit/E2E were still in progress when inspected. The selector fix and this checkpoint are committed locally using normal hooks; push and new exact-head CI remain pending.
+Initial PR HEAD `c3ecbc0d9c3b6a4818a6b224f36e23c644e9fd02` had one CI TypeScript error in the new test. Exact head `bc47a4d915e25a78baca9b067e20562b0932602a` corrected the test selector and passed Unified CI `40861817672`, including frontend unit, lint/type-check, build, configured E2E and PR Required Gate. Local focused tests (20/20), type-check, scoped ESLint, build, theme, icon audit, locale parity and diff-check also pass.
 
-Do not mark the PR ready or merge. Preserve Tier-2 as partial; the three legacy live specs and full `docs/runbooks/STAGING_VALIDATION.md` remain outstanding.
+The PR body now records exact-head results and remains truthful about skipped backend/staging checks and Tier-2 PARTIAL. The hosted PR Review Quality Gate failure was for the earlier body snapshot, which omitted required `Targeted tests or smoke run`, `Result`, and `Not checked` labels. The corrected body passes the local gate; create a new PR synchronize event through the evidence checkpoint commit and verify the hosted gate. Keep PR #3800 Draft for user review/merge; do not run staging or mark Tier-2 complete.
+
+Preserve Tier-2 as partial; the three legacy live specs and full `docs/runbooks/STAGING_VALIDATION.md` remain outstanding. No deferral/waiver, staging, merge or deployment.
 
 ## Latest continuation — T18 explicitly remains partial; no repeated staging cycle — 2026-10-29T15:35+05:00
 
