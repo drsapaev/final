@@ -57,6 +57,11 @@ services:
       # Use only a dedicated staging bot. A DB-configured bot token takes
       # precedence in the notification service.
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      # TextBee is an optional, isolated patient-OTP transport. Keep the
+      # general SMS provider unchanged; never pass this key to frontend/worker.
+      PATIENT_OTP_SMS_PROVIDER: ${PATIENT_OTP_SMS_PROVIDER:-}
+      TEXTBEE_API_KEY: ${TEXTBEE_API_KEY:-}
+      TEXTBEE_DEVICE_ID: ${TEXTBEE_DEVICE_ID:-}
       TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
       HOST: 0.0.0.0
       PORT: 18000

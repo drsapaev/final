@@ -46,7 +46,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.user import User
 from app.models.user_profile import UserProfile
-from app.services.sms_providers import get_sms_manager
+from app.services.sms_providers import SMSMessage, get_sms_manager
+from app.services.textbee_sms_provider import TextBeeSMSProvider
 
 logger = logging.getLogger(__name__)
 
@@ -257,8 +258,21 @@ class PatientOtpService:
         if backend.incr_with_ttl(cap_key, 3600) > HOURLY_SEND_CAP:
             raise PatientOtpError(429, ERR_RATE_LIMITED)
 
+        provider_override = (
+            (getattr(settings, "PATIENT_OTP_SMS_PROVIDER", None) or "").strip().lower()
+        )
         provider = (settings.SMS_DEFAULT_PROVIDER or "").strip().lower()
-        if provider == "mock" and not _testing_mode():
+        if provider_override:
+            environment = (settings.ENV or "").strip().lower()
+            api_key = (getattr(settings, "TEXTBEE_API_KEY", None) or "").strip()
+            if (
+                provider_override != "textbee"
+                or environment != "staging"
+                or not api_key
+            ):
+                logger.error("patient OTP: configured provider override is unavailable")
+                raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
+        elif provider == "mock" and not _testing_mode():
             # Owner gate #6: Mock SMS is dev/test-only for patient access.
             logger.error("patient OTP: MockSMSProvider refused outside TESTING")
             raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
@@ -267,8 +281,17 @@ class PatientOtpService:
         message = _OTP_MESSAGES[lang].format(code=code)
 
         try:
-            sms_manager = get_sms_manager()
-            result = await sms_manager.send_sms(phone=normalized, text=message)
+            if provider_override == "textbee":
+                provider_client = TextBeeSMSProvider(
+                    api_key=api_key,
+                    device_id=getattr(settings, "TEXTBEE_DEVICE_ID", None),
+                )
+                result = await provider_client.send_sms(
+                    SMSMessage(phone=normalized, text=message)
+                )
+            else:
+                sms_manager = get_sms_manager()
+                result = await sms_manager.send_sms(phone=normalized, text=message)
         except Exception as exc:  # noqa: BLE001
             logger.error("patient OTP: send_sms error: %s", exc)
             raise PatientOtpError(503, ERR_SMS_UNAVAILABLE) from exc

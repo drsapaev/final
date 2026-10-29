@@ -78,6 +78,86 @@ def sms_ok(monkeypatch):
     return sent
 
 
+@pytest.mark.asyncio
+async def test_staging_textbee_override_is_used_only_for_patient_otp(
+    svc, sms_ok, monkeypatch
+):
+    from app.services import patient_otp_service as mod
+
+    sent = []
+
+    class FakeTextBee:
+        def __init__(self, *, api_key, device_id=None):
+            assert api_key == "staging-test-key"
+            assert device_id is None
+
+        async def send_sms(self, message):
+            sent.append(message)
+            return type(
+                "Result",
+                (),
+                {"success": True, "message_id": "batch-1", "provider": "textbee"},
+            )()
+
+    monkeypatch.setattr(mod, "TextBeeSMSProvider", FakeTextBee)
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.PATIENT_OTP_SMS_PROVIDER",
+        "textbee",
+    )
+    monkeypatch.setattr("app.services.patient_otp_service.settings.ENV", "staging")
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.TEXTBEE_API_KEY",
+        "staging-test-key",
+    )
+
+    await svc.send_login_otp("+998901112233", "ru")
+
+    assert len(sent) == 1
+    assert sent[0].phone == "+998901112233"
+    assert sent[0].text.startswith("Код входа: ")
+    assert sms_ok == []
+
+
+@pytest.mark.asyncio
+async def test_textbee_patient_otp_override_fails_closed_outside_staging(
+    svc, sms_ok, monkeypatch
+):
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.PATIENT_OTP_SMS_PROVIDER",
+        "textbee",
+    )
+    monkeypatch.setattr("app.services.patient_otp_service.settings.ENV", "production")
+
+    with pytest.raises(PatientOtpError) as err:
+        await svc.send_login_otp("+998901112233", "ru")
+
+    assert err.value.status_code == 503
+    assert sms_ok == []
+
+
+@pytest.mark.asyncio
+async def test_textbee_patient_otp_override_fails_closed_without_key(
+    svc, sms_ok, monkeypatch
+):
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.PATIENT_OTP_SMS_PROVIDER",
+        "textbee",
+    )
+    monkeypatch.setattr("app.services.patient_otp_service.settings.ENV", "staging")
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.TEXTBEE_API_KEY", None
+    )
+
+    with pytest.raises(PatientOtpError) as err:
+        await svc.send_login_otp("+998901112233", "ru")
+
+    assert err.value.status_code == 503
+    assert sms_ok == []
+
+
 # ------------------------------------------------------------ normalization
 @pytest.mark.parametrize(
     ("raw", "expected"),
