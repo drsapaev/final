@@ -212,10 +212,12 @@ function getPatientBookingResubmitContext(state: unknown): PatientBookingResubmi
   const value = (state as { publicBookingResubmit?: unknown }).publicBookingResubmit;
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<PatientBookingResubmitContext>;
+  const expectedVersion = candidate.expectedVersion;
   if (typeof candidate.requestId !== 'string'
     || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate.requestId)
-    || !Number.isSafeInteger(candidate.expectedVersion)
-    || (candidate.expectedVersion ?? 0) < 1
+    || typeof expectedVersion !== 'number'
+    || !Number.isSafeInteger(expectedVersion)
+    || expectedVersion < 1
     || typeof candidate.serviceSlug !== 'string'
     || candidate.serviceSlug.length < 1
     || candidate.serviceSlug.length > 120
@@ -224,7 +226,7 @@ function getPatientBookingResubmitContext(state: unknown): PatientBookingResubmi
     || candidate.doctorSlug.length > 120) return null;
   return {
     requestId: candidate.requestId,
-    expectedVersion: candidate.expectedVersion,
+    expectedVersion,
     serviceSlug: candidate.serviceSlug,
     doctorSlug: candidate.doctorSlug,
   };
