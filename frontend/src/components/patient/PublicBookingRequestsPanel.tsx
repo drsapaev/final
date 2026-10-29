@@ -202,7 +202,7 @@ export default function PublicBookingRequestsPanel() {
                   </div>
                   {item.status === 'needs_new_time' && (
                     <a
-                      className="mt-2 inline-block text-sm text-[var(--mac-accent-blue-active, #004bb5)] underline"
+                      className="mt-2 inline-block text-sm text-blue-700 underline dark:text-blue-300"
                       href={language === 'uz-Latn' ? '/booking' : '/ru/booking'}
                     >
                       {t('publicBookingRequests.chooseAnotherTime')}
