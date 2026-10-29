@@ -1,4 +1,16 @@
-## Latest continuation — PR #3801 source-head CI passed after unrelated retry — 2026-10-29T21:16+05:00
+## Latest continuation — PR #3801 two follow-up P2 fixes validated locally — 2026-10-29
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. PR #3801 is OPEN / Ready for review at previous exact HEAD `8f4d9a8e283716960bef8e790ad73e1f5b5189c5`; base/main is `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`. The worktree has an uncommitted source + journal follow-up for two newly reported P2 findings.
+
+The user asked to fix both findings. The doctor-switch helper now resolves the clicked UI option to one exact ID from the same observed `/queue/available-specialists` response used to populate the selector, asserts that exact `doctor` query value, and waits for a queue snapshot. Queue selection now follows `useQueueManager.pickQueueForDoctor`: direct `specialist_id` first, then `routing_specialists`, allowing resource-routed queues. The canonical hook and queue payload type were inspected; no runtime/backend/API changes are intended.
+
+Gate mode was `narrow_override` under the user's explicit test-only fix request; there was no misroute, override was used, handoff was required and the execution prompt was read. First-touch files are the E2E spec and this plan's three journals. Stop if the selected option cannot map unambiguously to an API specialist ID or if runtime/API changes would be required.
+
+Local checks PASS: scoped ESLint, E2E TypeScript check, Playwright collection (6 tests / 0 executed), and frontend build. Existing Rollup annotation/CSS-property warnings remain. The named queue-system spec, staging and full Tier-2 are NOT_RUN; Tier-2 remains PARTIAL by explicit user instruction, with no deferral/waiver. Do not run the mutating spec or staging.
+
+Next: run CRLF-aware `git diff --check`, review scope, run normal commit hooks, commit/push the follow-up, and verify checks on the resulting exact PR head. Then respond to/resolve only the two addressed new threads and update the PR description. Keep merge with the user; do not submit an APPROVE or merge.
+
+## Previous continuation — PR #3801 source-head CI passed after unrelated retry — 2026-10-29T21:16+05:00
 
 Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. PR #3801 is OPEN / Ready for review at exact HEAD `0041bcd14dfd1b5b40054928313a630348306331`; base/main `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
 

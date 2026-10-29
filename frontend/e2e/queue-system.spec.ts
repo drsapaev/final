@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type Response } from '@playwright/test';
 
 const REGISTRAR_USERNAME = process.env.QA_REGISTRAR_USERNAME || 'registrar@clinic.com';
 const REGISTRAR_QUEUE_PATH = '/registrar/queue';
@@ -18,12 +18,33 @@ interface QueueEntrySnapshot {
 interface DoctorQueueSnapshot {
   specialist_id?: string | number | null;
   queue_resource_id?: string | number | null;
+  routing_specialists?: Array<string | number>;
   is_open?: boolean;
   entries?: QueueEntrySnapshot[];
 }
 
 interface QueueSnapshotPayload {
   queues?: DoctorQueueSnapshot[];
+}
+
+interface AvailableSpecialistOption {
+  id?: string | number | null;
+  doctor_name?: string | null;
+  full_name?: string | null;
+  name?: string | null;
+  user?: { full_name?: string | null };
+  specialty_display?: string | null;
+  specialty?: string | null;
+  cabinet?: string | number | null;
+}
+
+interface AvailableSpecialistsPayload {
+  specialists?: AvailableSpecialistOption[];
+}
+
+interface AvailableSpecialistsObservation {
+  ok: boolean;
+  payload: AvailableSpecialistsPayload;
 }
 
 interface QueueDoctorSelection {
@@ -37,6 +58,8 @@ interface VisibleQueueSignature {
   source: string;
 }
 
+const availableSpecialistsByPage = new WeakMap<Page, Promise<AvailableSpecialistsObservation>>();
+
 function requiredRegistrarPassword() {
   const password = process.env.QA_REGISTRAR_PASSWORD;
   if (!password) {
@@ -47,6 +70,84 @@ function requiredRegistrarPassword() {
 
 function isQueueSnapshotResponse(response: { url(): string; request(): { method(): string } }) {
   return response.request().method() === 'GET' && response.url().includes(QUEUE_SNAPSHOT_PATH);
+}
+
+function isAvailableSpecialistsResponse(response: Response): boolean {
+  if (response.request().method() !== 'GET') return false;
+
+  try {
+    return new URL(response.url()).pathname.endsWith('/queue/available-specialists');
+  } catch {
+    return false;
+  }
+}
+
+function observeAvailableSpecialists(page: Page): void {
+  let resolveObservation: (observation: AvailableSpecialistsObservation) => void = () => undefined;
+  const observation = new Promise<AvailableSpecialistsObservation>((resolve) => {
+    resolveObservation = resolve;
+  });
+
+  const onResponse = (response: Response) => {
+    if (!isAvailableSpecialistsResponse(response)) return;
+    page.off('response', onResponse);
+
+    void response.json().then(
+      (payload: AvailableSpecialistsPayload) => {
+        resolveObservation({ ok: response.ok(), payload });
+      },
+      () => resolveObservation({ ok: response.ok(), payload: {} })
+    );
+  };
+
+  page.on('response', onResponse);
+  availableSpecialistsByPage.set(page, observation);
+}
+
+async function availableSpecialistsFor(page: Page): Promise<AvailableSpecialistOption[]> {
+  const observation = availableSpecialistsByPage.get(page);
+  expect(observation, 'Available-specialists response must be observed before queue navigation.').toBeDefined();
+
+  const result = await observation!;
+  expect(result.ok, 'The available-specialists request must succeed.').toBe(true);
+  expect(
+    Array.isArray(result.payload.specialists),
+    'The available-specialists response must include its specialists list.'
+  ).toBe(true);
+  return result.payload.specialists!;
+}
+
+function doctorIdForOptionLabel(
+  optionLabel: string,
+  specialists: AvailableSpecialistOption[]
+): string {
+  const matches = specialists.filter((specialist) => {
+    if (specialist.id === null || specialist.id === undefined) return false;
+
+    const doctorName = specialist.doctor_name
+      || specialist.full_name
+      || specialist.user?.full_name
+      || specialist.name;
+    if (!doctorName) return false;
+
+    const specialtyLabel = specialist.specialty_display || specialist.specialty || '';
+    const labelPrefix = normalizedText(
+      `${doctorName}${specialtyLabel ? ` • ${specialtyLabel}` : ''}`
+    );
+    if (!optionLabel.startsWith(labelPrefix)) return false;
+
+    const suffix = optionLabel.slice(labelPrefix.length);
+    return !specialist.cabinet || suffix.includes(String(specialist.cabinet));
+  });
+
+  expect(
+    matches,
+    'The selected doctor option must resolve to exactly one available-specialists ID.'
+  ).toHaveLength(1);
+
+  const doctorId = String(matches[0].id);
+  expect(doctorId, 'The selected doctor ID must be numeric.').toMatch(/^\d+$/);
+  return doctorId;
 }
 
 async function waitForQueueSnapshot(page: Page): Promise<QueueSnapshotPayload> {
@@ -82,20 +183,27 @@ async function selectDoctorOption(page: Page, optionIndex: number): Promise<Queu
     'Queue system E2E requires the expected synthetic doctor option to exist.'
   ).toBeVisible({ timeout: 15_000 });
 
+  const optionLabel = normalizedText(await doctorOption.innerText());
+  const specialists = await availableSpecialistsFor(page);
+  const expectedDoctorId = doctorIdForOptionLabel(optionLabel, specialists);
+  const previousDoctorId = new URL(page.url()).searchParams.get('doctor');
+  expect(
+    expectedDoctorId,
+    'The next selection must be a different doctor so the route and queue refresh can be distinguished.'
+  ).not.toBe(previousDoctorId);
+
   const snapshotPromise = waitForQueueSnapshot(page);
   await doctorOption.click();
 
   await expect.poll(
     () => new URL(page.url()).searchParams.get('doctor'),
-    { message: 'Selecting a doctor must persist its ID in the canonical route.' }
-  ).not.toBeNull();
-
-  const doctorId = new URL(page.url()).searchParams.get('doctor');
-  expect(doctorId, 'The selected doctor ID must be present in the route.').toMatch(/^\d+$/);
+    { message: 'Selecting the displayed doctor must persist that exact ID in the canonical route.' }
+  ).toBe(expectedDoctorId);
+  await expect(doctorFilter).toContainText(optionLabel);
 
   const payload = await snapshotPromise;
   await expect(page.locator('.mqm-stats-grid')).toBeVisible();
-  return { doctorId: doctorId!, payload };
+  return { doctorId: expectedDoctorId, payload };
 }
 
 async function selectFirstAvailableDoctor(page: Page): Promise<QueueDoctorSelection> {
@@ -104,14 +212,24 @@ async function selectFirstAvailableDoctor(page: Page): Promise<QueueDoctorSelect
   return selectDoctorOption(page, 1);
 }
 
-function queueOwnedByDoctor(
+function queueForSelectedDoctor(
   payload: QueueSnapshotPayload,
   doctorId: string
 ): DoctorQueueSnapshot | undefined {
-  return payload.queues?.find((queue) =>
-    String(queue.specialist_id) === doctorId
-    && (queue.queue_resource_id === null || queue.queue_resource_id === undefined)
-  );
+  const selectedDoctorId = Number(doctorId);
+  return payload.queues?.find((queue) => {
+    if (
+      queue.specialist_id !== null
+      && queue.specialist_id !== undefined
+      && Number(queue.specialist_id) === selectedDoctorId
+    ) {
+      return true;
+    }
+
+    return queue.routing_specialists?.some(
+      (routedSpecialistId) => Number(routedSpecialistId) === selectedDoctorId
+    ) ?? false;
+  });
 }
 
 function normalizedText(value: string): string {
@@ -191,7 +309,7 @@ async function selectDoctorWithQueue(
 
   for (let optionIndex = 1; optionIndex < optionCount; optionIndex += 1) {
     const selection = await selectDoctorOption(page, optionIndex);
-    const queue = queueOwnedByDoctor(selection.payload, selection.doctorId);
+    const queue = queueForSelectedDoctor(selection.payload, selection.doctorId);
     const signatures = visibleQueueSignatures(queue);
     const hasWaitingEntry = (queue?.entries ?? []).some((entry) => entry.status === 'waiting');
 
@@ -201,8 +319,8 @@ async function selectDoctorWithQueue(
   }
 
   const requiredData = requiresWaitingEntry
-    ? 'a doctor-owned queue with a waiting synthetic entry'
-    : 'a doctor-owned queue with numbered synthetic entries';
+    ? 'a doctor-owned or resource-routed queue with a waiting synthetic entry'
+    : 'a doctor-owned or resource-routed queue with numbered synthetic entries';
   throw new Error('Queue system E2E requires ' + requiredData + '; seed the disposable test database before running this spec.');
 }
 
@@ -212,6 +330,7 @@ test.describe('Queue System Tests', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(async ({ page }) => {
+    observeAvailableSpecialists(page);
     await page.goto('/login');
     await page.fill('input[type="text"]', REGISTRAR_USERNAME);
     await page.fill('input[type="password"]', requiredRegistrarPassword());
@@ -282,7 +401,7 @@ test.describe('Queue System Tests', () => {
       if (visitedDoctorIds.has(selection.doctorId)) continue;
       visitedDoctorIds.add(selection.doctorId);
 
-      const queue = queueOwnedByDoctor(selection.payload, selection.doctorId);
+      const queue = queueForSelectedDoctor(selection.payload, selection.doctorId);
       const signatures = visibleQueueSignatures(queue);
       if (!signatures) continue;
 
@@ -337,8 +456,8 @@ test.describe('Queue System Tests', () => {
     const callResponse = await callResponsePromise;
     expect(callResponse.ok(), 'The call-next command must succeed for the seeded synthetic queue.').toBe(true);
     const updatedPayload = await updatedSnapshotPromise;
-    const updatedQueue = queueOwnedByDoctor(updatedPayload, selection.doctorId);
-    expect(updatedQueue, 'The selected doctor queue must remain available after call-next.').toBeDefined();
+    const updatedQueue = queueForSelectedDoctor(updatedPayload, selection.doctorId);
+    expect(updatedQueue, 'The selected doctor or routed resource queue must remain available after call-next.').toBeDefined();
 
     const waitingAfter = (updatedQueue?.entries ?? []).filter((entry) => entry.status === 'waiting').length;
     const calledAfter = (updatedQueue?.entries ?? []).filter((entry) => entry.status === 'called').length;

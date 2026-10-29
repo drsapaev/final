@@ -1,4 +1,22 @@
-## Latest checkpoint — PR #3801 review fixes pushed; source CI pass; evidence push pending — 2026-10-29T21:16+05:00
+## Current checkpoint — PR #3801 follow-up P2 fixes validated locally; commit/push pending — 2026-10-29
+
+- Plan version: 1.0
+- Current task: T18 follow-up for the two new PR #3801 review findings
+- Current status: source and local validation PASS; tracked checkpoint, commit, push and exact-head CI remain
+- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
+- Branch: `codex/aqs-t18-queue-system-route-spec`
+- Base commit: `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`
+- PR HEAD before this local follow-up: `8f4d9a8e283716960bef8e790ad73e1f5b5189c5`
+
+- Both new P2 findings are addressed in `frontend/e2e/queue-system.spec.ts`: selected option labels resolve uniquely to the exact specialist ID from the observed available-specialists response; the route must reach that ID and the queue snapshot is awaited before returning the selection. The queue resolver now mirrors `useQueueManager.pickQueueForDoctor`: exact `specialist_id`, then `routing_specialists`.
+- No application/runtime or backend/API code changed. Plan journals are being updated in the same PR.
+- Local validation PASS: scoped ESLint, `tsc --noEmit -p e2e/tsconfig.json`, Playwright collection (6 collected / 0 executed), and frontend build. Build emitted existing third-party Rollup annotation and CSS-property warnings.
+- Current change mode: the scoped gate returned `narrow_override`, no misroute, override used, handoff required; its prompt was read. Basis is the user's direct request to fix these two test-only findings. No gate/router change.
+- Tier-2 remains PARTIAL by the user's direction; named mutating spec, staging, and the full staging validation runbook remain NOT_RUN. No deferral/waiver.
+- PR #3801 remains OPEN / Ready for review; user retains merge.
+- Next exact action: finish the journals, run CRLF-aware `git diff --check` and normal hooks, commit/push this follow-up, verify exact-head CI, then reply to/resolve only the two new addressed review threads and refresh the PR description with verified results.
+
+## Previous checkpoint — PR #3801 review fixes pushed; source CI pass; evidence push pending — 2026-10-29T21:16+05:00
 
 - Plan version: 1.0
 - Current task: T18 bounded `queue-system.spec.ts` review correction
