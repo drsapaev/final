@@ -4955,3 +4955,11 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: only the named E2E spec and plan progress/evidence/resume journals changed locally. No staging, production, live data, other worktree, PR, merge, deployment, or deferral/waiver action occurred. Review threads and user merge authority remain untouched.
 - Remaining limitation: the two other legacy live specs and full docs/runbooks/STAGING_VALIDATION.md remain outstanding. T18 is still PARTIAL, not complete.
 - PR / merge commit: not created / not applicable at this checkpoint.
+
+## T18 — PR #3801 opened — 2026-10-29T17:18+05:00
+
+- PR: https://github.com/drsapaev/final/pull/3801, Draft; title: test(queue): align Registrar queue E2E with canonical route.
+- Exact PR HEAD at creation: bb1e8eaf3d356cd6176f74babf513034365d82f2; base/main: 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1. GitHub reports 2 commits and 4 changed files. CI is pending at this checkpoint; mergeability is not assumed from the creation response.
+- PR body lists only verified local results and clearly marks live Playwright, synthetic staging, and full T18 as NOT_RUN / PARTIAL.
+- PR attached to the current Codex task. User retains merge; no review, merge, deployment, staging, deferral, or waiver action was taken.
+- Next: poll exact-head checks, fix any in-scope failure, update this journal, and leave PR Draft for user disposition.

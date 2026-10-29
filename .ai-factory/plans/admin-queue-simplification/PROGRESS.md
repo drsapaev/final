@@ -2,20 +2,20 @@
 
 Plan version: 1.0
 Current task: T18 bounded Registrar queue-system spec route correction
-Current status: IN_PROGRESS; commit created; PR not created
+Current status: PR_OPEN / Draft; exact-head CI pending
 Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final
 Branch: codex/aqs-t18-queue-system-route-spec
 Base commit: 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1 (origin/main)
-Current code commit: bb28a6c73a96327ef7e0045e5e8ccd90eb06e479
+Current code commit: bb1e8eaf3d356cd6176f74babf513034365d82f2
 Last updated: 2026-10-29T17:16+05:00
 
 - Completed: PR #3800 merged at 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1; freshly fetched origin/main matches this commit. Previous branch/worktree was clean; a new isolated branch was created from this base.
 - Current change: frontend/e2e/queue-system.spec.ts sends all ten scenarios to canonical /registrar/queue instead of /registrar (the worklist), asserts route and actual stats/specialist controls, and removes vacuous console-log fallbacks. This is test-only; live scenarios were not run.
 - Local validation after commit: Playwright collection PASS (10 tests, --list only); scoped ESLint PASS; commit range diff-check PASS. Normal hooks PASS on the successful commit attempt. Full Playwright execution NOT_RUN because this legacy spec creates/changes queue and patient records; build not rerun for this spec-only slice.
 - Gate: gate_known_root_cause returned narrow_override, gate_misroute=true, override_used=true, handoff_required=true; generated prompt was read. User's standing direction to continue T18 while keeping Tier-2 partial is the narrow basis. No gate/router change.
-- Remaining: inspect final diff, commit with normal hooks, push a one-purpose PR, verify exact-head CI, then leave merge to the user. Do not run this mutating live spec or staging; Tier-2 remains PARTIAL, not deferred or complete.
+- PR #3801 is Draft at the exact branch HEAD; confirm exact-head CI and update the journal, then leave merge to the user. Do not run this mutating live spec or staging; Tier-2 remains PARTIAL, not deferred or complete.
 - Blocker: test data prerequisites (at least one doctor and available queue stats) have not been verified against a synthetic environment; execution remains NOT_RUN.
-- Next exact action: finish scope review, commit the focused spec/journal update, push, and monitor exact-head CI.
+- Next exact action: poll PR #3801 checks until terminal; investigate failures only within this test-only scope.
 - Tier-2 disposition: PARTIAL by explicit user instruction; no deferral, waiver, staging, merge, or deployment.
 ## Latest checkpoint — T18 remains PARTIAL by user direction — 2026-10-29T15:35+05:00
 

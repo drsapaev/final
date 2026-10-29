@@ -1,6 +1,6 @@
 ## Latest continuation — PR #3800 merged; T18 queue-system route spec — 2026-10-29T17:12+05:00
 
-Continue task 481fdb95-b9e6-48fd-b813-572932858920 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/aqs-t18-queue-system-route-spec. PR #3800 was merged at 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1; current origin/main and this branch base match that SHA. Do not edit C:\final or another worktree.
+Continue task 481fdb95-b9e6-48fd-b813-572932858920 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/aqs-t18-queue-system-route-spec; Draft PR #3801 is open at exact branch HEAD bb1e8eaf3d356cd6176f74babf513034365d82f2. PR #3800 was merged at 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1; current origin/main and this branch base match that SHA. Do not edit C:\final or another worktree.
 
 User direction: keep Tier-2 PARTIAL and continue the plan; this is not a deferral or waiver. No staging, merge, or deployment is authorized by this checkpoint.
 
@@ -10,7 +10,7 @@ Gate was run as gate_known_root_cause with root frontend/e2e/queue-system.spec.t
 
 Validation after commit bb28a6c73: scoped ESLint PASS; Playwright --list --project=chromium PASS, 10 tests collected and none executed; commit diff-check PASS using core.whitespace=cr-at-eol because this tracked spec uses CRLF; normal commit hooks PASS on the successful retry. Full live Playwright execution is NOT_RUN because the spec writes queue/patient records; no synthetic staging environment was started under the current disposition. Build NOT_RUN for this test-only slice; application source is unchanged. Confirm test prerequisites before any future synthetic execution.
 
-Next exact action: inspect scope/diff, commit with normal hooks, push a one-purpose PR, and verify CI on the exact head. User retains merge. Keep Tier-2 PARTIAL; no deferral, waiver, staging, or claim that T18 is complete. The other two legacy live specs and full docs/runbooks/STAGING_VALIDATION.md remain outstanding.
+Next exact action: verify PR #3801 CI on exact head bb1e8eaf3d356cd6176f74babf513034365d82f2; if checks fail, fix only within the authorized test/journal scope. User retains merge. Keep Tier-2 PARTIAL; no deferral, waiver, staging, or claim that T18 is complete. The other two legacy live specs and full docs/runbooks/STAGING_VALIDATION.md remain outstanding.
 ## Latest continuation — T18 explicitly remains partial; no repeated staging cycle — 2026-10-29T15:35+05:00
 
 Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final` at current `origin/main` `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Do not edit `C:\final` or another worktree.
