@@ -279,7 +279,11 @@ class PatientOtpService:
         if backend.get(cooldown_key) is not None:
             raise PatientOtpError(429, ERR_RATE_LIMITED)
 
-        cap_key = f"{namespace}:cap:{normalized}"
+        cap_key = (
+            f"{_PREFIX}:textbee-staging-cap:{normalized}"
+            if provider_override == "textbee"
+            else f"{namespace}:cap:{normalized}"
+        )
         send_cap = (
             TEXTBEE_STAGING_SEND_CAP
             if provider_override == "textbee"

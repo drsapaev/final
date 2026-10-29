@@ -132,6 +132,13 @@ async def test_staging_textbee_override_is_used_only_for_patient_otp(
     assert err.value.status_code == 429
     assert len(sent) == 1
 
+    # The single-send acceptance limit is shared by login and activation OTPs.
+    svc.get_backend().delete("patact:cd:+998901112233")
+    with pytest.raises(PatientOtpError) as activation_err:
+        await svc.send_activation_otp("+998901112233", "ru")
+    assert activation_err.value.status_code == 429
+    assert len(sent) == 1
+
 
 @pytest.mark.asyncio
 async def test_textbee_patient_otp_override_fails_closed_outside_staging(
