@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { MouseEventHandler, PropsWithChildren } from 'react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
@@ -128,6 +128,59 @@ describe('patient panel public booking requests', () => {
       },
     }));
     expect(screen.getByTestId('booking-route')).not.toHaveTextContent(/request|doctor|cardiology/i);
+  });
+
+  it('distinguishes requests for the same time and keeps each resubmit action on its request', async () => {
+    const firstRequest = { ...pendingRequest, status: 'needs_new_time' as const };
+    const secondRequest = {
+      ...pendingRequest,
+      id: '3d7bdb53-c26e-46ed-81ec-9e7bdebd12ac',
+      service_slug: 'dentistry',
+      doctor_slug: 'doctor-two',
+      status: 'needs_new_time' as const,
+    };
+    listRequests.mockResolvedValueOnce([firstRequest, secondRequest]);
+    const RouteProbe = () => {
+      const location = useLocation();
+      return <output data-testid="booking-route-state">{JSON.stringify(location.state)}</output>;
+    };
+    render(
+      <MemoryRouter initialEntries={['/patient/home']}>
+        <RouteProbe />
+        <PublicBookingRequestsPanel />
+      </MemoryRouter>,
+    );
+
+    const cards = await screen.findAllByTestId('patient-booking-request');
+    expect(cards).toHaveLength(2);
+    expect(within(cards[0]).getByText('publicBookingRequests.serviceCode: cardiology')).toBeInTheDocument();
+    expect(within(cards[0]).getByText('publicBookingRequests.doctorCode: doctor-one')).toBeInTheDocument();
+    expect(within(cards[1]).getByText('publicBookingRequests.serviceCode: dentistry')).toBeInTheDocument();
+    expect(within(cards[1]).getByText('publicBookingRequests.doctorCode: doctor-two')).toBeInTheDocument();
+
+    fireEvent.click(within(cards[0]).getByRole('link', {
+      name: 'publicBookingRequests.chooseAnotherTime',
+    }));
+    expect(screen.getByTestId('booking-route-state')).toHaveTextContent(JSON.stringify({
+      publicBookingResubmit: {
+        requestId: firstRequest.id,
+        expectedVersion: firstRequest.version,
+        serviceSlug: firstRequest.service_slug,
+        doctorSlug: firstRequest.doctor_slug,
+      },
+    }));
+
+    fireEvent.click(within(cards[1]).getByRole('link', {
+      name: 'publicBookingRequests.chooseAnotherTime',
+    }));
+    expect(screen.getByTestId('booking-route-state')).toHaveTextContent(JSON.stringify({
+      publicBookingResubmit: {
+        requestId: secondRequest.id,
+        expectedVersion: secondRequest.version,
+        serviceSlug: secondRequest.service_slug,
+        doctorSlug: secondRequest.doctor_slug,
+      },
+    }));
   });
 
   it('offers retry after the request list fails to load', async () => {

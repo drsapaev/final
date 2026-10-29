@@ -134,6 +134,8 @@ const uzLatn = {
     retry: 'Qayta urinish',
     loadMore: 'Yana ko‘rsatish',
     requestedTime: 'So‘ralgan vaqt',
+    serviceCode: 'Xizmat kodi',
+    doctorCode: 'Shifokor kodi',
     chooseAnotherTime: 'Boshqa vaqtni tanlash',
     status: {
       pending: 'Ko‘rib chiqilmoqda',

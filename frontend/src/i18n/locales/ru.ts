@@ -171,6 +171,8 @@ const ru = {
     retry: 'Повторить',
     loadMore: 'Показать ещё',
     requestedTime: 'Запрошенное время',
+    serviceCode: 'Код услуги',
+    doctorCode: 'Код врача',
     chooseAnotherTime: 'Выбрать другое время',
     status: {
       pending: 'Ожидает проверки',

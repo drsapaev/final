@@ -134,6 +134,8 @@ const en = {
     retry: 'Retry',
     loadMore: 'Show more',
     requestedTime: 'Requested time',
+    serviceCode: 'Service code',
+    doctorCode: 'Doctor code',
     chooseAnotherTime: 'Choose another time',
     status: {
       pending: 'Waiting for review',

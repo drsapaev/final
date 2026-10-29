@@ -134,6 +134,8 @@ const kk = {
     retry: 'Қайталау',
     loadMore: 'Тағы көрсету',
     requestedTime: 'Сұралған уақыт',
+    serviceCode: 'Қызмет коды',
+    doctorCode: 'Дәрігер коды',
     chooseAnotherTime: 'Басқа уақытты таңдау',
     status: {
       pending: 'Қаралуда',

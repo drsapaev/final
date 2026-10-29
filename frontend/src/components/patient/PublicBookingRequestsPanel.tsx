@@ -199,6 +199,12 @@ export default function PublicBookingRequestsPanel() {
                     {t('publicBookingRequests.requestedTime')}: {formatRequestedSlot(item, locale)}
                   </div>
                   <div className="pp-list-item-secondary">
+                    {t('publicBookingRequests.serviceCode')}: {item.service_slug}
+                  </div>
+                  <div className="pp-list-item-secondary">
+                    {t('publicBookingRequests.doctorCode')}: {item.doctor_slug}
+                  </div>
+                  <div className="pp-list-item-secondary">
                     {t(STATUS_HELP_KEYS[item.status])}
                   </div>
                   {item.status === 'needs_new_time' && (

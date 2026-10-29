@@ -138,6 +138,8 @@ const uzCyrl = {
     retry: 'Қайта уриниш',
     loadMore: 'Яна кўрсатиш',
     requestedTime: 'Сўралган вақт',
+    serviceCode: 'Хизмат коди',
+    doctorCode: 'Шифокор коди',
     chooseAnotherTime: 'Бошқа вақтни танлаш',
     status: {
       pending: 'Кўриб чиқилмоқда',
