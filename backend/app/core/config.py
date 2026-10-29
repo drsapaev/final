@@ -418,6 +418,7 @@ class Settings(BaseSettings):
     # sent to frontend builds or enabled by the production provider factory.
     TEXTBEE_API_KEY: str | None = None
     TEXTBEE_DEVICE_ID: str | None = None
+    TEXTBEE_ALLOWED_RECIPIENT: str | None = None
     # Only "textbee" is supported here, and only when ENV=staging.
     PATIENT_OTP_SMS_PROVIDER: str | None = None
 

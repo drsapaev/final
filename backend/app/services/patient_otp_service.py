@@ -59,6 +59,8 @@ CODE_TTL_SECONDS = 300
 MAX_ATTEMPTS = 3
 RESEND_COOLDOWN_SECONDS = 60
 HOURLY_SEND_CAP = 5
+TEXTBEE_STAGING_SEND_CAP = 1
+TEXTBEE_STAGING_SEND_CAP_TTL_SECONDS = 24 * 60 * 60
 GRANT_TTL_SECONDS = 600
 
 LOCALES = ("ru", "uz")
@@ -249,15 +251,6 @@ class PatientOtpService:
             raise PatientOtpError(400, ERR_OTP_INVALID)
         lang = locale if locale in LOCALES else _DEFAULT_LOCALE
 
-        backend = self._get_backend()
-        cooldown_key = f"{namespace}:cd:{normalized}"
-        if backend.get(cooldown_key) is not None:
-            raise PatientOtpError(429, ERR_RATE_LIMITED)
-
-        cap_key = f"{namespace}:cap:{normalized}"
-        if backend.incr_with_ttl(cap_key, 3600) > HOURLY_SEND_CAP:
-            raise PatientOtpError(429, ERR_RATE_LIMITED)
-
         provider_override = (
             (getattr(settings, "PATIENT_OTP_SMS_PROVIDER", None) or "").strip().lower()
         )
@@ -265,10 +258,14 @@ class PatientOtpService:
         if provider_override:
             environment = (settings.ENV or "").strip().lower()
             api_key = (getattr(settings, "TEXTBEE_API_KEY", None) or "").strip()
+            allowed_recipient = (
+                getattr(settings, "TEXTBEE_ALLOWED_RECIPIENT", None) or ""
+            ).strip()
             if (
                 provider_override != "textbee"
                 or environment != "staging"
                 or not api_key
+                or normalize_phone(allowed_recipient) != normalized
             ):
                 logger.error("patient OTP: configured provider override is unavailable")
                 raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
@@ -276,6 +273,25 @@ class PatientOtpService:
             # Owner gate #6: Mock SMS is dev/test-only for patient access.
             logger.error("patient OTP: MockSMSProvider refused outside TESTING")
             raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
+
+        backend = self._get_backend()
+        cooldown_key = f"{namespace}:cd:{normalized}"
+        if backend.get(cooldown_key) is not None:
+            raise PatientOtpError(429, ERR_RATE_LIMITED)
+
+        cap_key = f"{namespace}:cap:{normalized}"
+        send_cap = (
+            TEXTBEE_STAGING_SEND_CAP
+            if provider_override == "textbee"
+            else HOURLY_SEND_CAP
+        )
+        cap_ttl = (
+            TEXTBEE_STAGING_SEND_CAP_TTL_SECONDS
+            if provider_override == "textbee"
+            else 3600
+        )
+        if backend.incr_with_ttl(cap_key, cap_ttl) > send_cap:
+            raise PatientOtpError(429, ERR_RATE_LIMITED)
 
         code = "".join(str(secrets.randbelow(10)) for _ in range(6))
         message = _OTP_MESSAGES[lang].format(code=code)
