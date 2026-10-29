@@ -1,20 +1,26 @@
-## Current checkpoint — PR #3801 follow-up P2 fixes validated locally; commit/push pending — 2026-10-29
+## Current checkpoint — PR #3801 two follow-up P2 fixes pushed; exact source-head CI passed — 2026-10-29T22:22+05:00
 
 - Plan version: 1.0
-- Current task: T18 follow-up for the two new PR #3801 review findings
-- Current status: source and local validation PASS; tracked checkpoint, commit, push and exact-head CI remain
+- Current task: T18 follow-up for review #5701479576 on PR #3801
+- Current status: source fix and validation complete; journal records source-head evidence; PR awaits review/user disposition
 - Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
 - Branch: `codex/aqs-t18-queue-system-route-spec`
 - Base commit: `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`
-- PR HEAD before this local follow-up: `8f4d9a8e283716960bef8e790ad73e1f5b5189c5`
+- PR/source HEAD: `2dcbc06db26ba6c26dd3b635f86abe8242fc31bc`
+- Last updated: `2026-10-29T22:22+05:00`
 
-- Both new P2 findings are addressed in `frontend/e2e/queue-system.spec.ts`: selected option labels resolve uniquely to the exact specialist ID from the observed available-specialists response; the route must reach that ID and the queue snapshot is awaited before returning the selection. The queue resolver now mirrors `useQueueManager.pickQueueForDoctor`: exact `specialist_id`, then `routing_specialists`.
-- No application/runtime or backend/API code changed. Plan journals are being updated in the same PR.
-- Local validation PASS: scoped ESLint, `tsc --noEmit -p e2e/tsconfig.json`, Playwright collection (6 collected / 0 executed), and frontend build. Build emitted existing third-party Rollup annotation and CSS-property warnings.
-- Current change mode: the scoped gate returned `narrow_override`, no misroute, override used, handoff required; its prompt was read. Basis is the user's direct request to fix these two test-only findings. No gate/router change.
-- Tier-2 remains PARTIAL by the user's direction; named mutating spec, staging, and the full staging validation runbook remain NOT_RUN. No deferral/waiver.
-- PR #3801 remains OPEN / Ready for review; user retains merge.
-- Next exact action: finish the journals, run CRLF-aware `git diff --check` and normal hooks, commit/push this follow-up, verify exact-head CI, then reply to/resolve only the two new addressed review threads and refresh the PR description with verified results.
+## Current checkpoint
+- Completed: both review P2s are addressed in `frontend/e2e/queue-system.spec.ts`; exact-head CI run `40917888683` completed successfully. PR is OPEN, Ready for review, and mergeable.
+- Changed but not verified: no outstanding source changes. The named `queue-system.spec.ts` was collected only (6 tests, 0 executed), so its runtime behavior is not verified.
+- Remaining: the named mutating spec is NOT_RUN and Tier-2 remains PARTIAL; the two latest review threads remain unresolved.
+- Blocker: no source blocker. Do not publish a thread reply or resolve a thread without explicit user instruction.
+- Next exact action: no source change is pending. User retains merge; if more work is requested, first check the latest PR HEAD and review state.
+- Checks to rerun after the next source change: scoped E2E lint/type-check, Playwright collection (not execution), build, diff-check and exact-head CI. Do not run the named mutating spec or staging.
+
+- Both P2s are corrected: doctor selection resolves to exactly one ID from the observed available-specialists API response, asserts that exact ID in the route, and waits for the queue snapshot; queue lookup accepts the same per-queue `specialist_id` / `routing_specialists` matches as `useQueueManager.pickQueueForDoctor`.
+- Local validation PASS: scoped ESLint, E2E TypeScript check, Playwright collection (6 collected / 0 executed), frontend build, CRLF-aware diff check, and normal commit hooks. Build showed existing third-party Rollup annotation and CSS-property warnings.
+- Unified CI `40917888683` PASS on the exact source commit `2dcbc06d`: Frontend unit, build, lint, configured E2E job, PR Required Gate, PR Review Quality Gate, Lifecycle, security, CodeQL, gitleaks and scratch guards succeeded. Backend, integration, Docker, readiness, k6, DAST, parity and other path-aware jobs were SKIPPED, not PASS.
+- Tier-2 remains PARTIAL; named live spec, staging and full `STAGING_VALIDATION.md` remain NOT_RUN. No deferral/waiver. No runtime/backend/API change, no merge or deployment; user retains merge.
 
 ## Previous checkpoint — PR #3801 review fixes pushed; source CI pass; evidence push pending — 2026-10-29T21:16+05:00
 
