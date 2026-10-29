@@ -3,6 +3,12 @@
 Plan version: 2.9
 Last updated: 2026-10-04T08:31:13+05:00
 
+## D6 — T18 Tier-2 disposition — 2026-10-29
+
+- **Decision source:** explicit user instruction: keep Tier-2 partial and continue under the existing plan.
+- **Meaning:** preserve T18 as `PARTIAL`; this does not accept a staging deferral, waive the T18 acceptance criteria, complete the plan, or establish production readiness. Existing individual PASS/NOT_RUN evidence remains unchanged.
+- **Execution boundary:** this checkpoint runs no new staging project and does not alter runtime, PR, merge, deployment, or the plan's acceptance criteria. The full `STAGING_VALIDATION.md` remains required before production deployment.
+
 ## Current execution instruction
 
 - **User instruction, 2026-10-01 and 2026-10-03:** “Продолжай реализации плана”, “мержай и продолжай”, and “Я сам мержил. продолжай”. Implementation and sequential PR cycles are authorized. The user confirmed personally merging PR #3576; this does not authorize deployment or activating `QUEUE_POLICY_V2_CREATION_ENABLED`.
@@ -231,3 +237,9 @@ These constraints are taken from `.ai-factory/plans/registrar-queue-remediation/
 - **Impact confirmation:** preview reports linked entity counts, services entering/leaving Department scope, and whether the canonical public selector would restore QR/permanent-address booking. Apply requires explicit confirmations for reported service-scope changes and restored public access.
 - **Preservation:** no service row, queue owner/tag/row, issued number, patient entry/status/time, public address, token, publication flag, or QueueProfile tags are changed. The profile field update and strict audit row are committed atomically.
 - **Out of scope:** no arbitrary parent selection, resolver precedence change, migration, new entity, queue ownership/routing change, provisioning/retirement of addresses, clinical record change, merge, or deployment.
+
+## T18 queue-profile deletion refusal localization — 2026-10-29T15:42+05:00
+
+- Technical implementation choice (not a new product decision): map only the existing delete refusal codes `profile_has_significant_links` and `profile_binding_changed` to localized messages in the single-delete and bulk-delete UI. Preserve the backend contract and deletion/archive behavior; unknown error codes continue to use the existing server-message/fallback behavior.
+- Languages covered: `ru`, `en`, `kk`, `uz-Cyrl`, and `uz-Latn`. The in-use refusal explicitly tells the administrator to archive the profile instead of deleting it.
+- Tier-2 remains `PARTIAL` by user direction. This UI follow-up is not a Tier-2 pass, deferral, waiver, or acceptance of the outstanding live specs.

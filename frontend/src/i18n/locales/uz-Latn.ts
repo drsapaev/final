@@ -3422,6 +3422,8 @@ const uzLatn = {
     qp_delete_confirm_msg: "«{key}» yorligʻini oʻchirilsinmi?",
     qp_delete_confirm_desc: "Bu amal qaytarib boʻlmaydi.",
     qp_delete_error: 'Profilni oʻchirish xatosi',
+    qp_delete_refused_in_use: 'Bu profil ishlatilmoqda. Uni oʻchirish oʻrniga arxivlang.',
+    qp_delete_refused_binding_changed: 'Oʻchirish vaqtida profilning yoʻnalishga bogʻlanishi oʻzgardi. Roʻyxatni yangilab, qayta urinib koʻring.',
     qp_bulk_delete_confirm_msg: '{count} ta yorliq oʻchirilsinmi?',
     qp_bulk_delete_confirm_desc: "Bu amalni bekor qilib bo'lmaydi.",
     qp_bulk_delete_error: 'Ommaviy oʻchirish xatosi',

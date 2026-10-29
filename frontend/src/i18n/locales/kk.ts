@@ -3422,6 +3422,8 @@ const kk = {
     qp_delete_confirm_msg: 'Удалить вкладку «{key}»?',
     qp_delete_confirm_desc: 'Это действие необратимо.',
     qp_delete_error: 'Ошибка удаления профиля',
+    qp_delete_refused_in_use: 'Бұл профиль пайдаланылып жатыр. Оны жоюдың орнына архивке жіберіңіз.',
+    qp_delete_refused_binding_changed: 'Жою кезінде профильдің бағытқа байланысы өзгерді. Тізімді жаңартып, қайта көріңіз.',
     qp_bulk_delete_confirm_msg: 'Удалить {count} вкладок?',
     qp_bulk_delete_confirm_desc: 'Это действие нельзя отменить.',
     qp_bulk_delete_error: 'Ошибка массового удаления',

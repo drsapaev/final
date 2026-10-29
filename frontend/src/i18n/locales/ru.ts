@@ -3547,6 +3547,8 @@ const ru = {
     qp_delete_confirm_msg: 'Удалить вкладку «{key}»?',
     qp_delete_confirm_desc: 'Это действие необратимо.',
     qp_delete_error: 'Ошибка удаления профиля',
+    qp_delete_refused_in_use: 'Профиль используется: архивируйте его (is_active=false) вместо удаления.',
+    qp_delete_refused_binding_changed: 'Привязка направления изменилась во время удаления. Обновите страницу и повторите действие.',
     qp_bulk_delete_confirm_msg: 'Удалить {count} вкладок?',
     qp_bulk_delete_confirm_desc: 'Это действие нельзя отменить.',
     qp_bulk_delete_error: 'Ошибка массового удаления',

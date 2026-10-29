@@ -392,6 +392,62 @@ describe('QueueProfilesManager interactions', () => {
     expect(apiMock.get.mock.calls.filter(([url]) => url.startsWith('/queues/profiles'))).toHaveLength(1);
   });
 
+  it('localizes the single-delete refusal instead of displaying the server message', async () => {
+    const user = userEvent.setup();
+    await i18n.changeLanguage('en');
+    apiMock.delete.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          detail: {
+            reason: 'profile_has_significant_links',
+            message: 'Профиль используется: архивируйте его (is_active=false) вместо удаления.',
+          },
+        },
+      },
+    });
+    render(<ThemeProvider><QueueProfilesManager /></ThemeProvider>);
+
+    const profile = await screen.findByText('Синтетическая активная очередь');
+    const row = profile.closest('tr')!;
+    await user.click(within(row).getByTitle('Удалить'));
+    const confirmation = screen.getByRole('dialog', { name: 'Удаление вкладки очереди' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Удалить' }));
+
+    expect(await screen.findByText('This profile is in use. Archive it instead of deleting it.')).toBeInTheDocument();
+    expect(screen.queryByText('Профиль используется: архивируйте его (is_active=false) вместо удаления.')).not.toBeInTheDocument();
+    expect(apiMock.delete).toHaveBeenCalledExactlyOnceWith('/queues/profiles/synthetic-active');
+  });
+
+  it('localizes the bulk-delete refusal in per-profile results', async () => {
+    const user = userEvent.setup();
+    await i18n.changeLanguage('en');
+    apiMock.delete.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          detail: {
+            reason: 'profile_binding_changed',
+            message: 'Привязка направления изменилась во время удаления. Обновите страницу и повторите действие.',
+          },
+        },
+      },
+    });
+    await renderManager();
+
+    await user.click(screen.getByRole('button', { name: 'Выбрать вкладку Синтетическая активная очередь' }));
+    await user.click(screen.getByRole('button', { name: /^Удалить$/ }));
+    const confirmation = screen.getByRole('dialog', { name: 'Массовое удаление вкладок' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Удалить все' }));
+
+    const results = await screen.findByRole('region', { name: 'Operation results' });
+    const row = within(results).getByRole('listitem');
+    expect(row).toHaveTextContent('synthetic-active');
+    expect(row).toHaveTextContent('The direction binding changed while deleting this profile. Refresh the list and try again.');
+    expect(row).not.toHaveTextContent('Привязка направления изменилась во время удаления.');
+    expect(apiMock.delete).toHaveBeenCalledExactlyOnceWith('/queues/profiles/synthetic-active');
+  });
+
   it('reports each bulk result and retries only the refused profile after rereading current state', async () => {
     const user = userEvent.setup();
     await renderManager();
