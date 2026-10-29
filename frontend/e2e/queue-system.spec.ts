@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 const REGISTRAR_USERNAME = process.env.QA_REGISTRAR_USERNAME || 'registrar@clinic.com';
 const REGISTRAR_QUEUE_PATH = '/registrar/queue';
@@ -9,6 +9,21 @@ function requiredRegistrarPassword() {
     throw new Error('Set QA_REGISTRAR_PASSWORD to run queue system e2e tests.');
   }
   return password;
+}
+
+async function selectFirstAvailableDoctor(page: Page) {
+  const doctorFilter = page.locator('#modern-queue-doctor');
+  await expect(doctorFilter).toBeVisible();
+  await doctorFilter.click();
+
+  // The first option is the prompt; the next option is the first available doctor.
+  const firstDoctor = page.getByRole('option').nth(1);
+  await expect(
+    firstDoctor,
+    'Queue system E2E requires at least one available synthetic doctor; seed a doctor for the Registrar test account.'
+  ).toBeVisible({ timeout: 15_000 });
+  await firstDoctor.click();
+  await expect(page).toHaveURL(/[?&]doctor=[^&]+(?:&|$)/);
 }
 
 test.describe('Queue System Tests', () => {
@@ -224,6 +239,7 @@ test.describe('Queue System Tests', () => {
 
   test('should display queue statistics', async ({ page }) => {
     await page.goto(REGISTRAR_QUEUE_PATH);
+    await selectFirstAvailableDoctor(page);
 
     const statsGrid = page.locator('.mqm-stats-grid');
     await expect(statsGrid).toBeVisible();
@@ -232,15 +248,6 @@ test.describe('Queue System Tests', () => {
 
   test('should handle specialist-specific queues', async ({ page }) => {
     await page.goto(REGISTRAR_QUEUE_PATH);
-
-    const specialistFilter = page.locator('#modern-queue-doctor');
-    await expect(specialistFilter).toBeVisible();
-    await specialistFilter.click();
-
-    // The first option is the prompt; the second is the first available doctor.
-    const firstDoctor = page.getByRole('option').nth(1);
-    await expect(firstDoctor).toBeVisible();
-    await firstDoctor.click();
-    await expect(page).toHaveURL(/[?&]doctor=[^&]+(?:&|$)/);
+    await selectFirstAvailableDoctor(page);
   });
 });
