@@ -1,3 +1,21 @@
+## Latest checkpoint — PR #3801 statistics E2E review fix — 2026-10-29T19:27+05:00
+
+- Plan version: 1.0
+- Current task: T18 bounded `queue-system.spec.ts` review correction
+- Current status: source validation PASS; source fix committed; journal commit and push pending
+- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
+- Branch: `codex/aqs-t18-queue-system-route-spec`
+- Base commit: `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`
+- Source commit: `9cc0cabf8035f4a8b7f577eadc1531770f9fc59c`
+- Last updated: 2026-10-29T19:27+05:00
+
+- Fixed the reviewed P2: the queue statistics E2E now selects a doctor first. The shared helper waits for a real selectable doctor and fails with an explicit synthetic-seed diagnostic if none appears; the specialist-selection test uses the same helper.
+- Local checks on the source change: scoped ESLint PASS; E2E TypeScript check PASS; Playwright collection PASS (10 listed, 0 executed); frontend production build PASS; CRLF-aware `git diff --check` PASS; normal commit hooks PASS.
+- Gate: `gate_known_root_cause` for `frontend/e2e/queue-system.spec.ts` plus the three T18 journals returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`. The generated prompt was read; its first-touch scope was honored. Basis: the user's standing instruction to continue T18 while leaving Tier-2 PARTIAL.
+- PR #3801 is OPEN / Ready for review at previous HEAD `21a1812`; current source commit `9cc0cab` is committed locally and not yet pushed. User retains merge.
+- Tier-2 remains PARTIAL. The live `queue-system.spec.ts` and other remaining live scenarios remain NOT_RUN; the CI E2E pass does not execute this spec. No deferral or waiver is accepted.
+- Next exact action: update this checkpoint/evidence in the same PR branch, push the source and journal commits, then wait for exact-head CI and update the PR description. Do not run staging or the mutating live spec. Do not merge.
+
 ## Latest checkpoint — PR #3800 merged; bounded T18 queue-route spec correction — 2026-10-29T17:12+05:00
 
 Plan version: 1.0

@@ -1,3 +1,13 @@
+## Latest continuation — PR #3801 statistics E2E P2 fixed locally — 2026-10-29T19:27+05:00
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. PR #3801 is OPEN / Ready for review; previously checked HEAD was `21a181222be4916922e80a4a11734accb3d7cb97`, base and `origin/main` are `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`. The user said PR #3801 was merged, but direct GitHub checks still report `merged=false`; do not assume it is merged. The PR was moved from Draft to Ready for review, not merged.
+
+P2 from review #4412761716 is fixed in local source commit `9cc0cabf8035f4a8b7f577eadc1531770f9fc59c`: the statistics test selects a doctor before asserting the stats grid, and the shared selector helper emits a clear synthetic-doctor prerequisite failure. It is reused by the specialist test. Only `frontend/e2e/queue-system.spec.ts` changed in that source commit.
+
+Local validation: scoped ESLint PASS; `tsc --noEmit -p e2e/tsconfig.json` PASS; Playwright collection PASS (10 tests, 0 executed); `npm run build` PASS (existing CSS warnings); `git -c core.whitespace=cr-at-eol diff --check` PASS; commit hooks PASS. The gate returned `narrow_override`, `gate_misroute=false`, `override_used=true`, and `handoff_required=true`; the execution prompt was read. No live spec or staging was run. Tier-2 remains PARTIAL, without deferral/waiver.
+
+Next exact action: include the plan checkpoint/evidence changes, push the same PR branch, verify CI on the exact resulting HEAD, update the PR description with the P2 resolution and truthful NOT_RUN status, then leave merge to the user. Keep `C:\final`, production, staging, other worktrees, and review-thread mutation untouched.
+
 ## Latest continuation — PR #3800 merged; PR #3801 source-head CI passed — 2026-10-29T17:33+05:00
 
 Continue task 481fdb95-b9e6-48fd-b813-572932858920 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/aqs-t18-queue-system-route-spec. PR #3800 is merged at 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1; this branch is based on that fresh origin/main. Draft PR #3801 is open; source commit is bb28a6c73a96327ef7e0045e5e8ccd90eb06e479. PR head ac02dc2798a74fa4b27f972259cc66ba1fbf4aba differs only by checkpoint documentation commits after the source patch.

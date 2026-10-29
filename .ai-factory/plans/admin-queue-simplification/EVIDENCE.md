@@ -1,3 +1,18 @@
+## T18 — PR #3801 statistics E2E P2 correction — 2026-10-29T19:27+05:00
+
+- Commit under test: source commit `9cc0cabf8035f4a8b7f577eadc1531770f9fc59c`, based on PR HEAD `21a181222be4916922e80a4a11734accb3d7cb97`.
+- Environment: Windows PowerShell; isolated worktree `aqs-t18-live-specs`; branch `codex/aqs-t18-queue-system-route-spec`.
+- Execution mode: `gate_known_root_cause`. Gate result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt inspected. User's standing T18 instruction is the narrow basis. No gate/router changes.
+- Allowed paths: `frontend/e2e/queue-system.spec.ts`; `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md` for this plan. Denied: runtime/backend/API/DB/route/RBAC, staging/Compose/WSL, production/deploy, other worktrees, live execution of the mutating spec, merge.
+- Actual source path changed: `frontend/e2e/queue-system.spec.ts`. The statistics test now selects a doctor before checking the statistics grid; the shared helper waits for a selectable option and reports the synthetic doctor seed requirement. The specialist test reuses it.
+- Original failure: the test opened `/registrar/queue` without a doctor. `QueueView` passes an empty selection, and `ModernQueueManager` hides statistics until a doctor-specific queue snapshot loads.
+- Validation commands: `npm.cmd exec -- eslint e2e/queue-system.spec.ts`; `npm.cmd exec -- tsc --noEmit -p e2e/tsconfig.json`; `npm.cmd exec -- playwright test e2e/queue-system.spec.ts --list --project=chromium`; `npm.cmd run build`; `git -c core.whitespace=cr-at-eol diff --check`; normal commit hooks.
+- Result: all listed local validations PASS; Playwright collected 10 tests, 0 executed. Frontend build completed; only existing dependency/CSS warnings were emitted. Exact-head hosted CI for the new source commit is pending push; prior HEAD checks do not cover this fix.
+- Scope check: source delta is test-only; no application/runtime behavior changed. No staging, production, or patient data was used. No merge or review-thread update was performed.
+- Remaining limitation: the live `queue-system.spec.ts`, other remaining live scenarios, and full `docs/runbooks/STAGING_VALIDATION.md` remain NOT_RUN. Tier-2 stays PARTIAL by user direction; no deferral/waiver.
+- PR: `https://github.com/drsapaev/final/pull/3801` (OPEN / Ready for review at the last check).
+- Merge commit: none; user retains merge.
+
 ## Latest checkpoint — T17 first staging attempt cleaned; retry plan tightened — 2026-10-20T13:33:21+05:00
 
 - PR #3721 remains Draft at exact HEAD 1c3007c590d98ea6ce15a1c7358ceebbf86d410; base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43. Exact-head Tier 1 PASS; local check-theme PASS.
