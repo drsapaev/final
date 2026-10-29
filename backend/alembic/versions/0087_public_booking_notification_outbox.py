@@ -6,7 +6,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0087_public_booking_notification_outbox"
+revision = "0087_booking_notification_outbox"
 down_revision = "0086_public_booking_confirm"
 branch_labels = None
 depends_on = None

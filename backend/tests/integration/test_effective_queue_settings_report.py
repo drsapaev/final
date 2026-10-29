@@ -550,7 +550,7 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    assert revision == "0087_public_booking_notification_outbox"
+    assert revision == "0087_booking_notification_outbox"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",
