@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   createPublicBookingIdempotencyKey,
   createPatientPublicBookingRequest,
@@ -733,9 +733,13 @@ export default function PatientBookingPage() {
           <span className="public-site__brand-mark" aria-hidden="true">K</span>
           <span>Doktor KosMed Clinic</span>
         </a>
-        <a className="public-site__language" href={getPublicBookingPath(locale === 'ru' ? 'uz-Latn' : 'ru')}>
+        <Link
+          className="public-site__language"
+          to={getPublicBookingPath(locale === 'ru' ? 'uz-Latn' : 'ru')}
+          state={location.state}
+        >
           {copy.switchLanguage}
-        </a>
+        </Link>
       </header>
       <main id="main-content" lang={locale} className="public-site__main public-site__section" tabIndex={-1}>
         <h1>{copy.title}</h1>

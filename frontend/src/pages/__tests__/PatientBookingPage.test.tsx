@@ -176,6 +176,28 @@ describe('PatientBookingPage', () => {
     expect(mockedCreateRequest).not.toHaveBeenCalled();
   });
 
+  it('preserves the original request when the patient switches booking language', async () => {
+    const requestId = '3d7bdb53-c26e-46ed-81ec-9e7bdebd12ab';
+    renderPage('/ru/booking', {
+      publicBookingResubmit: {
+        requestId,
+        expectedVersion: 4,
+        serviceSlug: 'cardiology',
+        doctorSlug: 'doctor-one',
+      },
+    });
+
+    fireEvent.click(await screen.findByRole('link', { name: 'O‘zbekcha' }));
+    fireEvent.change(await screen.findByLabelText('Sana'), { target: { value: todayInTashkent() } });
+    fireEvent.click(await screen.findByLabelText('09:00'));
+    fireEvent.click(screen.getByRole('button', { name: 'Yangi vaqtni yuborish' }));
+
+    await waitFor(() => expect(mockedResubmitRequest).toHaveBeenCalledTimes(1));
+    expect(mockedResubmitRequest.mock.calls[0][0]).toBe(requestId);
+    expect(mockedResubmitRequest.mock.calls[0][1].expected_version).toBe(4);
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+  });
+
   it('fails closed when the resubmit handoff has expired', async () => {
     renderPage('/ru/booking', {
       publicBookingResubmitRequired: true,

@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
 from datetime import UTC, datetime, time, timedelta
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi import Request, Response
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+import app.api.v1.endpoints.patient_portal as patient_portal
 from app.models.appointment import Appointment
 from app.models.clinic import ClinicSettings, Doctor, Schedule
 from app.models.department import Department
@@ -21,6 +26,10 @@ from app.models.public_booking_request import (
 )
 from app.models.service import Service
 from app.models.user import User
+from app.schemas.public_booking_request import (
+    PublicBookingRequestCreate,
+    PublicBookingRequestResubmit,
+)
 from app.services.public_booking_availability import PUBLIC_BOOKING_TIMEZONE
 from app.services.public_booking_request_service import (
     PublicBookingRequestError,
@@ -171,6 +180,114 @@ def _confirm_request(
         headers={"Authorization": f"Bearer {registrar_token}"},
         json={"expected_version": version},
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["create", "resubmit"])
+async def test_booking_request_database_work_does_not_block_event_loop(
+    operation: str, monkeypatch: pytest.MonkeyPatch
+):
+    request_id = uuid4()
+    operation_started = threading.Event()
+    release_operation = threading.Event()
+
+    def blocking_write(*args, **kwargs):
+        operation_started.set()
+        if not release_operation.wait(timeout=1):
+            raise AssertionError("the booking database call blocked the event loop")
+        return SimpleNamespace(id=request_id, version=2)
+
+    monkeypatch.setattr(
+        patient_portal, "_require_patient_audited", lambda *args, **kwargs: 321
+    )
+    monkeypatch.setattr(patient_portal, "log_patient_access", lambda **kwargs: None)
+    monkeypatch.setattr(
+        PublicBookingRequestService, "create_for_patient", blocking_write
+    )
+    monkeypatch.setattr(
+        PublicBookingRequestService, "resubmit_for_patient", blocking_write
+    )
+
+    async def notify_without_io(self, **kwargs):
+        return True
+
+    monkeypatch.setattr(
+        patient_portal.RegistrarNotificationService,
+        "notify_public_booking_request",
+        notify_without_io,
+    )
+
+    path = (
+        f"{PATIENT_REQUESTS}/{request_id}/resubmit"
+        if operation == "resubmit"
+        else PATIENT_REQUESTS
+    )
+    request = Request(
+        {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": path,
+            "raw_path": path.encode("ascii"),
+            "query_string": b"",
+            "headers": [],
+            "server": ("testserver", 80),
+            "client": ("testclient", 123),
+        }
+    )
+    response = Response()
+    current_user = SimpleNamespace(id=12)
+    target_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+
+    async def release_after_event_loop_yields() -> bool:
+        assert await asyncio.to_thread(operation_started.wait, 1)
+        await asyncio.sleep(0.01)
+        event_loop_remained_responsive = not release_operation.is_set()
+        release_operation.set()
+        return event_loop_remained_responsive
+
+    release_task = asyncio.create_task(release_after_event_loop_yields())
+    if operation == "create":
+        result = await asyncio.wait_for(
+            patient_portal.create_patient_public_booking_request(
+                PublicBookingRequestCreate(
+                    service_slug="service",
+                    doctor_slug="doctor",
+                    appointment_date=target_date,
+                    appointment_time=time(9),
+                    expected_settings_version=1,
+                ),
+                request,
+                response,
+                "event-loop-test-key",
+                object(),
+                current_user,
+            ),
+            timeout=2,
+        )
+    else:
+        result = await asyncio.wait_for(
+            patient_portal.resubmit_patient_public_booking_request(
+                request_id,
+                PublicBookingRequestResubmit(
+                    expected_version=1,
+                    appointment_date=target_date,
+                    appointment_time=time(9),
+                    expected_settings_version=1,
+                ),
+                request,
+                response,
+                "event-loop-test-key",
+                object(),
+                current_user,
+            ),
+            timeout=2,
+        )
+
+    assert await release_task
+    assert result.id == request_id
 
 
 @pytest.mark.integration
