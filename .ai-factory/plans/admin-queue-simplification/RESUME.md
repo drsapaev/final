@@ -1,3 +1,17 @@
+## Latest continuation — T18 explicitly remains partial; no repeated staging cycle — 2026-10-29T15:35+05:00
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final` at current `origin/main` `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Do not edit `C:\final` or another worktree.
+
+The user directed that Tier-2 remain `PARTIAL` while continuing the plan. This is not a deferral/waiver and does not satisfy T18 or the full pre-deployment runbook. T01–T17 are merged; T18 is the final planned task. Do not invent a T19 or repeatedly rebuild staging.
+
+Read-only route review found only additive `/booking` and `/ru/booking` routes since `ff0f03b9`; Admin queue route contracts are unchanged. The existing source tests cover the four legacy Admin entry points and queue-profile query/history navigation, but were not executed here. Vitest/build are `NOT_RUN` because this worktree has no local `node_modules`; no staging was started. GitHub status lookup returned only Vercel and no PR workflow run, so no CI claim is made.
+
+PR #3790 (`fix(queue): preserve Registrar doctor selection`) is confirmed merged at `17c0a6b6`, and that merge is an ancestor of current main. Its exact-head Unified CI `40476497527` passed applicable frontend checks; backend/integration/staging jobs were skipped. Do not repeat its tests or treat it as T18 Tier-2 completion.
+
+The documentation gate for this checkpoint returned `narrow_override` with `gate_misroute=true`, `override_used=true`, `handoff_required=true`; the generated prompt was read and its first-touch list matched the four plan journals. User instruction provides the narrow scope basis. No runtime/code/gate/PR change occurred.
+
+Next: preserve existing PASS/NOT_RUN evidence, do not rerun already-passed staging scenarios, and continue only for a distinct bounded T18 acceptance gap. Keep `docs/runbooks/STAGING_VALIDATION.md` outstanding until its actual pre-deployment execution.
+
 ## Latest continuation — PR #3763 acceptance complete; final evidence and Ready next — 2026-10-24T15:18+05:00
 
 Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-parent-repair\final`, branch `codex/aqs-t18-parent-conflict-repair`. Tested source is pushed HEAD `7910963be23c6ebef3a9f70a1c29a9b45c7b9a84`; fresh main `b055a48bfe9b18120ec664918ae13f34b547ba9b` was merged without rewriting history. Its delta from the earlier source is four evidence files plus five already-merged frontend dependency updates; backend/frontend source is identical.
@@ -1320,3 +1334,29 @@ Gate: selected `advisory_gate` for a client-only update. Two `run_agent_gate.ps1
 Validation so far: backend canonicalization output, locale key parity (10,550 keys per locale), and `git diff --check` PASS. Focused Vitest could not execute: no worktree `node_modules`; reusing the main checkout’s Vitest binary failed to resolve `vitest/config`. Frontend build, lint and type-check are NOT_RUN. Exact-head CI on this patch is still required. The local changes are not committed/pushed yet; review threads were not replied to/resolved and no merge or deployment occurred.
 
 Next: inspect the final diff, commit with normal hooks, push this branch to PR #3721, and wait for exact-head CI. Keep both review threads open until the reviewer/user resolves them. User retains merge; do not start T18 before PR #3721 is merged.
+
+## Latest continuation — T18 localized deletion refusals; Tier-2 remains partial — 2026-10-29T15:42+05:00
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-localize-profile-delete-refusals`, based on fresh `origin/main` `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Do not modify `C:\final` or another worktree.
+
+A bounded T18 UI defect was confirmed: QueueProfile delete 409s expose stable reasons `profile_has_significant_links` and `profile_binding_changed`, while the UI showed the backend's Russian message verbatim in other languages. The current diff maps only these reasons to localized messages for single and bulk deletion across RU, EN, KK, Uzbek Cyrillic and Uzbek Latin. Unknown errors keep their existing server-message/fallback behavior; deletion policy and API are unchanged.
+
+Gate: `gate_known_root_cause`, exact source `QueueProfilesManager.tsx`; result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt read. First-touch scope is the component, its focused test, five locale files and four plan journals. The user directed continuing the plan while keeping Tier-2 partial. No gate/router edits.
+
+Validation: `git diff --check` and TypeScript 6.0.3 syntax parsing of the changed TS/TSX files PASS. Focused Vitest and build are `NOT_RUN`: this worktree lacks dependencies, and `C:\final` has Vitest 3.2.7 while the current lockfile specifies 5.0.3. No dependencies were installed or shared dependency link created. No staging cycle was run.
+
+Next: inspect the final diff, commit with normal hooks, push and open one PR, then use exact-head CI for the regression tests and build. Update the journal with the actual CI outcome. Keep Tier-2 `PARTIAL`; the three legacy live specs and full `docs/runbooks/STAGING_VALIDATION.md` remain outstanding. No merge or deployment.
+
+## Latest continuation — locale catalogs confirmed canonical; exact-head CI next — 2026-10-29T15:44+05:00
+
+The 409 deletion-message patch remains limited to the component, focused UI test, five active locale `.ts` files, and four plan journals. The apparent generator header is stale: no `ru.js` or generator script is tracked; `ru.ts` is the base catalog; `validate_locales.py` prefers `.ts`; PR #3780 previously edited locale `.ts` directly.
+
+`validate_locales.py --strict` PASS with `PYTHONUTF8=1` (10,709 keys each). TypeScript syntax parse and the static key check PASS. Focused Vitest/build are NOT_RUN because this worktree has no dependencies and the only installed Vitest is an incompatible version from `C:\final`; exact-head CI is pending. No staging run, dependency installation, or shared link.
+
+Next: review staged diff, commit with normal hooks, push and open one PR; then use exact-head CI for the focused tests/build. Keep Tier-2 PARTIAL with no deferral and do not start staging.
+
+## Latest continuation — focused tests/build passed; commit hook retry — 2026-10-29T15:49+05:00
+
+This branch now has an exact lockfile dependency install in its own worktree. The focused `QueueProfilesManager.interactions.test.tsx` suite passed 20/20, and `npm run build` passed. Locale key parity and static syntax checks also passed. Vite reported CSS-property and upstream Rollup annotation warnings; no build errors.
+
+The first commit attempt failed only because ESLint dependencies were absent. Nothing was bypassed. Rerun the normal commit hook now that `npm ci` completed; then inspect and push the branch, create one PR, and await exact-head CI. Keep all generated dependencies/artifacts in this worktree and clean them after the PR verification if safe. Do not run staging: user directed Tier-2 to stay PARTIAL with no deferral.

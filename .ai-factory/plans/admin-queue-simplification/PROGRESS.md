@@ -1,3 +1,14 @@
+## Latest checkpoint — T18 remains PARTIAL by user direction — 2026-10-29T15:35+05:00
+
+- Task memory: `481fdb95-b9e6-48fd-b813-572932858920`. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`; detached HEAD and `origin/main` both `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Tracked tree was clean before this journal update.
+- User decision: keep T18 Tier-2 `PARTIAL` and continue under the existing plan. This is not an accepted deferral, waiver, T18 completion, production-readiness statement, or permission to merge/deploy. No new staging cycle was run in this checkpoint.
+- Source-only T18 route review: diff from `ff0f03b9bb690d15eb751ceb96396056f08d2253` to current main adds patient-facing `/booking` and `/ru/booking`; no Admin queue route changed. Existing source tests still describe `/admin/setup-directions`, `/admin/queue-settings`, `/admin/queue-cabinet-management`, and the `/admin/services?servicesTab=queue-profiles` navigation/history path. This does not prove the tests ran.
+- Current T18 code follow-up: PR #3790 (`fix(queue): preserve Registrar doctor selection`) merged 2026-10-27 at merge `17c0a6b694cd8150e918f026baae78ab5d2e1317`; the merge is an ancestor of this worktree's current main. Its exact-head Unified CI run `40476497527` passed applicable frontend unit/E2E/build/lint/type-check, parity, PR Required Gate, and notifications. Path-aware backend, Docker, integration and staging checks were skipped; this is not Tier-2 proof.
+- Execution mode: `gate_known_root_cause`; owner is this plan's status journal. The gate returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; the exact first-touch list contained only these four journals and the generated prompt was read. The user's explicit instruction is the narrow human basis. No source, gate/router, PR, or runtime path was changed.
+- Validation: source diff and test-source review only. Focused Vitest/build `NOT_RUN` because this clean worktree has no local Vitest/`node_modules`; staging `NOT_RUN`. GitHub status lookup exposed only a Vercel status and no PR workflow run for this SHA, so it is not recorded as CI PASS.
+- Current plan position: T01–T17 are merged; T18 is the final plan task and remains partial. The three legacy live specs and full `docs/runbooks/STAGING_VALIDATION.md` remain outstanding; no T19 exists in this plan.
+- Next exact action: do not repeat already-passed staging scenarios or start another Compose cycle just for the additive public-booking routes. Continue only against a distinct, bounded T18 gap; retain the full runbook as a separate pre-deployment gate.
+
 ## Latest checkpoint — T18 parent repair and recurring Admin TOTP PASS — 2026-10-24T15:18+05:00
 
 - Task memory: `481fdb95-b9e6-48fd-b813-572932858920`. Worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-parent-repair\final`, branch `codex/aqs-t18-parent-conflict-repair`; tested source is `7910963be23c6ebef3a9f70a1c29a9b45c7b9a84`, containing a history-preserving merge of fresh main `b055a48bfe9b18120ec664918ae13f34b547ba9b` and its five frontend dependency updates.
@@ -1777,3 +1788,36 @@ Last updated: 2026-10-08T21:45+05:00
 - Temporary junction to `C:\final\frontend\node_modules` was removed after each command by verifying its Junction type and target; the build scratch directory is absent. Shared dependencies were not changed.
 - Gate: initial mandatory gate stopped requesting confirmed root cause; one `--known-root-cause` retry returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. Prompt read; basis is the user's exact review finding and narrow prescribed remedy. See pre-edit checkpoint below. No gate/router edits.
 - Next exact action: push the committed T15 fix, then verify exact-head CI. Do not touch review threads, stage, deploy, merge, or begin T16.
+
+## Latest checkpoint — T18 localized QueueProfile delete refusals — 2026-10-29T15:42+05:00
+
+Plan version: 1.0
+Current task: T18 bounded UI follow-up
+Current status: IN_PROGRESS
+Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
+Branch: `codex/aqs-t18-localize-profile-delete-refusals`
+Base commit: `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`
+Current commit: local changes on that base; not committed
+Last updated: 2026-10-29T15:42:19+05:00
+
+- Completed: confirmed the two backend delete refusal reason codes; localized single and bulk delete messages in five locales; added English UI regression coverage for both paths; TypeScript syntax parse and `git diff --check` pass.
+- Changed but not verified: focused Vitest and frontend build; no compatible local dependency tree is present. Exact-head CI has not started because the PR is not yet created.
+- Remaining: inspect final diff, commit and push the narrow patch, open one PR, verify its exact-head CI, and update this checkpoint with the actual CI outcome.
+- Blocker: local focused test is unavailable without installing dependencies; use exact-head CI rather than the incompatible Vitest 3.2.7 present in `C:\final` (lockfile requires 5.0.3).
+- Next exact action: final scope/diff review and normal-hook commit; then push/create the PR and wait for exact-head checks. Do not start another staging cycle.
+- Tier-2 disposition: `PARTIAL`, no deferral accepted. Full `STAGING_VALIDATION.md` and three legacy live specs remain outstanding.
+
+## T18 — localization validation checkpoint — 2026-10-29T15:44+05:00
+
+- Canonical-source ambiguity resolved from tracked files: the active locale catalogs are the five `.ts` files; the historical `ru.js` and generator do not exist. `validate_locales.py` prefers `.ts`; recent changes in PR #3780 use these same files.
+- Local validation now includes `scripts/i18n/validate_locales.py --strict` with UTF-8 mode: PASS, 10,709 keys in each locale. TypeScript syntax parse and AST key-presence checks also PASS; `git diff --check` PASS.
+- Focused Vitest and build remain NOT_RUN due missing compatible worktree dependencies. No dependency install or shared `node_modules` link was made.
+- Next exact action remains final staged-scope review, normal-hook commit, push/open one PR, then exact-head CI. No staging cycle.
+
+## Latest checkpoint — T18 focused tests/build PASS; normal hook next — 2026-10-29T15:49+05:00
+
+- Focused QueueProfilesManager interactions: PASS, 20/20 tests on locked Vitest 5.0.3.
+- Frontend build: PASS; Vite emitted existing dependency/CSS warnings only.
+- Locale parity: PASS, 10,709 keys in each locale; syntax and new-key checks PASS.
+- First commit attempt stopped at ESLint due missing worktree dependencies. No checks were bypassed. Exact `npm ci` has now installed dependencies in this worktree; normal hooks will be rerun.
+- Remaining: normal-hook commit, push/open one PR, exact-head hosted CI, then report current evidence. No staging cycle; Tier-2 remains PARTIAL.
