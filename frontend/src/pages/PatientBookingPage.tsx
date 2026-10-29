@@ -9,12 +9,16 @@ import {
   getPublicBookingErrorCode,
   getPublicBookingOptions,
   getPublicBookingPath,
+  hasPublicBookingResubmitHandoff,
+  getPublicBookingResubmitHandoffLocale,
   isUnknownPublicBookingOutcome,
+  PUBLIC_BOOKING_SELECTION_TTL_MS,
   savePublicBookingSelection,
   takePendingPublicBookingResume,
   type PublicBookingAvailability,
   type PublicBookingLocale,
   type PublicBookingOptions,
+  type PublicBookingResubmitSelection,
   type PublicBookingRequestBody,
   type PublicBookingRequestResubmitBody,
 } from '../api/publicBooking';
@@ -61,6 +65,7 @@ type Copy = {
   requestUnknown: string;
   requestFailed: string;
   retrySame: string;
+  resubmitContextExpired: string;
   contact: string;
   home: string;
   switchLanguage: string;
@@ -108,6 +113,7 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     requestUnknown: 'Не удалось подтвердить результат отправки. Чтобы избежать дубликата, повтор можно выполнить только для той же заявки.',
     requestFailed: 'Не удалось безопасно проверить заявку. Не отправляйте её повторно; свяжитесь с регистратором.',
     retrySame: 'Повторно проверить ту же заявку',
+    resubmitContextExpired: 'Данные для изменения прежней заявки устарели или потеряны. Откройте её в личном кабинете и начните выбор времени заново.',
     contact: 'Связаться с клиникой',
     home: 'На главную',
     switchLanguage: 'O‘zbekcha',
@@ -153,6 +159,7 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     requestUnknown: 'Yuborish natijasini tasdiqlab bo‘lmadi. Takroriy so‘rovni oldini olish uchun faqat ayni so‘rovni qayta tekshirish mumkin.',
     requestFailed: 'So‘rovni xavfsiz tekshirib bo‘lmadi. Uni qayta yubormang; registrator bilan bog‘laning.',
     retrySame: 'Ayni so‘rovni qayta tekshirish',
+    resubmitContextExpired: 'Avvalgi so‘rovni o‘zgartirish ma’lumotlari eskirgan yoki yo‘qolgan. Bemor kabinetida so‘rovni ochib, vaqt tanlashni qaytadan boshlang.',
     contact: 'Klinika bilan bog‘lanish',
     home: 'Bosh sahifa',
     switchLanguage: 'Русский',
@@ -207,12 +214,20 @@ type PatientBookingAttempt =
     key: string;
   };
 
-function getPatientBookingResubmitContext(state: unknown): PatientBookingResubmitContext | null {
+function getPatientBookingResubmitContext(state: unknown, now = Date.now()): PatientBookingResubmitContext | null {
   if (!state || typeof state !== 'object') return null;
   const value = (state as { publicBookingResubmit?: unknown }).publicBookingResubmit;
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<PatientBookingResubmitContext>;
   const expectedVersion = candidate.expectedVersion;
+  const isHandoff = hasPublicBookingResubmitHandoff(state);
+  const createdAt = (candidate as typeof candidate & { createdAt?: unknown }).createdAt;
+  if (isHandoff && (getPublicBookingResubmitHandoffLocale(state) === null
+    || typeof createdAt !== 'number'
+    || !Number.isSafeInteger(createdAt)
+    || createdAt <= 0
+    || now < createdAt
+    || now - createdAt > PUBLIC_BOOKING_SELECTION_TTL_MS)) return null;
   if (typeof candidate.requestId !== 'string'
     || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate.requestId)
     || typeof expectedVersion !== 'number'
@@ -233,8 +248,9 @@ function getPatientBookingResubmitContext(state: unknown): PatientBookingResubmi
 }
 
 function hasPatientBookingResubmitState(state: unknown): boolean {
-  return Boolean(state && typeof state === 'object'
-    && Object.prototype.hasOwnProperty.call(state, 'publicBookingResubmit'));
+  return hasPublicBookingResubmitHandoff(state)
+    || Boolean(state && typeof state === 'object'
+      && Object.prototype.hasOwnProperty.call(state, 'publicBookingResubmit'));
 }
 
 function getErrorMessage(code: string | null, copy: Copy): string {
@@ -255,12 +271,19 @@ function getErrorMessage(code: string | null, copy: Copy): string {
 export default function PatientBookingPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const resubmitContext = getPatientBookingResubmitContext(location.state);
-  const hasResubmitNavigationState = hasPatientBookingResubmitState(location.state);
+  const routeResubmitContext = getPatientBookingResubmitContext(location.state);
+  const hasRouteResubmitState = hasPatientBookingResubmitState(location.state);
   const locale: PublicBookingLocale = location.pathname.startsWith('/ru/') ? 'ru' : 'uz-Latn';
   const copy = COPY[locale];
   const [resume, setResume] = useState<ReturnType<typeof takePendingPublicBookingResume>>(null);
   const [resumeLoaded, setResumeLoaded] = useState(false);
+  const resumedResubmitContext = resume?.kind === 'selection' && resume.selection.resubmit
+    ? resume.selection.resubmit
+    : null;
+  const resubmitContext = routeResubmitContext ?? resumedResubmitContext;
+  const hasResubmitNavigationState = hasRouteResubmitState
+    || Boolean(resumedResubmitContext)
+    || Boolean(resume?.kind === 'expired' && resume.resubmitRequired);
   const [options, setOptions] = useState<PublicBookingOptions | null>(null);
   const [availability, setAvailability] = useState<PublicBookingAvailability | null>(null);
   const [optionsLoading, setOptionsLoading] = useState(true);
@@ -423,6 +446,7 @@ export default function PatientBookingPage() {
 
   const saveSelectionAndNavigate = (path: string) => {
     if (!serviceSlug || !doctorSlug || !date || !time || !options) return;
+    const createdAt = Date.now();
     savePublicBookingSelection({
       locale,
       serviceSlug,
@@ -430,9 +454,27 @@ export default function PatientBookingPage() {
       date,
       time,
       settingsVersion: availability?.settings_version ?? options.settings_version,
-      createdAt: Date.now(),
+      createdAt,
+      ...(resubmitContext ? {
+        resubmit: {
+          requestId: resubmitContext.requestId,
+          expectedVersion: resubmitContext.expectedVersion,
+          serviceSlug: resubmitContext.serviceSlug,
+          doctorSlug: resubmitContext.doctorSlug,
+        } satisfies PublicBookingResubmitSelection,
+      } : {}),
     });
-    navigate(path);
+    if (resubmitContext) {
+      navigate(path, {
+        state: {
+          publicBookingResubmitRequired: true,
+          publicBookingLocale: locale,
+          publicBookingResubmit: { ...resubmitContext, locale, createdAt },
+        },
+      });
+    } else {
+      navigate(path);
+    }
   };
 
   const sendAttempt = async (attempt: PatientBookingAttempt) => {
@@ -499,6 +541,13 @@ export default function PatientBookingPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
+    if (hasResubmitNavigationState
+      && (!resubmitContext
+        || (hasPublicBookingResubmitHandoff(location.state)
+          && !getPatientBookingResubmitContext(location.state)))) {
+      setError(copy.resubmitContextExpired);
+      return;
+    }
     if (unknownOutcome && attemptRef.current) {
       await sendAttempt(attemptRef.current);
       return;
@@ -716,6 +765,7 @@ export default function PatientBookingPage() {
         {!optionsLoading && hasResubmitNavigationState && !resubmitContext ? (
           <section className="public-site__section" role="alert">
             <h2>{copy.unavailable}</h2>
+            <p>{copy.resubmitContextExpired}</p>
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
           </section>
         ) : null}

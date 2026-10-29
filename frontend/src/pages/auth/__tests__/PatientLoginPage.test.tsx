@@ -1,10 +1,13 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '../../../contexts/ThemeContext';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import PatientLoginPage from '../PatientLoginPage';
+import PatientBookingPage from '../../PatientBookingPage';
+
+const authState = vi.hoisted(() => ({ current: { token: null as string | null, profile: null as Record<string, unknown> | null } }));
 
 vi.mock('../../../api/patientAccess', () => ({
   requestPatientOtp: vi.fn(),
@@ -21,16 +24,27 @@ vi.mock('../../../api/client', () => ({
 }));
 
 vi.mock('../../../stores/auth', () => ({
+  getState: vi.fn(() => authState.current),
   setToken: vi.fn(),
   setProfile: vi.fn(),
   clearToken: vi.fn(),
-  replaceAccessOnlySession: vi.fn(),
+  replaceAccessOnlySession: vi.fn((token: string, profile: Record<string, unknown>) => {
+    authState.current = { token, profile };
+  }),
 }));
 
-vi.mock('../../../api/publicBooking', () => ({
-  getPendingPublicBookingLocale: vi.fn(() => null),
-  getPublicBookingPath: (locale: string) => locale === 'ru' ? '/ru/booking' : '/booking',
-}));
+vi.mock('../../../api/publicBooking', async () => {
+  const actual = await vi.importActual<typeof import('../../../api/publicBooking')>('../../../api/publicBooking');
+  return {
+    ...actual,
+    getPendingPublicBookingLocale: vi.fn(() => null),
+    getPublicBookingOptions: vi.fn(),
+    getPublicBookingAvailability: vi.fn(),
+    createPatientPublicBookingRequest: vi.fn(),
+    resubmitPatientPublicBookingRequest: vi.fn(),
+    getPublicBookingPath: (locale: string) => locale === 'ru' ? '/ru/booking' : '/booking',
+  };
+});
 
 vi.mock('../../../i18n/useTranslation', () => ({
   useTranslation: () => ({
@@ -49,22 +63,46 @@ import {
 } from '../../../api/patientAccess';
 import { ensureCSRFToken } from '../../../api/client';
 import { replaceAccessOnlySession, setProfile, setToken } from '../../../stores/auth';
-import { getPendingPublicBookingLocale } from '../../../api/publicBooking';
+import {
+  clearPendingPublicBookingSelection,
+  createPatientPublicBookingRequest,
+  getPendingPublicBookingLocale,
+  getPublicBookingAvailability,
+  getPublicBookingOptions,
+  resubmitPatientPublicBookingRequest,
+} from '../../../api/publicBooking';
 
 const mockedRequestOtp = vi.mocked(requestPatientOtp);
 const mockedVerifyOtp = vi.mocked(verifyPatientOtp);
 const mockedPatientLogin = vi.mocked(patientLogin);
 
-function renderPage() {
+function todayInTashkent() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tashkent', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function renderPage(initialEntry: string | { pathname: string; state?: unknown } = '/patient/login') {
   const LocationProbe = () => {
     const location = useLocation();
-    return <output data-testid="current-path">{location.pathname}</output>;
+    return (
+      <>
+        <output data-testid="current-path">{location.pathname}</output>
+        <output data-testid="current-state">{JSON.stringify(location.state ?? null)}</output>
+      </>
+    );
   };
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <ThemeProvider>
         <LocationProbe />
-        <PatientLoginPage />
+        <Routes>
+          <Route path="/patient/login" element={<PatientLoginPage />} />
+          <Route path="/ru/booking" element={<PatientBookingPage />} />
+          <Route path="/booking" element={<PatientBookingPage />} />
+        </Routes>
       </ThemeProvider>
     </MemoryRouter>
   );
@@ -87,6 +125,8 @@ const PATIENT_SESSION = {
 describe('PatientLoginPage (Phase 0 PR-B)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    authState.current = { token: null, profile: null };
+    clearPendingPublicBookingSelection();
     mockedRequestOtp.mockResolvedValue({
       success: true,
       message: 'ok',
@@ -100,6 +140,23 @@ describe('PatientLoginPage (Phase 0 PR-B)', () => {
     });
     mockedPatientLogin.mockResolvedValue(PATIENT_SESSION);
     vi.mocked(getPendingPublicBookingLocale).mockReturnValue(null);
+    vi.mocked(getPublicBookingOptions).mockResolvedValue({
+      settings_version: 1,
+      available: true,
+      mode: 'registrar_request',
+      booking_horizon_days: 90,
+      services: [{ slug: 'cardiology', name: 'Кардиология' }],
+      doctors: [{ slug: 'doctor-one', name: 'Врач Один' }],
+      compatible_pairs: [{ service_slug: 'cardiology', doctor_slug: 'doctor-one' }],
+    } as never);
+    vi.mocked(getPublicBookingAvailability).mockImplementation(async ({ date }) => ({
+      date,
+      timezone: 'Asia/Tashkent',
+      settings_version: 1,
+      slots: ['09:00:00'],
+    }) as never);
+    vi.mocked(createPatientPublicBookingRequest).mockResolvedValue({ id: 'new-request' } as never);
+    vi.mocked(resubmitPatientPublicBookingRequest).mockResolvedValue({ id: 'same-request', status: 'pending' } as never);
   });
 
   it('renders the phone step and rejects an invalid phone client-side', async () => {
@@ -197,5 +254,59 @@ describe('PatientLoginPage (Phase 0 PR-B)', () => {
     fireEvent.submit(screen.getByLabelText('patientPortal.pl_verify').closest('form')!);
 
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/ru/booking'));
+  });
+
+  it('resubmits the same request after the patient signs in again', async () => {
+    const requestId = '3d7bdb53-c26e-46ed-81ec-9e7bdebd12ab';
+    renderPage({
+      pathname: '/ru/booking',
+      state: {
+        publicBookingResubmit: {
+          requestId,
+          expectedVersion: 6,
+          serviceSlug: 'cardiology',
+          doctorSlug: 'doctor-one',
+        },
+      },
+    });
+
+    await screen.findByLabelText('Услуга');
+    fireEvent.change(screen.getByLabelText('Дата'), { target: { value: todayInTashkent() } });
+    fireEvent.click(await screen.findByLabelText('09:00'));
+    fireEvent.click(screen.getByRole('button', { name: 'Войти как пациент' }));
+
+    expect(screen.getByTestId('current-path')).toHaveTextContent('/patient/login');
+    const loginState = JSON.parse(screen.getByTestId('current-state').textContent ?? 'null');
+    expect(loginState.publicBookingResubmitRequired).toBe(true);
+    expect(loginState.publicBookingResubmit.requestId).toBe(requestId);
+    expect(loginState.publicBookingResubmit.expectedVersion).toBe(6);
+    expect(loginState.publicBookingResubmit.createdAt).toEqual(expect.any(Number));
+
+    fireEvent.change(screen.getByLabelText('patientPortal.pl_phone_label'), {
+      target: { value: '+998901234567' },
+    });
+    fireEvent.submit(screen.getByLabelText('patientPortal.pl_send_code').closest('form')!);
+    await screen.findByLabelText('patientPortal.pl_code_label');
+    fireEvent.change(screen.getByLabelText('patientPortal.pl_code_label'), { target: { value: '123456' } });
+    fireEvent.submit(screen.getByLabelText('patientPortal.pl_verify').closest('form')!);
+
+    await screen.findByRole('button', { name: 'Отправить новое время' });
+    expect(screen.getByTestId('current-path')).toHaveTextContent('/ru/booking');
+    const returnedState = JSON.parse(screen.getByTestId('current-state').textContent ?? 'null');
+    expect(returnedState.publicBookingResubmit.requestId).toBe(requestId);
+    expect(returnedState.publicBookingResubmit.expectedVersion).toBe(6);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить новое время' }));
+    await screen.findByRole('heading', { name: /Новое время отправлено регистратору/ });
+
+    expect(resubmitPatientPublicBookingRequest).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(resubmitPatientPublicBookingRequest).mock.calls[0][0]).toBe(requestId);
+    expect(vi.mocked(resubmitPatientPublicBookingRequest).mock.calls[0][1]).toMatchObject({
+      expected_version: 6,
+      appointment_date: todayInTashkent(),
+      appointment_time: '09:00',
+      expected_settings_version: 1,
+    });
+    expect(createPatientPublicBookingRequest).not.toHaveBeenCalled();
   });
 });

@@ -32,13 +32,34 @@ export interface PublicBookingSelection {
   time: string;
   settingsVersion: number;
   createdAt: number;
+  resubmit?: PublicBookingResubmitSelection;
+}
+
+export interface PublicBookingResubmitSelection {
+  requestId: string;
+  expectedVersion: number;
+  serviceSlug: string;
+  doctorSlug: string;
 }
 
 export type PublicBookingResume =
   | { kind: 'selection'; selection: PublicBookingSelection }
-  | { kind: 'expired'; locale: PublicBookingLocale };
+  | { kind: 'expired'; locale: PublicBookingLocale; resubmitRequired?: true };
 
 export const PUBLIC_BOOKING_SELECTION_TTL_MS = 15 * 60 * 1000;
+
+/** Detect the short-lived, history-state handoff used when a patient must sign in before resubmitting. */
+export function hasPublicBookingResubmitHandoff(state: unknown): boolean {
+  return Boolean(state && typeof state === 'object'
+    && Object.prototype.hasOwnProperty.call(state, 'publicBookingResubmitRequired'));
+}
+
+/** Read only a supported locale from a resubmit handoff; never treat its state as a URL. */
+export function getPublicBookingResubmitHandoffLocale(state: unknown): PublicBookingLocale | null {
+  if (!hasPublicBookingResubmitHandoff(state)) return null;
+  const candidate = state as { publicBookingLocale?: unknown };
+  return isLocale(candidate.publicBookingLocale) ? candidate.publicBookingLocale : null;
+}
 
 const optionsPath = '/public-site/booking-options';
 const availabilityPath = '/public-site/availability';
@@ -113,7 +134,19 @@ function isSelection(value: unknown): value is PublicBookingSelection {
     && Number.isSafeInteger(candidate.settingsVersion)
     && (candidate.settingsVersion ?? -1) >= 0
     && Number.isSafeInteger(candidate.createdAt)
-    && (candidate.createdAt ?? 0) > 0;
+    && (candidate.createdAt ?? 0) > 0
+    && (candidate.resubmit === undefined || isResubmitSelection(candidate.resubmit, candidate));
+}
+
+function isResubmitSelection(value: unknown, selection: Partial<PublicBookingSelection>): value is PublicBookingResubmitSelection {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<PublicBookingResubmitSelection>;
+  return typeof candidate.requestId === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate.requestId)
+    && Number.isSafeInteger(candidate.expectedVersion)
+    && (candidate.expectedVersion ?? 0) >= 1
+    && candidate.serviceSlug === selection.serviceSlug
+    && candidate.doctorSlug === selection.doctorSlug;
 }
 
 export async function getPublicBookingOptions(
@@ -164,7 +197,13 @@ export function savePublicBookingSelection(selection: PublicBookingSelection): v
     pendingResume = null;
     return;
   }
-  pendingResume = { kind: 'selection', selection: { ...selection } };
+  pendingResume = {
+    kind: 'selection',
+    selection: {
+      ...selection,
+      ...(selection.resubmit ? { resubmit: { ...selection.resubmit } } : {}),
+    },
+  };
 }
 
 /** Return the localized destination without exposing the selection in a URL or history state. */
@@ -173,7 +212,11 @@ export function getPendingPublicBookingLocale(now = Date.now()): PublicBookingLo
   if (pendingResume.kind === 'selection'
     && (now < pendingResume.selection.createdAt
       || now - pendingResume.selection.createdAt > PUBLIC_BOOKING_SELECTION_TTL_MS)) {
-    pendingResume = { kind: 'expired', locale: pendingResume.selection.locale };
+    pendingResume = {
+      kind: 'expired',
+      locale: pendingResume.selection.locale,
+      ...(pendingResume.selection.resubmit ? { resubmitRequired: true } : {}),
+    };
   }
   return pendingResume.kind === 'selection'
     ? pendingResume.selection.locale
@@ -188,7 +231,11 @@ export function takePendingPublicBookingResume(now = Date.now()): PublicBookingR
   if (current.kind === 'expired') return current;
   if (now < current.selection.createdAt
     || now - current.selection.createdAt > PUBLIC_BOOKING_SELECTION_TTL_MS) {
-    return { kind: 'expired', locale: current.selection.locale };
+    return {
+      kind: 'expired',
+      locale: current.selection.locale,
+      ...(current.selection.resubmit ? { resubmitRequired: true } : {}),
+    };
   }
   return current;
 }

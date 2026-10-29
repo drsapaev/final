@@ -130,6 +130,31 @@ describe('publicBooking API adapter', () => {
       .toEqual({ kind: 'expired', locale: 'ru' });
   });
 
+  it('marks an expired tab handoff as requiring resubmit so it cannot become a new request', () => {
+    const now = 1_800_000_000_000;
+    savePublicBookingSelection({
+      locale: 'ru',
+      serviceSlug: 'cardiology',
+      doctorSlug: 'doctor-one',
+      date: '2026-10-28',
+      time: '09:00',
+      settingsVersion: 3,
+      createdAt: now,
+      resubmit: {
+        requestId: '3d7bdb53-c26e-46ed-81ec-9e7bdebd12ab',
+        expectedVersion: 4,
+        serviceSlug: 'cardiology',
+        doctorSlug: 'doctor-one',
+      },
+    });
+
+    expect(takePendingPublicBookingResume(now + PUBLIC_BOOKING_SELECTION_TTL_MS + 1)).toEqual({
+      kind: 'expired',
+      locale: 'ru',
+      resubmitRequired: true,
+    });
+  });
+
   it('maps structured API errors and treats ambiguous outcomes as unsafe to resubmit with a new key', () => {
     const conflict = {
       isAxiosError: true,

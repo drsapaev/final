@@ -25,6 +25,8 @@ import {
   getPendingPublicBookingLocale,
   getPublicBookingAvailability,
   getPublicBookingOptions,
+  PUBLIC_BOOKING_SELECTION_TTL_MS,
+  savePublicBookingSelection,
 } from '../../api/publicBooking';
 import { getState } from '../../stores/auth';
 import PatientBookingPage from '../PatientBookingPage';
@@ -171,6 +173,55 @@ describe('PatientBookingPage', () => {
     });
     expect(mockedResubmitRequest.mock.calls[0][2]).toMatch(/^[0-9a-f-]{36}$/i);
     expect(mockedResubmitRequest.mock.calls[1]).toEqual(firstAttempt);
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the resubmit handoff has expired', async () => {
+    renderPage('/ru/booking', {
+      publicBookingResubmitRequired: true,
+      publicBookingLocale: 'ru',
+      publicBookingResubmit: {
+        requestId: '3d7bdb53-c26e-46ed-81ec-9e7bdebd12ab',
+        expectedVersion: 4,
+        serviceSlug: 'cardiology',
+        doctorSlug: 'doctor-one',
+        locale: 'ru',
+        createdAt: Date.now() - PUBLIC_BOOKING_SELECTION_TTL_MS - 1,
+      },
+    });
+
+    expect(await screen.findByText(/данные для изменения прежней заявки устарели или потеряны/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Услуга')).not.toBeInTheDocument();
+    expect(mockedResubmitRequest).not.toHaveBeenCalled();
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
+  });
+
+  it('restores the same resubmit request from the short-lived tab handoff if route state is missing', async () => {
+    const requestId = '3d7bdb53-c26e-46ed-81ec-9e7bdebd12ab';
+    const date = todayInTashkent();
+    savePublicBookingSelection({
+      locale: 'ru',
+      serviceSlug: 'cardiology',
+      doctorSlug: 'doctor-one',
+      date,
+      time: '09:00',
+      settingsVersion: 1,
+      createdAt: Date.now(),
+      resubmit: {
+        requestId,
+        expectedVersion: 5,
+        serviceSlug: 'cardiology',
+        doctorSlug: 'doctor-one',
+      },
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Отправить новое время' }));
+    await screen.findByRole('heading', { name: /Новое время отправлено регистратору/ });
+
+    expect(mockedResubmitRequest).toHaveBeenCalledTimes(1);
+    expect(mockedResubmitRequest.mock.calls[0][0]).toBe(requestId);
+    expect(mockedResubmitRequest.mock.calls[0][1].expected_version).toBe(5);
     expect(mockedCreateRequest).not.toHaveBeenCalled();
   });
 
