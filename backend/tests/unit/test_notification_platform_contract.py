@@ -3,12 +3,14 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from fastapi import HTTPException
 import pytest
+from fastapi import HTTPException
 
 from app.api.v1.endpoints.notifications import _validate_recipient_scope
 from app.models.notification import NotificationDelivery, NotificationEvent
 from app.services.notification_platform_service import NotificationPlatformService
+from app.services.notifications import notification_sender_service
+from app.services.notifications_pkg._helpers import REGISTRAR_NOTIFICATION_EVENT_TYPES
 
 
 @pytest.mark.asyncio
@@ -82,11 +84,15 @@ async def test_notification_platform_service_creates_persistent_delivery_and_ded
     assert inbox["items"][0]["id"] == delivery.delivery_id
     assert inbox["items"][0]["event_type"] == "queue_update"
 
-    seen_delivery = await service.mark_seen(current_user=admin_user, delivery_id=delivery.delivery_id)
+    seen_delivery = await service.mark_seen(
+        current_user=admin_user, delivery_id=delivery.delivery_id
+    )
     assert seen_delivery.seen_at is not None
     assert seen_delivery.delivery_status == "seen"
 
-    read_delivery = await service.mark_read(current_user=admin_user, delivery_id=delivery.delivery_id)
+    read_delivery = await service.mark_read(
+        current_user=admin_user, delivery_id=delivery.delivery_id
+    )
     assert read_delivery.read_at is not None
     assert read_delivery.delivery_status == "read"
 
@@ -109,6 +115,67 @@ async def test_notification_platform_service_creates_persistent_delivery_and_ded
     assert archived_inbox["items"][0]["delivery_status"] == "archived"
 
 
+@pytest.mark.asyncio
+async def test_public_booking_request_notification_is_registrar_only_and_deduplicated(
+    db_session, registrar_user, admin_user, monkeypatch
+):
+    service = NotificationPlatformService(db_session)
+    service.ws_manager = SimpleNamespace(send_json=AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        notification_sender_service,
+        "_platform_service",
+        lambda _db: service,
+    )
+    request_id = "3d7bdb53-c26e-46ed-81ec-9e7bdebd12ab"
+    first = {
+        "request_id": request_id,
+        "request_version": 1,
+    }
+    assert "public_booking_request_submitted" in REGISTRAR_NOTIFICATION_EVENT_TYPES
+
+    created = await notification_sender_service.send_registrar_event_notification(
+        db=db_session,
+        event_type="public_booking_request_submitted",
+        title="Новая заявка на онлайн-запись",
+        message="Поступила заявка на онлайн-запись. Откройте рабочий список.",
+        metadata=first,
+        roles=["registrar"],
+        deep_link="/registrar/booking-requests",
+        entity_type="public_booking_request",
+        entity_id=request_id,
+    )
+    replayed = await notification_sender_service.send_registrar_event_notification(
+        db=db_session,
+        event_type="public_booking_request_submitted",
+        title="Новая заявка на онлайн-запись",
+        message="Поступила заявка на онлайн-запись. Откройте рабочий список.",
+        metadata=first,
+        roles=["registrar"],
+        deep_link="/registrar/booking-requests",
+        entity_type="public_booking_request",
+        entity_id=request_id,
+    )
+
+    assert created is True
+    assert replayed is True
+    event = (
+        db_session.query(NotificationEvent)
+        .filter(NotificationEvent.entity_id == request_id)
+        .one()
+    )
+    deliveries = (
+        db_session.query(NotificationDelivery)
+        .filter(NotificationDelivery.event_id == event.id)
+        .all()
+    )
+    assert event.entity_type == "public_booking_request"
+    assert event.payload_snapshot["metadata"] == first
+    assert {delivery.recipient_id for delivery in deliveries} == {registrar_user.id}
+    assert admin_user.id not in {delivery.recipient_id for delivery in deliveries}
+    assert len(deliveries) == 1
+    assert {delivery.channel for delivery in deliveries} == {service.INBOX_CHANNEL}
+
+
 def test_notification_history_scope_rejects_cross_recipient_requests(
     db_session,
     admin_user,
@@ -120,7 +187,7 @@ def test_notification_history_scope_rejects_cross_recipient_requests(
             platform_service=service,
             current_user=admin_user,
             recipient_id=admin_user.id + 1,
-            recipient_type='admin',
+            recipient_type="admin",
         )
 
     assert exc_info.value.status_code == 403
@@ -136,14 +203,16 @@ def test_notification_history_scope_allows_same_recipient_even_if_type_differs(
         platform_service=service,
         current_user=admin_user,
         recipient_id=admin_user.id,
-        recipient_type='doctor',
+        recipient_type="doctor",
     )
 
 
 def test_realtime_policy_suppresses_when_desktop_notifications_disabled(db_session):
     service = NotificationPlatformService(db_session)
     user = SimpleNamespace(
-        preferences=SimpleNamespace(desktop_notifications=False, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(
+            desktop_notifications=False, timezone="Asia/Tashkent"
+        ),
         profile=SimpleNamespace(timezone="Asia/Tashkent"),
         notification_settings=SimpleNamespace(
             quiet_hours_start="22:00",
@@ -163,10 +232,14 @@ def test_realtime_policy_suppresses_when_desktop_notifications_disabled(db_sessi
     assert reason == "desktop_notifications_disabled"
 
 
-def test_realtime_policy_allows_critical_breakthrough_even_when_desktop_disabled(db_session):
+def test_realtime_policy_allows_critical_breakthrough_even_when_desktop_disabled(
+    db_session,
+):
     service = NotificationPlatformService(db_session)
     user = SimpleNamespace(
-        preferences=SimpleNamespace(desktop_notifications=False, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(
+            desktop_notifications=False, timezone="Asia/Tashkent"
+        ),
         profile=SimpleNamespace(timezone="Asia/Tashkent"),
         notification_settings=SimpleNamespace(
             quiet_hours_start="22:00",
@@ -186,10 +259,14 @@ def test_realtime_policy_allows_critical_breakthrough_even_when_desktop_disabled
     assert reason == "critical_breakthrough"
 
 
-def test_realtime_policy_suppresses_queue_events_during_quiet_hours(monkeypatch, db_session):
+def test_realtime_policy_suppresses_queue_events_during_quiet_hours(
+    monkeypatch, db_session
+):
     service = NotificationPlatformService(db_session)
     user = SimpleNamespace(
-        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(
+            desktop_notifications=True, timezone="Asia/Tashkent"
+        ),
         profile=SimpleNamespace(timezone="Asia/Tashkent"),
         notification_settings=SimpleNamespace(
             quiet_hours_start="22:00",
@@ -213,7 +290,9 @@ def test_realtime_policy_suppresses_queue_events_during_quiet_hours(monkeypatch,
 def test_realtime_policy_respects_event_push_setting_mapping(db_session):
     service = NotificationPlatformService(db_session)
     user = SimpleNamespace(
-        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(
+            desktop_notifications=True, timezone="Asia/Tashkent"
+        ),
         profile=SimpleNamespace(timezone="Asia/Tashkent"),
         notification_settings=SimpleNamespace(
             push_system_updates=False,
@@ -248,7 +327,9 @@ async def test_queue_burst_realtime_is_suppressed_but_inbox_persistence_remains(
         role="patient",
         is_superuser=False,
         profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
-        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(
+            desktop_notifications=True, timezone="Asia/Tashkent"
+        ),
         notification_settings=SimpleNamespace(
             push_system_updates=True,
             quiet_hours_start="22:00",
@@ -312,7 +393,9 @@ async def test_queue_call_is_not_suppressed_by_burst_guard(
         role="patient",
         is_superuser=False,
         profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
-        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(
+            desktop_notifications=True, timezone="Asia/Tashkent"
+        ),
         notification_settings=SimpleNamespace(
             push_system_updates=True,
             quiet_hours_start="22:00",
@@ -376,7 +459,9 @@ async def test_record_delivery_for_users_keeps_inbox_but_filters_realtime_by_set
         role="patient",
         is_superuser=False,
         profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
-        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(
+            desktop_notifications=True, timezone="Asia/Tashkent"
+        ),
         notification_settings=SimpleNamespace(
             push_system_updates=False,
             quiet_hours_start="22:00",
@@ -389,7 +474,9 @@ async def test_record_delivery_for_users_keeps_inbox_but_filters_realtime_by_set
         role="patient",
         is_superuser=False,
         profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
-        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(
+            desktop_notifications=True, timezone="Asia/Tashkent"
+        ),
         notification_settings=SimpleNamespace(
             push_system_updates=True,
             quiet_hours_start="22:00",
@@ -428,7 +515,9 @@ async def test_record_delivery_for_user_persists_inbox_when_realtime_suppressed_
         role="patient",
         is_superuser=False,
         profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
-        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(
+            desktop_notifications=True, timezone="Asia/Tashkent"
+        ),
         notification_settings=SimpleNamespace(
             push_system_updates=False,
             quiet_hours_start="22:00",
@@ -467,7 +556,9 @@ async def test_record_delivery_for_user_allows_critical_breakthrough_even_if_set
         role="patient",
         is_superuser=False,
         profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
-        preferences=SimpleNamespace(desktop_notifications=False, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(
+            desktop_notifications=False, timezone="Asia/Tashkent"
+        ),
         notification_settings=SimpleNamespace(
             push_security_alerts=False,
             quiet_hours_start="22:00",

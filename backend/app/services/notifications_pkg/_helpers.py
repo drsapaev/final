@@ -3,6 +3,7 @@
 Split from notifications.py — these functions are used by the
 NotificationSenderService but are not methods.
 """
+
 from __future__ import annotations
 
 import logging  # noqa: F401
@@ -121,6 +122,8 @@ REGISTRAR_NOTIFICATION_EVENT_TYPES = {
     "all_free_approved",
     "all_free_rejected",
     "patient_registered",
+    "public_booking_request_submitted",
+    "public_booking_request_resubmitted",
 }
 
 QUEUE_NOTIFICATION_EVENT_TYPES = {
@@ -248,5 +251,3 @@ def _patient_telegram_event_message(
         "currency": _safe_patient_telegram_value(data.get("currency"), "UZS"),
     }
     return template.format(**safe_data)
-
-

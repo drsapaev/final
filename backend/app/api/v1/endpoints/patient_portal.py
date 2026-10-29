@@ -129,6 +129,7 @@ from app.services.public_booking_settings import (
     PublicBookingSettingsError,
     PublicBookingSettingsService,
 )
+from app.services.registrar_notification_service import RegistrarNotificationService
 from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppSessionScope,
     TelegramMiniAppSessionScopeError,
@@ -1157,7 +1158,7 @@ def _patient_request_idempotency_scope(request: Request) -> str:
     operation_id="patient_create_public_booking_request",
     summary="Submit a non-reserving request for a public booking time",
 )
-def create_patient_public_booking_request(
+async def create_patient_public_booking_request(
     body: PublicBookingRequestCreate,
     request: Request,
     response: Response,
@@ -1219,6 +1220,9 @@ def create_patient_public_booking_request(
         action="create",
         outcome="success",
         request=request,
+    )
+    await RegistrarNotificationService(db).notify_public_booking_request(
+        request_id=str(result.id), request_version=result.version
     )
     return result
 
@@ -1343,7 +1347,7 @@ def withdraw_patient_public_booking_request(
     operation_id="patient_resubmit_public_booking_request",
     summary="Choose a different time after staff requested one",
 )
-def resubmit_patient_public_booking_request(
+async def resubmit_patient_public_booking_request(
     request_id: UUID,
     body: PublicBookingRequestResubmit,
     request: Request,
@@ -1400,5 +1404,10 @@ def resubmit_patient_public_booking_request(
         action="resubmit",
         outcome="success",
         request=request,
+    )
+    await RegistrarNotificationService(db).notify_public_booking_request(
+        request_id=str(result.id),
+        request_version=result.version,
+        resubmitted=True,
     )
     return result

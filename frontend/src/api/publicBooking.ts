@@ -4,7 +4,10 @@ import type {
   PublicBookingAvailabilityDto,
   PublicBookingOptionsDto,
   PublicBookingRequestCreateDto,
+  PublicBookingRequestListOutDto,
+  PublicBookingRequestOutDto,
   PublicBookingRequestPatientOutDto,
+  PublicBookingRequestStatusDto,
 } from '../types/api';
 
 export type PublicBookingLocale = 'ru' | 'uz-Latn';
@@ -33,6 +36,31 @@ export const PUBLIC_BOOKING_SELECTION_TTL_MS = 15 * 60 * 1000;
 const optionsPath = '/public-site/booking-options';
 const availabilityPath = '/public-site/availability';
 const patientRequestsPath = '/patients/booking-requests';
+
+export type PatientPublicBookingRequest = PublicBookingRequestOutDto;
+export type PatientPublicBookingRequestStatus = PublicBookingRequestStatusDto;
+
+export async function listPatientPublicBookingRequests(input: {
+  limit?: number;
+  offset?: number;
+} = {}): Promise<PatientPublicBookingRequest[]> {
+  const response = await api.get<PublicBookingRequestListOutDto>(patientRequestsPath, {
+    params: { limit: input.limit ?? 50, offset: input.offset ?? 0 },
+    headers: { 'Cache-Control': 'no-cache' },
+  });
+  return response.data.items;
+}
+
+export async function withdrawPatientPublicBookingRequest(
+  requestId: string,
+  expectedVersion: number,
+): Promise<PatientPublicBookingRequest> {
+  const response = await api.post<PatientPublicBookingRequest>(
+    `${patientRequestsPath}/${encodeURIComponent(requestId)}/withdraw`,
+    { expected_version: expectedVersion },
+  );
+  return response.data;
+}
 
 let pendingResume: PublicBookingResume | null = null;
 

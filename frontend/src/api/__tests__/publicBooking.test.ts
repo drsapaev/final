@@ -12,10 +12,12 @@ import {
   getPublicBookingAvailability,
   getPublicBookingErrorCode,
   getPublicBookingOptions,
+  listPatientPublicBookingRequests,
   getPublicBookingPath,
   isUnknownPublicBookingOutcome,
   savePublicBookingSelection,
   takePendingPublicBookingResume,
+  withdrawPatientPublicBookingRequest,
   PUBLIC_BOOKING_SELECTION_TTL_MS,
 } from '../publicBooking';
 
@@ -62,6 +64,29 @@ describe('publicBooking API adapter', () => {
       headers: { 'Idempotency-Key': 'key-once' },
     });
     expect(body).not.toHaveProperty('patient_id');
+  });
+
+  it('loads only the authenticated patient booking request list without caching', async () => {
+    mockedApi.get.mockResolvedValueOnce({ data: { items: [{ id: 'request-1' }] } });
+
+    const result = await listPatientPublicBookingRequests({ limit: 20, offset: 10 });
+
+    expect(result).toEqual([{ id: 'request-1' }]);
+    expect(mockedApi.get).toHaveBeenCalledWith('/patients/booking-requests', {
+      params: { limit: 20, offset: 10 },
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+  });
+
+  it('withdraws a request using its current version', async () => {
+    mockedApi.post.mockResolvedValueOnce({ data: { id: 'request-1', status: 'withdrawn' } });
+
+    await withdrawPatientPublicBookingRequest('request-1', 3);
+
+    expect(mockedApi.post).toHaveBeenCalledWith(
+      '/patients/booking-requests/request-1/withdraw',
+      { expected_version: 3 },
+    );
   });
 
   it('keeps a short-lived selection only in memory and consumes it once', () => {

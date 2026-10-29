@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.models.appointment import Appointment
 from app.models.clinic import ClinicSettings, Doctor, Schedule
 from app.models.department import Department
+from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.patient import Patient
 from app.models.patient_access_audit import PatientAccessAuditLog
 from app.models.public_booking_request import (
@@ -174,7 +175,7 @@ def _confirm_request(
 
 @pytest.mark.integration
 def test_patient_submission_is_idempotent_and_never_creates_appointment(
-    client: TestClient, db_session: Session, public_booking_case
+    client: TestClient, db_session: Session, public_booking_case, registrar_user
 ):
     case = public_booking_case
     idempotency_key = uuid4().hex
@@ -196,6 +197,27 @@ def test_patient_submission_is_idempotent_and_never_creates_appointment(
     assert db_session.query(PublicBookingRequest).count() == 1
     assert db_session.query(PublicBookingRequestEvent).count() == 1
     assert db_session.query(Appointment).count() == 0
+    notification = (
+        db_session.query(NotificationEvent)
+        .filter(
+            NotificationEvent.event_type == "public_booking_request_submitted",
+            NotificationEvent.entity_id == first.json()["id"],
+        )
+        .one()
+    )
+    delivery = (
+        db_session.query(NotificationDelivery)
+        .filter(NotificationDelivery.event_id == notification.id)
+        .one()
+    )
+    assert delivery.recipient_id == registrar_user.id
+    assert notification.entity_type == "public_booking_request"
+    assert notification.deep_link == "/registrar/booking-requests"
+    assert "Синтетический пациент" not in notification.message
+    assert notification.payload_snapshot["metadata"] == {
+        "request_id": first.json()["id"],
+        "request_version": 1,
+    }
 
     # Exercise the persisted idempotency record directly as well: the HTTP
     # middleware may short-circuit a retry while its response cache is warm.
@@ -404,6 +426,35 @@ def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
     ]
     assert db_session.query(PublicBookingRequest).count() == 2
     assert db_session.query(Appointment).count() == 1
+    request_notifications = (
+        db_session.query(NotificationEvent)
+        .filter(NotificationEvent.entity_id == request_id)
+        .order_by(NotificationEvent.id)
+        .all()
+    )
+    assert [event.event_type for event in request_notifications] == [
+        "public_booking_request_submitted",
+        "public_booking_request_resubmitted",
+    ]
+    assert all(
+        event.entity_type == "public_booking_request"
+        and event.deep_link == "/registrar/booking-requests"
+        and "Синтетический пациент" not in event.message
+        for event in request_notifications
+    )
+    request_notification_deliveries = (
+        db_session.query(NotificationDelivery)
+        .filter(
+            NotificationDelivery.event_id.in_(
+                [event.id for event in request_notifications]
+            )
+        )
+        .all()
+    )
+    assert {delivery.recipient_id for delivery in request_notification_deliveries} == {
+        registrar_user.id
+    }
+    assert len(request_notification_deliveries) == 2
 
     rejected = client.post(
         f"{STAFF_REQUESTS}/{request_id}/reject",
