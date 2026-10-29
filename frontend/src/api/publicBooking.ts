@@ -17,6 +17,13 @@ export type PublicBookingAvailability = PublicBookingAvailabilityDto;
 export type PublicBookingRequestBody = PublicBookingRequestCreateDto;
 export type PublicBookingRequestResult = PublicBookingRequestPatientOutDto;
 
+export interface PublicBookingRequestResubmitBody {
+  expected_version: number;
+  appointment_date: string;
+  appointment_time: string;
+  expected_settings_version: number;
+}
+
 export interface PublicBookingSelection {
   locale: PublicBookingLocale;
   serviceSlug: string;
@@ -58,6 +65,19 @@ export async function withdrawPatientPublicBookingRequest(
   const response = await api.post<PatientPublicBookingRequest>(
     `${patientRequestsPath}/${encodeURIComponent(requestId)}/withdraw`,
     { expected_version: expectedVersion },
+  );
+  return response.data;
+}
+
+export async function resubmitPatientPublicBookingRequest(
+  requestId: string,
+  body: PublicBookingRequestResubmitBody,
+  idempotencyKey: string,
+): Promise<PatientPublicBookingRequest> {
+  const response = await api.post<PatientPublicBookingRequest>(
+    `${patientRequestsPath}/${encodeURIComponent(requestId)}/resubmit`,
+    body,
+    { headers: { 'Idempotency-Key': idempotencyKey } },
   );
   return response.data;
 }

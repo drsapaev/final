@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { MouseEventHandler, PropsWithChildren } from 'react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const { listRequests, withdrawRequest, confirmAction } = vi.hoisted(() => ({
   listRequests: vi.fn(),
@@ -97,11 +98,36 @@ describe('patient panel public booking requests', () => {
 
   it('offers the public booking form when the registrar requests a different time', async () => {
     listRequests.mockResolvedValueOnce([{ ...pendingRequest, status: 'needs_new_time' }]);
-    render(<PublicBookingRequestsPanel />);
+    const RouteProbe = () => {
+      const location = useLocation();
+      return (
+        <>
+          <output data-testid="booking-route">{location.pathname + location.search}</output>
+          <output data-testid="booking-route-state">{JSON.stringify(location.state)}</output>
+        </>
+      );
+    };
+    render(
+      <MemoryRouter initialEntries={['/patient/home']}>
+        <RouteProbe />
+        <PublicBookingRequestsPanel />
+      </MemoryRouter>,
+    );
 
-    expect(await screen.findByRole('link', {
+    fireEvent.click(await screen.findByRole('link', {
       name: 'publicBookingRequests.chooseAnotherTime',
-    })).toHaveAttribute('href', '/ru/booking');
+    }));
+
+    expect(screen.getByTestId('booking-route')).toHaveTextContent('/ru/booking');
+    expect(screen.getByTestId('booking-route-state')).toHaveTextContent(JSON.stringify({
+      publicBookingResubmit: {
+        requestId: pendingRequest.id,
+        expectedVersion: pendingRequest.version,
+        serviceSlug: pendingRequest.service_slug,
+        doctorSlug: pendingRequest.doctor_slug,
+      },
+    }));
+    expect(screen.getByTestId('booking-route')).not.toHaveTextContent(/request|doctor|cardiology/i);
   });
 
   it('offers retry after the request list fails to load', async () => {

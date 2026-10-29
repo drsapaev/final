@@ -10,6 +10,7 @@ vi.mock('../../api/publicBooking', async () => {
     getPublicBookingOptions: vi.fn(),
     getPublicBookingAvailability: vi.fn(),
     createPatientPublicBookingRequest: vi.fn(),
+    resubmitPatientPublicBookingRequest: vi.fn(),
   };
 });
 
@@ -20,6 +21,7 @@ vi.mock('../../stores/auth', () => ({
 import {
   clearPendingPublicBookingSelection,
   createPatientPublicBookingRequest,
+  resubmitPatientPublicBookingRequest,
   getPendingPublicBookingLocale,
   getPublicBookingAvailability,
   getPublicBookingOptions,
@@ -30,6 +32,7 @@ import PatientBookingPage from '../PatientBookingPage';
 const mockedOptions = vi.mocked(getPublicBookingOptions);
 const mockedAvailability = vi.mocked(getPublicBookingAvailability);
 const mockedCreateRequest = vi.mocked(createPatientPublicBookingRequest);
+const mockedResubmitRequest = vi.mocked(resubmitPatientPublicBookingRequest);
 const mockedAuthState = vi.mocked(getState);
 
 const OPTIONS = {
@@ -65,13 +68,13 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-function renderPage(path = '/ru/booking') {
+function renderPage(path = '/ru/booking', state?: unknown) {
   const LocationProbe = () => {
     const location = useLocation();
     return <output data-testid="current-path">{location.pathname + location.search}</output>;
   };
   return render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={[state ? { pathname: path, state } : path]}>
       <LocationProbe />
       <PatientBookingPage />
     </MemoryRouter>,
@@ -102,6 +105,7 @@ describe('PatientBookingPage', () => {
       slots: ['09:00:00'],
     }) as never);
     mockedCreateRequest.mockResolvedValue({ id: 'request-id' } as never);
+    mockedResubmitRequest.mockResolvedValue({ id: 'request-id', status: 'pending' } as never);
   });
 
   it('shows only service/doctor pairs approved by the current public policy', async () => {
@@ -132,6 +136,42 @@ describe('PatientBookingPage', () => {
     expect(key).toMatch(/^[0-9a-f-]{36}$/i);
     expect(body).not.toHaveProperty('patient_id');
     expect(screen.getByText(/не резервирует время/i)).toBeInTheDocument();
+  });
+
+  it('resubmits a changed time against the existing request instead of creating another one', async () => {
+    const requestId = '3d7bdb53-c26e-46ed-81ec-9e7bdebd12ab';
+    mockedResubmitRequest.mockRejectedValueOnce({ isAxiosError: true, request: {} });
+    renderPage('/ru/booking', {
+      publicBookingResubmit: {
+        requestId,
+        expectedVersion: 4,
+        serviceSlug: 'cardiology',
+        doctorSlug: 'doctor-one',
+      },
+    });
+
+    const date = todayInTashkent();
+    fireEvent.change(await screen.findByLabelText('Дата'), { target: { value: date } });
+    fireEvent.click(await screen.findByLabelText('09:00'));
+    expect(screen.getByLabelText('Услуга')).toBeDisabled();
+    expect(screen.getByLabelText('Врач')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить новое время' }));
+
+    const retry = await screen.findByRole('button', { name: 'Повторно проверить ту же заявку' });
+    const firstAttempt = mockedResubmitRequest.mock.calls[0];
+    fireEvent.click(retry);
+    await screen.findByRole('heading', { name: /Новое время отправлено регистратору/ });
+    expect(mockedResubmitRequest).toHaveBeenCalledTimes(2);
+    expect(mockedResubmitRequest.mock.calls[0][0]).toBe(requestId);
+    expect(mockedResubmitRequest.mock.calls[0][1]).toEqual({
+      expected_version: 4,
+      appointment_date: date,
+      appointment_time: '09:00',
+      expected_settings_version: 1,
+    });
+    expect(mockedResubmitRequest.mock.calls[0][2]).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(mockedResubmitRequest.mock.calls[1]).toEqual(firstAttempt);
+    expect(mockedCreateRequest).not.toHaveBeenCalled();
   });
 
   it('shows patient-card guidance for the backend detail.reason response', async () => {

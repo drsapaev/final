@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { CalendarClock, RotateCw } from 'lucide-react';
 import { useConfirm } from '../common/ConfirmDialog';
 import { Badge, Button, Card } from '../ui/macos';
@@ -201,12 +202,20 @@ export default function PublicBookingRequestsPanel() {
                     {t(STATUS_HELP_KEYS[item.status])}
                   </div>
                   {item.status === 'needs_new_time' && (
-                    <a
+                    <Link
                       className="mt-2 inline-block text-sm text-blue-700 underline dark:text-blue-300"
-                      href={language === 'uz-Latn' ? '/booking' : '/ru/booking'}
+                      to={language === 'uz-Latn' ? '/booking' : '/ru/booking'}
+                      state={{
+                        publicBookingResubmit: {
+                          requestId: item.id,
+                          expectedVersion: item.version,
+                          serviceSlug: item.service_slug,
+                          doctorSlug: item.doctor_slug,
+                        },
+                      }}
                     >
                       {t('publicBookingRequests.chooseAnotherTime')}
-                    </a>
+                    </Link>
                   )}
                   {canWithdraw && (
                     <Button

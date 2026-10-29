@@ -15,6 +15,7 @@ import {
   listPatientPublicBookingRequests,
   getPublicBookingPath,
   isUnknownPublicBookingOutcome,
+  resubmitPatientPublicBookingRequest,
   savePublicBookingSelection,
   takePendingPublicBookingResume,
   withdrawPatientPublicBookingRequest,
@@ -86,6 +87,24 @@ describe('publicBooking API adapter', () => {
     expect(mockedApi.post).toHaveBeenCalledWith(
       '/patients/booking-requests/request-1/withdraw',
       { expected_version: 3 },
+    );
+  });
+
+  it('resubmits the same request with its version and a mandatory idempotency key', async () => {
+    mockedApi.post.mockResolvedValueOnce({ data: { id: 'request-1', status: 'pending' } });
+    const body = {
+      expected_version: 4,
+      appointment_date: '2026-10-30',
+      appointment_time: '09:40',
+      expected_settings_version: 7,
+    };
+
+    await resubmitPatientPublicBookingRequest('request/1', body, 'resubmit-key');
+
+    expect(mockedApi.post).toHaveBeenCalledWith(
+      '/patients/booking-requests/request%2F1/resubmit',
+      body,
+      { headers: { 'Idempotency-Key': 'resubmit-key' } },
     );
   });
 

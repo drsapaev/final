@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   createPublicBookingIdempotencyKey,
   createPatientPublicBookingRequest,
+  resubmitPatientPublicBookingRequest,
   getPublicBookingAvailability,
   getPublicBookingErrorCode,
   getPublicBookingOptions,
@@ -15,6 +16,7 @@ import {
   type PublicBookingLocale,
   type PublicBookingOptions,
   type PublicBookingRequestBody,
+  type PublicBookingRequestResubmitBody,
 } from '../api/publicBooking';
 import { getState } from '../stores/auth';
 
@@ -40,8 +42,10 @@ type Copy = {
   activate: string;
   login: string;
   submit: string;
+  resubmit: string;
   submitting: string;
   requestSent: string;
+  requestResubmitted: string;
   requestNotice: string;
   nonReserving: string;
   responseTime: string;
@@ -85,8 +89,10 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     activate: 'Активировать карточку',
     login: 'Войти как пациент',
     submit: 'Отправить заявку',
+    resubmit: 'Отправить новое время',
     submitting: 'Проверяем и отправляем…',
     requestSent: 'Заявка отправлена регистратору. Это ещё не подтверждённая запись.',
+    requestResubmitted: 'Новое время отправлено регистратору в рамках вашей прежней заявки.',
     requestNotice: 'Регистратор повторно проверит выбранное время. До подтверждения время может занять другой пациент.',
     nonReserving: 'Отправка заявки не резервирует время.',
     responseTime: 'Точный срок ответа пока не обещан. Для отмены или переноса свяжитесь с регистратором.',
@@ -128,8 +134,10 @@ const COPY: Record<PublicBookingLocale, Copy> = {
     activate: 'Kartani faollashtirish',
     login: 'Bemor sifatida kirish',
     submit: 'So‘rov yuborish',
+    resubmit: 'Yangi vaqtni yuborish',
     submitting: 'Tekshirilmoqda va yuborilmoqda…',
     requestSent: 'So‘rov registratorga yuborildi. Bu hali tasdiqlangan qabul emas.',
+    requestResubmitted: 'Yangi vaqt avvalgi so‘rovingiz doirasida registratorga yuborildi.',
     requestNotice: 'Registrator tanlangan vaqtni qayta tekshiradi. Tasdiqlanguncha vaqtni boshqa bemor egallashi mumkin.',
     nonReserving: 'So‘rov vaqtni band qilmaydi.',
     responseTime: 'Hozircha aniq javob muddati belgilanmagan. Bekor qilish yoki ko‘chirish uchun registratorga murojaat qiling.',
@@ -183,6 +191,50 @@ function isPatientSession(): boolean {
     && String((state.profile as unknown as Record<string, unknown> | null)?.role ?? '').toLowerCase() === 'patient';
 }
 
+interface PatientBookingResubmitContext {
+  requestId: string;
+  expectedVersion: number;
+  serviceSlug: string;
+  doctorSlug: string;
+}
+
+type PatientBookingAttempt =
+  | { kind: 'create'; body: PublicBookingRequestBody; key: string }
+  | {
+    kind: 'resubmit';
+    requestId: string;
+    body: PublicBookingRequestResubmitBody;
+    key: string;
+  };
+
+function getPatientBookingResubmitContext(state: unknown): PatientBookingResubmitContext | null {
+  if (!state || typeof state !== 'object') return null;
+  const value = (state as { publicBookingResubmit?: unknown }).publicBookingResubmit;
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<PatientBookingResubmitContext>;
+  if (typeof candidate.requestId !== 'string'
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate.requestId)
+    || !Number.isSafeInteger(candidate.expectedVersion)
+    || (candidate.expectedVersion ?? 0) < 1
+    || typeof candidate.serviceSlug !== 'string'
+    || candidate.serviceSlug.length < 1
+    || candidate.serviceSlug.length > 120
+    || typeof candidate.doctorSlug !== 'string'
+    || candidate.doctorSlug.length < 1
+    || candidate.doctorSlug.length > 120) return null;
+  return {
+    requestId: candidate.requestId,
+    expectedVersion: candidate.expectedVersion,
+    serviceSlug: candidate.serviceSlug,
+    doctorSlug: candidate.doctorSlug,
+  };
+}
+
+function hasPatientBookingResubmitState(state: unknown): boolean {
+  return Boolean(state && typeof state === 'object'
+    && Object.prototype.hasOwnProperty.call(state, 'publicBookingResubmit'));
+}
+
 function getErrorMessage(code: string | null, copy: Copy): string {
   switch (code) {
     case 'public_booking_unavailable':
@@ -201,6 +253,8 @@ function getErrorMessage(code: string | null, copy: Copy): string {
 export default function PatientBookingPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const resubmitContext = getPatientBookingResubmitContext(location.state);
+  const hasResubmitNavigationState = hasPatientBookingResubmitState(location.state);
   const locale: PublicBookingLocale = location.pathname.startsWith('/ru/') ? 'ru' : 'uz-Latn';
   const copy = COPY[locale];
   const [resume, setResume] = useState<ReturnType<typeof takePendingPublicBookingResume>>(null);
@@ -210,17 +264,18 @@ export default function PatientBookingPage() {
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [serviceSlug, setServiceSlug] = useState('');
-  const [doctorSlug, setDoctorSlug] = useState('');
+  const [serviceSlug, setServiceSlug] = useState(() => resubmitContext?.serviceSlug ?? '');
+  const [doctorSlug, setDoctorSlug] = useState(() => resubmitContext?.doctorSlug ?? '');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [completed, setCompleted] = useState(false);
+  const [completionMessage, setCompletionMessage] = useState('');
   const [needsPolicyReview, setNeedsPolicyReview] = useState(false);
   const [policyAcknowledgedVersion, setPolicyAcknowledgedVersion] = useState<number | null>(null);
   const [unknownOutcome, setUnknownOutcome] = useState(false);
-  const attemptRef = useRef<{ body: PublicBookingRequestBody; key: string } | null>(null);
+  const attemptRef = useRef<PatientBookingAttempt | null>(null);
   const resumeConsumed = useRef(false);
   const availabilityRequestGeneration = useRef(0);
   const selectedTimeRef = useRef(time);
@@ -378,15 +433,21 @@ export default function PatientBookingPage() {
     navigate(path);
   };
 
-  const sendAttempt = async (attempt: { body: PublicBookingRequestBody; key: string }) => {
+  const sendAttempt = async (attempt: PatientBookingAttempt) => {
     setSubmitting(true);
     setError('');
     try {
-      await createPatientPublicBookingRequest(attempt.body, attempt.key);
+      if (attempt.kind === 'resubmit') {
+        await resubmitPatientPublicBookingRequest(attempt.requestId, attempt.body, attempt.key);
+      } else {
+        await createPatientPublicBookingRequest(attempt.body, attempt.key);
+      }
       attemptRef.current = null;
       setUnknownOutcome(false);
       setCompleted(true);
-      setNotice(copy.requestSent);
+      const successMessage = attempt.kind === 'resubmit' ? copy.requestResubmitted : copy.requestSent;
+      setCompletionMessage(successMessage);
+      setNotice(successMessage);
     } catch (requestError) {
       if (isUnknownPublicBookingOutcome(requestError)) {
         attemptRef.current = attempt;
@@ -440,8 +501,11 @@ export default function PatientBookingPage() {
       await sendAttempt(attemptRef.current);
       return;
     }
-    if (!patient || !options || options.mode !== 'registrar_request' || !pairIsAllowed
+    if ((hasResubmitNavigationState && !resubmitContext)
+      || !patient || !options || options.mode !== 'registrar_request' || !pairIsAllowed
       || !availability || !time || !date || !serviceSlug || !doctorSlug) return;
+    if (resubmitContext && (serviceSlug !== resubmitContext.serviceSlug
+      || doctorSlug !== resubmitContext.doctorSlug)) return;
     if (!isDateWithinHorizon(date, today, maxDate)) {
       setTime('');
       setError(copy.slotExpired);
@@ -514,14 +578,30 @@ export default function PatientBookingPage() {
         return;
       }
 
-      const body: PublicBookingRequestBody = {
-        service_slug: serviceSlug,
-        doctor_slug: doctorSlug,
-        appointment_date: date,
-        appointment_time: time,
-        expected_settings_version: freshOptions.settings_version,
-      };
-      const attempt = { body, key: createPublicBookingIdempotencyKey() };
+      const key = createPublicBookingIdempotencyKey();
+      const attempt: PatientBookingAttempt = resubmitContext
+        ? {
+          kind: 'resubmit',
+          requestId: resubmitContext.requestId,
+          body: {
+            expected_version: resubmitContext.expectedVersion,
+            appointment_date: date,
+            appointment_time: time,
+            expected_settings_version: freshOptions.settings_version,
+          },
+          key,
+        }
+        : {
+          kind: 'create',
+          body: {
+            service_slug: serviceSlug,
+            doctor_slug: doctorSlug,
+            appointment_date: date,
+            appointment_time: time,
+            expected_settings_version: freshOptions.settings_version,
+          },
+          key,
+        };
       attemptRef.current = attempt;
       await sendAttempt(attempt);
     } catch {
@@ -631,17 +711,30 @@ export default function PatientBookingPage() {
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
           </section>
         ) : null}
+        {!optionsLoading && hasResubmitNavigationState && !resubmitContext ? (
+          <section className="public-site__section" role="alert">
+            <h2>{copy.unavailable}</h2>
+            <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
+          </section>
+        ) : null}
         {!optionsLoading && options?.available && options.mode === 'registrar_request' && !bookingConfigurationUsable ? (
           <section className="public-site__section" aria-labelledby="booking-config-unavailable-title">
             <h2 id="booking-config-unavailable-title">{copy.unavailable}</h2>
             <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
           </section>
         ) : null}
-        {!optionsLoading && bookingConfigurationUsable && options && !completed ? (
+        {!optionsLoading && bookingConfigurationUsable && options && resubmitContext && !pairIsAllowed ? (
+          <section className="public-site__section" role="alert">
+            <h2>{copy.unavailable}</h2>
+            <a className="public-site__button public-site__button--primary" href={locale === 'ru' ? '/ru/contacts' : '/contacts'}>{copy.contact}</a>
+          </section>
+        ) : null}
+        {!optionsLoading && bookingConfigurationUsable && options && !completed
+          && (!hasResubmitNavigationState || Boolean(resubmitContext && pairIsAllowed)) ? (
           <form className="public-site__booking-form" onSubmit={handleSubmit} aria-label={copy.title}>
             <label className="public-site__booking-field" htmlFor="public-booking-service">
               {copy.service}
-              <select id="public-booking-service" className="public-site__booking-control" value={serviceSlug} disabled={formLocked} required
+              <select id="public-booking-service" className="public-site__booking-control" value={serviceSlug} disabled={formLocked || Boolean(resubmitContext)} required
                 onChange={(event) => { invalidateAvailabilityRequests(); setServiceSlug(event.target.value); setDoctorSlug(''); setDate(''); setTime(''); setAvailability(null); setError(''); setNotice(''); }}>
                 <option value="">{copy.choose}</option>
                 {options.services.map((service) => <option key={service.slug} value={service.slug}>{service.name}</option>)}
@@ -649,7 +742,7 @@ export default function PatientBookingPage() {
             </label>
             <label className="public-site__booking-field" htmlFor="public-booking-doctor">
               {copy.doctor}
-              <select id="public-booking-doctor" className="public-site__booking-control" value={doctorSlug} disabled={formLocked || !serviceSlug} required
+              <select id="public-booking-doctor" className="public-site__booking-control" value={doctorSlug} disabled={formLocked || !serviceSlug || Boolean(resubmitContext)} required
                 onChange={(event) => { invalidateAvailabilityRequests(); setDoctorSlug(event.target.value); setDate(''); setTime(''); setAvailability(null); setError(''); setNotice(''); }}>
                 <option value="">{copy.choose}</option>
                 {eligibleDoctors.map((doctor) => <option key={doctor.slug} value={doctor.slug}>{doctor.name}</option>)}
@@ -714,7 +807,7 @@ export default function PatientBookingPage() {
                 <button type="submit" className="public-site__button public-site__button--primary"
                   disabled={formLocked || !serviceSlug || !doctorSlug || !date || !time || !availability || !slots.includes(time)
                     || (needsPolicyReview && policyAcknowledgedVersion !== options.settings_version)}>
-                  {submitting ? copy.submitting : copy.submit}
+                  {submitting ? copy.submitting : resubmitContext ? copy.resubmit : copy.submit}
                 </button>
               </section>
             )}
@@ -727,7 +820,7 @@ export default function PatientBookingPage() {
         ) : null}
         {completed ? (
           <section className="public-site__section" role="status" aria-live="polite">
-            <h2>{copy.requestSent}</h2>
+            <h2>{completionMessage || copy.requestSent}</h2>
             <p>{copy.nonReserving} {copy.requestNotice}</p>
             <p className="public-site__muted">{copy.responseTime}</p>
             {selectedService && selectedDoctor ? <p>{selectedService.name} · {selectedDoctor.name} · {date} {time}</p> : null}

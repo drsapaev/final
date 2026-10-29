@@ -98,7 +98,6 @@ const uzLatn = {
     loading: 'Rasmlar yuklanmoqda…',
     loadError: 'Rasmlar ro‘yxatini yuklab bo‘lmadi.',
     retry: 'Qayta urinish',
-    loadMore: 'Yana ko‘rsatish',
     uploadSuccess: 'Rasm qoralama sifatida yuklandi.',
     publishSuccess: 'Rasm saytda chop etildi.',
     unpublishSuccess: 'Rasm saytdan olib tashlandi.',
@@ -133,6 +132,7 @@ const uzLatn = {
     empty: 'Sizda hozircha onlayn yozilish so‘rovlari yo‘q.',
     loadError: 'So‘rovlarni yuklab bo‘lmadi. Ulanishni tekshirib, qayta urinib ko‘ring.',
     retry: 'Qayta urinish',
+    loadMore: 'Yana ko‘rsatish',
     requestedTime: 'So‘ralgan vaqt',
     chooseAnotherTime: 'Boshqa vaqtni tanlash',
     status: {
