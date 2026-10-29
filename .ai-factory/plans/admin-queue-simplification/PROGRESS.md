@@ -1,21 +1,22 @@
-## Latest checkpoint — PR #3801 review fixes locally validated — 2026-10-29T20:43+05:00
+## Latest checkpoint — PR #3801 review fixes pushed; source CI pass; evidence push pending — 2026-10-29T21:16+05:00
 
 - Plan version: 1.0
 - Current task: T18 bounded `queue-system.spec.ts` review correction
-- Current status: source and local validation PASS; commit/push and exact-head CI pending
+- Current status: source and local validation PASS; exact source-head CI PASS after one retry of an unrelated Lab E2E timeout; evidence checkpoint uncommitted
 - Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
 - Branch: `codex/aqs-t18-queue-system-route-spec`
 - Base commit: `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`
-- Source under test: working-tree delta on PR HEAD `ebf2715790bb484d0df62bc943edd77bab81abb4`
-- Last updated: 2026-10-29T20:43+05:00
+- Source under test: `0041bcd14dfd1b5b40054928313a630348306331`; exact PR HEAD confirmed equal
+- Last updated: 2026-10-29T21:16+05:00
 
-- Review #5700225111 findings addressed in the spec: all action checks now select a doctor; obsolete add-patient, duplicate-phone, completion and browser-mocked 07:00-window scenarios were removed/replaced because this route has no such controls or server time rule; real DataTable locators compare rows to the selected doctor API snapshot; specialist switching requires two distinct synthetic doctor queues and verifies visible rows.
+- Review #5700225111 findings addressed in the spec: action checks select a doctor; obsolete add-patient, duplicate-phone, completion and browser-mocked 07:00-window scenarios were removed/replaced because this route has no such controls or server time rule; canonical DataTable locators compare rows to the selected doctor API snapshot; specialist switching requires two distinct synthetic doctor queues and verifies visible rows.
 - The call-next scenario requires a waiting synthetic entry, executes only when the spec is later run in disposable staging, and checks the actual API response plus waiting/called status transition. Assertions compare queue labels only in memory and do not print patient values.
-- Actual changed paths: `frontend/e2e/queue-system.spec.ts`; this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md` only.
-- Local validation PASS: scoped ESLint; `tsc --noEmit -p e2e/tsconfig.json`; Playwright collection (6 collected, 0 executed); `npm run build` (43.88s; existing third-party annotation/CSS warnings); CRLF-aware `git diff --check`.
+- Actual changed paths in source commit: `frontend/e2e/queue-system.spec.ts`; the journal checkpoint is a separate docs-only change.
+- Local validation PASS on source commit: scoped ESLint; `tsc --noEmit -p e2e/tsconfig.json`; Playwright collection (6 collected, 0 executed); `npm run build` (43.88s; existing third-party annotation/CSS warnings); CRLF-aware `git diff --check`; normal commit hooks.
 - Gate: prior `gate_known_root_cause` for the same test file/journals returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; prompt read. No gate/router change.
-- Exact-head CI is pending because the validated working-tree delta has not yet been committed/pushed. User's explicit Tier-2 direction remains PARTIAL; the named spec and staging remain NOT_RUN, with no deferral/waiver. User retains merge.
-- Next exact action: commit this single-purpose test/evidence change through normal hooks, push the existing PR branch, then verify checks on the resulting exact PR HEAD before updating review threads/body.
+- Exact-head PR CI run `40904558075` attempt 1 failed on an unrelated `Lab dirty-guard e2e` timeout (`frontend/e2e/lab-dirty-guard.spec.ts:1654`, 60 passed / 1 timeout). The failed job was retried once; attempt 2 passed Lab dirty-guard and all remaining configured E2E groups. Run attempt 2 concluded SUCCESS, including Frontend unit, build, lint/type-check, Frontend E2E and PR Required Gate. Review Quality, Lifecycle, Gitleaks, Security and Agent Workflow Guards PASS. Backend/integration/Docker/readiness and other path-aware jobs are SKIPPED, not PASS.
+- The named `queue-system.spec.ts` and staging remain NOT_RUN. Tier-2 remains PARTIAL, with no deferral/waiver. PR #3801 is OPEN/Ready for review, not merged; user retains merge.
+- Next exact action: commit and push the docs-only evidence checkpoint, verify the resulting exact PR HEAD CI, then reply to and resolve only the three addressed review threads and update the PR description with accurate results.
 
 ## Latest checkpoint — PR #3801 queue-system E2E review corrections — 2026-10-29T20:36+05:00
 

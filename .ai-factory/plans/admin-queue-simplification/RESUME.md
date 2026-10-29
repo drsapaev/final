@@ -1,14 +1,14 @@
-## Latest continuation — PR #3801 review fixes locally validated — 2026-10-29T20:43+05:00
+## Latest continuation — PR #3801 source-head CI passed after unrelated retry — 2026-10-29T21:16+05:00
 
-Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. PR #3801 is OPEN / Ready for review at base HEAD `ebf2715790bb484d0df62bc943edd77bab81abb4`; main/base `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. PR #3801 is OPEN / Ready for review at exact HEAD `0041bcd14dfd1b5b40054928313a630348306331`; base/main `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
 
-The user asked to fix review #5700225111. `frontend/e2e/queue-system.spec.ts` now has six meaningful QueueView scenarios. It selects doctors before scoped controls, uses the canonical table and API snapshots, proves two doctor queues display distinct rows, and removes legacy patient-create/duplicate/completion controls and unsupported 07:00 browser-clock assumptions. The call-next scenario requires a waiting synthetic row and asserts the real status transition. It is mutating and was NOT_RUN.
+The user asked to fix review #5700225111. Source commit `0041bcd14dfd1b5b40054928313a630348306331` updates `frontend/e2e/queue-system.spec.ts` to six meaningful QueueView scenarios. It selects doctors before scoped controls, uses the canonical table and API snapshots, proves two doctor queues display distinct rows, and removes legacy patient-create/duplicate/completion controls and unsupported 07:00 browser-clock assumptions. The call-next scenario requires a waiting synthetic row and asserts the real status transition. It is mutating and was NOT_RUN.
 
-Local validation PASS: scoped ESLint; E2E TS check; Playwright `--list` (6 collected, 0 executed); frontend build (43.88s; only existing third-party/CSS warnings); CRLF-aware diff check. No live E2E/staging/Compose/WSL execution. The previous `gate_known_root_cause` covered the exact scope and returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt read.
+Local validation PASS on `0041bcd`: scoped ESLint; E2E TS check; Playwright `--list` (6 collected, 0 executed); frontend build (43.88s; only existing third-party/CSS warnings); CRLF-aware diff check; normal commit hooks. Unified CI `40904558075` attempt 1 failed at the unrelated Lab dirty-guard test (`lab-dirty-guard.spec.ts:1654`, 60 passed / 1 timeout); attempt 2 passed the Lab test and all remaining configured E2E groups. Attempt 2 result: SUCCESS, including Frontend unit/build/lint, Frontend E2E and PR Required Gate. No live queue spec or staging/Compose/WSL execution.
 
-Only the queue E2E spec and T18 `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md` changed. Exact-head CI is pending until commit/push. Tier-2 remains PARTIAL by explicit user direction, no waiver/deferral. User retains merge.
+The source commit was pushed to PR #3801. This checkpoint changes only the plan journals; its resulting exact PR HEAD still needs CI verification. Tier-2 remains PARTIAL by explicit user direction, no waiver/deferral. User retains merge.
 
-Next: commit and push the reviewed test/evidence slice to PR #3801, verify exact-head CI, then reply to/resolve only the addressed review threads and update the PR description with six collected tests and accurate NOT_RUN status. Do not execute the mutating spec or staging.
+Next: commit/push the docs-only checkpoint, verify checks on the resulting exact head, then reply to and resolve only the three addressed review threads and update the PR body. Do not execute the mutating spec or staging.
 
 ## Latest continuation — PR #3801 review findings accepted for scoped test correction — 2026-10-29T20:36+05:00
 
