@@ -5229,3 +5229,22 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: targeted Admin panel checks PASS; overall Admin live slice PASS across r5/r7. r5/r6 failed attempts are retained as diagnostic history, not converted to PASS. Full `docs/runbooks/STAGING_VALIDATION.md` and remaining integrated T18 scenarios are NOT_RUN. Tier-2 remains PARTIAL; no deferral/waiver.
 - Scope check: only scratch harness/env and plan journals; no runtime/backend/auth policy/database/production/foreign resource, approval, merge, or deployment changes.
 - Next: commit the three journal updates to the existing PR #3805 branch, update the PR description, and verify exact-head CI. User retains merge authority.
+
+## T18 — PR #3805 current UI direction lifecycle — 2026-10-30T18:42+05:00
+
+- Commit under test: 38ecd42927fee6fe867a75188d5cb941e081ec6f; PR #3805 base/current origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
+- GitHub state: OPEN / Ready for review, mergedAt null at the time of this checkpoint, despite the user reporting merge.
+- Environment: own synthetic WSL Ubuntu-24.04 project clinic-aqs-t18-rq18-20261030-r8; host ports 18882/18883/15533; worktree and WSL backing disk had adequate reserve at Preflight. No production or foreign project was used.
+- Execution mode: validation-only continuation under the previously recorded T18 narrow_override; no runtime or tracked test source edits. Scratch harness only.
+- Actual scratch paths: .scratch/t18-final-acceptance-20261030/validate-rq18-session.ps1 and frontend/output/staging/t18-final-acceptance-20261030/rq18-current-ui.{spec.ts,config.ts}. The validation script captured command output in memory and printed only safe status markers/hash; QR code, TOTP secret, credentials and synthetic patient values were not written to evidence.
+- Pre-session canonical Preflight: PASS; commit exact; tracked worktree clean; no warnings. At the last Preflight before Session, host free disk was 18 GiB, WSL backing free disk 28 GiB and Ubuntu available memory approximately 3.2 GiB.
+- Session build/readiness: PASS. Synthetic DEV-DEMO seed: PASS.
+- Served frontend evidence: served sw.js contained exact tested SHA 38ecd42927fee6fe867a75188d5cb941e081ec6f; SHA-256 8038d6d1637df1f61d4995fe25d38cafa1ac7a0b30237a5280a3e70d879f645e. Canonical launcher still reported served_revision_verified=false; only the service-worker marker is attested, not every served static asset.
+- Browser validation: 1 Playwright test, 8/8 checkpoints PASS, 0 failures: normal Admin login and TOTP setup/verification; new QueueProfile hidden by default; doctorless service creation; explicit QR publication; permanent address recovered unchanged after reload; synthetic anonymous join; hide/republish preserves the address; QueueResource archive and restore control availability.
+- Earlier harness-only failures were diagnosed from canonical UI contracts and corrected in scratch: service creation required category/code/price/duration and displays profile title for queue-tag selection; checkbox state belongs to its accessible role wrapper; QR block must be expanded and uses a provision button before the address exists. No product/runtime defect was inferred from these harness failures.
+- Session teardown: PASS; removed 5 containers, 3 volumes and 1 network; remaining owned containers/volumes/networks all 0; local images removed.
+- Post-Session canonical Preflight: FAIL with WINDOWS_PORT_OWNER. Session teardown itself passed; do not begin another staging session until a fresh Preflight passes.
+- Validation commands: PowerShell syntax parse PASS; targeted TypeScript check for scratch spec/config PASS; Playwright collection PASS (1 collected, not counted as execution); canonical Preflight PASS → Session PASS for the final run → teardown PASS. Earlier failed Sessions and the no-build attempt are retained as diagnostic history and not reported as successful.
+- Result: this current UI flow PASS on exact commit. Overall Tier-2 remains PARTIAL. Full docs/runbooks/STAGING_VALIDATION.md and remaining integrated T18 scenarios are NOT_RUN; no deferral is claimed.
+- Scope check: no tracked runtime/test change, no production/foreign Compose, no merge or deployment. PR #3805 remains open at the time checked.
+- Next: commit and push the three journal updates to existing PR #3805, refresh the PR description with exact results/limitations, then verify exact-head CI. Await user-owned merge before starting a new PR cycle.

@@ -1,12 +1,14 @@
-## Latest continuation — PR #3805 Admin panel checks passed — 2026-10-30T17:07+05:00
+## Latest continuation — PR #3805 T18 current UI lifecycle flow passed — 2026-10-30T18:42+05:00
 
-Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/t18-queue-row-diagnostics`. PR #3805 is OPEN / Ready for review at HEAD `b74cdb4d1393bcdab31bbf6e95fbf60130473b68`; base/current main is `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`, including merged PR #3801. User owns merge; do not approve or merge.
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/t18-queue-row-diagnostics. GitHub still reports PR #3805 OPEN / Ready for review at exact HEAD 38ecd42927fee6fe867a75188d5cb941e081ec6f, base 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. Although the user said it was merged, mergedAt is null; verify before beginning a new PR cycle.
 
-The exact tested application/test source was `9e1cf85cc89e19969799cac6d5833f7d78389b2c`; `b74cdb4` adds only documentation. In separate synthetic cycles, Admin navigation passed 3/3, Admin panel cases passed 2/2, normal Admin password login and TOTP setup/verification passed, and the earlier queue-system suite passed 6/6. r5 exposed an invalid success assertion; r6 exposed an invalid optional `.test` email in the scratch fixture (HTTP 422, locally reproduced as `EmailStr` validation failure); r7 omitted email and passed both panel tests. All Sessions auto-teardown passed and post-session Preflight was clean. Full staging runbook/T18 remains incomplete and Tier-2 stays PARTIAL.
+Latest owned synthetic project r8 completed canonical Preflight and one complete Session. DEV-DEMO seed PASS; served sw.js marker matched the tested commit (SHA-256 8038d6d1637df1f61d4995fe25d38cafa1ac7a0b30237a5280a3e70d879f645e); Admin 2FA PASS; hidden-by-default profile PASS; doctorless service PASS; explicit publication PASS; permanent QR address stable after reload PASS; synthetic anonymous join PASS; hide/republish same address PASS; resource archive/restore PASS. All eight browser checkpoints passed.
 
-Latest r7 details are recorded in `EVIDENCE.md`. The service-worker file marker and SHA-256 match the tested commit, but the staging helper continues to report `served_revision_verified=false`; do not claim full frontend artifact attestation.
+Session teardown PASS: removed 5 containers, 3 volumes, 1 network; remaining owned resources 0; local images removed. A subsequent Preflight failed with WINDOWS_PORT_OWNER. Do not start more staging until a fresh Preflight passes. The helper still reports served_revision_verified=false; the sw.js marker/hash is not full static-asset provenance.
 
-Next: commit the plan-journal evidence, push to the existing PR branch, refresh PR #3805 body with the new Admin panel results and the remaining Tier-2 limits, then verify exact-head CI. Do not approve, merge, or deploy. After the user merges, continue remaining T18 acceptance.
+Earlier same-source evidence remains queue-system 6/6, Admin navigation 3/3, and Admin panels 2/2. Full STAGING_VALIDATION.md and remaining T18 acceptance are incomplete; Tier-2 remains PARTIAL and no deferral is claimed.
+
+Next: commit/push the three updated T18 journals on the existing PR branch, refresh PR #3805 description, and verify exact-head CI. Do not approve, merge, deploy, or create the next PR cycle; the user owns merge. After GitHub confirms merge, fetch fresh origin/main and continue T18 in an isolated worktree.
 
 ## Previous continuation — PR #3805 staging queue suite passed — 2026-10-30T15:39+05:00
 

@@ -1,19 +1,16 @@
-## Current checkpoint — PR #3805 Admin panel staging checks passed — 2026-10-30T17:07+05:00
+## Current checkpoint — T18 current UI lifecycle flow passed; PR #3805 still open — 2026-10-30T18:42+05:00
 
 - Plan version: 1.0
-- Current task: T18 integrated synthetic acceptance; PR #3805
-- Current status: PR #3805 OPEN / Ready for review at `b74cdb4d1393bcdab31bbf6e95fbf60130473b68`; base/current main is merged PR #3801 at `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`. Admin navigation 3/3 passed in r5; Admin panel tests 2/2 passed in r7. Normal Admin password + TOTP passed. Queue E2E 6/6 was already confirmed in the earlier exact code run. Tier-2 remains PARTIAL; full T18/STAGING_VALIDATION.md is incomplete.
-- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
-- Branch: `codex/t18-queue-row-diagnostics`
-- Current PR HEAD under test: `b74cdb4d1393bcdab31bbf6e95fbf60130473b68`; executable code was from `9e1cf85cc89e19969799cac6d5833f7d78389b2c`, with only the plan checkpoint added in `b74cdb4`.
-- r5 finding: a scratch test treated a page button behind the modal as proof of successful patient creation. This harness assertion was invalid; navigation 3/3 and normal Admin TOTP passed. The panel suite stopped at the first failed test.
-- r6 finding: after strengthening the assertion, synthetic patient creation returned HTTP 422. Local validation of the same synthetic request identified the optional `.test` email as invalid under `EmailStr`; no product change was made. Session teardown and post-session Preflight passed.
-- r7 result: removed the unnecessary email, required a successful POST and form dismissal, then ran only the two panel cases. Synthetic seed, service-worker commit marker/hash, guarded Admin bootstrap, normal Admin TOTP, and panel tests 2/2 passed.
-- r7 teardown: PASS; removed 5 containers, 3 volumes, 1 network; remaining owned resources 0. Post-session canonical Preflight PASS; no warnings; C: 17 GiB free, WSL backing D: 28 GiB free, Ubuntu available memory 3190 MiB.
-- Served artifact limit: the captured `sw.js` contains the exact tested commit and SHA-256 `7693a0276b889ecc6845039f7bd3e3616f15c5e5d0ada4434ac63833d6466fc5`; the launcher still reports `served_revision_verified=false`, so this proves the service-worker marker only, not every served frontend asset.
-- Scope: no runtime or tracked test changed in these staging cycles. T18 journals are the only planned tracked updates; production, foreign projects, approval, merge, and deployment remain untouched. User owns merge.
-- Remaining: full `STAGING_VALIDATION.md` and the rest of integrated T18 are NOT_RUN. Tier-2 remains PARTIAL; no deferral is claimed.
-- Next exact action: record this evidence in the three T18 journals and refresh the existing PR #3805 description; verify exact-head CI after the evidence commit. Do not approve or merge.
+- Current task: T18 integrated synthetic acceptance; PR #3805.
+- Current status: The user reported merge, but direct GitHub state is OPEN / Ready for review at HEAD 38ecd42927fee6fe867a75188d5cb941e081ec6f; mergedAt is null. Base and current origin/main are 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final; branch codex/t18-queue-row-diagnostics; tracked worktree clean.
+- Latest r8 Session: Preflight passed; synthetic DEV-DEMO seed passed; served sw.js contained exact commit marker, SHA-256 8038d6d1637df1f61d4995fe25d38cafa1ac7a0b30237a5280a3e70d879f645e; Admin 2FA and all eight current UI lifecycle checkpoints passed.
+- r8 teardown: PASS; removed 5 containers, 3 volumes, 1 network; remaining owned resources 0. Local staging images were removed.
+- Post-Session Preflight: FAIL with WINDOWS_PORT_OWNER. Do not start another staging cycle until a fresh canonical Preflight passes.
+- Artifact limit: the sw.js marker/hash confirms that artifact only. The launcher still reports served_revision_verified=false; full frontend artifact provenance is NOT_RUN.
+- Earlier same-source evidence remains: queue-system 6/6; Admin navigation 3/3; Admin panel 2/2. Tier-2 remains PARTIAL; the complete STAGING_VALIDATION.md checklist and remaining T18 integrated checks are incomplete.
+- Scope: validation-only scratch harness and journals; no runtime, tracked test source, production, foreign project, merge, or deployment change.
+- Next exact action: record/commit the three T18 journal updates to the existing PR branch, refresh PR #3805 description with exact evidence and limits, then verify exact-head CI. Do not start a new PR cycle until GitHub confirms the current PR is merged.
 
 ## Previous checkpoint — PR #3805 queue E2E and Admin route checks passed — 2026-10-30T15:39+05:00
 
