@@ -1,4 +1,14 @@
-## Latest continuation — PR #3805 exact static frontend provenance passed — 2026-10-30T21:21+05:00
+## Latest continuation — PR #3805 exact-head CI passed — 2026-10-30T23:10+05:00
+
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/t18-queue-row-diagnostics. PR #3801 is merged at 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. At CI verification PR #3805 was OPEN / Ready for review / mergeable at HEAD 8be11af929c1faa9e0d091427e055ab512540923, based on the same main commit. This journal-only update advances the PR head. User owns merge; do not merge or deploy. On resume, re-read the current PR head and exact-head checks before deciding the next step.
+
+Exact-head checks passed: Frontend build/unit/lint/E2E, PR Required Gate, PR Review Quality Gate, Security/Gitleaks/CodeQL, lifecycle recommendation and Windows/Ubuntu Git scratch guards. The first Windows guard attempt was cancelled after tests printed OK; rerun attempt 2 passed. Local Windows scratch guard suite passed 5/5 through the repository Python launcher. Path-aware backend/integration/Docker/readiness/load/DAST jobs were SKIPPED, not PASS.
+
+The PR description now states the completed checks and remaining limits. Tier-2 is PARTIAL; full integrated T18 and docs/runbooks/STAGING_VALIDATION.md are incomplete; no deferral is claimed. Do not repeat queue-system 6/6, Admin navigation 3/3 + panel 2/2, RQ18 8/8, R5 static comparison 261/261 or the route-context scenario.
+
+Next: re-read PR #3805 exact HEAD/state and applicable CI; if green, await user-owned merge. Then refresh origin/main, use a fresh worktree and continue one uncovered T18 item. Preserve task-owned ignored harness outputs because the desktop policy previously rejected deletion; do not use alternate deletion methods.
+
+## Previous continuation — PR #3805 exact static frontend provenance passed — 2026-10-30T21:21+05:00
 
 Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/t18-queue-row-diagnostics. PR #3801 is confirmed merged at 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. PR #3805 remains OPEN / Ready for review at exact HEAD b9dfbd4642e57492421c3ef15daa0317d7351279, base/current origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. User owns merge; do not merge or deploy.
 

@@ -5324,3 +5324,23 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: Tier-2 remains PARTIAL. Full T18 integration and every item in `docs/runbooks/STAGING_VALIDATION.md` are not complete; no deferral is claimed.
 - PR: https://github.com/drsapaev/final/pull/3805. Merge commit: none; PR #3805 remains open and user retains merge authority.
 - Next: commit/push the three T18 journals to existing PR #3805, update its description to the new exact HEAD and verify CI; then continue only a distinct unverified T18 item after user-owned merge.
+
+
+## T18 — PR #3805 exact-head CI completion — 2026-10-30T23:10+05:00
+
+- Commit under test: 8be11af929c1faa9e0d091427e055ab512540923; base/current origin/main: 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
+- Environment: GitHub Actions; local Windows host with repository Python 3.11 launcher.
+- Execution mode: exact-head validation and evidence update within the existing approved T18 scope. No source, staging, production or auth operation.
+- Allowed paths: T18 journals, task-owned prework checkpoint, existing PR #3805 body. Denied: runtime/tests, production, foreign projects, merge/deploy.
+- Original CI anomaly: Windows Git scratch guard attempt 1 concluded CANCELLED after its log showed five test cases and “Ran 5 tests ... OK”; cause of cancellation was not established. It was not recorded as PASS.
+- Validation commands/results:
+  - scripts/run_python.ps1 invoking unittest discovery for scripts/tests/test_agent_scratch_ignore.py: PASS, 5 tests.
+  - GitHub Actions Unified CI run 41100443815 at exact HEAD: Frontend build/unit/lint/E2E and PR Required Gate PASS.
+  - Agent Workflow Guards run 41100443810, attempt 2: Windows and Ubuntu scratch guards PASS; Windows duration 22s.
+  - Security, CodeQL, Gitleaks, PR Review Quality Gate and lifecycle recommendation: PASS.
+  - Backend, integration, Docker, parity, staging/production readiness, load and DAST jobs: SKIPPED by workflow scope, not PASS.
+  - git -c core.whitespace=cr-at-eol diff --check origin/main...HEAD: PASS. Repository baseline uses CRLF; no line-ending rewrite was kept.
+- Result: exact-head applicable CI PASS. PR body updated with current CI state and explicit path-aware skips. At verification PR #3805 was OPEN / Ready for review / mergeable; this journal-only follow-up advances its head. No approval or merge performed.
+- Scope check: only PROGRESS.md, RESUME.md, EVIDENCE.md are changed by this follow-up; no application/runtime/test, staging, production, or Docker resource changes.
+- Remaining limitation: T18 Tier-2 is PARTIAL; full integrated T18 and full docs/runbooks/STAGING_VALIDATION.md remain NOT_RUN/incomplete. No deferral is claimed. Exact staging evidence stays anchored to its recorded source commit; no scenario was repeated.
+- Next exact action: re-read current PR #3805 HEAD/state and exact-head CI after this docs-only follow-up; if green, await user-owned merge. Then sync latest origin/main in a fresh worktree and run only one remaining T18 scenario. Preserve task-owned ignored harness paths; no alternate cleanup was attempted.

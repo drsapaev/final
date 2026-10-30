@@ -1,4 +1,17 @@
-## Current checkpoint — T18 Admin setup context live scenario passed — 2026-10-30T22:33+05:00
+## Current checkpoint — PR #3805 exact-head CI passed; awaiting user merge — 2026-10-30T23:10+05:00
+
+- Plan version: 1.0.
+- Current task: T18 integrated synthetic acceptance; PR #3805.
+- Current status: IN_PROGRESS. PR #3801 is confirmed merged at 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. At CI verification, PR #3805 was OPEN / Ready for review / mergeable at HEAD 8be11af929c1faa9e0d091427e055ab512540923, base 22b21a8b7c3c0b9b56f4e388c35e329a4321f768, and applicable checks passed. This checkpoint itself is journal-only and advances PR HEAD; re-read the exact PR state/checks before merge. User retains merge authority.
+- Completed this checkpoint: exact-head Frontend build/unit/lint/E2E and PR Required Gate PASS; Security, Gitleaks, CodeQL, PR Review Quality Gate and lifecycle recommendation PASS. Windows/Ubuntu Git scratch guards PASS on rerun. Local Windows scratch guard suite: 5/5 PASS using scripts/run_python.ps1.
+- The first Windows scratch-guard job was marked cancelled after its output showed all five tests passing; its terminal conclusion was treated as CANCELLED. Rerun attempt 2 completed PASS. No code defect was inferred.
+- Diff validation: git -c core.whitespace=cr-at-eol diff --check origin/main...HEAD PASS. Repository files use CRLF; default local git diff --check reports CR at EOL as whitespace. No broad EOL rewrite was kept.
+- PR body corrected to reflect the completed exact-head CI. Worktree was clean before this journal update; no runtime, tracked-test, staging, production, or Docker resource changes.
+- T18 remains PARTIAL. Full integrated T18 and docs/runbooks/STAGING_VALIDATION.md are incomplete; no deferral is claimed. Existing passing scenarios are not to be repeated.
+- Allowed scope: this task's T18 journals and PR #3805 body. Denied: runtime/application/tests, production, foreign projects, merge/deploy.
+- Next exact action: on resume, read the actual PR #3805 HEAD/state and verify exact-head applicable CI; update its body only if stale. If checks pass, await the user-owned merge. After merge, refresh origin/main in a fresh worktree and select one unverified T18 case (prioritize defaults/snapshots, cabinets, quota concurrency or replay). Do not repeat queue-system 6/6, Admin navigation 3/3 + panel 2/2, RQ18 8/8, R5 static comparison 261/261, or this route-context scenario.
+
+## Previous checkpoint — T18 Admin setup context live scenario passed — 2026-10-30T22:33+05:00
 
 - Plan version: 1.0.
 - Current task: T18 integrated synthetic acceptance; existing PR #3805.
