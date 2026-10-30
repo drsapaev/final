@@ -59,12 +59,16 @@ class CircuitBreaker:
             import os
 
             import redis.asyncio as aioredis
+
             redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
             self._redis = aioredis.from_url(redis_url, decode_responses=True)
             await self._redis.ping()
             return self._redis
         except Exception as e:
-            logger.debug(f"FA-012: Redis unavailable, using in-memory: {e}")
+            logger.debug(
+                "FA-012: Redis unavailable, using in-memory (error_type=%s)",
+                type(e).__name__,
+            )
             self._redis = None
             return None
 
@@ -72,13 +76,21 @@ class CircuitBreaker:
         redis = await self._get_redis()
         if redis:
             try:
-                state = await redis.get(f"{self._redis_key_prefix}:state:{provider}") or "CLOSED"
+                state = (
+                    await redis.get(f"{self._redis_key_prefix}:state:{provider}")
+                    or "CLOSED"
+                )
                 if state == "OPEN":
-                    last_fail = await redis.get(f"{self._redis_key_prefix}:last_fail:{provider}")
+                    last_fail = await redis.get(
+                        f"{self._redis_key_prefix}:last_fail:{provider}"
+                    )
                     if last_fail:
                         elapsed = datetime.now(UTC) - datetime.fromisoformat(last_fail)
                         if elapsed > timedelta(seconds=self.recovery_timeout):
-                            await redis.set(f"{self._redis_key_prefix}:state:{provider}", "HALF_OPEN")
+                            await redis.set(
+                                f"{self._redis_key_prefix}:state:{provider}",
+                                "HALF_OPEN",
+                            )
                             return True
                     return False
                 return True
@@ -90,7 +102,9 @@ class CircuitBreaker:
             return True
         if state == "OPEN":
             last = self._mem_last_failure.get(provider)
-            if last and datetime.now(UTC) - last > timedelta(seconds=self.recovery_timeout):
+            if last and datetime.now(UTC) - last > timedelta(
+                seconds=self.recovery_timeout
+            ):
                 self._mem_state[provider] = "HALF_OPEN"
                 return True
             return False
@@ -112,11 +126,20 @@ class CircuitBreaker:
         redis = await self._get_redis()
         if redis:
             try:
-                failures = await redis.incr(f"{self._redis_key_prefix}:failures:{provider}")
-                await redis.set(f"{self._redis_key_prefix}:last_fail:{provider}", datetime.now(UTC).isoformat())
+                failures = await redis.incr(
+                    f"{self._redis_key_prefix}:failures:{provider}"
+                )
+                await redis.set(
+                    f"{self._redis_key_prefix}:last_fail:{provider}",
+                    datetime.now(UTC).isoformat(),
+                )
                 if failures >= self.failure_threshold:
-                    await redis.set(f"{self._redis_key_prefix}:state:{provider}", "OPEN")
-                    logger.warning(f"FA-012: Circuit for {provider}: OPEN ({failures} failures, Redis)")
+                    await redis.set(
+                        f"{self._redis_key_prefix}:state:{provider}", "OPEN"
+                    )
+                    logger.warning(
+                        f"FA-012: Circuit for {provider}: OPEN ({failures} failures, Redis)"
+                    )
                 return
             except Exception:
                 pass
@@ -155,10 +178,7 @@ class AIGateway(IAIGateway):
             AITaskType.LAB_INTERPRETATION: timedelta(hours=2),
         }
 
-        self._circuit_breaker = CircuitBreaker(
-            failure_threshold=3,
-            recovery_timeout=60
-        )
+        self._circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=60)
 
         self._anonymizer = get_anonymizer()
         self._rate_limiter = get_rate_limiter()
@@ -168,7 +188,7 @@ class AIGateway(IAIGateway):
             AIProviderType.DEEPSEEK,  # Cheapest
             AIProviderType.GEMINI,
             AIProviderType.OPENAI,
-            AIProviderType.MOCK,      # Fallback
+            AIProviderType.MOCK,  # Fallback
         ]
 
         logger.info("AI Gateway initialized")
@@ -178,7 +198,7 @@ class AIGateway(IAIGateway):
         task_type: AITaskType,
         payload: dict[str, Any],
         user_id: int,
-        specialty: str | None = None
+        specialty: str | None = None,
     ) -> AIResponse:
         """
         Единая точка входа для AI операций.
@@ -219,7 +239,9 @@ class AIGateway(IAIGateway):
                 )
 
             # 2. Cache lookup
-            cache_key = self._make_cache_key(task_type, payload, specialty, user_id=user_id)
+            cache_key = self._make_cache_key(
+                task_type, payload, specialty, user_id=user_id
+            )
             cached = self._get_from_cache(cache_key)
             if cached:
                 logger.info(f"[{request_id}] Cache hit")
@@ -258,7 +280,11 @@ class AIGateway(IAIGateway):
                 tokens_used=response.tokens_used,
                 cached=response.cached,
                 payload=payload,
-                response_preview=response.data.get("content", "") if response.status == "success" else None
+                response_preview=(
+                    response.data.get("content", "")
+                    if response.status == "success"
+                    else None
+                ),
             )
 
             # 7. Cache successful responses
@@ -268,7 +294,14 @@ class AIGateway(IAIGateway):
             return response
 
         except Exception as e:
-            logger.exception(f"[{request_id}] AI Gateway error: {e}")
+            logger.error(
+                "AI Gateway request failed",
+                extra={
+                    "diagnostic_code": "ai_gateway_unexpected_error",
+                    "request_id": request_id,
+                    "error_type": type(e).__name__,
+                },
+            )
             latency_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
             return AIResponse(
@@ -289,7 +322,7 @@ class AIGateway(IAIGateway):
         task_type: AITaskType,
         payload: dict[str, Any],
         user_id: int,
-        specialty: str | None = None
+        specialty: str | None = None,
     ) -> AsyncIterator[str]:
         """
         Streaming version for chat.
@@ -326,11 +359,17 @@ class AIGateway(IAIGateway):
             chunk_size = 50
 
             for i in range(0, len(content), chunk_size):
-                yield content[i:i + chunk_size]
+                yield content[i : i + chunk_size]
                 await asyncio.sleep(0.05)  # Simulate streaming delay
 
         except Exception as e:
-            logger.exception(f"Streaming error: {e}")
+            logger.error(
+                "AI Gateway stream failed",
+                extra={
+                    "diagnostic_code": "ai_gateway_stream_error",
+                    "error_type": type(e).__name__,
+                },
+            )
             yield "[ERROR] AI service temporarily unavailable"  # sanitized
 
     async def _execute_with_fallback(
@@ -338,7 +377,7 @@ class AIGateway(IAIGateway):
         task_type: AITaskType,
         payload: dict[str, Any],
         specialty: str | None,
-        request_id: str
+        request_id: str,
     ) -> AIResponse:
         """Execute with provider fallback chain"""
         errors = []
@@ -346,13 +385,19 @@ class AIGateway(IAIGateway):
         for provider_type in self._provider_priority:
             # Check circuit breaker
             if not await self._circuit_breaker.is_available(provider_type.value):
-                logger.debug(f"[{request_id}] Skipping {provider_type.value} (circuit open)")
+                logger.debug(
+                    f"[{request_id}] Skipping {provider_type.value} (circuit open)"
+                )
                 continue
 
             # Check rate limit for provider
-            allowed, _ = await self._rate_limiter.check_provider_limit(provider_type.value)
+            allowed, _ = await self._rate_limiter.check_provider_limit(
+                provider_type.value
+            )
             if not allowed:
-                logger.debug(f"[{request_id}] Skipping {provider_type.value} (rate limited)")
+                logger.debug(
+                    f"[{request_id}] Skipping {provider_type.value} (rate limited)"
+                )
                 continue
 
             try:
@@ -362,7 +407,9 @@ class AIGateway(IAIGateway):
                     continue
 
                 # Route to appropriate method
-                result = await self._route_task(provider, provider_type, task_type, payload, specialty)
+                result = await self._route_task(
+                    provider, provider_type, task_type, payload, specialty
+                )
 
                 # Success!
                 await self._circuit_breaker.record_success(provider_type.value)
@@ -373,7 +420,9 @@ class AIGateway(IAIGateway):
                     provider=provider_type.value,
                     model=getattr(provider, "model", None) or "unknown",
                     latency_ms=0,  # Will be set by caller
-                    tokens_used=result.get("tokens_used") if isinstance(result, dict) else None,
+                    tokens_used=(
+                        result.get("tokens_used") if isinstance(result, dict) else None
+                    ),
                     requires_doctor_confirmation=True,
                     decision_boundary="suggestion_only",
                     ai_notice=AI_NOTICE,
@@ -382,7 +431,15 @@ class AIGateway(IAIGateway):
             except Exception as e:
                 error_msg = f"{provider_type.value}: failed"  # sanitized
                 errors.append(error_msg)
-                logger.warning(f"[{request_id}] Provider {provider_type.value} failed: {e}")
+                logger.warning(
+                    "AI provider call failed",
+                    extra={
+                        "diagnostic_code": "ai_provider_failure",
+                        "request_id": request_id,
+                        "provider": provider_type.value,
+                        "error_type": type(e).__name__,
+                    },
+                )
                 await self._circuit_breaker.record_failure(provider_type.value)
                 continue
 
@@ -403,10 +460,15 @@ class AIGateway(IAIGateway):
         """Get provider instance from ai_manager"""
         try:
             from .ai_manager import get_ai_manager
+
             manager = get_ai_manager()
             return manager.get_provider(provider_type)
         except Exception as e:
-            logger.debug(f"Failed to get provider {provider_type}: {e}")
+            logger.debug(
+                "Failed to get provider (provider=%s, error_type=%s)",
+                provider_type.value,
+                type(e).__name__,
+            )
             return None
 
     async def _route_task(
@@ -415,40 +477,34 @@ class AIGateway(IAIGateway):
         provider_type: AIProviderType,
         task_type: AITaskType,
         payload: dict[str, Any],
-        specialty: str | None
+        specialty: str | None,
     ) -> dict[str, Any]:
         """Route task to appropriate provider method"""
 
         # Task type to method mapping
         if task_type == AITaskType.COMPLAINT_ANALYSIS:
             result = await provider.analyze_complaint(
-                payload.get("complaint", ""),
-                payload.get("patient_info")
+                payload.get("complaint", ""), payload.get("patient_info")
             )
         elif task_type == AITaskType.ICD10_SUGGESTION:
             result = await provider.suggest_icd10(
-                payload.get("symptoms", []),
-                payload.get("diagnosis")
+                payload.get("symptoms", []), payload.get("diagnosis")
             )
         elif task_type == AITaskType.LAB_INTERPRETATION:
             result = await provider.interpret_lab_results(
-                payload.get("results", []),
-                payload.get("patient_info")
+                payload.get("results", []), payload.get("patient_info")
             )
         elif task_type == AITaskType.SKIN_ANALYSIS:
             result = await provider.analyze_skin(
-                payload.get("image_data"),
-                payload.get("metadata")
+                payload.get("image_data"), payload.get("metadata")
             )
         elif task_type == AITaskType.ECG_INTERPRETATION:
             result = await provider.interpret_ecg(
-                payload.get("ecg_data"),
-                payload.get("patient_info")
+                payload.get("ecg_data"), payload.get("patient_info")
             )
         elif task_type == AITaskType.DIFFERENTIAL_DIAGNOSIS:
             result = await provider.differential_diagnosis(
-                payload.get("symptoms", []),
-                payload.get("patient_info")
+                payload.get("symptoms", []), payload.get("patient_info")
             )
         elif task_type == AITaskType.CHAT_MESSAGE:
             # Chat message with history support
@@ -466,7 +522,10 @@ class AIGateway(IAIGateway):
                 "laboratory": "Вы - AI ассистент для лаборатории. Помогайте с интерпретацией результатов анализов, выявлением отклонений и рекомендациями по дополнительным исследованиям.",
                 "general": "Вы - медицинский AI ассистент общей практики. Помогайте врачам с диагностикой, дифференциальной диагностикой и планированием обследований.",
             }
-            system_prompt = system_prompts.get(specialty_context, "Вы - медицинский AI ассистент. Помогайте врачам с профессиональными вопросами.")
+            system_prompt = system_prompts.get(
+                specialty_context,
+                "Вы - медицинский AI ассистент. Помогайте врачам с профессиональными вопросами.",
+            )
 
             # FA-002: structured messages — no concatenation (anti prompt injection)
             system_prompt_safe = (
@@ -478,13 +537,14 @@ class AIGateway(IAIGateway):
                 prompt=message,
                 system_prompt=system_prompt_safe,
                 temperature=0.3,  # FA-002: lowered for determinism
-                max_tokens=1500
+                max_tokens=1500,
             )
 
             result = await provider.generate(request)
         else:
             # Default: generic generation
             from .base_provider import AIRequest
+
             request = AIRequest(prompt=json.dumps(payload))
             result = await provider.generate(request)
 
@@ -492,7 +552,10 @@ class AIGateway(IAIGateway):
         if isinstance(result, str):
             return {"content": result}
         elif hasattr(result, "content"):
-            return {"content": result.content, "tokens_used": getattr(result, "tokens_used", None)}
+            return {
+                "content": result.content,
+                "tokens_used": getattr(result, "tokens_used", None),
+            }
         elif isinstance(result, dict):
             return result
         else:
@@ -503,7 +566,7 @@ class AIGateway(IAIGateway):
         task_type: AITaskType,
         payload: dict[str, Any],
         specialty: str | None,
-        user_id: int | None = None
+        user_id: int | None = None,
     ) -> str:
         """FA-004: cache key includes user_id for tenant isolation."""
         key_data = {
@@ -536,7 +599,11 @@ class AIGateway(IAIGateway):
 
     def _save_to_cache(self, cache_key: str, response: AIResponse, task_type=None):
         """FA-009: save with per-task TTL."""
-        if task_type and hasattr(self, '_cache_ttl_by_task') and task_type in self._cache_ttl_by_task:
+        if (
+            task_type
+            and hasattr(self, "_cache_ttl_by_task")
+            and task_type in self._cache_ttl_by_task
+        ):
             ttl = self._cache_ttl_by_task[task_type]
             if ttl == timedelta(0):
                 return
@@ -560,7 +627,7 @@ class AIGateway(IAIGateway):
         tokens_used: int | None,
         cached: bool,
         payload: dict[str, Any] | None = None,
-        response_preview: str | None = None
+        response_preview: str | None = None,
     ):
         """FA-007: audit with payload + response preview."""
         try:
@@ -571,9 +638,11 @@ class AIGateway(IAIGateway):
             db = SessionLocal()
             try:
                 # Find provider ID
-                provider_record = db.query(AIProviderModel).filter(
-                    AIProviderModel.name == provider
-                ).first()
+                provider_record = (
+                    db.query(AIProviderModel)
+                    .filter(AIProviderModel.name == provider)
+                    .first()
+                )
 
                 if not provider_record and provider != "none":
                     logger.warning(f"Provider '{provider}' not found in DB for audit")
@@ -588,7 +657,7 @@ class AIGateway(IAIGateway):
                     tokens_used=tokens_used,
                     response_time_ms=latency_ms,
                     success=success,
-                    cached_response=cached
+                    cached_response=cached,
                 )
 
                 db.add(log)
@@ -599,7 +668,7 @@ class AIGateway(IAIGateway):
 
         except Exception as e:
             # Don't fail the request if audit fails
-            logger.error(f"Failed to audit AI request: {e}")
+            logger.error("Failed to audit AI request (error_type=%s)", type(e).__name__)
 
     async def get_available_providers(self) -> list[AIProviderType]:
         """FA-012: async — uses Redis-backed circuit breaker."""
@@ -625,10 +694,7 @@ class AIGateway(IAIGateway):
         health = {
             "status": "healthy",
             "providers": {},
-            "cache": {
-                "enabled": self._cache_enabled,
-                "size": len(self._cache)
-            }
+            "cache": {"enabled": self._cache_enabled, "size": len(self._cache)},
         }
 
         for provider_type in self._provider_priority:
@@ -642,9 +708,7 @@ class AIGateway(IAIGateway):
             }
 
         # Overall status
-        available_count = sum(
-            1 for p in health["providers"].values() if p["available"]
-        )
+        available_count = sum(1 for p in health["providers"].values() if p["available"])
         if available_count == 0:
             health["status"] = "unhealthy"
         elif available_count < len(self._provider_priority) - 1:  # Exclude MOCK

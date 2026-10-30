@@ -8,51 +8,45 @@ These tests do NOT require a running Sentry SDK or network — they exercise
 ``sanitize_event`` and the ``before_send`` closure directly against
 synthetic event dicts.
 """
+
 from __future__ import annotations
 
-from unittest.mock import patch
+import sys
+from types import ModuleType
+from unittest.mock import Mock, patch
 
+from app.core import sentry as sentry_module
 from app.core.sentry import sanitize_event
 
 
-def _make_before_send():
-    """Return the ``before_send`` closure defined inside ``init_sentry``.
+def _make_before_send(monkeypatch, callback_name="before_send"):
+    """Return a callback actually passed to ``sentry_sdk.init``."""
+    sdk = ModuleType("sentry_sdk")
+    sdk.__path__ = []
+    sdk.init = Mock()
+    integrations = ModuleType("sentry_sdk.integrations")
+    integrations.__path__ = []
+    monkeypatch.setitem(sys.modules, "sentry_sdk", sdk)
+    monkeypatch.setitem(sys.modules, "sentry_sdk.integrations", integrations)
 
-    We call ``init_sentry`` with SENTRY_DSN unset (no-op) and patch the SDK
-    import so the closure is still constructed. The closure is extracted from
-    the ``init_sentry`` function's locals via a test hook.
-    """
-    # init_sentry returns None, but before_send is defined inside it.
-    # To test it in isolation, we replicate the closure's behavior by
-    # calling sanitize_event directly (which is what before_send does).
-    # For the "sanitizer fails" test, we patch sanitize_event to raise.
-    # This is sufficient because before_send is a thin wrapper:
-    #   try: sanitize_event(event)
-    #   except Exception: logger.warning(...)
-    #   return event
-    #
-    # For direct before_send tests, we construct an equivalent closure.
-    import logging
+    for module_name, integration_name in (
+        ("fastapi", "FastApiIntegration"),
+        ("redis", "RedisIntegration"),
+        ("sqlalchemy", "SqlalchemyIntegration"),
+        ("asyncpg", "AsyncPGIntegration"),
+    ):
+        module = ModuleType(f"sentry_sdk.integrations.{module_name}")
+        setattr(module, integration_name, lambda: object())
+        monkeypatch.setitem(
+            sys.modules, f"sentry_sdk.integrations.{module_name}", module
+        )
 
-    sentinel_logger = logging.getLogger("app.core.sentry")
+    monkeypatch.delenv("TESTING", raising=False)
+    monkeypatch.setenv("SENTRY_DSN", "test-dsn")
+    sentry_module.init_sentry()
 
-    def before_send(event, hint=None):
-        try:
-            sanitize_event(event)
-        except Exception:
-            # logger.warning (NOT logger.exception) — avoids Sentry recursion
-            # because LoggingIntegration DEFAULT_EVENT_LEVEL=ERROR and
-            # WARNING < ERROR, so no new Sentry event is created.
-            sentinel_logger.warning(
-                "Sentry before_send sanitizer failed — "
-                "event sent unscrubbed (event_id=%s error_type=%s)",
-                event.get("event_id", "unknown"),
-                type(hint.get("exception") or hint.get("exc_info") or Exception()).__name__
-                if hint else "unknown",
-            )
-        return event
-
-    return before_send
+    assert sdk.init.call_count == 1
+    return sdk.init.call_args.kwargs[callback_name]
 
 
 class TestSanitizeEventPhoneScrubbing:
@@ -371,7 +365,10 @@ class TestSanitizeEventBreadcrumbsShape:
         event = {
             "breadcrumbs": {
                 "values": [
-                    {"message": "visit failed for +998901234567 john@example.com", "data": {}}
+                    {
+                        "message": "visit failed for +998901234567 john@example.com",
+                        "data": {},
+                    }
                 ]
             }
         }
@@ -449,7 +446,10 @@ class TestSanitizeEventIdempotency:
         }
         # Second pass on the already-scrubbed value
         sanitize_event(first_pass)
-        assert first_pass["exception"]["values"][0]["value"] == event["exception"]["values"][0]["value"]
+        assert (
+            first_pass["exception"]["values"][0]["value"]
+            == event["exception"]["values"][0]["value"]
+        )
 
 
 class TestSanitizeEventMissingFields:
@@ -489,9 +489,7 @@ class TestSanitizeEventMissingFields:
     def test_event_with_no_stacktrace(self):
         """``exception.values[*]`` with no ``stacktrace`` must not raise."""
         event = {
-            "exception": {
-                "values": [{"type": "ValueError", "value": "no stacktrace"}]
-            }
+            "exception": {"values": [{"type": "ValueError", "value": "no stacktrace"}]}
         }
         result = sanitize_event(event)
         assert result["exception"]["values"][0]["value"] == "no stacktrace"
@@ -532,11 +530,7 @@ class TestSanitizeEventPreservesNonPii:
 
     def test_preserves_exception_type(self):
         """Exception type (class name) must never be scrubbed."""
-        event = {
-            "exception": {
-                "values": [{"type": "IntegrityError", "value": "ok"}]
-            }
-        }
+        event = {"exception": {"values": [{"type": "IntegrityError", "value": "ok"}]}}
         sanitize_event(event)
         assert event["exception"]["values"][0]["type"] == "IntegrityError"
 
@@ -570,13 +564,14 @@ class TestSanitizeEventPreservesNonPii:
 
 
 class TestBeforeSendSanitizerFailure:
-    """If sanitize_event raises, before_send must still return the event."""
+    """If sanitize_event raises, the registered callback must drop the event."""
 
-    def test_before_send_returns_event_when_sanitizer_raises(self):
+    def test_registered_before_send_drops_event_when_sanitizer_raises(
+        self, monkeypatch
+    ):
         """When mask_pii (called by sanitize_event) raises, before_send
-        must NOT return None and must NOT raise — the event is returned
-        unscrubbed so error tracking is not lost."""
-        before_send = _make_before_send()
+        must drop the event rather than send it without sanitization."""
+        before_send = _make_before_send(monkeypatch)
         event = {
             "event_id": "test-123",
             "exception": {
@@ -591,25 +586,23 @@ class TestBeforeSendSanitizerFailure:
         ):
             result = before_send(event, hint={})
 
-        # Event is still returned (unscrubbed) — NOT None, NOT raised
-        assert result is event
-        assert result["event_id"] == "test-123"
-        # PII is still present (unscrubbed) — but event is not lost
-        assert "+998901234567" in result["exception"]["values"][0]["value"]
+        assert result is None
 
-    def test_before_send_returns_event_on_empty_event(self):
+    def test_registered_before_send_returns_event_on_empty_event(self, monkeypatch):
         """before_send({}) must return {} (not None, not raise)."""
-        before_send = _make_before_send()
+        before_send = _make_before_send(monkeypatch)
         result = before_send({}, hint={})
         assert result == {}
 
-    def test_before_send_returns_event_on_none_hint(self):
+    def test_registered_before_send_accepts_none_hint(self, monkeypatch):
         """before_send must accept hint=None (Sentry SDK may pass None)."""
-        before_send = _make_before_send()
-        result = before_send({"event_id": "x"}, hint=None)
-        assert result["event_id"] == "x"
+        before_send = _make_before_send(monkeypatch)
+        result = before_send({"event_id": "a" * 32}, hint=None)
+        assert result["event_id"] == "a" * 32
 
-    def test_before_send_uses_warning_not_exception_on_failure(self, caplog):
+    def test_registered_before_send_uses_warning_and_drops_on_failure(
+        self, caplog, monkeypatch
+    ):
         """When sanitize_event raises, before_send must log via
         ``logger.warning`` (NOT ``logger.exception``) to avoid Sentry
         recursion.
@@ -626,27 +619,26 @@ class TestBeforeSendSanitizerFailure:
         """
         import logging
 
-        before_send = _make_before_send()
+        before_send = _make_before_send(monkeypatch)
         event = {"event_id": "recursion-test", "request": {"data": "x"}}
 
         with patch(
             "app.core.sentry.mask_pii",
             side_effect=RuntimeError("sanitizer crashed"),
         ):
-            with caplog.at_level(
-                logging.WARNING, logger="app.core.sentry"
-            ):
-                before_send(event, hint={"exception": RuntimeError("x")})
+            with caplog.at_level(logging.WARNING, logger="app.core.sentry"):
+                result = before_send(event, hint={"exception": RuntimeError("x")})
 
         # Find the warning record
         warning_records = [
-            r for r in caplog.records
-            if r.levelno == logging.WARNING
-            and "sanitizer failed" in r.message
+            r
+            for r in caplog.records
+            if r.levelno == logging.WARNING and "sanitizer failed" in r.message
         ]
-        assert len(warning_records) == 1, (
-            f"Expected exactly 1 WARNING record, got {len(warning_records)}"
-        )
+        assert (
+            len(warning_records) == 1
+        ), f"Expected exactly 1 WARNING record, got {len(warning_records)}"
+        assert result is None
         rec = warning_records[0]
         # Critical: exc_info must NOT be set — logger.exception() sets it,
         # logger.warning() does not. If exc_info is set, LoggingIntegration
@@ -659,6 +651,329 @@ class TestBeforeSendSanitizerFailure:
             f"Expected WARNING (30), got {rec.levelno} — "
             "logger.exception() uses ERROR (40) which triggers Sentry capture."
         )
+
+
+class TestRegisteredBeforeSendPayloadRedaction:
+    def test_registered_before_send_redacts_free_text_and_ai_payloads(
+        self, monkeypatch
+    ):
+        """The SDK-registered callback removes free-form clinical/AI content."""
+        import json
+
+        before_send = _make_before_send(monkeypatch)
+        event = {
+            "message": "CLINICAL_EVENT_CANARY",
+            "request": {
+                "data": {
+                    "patient_note": "CLINICAL_REQUEST_CANARY",
+                    "prompt": "AI_PROMPT_CANARY",
+                }
+            },
+            "breadcrumbs": {
+                "values": [
+                    {
+                        "message": "CLINICAL_BREADCRUMB_CANARY",
+                        "data": {
+                            "tool_arguments": "AI_TOOL_CANARY",
+                            "action": "submit",
+                        },
+                    }
+                ]
+            },
+            "exception": {
+                "values": [
+                    {
+                        "type": "ProviderError",
+                        "value": "AI_EXCEPTION_CANARY",
+                        "stacktrace": {
+                            "frames": [{"vars": {"content": "AI_FRAME_CANARY"}}]
+                        },
+                    }
+                ]
+            },
+            "extra": {"completion": "AI_EXTRA_CANARY"},
+            "contexts": {"response": {"status_code": 503}},
+            "threads": {
+                "values": [
+                    {
+                        "stacktrace": {
+                            "frames": [{"vars": {"note": "THREAD_LOCAL_CANARY"}}]
+                        }
+                    }
+                ]
+            },
+        }
+
+        scrubbed = before_send(event, hint={})
+
+        assert scrubbed is not None
+        serialized = json.dumps(scrubbed)
+        for marker in (
+            "CLINICAL_EVENT_CANARY",
+            "CLINICAL_REQUEST_CANARY",
+            "AI_PROMPT_CANARY",
+            "CLINICAL_BREADCRUMB_CANARY",
+            "AI_TOOL_CANARY",
+            "AI_EXCEPTION_CANARY",
+            "AI_FRAME_CANARY",
+            "AI_EXTRA_CANARY",
+            "THREAD_LOCAL_CANARY",
+        ):
+            assert marker not in serialized
+        assert "breadcrumbs" not in scrubbed
+        assert scrubbed["contexts"]["response"]["status_code"] == 503
+
+    def test_registered_callback_scrubs_ai_keys_and_keeps_safe_diagnostics(
+        self, monkeypatch
+    ):
+        import json
+
+        before_send = _make_before_send(monkeypatch)
+        event = {
+            "extra": {
+                "system_prompt": "SYSTEM_PROMPT_CANARY",
+                "provider_response": "PROVIDER_RESPONSE_CANARY",
+                "input": "AI_INPUT_CANARY",
+                "input_tokens": 42,
+                "invalid_input_tokens": "INVALID_TOKEN_DIAGNOSTIC_CANARY",
+                "diagnostic_code": "ai_provider_failure",
+                "provider": "openai",
+                "error_type": "TimeoutError",
+            },
+            "contexts": {
+                "response": {
+                    "status_code": 503,
+                    "body": "HTTP_RESPONSE_BODY_CANARY",
+                }
+            },
+            "spans": [
+                {
+                    "data": {
+                        "gen_ai.request.messages": "GEN_AI_PROMPT_CANARY",
+                        "http.response.status_code": 502,
+                    }
+                }
+            ],
+        }
+
+        scrubbed = before_send(event, {})
+        serialized = json.dumps(scrubbed)
+
+        for marker in (
+            "SYSTEM_PROMPT_CANARY",
+            "PROVIDER_RESPONSE_CANARY",
+            "AI_INPUT_CANARY",
+            "HTTP_RESPONSE_BODY_CANARY",
+            "GEN_AI_PROMPT_CANARY",
+            "INVALID_TOKEN_DIAGNOSTIC_CANARY",
+        ):
+            assert marker not in serialized
+        assert scrubbed["extra"]["input_tokens"] == 42
+        assert "model" not in scrubbed["extra"]
+        assert scrubbed["contexts"]["response"] == {"status_code": 503}
+        assert scrubbed["spans"][0]["data"]["http.response.status_code"] == 502
+        assert scrubbed["fingerprint"] == [
+            "{{ default }}",
+            "ai_provider_failure",
+            "openai",
+            "TimeoutError",
+        ]
+
+
+class TestRegisteredBeforeSendTransaction:
+    def test_registered_callback_scrubs_transaction_payload(self, monkeypatch):
+        import json
+
+        callback = _make_before_send(
+            monkeypatch, callback_name="before_send_transaction"
+        )
+        event = {
+            "type": "transaction",
+            "transaction": "/api/ai/complaint",
+            "request": {"data": {"input": "TRACE_REQUEST_CANARY"}},
+            "contexts": {
+                "response": {
+                    "status_code": 503,
+                    "body": "TRACE_RESPONSE_BODY_CANARY",
+                }
+            },
+            "extra": {"system_prompt": "TRACE_SYSTEM_PROMPT_CANARY"},
+            "breadcrumbs": {"values": [{"message": "TRACE_BREADCRUMB_CANARY"}]},
+            "spans": [
+                {
+                    "description": "gen_ai.generate",
+                    "data": {
+                        "gen_ai.request.messages": "TRACE_PROMPT_CANARY",
+                        "gen_ai.usage.input_tokens": 24,
+                        "http.response.status_code": 503,
+                    },
+                }
+            ],
+        }
+
+        scrubbed = callback(event, {})
+        serialized = json.dumps(scrubbed)
+
+        for marker in (
+            "TRACE_REQUEST_CANARY",
+            "TRACE_RESPONSE_BODY_CANARY",
+            "TRACE_SYSTEM_PROMPT_CANARY",
+            "TRACE_BREADCRUMB_CANARY",
+            "TRACE_PROMPT_CANARY",
+        ):
+            assert marker not in serialized
+        assert scrubbed["contexts"]["response"] == {"status_code": 503}
+        assert scrubbed["spans"][0]["data"]["gen_ai.usage.input_tokens"] == 24
+        assert scrubbed["spans"][0]["data"]["http.response.status_code"] == 503
+        assert scrubbed["transaction"] == "[REDACTED TRANSACTION]"
+        assert "description" not in scrubbed["spans"][0]
+        assert "breadcrumbs" not in scrubbed
+
+    def test_registered_callback_drops_transaction_when_scrubber_fails(
+        self, monkeypatch
+    ):
+        callback = _make_before_send(
+            monkeypatch, callback_name="before_send_transaction"
+        )
+        with patch("app.core.sentry.mask_pii", side_effect=RuntimeError("synthetic")):
+            assert (
+                callback({"type": "transaction", "request": {"data": "x"}}, {}) is None
+            )
+
+    def test_registered_callbacks_drop_arbitrary_event_channels_and_keep_safe_diagnostics(
+        self, monkeypatch
+    ):
+        import json
+
+        callback = _make_before_send(monkeypatch)
+        event = {
+            "event_id": "a" * 32,
+            "request": {
+                "method": "GET",
+                "url": "/api/v1/patients?clinical_note=REQUEST_QUERY_CANARY",
+                "query_string": "name=QUERY_CANARY",
+                "headers": {"referer": "REFERER_CANARY"},
+            },
+            "user": {"email": "PATIENT_EMAIL_CANARY", "id": "PATIENT_ID_CANARY"},
+            "extra": {
+                "clinical_summary": "EXTRA_CANARY",
+                "diagnostic_code": "ai_provider_failure",
+                "provider": "openai",
+                "error_type": "TimeoutError",
+                "input_tokens": 27,
+                "model": "MODEL_CANARY",
+            },
+            "contexts": {
+                "ai": {"summary": "CUSTOM_CONTEXT_CANARY"},
+                "response": {
+                    "status_code": 503,
+                    "body_size": 42,
+                    "body": "RESPONSE_BODY_CANARY",
+                },
+                "trace": {"trace_id": "a" * 32, "detail": "TRACE_DETAIL_CANARY"},
+            },
+            "breadcrumbs": {
+                "values": [
+                    {
+                        "message": "BREADCRUMB_CANARY",
+                        "data": {"details": "CRUMB_DATA_CANARY"},
+                    }
+                ]
+            },
+            "spans": [
+                {
+                    "description": "SPAN_DESCRIPTION_CANARY",
+                    "op": "http.client",
+                    "data": {
+                        "http.response.status_code": 502,
+                        "gen_ai.usage.input_tokens": 19,
+                        "clinical_summary": "SPAN_DATA_CANARY",
+                    },
+                }
+            ],
+            "tags": {"severity": "error", "patient_name": "TAG_CANARY"},
+            "unrecognized_payload": "TOP_LEVEL_CANARY",
+            "transaction": "/patients/alice?note=TRANSACTION_QUERY_CANARY",
+            "transaction_info": {"source": "route"},
+            "fingerprint": ["PATIENT_FINGERPRINT_CANARY"],
+        }
+
+        scrubbed = callback(event, {})
+        serialized = json.dumps(scrubbed)
+
+        for marker in (
+            "REQUEST_QUERY_CANARY",
+            "QUERY_CANARY",
+            "REFERER_CANARY",
+            "PATIENT_EMAIL_CANARY",
+            "PATIENT_ID_CANARY",
+            "EXTRA_CANARY",
+            "MODEL_CANARY",
+            "CUSTOM_CONTEXT_CANARY",
+            "RESPONSE_BODY_CANARY",
+            "TRACE_DETAIL_CANARY",
+            "BREADCRUMB_CANARY",
+            "CRUMB_DATA_CANARY",
+            "SPAN_DESCRIPTION_CANARY",
+            "SPAN_DATA_CANARY",
+            "TAG_CANARY",
+            "TOP_LEVEL_CANARY",
+            "TRANSACTION_QUERY_CANARY",
+            "PATIENT_FINGERPRINT_CANARY",
+        ):
+            assert marker not in serialized
+        assert scrubbed["request"] == {"method": "GET"}
+        assert "user" not in scrubbed
+        assert "breadcrumbs" not in scrubbed
+        assert scrubbed["contexts"] == {
+            "response": {"status_code": 503, "body_size": 42},
+            "trace": {"trace_id": "a" * 32},
+        }
+        assert scrubbed["extra"] == {
+            "diagnostic_code": "ai_provider_failure",
+            "provider": "openai",
+            "error_type": "TimeoutError",
+            "input_tokens": 27,
+        }
+        assert scrubbed["spans"][0] == {
+            "op": "http.client",
+            "data": {
+                "http.response.status_code": 502,
+                "gen_ai.usage.input_tokens": 19,
+            },
+        }
+        assert scrubbed["tags"] == {"severity": "error"}
+        assert scrubbed["fingerprint"] == [
+            "{{ default }}",
+            "ai_provider_failure",
+            "openai",
+            "TimeoutError",
+        ]
+
+    def test_registered_callback_preserves_only_framework_route_templates(
+        self, monkeypatch
+    ):
+        callback = _make_before_send(
+            monkeypatch, callback_name="before_send_transaction"
+        )
+        event = {
+            "type": "transaction",
+            "transaction": "GET /api/v1/patients/{patient_id}",
+            "transaction_info": {"source": "route"},
+        }
+
+        scrubbed = callback(event, {})
+
+        assert scrubbed["transaction"] == "GET /api/v1/patients/{patient_id}"
+        assert scrubbed["transaction_info"] == {"source": "route"}
+
+    def test_registered_before_breadcrumb_discards_crumbs(self, monkeypatch):
+        _make_before_send(monkeypatch)
+        import sentry_sdk
+
+        sentry_sdk.init.assert_called_once()
+        before_breadcrumb = sentry_sdk.init.call_args.kwargs["before_breadcrumb"]
+        assert before_breadcrumb({"message": "CLINICAL_BREADCRUMB_CANARY"}) is None
 
 
 class TestSanitizeEventStandardContextsPreserved:
@@ -743,9 +1058,9 @@ class TestSanitizeEventStandardContextsPreserved:
         }
         sanitize_event(event)
         for ctx_key in ("runtime", "os", "device", "app", "browser", "gpu", "trace"):
-            assert event["contexts"][ctx_key] == event["contexts"][ctx_key], (
-                f"{ctx_key} context was modified"
-            )
+            assert (
+                event["contexts"][ctx_key] == event["contexts"][ctx_key]
+            ), f"{ctx_key} context was modified"
 
 
 class TestSanitizeEventCustomContextsScrubbed:
@@ -894,11 +1209,11 @@ class TestSanitizeEventPiiInStandardContext:
         event = {
             "contexts": {
                 "device": {
-                    "name": "server-1",           # diagnostic → preserved
-                    "arch": "x86_64",             # non-PII → preserved
-                    "phone": "+998901234567",     # PII → scrubbed
-                    "iin": "12345678901234",      # PII → scrubbed
-                    "version": "1.0.0",           # non-PII → preserved
+                    "name": "server-1",  # diagnostic → preserved
+                    "arch": "x86_64",  # non-PII → preserved
+                    "phone": "+998901234567",  # PII → scrubbed
+                    "iin": "12345678901234",  # PII → scrubbed
+                    "version": "1.0.0",  # non-PII → preserved
                 }
             }
         }
@@ -980,9 +1295,9 @@ class TestSanitizeEventPiiInDiagnosticNameField:
         event = {
             "contexts": {
                 "device": {
-                    "name": "server-1",           # non-PII → preserved
-                    "phone": "+998901234567",     # PII → scrubbed
-                    "model": "PowerEdge R750",    # non-PII → preserved
+                    "name": "server-1",  # non-PII → preserved
+                    "phone": "+998901234567",  # PII → scrubbed
+                    "model": "PowerEdge R750",  # non-PII → preserved
                 }
             }
         }
