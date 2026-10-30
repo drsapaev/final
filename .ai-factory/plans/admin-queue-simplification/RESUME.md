@@ -1,4 +1,24 @@
-## Latest continuation — queue row mismatch diagnostics committed locally — 2026-10-30T08:41:59+05:00
+## Latest continuation — PR #3805 queue locator fixed locally — 2026-10-30T09:24:24+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/t18-queue-row-diagnostics`. PR #3805 remains OPEN/Draft at pushed HEAD `5cd1e1e62b9f8e4daf6d121fff4a11f586497957`, based on `origin/main` `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`.
+
+Previous canonical Preflight → Start → Session succeeded after installing Ubuntu's `docker-buildx` package (version `0.30.1-0ubuntu1~24.04.1`; `docker buildx` reports `0.30.1`). The owned project was fully torn down. Seed, served revision (`5cd1e1e6…`, `sw.js` SHA-256 `a73f592a…`), Registrar login/canonical route, Admin password+2FA, and four Admin routes passed. Queue suite stopped after 2 PASS / 1 FAIL; the remaining three tests are `NOT_RUN`.
+
+The failure is now source-backed: the page snapshot contained two queue rows, while the test matched zero because it required `.mac-table-row`. `DataTable.renderDataRow` emits raw `<tr>` elements without that class. The local patch changes only `frontend/e2e/queue-system.spec.ts` to use the numbered table and row/cell roles. Focused ESLint, E2E TypeScript and Playwright collection pass (30 combinations, 6 scenarios); no target test has run after the correction.
+
+Gate: first wording caused a migration-intent misroute; one adjusted known-root retry returned `gate_ok`, `gate_misroute=false`, `override_used=false`, `handoff_required=true`; prompt read. No narrow override was used. Three journals are also locally modified; current diff is four files. Next: `git -c core.whitespace=cr-at-eol diff --check`, inspect scope, commit/push, wait for exact-head CI. If green, execute one new uniquely named synthetic Preflight → Start → Session run for the six queue scenarios, Admin 2FA/routes and provenance; confirm teardown. Do not reuse the old Compose project name. Do not merge. Keep Tier-2 PARTIAL until evidence is complete; full `STAGING_VALIDATION.md` remains incomplete.
+
+## Previous continuation — PR #3805 staging build blocked — 2026-10-30T09:05+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/t18-queue-row-diagnostics`. PR #3805 is OPEN/Draft at exact HEAD `5cd1e1e62b9f8e4daf6d121fff4a11f586497957`, based on merged `origin/main` `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`.
+
+On this exact HEAD, Frontend unit/E2E/build/lint, PR Required Gate, latest PR Review Quality Gate, security and scratch guards passed. Path-aware Docker build/staging readiness/backend integration jobs were skipped. Canonical Preflight passed with C: 17 GiB, WSL backing D: 28 GiB, WSL available 3222 MiB, no warnings and free task ports.
+
+Canonical Start then failed during `compose-up` with safe category `image_build`; its own project teardown passed. Session did not run, so queue E2E, exact served revision provenance and Admin 2FA are `NOT_RUN` for this HEAD. Read-only checks found no OOM/disk-exhaustion message; `docker buildx` is unavailable and client plugins list Compose/trust only. This suggests a missing build prerequisite but does not prove the precise cause because raw Compose stderr is intentionally suppressed. No package installation or retry was performed.
+
+Do not repeat Start until the builder issue is resolved. The next smallest action is the user's approval to install the official `docker-buildx-plugin` in Ubuntu-24.04, a persistent WSL package change. After that, rerun canonical Preflight and only then one Start → Session for the six queue tests, served frontend revision, normal Admin 2FA/routes, and owned teardown. Keep Tier-2 PARTIAL until actual evidence is complete; full `STAGING_VALIDATION.md` remains outstanding.
+
+## Previous continuation — queue row mismatch diagnostics committed locally — 2026-10-30T08:41:59+05:00
 
 Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-live-specs/final on branch codex/t18-queue-row-diagnostics. Base is exact origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768; source commit is 2a030c2f4e30ee9b3d44f490b775eb83b8dc437d. PR #3801 is merged.
 

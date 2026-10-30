@@ -1,4 +1,39 @@
-## Current checkpoint — T18 queue E2E diagnostics committed locally — 2026-10-30T08:41:59+05:00
+## Current checkpoint — PR #3805 corrected queue locator locally — 2026-10-30T09:24:24+05:00
+
+- Plan version: 1.0
+- Current task: T18 integrated synthetic acceptance; PR #3805
+- Current status: previous exact-head CI and owned staging lifecycle PASS. Synthetic seed, served frontend provenance, Admin 2FA/routes PASS. Previous target run: 2 PASS / 1 FAIL / 3 NOT_RUN because serial execution stopped after the failure. Source-backed E2E locator correction is local; focused lint, E2E TypeScript check, and Playwright collection PASS. Tier-2 remains PARTIAL; no waiver.
+- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
+- Branch: `codex/t18-queue-row-diagnostics`
+- Base commit: `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`
+- Current pushed PR HEAD: `5cd1e1e62b9f8e4daf6d121fff4a11f586497957`; local pending source correction is not yet committed or pushed.
+- Confirmed failure: failing test's accessible page snapshot contains two queue rows, but the test CSS locator returns zero. `DataTable.renderDataRow` renders raw `<tr>` elements with `aria-rowindex`; the test incorrectly requires `.mac-table-row`, a class used only by the separate `TableRow` primitive.
+- Chosen mode: `gate_known_root_cause` for a queue E2E selector correction. The first command stopped because `rendered table contract` matched the migration-intent keyword heuristic; no source edit followed. The single misroute retry retained the confirmed root and reviewed scope; result `gate_ok`, mode `execute`, `gate_misroute=false`, `override_used=false`, `handoff_required=true`. The generated execution prompt was read and its first-touch list limits edits to the E2E file and journals. No `narrow_override` was used.
+- Canonical read-only anchors: `frontend/src/components/queue/QueueTable.tsx`, `frontend/src/components/ui/DataTable.tsx`, and `frontend/src/hooks/useQueueManager.ts`. Reference-only; source changes denied.
+- First-touch allowed after gate: `frontend/e2e/queue-system.spec.ts`; local T18 journals `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Focused ESLint PASS; `tsc --noEmit -p e2e/tsconfig.json` PASS; Playwright collection PASS (30 project/test combinations, 6 scenarios). Next: commit/push, exact-head CI, then one fresh owned canonical Preflight → Start → Session target run and teardown.
+- Denied: app/runtime/backend/API/DB/auth changes, generated frontend output, production, `C:\final`, foreign worktrees/projects, merge/deployment, recording patient labels or credentials.
+- First stop condition: gate blocks without a valid explicit override, source shows queue rows are truly absent rather than locator mismatch, or the corrected test finds a second application contract defect. Keep Tier-2 PARTIAL and report the new failure without broadening scope.
+- Next exact action: commit/push the reviewed four-file change, wait for exact-head CI, then run one new owned synthetic staging cycle for the six target scenarios and teardown.
+
+## Previous checkpoint — PR #3805 queue E2E locator diagnosis — 2026-10-30T09:05+05:00
+
+- Plan version: 1.0
+- Current task: T18 integrated synthetic acceptance; PR #3805
+- Current status: exact-head CI PASS; canonical Preflight PASS; Start failed during image build and owned teardown PASS; Session and the six named queue E2E cases NOT_RUN. Tier-2 remains PARTIAL, with no waiver.
+- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
+- Branch: `codex/t18-queue-row-diagnostics`
+- Base commit: `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`
+- Current PR HEAD: `5cd1e1e62b9f8e4daf6d121fff4a11f586497957`
+- CI: Frontend unit, Frontend E2E, build, lint, PR Required Gate, latest PR Review Quality Gate, CodeQL, Gitleaks, security and scratch guards PASS. Docker build, staging readiness, backend/integration and other path-aware jobs SKIPPED.
+- Preflight: PASS; worktree clean, C: 17 GiB free, Ubuntu VHD backing volume D: 28 GiB free, WSL available 3222 MiB, ports free, no warnings.
+- Start: `NATIVE_FAILED (compose-up)`, category `image_build`; canonical cleanup reports `STAGING_TEARDOWN=PASS`. No Session ran.
+- Read-only diagnosis: `docker buildx` is unavailable in Ubuntu-24.04 and Docker's client-plugin inventory lists Compose/trust only. No OOM or disk-exhaustion messages were observed. This is a likely build prerequisite gap, not a confirmed exact cause because the launcher intentionally suppresses raw Compose stderr. No package was installed.
+- Scope: no new tracked source changes; only this checkpoint/evidence and task-owned harness paths are allowed. Production, `C:\final`, foreign worktrees/projects, merge and deployment remain denied.
+- Remaining: resolve the missing image-builder prerequisite, rerun Preflight, then one owned Start → Session for queue E2E, served revision and Admin 2FA, and verify teardown.
+- Blocker: exact build failure remains unconfirmed; do not repeat the same build until the builder prerequisite is resolved.
+- Next exact action: obtain authorization to add the official Docker Buildx CLI plugin to the Ubuntu-24.04 WSL environment, or keep staging blocked and Tier-2 PARTIAL.
+
+## Previous checkpoint — T18 queue E2E diagnostics committed locally — 2026-10-30T08:41:59+05:00
 
 - Plan version: 1.0
 - Current task: T18 integrated synthetic acceptance; queue-system failure diagnosis

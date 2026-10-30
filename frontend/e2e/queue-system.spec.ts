@@ -3,7 +3,6 @@ import { test, expect, type Page, type Response } from '@playwright/test';
 const REGISTRAR_USERNAME = process.env.QA_REGISTRAR_USERNAME || 'registrar@clinic.com';
 const REGISTRAR_QUEUE_PATH = '/registrar/queue';
 const QUEUE_SNAPSHOT_PATH = '/registrar/queues/today';
-const QUEUE_ROW_SELECTOR = '.qt-table-container tbody tr.mac-table-row';
 
 interface QueueEntrySnapshot {
   queue_number?: string | number | null;
@@ -277,8 +276,14 @@ async function expectVisibleQueueToMatch(
   expected: VisibleQueueSignature[],
   message: string
 ): Promise<void> {
+  const queueTable = page.getByRole('table').filter({
+    has: page.getByRole('columnheader', { name: '№', exact: true }),
+  });
+  await expect(queueTable, 'The visible queue must render its numbered table.').toHaveCount(1);
+  const queueRows = queueTable.getByRole('row').filter({ has: page.getByRole('cell') });
+
   await expect.poll(async () => {
-    const actual = await page.locator(QUEUE_ROW_SELECTOR).evaluateAll((rows) =>
+    const actual = await queueRows.evaluateAll((rows) =>
       rows.map((row) => {
         const number = row.querySelector('.qt-table-cell-number')?.textContent?.trim() ?? '';
         const patientCell = row.querySelector('.qt-table-cell-primary');

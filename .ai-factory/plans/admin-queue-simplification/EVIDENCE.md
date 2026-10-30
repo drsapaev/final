@@ -5122,3 +5122,31 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Validation: scoped ESLint PASS; tsc --noEmit -p e2e/tsconfig.json PASS; Playwright --list PASS (6 collected, 0 executed); npm run build PASS (1m 2s, existing dependency annotation/CSS warnings); CRLF-aware git diff --check PASS; normal source commit hooks PASS.
 - Result: local source validation PASS. Six named queue E2E tests, exact-head CI and synthetic staging are NOT_RUN at this checkpoint.
 - Remaining: push, exact-head CI, then one canonical synthetic Preflight → Start → Session with focused queue tests, exact service-worker revision provenance, and owned teardown. Tier-2 remains PARTIAL; full STAGING_VALIDATION.md remains incomplete.
+
+## T18 — PR #3805 staging build attempt — 2026-10-30T09:05+05:00
+
+- Commit under test: exact PR HEAD `5cd1e1e62b9f8e4daf6d121fff4a11f586497957`; base/current `origin/main`: `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`.
+- Environment: Windows task worktree and own project `clinic-aqs-t18-pr3805-20261030` on Ubuntu-24.04; synthetic credentials only.
+- Execution mode: continuation of previously authorized validation-only `narrow_override`; no application source, runtime, auth, production or merge action.
+- Allowed paths: `.scratch/t18-final-acceptance-20261030/`, `output/staging/t18-final-acceptance-20261030/`, and T18 plan journals. No foreign Compose resources or production targets.
+- Exact-head CI: Frontend unit, Frontend E2E, build, lint, PR Required Gate, latest PR Review Quality Gate, CodeQL, Gitleaks, security and scratch guards PASS. Docker build/staging readiness/backend integration are SKIPPED, not PASS. Earlier body-triggered Quality Gate failures were superseded by a successful check after the PR-body correction.
+- Canonical validation: Preflight PASS; worktree clean, C: 17 GiB free, D: 28 GiB backing-volume free, WSL available 3222 MiB, backend/frontend/Postgres ports free, no warnings.
+- Original failure: canonical `Start` returned `NATIVE_FAILED (compose-up)`, category `image_build`. It automatically tore down only the verified task project and reported `STAGING_TEARDOWN=PASS`.
+- Follow-up: no Session or browser tests ran. Read-only checks showed WSL free memory ~3.1 GiB after failure and no OOM/no-space kernel messages. Docker client plugin inventory listed Compose/trust but not Buildx; `docker buildx history ls` returned unknown command. This is a likely missing build prerequisite, not a confirmed exact cause because raw Compose stderr is intentionally suppressed. No package installation or second build attempted.
+- Result: Preflight PASS; Start FAIL; teardown PASS; synthetic seed, served frontend provenance, Admin 2FA/routes and all six queue E2E cases `NOT_RUN` on this HEAD. Tier-2 remains PARTIAL; no deferral/waiver.
+- Stop condition: do not repeat image build until the builder prerequisite is resolved. A persistent WSL package installation is pending user authorization.
+- Next: if authorized, install the official Buildx plugin in Ubuntu-24.04; rerun Preflight; then execute one Start → Session and verify exact served revision, target test results, Admin flow and teardown. Full `STAGING_VALIDATION.md` remains incomplete.
+
+## T18 — PR #3805 queue E2E locator correction — 2026-10-30T09:24:24+05:00
+
+- Commit under test: local uncommitted correction based on exact pushed PR HEAD `5cd1e1e62b9f8e4daf6d121fff4a11f586497957`; current main/base `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`.
+- Environment: prior own synthetic Compose project `clinic-aqs-t18-pr3805-20261030`; canonical Session already performed teardown. No new project launched in this entry.
+- Execution mode: `gate_known_root_cause`. First attempt STOPped because the task phrase `rendered table contract` matched the migration-intent heuristic. One adjusted retry returned `gate_ok`, mode `execute`, `gate_misroute=false`, `override_used=false`, `handoff_required=true`; generated prompt read. No narrow override used.
+- Confirmed root cause: prior browser failure reported 2 expected rows / 0 matched rows while the accessibility snapshot showed two rows. `DataTable.renderDataRow` emits raw `<tr aria-rowindex=...>` without `.mac-table-row`; that class belongs to a separate `TableRow` primitive. The E2E CSS selector required `.mac-table-row` and therefore matched nothing.
+- Change: `frontend/e2e/queue-system.spec.ts` now identifies the numbered queue table by its column-header role and its data rows by row/cell roles. Runtime/UI code, API, queue identity and test oracle are unchanged.
+- Allowed paths: `frontend/e2e/queue-system.spec.ts` and the three T18 journals. Denied: runtime/backend/API/DB/auth, production, `C:\final`, foreign projects, merge and deployment.
+- Validation: focused ESLint PASS; `npx tsc --noEmit -p e2e/tsconfig.json` PASS; Playwright `--list` PASS (30 browser/project combinations representing 6 scenarios). CRLF-aware `git diff --check` had passed before this correction; rerun before commit. No target E2E rerun yet.
+- Previous staging result (pre-correction): synthetic seed `DEV-DEMO` PASS; service-worker provenance PASS for commit `5cd1e1e62b9f8e4daf6d121fff4a11f586497957`, `sw.js` SHA-256 `a73f592aa9442a898d5a781363c29d40db82355a7eaf786eea572d7598d4b01d`; Registrar login PASS and canonical `/registrar/queue`; queue E2E 2 PASS / 1 FAIL / 3 NOT_RUN (serial stop); normal Admin login + 2FA PASS; Admin routes 4/4 PASS.
+- Teardown: canonical Session PASS; removed only the owned project's 5 containers, 3 volumes, 1 network; post-teardown owned-resource counts zero. No foreign resources touched.
+- Result: selector correction is locally validated but not yet pushed; target E2E behavior after correction NOT_RUN. Exact-head CI for the pending patch NOT_RUN. Tier-2 remains PARTIAL; full `STAGING_VALIDATION.md` is incomplete; no waiver.
+- Next: run CRLF-aware diff check and commit/push this scoped patch plus journals; wait for exact-head CI; if green, use one new uniquely named synthetic project for the six focused scenarios, Admin 2FA/routes and provenance, then confirm owned teardown.
