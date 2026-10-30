@@ -243,14 +243,40 @@ export const useRegistrarRowActions = ({
           document.body.removeChild(link);
         }
         break;
-      case 'force_majeure':
-        // Открываем модальное окно форс-мажора для специалиста
-        setForceMajeureModal({
-          open: true,
-          specialistId: row.doctor_id || row.specialist_id || null,
-          specialistName: row.doctor_name || row.specialist_name || tI18n('registrarPanel.rp_all_specialists')
-        });
+      case 'force_majeure': {
+        // #3808 (CR-01 / REG-FE-025): цель форс-мажора — канонический
+        // владелец строки read-модели (queue_owner_kind/queue_owner_id),
+        // а НЕ legacy-поля врача. Ресурсная, смешанная или неизвестная
+        // очередь не может быть молча перенаправлена на «случайного»
+        // врача всей очередью: такое действие видно недоступно, пока у
+        // бэкенда нет безопасного ресурсного контракта.
+        const ownerKind = row.queue_owner_kind ?? null;
+        const ownerId = row.queue_owner_id ?? null;
+        const ownerIsUnambiguousDoctor =
+          ownerKind === 'doctor' && typeof ownerId === 'number' && ownerId > 0;
+
+        if (ownerIsUnambiguousDoctor) {
+          const targetDate =
+            (typeof row.record_date === 'string' && row.record_date) ||
+            (typeof row.date === 'string' && row.date) ||
+            null;
+          setForceMajeureModal({
+            open: true,
+            specialistId: ownerId,
+            specialistName:
+              row.doctor_name || row.specialist_name || row.queue_name || tI18n('registrarPanel.rp_all_specialists'),
+            targetDate,
+          });
+        } else {
+          logger.info('[RegistrarPanel] Force majeure unavailable: row owner is not an unambiguous doctor', {
+            ownerKind,
+            ownerId,
+            dailyQueueId: row.daily_queue_id ?? null,
+          });
+          notify.warning(tI18n('misc.fm_owner_unsupported'));
+        }
         break;
+      }
       default:
         logger.info('Неизвестное действие:', action);
         break;

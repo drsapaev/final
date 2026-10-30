@@ -28,7 +28,7 @@ describe('registrarDialogsReducer (PR-UI-13-3)', () => {
       cancelDialog: { open: false, row: null, reason: '' },
       paymentDialog: { open: false, row: null, paid: false, source: null },
       recordPreviewDialog: { open: false, row: null },
-      forceMajeureModal: { open: false, specialistId: null, specialistName: '' },
+      forceMajeureModal: { open: false, specialistId: null, specialistName: '', targetDate: null },
       contextMenu: { open: false, row: null, position: { x: 0, y: 0 } },
       rescheduleDialog: { open: false, data: null },
       showPaymentManager: false,
@@ -82,9 +82,12 @@ describe('registrarDialogsReducer (PR-UI-13-3)', () => {
   it('SET_FORCE_MAJEURE_MODAL / SET_CANCEL_DIALOG / SET_RECORD_PREVIEW_DIALOG store full values', () => {
     const s1 = registrarDialogsReducer(initialRegistrarDialogsState, {
       type: 'SET_FORCE_MAJEURE_MODAL',
-      value: { open: true, specialistId: 5, specialistName: 'Dr Test' },
+      value: { open: true, specialistId: 5, specialistName: 'Dr Test', targetDate: '2026-10-30' },
     });
     expect(s1.forceMajeureModal.specialistName).toBe('Dr Test');
+    // #3808 (REG-FE-025): the modal target carries the canonical row day so
+    // preview and mutation stay bound to the same queue date.
+    expect(s1.forceMajeureModal.targetDate).toBe('2026-10-30');
     const s2 = registrarDialogsReducer(s1, {
       type: 'SET_CANCEL_DIALOG',
       value: { open: true, row: { id: '2' } as never, reason: '' },

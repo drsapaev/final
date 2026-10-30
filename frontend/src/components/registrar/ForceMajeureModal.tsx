@@ -8,7 +8,7 @@
  * - Safety confirmation (dry run + type CONFIRM)
  */
 import { api } from '../../api/client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -34,6 +34,12 @@ interface ForceMajeureModalProps {
   onClose: () => void;
   specialistId: string | number | null;
   specialistName?: string;
+  /**
+   * 3808 (REG-FE-025): канонический день очереди строки, открывшей
+   * модал. Preview и мутация обязаны ссылаться на одного специалиста и
+   * одну дату; null — SSOT-день клиники на бэкенде.
+   */
+  targetDate?: string | null;
   onSuccess?: (...args: unknown[]) => void;
 }
 
@@ -48,6 +54,7 @@ const ForceMajeureModal = ({
   onClose,
   specialistId,
   specialistName,
+  targetDate,
   onSuccess
 }: ForceMajeureModalProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
@@ -57,8 +64,14 @@ const ForceMajeureModal = ({
   const [confirmText, setConfirmText] = useState('');
   const [loading, setLoading] = useState(false);
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  // 3808: хранит i18n-ключ ошибки preview (перевод — в рендере).
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // 3808: синхронный in-flight предохранитель — два клика в одном стеке
+  // (до ре-рендера) не могут повторить финансовую мутацию.
+  const submitInFlight = useRef(false);
 
   // UX Audit: getAuthToken + tokenManager удалены — auth через axios-interceptor.
 
@@ -66,8 +79,17 @@ const ForceMajeureModal = ({
   const loadPendingEntries = useCallback(async () => {
     if (!specialistId) return;
 
+    // 3808: предыдущий снапшот сбрасывается ДО загрузки — устаревший
+    // preview (другая строка/дата) не может авторизовать мутацию.
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setDryRunResult(null);
+
     try {
-      const response = await api.get(`/force-majeure/pending-entries?specialist_id=${specialistId}`);
+      // Preview и мутация связаны одним контрактом: specialist_id +
+      // target_date. Дата передаётся явно, а не выводится хостом.
+      const targetParam = targetDate ? `&target_date=${encodeURIComponent(targetDate)}` : '';
+      const response = await api.get(`/force-majeure/pending-entries?specialist_id=${specialistId}${targetParam}`);
       const data = response.data;
       setDryRunResult({
         count: data.length,
@@ -76,10 +98,15 @@ const ForceMajeureModal = ({
       });
     } catch (err) {
       logger.error('[ForceMajeureModal] Error loading pending entries:', err);
+      // ключ, а не перевод: t нестабильна между рендерами и не должна
+      // попадать в deps этого callback (иначе reset-effect зациклится)
+      setPreviewError('misc.fm_preview_failed');
+    } finally {
+      setPreviewLoading(false);
     }
-  }, [specialistId]);
+  }, [specialistId, targetDate]);
 
-  // Reset state when modal opens
+  // Reset state when modal opens (or is re-targeted at another row/day)
   useEffect(() => {
     if (isOpen) {
       setReason('');
@@ -87,12 +114,18 @@ const ForceMajeureModal = ({
       setError(null);
       setSuccess(null);
       setDryRunResult(null);
+      setPreviewError(null);
+      setPreviewLoading(false);
       loadPendingEntries();
     }
-  }, [isOpen, specialistId, loadPendingEntries]);
+  }, [isOpen, specialistId, targetDate, loadPendingEntries]);
 
   // Transfer to tomorrow
   const handleTransfer = async () => {
+    // 3808: in-flight предохранитель — повторный клик в том же стеке
+    // не может запустить вторую финансовую мутацию.
+    if (submitInFlight.current || loading) return;
+
     if (!reason.trim() || reason.length < 5) {
       setError(t('misc.fm_reason_required'));
       return;
@@ -103,12 +136,23 @@ const ForceMajeureModal = ({
       return;
     }
 
+    // 3808: разрушающее действие разрешено только после успешного
+    // непустого dry-run — ввод ПОДТВЕРЖДАЮ сам по себе ничего не
+    // авторизует.
+    if (!isScopeValidated) {
+      setError(t('misc.fm_preview_required'));
+      return;
+    }
+
+    submitInFlight.current = true;
     setLoading(true);
     setError(null);
 
     try {
       const response = await api.post('/force-majeure/transfer', {
           specialist_id: specialistId,
+          // 3808: мутация привязана к той же дате, что и preview
+          ...(targetDate ? { target_date: targetDate } : {}),
           reason: reason,
           send_notifications: true
       });
@@ -121,12 +165,17 @@ const ForceMajeureModal = ({
       logger.error('[ForceMajeureModal] Transfer error:', err);
       setError(getErrorMessage(err) || t('misc.fm_network_error'));
     } finally {
+      submitInFlight.current = false;
       setLoading(false);
     }
   };
 
   // Cancel with refund
   const handleCancel = async () => {
+    // 3808: in-flight предохранитель — повторный клик в том же стеке
+    // не может запустить вторую финансовую мутацию.
+    if (submitInFlight.current || loading) return;
+
     if (!reason.trim() || reason.length < 5) {
       setError(t('misc.fm_reason_required'));
       return;
@@ -137,12 +186,22 @@ const ForceMajeureModal = ({
       return;
     }
 
+    // 3808: разрушающее действие разрешено только после успешного
+    // непустого dry-run.
+    if (!isScopeValidated) {
+      setError(t('misc.fm_preview_required'));
+      return;
+    }
+
+    submitInFlight.current = true;
     setLoading(true);
     setError(null);
 
     try {
       const response = await api.post('/force-majeure/cancel-with-refund', {
         specialist_id: specialistId,
+        // 3808: мутация привязана к той же дате, что и preview
+        ...(targetDate ? { target_date: targetDate } : {}),
         reason: reason,
         refund_type: refundType,
         send_notifications: true
@@ -156,6 +215,7 @@ const ForceMajeureModal = ({
       logger.error('[ForceMajeureModal] Cancel error:', err);
       setError(getErrorMessage(err) || t('misc.fm_network_error'));
     } finally {
+      submitInFlight.current = false;
       setLoading(false);
     }
   };
@@ -164,6 +224,12 @@ const ForceMajeureModal = ({
 
   const isConfirmValid = confirmText === 'ПОДТВЕРЖДАЮ';
   const isReasonValid = reason.trim().length >= 5;
+  // 3808: серверный скоуп валидирован только успешным непустым dry-run.
+  const isScopeValidated =
+    !previewLoading &&
+    !previewError &&
+    dryRunResult !== null &&
+    dryRunResult.count > 0;
   const primaryActionLabel = loading ? t('misc.fm_processing') : activeTab === 'transfer' ? t('misc.fm_transfer_button') : t('misc.fm_cancel_button');
   const primaryActionIcon = loading ? <Loader2 size={18} className="animate-spin" /> : activeTab === 'transfer' ? <ArrowRight size={18} /> : <XCircle size={18} />;
   const dialogSurfaceStyle = {
@@ -206,7 +272,7 @@ const ForceMajeureModal = ({
       variant: activeTab === 'transfer' ? 'primary' : 'danger',
       icon: primaryActionIcon,
       onClick: activeTab === 'transfer' ? handleTransfer : handleCancel,
-      disabled: loading || !isConfirmValid || !isReasonValid || Boolean(success)
+      disabled: loading || !isConfirmValid || !isReasonValid || !isScopeValidated || Boolean(success)
     }
   ];
 
@@ -241,6 +307,14 @@ const ForceMajeureModal = ({
           </button>
         </div>
 
+        {/* 3808: ошибка preview — разрушающее действие остаётся
+            заблокированным; ввод ПОДТВЕРЖДАЮ ничего не авторизует */}
+        {previewError &&
+        <div className="fmm-error-box">
+          {t(previewError)}
+        </div>
+        }
+
         {dryRunResult &&
         <div className="fmm-dry-run-card">
           <Users size={32} className="fmm-dry-run-icon" />
@@ -252,6 +326,11 @@ const ForceMajeureModal = ({
               {t('misc.fm_entries_action', { action: activeTab === 'transfer' ? t('misc.fm_transferred_word') : t('misc.fm_cancelled_word') })}
               {dryRunResult.totalAmount > 0 && t('misc.fm_entries_amount', { amount: dryRunResult.totalAmount.toLocaleString() })}
             </p>
+            {dryRunResult.count === 0 &&
+            <p className="fmm-error-text">
+              {t('misc.fm_no_entries')}
+            </p>
+            }
           </div>
           <button
             type="button"
