@@ -178,7 +178,11 @@ describe('useRegistrarRowActions (PR-UI-13-5)', () => {
   // #3808 (CR-01 / REG-FE-025): the force-majeure target comes from the
   // canonical per-row owner facts of the registrar read model — never from
   // the legacy doctor fallback, which can silently retarget a whole-queue
-  // financial mutation onto an incidental doctor.
+  // financial mutation onto an incidental doctor. Review round 2: the row's
+  // canonical daily_queue_id is a REQUIRED fact — without it the mass
+  // operation cannot be bound to one concrete queue (the backend may resolve
+  // the specialist onto the shared registry surface), so the action must be
+  // visibly unavailable instead.
   it('force_majeure targets the canonical doctor owner when legacy doctor fields are absent', async () => {
     const { hook, setters, tI18n } = renderRowActions();
     await act(async () => {
@@ -197,6 +201,7 @@ describe('useRegistrarRowActions (PR-UI-13-5)', () => {
       specialistId: 3,
       specialistName: 'Dr X',
       targetDate: '2026-10-30',
+      dailyQueueId: 41,
     });
     expect(tI18n).not.toHaveBeenCalledWith('registrarPanel.rp_all_specialists');
     expect(notify.warning).not.toHaveBeenCalled();
@@ -219,7 +224,28 @@ describe('useRegistrarRowActions (PR-UI-13-5)', () => {
       specialistId: 3,
       specialistName: 'Терапия',
       targetDate: '2026-10-29',
+      dailyQueueId: 41,
     });
+  });
+
+  it('force_majeure is unavailable for a doctor row without the canonical queue id (round 2 P1)', async () => {
+    const { hook, setters, tI18n } = renderRowActions();
+    await act(async () => {
+      await hook.current.handleContextMenuAction('force_majeure', {
+        id: 72,
+        queue_owner_kind: 'doctor',
+        queue_owner_id: 3,
+        daily_queue_id: null,
+        record_date: '2026-10-30',
+        doctor_name: 'Dr X',
+      } as never);
+    });
+    // Without the row's daily_queue_id the preview/mutation cannot be bound
+    // to one concrete queue — the backend may resolve the specialist onto the
+    // shared registry surface. Fail closed: no modal, explicit warning.
+    expect(setters.setForceMajeureModal).not.toHaveBeenCalled();
+    expect(notify.warning).toHaveBeenCalledTimes(1);
+    expect(tI18n).toHaveBeenCalledWith('misc.fm_queue_unbound');
   });
 
   it('force_majeure does not retarget a resource-owned row onto its incidental doctor', async () => {

@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import clinic_today
+from app.crud.queue_resource_routing import (
+    resolve_registry_tag_queue_for_specialist,
+)
+from app.models.online_queue import DailyQueue
 from app.models.refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
@@ -36,9 +41,62 @@ class ForceMajeureApiService:
     ):
         self.repository = repository or ForceMajeureApiRepository(db)
 
+    def _validated_daily_queue(
+        self,
+        *,
+        daily_queue_id: int,
+        specialist_id: int,
+        queue_day: date,
+    ) -> DailyQueue:
+        """3808 review round 2 (P1 queue identity): validate the row's
+        canonical DailyQueue as the ONLY operation target.
+
+        The queue must exist, belong to the resolved day, and be addressable
+        by the specialist (their own queue or their registry tag surface).
+        A doctor-owned row must never silently operate the shadow resource
+        queue that ``resolve_registry_tag_queue_for_specialist`` would pick.
+        """
+        queue = self.repository.db.get(DailyQueue, daily_queue_id)
+        if queue is None:
+            raise ForceMajeureApiDomainError(404, "Очередь не найдена")
+        if queue.day != queue_day:
+            raise ForceMajeureApiDomainError(
+                422,
+                "Очередь принадлежит другому дню",
+            )
+        if queue.specialist_id != specialist_id:
+            surface = resolve_registry_tag_queue_for_specialist(
+                self.repository.db, queue.day, specialist_id, None
+            )
+            if surface is None or surface.id != daily_queue_id:
+                raise ForceMajeureApiDomainError(
+                    422,
+                    "Очередь не принадлежит указанному специалисту",
+                )
+        return queue
+
     def transfer_queue_to_tomorrow(self, *, request, current_user_id: int) -> dict[str, Any]:
         service = get_force_majeure_service(self.repository.db)
-        if request.entry_ids:
+        # 3808 review round 2 (P1 transfer destination): the transfer day
+        # chain is derived from the SOURCE queue day (request.target_date or
+        # the clinic SSOT day) — the same day the entries are selected from.
+        if request.daily_queue_id is not None and request.entry_ids:
+            raise ForceMajeureApiDomainError(
+                422,
+                "daily_queue_id и entry_ids взаимоисключающие: укажите одно",
+            )
+        queue_day = request.target_date or clinic_today(self.repository.db)
+        if request.daily_queue_id is not None:
+            queue = self._validated_daily_queue(
+                daily_queue_id=request.daily_queue_id,
+                specialist_id=request.specialist_id,
+                queue_day=queue_day,
+            )
+            entries = service.get_pending_entries(
+                queue_id=queue.id,
+                target_date=queue.day,
+            )
+        elif request.entry_ids:
             entries = self.repository.list_pending_entries_by_ids(
                 request.entry_ids,
                 specialist_id=request.specialist_id,
@@ -59,6 +117,7 @@ class ForceMajeureApiService:
             reason=request.reason,
             performed_by_id=current_user_id,
             send_notifications=request.send_notifications,
+            source_date=queue_day,
         )
 
     def cancel_queue_with_refund(self, *, request, current_user_id: int) -> dict[str, Any]:
@@ -71,7 +130,23 @@ class ForceMajeureApiService:
                 f"Неверный тип возврата: {request.refund_type}",
             ) from exc
 
-        if request.entry_ids:
+        if request.daily_queue_id is not None and request.entry_ids:
+            raise ForceMajeureApiDomainError(
+                422,
+                "daily_queue_id и entry_ids взаимоисключающие: укажите одно",
+            )
+        queue_day = request.target_date or clinic_today(self.repository.db)
+        if request.daily_queue_id is not None:
+            queue = self._validated_daily_queue(
+                daily_queue_id=request.daily_queue_id,
+                specialist_id=request.specialist_id,
+                queue_day=queue_day,
+            )
+            entries = service.get_pending_entries(
+                queue_id=queue.id,
+                target_date=queue.day,
+            )
+        elif request.entry_ids:
             entries = self.repository.list_pending_entries_by_ids(
                 request.entry_ids,
                 specialist_id=request.specialist_id,
@@ -99,12 +174,25 @@ class ForceMajeureApiService:
         *,
         specialist_id: int,
         target_date,
+        daily_queue_id: int | None = None,
     ) -> list[dict[str, Any]]:
         service = get_force_majeure_service(self.repository.db)
-        entries = service.get_pending_entries(
-            specialist_id=specialist_id,
-            target_date=target_date,
-        )
+        if daily_queue_id is not None:
+            queue_day = target_date or clinic_today(self.repository.db)
+            queue = self._validated_daily_queue(
+                daily_queue_id=daily_queue_id,
+                specialist_id=specialist_id,
+                queue_day=queue_day,
+            )
+            entries = service.get_pending_entries(
+                queue_id=queue.id,
+                target_date=queue.day,
+            )
+        else:
+            entries = service.get_pending_entries(
+                specialist_id=specialist_id,
+                target_date=target_date,
+            )
         return [
             {
                 "id": entry.id,

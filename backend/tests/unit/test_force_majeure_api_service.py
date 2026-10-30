@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.refund_deposit import DepositTransaction, PatientDeposit, RefundType
@@ -16,7 +16,7 @@ from app.services.force_majeure_api_service import (
     ForceMajeureApiDomainError,
     ForceMajeureApiService,
 )
-from app.services.force_majeure_service import ForceMajeureService
+from app.services.force_majeure_service import ForceMajeureService, get_force_majeure_service
 
 
 @pytest.mark.unit
@@ -56,6 +56,7 @@ class TestForceMajeureApiService:
                 entry_ids=[11, 12],
                 specialist_id=77,
                 target_date=target_date,
+                daily_queue_id=None,
                 reason="doctor emergency",
                 send_notifications=False,
             ),
@@ -129,6 +130,345 @@ class TestForceMajeureApiService:
         )
 
         assert [entry.id for entry in entries] == [scoped_entry.id]
+
+    # -- Review round 2 (#3809 P1): queue identity binding -----------------
+
+    def test_pending_entries_bind_to_requested_daily_queue_not_registry_surface(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """The registrar row's canonical daily_queue_id is the ONLY target.
+
+        The doctor's specialty tag has a registry-backed resource surface
+        (the shadow-queue case): the legacy specialist resolution prefers it
+        and would return ANOTHER queue's patients. Bound to daily_queue_id
+        the preview returns exactly the row's own queue entries.
+        """
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        resource = QueueResource(
+            code="cardio_surface",
+            queue_tag=test_doctor.specialty,
+            display_name="Кардиология (реестр)",
+            active=True,
+        )
+        db_session.add(resource)
+        db_session.flush()
+        surface_queue = DailyQueue(
+            day=today,
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        doctor_queue = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="doctor_own_queue",
+            active=True,
+        )
+        db_session.add_all([surface_queue, doctor_queue])
+        db_session.flush()
+
+        doctor_entry = OnlineQueueEntry(
+            queue_id=doctor_queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Doctor Queue Patient",
+            status="waiting",
+            source="desk",
+        )
+        surface_entry = OnlineQueueEntry(
+            queue_id=surface_queue.id,
+            number=2,
+            patient_id=test_patient.id,
+            patient_name="Surface Queue Patient",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add_all([doctor_entry, surface_entry])
+        db_session.flush()
+
+        service = ForceMajeureApiService(db_session)
+
+        bound = service.get_pending_entries(
+            specialist_id=test_doctor.id,
+            target_date=today,
+            daily_queue_id=doctor_queue.id,
+        )
+        assert [entry["id"] for entry in bound] == [doctor_entry.id]
+
+        # The legacy path (no daily_queue_id) still prefers the registry
+        # surface — the exact hazard the binding removes for the UI.
+        legacy = service.get_pending_entries(
+            specialist_id=test_doctor.id,
+            target_date=today,
+        )
+        assert [entry["id"] for entry in legacy] == [surface_entry.id]
+
+    def test_pending_entries_daily_queue_id_rejects_unknown_queue(
+        self, db_session, test_doctor
+    ):
+        service = ForceMajeureApiService(db_session)
+        with pytest.raises(ForceMajeureApiDomainError) as exc_info:
+            service.get_pending_entries(
+                specialist_id=test_doctor.id,
+                target_date=date.today(),
+                daily_queue_id=999999,
+            )
+        assert exc_info.value.status_code == 404
+
+    def test_pending_entries_daily_queue_id_rejects_foreign_specialist_queue(
+        self, db_session, test_doctor
+    ):
+        other_specialist_queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id + 1000,
+            queue_tag="foreign_queue",
+            active=True,
+        )
+        db_session.add(other_specialist_queue)
+        db_session.flush()
+
+        service = ForceMajeureApiService(db_session)
+        with pytest.raises(ForceMajeureApiDomainError) as exc_info:
+            service.get_pending_entries(
+                specialist_id=test_doctor.id,
+                target_date=date.today(),
+                daily_queue_id=other_specialist_queue.id,
+            )
+        assert exc_info.value.status_code == 422
+
+    def test_pending_entries_daily_queue_id_rejects_day_mismatch(
+        self, db_session, test_doctor
+    ):
+        other_day_queue = DailyQueue(
+            day=date.today() + timedelta(days=3),
+            specialist_id=test_doctor.id,
+            queue_tag="future_day_queue",
+            active=True,
+        )
+        db_session.add(other_day_queue)
+        db_session.flush()
+
+        service = ForceMajeureApiService(db_session)
+        with pytest.raises(ForceMajeureApiDomainError) as exc_info:
+            service.get_pending_entries(
+                specialist_id=test_doctor.id,
+                target_date=date.today(),
+                daily_queue_id=other_day_queue.id,
+            )
+        assert exc_info.value.status_code == 422
+
+    def test_daily_queue_id_and_entry_ids_are_mutually_exclusive(self, monkeypatch):
+        service = ForceMajeureApiService(db=None, repository=SimpleNamespace(db=None))
+        with pytest.raises(ForceMajeureApiDomainError) as transfer_error:
+            service.transfer_queue_to_tomorrow(
+                request=SimpleNamespace(
+                    specialist_id=1,
+                    target_date=None,
+                    daily_queue_id=5,
+                    entry_ids=[1, 2],
+                    reason="reason",
+                    send_notifications=False,
+                ),
+                current_user_id=1,
+            )
+        assert transfer_error.value.status_code == 422
+
+        with pytest.raises(ForceMajeureApiDomainError) as cancel_error:
+            service.cancel_queue_with_refund(
+                request=SimpleNamespace(
+                    specialist_id=1,
+                    target_date=None,
+                    daily_queue_id=5,
+                    entry_ids=[1, 2],
+                    reason="reason",
+                    refund_type="deposit",
+                    send_notifications=False,
+                ),
+                current_user_id=1,
+            )
+        assert cancel_error.value.status_code == 422
+
+    def test_transfer_passes_resolved_source_day_to_domain_service(self, monkeypatch):
+        captured = {}
+
+        def fake_transfer(**kwargs):
+            captured.update(kwargs)
+            return {"success": True, "transferred": len(kwargs["entries"])}
+
+        force_service = SimpleNamespace(
+            get_pending_entries=lambda **kwargs: [SimpleNamespace(id=11)],
+            transfer_entries_to_tomorrow=fake_transfer,
+        )
+        monkeypatch.setattr(
+            "app.services.force_majeure_api_service.get_force_majeure_service",
+            lambda db: force_service,
+        )
+
+        source_day = date(2026, 11, 5)
+        service = ForceMajeureApiService(db=None, repository=SimpleNamespace(db=None))
+        service.transfer_queue_to_tomorrow(
+            request=SimpleNamespace(
+                specialist_id=7,
+                target_date=source_day,
+                daily_queue_id=None,
+                entry_ids=None,
+                reason="doctor absent on Nov 5",
+                send_notifications=False,
+            ),
+            current_user_id=1,
+        )
+
+        # round 2 P1: the destination day must derive from the SOURCE queue
+        # day, never from the current clinic day
+        assert captured["source_date"] == source_day
+
+    def test_transfer_destination_is_source_day_plus_one_for_future_queue(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """A future-dated queue transfers to source day + 1, not clinic
+        tomorrow: on clinic day 2026-10-30 the Nov 5 queue moves to Nov 6
+        (the old behavior recreated the entries on Oct 31 — backwards)."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        clinic_day = date(2026, 10, 30)
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.clinic_today", lambda db: clinic_day
+        )
+        monkeypatch.setattr(
+            "app.services.force_majeure_api_service.clinic_today",
+            lambda db: clinic_day,
+        )
+
+        source_day = date(2026, 11, 5)
+        source_queue = DailyQueue(
+            day=source_day,
+            specialist_id=test_doctor.id,
+            queue_tag="doctor_future_queue",
+            active=True,
+        )
+        db_session.add(source_queue)
+        db_session.flush()
+        entry = OnlineQueueEntry(
+            queue_id=source_queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Future Queue Patient",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add(entry)
+        db_session.flush()
+
+        result = ForceMajeureApiService(db_session).transfer_queue_to_tomorrow(
+            request=SimpleNamespace(
+                specialist_id=test_doctor.id,
+                target_date=source_day,
+                daily_queue_id=source_queue.id,
+                entry_ids=None,
+                reason="doctor absent on Nov 5",
+                send_notifications=False,
+            ),
+            current_user_id=1,
+        )
+
+        assert result["transferred"] == 1
+        assert result["new_date"] == "2026-11-06"
+        db_session.refresh(entry)
+        assert entry.status == "cancelled"
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        moved_queue = db_session.get(DailyQueue, moved.queue_id)
+        assert moved_queue.day == date(2026, 11, 6)
+
+    def test_cancel_with_refund_selects_only_the_bound_queue_entries(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        resource = QueueResource(
+            code="cardio_surface_c",
+            queue_tag=test_doctor.specialty,
+            display_name="Кардиология (реестр)",
+            active=True,
+        )
+        db_session.add(resource)
+        db_session.flush()
+        surface_queue = DailyQueue(
+            day=today,
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        doctor_queue = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="doctor_own_queue_c",
+            active=True,
+        )
+        db_session.add_all([surface_queue, doctor_queue])
+        db_session.flush()
+
+        own_entry = OnlineQueueEntry(
+            queue_id=doctor_queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Own Queue Patient",
+            status="waiting",
+            source="desk",
+        )
+        surface_entry = OnlineQueueEntry(
+            queue_id=surface_queue.id,
+            number=2,
+            patient_id=test_patient.id,
+            patient_name="Surface Queue Patient",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add_all([own_entry, surface_entry])
+        db_session.flush()
+
+        captured = {}
+        real_service = get_force_majeure_service(db_session)
+
+        def fake_cancel(**kwargs):
+            captured["entries"] = kwargs["entries"]
+            return {"success": True, "cancelled": len(kwargs["entries"])}
+
+        monkeypatch.setattr(real_service, "cancel_entries_with_refund", fake_cancel)
+        monkeypatch.setattr(
+            "app.services.force_majeure_api_service.get_force_majeure_service",
+            lambda db: real_service,
+        )
+
+        result = ForceMajeureApiService(db_session).cancel_queue_with_refund(
+            request=SimpleNamespace(
+                specialist_id=test_doctor.id,
+                target_date=today,
+                daily_queue_id=doctor_queue.id,
+                entry_ids=None,
+                reason="doctor emergency",
+                refund_type="deposit",
+                send_notifications=False,
+            ),
+            current_user_id=1,
+        )
+
+        assert result["cancelled"] == 1
+        assert [entry.id for entry in captured["entries"]] == [own_entry.id]
 
     def test_cancel_with_refund_rejects_entry_linked_to_other_patient_visit(
         self,
@@ -236,6 +576,7 @@ class TestForceMajeureApiService:
                     entry_ids=None,
                     specialist_id=1,
                     target_date=None,
+                    daily_queue_id=None,
                     reason="reason",
                     send_notifications=False,
                 ),

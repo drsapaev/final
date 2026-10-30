@@ -40,6 +40,11 @@ class ForceMajeureTransferRequest(BaseModel):
 
     specialist_id: int = Field(..., description="ID специалиста")
     target_date: date | None = Field(None, description="Дата очереди (по умолчанию сегодня)")
+    # 3808 review round 2 (P1 queue identity): канонический ID очереди
+    # (DailyQueue) из read-модели регистратора. Жёстко ограничивает и preview,
+    # и мутацию ЭТОЙ очередью — резолюция specialist→реестровая поверхность
+    # больше не может молча подменить цель операции. Взаимоисключающе с entry_ids.
+    daily_queue_id: int | None = Field(None, description="ID канонической очереди строки (ограничивает операцию этой очередью)")
     reason: str = Field(..., min_length=5, description="Причина переноса")
     entry_ids: list[int] | None = Field(None, description="ID конкретных записей (все если не указано)")
     send_notifications: bool = Field(True, description="Отправить уведомления пациентам")
@@ -50,6 +55,8 @@ class ForceMajeureCancelRequest(BaseModel):
 
     specialist_id: int = Field(..., description="ID специалиста")
     target_date: date | None = Field(None, description="Дата очереди (по умолчанию сегодня)")
+    # 3808 review round 2 (P1 queue identity): см. ForceMajeureTransferRequest.
+    daily_queue_id: int | None = Field(None, description="ID канонической очереди строки (ограничивает операцию этой очередью)")
     reason: str = Field(..., min_length=5, description="Причина отмены")
     refund_type: str = Field("deposit", description="Тип возврата: deposit или bank_transfer")
     entry_ids: list[int] | None = Field(None, description="ID конкретных записей (все если не указано)")
@@ -189,6 +196,10 @@ async def cancel_queue_with_refund(
 async def get_pending_entries_for_force_majeure(
     specialist_id: int = Query(..., description="ID специалиста"),
     target_date: date | None = Query(None, description="Дата очереди"),
+    daily_queue_id: int | None = Query(
+        None,
+        description="ID канонической очереди строки (ограничивает preview этой очередью)",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
@@ -202,6 +213,7 @@ async def get_pending_entries_for_force_majeure(
     return ForceMajeureApiService(db).get_pending_entries(
         specialist_id=specialist_id,
         target_date=target_date,
+        daily_queue_id=daily_queue_id,
     )
 
 

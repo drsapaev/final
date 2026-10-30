@@ -52,6 +52,10 @@ export interface ForceMajeureModalState {
   // modal. Preview and mutation must refer to the same specialist + date;
   // null falls back to the backend clinic-day SSOT.
   targetDate: string | null;
+  // Review round 2 (P1 queue identity): canonical queue id of the row —
+  // the backend binds preview and both mutations to EXACTLY this queue
+  // instead of resolving the specialist onto a shared registry surface.
+  dailyQueueId: number | null;
 }
 export interface ContextMenuState {
   open: boolean;
@@ -89,7 +93,7 @@ export const initialRegistrarDialogsState: RegistrarDialogsState = {
   cancelDialog: { open: false, row: null, reason: '' },
   paymentDialog: { open: false, row: null, paid: false, source: null },
   recordPreviewDialog: { open: false, row: null },
-  forceMajeureModal: { open: false, specialistId: null, specialistName: '', targetDate: null },
+  forceMajeureModal: { open: false, specialistId: null, specialistName: '', targetDate: null, dailyQueueId: null },
   contextMenu: { open: false, row: null, position: { x: 0, y: 0 } },
   rescheduleDialog: { open: false, data: null },
   showPaymentManager: false,
@@ -161,11 +165,11 @@ export const useRegistrarDialogs = () => {
   const closeContextMenu = useCallback(() => {
     dispatch({ type: 'SET_CONTEXT_MENU', value: { open: false, row: null, position: { x: 0, y: 0 } } });
   }, []);
-  const openForceMajeure = useCallback((specialistId: string | number | null, specialistName: string, targetDate: string | null = null) => {
-    dispatch({ type: 'SET_FORCE_MAJEURE_MODAL', value: { open: true, specialistId, specialistName, targetDate } });
+  const openForceMajeure = useCallback((specialistId: string | number | null, specialistName: string, targetDate: string | null = null, dailyQueueId: number | null = null) => {
+    dispatch({ type: 'SET_FORCE_MAJEURE_MODAL', value: { open: true, specialistId, specialistName, targetDate, dailyQueueId } });
   }, []);
   const closeForceMajeure = useCallback(() => {
-    dispatch({ type: 'SET_FORCE_MAJEURE_MODAL', value: { open: false, specialistId: null, specialistName: '', targetDate: null } });
+    dispatch({ type: 'SET_FORCE_MAJEURE_MODAL', value: { open: false, specialistId: null, specialistName: '', targetDate: null, dailyQueueId: null } });
   }, []);
   const openRescheduleDialog = useCallback((data: Record<string, unknown>) => {
     dispatch({ type: 'SET_RESCHEDULE_DIALOG', value: { open: true, data } });

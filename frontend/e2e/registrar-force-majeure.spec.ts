@@ -5,12 +5,14 @@
  *
  * Covers the regression contract end-to-end through the real UI:
  * 1. A doctor-owned row (queue_owner_kind='doctor', no legacy doctor
- *    fields) opens the modal targeting queue_owner_id and the row's
- *    canonical day; the preview request carries the SAME
- *    specialist_id + target_date that the mutation will carry.
+ *    fields) opens the modal targeting queue_owner_id, the row's canonical
+ *    day AND the row's daily_queue_id; the preview request carries the SAME
+ *    specialist_id + target_date + daily_queue_id that the mutation will
+ *    carry (round 2 P1: the backend targets exactly that queue instead of
+ *    resolving the specialist onto a shared registry surface).
  * 2. Typing ПОДТВЕРЖДАЮ + a reason only enables the destructive action
  *    after the (mocked) dry-run preview succeeds; the transfer POST is
- *    bound to the previewed specialist + date.
+ *    bound to the previewed specialist + date + queue.
  * 3. A resource-owned row with an incidental legacy doctor_id never
  *    opens the modal — the action is visibly unavailable instead of
  *    silently retargeting doctor 3's whole queue.
@@ -241,12 +243,13 @@ test.describe('Registrar force majeure (#3808 REG-FE-025)', () => {
     const dialog = page.locator('[role="dialog"]');
     await expect(dialog).toBeVisible();
 
-    // The preview (dry run) is bound to the canonical owner + row day.
+    // The preview (dry run) is bound to the canonical owner + row day + queue.
     await expect
       .poll(() => previewUrls.length, { timeout: 10000 })
       .toBeGreaterThanOrEqual(1);
     expect(previewUrls[0]).toContain('specialist_id=3');
     expect(previewUrls[0]).toContain(`target_date=${targetDate}`);
+    expect(previewUrls[0]).toContain('daily_queue_id=41');
 
     // The dry-run card shows the previewed entries.
     await expect(page.getByText('2 записей')).toBeVisible({ timeout: 10000 });
@@ -260,13 +263,14 @@ test.describe('Registrar force majeure (#3808 REG-FE-025)', () => {
     await expect(transferButton).toBeEnabled();
     await transferButton.click();
 
-    // The mutation carries the SAME specialist + date as the preview.
+    // The mutation carries the SAME specialist + date + queue as the preview.
     await expect
       .poll(() => transferBodies.length, { timeout: 10000 })
       .toBeGreaterThanOrEqual(1);
     expect(transferBodies[0]).toMatchObject({
       specialist_id: 3,
       target_date: targetDate,
+      daily_queue_id: 41,
       reason: 'Затопление кабинета',
       send_notifications: true,
     });

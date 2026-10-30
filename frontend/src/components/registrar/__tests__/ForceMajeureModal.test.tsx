@@ -8,13 +8,18 @@
  *
  * Pins:
  * - preview requests the canonical target: specialist_id + target_date
+ *   + the row's daily_queue_id (round 2: the backend targets EXACTLY that
+ *   queue instead of resolving the specialist onto a shared surface)
  * - failed / in-flight / stale / empty previews never enable the primary
  *   action, even after typing ПОДТВЕРЖДАЮ + a valid reason
- * - re-targeting the modal (another row/day) re-locks the action until the
- *   new preview succeeds and binds the mutation to the NEW target
+ * - re-targeting the modal (another row/day/queue) re-locks the action until
+ *   the new preview succeeds and binds the mutation to the NEW target
+ * - an OUT-OF-ORDER late preview response for a previous target never
+ *   authorizes the current one (round 2 P1: deferred A/B regression)
  * - a preview refresh that fails re-locks a previously authorized action
  * - a synchronous double submit fires exactly one financial mutation
- * - POST bodies carry the same specialist_id + target_date as the preview
+ * - POST bodies carry the same specialist_id + target_date + daily_queue_id
+ *   as the preview
  */
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -50,6 +55,7 @@ function renderModal(props: Partial<React.ComponentProps<typeof ForceMajeureModa
       specialistId={3}
       specialistName="Dr X"
       targetDate="2026-10-30"
+      dailyQueueId={41}
       {...props}
     />,
   );
@@ -78,7 +84,7 @@ describe('ForceMajeureModal (#3808 REG-FE-025)', () => {
     renderModal();
     await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
     expect(apiGet).toHaveBeenCalledWith(
-      '/force-majeure/pending-entries?specialist_id=3&target_date=2026-10-30',
+      '/force-majeure/pending-entries?specialist_id=3&target_date=2026-10-30&daily_queue_id=41',
     );
     await waitFor(() => expect(screen.getByText('misc.fm_entries_count:2')).toBeInTheDocument());
   });
@@ -116,7 +122,7 @@ describe('ForceMajeureModal (#3808 REG-FE-025)', () => {
     await fillConfirmation();
     expect(submitButton()).toBeEnabled();
 
-    // re-target the open modal at another row/day: the old preview is stale
+    // re-target the open modal at another row/day/queue: the old preview is stale
     let resolveSecondPreview!: (value: unknown) => void;
     apiGet.mockImplementationOnce(
       () => new Promise((resolve) => { resolveSecondPreview = resolve; }) as never,
@@ -128,6 +134,7 @@ describe('ForceMajeureModal (#3808 REG-FE-025)', () => {
         specialistId={5}
         specialistName="Dr Y"
         targetDate="2026-10-31"
+        dailyQueueId={55}
       />,
     );
     await fillConfirmation();
@@ -138,12 +145,65 @@ describe('ForceMajeureModal (#3808 REG-FE-025)', () => {
     await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(submitButton()).toBeEnabled());
 
-    // the mutation is bound to the NEW specialist + date, not the stale ones
+    // the mutation is bound to the NEW specialist + date + queue, not the stale ones
     fireEvent.click(submitButton());
     await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
     expect(apiPost).toHaveBeenCalledWith('/force-majeure/transfer', {
       specialist_id: 5,
       target_date: '2026-10-31',
+      daily_queue_id: 55,
+      reason: REASON,
+      send_notifications: true,
+    });
+  });
+
+  it('an out-of-order late preview response never authorizes the current target (round 2 P1)', async () => {
+    // Row A preview hangs; while it is pending the modal is re-targeted at
+    // row B (its preview hangs too); only THEN does A resolve — late.
+    let resolvePreviewA!: (value: unknown) => void;
+    let resolvePreviewB!: (value: unknown) => void;
+    apiGet.mockImplementationOnce(
+      () => new Promise((resolve) => { resolvePreviewA = resolve; }) as never,
+    );
+    const { rerender } = renderModal();
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
+
+    apiGet.mockImplementationOnce(
+      () => new Promise((resolve) => { resolvePreviewB = resolve; }) as never,
+    );
+    rerender(
+      <ForceMajeureModal
+        isOpen
+        onClose={vi.fn()}
+        specialistId={5}
+        specialistName="Dr Y"
+        targetDate="2026-10-31"
+        dailyQueueId={55}
+      />,
+    );
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
+    await fillConfirmation();
+
+    // A resolves LATE (after B's request started): its data must be discarded —
+    // B is still unvalidated, so the destructive action stays locked.
+    await act(async () => {
+      resolvePreviewA({ data: [{ total_amount: 1 }] });
+    });
+    expect(screen.queryByText('misc.fm_entries_count:1')).not.toBeInTheDocument();
+    expect(submitButton()).toBeDisabled();
+
+    // B resolves: only now the action unlocks, bound to B's target facts.
+    await act(async () => {
+      resolvePreviewB({ data: [{ total_amount: 7 }, { total_amount: 8 }] });
+    });
+    await waitFor(() => expect(screen.getByText('misc.fm_entries_count:2')).toBeInTheDocument());
+    expect(submitButton()).toBeEnabled();
+    fireEvent.click(submitButton());
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+    expect(apiPost).toHaveBeenCalledWith('/force-majeure/transfer', {
+      specialist_id: 5,
+      target_date: '2026-10-31',
+      daily_queue_id: 55,
       reason: REASON,
       send_notifications: true,
     });
@@ -172,6 +232,7 @@ describe('ForceMajeureModal (#3808 REG-FE-025)', () => {
     expect(apiPost).toHaveBeenCalledWith('/force-majeure/transfer', {
       specialist_id: 3,
       target_date: '2026-10-30',
+      daily_queue_id: 41,
       reason: REASON,
       send_notifications: true,
     });
@@ -188,6 +249,7 @@ describe('ForceMajeureModal (#3808 REG-FE-025)', () => {
     expect(apiPost).toHaveBeenCalledWith('/force-majeure/cancel-with-refund', {
       specialist_id: 3,
       target_date: '2026-10-30',
+      daily_queue_id: 41,
       reason: REASON,
       refund_type: 'deposit',
       send_notifications: true,

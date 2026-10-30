@@ -40,6 +40,14 @@ interface ForceMajeureModalProps {
    * одну дату; null — SSOT-день клиники на бэкенде.
    */
   targetDate?: string | null;
+  /**
+   * 3808 review round 2 (P1 queue identity): канонический ID очереди
+   * (DailyQueue) строки. Preview и обе мутации передают его бэкенду,
+   * чтобы операция была жёстко привязана к очереди строки, а не к
+   * резолюции специалиста (которая может выбрать общую ресурсную
+   * очередь специальности).
+   */
+  dailyQueueId?: number | null;
   onSuccess?: (...args: unknown[]) => void;
 }
 
@@ -49,12 +57,20 @@ interface DryRunResult {
   totalAmount: number;
 }
 
+/** Скоуп, валидированный последним успешным preview (round 2 P1). */
+interface ValidatedPreviewScope {
+  specialistId: string | number | null;
+  targetDate: string | null;
+  dailyQueueId: number | null;
+}
+
 const ForceMajeureModal = ({
   isOpen,
   onClose,
   specialistId,
   specialistName,
   targetDate,
+  dailyQueueId,
   onSuccess
 }: ForceMajeureModalProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
@@ -72,6 +88,14 @@ const ForceMajeureModal = ({
   // 3808: синхронный in-flight предохранитель — два клика в одном стеке
   // (до ре-рендера) не могут повторить финансовую мутацию.
   const submitInFlight = useRef(false);
+  // 3808 review round 2 (P1 stale preview): поколение запросов preview.
+  // Каждое новое открытие/перенаведение/refresh инвалидирует все
+  // предыдущие: поздний (out-of-order) ответ чужой строки отбрасывается
+  // и не может авторизовать мутацию текущей.
+  const previewSeq = useRef(0);
+  // Скоуп последнего УСПЕШНОГО preview — авторизация действия
+  // привязана к нему и должна совпадать с текущей целью модала.
+  const validatedScope = useRef<ValidatedPreviewScope | null>(null);
 
   // UX Audit: getAuthToken + tokenManager удалены — auth через axios-interceptor.
 
@@ -79,34 +103,50 @@ const ForceMajeureModal = ({
   const loadPendingEntries = useCallback(async () => {
     if (!specialistId) return;
 
+    // 3808 review round 2 (P1 stale preview): фиксируем поколение запроса;
+    // ответ применяется только если он всё ещё последний.
+    const seq = ++previewSeq.current;
+
     // 3808: предыдущий снапшот сбрасывается ДО загрузки — устаревший
-    // preview (другая строка/дата) не может авторизовать мутацию.
+    // preview (другая строка/дата/очередь) не может авторизовать мутацию.
     setPreviewLoading(true);
     setPreviewError(null);
     setDryRunResult(null);
+    validatedScope.current = null;
 
     try {
       // Preview и мутация связаны одним контрактом: specialist_id +
-      // target_date. Дата передаётся явно, а не выводится хостом.
+      // target_date + daily_queue_id. Дата и очередь передаются явно,
+      // а не выводятся хостом или резолюцией специалиста на бэкенде.
       const targetParam = targetDate ? `&target_date=${encodeURIComponent(targetDate)}` : '';
-      const response = await api.get(`/force-majeure/pending-entries?specialist_id=${specialistId}${targetParam}`);
+      const queueParam = dailyQueueId ? `&daily_queue_id=${dailyQueueId}` : '';
+      const response = await api.get(`/force-majeure/pending-entries?specialist_id=${specialistId}${targetParam}${queueParam}`);
+      if (seq !== previewSeq.current) return; // поздний ответ чужой цели
       const data = response.data;
       setDryRunResult({
         count: data.length,
         entries: data,
         totalAmount: data.reduce((sum: number, e: Record<string, unknown>) => sum + (Number(e.total_amount) || 0), 0)
       });
+      validatedScope.current = {
+        specialistId,
+        targetDate: targetDate ?? null,
+        dailyQueueId: dailyQueueId ?? null,
+      };
     } catch (err) {
+      if (seq !== previewSeq.current) return; // ошибка устаревшего запроса
       logger.error('[ForceMajeureModal] Error loading pending entries:', err);
       // ключ, а не перевод: t нестабильна между рендерами и не должна
       // попадать в deps этого callback (иначе reset-effect зациклится)
       setPreviewError('misc.fm_preview_failed');
     } finally {
-      setPreviewLoading(false);
+      if (seq === previewSeq.current) {
+        setPreviewLoading(false);
+      }
     }
-  }, [specialistId, targetDate]);
+  }, [specialistId, targetDate, dailyQueueId]);
 
-  // Reset state when modal opens (or is re-targeted at another row/day)
+  // Reset state when modal opens (or is re-targeted at another row/day/queue)
   useEffect(() => {
     if (isOpen) {
       setReason('');
@@ -116,9 +156,14 @@ const ForceMajeureModal = ({
       setDryRunResult(null);
       setPreviewError(null);
       setPreviewLoading(false);
+      validatedScope.current = null;
       loadPendingEntries();
+    } else {
+      // Закрытие модала инвалидирует висящий preview этого экземпляра.
+      previewSeq.current += 1;
+      validatedScope.current = null;
     }
-  }, [isOpen, specialistId, targetDate, loadPendingEntries]);
+  }, [isOpen, specialistId, targetDate, dailyQueueId, loadPendingEntries]);
 
   // Transfer to tomorrow
   const handleTransfer = async () => {
@@ -151,8 +196,9 @@ const ForceMajeureModal = ({
     try {
       const response = await api.post('/force-majeure/transfer', {
           specialist_id: specialistId,
-          // 3808: мутация привязана к той же дате, что и preview
+          // 3808: мутация привязана к той же дате и очереди, что и preview
           ...(targetDate ? { target_date: targetDate } : {}),
+          ...(dailyQueueId ? { daily_queue_id: dailyQueueId } : {}),
           reason: reason,
           send_notifications: true
       });
@@ -200,8 +246,9 @@ const ForceMajeureModal = ({
     try {
       const response = await api.post('/force-majeure/cancel-with-refund', {
         specialist_id: specialistId,
-        // 3808: мутация привязана к той же дате, что и preview
+        // 3808: мутация привязана к той же дате и очереди, что и preview
         ...(targetDate ? { target_date: targetDate } : {}),
+        ...(dailyQueueId ? { daily_queue_id: dailyQueueId } : {}),
         reason: reason,
         refund_type: refundType,
         send_notifications: true
@@ -224,12 +271,19 @@ const ForceMajeureModal = ({
 
   const isConfirmValid = confirmText === 'ПОДТВЕРЖДАЮ';
   const isReasonValid = reason.trim().length >= 5;
-  // 3808: серверный скоуп валидирован только успешным непустым dry-run.
+  // 3808: серверный скоуп валидирован только успешным непустым dry-run,
+  // причём скоуп этого dry-run обязан совпадать с ТЕКУЩЕЙ целью модала
+  // (round 2 P1: поздний ответ другой строки не авторизует мутацию).
+  const validated = validatedScope.current;
   const isScopeValidated =
     !previewLoading &&
     !previewError &&
     dryRunResult !== null &&
-    dryRunResult.count > 0;
+    dryRunResult.count > 0 &&
+    validated !== null &&
+    validated.specialistId === specialistId &&
+    validated.targetDate === (targetDate ?? null) &&
+    validated.dailyQueueId === (dailyQueueId ?? null);
   const primaryActionLabel = loading ? t('misc.fm_processing') : activeTab === 'transfer' ? t('misc.fm_transfer_button') : t('misc.fm_cancel_button');
   const primaryActionIcon = loading ? <Loader2 size={18} className="animate-spin" /> : activeTab === 'transfer' ? <ArrowRight size={18} /> : <XCircle size={18} />;
   const dialogSurfaceStyle = {

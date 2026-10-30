@@ -300,10 +300,11 @@ const RegistrarDialogsLayer = ({
     {/* ✅ Форс-мажор модальное окно */}
     <ForceMajeureModal
       isOpen={forceMajeureModal.open}
-      onClose={() => setForceMajeureModal({ open: false, specialistId: null, specialistName: '', targetDate: null })}
+      onClose={() => setForceMajeureModal({ open: false, specialistId: null, specialistName: '', targetDate: null, dailyQueueId: null })}
       specialistId={forceMajeureModal.specialistId}
       specialistName={forceMajeureModal.specialistName}
       targetDate={forceMajeureModal.targetDate}
+      dailyQueueId={forceMajeureModal.dailyQueueId}
       onSuccess={(action, result) => {
         logger.info('[RegistrarPanel] Force majeure action completed:', action, result);
         notify.success(action === 'transfer' ? tI18n('registrarPanel.rp_notify_force_majeure_transfer') : tI18n('registrarPanel.rp_notify_force_majeure_cancel'));

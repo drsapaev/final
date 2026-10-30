@@ -67428,6 +67428,24 @@
               "title": "Target Date"
             },
             "description": "Дата очереди"
+          },
+          {
+            "name": "daily_queue_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ID канонической очереди строки (ограничивает preview этой очередью)",
+              "title": "Daily Queue Id"
+            },
+            "description": "ID канонической очереди строки (ограничивает preview этой очередью)"
           }
         ],
         "responses": {
@@ -90149,6 +90167,18 @@
             "title": "Target Date",
             "description": "Дата очереди (по умолчанию сегодня)"
           },
+          "daily_queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Queue Id",
+            "description": "ID канонической очереди строки (ограничивает операцию этой очередью)"
+          },
           "reason": {
             "type": "string",
             "minLength": 5,
@@ -90210,6 +90240,18 @@
             ],
             "title": "Target Date",
             "description": "Дата очереди (по умолчанию сегодня)"
+          },
+          "daily_queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Queue Id",
+            "description": "ID канонической очереди строки (ограничивает операцию этой очередью)"
           },
           "reason": {
             "type": "string",

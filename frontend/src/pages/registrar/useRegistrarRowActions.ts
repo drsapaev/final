@@ -250,12 +250,20 @@ export const useRegistrarRowActions = ({
         // очередь не может быть молча перенаправлена на «случайного»
         // врача всей очередью: такое действие видно недоступно, пока у
         // бэкенда нет безопасного ресурсного контракта.
+        // Review round 2 (P1 queue identity): daily_queue_id — такой же
+        // обязательный факт строки: без него бэкенд не может привязать
+        // операцию к конкретной очереди (резолюция специалиста способна
+        // выбрать общую ресурсную очередь) — действие тоже недоступно.
         const ownerKind = row.queue_owner_kind ?? null;
         const ownerId = row.queue_owner_id ?? null;
+        const dailyQueueId =
+          typeof row.daily_queue_id === 'number' && row.daily_queue_id > 0
+            ? row.daily_queue_id
+            : null;
         const ownerIsUnambiguousDoctor =
           ownerKind === 'doctor' && typeof ownerId === 'number' && ownerId > 0;
 
-        if (ownerIsUnambiguousDoctor) {
+        if (ownerIsUnambiguousDoctor && dailyQueueId) {
           const targetDate =
             (typeof row.record_date === 'string' && row.record_date) ||
             (typeof row.date === 'string' && row.date) ||
@@ -266,14 +274,17 @@ export const useRegistrarRowActions = ({
             specialistName:
               row.doctor_name || row.specialist_name || row.queue_name || tI18n('registrarPanel.rp_all_specialists'),
             targetDate,
+            dailyQueueId,
           });
         } else {
-          logger.info('[RegistrarPanel] Force majeure unavailable: row owner is not an unambiguous doctor', {
+          logger.info('[RegistrarPanel] Force majeure unavailable: row owner is not an unambiguous doctor or the canonical queue identity is missing', {
             ownerKind,
             ownerId,
-            dailyQueueId: row.daily_queue_id ?? null,
+            dailyQueueId,
           });
-          notify.warning(tI18n('misc.fm_owner_unsupported'));
+          notify.warning(
+            tI18n(ownerIsUnambiguousDoctor ? 'misc.fm_queue_unbound' : 'misc.fm_owner_unsupported'),
+          );
         }
         break;
       }

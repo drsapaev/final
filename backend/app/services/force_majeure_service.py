@@ -122,6 +122,7 @@ class ForceMajeureService:
         reason: str,
         performed_by_id: int,
         send_notifications: bool = True,
+        source_date: date | None = None,
     ) -> dict[str, Any]:
         """
         Массовый перенос записей на завтра
@@ -135,6 +136,11 @@ class ForceMajeureService:
             reason: Причина переноса
             performed_by_id: ID пользователя, выполнившего перенос
             send_notifications: Отправить уведомления
+            source_date: День очереди-источника (по умолчанию — день
+                клиники). «Завтра» считается от НЕГО: перенос будущей
+                очереди (например, 5 ноября) ведёт на 6 ноября, а не на
+                «завтра от сегодня» (3808 review round 2 P1 — раньше
+                записи будущей очереди пересоздавались задним числом).
 
         Returns:
             Результат операции с деталями
@@ -150,7 +156,11 @@ class ForceMajeureService:
         # что и резолв записей выше): host-завтра в раннем-вечернем
         # окне = СЕГОДНЯ клиники — перенос сваливался бы в исходный
         # день, из которого записи пришли.
-        tomorrow = clinic_today(self.db) + timedelta(days=1)
+        # 3808 review round 2 (P1): день-источник передаёт вызывающий
+        # слой (target_date запроса); дефолт — день клиники для
+        # прямых вызовов сервиса (совместимость с текущими тестами).
+        base_day = source_date or clinic_today(self.db)
+        tomorrow = base_day + timedelta(days=1)
 
         # Получаем или создаём очередь на завтра
         tomorrow_queue = self._get_or_create_queue(specialist_id, tomorrow)
