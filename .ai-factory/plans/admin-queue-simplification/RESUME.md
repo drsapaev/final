@@ -1,4 +1,14 @@
-## Latest continuation — PR #3805 staging queue suite passed — 2026-10-30T15:39+05:00
+## Latest continuation — PR #3805 Admin panel checks passed — 2026-10-30T17:07+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/t18-queue-row-diagnostics`. PR #3805 is OPEN / Ready for review at HEAD `b74cdb4d1393bcdab31bbf6e95fbf60130473b68`; base/current main is `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`, including merged PR #3801. User owns merge; do not approve or merge.
+
+The exact tested application/test source was `9e1cf85cc89e19969799cac6d5833f7d78389b2c`; `b74cdb4` adds only documentation. In separate synthetic cycles, Admin navigation passed 3/3, Admin panel cases passed 2/2, normal Admin password login and TOTP setup/verification passed, and the earlier queue-system suite passed 6/6. r5 exposed an invalid success assertion; r6 exposed an invalid optional `.test` email in the scratch fixture (HTTP 422, locally reproduced as `EmailStr` validation failure); r7 omitted email and passed both panel tests. All Sessions auto-teardown passed and post-session Preflight was clean. Full staging runbook/T18 remains incomplete and Tier-2 stays PARTIAL.
+
+Latest r7 details are recorded in `EVIDENCE.md`. The service-worker file marker and SHA-256 match the tested commit, but the staging helper continues to report `served_revision_verified=false`; do not claim full frontend artifact attestation.
+
+Next: commit the plan-journal evidence, push to the existing PR branch, refresh PR #3805 body with the new Admin panel results and the remaining Tier-2 limits, then verify exact-head CI. Do not approve, merge, or deploy. After the user merges, continue remaining T18 acceptance.
+
+## Previous continuation — PR #3805 staging queue suite passed — 2026-10-30T15:39+05:00
 
 Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/t18-queue-row-diagnostics. PR #3805 remains OPEN/Draft at pushed HEAD 9e1cf85cc89e19969799cac6d5833f7d78389b2c; base/current main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. User owns merge; do not merge or self-approve.
 
