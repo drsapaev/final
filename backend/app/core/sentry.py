@@ -28,18 +28,20 @@ logger = logging.getLogger(__name__)
 
 # Standard Sentry contexts as documented by Sentry:
 # https://docs.sentry.io/platforms/python/enriching-events/contexts/
-_STANDARD_SENTRY_CONTEXTS = frozenset({
-    "app",             # app version, build type
-    "browser",         # browser name, version
-    "device",          # device model, family, arch
-    "os",              # os name, version, build
-    "runtime",         # runtime name, version (CPython, etc.)
-    "gpu",             # GPU name, vendor
-    "trace",           # distributed tracing (trace_id, span_id)
-    "response",        # HTTP response context
-    "culture",         # user culture (locale, timezone)
-    "cloud_resource",  # cloud provider info
-})
+_STANDARD_SENTRY_CONTEXTS = frozenset(
+    {
+        "app",  # app version, build type
+        "browser",  # browser name, version
+        "device",  # device model, family, arch
+        "os",  # os name, version, build
+        "runtime",  # runtime name, version (CPython, etc.)
+        "gpu",  # GPU name, vendor
+        "trace",  # distributed tracing (trace_id, span_id)
+        "response",  # HTTP response context
+        "culture",  # user culture (locale, timezone)
+        "cloud_resource",  # cloud provider info
+    }
+)
 
 # Diagnostic field keys within standard Sentry contexts whose names collide
 # with PII field patterns (e.g. "name" is in PII_FIELD_PATTERNS). These are
@@ -51,6 +53,86 @@ _STANDARD_SENTRY_CONTEXTS = frozenset({
 # so PII that accidentally lands inside a standard context (e.g.
 # {"device": {"name": "server-1", "phone": "+998..."}}) is still redacted.
 _STANDARD_CONTEXT_DIAGNOSTIC_KEYS = frozenset({"name"})
+
+# Provider payloads can contain clinical notes and tool arguments under
+# generic keys that are not covered by the PII field catalog.
+_AI_CONTENT_KEYS = frozenset(
+    {
+        "prompt",
+        "prompts",
+        "response",
+        "responses",
+        "content",
+        "completion",
+        "completions",
+        "messages",
+        "arguments",
+        "tool_args",
+        "tool_arguments",
+        "toolargs",
+        "toolarguments",
+    }
+)
+
+
+def _redact_ai_content(value: Any, parent_key: str = "") -> Any:
+    """Remove AI prompt/response content wherever it appears in an event."""
+    if isinstance(value, dict):
+        redacted = {}
+        for key, item in value.items():
+            normalized_key = str(key).lower().replace("-", "_")
+            is_http_response_context = (
+                parent_key == "contexts" and normalized_key == "response"
+            )
+            if normalized_key in _AI_CONTENT_KEYS and not is_http_response_context:
+                redacted[key] = "[REDACTED]"
+            else:
+                redacted[key] = _redact_ai_content(item, normalized_key)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_ai_content(item, parent_key) for item in value]
+    return value
+
+
+def _redact_unstructured_event_text(event: dict[str, Any]) -> None:
+    """Drop free-form text fields that can contain clinical narratives."""
+    if isinstance(event.get("message"), str):
+        event["message"] = "[REDACTED]"
+
+    request = event.get("request")
+    if isinstance(request, dict) and request.get("data") is not None:
+        # Request bodies can contain patient text under unknown field names.
+        request["data"] = "[REDACTED]"
+
+    logentry = event.get("logentry")
+    if isinstance(logentry, dict):
+        for key in ("message", "formatted"):
+            if isinstance(logentry.get(key), str):
+                logentry[key] = "[REDACTED]"
+        if logentry.get("params") is not None:
+            logentry["params"] = []
+
+    breadcrumbs = event.get("breadcrumbs")
+    crumbs = breadcrumbs.get("values") if isinstance(breadcrumbs, dict) else breadcrumbs
+    if isinstance(crumbs, list):
+        for crumb in crumbs:
+            if isinstance(crumb, dict) and isinstance(crumb.get("message"), str):
+                crumb["message"] = "[REDACTED]"
+
+    exception = event.get("exception")
+    values = exception.get("values") if isinstance(exception, dict) else None
+    if isinstance(values, list):
+        for value_entry in values:
+            if not isinstance(value_entry, dict):
+                continue
+            if value_entry.get("value") is not None:
+                value_entry["value"] = "[REDACTED]"
+            stacktrace = value_entry.get("stacktrace")
+            frames = stacktrace.get("frames") if isinstance(stacktrace, dict) else None
+            if isinstance(frames, list):
+                for frame in frames:
+                    if isinstance(frame, dict) and "vars" in frame:
+                        frame["vars"] = {}
 
 
 def _scrub_context(context_name: str, context_value: Any) -> Any:
@@ -164,9 +246,7 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
             # preserved via _scrub_context(); all other keys are scrubbed.
             # This ensures PII that accidentally lands inside a standard
             # context (e.g. device.phone) is still redacted.
-            event["contexts"] = {
-                k: _scrub_context(k, v) for k, v in contexts.items()
-            }
+            event["contexts"] = {k: _scrub_context(k, v) for k, v in contexts.items()}
         else:
             event["contexts"] = mask_pii(contexts)
 
@@ -231,6 +311,7 @@ def init_sentry() -> None:
         from sentry_sdk.integrations.fastapi import FastApiIntegration
         from sentry_sdk.integrations.redis import RedisIntegration
         from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
         try:
             from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
         except ImportError:
@@ -268,8 +349,7 @@ def init_sentry() -> None:
         for PII scrubbing, shared with ``JsonLogFormatter`` and
         ``PIIMaskingFilter`` for stdout logs.
 
-        If ``sanitize_event`` raises, the event is still returned (unscrubbed)
-        so error tracking is not lost. The failure is logged via
+        If sanitization raises, the event is dropped. The failure is logged via
         ``logger.warning`` (NOT ``logger.exception``) to avoid Sentry
         recursion: ``LoggingIntegration`` auto-registers with
         ``DEFAULT_EVENT_LEVEL=ERROR``, so ``logger.exception`` (level=ERROR)
@@ -280,16 +360,13 @@ def init_sentry() -> None:
         """
         try:
             sanitize_event(event)
+            _redact_unstructured_event_text(event)
+            event.update(_redact_ai_content(event))
         except Exception:
             # logger.warning (NOT logger.exception) — see docstring above
             # for the Sentry recursion risk that logger.exception creates.
-            logger.warning(
-                "Sentry before_send sanitizer failed — "
-                "event sent unscrubbed (event_id=%s error_type=%s)",
-                event.get("event_id", "unknown"),
-                type(hint.get("exception") or hint.get("exc_info") or Exception()).__name__
-                if hint else "unknown",
-            )
+            logger.warning("Sentry before_send sanitizer failed; event dropped")
+            return None
         return event
 
     sentry_sdk.init(
@@ -305,13 +382,16 @@ def init_sentry() -> None:
             "fastapi.exceptions.HTTPException",  # 4xx are not errors
         ],
     )
-    logger.info("[sentry] initialized (env=%s, sample_rate=%s)", environment, sample_rate)
+    logger.info(
+        "[sentry] initialized (env=%s, sample_rate=%s)", environment, sample_rate
+    )
 
 
 def capture_exception(exc: Exception, **context: Any) -> None:
     """Capture an exception with optional context. No-op if Sentry not initialized."""
     try:
         import sentry_sdk
+
         if context:
             with sentry_sdk.push_scope() as scope:
                 for k, v in context.items():
@@ -330,6 +410,7 @@ def capture_message(msg: str, level: str = "info") -> None:
     """Capture a message. No-op if Sentry not initialized."""
     try:
         import sentry_sdk
+
         sentry_sdk.capture_message(msg, level=level)
     except ImportError:
         pass

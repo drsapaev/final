@@ -28,11 +28,15 @@ type HookOptions = {
 type FakeSpan = { description?: unknown; data?: Record<string, unknown> };
 type FakeEvent = {
   type?: string;
+  message?: string;
   transaction?: string;
   request?: Record<string, unknown>;
   spans?: FakeSpan[];
   breadcrumbs?: Array<Record<string, unknown>>;
   extra?: Record<string, unknown>;
+  contexts?: Record<string, unknown>;
+  logentry?: { message?: string; formatted?: string; params?: unknown[] };
+  exception?: { values?: Array<{ type?: string; value?: string }> };
 };
 
 describe('initSentry scrubbing wiring (owner round-12 P1)', () => {
@@ -108,5 +112,88 @@ describe('initSentry scrubbing wiring (owner round-12 P1)', () => {
     const crumbData = scrubbed.breadcrumbs![0].data as Record<string, unknown>;
     expect(crumbData.from).toBe('/patient/activate?token=[REDACTED]');
     expect(crumbData.to).toBe('/x');
+  });
+
+  it('beforeSend removes unstructured clinical text and AI payload content', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'enabled');
+    const sentry = await import('../sentry');
+    sentry.initSentry();
+
+    const options = initMock.mock.calls[0][0] as Record<string, unknown> & HookOptions;
+    const event: FakeEvent = {
+      message: 'CLINICAL_MESSAGE_CANARY',
+      request: {
+        url: '/api/ai',
+        data: {
+          prompt: 'AI_PROMPT_CANARY',
+          tool_arguments: 'AI_TOOL_ARGS_CANARY',
+          content: 'AI_RESPONSE_CANARY',
+        },
+      },
+      breadcrumbs: [
+        {
+          message: 'CLINICAL_BREADCRUMB_CANARY',
+          data: { response: 'AI_BREADCRUMB_RESPONSE_CANARY', action: 'submit' },
+        },
+      ],
+      exception: { values: [{ type: 'ProviderError', value: 'AI_EXCEPTION_CANARY' }] },
+      extra: { completion: 'AI_EXTRA_CANARY' },
+      contexts: { response: { status_code: 503 } },
+      logentry: {
+        message: 'CLINICAL_LOGENTRY_MESSAGE_CANARY',
+        formatted: 'CLINICAL_LOGENTRY_FORMAT_CANARY',
+        params: ['CLINICAL_LOGENTRY_PARAM_CANARY'],
+      },
+    };
+
+    const scrubbed = options.beforeSend!(event) as FakeEvent;
+    const serialized = JSON.stringify(scrubbed);
+
+    for (const marker of [
+      'CLINICAL_MESSAGE_CANARY',
+      'AI_PROMPT_CANARY',
+      'AI_TOOL_ARGS_CANARY',
+      'AI_RESPONSE_CANARY',
+      'CLINICAL_BREADCRUMB_CANARY',
+      'AI_BREADCRUMB_RESPONSE_CANARY',
+      'AI_EXCEPTION_CANARY',
+      'AI_EXTRA_CANARY',
+      'CLINICAL_LOGENTRY_MESSAGE_CANARY',
+      'CLINICAL_LOGENTRY_FORMAT_CANARY',
+      'CLINICAL_LOGENTRY_PARAM_CANARY',
+    ]) {
+      expect(serialized).not.toContain(marker);
+    }
+    expect(scrubbed.contexts!.response).toEqual({ status_code: 503 });
+  });
+
+  it('drops an event when beforeSend cannot scrub its payload', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'enabled');
+    const sentry = await import('../sentry');
+    sentry.initSentry();
+
+    const options = initMock.mock.calls[0][0] as Record<string, unknown> & HookOptions;
+    const requestData = new Proxy({}, {
+      ownKeys() {
+        throw new Error('synthetic scrubber failure');
+      },
+    });
+
+    expect(options.beforeSend!({ request: { data: requestData } })).toBeNull();
+  });
+
+  it('drops a transaction when beforeSendTransaction cannot scrub its payload', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'enabled');
+    const sentry = await import('../sentry');
+    sentry.initSentry();
+
+    const options = initMock.mock.calls[0][0] as Record<string, unknown> & HookOptions;
+    const requestData = new Proxy({}, {
+      ownKeys() {
+        throw new Error('synthetic scrubber failure');
+      },
+    });
+
+    expect(options.beforeSendTransaction!({ request: { data: requestData } })).toBeNull();
   });
 });

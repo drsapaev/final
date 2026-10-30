@@ -1,5 +1,6 @@
 """Medical safety envelope for the canonical AI v2 gateway."""
 
+import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -83,6 +84,38 @@ async def test_ai_v2_unexpected_error_keeps_safety_envelope() -> None:
     assert response.status == "error"
     assert response.error == "AI service temporarily unavailable"
     _assert_safety(response)
+
+
+@pytest.mark.asyncio
+async def test_ai_v2_unexpected_error_log_omits_exception_text(caplog) -> None:
+    gateway = _synthetic_gateway()
+    gateway._rate_limiter.check_user_limit = AsyncMock(
+        side_effect=RuntimeError("AI_RESPONSE_CANARY")
+    )
+
+    with caplog.at_level(logging.ERROR, logger="app.services.ai.ai_gateway"):
+        response = await gateway.execute(AITaskType.COMPLAINT_ANALYSIS, {}, user_id=1)
+
+    assert response.status == "error"
+    assert "RuntimeError" in caplog.text
+    assert "AI_RESPONSE_CANARY" not in caplog.text
+    assert all(record.exc_info is None for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_ai_v2_provider_failure_log_omits_exception_text(caplog) -> None:
+    gateway = _synthetic_gateway()
+    gateway._provider_priority = [AIProviderType.MOCK]
+    gateway._circuit_breaker.record_failure = AsyncMock()
+    gateway._route_task = AsyncMock(
+        side_effect=RuntimeError("AI_TOOL_ARGUMENTS_CANARY")
+    )
+
+    with caplog.at_level(logging.WARNING, logger="app.services.ai.ai_gateway"):
+        response = await gateway.execute(AITaskType.COMPLAINT_ANALYSIS, {}, user_id=1)
+
+    assert response.status == "error"
+    assert "AI_TOOL_ARGUMENTS_CANARY" not in caplog.text
 
 
 @pytest.mark.parametrize(

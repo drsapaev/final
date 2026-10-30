@@ -49,6 +49,12 @@ const MEDICAL_PII_KEYS = [
   'token', 'access_token', 'refresh_token', 'secret', 'api_key', 'password',
 ];
 
+// AI content can include clinical notes and tool arguments under generic keys.
+const AI_CONTENT_KEYS = [
+  'prompt', 'prompts', 'response', 'responses', 'content', 'completion',
+  'completions', 'messages', 'arguments', 'tool_args', 'tool_arguments',
+];
+
 // Credential keys redacted INSIDE URL-shaped strings (owner round-12 P1):
 // request.url, breadcrumb from/to, Referer headers and pageload/http-span
 // descriptions carry the URL as a plain string, so the key-based scrubber
@@ -97,20 +103,25 @@ export function redactCredentialQueryParams<T extends string | undefined | null>
  * key-based loop below cannot catch a `?token=` embedded in it. Exported
  * for unit tests (scrubbing contract is security-relevant).
  */
-export function scrubPIIFromObject(obj: unknown): unknown {
+export function scrubPIIFromObject(obj: unknown, parentKey = ''): unknown {
   if (typeof obj === 'string') {
     return redactCredentialQueryParams(obj);
   }
   if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(scrubPIIFromObject);
+  if (Array.isArray(obj)) return obj.map((item) => scrubPIIFromObject(item, parentKey));
 
   const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     const lowerKey = key.toLowerCase();
-    if (MEDICAL_PII_KEYS.some((pii) => lowerKey.includes(pii))) {
+    const isHttpResponseContext = parentKey === 'contexts' && lowerKey === 'response';
+    const containsAiContent = AI_CONTENT_KEYS.some((contentKey) => lowerKey.includes(contentKey));
+    if (
+      (!isHttpResponseContext && containsAiContent) ||
+      MEDICAL_PII_KEYS.some((pii) => lowerKey.includes(pii))
+    ) {
       (cleaned as Record<string, unknown>)[key] = '[REDACTED]';
     } else {
-      (cleaned as Record<string, unknown>)[key] = scrubPIIFromObject(value);
+      (cleaned as Record<string, unknown>)[key] = scrubPIIFromObject(value, lowerKey);
     }
   }
   return cleaned;
@@ -148,26 +159,50 @@ export function initSentry() {
       }),
     ],
     beforeSend(event) {
-      // Scrub PII from request bodies, breadcrumbs, extra context, and contexts.
-      // audit/phase-2, BS-57: previously `event.contexts` was not scrubbed,
-      // so PII attached by Sentry SDK integrations (e.g., device context,
-      // custom contexts set via Sentry.setContext()) leaked through.
-      if (event.request) {
-        event.request = scrubPIIFromObject(event.request) as typeof event.request;
+      try {
+        // Field-name matching cannot reliably recognize clinical narratives
+        // embedded in free-form event, exception, or breadcrumb messages.
+        if (typeof event.message === 'string') event.message = '[REDACTED]';
+        if (event.logentry) {
+          const logentry = event.logentry as typeof event.logentry & { formatted?: string };
+          if (logentry.message) logentry.message = '[REDACTED]';
+          if (logentry.formatted) logentry.formatted = '[REDACTED]';
+          if (logentry.params) logentry.params = [];
+        }
+        if (event.exception?.values) {
+          event.exception.values = event.exception.values.map((value) => ({
+            ...value,
+            value: value.value ? '[REDACTED]' : value.value,
+            stacktrace: value.stacktrace
+              ? {
+                  ...value.stacktrace,
+                  frames: value.stacktrace.frames?.map((frame) => ({ ...frame, vars: undefined })),
+                }
+              : value.stacktrace,
+          }));
+        }
+        if (event.request) {
+          event.request = scrubPIIFromObject(event.request) as typeof event.request;
+          if (event.request.data !== undefined) event.request.data = '[REDACTED]';
+        }
+        if (event.breadcrumbs) {
+          event.breadcrumbs = event.breadcrumbs.map((b) => ({
+            ...b,
+            message: b.message ? '[REDACTED]' : b.message,
+            data: scrubPIIFromObject(b.data) as Record<string, unknown> | undefined,
+          }));
+        }
+        if (event.extra) {
+          event.extra = scrubPIIFromObject(event.extra) as typeof event.extra;
+        }
+        if (event.contexts) {
+          event.contexts = scrubPIIFromObject(event.contexts, 'contexts') as typeof event.contexts;
+        }
+        return event;
+      } catch {
+        // Drop an event if its privacy scrubber fails; never send it raw.
+        return null;
       }
-      if (event.breadcrumbs) {
-        event.breadcrumbs = event.breadcrumbs.map((b) => ({
-          ...b,
-          data: scrubPIIFromObject(b.data) as Record<string, unknown> | undefined,
-        }));
-      }
-      if (event.extra) {
-        event.extra = scrubPIIFromObject(event.extra) as typeof event.extra;
-      }
-      if (event.contexts) {
-        event.contexts = scrubPIIFromObject(event.contexts) as typeof event.contexts;
-      }
-      return event;
     },
     // Owner round-12 P1: pageload/navigation traces are NOT routed through
     // beforeSend — request.url carries the full URL (legacy ?token= handout
@@ -175,23 +210,28 @@ export function initSentry() {
     // way regardless of trace sampling (errors are always sent, traces are
     // sampled — both must be credential-free).
     beforeSendTransaction(event) {
-      if (event.request) {
-        event.request = scrubPIIFromObject(event.request) as typeof event.request;
+      try {
+        if (event.request) {
+          event.request = scrubPIIFromObject(event.request) as typeof event.request;
+          if (event.request.data !== undefined) event.request.data = '[REDACTED]';
+        }
+        event.transaction = redactCredentialQueryParams(event.transaction);
+        if (event.spans?.length) {
+          event.spans = event.spans.map((span) => ({
+            ...span,
+            description:
+              typeof span.description === 'string'
+                ? redactCredentialQueryParams(span.description)
+                : span.description,
+            data: span.data
+              ? (scrubPIIFromObject(span.data) as typeof span.data)
+              : span.data,
+          }));
+        }
+        return event;
+      } catch {
+        return null;
       }
-      event.transaction = redactCredentialQueryParams(event.transaction);
-      if (event.spans?.length) {
-        event.spans = event.spans.map((span) => ({
-          ...span,
-          description:
-            typeof span.description === 'string'
-              ? redactCredentialQueryParams(span.description)
-              : span.description,
-          data: span.data
-            ? (scrubPIIFromObject(span.data) as typeof span.data)
-            : span.data,
-        }));
-      }
-      return event;
     },
   });
 
