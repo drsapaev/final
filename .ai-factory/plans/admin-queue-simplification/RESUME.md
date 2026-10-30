@@ -1,14 +1,18 @@
-## Latest continuation — PR #3805 T18 current UI lifecycle flow passed — 2026-10-30T18:42+05:00
+## Latest continuation — PR #3805 exact static frontend provenance passed — 2026-10-30T21:21+05:00
 
-Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/t18-queue-row-diagnostics. GitHub still reports PR #3805 OPEN / Ready for review at exact HEAD 38ecd42927fee6fe867a75188d5cb941e081ec6f, base 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. Although the user said it was merged, mergedAt is null; verify before beginning a new PR cycle.
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/t18-queue-row-diagnostics. PR #3801 is confirmed merged at 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. PR #3805 remains OPEN / Ready for review at exact HEAD b9dfbd4642e57492421c3ef15daa0317d7351279, base/current origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. User owns merge; do not merge or deploy.
 
-Latest owned synthetic project r8 completed canonical Preflight and one complete Session. DEV-DEMO seed PASS; served sw.js marker matched the tested commit (SHA-256 8038d6d1637df1f61d4995fe25d38cafa1ac7a0b30237a5280a3e70d879f645e); Admin 2FA PASS; hidden-by-default profile PASS; doctorless service PASS; explicit publication PASS; permanent QR address stable after reload PASS; synthetic anonymous join PASS; hide/republish same address PASS; resource archive/restore PASS. All eight browser checkpoints passed.
+R5 corrected only the ignored provenance harness enum handling after R4 showed Windows PowerShell/.NET Framework lacks DecompressionMethods.All. The exact child PowerShell GZip|Deflate compatibility probe and parser passed. Gate used the known harness root and exact existing first-touch scope: narrow_override, gate_misroute=false, override_used=true, handoff_required=true; prompt read. User's prior explicit authorization for repeated isolated T18 cycles is the basis.
 
-Session teardown PASS: removed 5 containers, 3 volumes, 1 network; remaining owned resources 0; local images removed. A subsequent Preflight failed with WINDOWS_PORT_OWNER. Do not start more staging until a fresh Preflight passes. The helper still reports served_revision_verified=false; the sw.js marker/hash is not full static-asset provenance.
+Canonical R5 Preflight PASS: exact source HEAD; tracked worktree clean; C free 18 GiB; WSL backing D free 28 GiB; Ubuntu memory 3193 MiB; ports 18898/18899/15541 free; no warnings. Canonical Start PASS: 10-GiB build reserve; three images built; readiness PASS; memory 3263 MiB.
 
-Earlier same-source evidence remains queue-system 6/6, Admin navigation 3/3, and Admin panels 2/2. Full STAGING_VALIDATION.md and remaining T18 acceptance are incomplete; Tier-2 remains PARTIAL and no deferral is claimed.
+Static asset provenance PASS: frontend container listed 261 files and generated a complete 261-record SHA-256 manifest. Every HTTP-served file matched its container bytes (261 matches, 0 mismatches); manifest SHA-256 22a4acfa1ba98934d07d854ca38333e4c412c14803bd0a26e9990101192b9d20. Frontend image ID sha256:6216be5a85def3ac9da79048b5bd27653c16d219a8654858b46417e0f674970a. Served sw.js marker matched exact source SHA b9dfbd4642e57492421c3ef15daa0317d7351279. The canonical helper still reports served_revision_verified=false; record the independent complete comparison without changing or relabeling the helper field.
 
-Next: commit/push the three updated T18 journals on the existing PR branch, refresh PR #3805 description, and verify exact-head CI. Do not approve, merge, deploy, or create the next PR cycle; the user owns merge. After GitHub confirms merge, fetch fresh origin/main and continue T18 in an isolated worktree.
+Canonical Session teardown PASS: removed 5 containers, 3 volumes, 1 network; remaining project-labeled resources 0; local images removed. Independent inventory confirmed zero owned containers/volumes/networks and all three ports free; post-session Ubuntu memory 2455 MiB.
+
+Changed tracked files are the three T18 journals only. Scratch harness/env remain task-owned ignored files. No runtime, tracked tests, staging config, production, foreign Compose, merge, or deployment changed.
+
+T18 is still PARTIAL: full integrated T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete; no deferral is claimed. Next: review and diff-check journals, commit/push the journal-only follow-up to existing PR #3805, update the PR body with exact provenance and remaining limitations, and verify exact-head CI. Do not start a new PR cycle or merge.
 
 ## Previous continuation — PR #3805 staging queue suite passed — 2026-10-30T15:39+05:00
 

@@ -1,16 +1,20 @@
-## Current checkpoint — T18 current UI lifecycle flow passed; PR #3805 still open — 2026-10-30T18:42+05:00
+## Current checkpoint — PR #3805 static asset provenance passed; T18 remains partial — 2026-10-30T21:21+05:00
 
-- Plan version: 1.0
-- Current task: T18 integrated synthetic acceptance; PR #3805.
-- Current status: The user reported merge, but direct GitHub state is OPEN / Ready for review at HEAD 38ecd42927fee6fe867a75188d5cb941e081ec6f; mergedAt is null. Base and current origin/main are 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
-- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final; branch codex/t18-queue-row-diagnostics; tracked worktree clean.
-- Latest r8 Session: Preflight passed; synthetic DEV-DEMO seed passed; served sw.js contained exact commit marker, SHA-256 8038d6d1637df1f61d4995fe25d38cafa1ac7a0b30237a5280a3e70d879f645e; Admin 2FA and all eight current UI lifecycle checkpoints passed.
-- r8 teardown: PASS; removed 5 containers, 3 volumes, 1 network; remaining owned resources 0. Local staging images were removed.
-- Post-Session Preflight: FAIL with WINDOWS_PORT_OWNER. Do not start another staging cycle until a fresh canonical Preflight passes.
-- Artifact limit: the sw.js marker/hash confirms that artifact only. The launcher still reports served_revision_verified=false; full frontend artifact provenance is NOT_RUN.
-- Earlier same-source evidence remains: queue-system 6/6; Admin navigation 3/3; Admin panel 2/2. Tier-2 remains PARTIAL; the complete STAGING_VALIDATION.md checklist and remaining T18 integrated checks are incomplete.
-- Scope: validation-only scratch harness and journals; no runtime, tracked test source, production, foreign project, merge, or deployment change.
-- Next exact action: record/commit the three T18 journal updates to the existing PR branch, refresh PR #3805 description with exact evidence and limits, then verify exact-head CI. Do not start a new PR cycle until GitHub confirms the current PR is merged.
+- Plan version: 1.0.
+- Current task: T18 integrated synthetic acceptance; existing PR #3805.
+- Current status: IN_PROGRESS. PR #3805 is OPEN / Ready for review at HEAD b9dfbd4642e57492421c3ef15daa0317d7351279, based on origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. PR #3801 is confirmed merged at that base.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final.
+- Branch: codex/t18-queue-row-diagnostics.
+- Base commit: 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
+- Current source commit: b9dfbd4642e57492421c3ef15daa0317d7351279.
+- R5 canonical Preflight: PASS; exact commit, tracked worktree clean, host disk C: 18 GiB, WSL backing D: 28 GiB, Ubuntu available memory 3193 MiB, ports 18898/18899/15541 free, no warnings.
+- R5 canonical Start: PASS; 10-GiB build reserve, backend/frontend/worker images built, readiness PASS, Ubuntu memory 3263 MiB.
+- R5 static artifact provenance: PASS for all 261 files. Container manifest SHA-256 22a4acfa1ba98934d07d854ca38333e4c412c14803bd0a26e9990101192b9d20; exact HTTP byte matches 261, mismatches 0; sw.js marker matches source commit; frontend image ID sha256:6216be5a85def3ac9da79048b5bd27653c16d219a8654858b46417e0f674970a.
+- Canonical Session teardown: PASS; removed 5 containers, 3 volumes, 1 network; remaining 0. Independent resource and port verification PASS; Ubuntu memory after session 2455 MiB.
+- Limitation: helper output still says served_revision_verified=false; independent byte-comparison evidence is recorded separately. Full integrated T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Tier-2 remains PARTIAL; no deferral is claimed.
+- Allowed scope: task-owned ignored provenance harness/env and T18 journals. Denied scope preserved: application/runtime, tracked tests, staging configuration, production, foreign projects, global Docker cleanup, merge, deployment.
+- Changed but not yet committed: PROGRESS.md, RESUME.md, EVIDENCE.md.
+- Next exact action: review and diff-check the three journal updates, commit and push them to the existing PR #3805 branch, update its description with the exact R5 result and remaining acceptance limits, then verify exact-head CI. Do not merge; the user owns merge.
 
 ## Previous checkpoint — PR #3805 queue E2E and Admin route checks passed — 2026-10-30T15:39+05:00
 

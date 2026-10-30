@@ -5277,3 +5277,20 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: all-static-file served provenance is NOT_RUN. No product defect is inferred. Earlier writer/parser format mismatch was corrected in the generated harness, but the new container manifest command exit 2 remains unexplained. Tier-2 remains PARTIAL with no deferral; full T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete.
 - Scope check: only task-owned ignored harness/env plus the three T18 journals; runtime, tracked tests, application config, production, foreign Compose projects, and shared Docker cache were untouched. No browser scenarios were repeated.
 - Next exact action: preserve this diagnostic on PR #3805, update its body, and verify exact-head CI. After the user-owned merge, continue T18 in a fresh worktree by diagnosing the container-only manifest exit 2 with safe error-class/line-count reporting before any further image build.
+
+## T18 static frontend provenance R5 — 2026-10-30T21:21+05:00
+
+- Commit under test: PR #3805 source HEAD b9dfbd4642e57492421c3ef15daa0317d7351279; base/current origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. PR #3801 merged at that base; #3805 remains OPEN / Ready for review.
+- Environment: own synthetic Ubuntu-24.04 project clinic-aqs-t18-static-provenance-r5-20261030; owner codex-t18-static-provenance-r5; host ports 18898/18899/15541; private synthetic environment only.
+- Execution mode: validation-only narrow_override for confirmed harness root cause. Gate result: narrow_override; gate_misroute=false; override_used=true; handoff_required=true; execution prompt read. No runtime or tracked test source edit.
+- Allowed scope: task-owned ignored harness/env and T18 journals. Denied: application/runtime, tracked tests, staging configuration, production, foreign projects, shared Docker cleanup, merge/deployment.
+- Canonical Preflight: PASS; exact commit; tracked worktree clean; C free 18 GiB; WSL backing D free 28 GiB; Ubuntu available memory 3193 MiB; ports free; no warnings.
+- Canonical Start: PASS; 10-GiB build reserve; backend/frontend/worker images built; runtime readiness PASS; no warnings; Ubuntu memory 3263 MiB.
+- Original harness failure: R4 generated manifest completed but Windows PowerShell .NET Framework failed before HTTP comparison because DecompressionMethods.All is unsupported. Local exact-runtime GZip|Deflate flag check and PowerShell parser passed. No application defect inferred.
+- Validation command: canonical ops/scripts/wsl_staging.ps1 Preflight → Start → Session; Session ran direct container find, batched sha256sum, HTTP byte comparison and sw.js commit marker check.
+- Result: PASS. Container manifest contained 261 static files; HTTP-served byte comparison 261 matches / 0 mismatches; sw.js marker matched exact commit b9dfbd4642e57492421c3ef15daa0317d7351279. Manifest SHA-256: 22a4acfa1ba98934d07d854ca38333e4c412c14803bd0a26e9990101192b9d20. Served frontend image ID: sha256:6216be5a85def3ac9da79048b5bd27653c16d219a8654858b46417e0f674970a.
+- Helper limitation: canonical helper continues to report served_revision_verified=false. The independent byte comparison is recorded as a separate exact-build provenance result; helper behavior was not changed.
+- Teardown: PASS; Session removed 5 containers, 3 volumes, 1 network and local images. Remaining owned resources 0. Independent project-label inventory: 0 containers/volumes/networks; ports 18898/18899/15541 free. Ubuntu memory after Session 2455 MiB.
+- PR: https://github.com/drsapaev/final/pull/3805. Merge commit: none; user retains merge authority.
+- Remaining limitation: full integrated T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Tier-2 remains PARTIAL; no deferral is claimed.
+- Next: commit/push these journal updates to existing PR #3805, update PR body, verify exact-head CI, then continue remaining T18 work.
