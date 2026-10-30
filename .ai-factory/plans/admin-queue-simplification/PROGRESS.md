@@ -1,4 +1,22 @@
-## Current checkpoint — PR #3805 sessionStorage E2E correction locally validated — 2026-10-30T10:36+05:00
+## Current checkpoint — PR #3805 queue E2E and Admin staging checks passed — 2026-10-30T15:39+05:00
+
+- Plan version: 1.0
+- Current task: T18 integrated synthetic acceptance; PR #3805
+- Current status: source commit 9e1cf85cc89e19969799cac6d5833f7d78389b2c passed exact-head CI (19 success, 18 skipped, 0 failures). Canonical Preflight/Start/Session and post-session Preflight passed. Synthetic seed, served frontend provenance, Registrar route, queue-system E2E (6/6), normal Admin password→TOTP, and Admin routes (4/4) passed. Owned Compose teardown removed all resources. Tier-2 remains PARTIAL; full T18/STAGING_VALIDATION.md is incomplete.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final
+- Branch: codex/t18-queue-row-diagnostics
+- Base commit: 22b21a8b7c3c0b9b56f4e388c35e329a4321f768
+- Current pushed PR HEAD: 9e1cf85cc89e19969799cac6d5833f7d78389b2c. Source is committed; final-cycle evidence is in a pending docs-only checkpoint.
+- Fixture correction: app auth is stored in sessionStorage, so Playwright storageState alone was insufficient. E2E now performs one ordinary Registrar UI login per worker, captures sessionStorage entries in memory, restores them into fresh same-origin test contexts before app scripts run, and asserts that the auth_token key exists without logging its value.
+- Latest exact synthetic run: synthetic seed DEV-DEMO PASS; served sw.js provenance PASS for 9e1cf85cc89e19969799cac6d5833f7d78389b2c (SHA-256 0515e270aa911445918d12255f32d2e728c07e64fcc2b454e3c0a6f51a950767); Registrar login HTTP 200; /registrar/queue; all six queue E2E PASS; Admin password login and first-time 2FA setup/verify PASS; Admin routes 4/4 PASS.
+- Teardown: PASS; 5 containers, 3 volumes, 1 network removed; remaining resources 0. Post-session canonical Preflight PASS with free ports; Ubuntu available memory 3190 MiB, C: 17 GiB, WSL backing D: 28 GiB.
+- An earlier Start attempt on this SHA stopped before service startup because its synthetic lease had expired; canonical teardown passed. Expiry was renewed in the private env and a fresh Preflight/Start/Session succeeded.
+- Local checks: focused ESLint PASS; E2E TypeScript PASS; Playwright collection PASS (6 scenarios); Vite build PASS (3m06s; existing Zod/Rollup/CSS warnings); CRLF-aware git diff --check PASS; normal commit hooks PASS.
+- Allowed/denied scope preserved: test harness and T18 journals only; no runtime/backend/auth policy/production/foreign Compose changes, no merge/deploy. User owns merge.
+- Cleanup note: local generated Playwright results directory still contains the earlier failure error-context. After verifying its exact path, the host command policy rejected both recursive and file-specific deletion; no alternate deletion route was attempted.
+- Next exact action: update the PR description with exact evidence and make #3805 Ready for review, without approving or merging. After the user merges, continue remaining T18 items. Do not call T18 complete or Tier-2 full.
+
+## Previous checkpoint — PR #3805 sessionStorage E2E correction locally validated — 2026-10-30T10:36+05:00
 
 - Plan version: 1.0
 - Current task: T18 integrated synthetic acceptance; PR #3805

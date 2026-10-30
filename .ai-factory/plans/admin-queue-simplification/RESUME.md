@@ -1,4 +1,25 @@
-## Latest continuation — PR #3805 queue sessionStorage fixture correction — 2026-10-30T10:36+05:00
+## Latest continuation — PR #3805 staging queue suite passed — 2026-10-30T15:39+05:00
+
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/t18-queue-row-diagnostics. PR #3805 remains OPEN/Draft at pushed HEAD 9e1cf85cc89e19969799cac6d5833f7d78389b2c; base/current main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. User owns merge; do not merge or self-approve.
+
+The latest exact-head GitHub checks completed: 19 success, 18 skipped, 0 failed; PR Required Gate passed. Local ESLint, E2E TypeScript check, Playwright collection (6 tests), Vite build (3m06s), CRLF-aware diff-check and normal commit hooks passed. Only existing third-party Zod/Rollup/CSS build warnings appeared.
+
+Synthetic run on exact code commit 9e1cf85cc89e19969799cac6d5833f7d78389b2c:
+- Canonical Preflight PASS (C 17 GiB, WSL backing D 28 GiB, Ubuntu ~3.2 GiB free at preflight, no warnings, ports 18881/18880/15532 free).
+- First Start refused an expired local lease and performed successful owned teardown before services started. The private synthetic env expiry was renewed; a fresh canonical Preflight then passed.
+- Start PASS; backend/frontend/worker built and readiness PASS.
+- Session PASS: synthetic seed marker DEV-DEMO; served sw.js includes exact commit SHA and had SHA-256 0515e270aa911445918d12255f32d2e728c07e64fcc2b454e3c0a6f51a950767; Registrar login HTTP 200 and canonical /registrar/queue.
+- Queue E2E PASS: all 6 scenarios, 0 failed, 0 skipped. The fixture authenticates once by normal UI login per worker and carries sessionStorage entries in process memory into fresh same-origin contexts. It asserts auth_token exists without logging/storing token value.
+- Admin PASS: normal password login HTTP 200, 2FA enrollment and verification HTTP 200, Admin route checks 4/4.
+- Session teardown PASS: removed 5 containers, 3 volumes, 1 network; zero remaining project resources. Post-session canonical Preflight also PASS, ports free, Ubuntu memory 3190 MiB.
+- Note: registrar-auth diagnostic field token_persisted=false checks localStorage only; source and E2E confirm auth_token resides in sessionStorage.
+- Local generated artifact frontend/output/staging/t18-final-acceptance-20261030/results still retains a small error-context from the earlier failed run. The host command policy rejected deletion after verifying the exact worktree-owned path; do not work around policy.
+
+Current PR scope is validated, but full Tier-2/T18 is not: STAGING_VALIDATION.md is incomplete and other T18 scenarios remain outside this queue-suite run. Tier-2 stays PARTIAL.
+
+Next exact action: update PR #3805 body with exact-source evidence and mark it Ready for review; do not submit an approval or merge. Wait for the owner to merge before starting another PR cycle, then resume the outstanding T18 plan.
+
+## Previous continuation — PR #3805 queue sessionStorage fixture correction — 2026-10-30T10:36+05:00
 
 Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/t18-queue-row-diagnostics. PR #3805 is OPEN/Draft at pushed HEAD 0d253227ea2fb8dd01c8df62f75f3b5b2b5fd53d; base/current main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. User owns merge; do not merge.
 

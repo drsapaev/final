@@ -5188,3 +5188,24 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: changed only the test harness and T18 journals; no app/runtime/backend/auth code, production, foreign resources, merge or deployment.
 - Tier-2: PARTIAL. Full STAGING_VALIDATION.md remains incomplete. No deferral/waiver.
 - Next: commit/push the corrected E2E fixture and this evidence; verify exact-head CI; then update the existing private env file to a new unique owned project identity and exact SHA, run canonical Preflight, and only if it passes perform Start → Session → teardown.
+
+
+## T18 — PR #3805 final queue E2E synthetic cycle — 2026-10-30T15:39+05:00
+
+- Source commit under test: 9e1cf85cc89e19969799cac6d5833f7d78389b2c; PR base/current main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
+- Environment: own Ubuntu-24.04 synthetic project clinic-aqs-t18-pr3805-sessionstorage-20261030. Private synthetic env only; no production/foreign project or Compose resource.
+- Exact-head CI: 19 success, 18 skipped, 0 failure; Frontend build/lint/unit/E2E and PR Required Gate passed. Skipped jobs are not counted as passed.
+- Local validation: scoped ESLint PASS; tsc --noEmit -p e2e/tsconfig.json PASS; Playwright collection PASS (6 collected, 0 executed locally); npm run build PASS (3m06s, existing third-party Zod/Rollup/CSS warnings); CRLF-aware git diff --check PASS; normal commit hooks PASS.
+- Gate for sessionStorage fixture correction: known root cause frontend/e2e/queue-system.spec.ts; narrow_override, gate_misroute=false, override_used=true, handoff_required=true; generated execution prompt read. This follows the user's existing authorization for repeated synthetic T18 cycles.
+- Lease handling: initial Start refused because CLINIC_EXPIRES_AT had elapsed during CI wait; launcher teardown PASS occurred before service startup. The private synthetic env expiry was updated to a future time; no source/config tracked by Git changed.
+- Canonical Preflight after lease refresh: PASS on exact SHA; C: 17 GiB free; WSL backing D: 28 GiB; Ubuntu available 3228 MiB; ports 18881/18880/15532 free; warnings none; worktree clean.
+- Canonical Start: PASS; backend/frontend/worker images built; runtime readiness PASS.
+- Session: synthetic seed PASS with DEV-DEMO marker. Served frontend provenance PASS for exact source commit 9e1cf85cc89e19969799cac6d5833f7d78389b2c; served sw.js SHA-256 0515e270aa911445918d12255f32d2e728c07e64fcc2b454e3c0a6f51a950767.
+- Registrar smoke: login HTTP 200, no 2FA required, canonical /registrar/queue, login screen absent. Diagnostic token_persisted=false is a localStorage-only check; it does not describe sessionStorage.
+- Queue suite: T18_QUEUE_E2E=PASS; tests=6; failed=0; skipped=0. Auth fixture logs in through normal UI once per worker and copies captured sessionStorage only in memory into fresh same-origin contexts. It asserts the auth_token key exists without printing the value.
+- Admin smoke: password login HTTP 200; setup required for the synthetic account; 2FA setup HTTP 200; 2FA verify HTTP 200; ADMIN_2FA PASS; Admin routes 4/4 PASS.
+- Teardown: Session PASS; removed 5 containers, 3 volumes, 1 network; remaining owned resources 0. Post-session canonical Preflight PASS; ports free; Ubuntu available memory 3190 MiB.
+- Scope check: only frontend/e2e/queue-system.spec.ts and T18 journals changed. No application/runtime/backend/auth policy/DB, production, foreign resource, deployment, approval or merge.
+- Remaining limitation: full STAGING_VALIDATION.md and remaining T18 scenarios are NOT_RUN in this cycle. Tier-2 remains PARTIAL; no waiver/deferral.
+- Local cleanup limitation: generated Playwright results under frontend/output/staging/t18-final-acceptance-20261030/results retain the prior failure error-context. Exact in-worktree path was verified, but host command policy rejected file and directory deletion. No alternate delete mechanism was used.
+- Next: update PR body and mark Ready for review; await user merge before another PR cycle.
