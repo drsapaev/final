@@ -52,6 +52,13 @@
 | REG-FE-024 | P2 | Aggregated action visibility | Context menu ignores grouped_records.available_actions and hides backend-permitted non-payment actions | SOURCE-OBSERVED / REPRO-PENDING | Batch Q: action exposure/wiring |
 | REG-FE-025 | P2 | Force majeure target identity | Row action selects specialist_id from legacy doctor fields, not backend queue-owner scope, for mass queue transfer/cancel | SOURCE-OBSERVED / REPRO-PENDING | Batch R: force-majeure owner boundary |
 | REG-FE-026 | P3 | Context-menu reschedule visibility | Menu checks missing can_reschedule/reschedule signal on canonical registrar queue rows while inline reschedule remains accessible | SOURCE-OBSERVED / REPRO-PENDING | Batch Q: action exposure/wiring |
+| REG-FE-027 | P2 | Welcome morning doctor summary | Doctor groups use absent legacy IDs and count rows, not distinct patients | SOURCE-OBSERVED / REPRO-PENDING | Batch S: Welcome summary |
+| REG-FE-028 | P2 | Welcome filtered-empty presentation | No-match filtered results are presented as an empty queue and offer first-record CTA | SOURCE-OBSERVED / REPRO-PENDING | Batch S: Welcome empty states |
+| REG-FE-029 | P2 | Welcome primary load error | With zero rows/dataSource=error there is no error message or retry UI | SOURCE-OBSERVED / REPRO-PENDING | Batch S: Welcome error state |
+| REG-FE-030 | P2 | Welcome query scope loss | Quick filter replaces all URL params and drops active date/department/doctor/search scope | SOURCE-OBSERVED / REPRO-PENDING | Batch T: URL filters |
+| REG-FE-031 | P3 | Welcome orphaned selection | Selection checkboxes enabled with no bulk-action consumer | SOURCE-OBSERVED / REPRO-PENDING | Batch U: selection UX |
+| REG-FE-032 | P3 | Welcome calendar date timezone | History date-only string parsed as UTC and displayed in browser local timezone | SOURCE-OBSERVED / REPRO-PENDING | Batch U: clinic date |
+| REG-FE-033 | P3 | Default tabpanel label | All-departments tabpanel has no labelledby; corresponding control is not a real tab | SOURCE-OBSERVED / REPRO-PENDING | Batch U: accessibility |
 
 ### REG-FE-001 — Row activation does not open details (P2 candidate)
 
@@ -395,6 +402,73 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 
 **Unlogged/needs product contract:** the table branches invoke status actions without `await` ([useRegistrarRowActions.ts L101–L135](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarRowActions.ts#L101-L135)); existing tests explicitly pin this behavior, and `updateAppointmentStatus` catches failures and emits error toasts. Rapid repeated clicks *may* send overlapping actions, but the backend's transition rules and idempotency contract must be exercised before logging a discrete duplicate-command defect. No P0/P1 was established.
 
+
+### REG-FE-027 — Welcome morning doctor summary merges unrelated owners and mislabels row counts (P2 candidate)
+
+**Code:** [WelcomeView.tsx L205–L280](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L205-L280) builds its `doctorMap` from `appt.doctor_id || appt.specialist_id`, uses `Врач #${doctorId}` when no name exists, and increments `patientCount` **once per record** while labelling it `Пациентов`. Canonical [registrarQueueAdapter.ts L53–L75](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/registrarQueueAdapter.ts#L53-L75) preserves `queue_owner_kind`, `queue_owner_id`, `daily_queue_id`, `patient_id` but does not synthesize a `doctor_id` from the surrounding specialty bucket. Backend [_queue_ops.py L352–L432](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/backend/app/api/v1/endpoints/registrar_integration/_queue_ops.py#L352-L432) distinguishes doctor/resource owners.
+
+**Risk:** canonical doctor/resource entries lacking legacy IDs may be merged into a bogus "Врач #undefined" summary; one patient with two records is counted twice as two "patients". `hasQueue` is computed but not rendered here, so do not claim a false open/closed status is displayed.
+
+**Fail-first test:** render synthetic rows from two doctor-owned queues, a resource-owned queue, an unknown owner, and one patient with two records. Assert owner groups are not collapsed and counts use distinct patients or are accurately labelled as record counts. **Repair:** use canonical owner-aware backend presentation facts (or a typed read-model summary), never infer doctor from queue bucket; clarify scope/date and unknown-owner treatment.
+
+### REG-FE-028 — Welcome filtered-no-match screen falsely says queue is empty (P2 candidate)
+
+**Code:** [WelcomeView.tsx L530–L561](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L530-L561) marks empty when `!appointmentsLoading && dataSource==='api' && filteredAppointments.length===0`; [L591–L615](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L591-L615) shows "Сегодня пока нет записей"/"Создать первую запись". The parent supplies both raw `appointments` and filtered rows ([RegistrarPanel.tsx L350–L395](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/RegistrarPanel.tsx#L350-L395)); main [WorklistView.tsx L213–L269](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WorklistView.tsx#L213-L269) correctly differentiates "nothing matched" vs "no entries". Existing [registrarWorklistRows.test.ts L328–L397](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/__tests__/registrarWorklistRows.test.ts#L328-L397) tests the scope fact, but it is not wired into Welcome.
+
+**Risk:** a failed search or narrow status filter can imply there are no patients and invite an unnecessary new registration. Distinct view surface from already fixed Worklist empty-state behavior.
+
+**Fail-first test:** `appointments.length>0`, `filteredAppointments=[]`, `dataSource='api'`, valid auth; assert "Ничего не найдено" and no first-record text. For a genuinely empty response, assert proper empty queue CTA. **Repair:** share the backend-derived scope classification/view-model facts with Welcome, not duplicated heuristics.
+
+### REG-FE-029 — Primary queue load failure is invisible in Welcome's empty history (P2 candidate)
+
+**Code:** [WelcomeView.tsx L527–L545](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L527-L545) shows `DataSourceIndicator` only when `appointments.length>0`, and its empty-state condition requires `dataSource==='api'`. Table is displayed only when loading or `filteredAppointments.length>0` ([L618–L628](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L618-L628)). Thus with initial `dataSource='error'`, no loading and no rows, there is no dedicated failure/retry state. [WorklistView.tsx L213–L232](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WorklistView.tsx#L213-L232) has one; [useRegistrarWorklistData.ts L114–L136](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarWorklistData.ts#L114-L136) preserves this primary-error distinction.
+
+**Risk:** staff may see a blank history region on an otherwise rendered dashboard, without knowing API data failed to load. This does not imply a full-page crash.
+
+**Fail-first test:** render Welcome with zero entries, `dataSource='error'`, `appointmentsLoading=false`, assert visible failure text and retry invoking `loadAppointments`; also cover a previously loaded stale sample. **Repair:** use shared Worklist-style error/stale state and a retry control.
+
+### REG-FE-030 — Welcome quick-filter changes discard unrelated URL scope (P2 candidate)
+
+**Code:** [WelcomeView.tsx L389–L411](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L389-L411) uses `setSearchParams({status:'queued'})` and `setSearchParams({status:'paid_pending'})`, replacing the entire query rather than changing just `status`; the "Все записи" action [L379–L387](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L379-L387) similarly clears all query keys. [useRegistrarNavigation.ts L50–L63, L93–L112](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarNavigation.ts#L50-L112) explicitly syncs department/doctor from query keys and carefully preserves unrelated params in its `clearStatusFilter`.
+
+**Risk:** clicking a status quick filter wipes `date`, `dept`, `doctor_id`, `q`, possibly changing which patients are shown. The status **value** mismatch is already REG-FE-004; this finding concerns the destructive URL update only.
+
+**Fail-first test:** at `/registrar/welcome?date=2026-10-28&dept=lab&q=synthetic`, click each quick filter; verify these keys remain while `status` changes. Decide/document whether "Все записи" means clear status/search or deliberately clear all scope. **Repair:** use functional updates to `URLSearchParams` and mutate only intended keys.
+
+### REG-FE-031 — Welcome selection checkboxes have no bulk-action consumer (P3 candidate)
+
+**Code:** [WelcomeView.tsx L618–L680](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L618-L680) sets `showCheckboxes={true}` with a comment about bulk printing, but does not provide a selection handler or any bulk action. [EnhancedAppointmentsTable.tsx L51–L71, L183–L189](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/tables/EnhancedAppointmentsTable.tsx#L51-L189) keeps local selected rows and renders a "selected N" badge, not a bulk operation. Worklist deliberately sets `showCheckboxes={false}` ([WorklistView.tsx L285–L294](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WorklistView.tsx#L285-L294)) because the bulk action bar was removed.
+
+**Risk:** users can select rows but cannot act on that selection. Not evidence of duplicate backend writes.
+
+**Fail-first test:** render Welcome table, select two rows, verify either a valid bulk-print command exists and uses selection, or selection controls are absent pending product approval. **Repair:** disable orphaned checkboxes unless an authorized bulk operation is truly implemented.
+
+### REG-FE-032 — Welcome history date can shift to the previous day outside clinic timezone (P3 candidate)
+
+**Code:** [WelcomeView.tsx L516–L523](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L516-L523) uses `new Date(historyDate).toLocaleDateString(...)` without an explicit timezone. ISO date-only strings are parsed as UTC midnight, then displayed in the browser's local timezone, showing the previous calendar date in UTC-negative zones. Its hero subtitle [L191–L201](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L191-L201) also uses browser-local today; [dateUtils.ts L168–L180](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/utils/dateUtils.ts#L168-L180) and [WorklistView.tsx L148–L153](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WorklistView.tsx#L148-L153) honor the clinic's Asia/Tashkent time.
+
+**Risk:** remote operator at UTC−5 can see 29 October on a history badge for 30 October while the backend targets 30 October. Display-only, not evidence of wrong queue date.
+
+**Fail-first test:** run synthetic date display under `TZ=America/New_York` with `historyDate='2026-10-30'` and assert 30 October is shown; test clinic-midnight rollover. **Repair:** use shared Tashkent-aware date formatter; keep locale independent of timezone.
+
+### REG-FE-033 — Default all-departments tabpanel has no accessible tab label (P3 candidate)
+
+**Code:** [WorklistView.tsx L122–L133](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WorklistView.tsx#L122-L133) sets `role='tabpanel'` with `aria-labelledby` defined only when a department or doctor is selected. The all-departments control [Tabs.tsx L460–L482](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/navigation/Tabs.tsx#L460-L482) is a plain button outside the tablist, without an `id` or `role='tab'`; doctor/department controls are real tabs ([L490–L524, L573–L589](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/navigation/Tabs.tsx#L490-L589)).
+
+**Risk:** screen readers may encounter a nameless tabpanel in the default view and cannot associate it with the all-departments control. Functional queue data remains unchanged.
+
+**Fail-first test:** run axe/accessibility-tree and keyboard navigation in all-departments, department and doctor modes; check selected tab, tabpanel name, `aria-controls`, focus. **Repair:** make all-departments a coherent tab or expose the default view as a named region instead, while keeping proper accessible navigation.
+
+### Group 4 focused review — interface (2026-10-30)
+
+**Main source baseline:** `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`. **Primary files:** [WorklistView.tsx](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WorklistView.tsx#L1-L334), [WelcomeView.tsx](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L1-L696), [QueueView.tsx](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/QueueView.tsx#L1-L119).
+
+**Cross-checks:** `RegistrarPanel.tsx`, `registrarQueueAdapter.ts`, `registrarWorklistRows.ts`, `useRegistrarWorklistData.ts`, `useRegistrarNavigation.ts`, `dateUtils.ts`, `EnhancedAppointmentsTable.tsx`, `ModernQueueManager.tsx`, `Tabs.tsx`, `registrarCsv.ts`, `registrarWorklistRows.test.ts`, `RegistrarPanel.contract.test.tsx`, and `frontend/e2e/registrar-ux-audit.spec.ts`. **No runtime tests were executed.**
+
+**Previously indexed, not duplicated:** REG-FE-001 row click no-op in Worklist and Welcome; REG-FE-004 quick-filter status names; REG-FE-005 URL date/label; REG-FE-006 missing Welcome status confirmation; REG-FE-008 premature refresh toast; REG-FE-013 development PHI logging (Welcome passes full rows and a name string to `logger.info`, [L629–L661](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L629-L661), with no production disclosure asserted).
+
+**Positive:** Worklist uses an effective counter descriptor, stale/error/retry logic and distinct no-match/empty states, and disables dead selection controls. QueueView forwards URL date/doctor/search values to ModernQueueManager and uses the existing queue update callback ([QueueView.tsx L87–L109](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/QueueView.tsx#L87-L109)); manager responds to date/doctor and queue updates ([ModernQueueManager.tsx L143–L211](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/queue/ModernQueueManager.tsx#L143-L211)). No new separately evidenced defect in QueueView itself in this bounded pass. Existing registrar UX E2E [L178–L218](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/e2e/registrar-ux-audit.spec.ts#L178-L218) checks overflow options and roles, not the missing group-4 regressions.
+
 ## Review coverage
 
 ### Actually inspected in first pass (source reads; not an exhaustive audit)
@@ -438,7 +512,7 @@ Run **one bounded file group per review pass**; for each group, verify the curre
 1. **Group 1 — patient registration — SOURCE REVIEW DONE (2026-10-30), reproductions pending:** `frontend/src/pages/RegistrarPanel.tsx`, `frontend/src/pages/registrar/useRegistrarWizard.ts`, `frontend/src/pages/registrar/views/RegistrarDialogsLayer.tsx`. Added REG-FE-017–019; earlier cross-cutting issues remain pending tests.
 2. **Group 2 — queues — SOURCE REVIEW DONE (2026-10-30), reproductions pending:** `frontend/src/pages/registrar/useRegistrarWorklistData.ts`, `frontend/src/pages/registrar/registrarWorklistRows.ts`, `frontend/src/pages/registrar/registrarQueueAdapter.ts`. Completed bounded read with backend number/owner validation and focused test inspection; added REG-FE-020–022.
 3. **Group 3 — registrar actions — SOURCE REVIEW DONE (2026-10-30), reproductions pending:** `frontend/src/pages/registrar/useRegistrarRowActions.ts`, `frontend/src/pages/registrar/useRegistrarActions.ts`. Added REG-FE-023–026; earlier REG-FE-014/015/017 reaffirmed; REG-FE-013 cross-file privacy scope expanded.
-4. **Group 4 — interface — systematic review pending:** `frontend/src/pages/registrar/views/WorklistView.tsx`, `frontend/src/pages/registrar/views/WelcomeView.tsx`, `frontend/src/pages/registrar/views/QueueView.tsx`. Partial earlier observations REG-FE-001/004/006/008; full bounded review pending.
+4. **Group 4 — interface — SOURCE REVIEW DONE (2026-10-30), reproductions pending:** `frontend/src/pages/registrar/views/WorklistView.tsx`, `frontend/src/pages/registrar/views/WelcomeView.tsx`, `frontend/src/pages/registrar/views/QueueView.tsx`. Group 4 completed; added REG-FE-027–033 (Welcome summary, empty/error feedback, URL filters, dead checkboxes, date formatting and default tabpanel accessibility).
 5. **Group 5 — API and integration — systematic review pending:** `frontend/src/api/registrar.ts`, relevant clients/mappers and frontend/backend contract tests. Verify route/version compatibility, typed errors, refresh guarantees and PHI-safe diagnostics.
 
 ## Remediation plan — execute only after review triage
@@ -463,9 +537,12 @@ Run **one bounded file group per review pass**; for each group, verify the curre
 18. **Batch P — canonical queue allocation fact:** verify REG-FE-022 with backend linked/unlinked queue records and pure adapter→stats tests, run mandatory queue SSOT gate before repair.
 19. **Batch Q — action menu contract and wiring:** verify REG-FE-023/024/026 (schedule-next visibility, grouped availability and reschedule affordance). Align UI with backend actions, protect role boundaries; use mandatory gate if backend contract/clinical workflow changes.
 20. **Batch R — force-majeure target ownership:** verify REG-FE-025 against doctor/resource/aggregate scopes and backend dry-run+POST consistency; mandatory queue/payment execution gate before any repair.
-21. **Additional batches:** one bounded fix PR per validated domain/root cause; never introduce a speculative blanket refactor or mix unrelated source fixes into this ledger PR.
-22. **Validation:** relevant Vitest components/contracts, `tsc`/ESLint, affected Playwright flows with synthetic data, relevant queue contract tests, PR quality gates, `git diff --check`, and code review. Record **actual commands/results**; do not claim tests passed without execution.
-23. **Closure:** update each ledger row with root cause, test evidence, fix PR/commit SHA, review outcome, and resolution status. Keep this audit PR as the index; merge it only when repository review and CI policy permit. Do not deploy as part of this audit.
+21. **Batch S — Welcome data/summary truth:** verify REG-FE-027/028/029 with canonical owner, patient and loading/empty/error facts; no frontend business-rule guesses.
+22. **Batch T — Welcome URL filter scope:** verify REG-FE-030 and coordinate with REG-FE-004/005, preserving unrelated query keys.
+23. **Batch U — selection/date/a11y:** verify REG-FE-031/032/033 with component tests, clinic-zone boundary tests and axe/keyboard.
+24. **Additional batches:** one bounded fix PR per validated domain/root cause; never introduce a speculative blanket refactor or mix unrelated source fixes into this ledger PR.
+25. **Validation:** relevant Vitest components/contracts, `tsc`/ESLint, affected Playwright flows with synthetic data, relevant queue contract tests, PR quality gates, `git diff --check`, and code review. Record **actual commands/results**; do not claim tests passed without execution.
+26. **Closure:** update each ledger row with root cause, test evidence, fix PR/commit SHA, review outcome, and resolution status. Keep this audit PR as the index; merge it only when repository review and CI policy permit. Do not deploy as part of this audit.
 
 ## Change log
 
@@ -478,6 +555,7 @@ Run **one bounded file group per review pass**; for each group, verify the curre
 | 2026-10-30 | Five-group protocol / Group 1 | REG-FE-017–019: cancellation acknowledgement, post-wizard retry, duplicate toasts. Ordered remaining Groups 2–5 per user request | Named three files and necessary callers/tests inspected at main SHA `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; no runtime tests |
 | 2026-10-30 | Five-group protocol / Group 2 | REG-FE-020–022: stale request in-flight cleanup, modal interval snapshot, apparent queue number without linked DailyQueue; preexisting REG-FE-002/005/007 not duplicated | Named three files, backend DTO/ownership/number resolver and matching unit tests inspected at main SHA `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; no runtime tests |
 | 2026-10-30 | Five-group protocol / Group 3 | REG-FE-023–026: dead schedule-next action, missing grouped action visibility, force-majeure target mismatch, hidden context reschedule; expanded existing REG-FE-013 evidence without duplicate | Two primary action hooks, context menu, server action/owner contracts, force-majeure and focused tests inspected at main SHA `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; no runtime tests |
+| 2026-10-30 | Five-group protocol / Group 4 | REG-FE-027–033: Welcome summary, filtered/no-data/error semantics, URL query preservation, orphaned selection, clinic date formatting and unlabeled all-departments tabpanel. Existing 001/004/005/006/008/013 not duplicated | Three views, queue manager, adapters, table, navigation and focused tests inspected at main `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; no runtime tests |
 
 ## End-of-review acceptance criteria
 
