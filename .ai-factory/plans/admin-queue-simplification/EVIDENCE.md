@@ -5167,3 +5167,24 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Teardown: canonical Session reported PASS; removed the retry project's 5 containers, 3 volumes and 1 network; remaining owned resources all zero. No foreign resources touched. WSL available memory after the test session was 2567 MiB; no OOM or disk refusal reported.
 - Result: build/lifecycle and frontend provenance are confirmed; queue suite and Admin/2FA acceptance remain incomplete due repeated-login throttling. Current worker-storage correction is not yet pushed or tested in staging. Exact-head CI for the pending correction NOT_RUN. Tier-2 remains PARTIAL; full `STAGING_VALIDATION.md` is incomplete; no deferral/waiver.
 - Next: rerun build and diff checks, commit/push the E2E test and journals, wait for exact-head CI, then use one new project to repeat the six queue tests, Admin 2FA/routes and provenance; confirm teardown.
+
+
+## T18 — PR #3805 sessionStorage auth transfer follow-up — 2026-10-30T10:36+05:00
+
+- Commit under test: pushed source commit 0d253227ea2fb8dd01c8df62f75f3b5b2b5fd53d; local sessionStorage fixture correction is not yet committed.
+- Environment: own synthetic Ubuntu-24.04 Compose project clinic-aqs-t18-pr3805-workerlogin-20261030; no production or foreign resources.
+- Gate: known root cause frontend/e2e/queue-system.spec.ts; result narrow_override, gate_misroute=false, override_used=true, handoff_required=true; prompt read. Basis: user's existing authorization for repeated isolated synthetic T18 cycles.
+- Exact-head CI: 19 checks success, 18 skipped, 0 failures; Frontend unit/E2E/build/lint and PR Required Gate passed. Skipped jobs are not counted as pass.
+- Canonical Preflight: PASS for 0d253227; C: 16 GiB free, WSL backing D: 28 GiB, Ubuntu available 3184 MiB, ports 18881/18880/15532 free, warnings none, worktree clean.
+- Canonical Start: PASS; backend/frontend/worker images built; runtime readiness PASS; WSL available 3231 MiB at return.
+- Session: synthetic seed PASS with DEV-DEMO marker; served sw.js exact commit provenance PASS for 0d253227; served sw.js SHA-256 72b715193d88dcaf775af38f340d0c2a9d74a9a751579a7eea1c3faae6e680d9; Registrar diagnostic login HTTP 200 and canonical /registrar/queue PASS.
+- Queue E2E: wrapper reported 0 passed / 1 failed / 0 skipped, exit 1. First scenario timed out waiting for queue controls; error context identified an absent element at the display-interface scenario. Remaining suite execution is not proven.
+- Admin: normal password login HTTP 200; new synthetic account required 2FA setup; setup HTTP 200 and verification HTTP 200; Admin 2FA PASS. Admin route smoke 4/4 PASS.
+- Root cause: frontend/src/utils/tokenManager.ts stores auth tokens in sessionStorage. Playwright storageState does not capture sessionStorage; the authenticated worker state was therefore lost by fresh test contexts. This is a test harness defect, not a product auth/rate-limit defect.
+- Local test-only correction in progress: capture sessionStorage entries in worker memory and restore them with same-origin addInitScript before each test app loads. Tokens are neither logged nor written to files. Auth policy/runtime unchanged.
+- Local validation on the correction: ESLint PASS; E2E TypeScript PASS; Playwright collection PASS (6 scenarios, 0 executed); frontend build PASS (3m06s; existing third-party annotation/CSS warnings). CRLF-aware diff check PASS; normal commit hooks remain pending.
+- Teardown: Session PASS; removed 5 containers, 3 volumes, 1 network; zero owned containers/volumes/networks remaining. WSL available memory after the test session: 1237 MiB.
+- Port guard: an immediate post-Session canonical Preflight failed with WINDOWS_PORT_OWNER on 18880. Read-only netstat observed a loopback listener with PID 0; later Get-NetTCPConnection showed no LISTEN entry. No process/resource was killed or changed. A fresh canonical Preflight on the next pushed SHA is required before Start.
+- Scope check: changed only the test harness and T18 journals; no app/runtime/backend/auth code, production, foreign resources, merge or deployment.
+- Tier-2: PARTIAL. Full STAGING_VALIDATION.md remains incomplete. No deferral/waiver.
+- Next: commit/push the corrected E2E fixture and this evidence; verify exact-head CI; then update the existing private env file to a new unique owned project identity and exact SHA, run canonical Preflight, and only if it passes perform Start → Session → teardown.

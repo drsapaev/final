@@ -1,4 +1,23 @@
-## Current checkpoint — PR #3805 single-login E2E fixture locally validated — 2026-10-30T09:59:33+05:00
+## Current checkpoint — PR #3805 sessionStorage E2E correction locally validated — 2026-10-30T10:36+05:00
+
+- Plan version: 1.0
+- Current task: T18 integrated synthetic acceptance; PR #3805
+- Current status: pushed source HEAD 0d253227 passed GitHub CI (19 success, 18 skipped, 0 failures). Canonical Preflight, Start, and Session lifecycle passed; seed, served frontend provenance, Registrar login/path, Admin password→TOTP, and Admin routes 4/4 passed. Queue E2E failed at its first scenario because Playwright storageState did not restore the app's sessionStorage token into fresh test contexts. Root cause confirmed in frontend/src/utils/tokenManager.ts. A test-only sessionStorage transfer fix is local and validated; Tier-2 remains PARTIAL, no waiver.
+- Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final
+- Branch: codex/t18-queue-row-diagnostics
+- Base commit: 22b21a8b7c3c0b9b56f4e388c35e329a4321f768
+- Current pushed PR HEAD: 0d253227ea2fb8dd01c8df62f75f3b5b2b5fd53d; current local E2E fixture correction is uncommitted.
+- Confirmed source contract: auth tokens are stored in sessionStorage, not localStorage; Playwright storageState only contains browser cookies and local storage. The worker login itself succeeded, but the first queue page did not receive the session token and timed out waiting for queue controls.
+- Local fix: one normal Registrar UI login per worker; capture sessionStorage entries only in process memory and seed each new same-origin Playwright context through addInitScript before app scripts run. No token file/log, auth policy change, or runtime edit.
+- Gate for this fix: known root cause frontend/e2e/queue-system.spec.ts; narrow_override, gate_misroute=false, override_used=true, handoff_required=true; prompt read. User's existing authorization covers repeated isolated synthetic T18 cycles.
+- Validation on current local patch: scoped ESLint PASS; E2E TypeScript PASS; Playwright collection PASS (6 scenarios, 0 executed); frontend build PASS (3m06s; existing dependency/CSS warnings). CRLF-aware diff check PASS; normal commit hooks remain to run.
+- Latest synthetic run on 0d253227: exact served sw.js provenance PASS (SHA-256 72b715193d88dcaf775af38f340d0c2a9d74a9a751579a7eea1c3faae6e680d9); synthetic seed DEV-DEMO PASS; Registrar login HTTP 200 and canonical /registrar/queue PASS; queue suite wrapper reported 0 passed / 1 failed / 0 skipped, runner exit 1 at first scenario; Admin normal password login, first-time 2FA setup/verify, and routes 4/4 PASS.
+- Teardown PASS removed 5 containers, 3 volumes and 1 network; remaining owned resources all zero. WSL available memory after Session: 1237 MiB. A following read-only Preflight temporarily rejected a Windows listener on 18880; netstat showed loopback PID 0 and no resources were touched. Later Get-NetTCPConnection showed no listener, but canonical Preflight has not yet been rerun after the new local change.
+- Allowed paths: frontend/e2e/queue-system.spec.ts and the T18 plan journals; local validation files in output/staging and .scratch only. Denied: product/runtime/backend/auth policy, production/C:\final, foreign resources, merge, deployment, token/PHI output.
+- Next exact action: run normal commit hooks, commit/push test plus journals normally, verify exact-head CI, then update only the existing private env's owner/project/expiry/SHA and run Preflight. If it passes, run one canonical Start → Session for queue E2E plus provenance/Admin checks and teardown. Do not merge or claim T18 complete.
+
+
+## Previous checkpoint — PR #3805 single-login E2E fixture locally validated — 2026-10-30T09:59:33+05:00
 
 - Plan version: 1.0
 - Current task: T18 integrated synthetic acceptance; PR #3805

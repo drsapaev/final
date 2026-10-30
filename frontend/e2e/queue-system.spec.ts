@@ -5,11 +5,15 @@ const REGISTRAR_QUEUE_PATH = '/registrar/queue';
 const QUEUE_SNAPSHOT_PATH = '/registrar/queues/today';
 
 type RegistrarWorkerFixtures = {
-  registrarStorageState: Awaited<ReturnType<BrowserContext['storageState']>>;
+  registrarAuthState: {
+    baseURL: string;
+    storageState: Awaited<ReturnType<BrowserContext['storageState']>>;
+    sessionStorageEntries: Array<[string, string]>;
+  };
 };
 
 const test = base.extend<{}, RegistrarWorkerFixtures>({
-  registrarStorageState: [async ({ browser }, use, workerInfo) => {
+  registrarAuthState: [async ({ browser }, use, workerInfo) => {
     const baseURL = workerInfo.project.use.baseURL;
     expect(typeof baseURL, 'Queue system E2E requires a configured baseURL.').toBe('string');
 
@@ -25,13 +29,47 @@ const test = base.extend<{}, RegistrarWorkerFixtures>({
         /\/login(?:[?#].*)?$/
       );
 
-      await use(await context.storageState());
+      const storageState = await context.storageState();
+      const sessionStorageEntries = await page.evaluate(() => {
+        const entries: Array<[string, string]> = [];
+        for (let index = 0; index < window.sessionStorage.length; index += 1) {
+          const key = window.sessionStorage.key(index);
+          if (key === null) continue;
+          const value = window.sessionStorage.getItem(key);
+          if (value !== null) entries.push([key, value]);
+        }
+        return entries;
+      });
+      expect(
+        sessionStorageEntries.some(([key, value]) => key === 'auth_token' && value.length > 0),
+        'The normal Registrar login must keep its access token in sessionStorage.'
+      ).toBe(true);
+
+      await use({
+        baseURL: baseURL as string,
+        storageState,
+        sessionStorageEntries,
+      });
     } finally {
       await context.close();
     }
   }, { scope: 'worker' }],
-  storageState: async ({ registrarStorageState }, provideState) => {
-    await provideState(registrarStorageState);
+  context: async ({ browser, registrarAuthState }, provideContext) => {
+    const origin = new URL(registrarAuthState.baseURL).origin;
+    const context = await browser.newContext({
+      baseURL: registrarAuthState.baseURL,
+      storageState: registrarAuthState.storageState,
+    });
+    await context.addInitScript(({ expectedOrigin, entries }) => {
+      if (window.location.origin !== expectedOrigin) return;
+      for (const [key, value] of entries) window.sessionStorage.setItem(key, value);
+    }, { expectedOrigin: origin, entries: registrarAuthState.sessionStorageEntries });
+
+    try {
+      await provideContext(context);
+    } finally {
+      await context.close();
+    }
   },
 });
 

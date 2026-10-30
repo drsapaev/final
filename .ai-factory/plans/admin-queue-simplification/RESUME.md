@@ -1,3 +1,22 @@
+## Latest continuation — PR #3805 queue sessionStorage fixture correction — 2026-10-30T10:36+05:00
+
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/t18-queue-row-diagnostics. PR #3805 is OPEN/Draft at pushed HEAD 0d253227ea2fb8dd01c8df62f75f3b5b2b5fd53d; base/current main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. User owns merge; do not merge.
+
+Latest synthetic cycle on 0d253227:
+- Exact-head CI: 19 success, 18 skipped, 0 failures; PR Required Gate PASS.
+- Canonical Preflight PASS; Start PASS. Synthetic seed and frontend served revision provenance PASS (sw.js SHA-256 72b715193d88dcaf775af38f340d0c2a9d74a9a751579a7eea1c3faae6e680d9); Registrar login HTTP 200 and /registrar/queue PASS.
+- Queue E2E wrapper: 0 passed / 1 failed / 0 skipped, runner exit 1. First test timed out waiting for queue controls. Root cause confirmed: app tokens are in sessionStorage (frontend/src/utils/tokenManager.ts); Playwright storageState does not copy sessionStorage, so fresh page contexts lost auth.
+- Admin password login, first-time TOTP setup/verification and all 4 Admin routes PASS.
+- Session teardown PASS: 5 containers, 3 volumes, 1 network removed; zero owned resources left. WSL available memory after Session was 1237 MiB.
+- A post-teardown Preflight returned WINDOWS_PORT_OWNER on staging port 18880; read-only netstat saw a transient 127.0.0.1 listener owned by PID 0. No kill or resource mutation was attempted. Later Get-NetTCPConnection saw no listener. Re-run canonical Preflight only after the code patch is committed/pushed and CI completes.
+
+Uncommitted source change: in frontend/e2e/queue-system.spec.ts, keep one normal UI Registrar login per worker, capture sessionStorage entries in process memory only, and restore them in each same-origin new test context with addInitScript. No token is logged or written to disk; no runtime/auth change. Gate for this exact file returned narrow_override, gate_misroute=false, override_used=true, handoff_required=true; prompt read. User authorization for repeated synthetic cycles applies.
+
+Current local checks after patch: scoped ESLint PASS, E2E tsc PASS, Playwright collection PASS (6 scenarios), frontend build PASS with existing Zod/Rollup/CSS warnings. CRLF-aware diff check PASS; normal commit hooks pending.
+
+Next exact action: run normal commit hooks, commit and push the test fixture plus journals, verify exact-head CI; then refresh the existing staging env metadata, run canonical Preflight, and if PASS perform one Start → Session → teardown. Then update the same private staging.env file to a fresh unique project/owner/expiry/current SHA (never print secret values), rerun canonical Preflight, and if PASS do one Start → Session → teardown. Keep Tier-2 PARTIAL until all required evidence passes; full STAGING_VALIDATION.md remains incomplete. Never change backend rate limits or alter production, merge, or deployment.
+
+
 ## Latest continuation — PR #3805 single-login E2E fixture — 2026-10-30T09:59:33+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/t18-queue-row-diagnostics`. PR #3805 is OPEN/Draft at pushed HEAD `fa519728dab30f795ccd66506670c97fbeb6cd6c`, based on `origin/main` `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`.
