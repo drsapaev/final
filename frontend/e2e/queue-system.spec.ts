@@ -293,12 +293,27 @@ async function expectVisibleQueueToMatch(
       })
     );
 
-    return actual.length === expected.length && actual.every((row, index) =>
-      row.number === expected[index].number
-      && row.patient === expected[index].patient
-      && row.source === expected[index].source
-    );
-  }, { message, timeout: 15_000 }).toBe(true);
+    const comparableRows = Math.min(actual.length, expected.length);
+    return {
+      expectedRowCount: expected.length,
+      actualRowCount: actual.length,
+      queueNumberMismatchCount: actual
+        .slice(0, comparableRows)
+        .filter((row, index) => row.number !== expected[index].number).length,
+      patientLabelMismatchCount: actual
+        .slice(0, comparableRows)
+        .filter((row, index) => row.patient !== expected[index].patient).length,
+      sourceBadgeMismatchCount: actual
+        .slice(0, comparableRows)
+        .filter((row, index) => row.source !== expected[index].source).length,
+    };
+  }, { message, timeout: 15_000 }).toEqual({
+    expectedRowCount: expected.length,
+    actualRowCount: expected.length,
+    queueNumberMismatchCount: 0,
+    patientLabelMismatchCount: 0,
+    sourceBadgeMismatchCount: 0,
+  });
 }
 
 async function selectDoctorWithQueue(
