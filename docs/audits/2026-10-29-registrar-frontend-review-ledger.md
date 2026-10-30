@@ -50,7 +50,7 @@
 | REG-FE-022 | P2 | Synthetic queue number/active indicator | Adapter always creates a queue_numbers entry; a visit without a linked DailyQueue can appear to have an active queue | SOURCE-OBSERVED / REPRO-PENDING | Batch P: queue DTO truth |
 | REG-FE-023 | P2 | Schedule-next dead control | Registrar context-menu schedule_next is shown but neither table nor menu action router handles it | SOURCE-OBSERVED / REPRO-PENDING | Batch Q: action exposure/wiring |
 | REG-FE-024 | P2 | Aggregated action visibility | Context menu ignores grouped_records.available_actions and hides backend-permitted non-payment actions | SOURCE-OBSERVED / REPRO-PENDING | Batch Q: action exposure/wiring |
-| REG-FE-025 | P2 | Force majeure target identity | Row action selects specialist_id from legacy doctor fields, not backend queue-owner scope, for mass queue transfer/cancel | SOURCE-OBSERVED / REPRO-PENDING | Batch R: force-majeure owner boundary |
+| REG-FE-025 | P2 | Force majeure target identity | Row action selects specialist_id from legacy doctor fields, not backend queue-owner scope, for mass queue transfer/cancel | CONFIRMED / FIX-IN-REVIEW — Draft PR #3809 (fail-first RED→GREEN, CI green, review pending) | Batch R: force-majeure owner boundary |
 | REG-FE-026 | P3 | Context-menu reschedule visibility | Menu checks missing can_reschedule/reschedule signal on canonical registrar queue rows while inline reschedule remains accessible | SOURCE-OBSERVED / REPRO-PENDING | Batch Q: action exposure/wiring |
 | REG-FE-027 | P2 | Welcome morning doctor summary | Doctor groups use absent legacy IDs and count rows, not distinct patients | SOURCE-OBSERVED / REPRO-PENDING | Batch S: Welcome summary |
 | REG-FE-028 | P2 | Welcome filtered-empty presentation | No-match filtered results are presented as an empty queue and offer first-record CTA | SOURCE-OBSERVED / REPRO-PENDING | Batch S: Welcome empty states |
@@ -670,6 +670,14 @@ Cloud agents operate on a *fresh* base fetched from `origin/main`, in an isolate
 - **Cloud executor next action:** in an authorized cloud coding worktree from fresh `origin/main`, run the mandatory gate with confirmed scope, save its emitted prompt/evidence, first introduce a synthetic failing regression for doctor/resource/aggregate owner and preview-before-mass-action, then make the smallest safe fix, run affected tests/CI, and open exactly one Draft fix PR. Stop on unresolved owner-typed API decisions. **No merge or production deploy authorized.**
 - **Tracking:** REG-FE-025 remains `SOURCE-OBSERVED / REPRO-PENDING`, severity provisional P2. No new issue IDs or finding statuses were changed.
 
+### Execution checkpoint — CR-01 / REG-FE-025 (2026-10-30, cloud cycle 1 result)
+
+- **Gate:** run before the first source edit from a fresh isolated worktree off `origin/main` `22b21a8b7c3c0b9b56f4e388c35e329a4321f768` via `ai/langgraph/scripts/run_agent_gate.ps1` (pwsh 7.5.2) with `--known-root-cause frontend/src/pages/registrar/useRegistrarRowActions.ts` + a 15-path reviewed scope → `narrow_override`; the plain gate's queue-fairness routing to backend queue files was recorded as a misroute and not followed (no router files changed). Scope expanded once (+ the Playwright spec) with the gate re-run before editing.
+- **Fail-first:** 15 new-contract assertions RED on the untouched baseline — including the resource-owned row silently retargeting incidental doctor 3's whole queue, and a synchronous double submit firing the financial POST twice.
+- **Fix:** frontend-only minimal change (canonical `queue_owner_kind`/`queue_owner_id` + row-day target; destructive actions gated by a successful non-empty dry-run bound to the same specialist + `target_date`; in-flight submit guard); backend contract untouched.
+- **Evidence:** RED 15 → GREEN 40/40 (3 suites) + 216/216 affected modules, strict `tsc` 0, eslint 0 (pre-existing warnings only), `npm run build` ✓, Playwright synthetic scenario 2 passed, `git diff --check` clean; **Draft PR #3809** commit `4776cb279` — CI 40 check-runs, 22 success, 0 failures (incl. Frontend e2e with the new spec).
+- **Tracking:** REG-FE-025 → `CONFIRMED / FIX-IN-REVIEW` (see findings index). Draft only — no merge/deploy from the cloud job; `RESOLVED` when #3809 is reviewed and merged.
+
 ## Change log
 
 | Date | Ledger revision | Added / updated | Verification |
@@ -685,6 +693,7 @@ Cloud agents operate on a *fresh* base fetched from `origin/main`, in an isolate
 | 2026-10-30 | Five-group protocol / Group 5; source inventory complete | REG-FE-034–035: malformed canonical queue API response silently treated as empty, and older queue-manager snapshot supersedes current doctor/day. Verified date/catalog, price route, auth/CSRF replay and backend resource call routing; dormant demo selector excluded as unproven live risk | API clients, mappers, selector hooks, backend endpoints/domain and focused frontend/backend test sources inspected at main `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; no runtime/automated tests |
 | 2026-10-30 | Cloud remediation plan (documentation only) | Added Stage 0 triage, 18 candidate small-PR packages with **exact 35-ID coverage**, cloud agent workflow, risk gate, test matrix, dependencies and release stop conditions. No app fixes or deployment authorized | Current #3803 draft and audit/main SHA inspected; plan text/index coverage checked; no source, runtime tests or CI executed |
 | 2026-10-30 | CR-01 start / gate blocker checkpoint | Created GitHub issue #3808 with precise fail-first/owner/preview requirements; source rechecked. Mandatory PowerShell gate cannot run in this no-checkout/no-pwsh execution container | No code/test edits, no gate/test/CI execution; issue confirmed in GitHub. Status remains SOURCE-OBSERVED / REPRO-PENDING |
+| 2026-10-30 | CR-01 cloud cycle 1 | REG-FE-025 → CONFIRMED / FIX-IN-REVIEW: mandatory gate run (narrow_override), fail-first RED 15 → GREEN, Draft PR #3809 opened with CI green (22 success / 0 fail) | Worktree gate payload + vitest/tsc/eslint/build/Playwright logs; PR #3809 checks on commit 4776cb279 |
 
 ## End-of-review acceptance criteria
 
