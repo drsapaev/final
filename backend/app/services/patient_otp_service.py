@@ -36,6 +36,7 @@ import logging
 import os
 import re
 import secrets
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -59,7 +60,6 @@ CODE_TTL_SECONDS = 300
 MAX_ATTEMPTS = 3
 RESEND_COOLDOWN_SECONDS = 60
 HOURLY_SEND_CAP = 5
-TEXTBEE_STAGING_SEND_CAP = 1
 TEXTBEE_STAGING_SEND_CAP_TTL_SECONDS = 24 * 60 * 60
 GRANT_TTL_SECONDS = 600
 
@@ -113,6 +113,7 @@ class _MemoryBackend:
     def __init__(self) -> None:
         self._store: dict[str, tuple[str, float]] = {}
         self._counters: dict[str, tuple[int, float]] = {}
+        self._reservation_lock = threading.Lock()
 
     def _alive(self, expires_at: float) -> bool:
         return time.monotonic() < expires_at
@@ -142,6 +143,24 @@ class _MemoryBackend:
         count += 1
         self._counters[key] = (count, expires_at)
         return count
+
+    def reserve_once(self, key: str, value: str, ttl: int) -> bool:
+        """Atomically reserve a single-use key in the TESTING backend."""
+        with self._reservation_lock:
+            current = self._store.get(key)
+            if current and self._alive(current[1]):
+                return False
+            self._store[key] = (value, time.monotonic() + ttl)
+            return True
+
+    def release_if_value(self, key: str, value: str) -> bool:
+        """Release only the live reservation owned by this send attempt."""
+        with self._reservation_lock:
+            current = self._store.get(key)
+            if current and self._alive(current[1]) and current[0] == value:
+                self._store.pop(key, None)
+                return True
+            return False
 
     # TEST HOOK: populated ONLY when TESTING=1 (never in production path).
     last_sent_code: dict[str, str] = {}
@@ -194,6 +213,20 @@ class _RedisBackend:
         pipe.expire(key, ttl, nx=True)
         count, _ = self._run(pipe.execute)
         return int(count)
+
+    def reserve_once(self, key: str, value: str, ttl: int) -> bool:
+        """Atomically reserve a single-use key with Redis SET NX EX."""
+        return bool(self._run(self._client.set, key, value, ex=ttl, nx=True))
+
+    def release_if_value(self, key: str, value: str) -> bool:
+        """Compare-and-delete so a stale send cannot release a newer lease."""
+        script = """
+        if redis.call('GET', KEYS[1]) == ARGV[1] then
+            return redis.call('DEL', KEYS[1])
+        end
+        return 0
+        """
+        return bool(self._run(self._client.eval, script, 1, key, value))
 
 
 class PatientOtpService:
@@ -284,17 +317,17 @@ class PatientOtpService:
             if provider_override == "textbee"
             else f"{namespace}:cap:{normalized}"
         )
-        send_cap = (
-            TEXTBEE_STAGING_SEND_CAP
-            if provider_override == "textbee"
-            else HOURLY_SEND_CAP
-        )
         cap_ttl = (
             TEXTBEE_STAGING_SEND_CAP_TTL_SECONDS
             if provider_override == "textbee"
             else 3600
         )
-        if backend.incr_with_ttl(cap_key, cap_ttl) > send_cap:
+        cap_reservation_token: str | None = None
+        if provider_override == "textbee":
+            cap_reservation_token = secrets.token_urlsafe(24)
+            if not backend.reserve_once(cap_key, cap_reservation_token, cap_ttl):
+                raise PatientOtpError(429, ERR_RATE_LIMITED)
+        elif backend.incr_with_ttl(cap_key, cap_ttl) > HOURLY_SEND_CAP:
             raise PatientOtpError(429, ERR_RATE_LIMITED)
 
         code = "".join(str(secrets.randbelow(10)) for _ in range(6))
@@ -316,6 +349,10 @@ class PatientOtpService:
             logger.error("patient OTP: send_sms error: %s", exc)
             raise PatientOtpError(503, ERR_SMS_UNAVAILABLE) from exc
         if not getattr(result, "success", False):
+            if cap_reservation_token is not None and getattr(
+                result, "definitely_not_accepted", False
+            ):
+                backend.release_if_value(cap_key, cap_reservation_token)
             logger.error(
                 "patient OTP: send_sms failed: %s", getattr(result, "error", "")
             )

@@ -56,6 +56,32 @@ async def test_textbee_queues_one_otp_to_fixed_api_host(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_textbee_accepts_immediate_single_recipient_success(monkeypatch):
+    real_async_client = httpx.AsyncClient
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200,
+            json={"data": {"successCount": 1, "failureCount": 0}},
+        )
+    )
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda **kwargs: real_async_client(transport=transport, **kwargs),
+    )
+
+    result = await TextBeeSMSProvider("test-api-key").send_sms(
+        SMSMessage(phone="+998901112233", text="test")
+    )
+
+    assert result.success is True
+    assert result.provider == "textbee"
+    assert result.status == "sent"
+    assert result.message_id is None
+    assert result.definitely_not_accepted is False
+
+
+@pytest.mark.asyncio
 async def test_textbee_rejects_non_e164_number_without_network(monkeypatch):
     called = False
 
@@ -71,6 +97,7 @@ async def test_textbee_rejects_non_e164_number_without_network(monkeypatch):
 
     assert result.success is False
     assert result.provider == "textbee"
+    assert result.definitely_not_accepted is True
     assert called is False
 
 
@@ -82,6 +109,8 @@ async def test_textbee_rejects_non_e164_number_without_network(monkeypatch):
         {"data": {"success": True, "smsBatchId": "batch-123", "recipientCount": 2}},
         {"data": {"success": True, "smsBatchId": "batch-123", "recipientCount": True}},
         {"data": {"success": True, "recipientCount": 1}},
+        {"data": {"successCount": 1, "failureCount": 1}},
+        {"data": {"successCount": True, "failureCount": 0}},
     ],
 )
 async def test_textbee_requires_single_recipient_queue_acceptance(monkeypatch, body):
@@ -102,11 +131,40 @@ async def test_textbee_requires_single_recipient_queue_acceptance(monkeypatch, b
 
 
 @pytest.mark.asyncio
-async def test_textbee_http_error_is_generic_and_does_not_echo_response(monkeypatch):
+async def test_textbee_immediate_failure_proves_non_acceptance(monkeypatch):
+    real_async_client = httpx.AsyncClient
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200,
+            json={"data": {"successCount": 0, "failureCount": 1}},
+        )
+    )
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda **kwargs: real_async_client(transport=transport, **kwargs),
+    )
+
+    result = await TextBeeSMSProvider("test-api-key").send_sms(
+        SMSMessage(phone="+998901112233", text="test")
+    )
+
+    assert result.success is False
+    assert result.definitely_not_accepted is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "definitely_not_accepted"),
+    [(400, True), (401, True), (403, True), (429, True), (500, False)],
+)
+async def test_textbee_http_error_is_generic_and_does_not_echo_response(
+    monkeypatch, status_code, definitely_not_accepted
+):
     secret_response = {"message": "test-api-key must not be exposed"}
     real_async_client = httpx.AsyncClient
     transport = httpx.MockTransport(
-        lambda request: httpx.Response(401, json=secret_response)
+        lambda request: httpx.Response(status_code, json=secret_response)
     )
     monkeypatch.setattr(
         httpx,
@@ -120,6 +178,7 @@ async def test_textbee_http_error_is_generic_and_does_not_echo_response(monkeypa
 
     assert result.success is False
     assert result.error == "SMS provider send failed"
+    assert result.definitely_not_accepted is definitely_not_accepted
     assert "test-api-key" not in str(result)
 
 
