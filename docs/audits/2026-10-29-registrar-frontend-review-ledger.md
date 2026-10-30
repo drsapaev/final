@@ -584,6 +584,84 @@ Run **one bounded file group per review pass**; for each group, verify the curre
 27. **Validation:** relevant Vitest components/contracts, `tsc`/ESLint, affected Playwright flows with synthetic data, relevant queue contract tests, PR quality gates, `git diff --check`, and code review. Record **actual commands/results**; do not claim tests passed without execution.
 28. **Closure:** update each ledger row with root cause, test evidence, fix PR/commit SHA, review outcome, and resolution status. Keep this audit PR as the index; merge it only when repository review and CI policy permit. Do not deploy as part of this audit.
 
+
+## Cloud remediation execution plan — 2026-10-30 (planning only)
+
+> **Authorization / scope:** cloud-hosted GitHub PR and CI workflow **plan**, not permission to deploy, migrate databases, execute against production, or merge. No fix branches/issues have been created by this plan. **All 35 candidate defects remain SOURCE-OBSERVED / REPRO-PENDING** until a controlled synthetic reproduction demonstrates them. The PR containing this plan remains documentation-only.
+
+### Objective, invariants and execution model
+
+Move the registrar's source-observed inventory to reproducible, reviewed, tested and safely integrated changes. The invariants of the clinic system are: backend as SSOT for queue owner/fairness/numbering, transitions, payments, user permissions and audit; **never** switch doctor ID and resource ID interchangeably; do not mutate a second patient's visit through numeric ID collision; no unverified success acknowledgements; no PHI or credentials in cloud logs or test fixtures.
+
+Cloud agents operate on a *fresh* base fetched from `origin/main`, in an isolated clean worktree/branch, with GitHub PRs and GitHub Actions for validation. **One implementation PR cycle at a time**, per root [AGENTS.md](https://github.com/drsapaev/final/blob/main/AGENTS.md): finish required checks, review and merge/close/record the disposition, then begin the next. Independent agents may review contracts, develop synthetic test proposals and audit risks in parallel **read-only**, but must not make concurrent application PRs in this sequential clinic workflow. No deployment secrets or live patient data are needed for cloud repro.
+
+**Gate:** For each candidate, read current `AGENTS.md`, `.ai-factory/ARCHITECTURE.md`, `.ai-factory/RULES.md`, `.ai-factory/DESCRIPTION.md`, relevant skill and canonical backend source. Choose `direct_execute` for a truly narrow, non-risky UI-only change; otherwise run the mandatory gate via **`ai/langgraph/scripts/run_agent_gate.ps1` from `ai/langgraph`**, including known root cause/scope. Stop if the gate fails or ownership is not established; do not run `agent_gate.py` directly or substitute a made-up approval. The docs-only audit update itself is a narrow `direct_execute` and does **not** run implementation gates.
+
+### Stage 0 — prove, triage, and narrow (before implementing)
+
+1. Pin a fresh `origin/main` SHA and current PR #3803 HEAD. Recheck each candidate against **current** source (the audit's frozen source was `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; old findings are not automatically still open). Inspect existing branches/fix PRs and affected tests. Establish reachable caller paths; do not label dead legacy components as active faults.
+2. Use fake timers, deferred network promises and **synthetic-only** rows with deliberate numeric ID collisions, mixed doctor/resource ownership, mixed payment/cancel outcomes and simulated lost responses. For each REG-FE ID, save a minimal failing test **before** altering production source. Record actual pre-fix failure, then post-fix pass. If no reproducible defect, record `NOT A BUG`, `DUPLICATE` or `NEEDS PRODUCT DECISION` with evidence instead of introducing a speculative fix.
+3. Recalculate effective severity from **impact + reachability + reversibility**, not from the preliminary P2/P3. Confirm whether REG-FE-025 (mass cancel/refund), 015/017 (partial commands), 011 (partial persistence), 022/034/035 (truthfulness of worklist) warrant escalation. No P0/P1 is declared without evidence.
+4. Snapshot the frontend API contracts: `/registrar/queues/today`, `/registrar/records/actions`, price overrides, edit-delta, resource routing, and `/queue/{specialist_id}/call-next`. Separate read-model tests from command mutation tests. Existing queued/doctor/resource compatibility should stay tested, not rewritten blindly.
+
+### Candidate fix PRs (create **only after** its fail-first test)
+
+| Candidate PR | Track | Finding IDs | Narrow purpose / ownership | Execution gate |
+| --- | --- | --- | --- | --- |
+| CR-01 | Safety | REG-FE-025 | Force-majeure owner-boundary and dry-run/POST parity | Mandatory: queue ownership + payments + RBAC |
+| CR-02 | Safety | REG-FE-015, REG-FE-017 | Partial batch/cancellation result reconciliation | Mandatory if clinical/payment/queue command contract changes |
+| CR-03 | Safety | REG-FE-014 | Truthful context-action acknowledgements | direct_execute UI-only if no domain/role/command change |
+| CR-04 | Data | REG-FE-034 | Canonical queue API envelope validation | Mandatory: frontend/backend API contract |
+| CR-05 | Data | REG-FE-035 | Latest doctor/day snapshot wins | Mandatory if queue ownership/selection semantics change; otherwise narrow UI boundary |
+| CR-06 | Data | REG-FE-022 | Distinguish real allocated numbers from display ordinals | Mandatory: queue numbering/SSOT |
+| CR-07 | Data | REG-FE-011 | Patient edit/visit-save transaction boundary | Mandatory: DB, clinical lifecycle, payments |
+| CR-08 | Data | REG-FE-010 | Existing-patient profile update contract | Mandatory if profile/visit write contract changes |
+| CR-09 | Safety | REG-FE-013 | PHI-safe diagnostic logging across registrar | Mandatory: privacy/security |
+| CR-10 | Data | REG-FE-007, REG-FE-020, REG-FE-021 | Worklist refresh scheduling and cooldown correctness | direct_execute if UI-only; mandatory for API/rate-limit contract changes |
+| CR-11 | Data | REG-FE-009 | Stable reschedule record identity | Mandatory if visit/queue identity or command semantics change |
+| CR-12 | UX | REG-FE-012, REG-FE-016 | Wizard catalogue request freshness and visit forecast | direct_execute only if strictly UI-only |
+| CR-13 | UX | REG-FE-018, REG-FE-019 | Post-save reconciliation and single success acknowledgement | mandatory if command outcome contract changes |
+| CR-14 | UX | REG-FE-006, REG-FE-023, REG-FE-024, REG-FE-026 | Action availability, confirmation and menu routing | Mandatory if roles/actions/clinical policy change |
+| CR-15 | UX | REG-FE-004, REG-FE-005, REG-FE-030 | Canonical status/date/URL navigation contract | Mandatory if queue status meaning changes; otherwise UI-only |
+| CR-16 | UX | REG-FE-008, REG-FE-027, REG-FE-028, REG-FE-029 | Welcome counters and data-source feedback | Mandatory if changing backend owner/read model |
+| CR-17 | Polish | REG-FE-031, REG-FE-032, REG-FE-033 | Unused selection, clinic-timezone display, accessibility | direct_execute if presentation-only |
+| CR-18 | Polish | REG-FE-001, REG-FE-002, REG-FE-003 | Worklist row activation, search display and locale reactivity | direct_execute if presentation-only |
+
+**Priority execution sequence:** Start with **Safety** and high-risk **Data**: `CR-01` (owner of a mass operation), `CR-02` (partial cancel/command truth), `CR-04` (malformed queue response), `CR-05` (doctor/day race), `CR-06` (real queue-number allocation), `CR-07` (patient/visit write boundary), `CR-09` (diagnostic PHI). The IDs are *candidate work packages, not existing GitHub PR numbers*. `CR-03/08/10/11` and other independent slices follow the highest verified risk. Finally fix UX/polish only after data/action contracts are stable. Work-package order can change with **newly confirmed** risk but never skip mandatory gates.
+
+**Dependencies:** `CR-04` before `CR-16` (accurate empty/error-state display); `CR-02` before `CR-03/14` (command outcomes before success messaging); `CR-07` before `CR-08/13` if save workflows share the same write boundary; `CR-10` before `CR-13/16` when refresh behavior affects acknowledgements; `CR-15` before `CR-16/17` when date/filter scope affects displayed counts. `CR-01` may expose a new backend contract decision and must stop on mixed resource/doctor scope ambiguity, not guess. **Split any grouped package** if tests prove unrelated root causes, if the patch crosses two safety domains or if review scope becomes broad; never merge distinct root causes for a convenience bulk PR.
+
+### Mandatory edge-case test matrix
+
+| Area | Controlled synthetic scenario | Acceptance |
+| --- | --- | --- |
+| Force majeure (`025`) | doctor-owned, resource-owned, unknown and mixed-owner queue; stale view; dry-run followed by POST | Exact same authorized target identity in preview and mutation; unsupported scopes disabled; no unintended refund |
+| Batch action/cancel (`014/015/017`) | mixed accepted/rejected/no-op records, response lost after commit, repeated click | Acknowledge only committed operations; return per-record outcomes; reconcile list; never blindly resubmit money/queue commands |
+| Queue API (`022/034/035`) | malformed HTTP 200, valid empty `queues:[]`, missing linked DailyQueue, fallback ordinal, delayed doctor/date A vs B | Invalid data `error/stale`, true empty `empty`, real ticket only when allocated; B's selection wins |
+| Patient/wizard (`009/010/011/012/016/018`) | two entities with same numeric ID; failed second command after first commit; stale catalogue day; failed refresh after committed save | Correct identity, explicit write boundaries, current catalogue, truthful visit count, no retry of committed create |
+| Refresh (`007/008/020/021/035`) | HTTP 429 and Retry-After, overlapping A/B/C, modal open-close, WS update, unmount | No stale overwrite/false success, consistent cooldown and loading, no unhandled timers |
+| Views/accessibility (`001/002/003/004/005/006/019/023/024/026/027–033`) | all-department grouping, zero-match vs zero-records, fetch error, role gating, locale switch, UTC-negative browser, keyboard navigation | Canonical statuses/action rights, preserved date/query scope, no ghost buttons/checks, correct clinic day and semantic names |
+| Privacy (`013`) | nested synthetic patient names, phone numbers, IDs in thrown errors, logger primitives, telemetry breadcrumbs | Neither console nor telemetry leaks PHI; tests use no real identities |
+
+### Single cloud-agent PR lifecycle
+
+1. **Discover:** re-read current repo rules/SSOT sources, pin `origin/main` SHA, confirm finding still exists, and record selected `CR-XX`, candidate IDs, risk mode, allowed/denied files, known owner, test scope and stop condition.
+2. **Gate and red test:** execute mandatory `run_agent_gate.ps1` if triggered and read its execution prompt. Create a **deterministic fail-first regression** against synthetic data, including a negative test and backend contract when the command/SSOT is involved. Report red test output; a test that passes when all actions are stubs is not sufficient.
+3. **Minimal repair:** only after the failing proof, change the smallest canonical backend contract or React presentation/command-adapter branch necessary. Keep backend decision-making server-owned. Do not implement fallback patient/provider/queue guesses to conceal contract defects.
+4. **Verify:** run focused Vitest/pytest, TypeScript strict check, relevant ESLint, API/OpenAPI and RBAC/integration checks for risky actions; run relevant Playwright synthetic registrar flows, and `git diff --check`. Run repository-required CI and security gates. Record **exact commands and results**; no fictitious green CI.
+5. **Review:** open one appropriately labeled GitHub PR with pre-fix red/post-fix green evidence, test files, risk/gate logs, precise diff, rollout constraints and rollback procedure. Obtain independent code review, address findings, then merge only through normal branch protections. The existing #3803 remains an index, never a runtime-fix branch.
+6. **Rebase/recheck and repeat:** begin the next PR from new `origin/main` only when the previous cycle has a recorded terminal outcome. Update the corresponding `REG-FE-XXX` ledger row with confirmed severity, reproduction, PR/commit links, validation and `CONFIRMED/RESOLVED/NOT A BUG/DUPLICATE`.
+
+### Release and stop conditions
+
+- **No automatic production deployment** from this plan. The plan covers a cloud development/PR/CI pipeline; a separate production change authorization, clean synced `main`, backup/restore evidence, deployment runbook and post-release monitoring are required. Test against isolated synthetic Postgres/test data only. A successful Vercel frontend build does **not** prove FastAPI/database/queue behaviors.
+- **Stop on:** unknown/mixed queue ownership, doctor/resource ID ambiguity, unclear clinical/payment write semantics, uncertain result after lost response, failed mandatory gate, failing tests, missing required CI, missing safe rollback, leaked PII/credentials, or changes outside authorized app source scope. Do not retry a possibly committed payment/cancellation automatically.
+- **Final completion evidence:** 35 original findings have grounded dispositions and no unresolved confirmed release-blocking issues; every fix has a failing-then-passing regression, required green CI, independent review and recorded merge; synthetic E2E covers booking → queue → call/start → payment/cancel → report and role boundaries; migration/backup/rollback rehearsals are documented where applicable. Reassess production readiness **separately** after these facts exist.
+
+### Cloud agent launch brief (copy/paste when starting one cycle)
+
+> Repository `drsapaev/final`. Read fresh `AGENTS.md`, `.ai-factory/ARCHITECTURE.md`, `.ai-factory/RULES.md`, relevant project skills and audit `docs/audits/2026-10-29-registrar-frontend-review-ledger.md`. Select **one** `CR-XX` package from the Cloud remediation execution plan and its `REG-FE-XXX` IDs. Pin current `origin/main`, inspect canonical backend owner/tests, establish reachability and run the mandatory project gate when triggered. **First write a synthetic failing test; if no bug, report NOT A BUG without changing runtime.** Make the smallest fix from the established root cause, keep backend SSOT, verify affected frontend/backend contracts and GitHub Actions, produce one scoped PR with exact evidence. Do not touch live patient data, credentials, deployments, production, main directly, or merge automatically. Stop on unsafe or unresolved domain decisions.
+
 ## Change log
 
 | Date | Ledger revision | Added / updated | Verification |
@@ -597,6 +675,7 @@ Run **one bounded file group per review pass**; for each group, verify the curre
 | 2026-10-30 | Five-group protocol / Group 3 | REG-FE-023–026: dead schedule-next action, missing grouped action visibility, force-majeure target mismatch, hidden context reschedule; expanded existing REG-FE-013 evidence without duplicate | Two primary action hooks, context menu, server action/owner contracts, force-majeure and focused tests inspected at main SHA `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; no runtime tests |
 | 2026-10-30 | Five-group protocol / Group 4 | REG-FE-027–033: Welcome summary, filtered/no-data/error semantics, URL query preservation, orphaned selection, clinic date formatting and unlabeled all-departments tabpanel. Existing 001/004/005/006/008/013 not duplicated | Three views, queue manager, adapters, table, navigation and focused tests inspected at main `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; no runtime tests |
 | 2026-10-30 | Five-group protocol / Group 5; source inventory complete | REG-FE-034–035: malformed canonical queue API response silently treated as empty, and older queue-manager snapshot supersedes current doctor/day. Verified date/catalog, price route, auth/CSRF replay and backend resource call routing; dormant demo selector excluded as unproven live risk | API clients, mappers, selector hooks, backend endpoints/domain and focused frontend/backend test sources inspected at main `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; no runtime/automated tests |
+| 2026-10-30 | Cloud remediation plan (documentation only) | Added Stage 0 triage, 18 candidate small-PR packages with **exact 35-ID coverage**, cloud agent workflow, risk gate, test matrix, dependencies and release stop conditions. No app fixes or deployment authorized | Current #3803 draft and audit/main SHA inspected; plan text/index coverage checked; no source, runtime tests or CI executed |
 
 ## End-of-review acceptance criteria
 
