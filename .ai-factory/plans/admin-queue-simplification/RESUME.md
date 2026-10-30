@@ -1,15 +1,62 @@
-## Latest continuation — PR #3800 exact-head CI pass, Tier-2 remains PARTIAL — 2026-10-29T16:20+05:00
+## Latest continuation — PR #3801 two follow-up P2 fixes pushed; CI passed — 2026-10-29T22:22+05:00
 
-Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-localize-profile-delete-refusals`, PR #3800. Base `origin/main` at branch start was `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Do not edit `C:\final` or another worktree.
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. Source-bearing commit `2dcbc06db26ba6c26dd3b635f86abe8242fc31bc` is in PR #3801; base/current `origin/main` is `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`. Any journal-only follow-up does not change the source tested by that run.
 
-The PR localizes only the two existing QueueProfile deletion refusal codes across five active locales and adds single/bulk UI regressions. User direction: keep Tier-2 `PARTIAL` and continue the plan; no staging, deferral, waiver, merge, or deployment.
+Review #5701479576's two P2 findings are addressed in `frontend/e2e/queue-system.spec.ts`: the clicked doctor label maps to one ID from the observed available-specialists response; the URL must become that exact ID; the queue snapshot is awaited; and queue resolution accepts either the exact `specialist_id` or the selected doctor's ID in `routing_specialists`, matching the current production hook's per-queue selection behavior. No runtime/backend/API code changed.
 
-Initial PR HEAD `c3ecbc0d9c3b6a4818a6b224f36e23c644e9fd02` had one CI TypeScript error in the new test. Exact head `bc47a4d915e25a78baca9b067e20562b0932602a` corrected the test selector and passed Unified CI `40861817672`, including frontend unit, lint/type-check, build, configured E2E and PR Required Gate. Local focused tests (20/20), type-check, scoped ESLint, build, theme, icon audit, locale parity and diff-check also pass.
+Local PASS: scoped ESLint, E2E TypeScript check, Playwright collection (6 collected / 0 executed), frontend build, CRLF-aware diff check and normal commit hooks. Unified CI `40917888683` completed SUCCESS on exact source HEAD `2dcbc06d`; Frontend unit, build, lint, configured E2E, PR Required Gate, review quality, lifecycle, security, CodeQL, gitleaks and scratch guards passed. Backend, integration, Docker, readiness, k6, DAST and other path-aware jobs were SKIPPED, not PASS.
 
-The PR body now records exact-head results and remains truthful about skipped backend/staging checks and Tier-2 PARTIAL. The hosted PR Review Quality Gate failure was for the earlier body snapshot, which omitted required `Targeted tests or smoke run`, `Result`, and `Not checked` labels. The corrected body passes the local gate; create a new PR synchronize event through the evidence checkpoint commit and verify the hosted gate. Keep PR #3800 Draft for user review/merge; do not run staging or mark Tier-2 complete.
+The named `queue-system.spec.ts` remains NOT_RUN; CI's Frontend E2E job does not execute it. Tier-2 remains PARTIAL by explicit user direction, without deferral/waiver. Do not run staging or the mutating named spec. PR remains OPEN/Ready, mergeable, and user retains merge.
 
-Preserve Tier-2 as partial; the three legacy live specs and full `docs/runbooks/STAGING_VALIDATION.md` remain outstanding. No deferral/waiver, staging, merge or deployment.
+Two newest inline threads (`4415182939`, `4415182956`) remain unresolved. Under `gh-address-comments` write safety, do not reply to or resolve them unless the user explicitly requests that GitHub write. The PR description was not edited in this source-fix task. The named live spec remains NOT_RUN; Tier-2 remains PARTIAL. No source change is pending, and user retains merge. Do not submit an APPROVE or merge.
 
+## Previous continuation — PR #3801 source-head CI passed after unrelated retry — 2026-10-29T21:16+05:00
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. PR #3801 is OPEN / Ready for review at exact HEAD `0041bcd14dfd1b5b40054928313a630348306331`; base/main `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
+
+The user asked to fix review #5700225111. Source commit `0041bcd14dfd1b5b40054928313a630348306331` updates `frontend/e2e/queue-system.spec.ts` to six meaningful QueueView scenarios. It selects doctors before scoped controls, uses the canonical table and API snapshots, proves two doctor queues display distinct rows, and removes legacy patient-create/duplicate/completion controls and unsupported 07:00 browser-clock assumptions. The call-next scenario requires a waiting synthetic row and asserts the real status transition. It is mutating and was NOT_RUN.
+
+Local validation PASS on `0041bcd`: scoped ESLint; E2E TS check; Playwright `--list` (6 collected, 0 executed); frontend build (43.88s; only existing third-party/CSS warnings); CRLF-aware diff check; normal commit hooks. Unified CI `40904558075` attempt 1 failed at the unrelated Lab dirty-guard test (`lab-dirty-guard.spec.ts:1654`, 60 passed / 1 timeout); attempt 2 passed the Lab test and all remaining configured E2E groups. Attempt 2 result: SUCCESS, including Frontend unit/build/lint, Frontend E2E and PR Required Gate. No live queue spec or staging/Compose/WSL execution.
+
+The source commit was pushed to PR #3801. This checkpoint changes only the plan journals; its resulting exact PR HEAD still needs CI verification. Tier-2 remains PARTIAL by explicit user direction, no waiver/deferral. User retains merge.
+
+Next: commit/push the docs-only checkpoint, verify checks on the resulting exact head, then reply to and resolve only the three addressed review threads and update the PR body. Do not execute the mutating spec or staging.
+
+## Latest continuation — PR #3801 review findings accepted for scoped test correction — 2026-10-29T20:36+05:00
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. PR #3801 is OPEN / Ready for review at exact HEAD `ebf2715790bb484d0df62bc943edd77bab81abb4`; base/current `origin/main` is `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
+
+The user asked to fix the current review findings. Review #5700225111 reports: (1) action controls are clicked before selecting a doctor; (2) old selectors and conditional guards allow false-green results, and add-patient/duplicate-phone/completion cases do not exist on QueueView; (3) the specialist test only checks the URL. Source inspection also confirmed browser Date mocking cannot prove a backend 07:00–08:00 reception rule; that endpoint does not enforce this window.
+
+Only `frontend/e2e/queue-system.spec.ts` and this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md` are in scope. No runtime/backend/API/DB/auth/route, Playwright configuration/credentials, staging/Compose/WSL, production, other worktree, merge, or deployment changes. Do not execute this mutating live spec. Tier-2 remains PARTIAL; no deferral/waiver.
+
+Previously run `gate_known_root_cause` covers the same spec and journals; result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`, prompt read. Required validation after edits: scoped ESLint, E2E TS check, Playwright `--list` only, build, CRLF-aware diff check, normal hooks and exact-head CI. Do not describe collection/CI as execution of this spec.
+
+Next: implement meaningful checks for current queue UI, doctor-owned synthetic queue snapshots and action prerequisites; then validate and update this checkpoint. User retains merge.
+
+## Latest continuation — PR #3801 statistics E2E P2 pushed; final checkpoint pending — 2026-10-29T19:31+05:00
+
+Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. PR #3801 is OPEN / Ready for review at exact HEAD `b02e1f15a1478def02be4e7f70f34be69849ae62`; base and `origin/main` are `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`. Direct GitHub checks report `merged=false` and mergeable; the user performs merge.
+
+P2 from review #4412761716 is fixed in local source commit `9cc0cabf8035f4a8b7f577eadc1531770f9fc59c`: the statistics test selects a doctor before asserting the stats grid, and the shared selector helper emits a clear synthetic-doctor prerequisite failure. It is reused by the specialist test. Only `frontend/e2e/queue-system.spec.ts` changed in that source commit.
+
+Local validation: scoped ESLint PASS; `tsc --noEmit -p e2e/tsconfig.json` PASS; Playwright collection PASS (10 tests, 0 executed); `npm run build` PASS (existing CSS warnings); `git -c core.whitespace=cr-at-eol diff --check` PASS; commit hooks PASS. PR body quality validation PASS; hosted PR Quality Gate and Lifecycle on the body update PASS. Unified CI on exact HEAD `b02e1f1` was in progress when this checkpoint was written. This journal update advances the PR head, so verify the resulting newer HEAD rather than counting the b02e run. The gate returned `narrow_override`, `gate_misroute=false`, `override_used=true`, and `handoff_required=true`; the execution prompt was read. No live spec or staging was run. Tier-2 remains PARTIAL, without deferral/waiver.
+
+Next exact action: commit and push this final journal update; then wait for exact-head CI on the resulting PR SHA. If green, update the PR description with final checks and leave merge to the user; if red, fix the failure in the same PR. Keep `C:\final`, production, staging, other worktrees, and review-thread mutation untouched.
+
+## Latest continuation — PR #3800 merged; PR #3801 source-head CI passed — 2026-10-29T17:33+05:00
+
+Continue task 481fdb95-b9e6-48fd-b813-572932858920 in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/aqs-t18-queue-system-route-spec. PR #3800 is merged at 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1; this branch is based on that fresh origin/main. Draft PR #3801 is open; source commit is bb28a6c73a96327ef7e0045e5e8ccd90eb06e479. PR head ac02dc2798a74fa4b27f972259cc66ba1fbf4aba differs only by checkpoint documentation commits after the source patch.
+
+The user directed that Tier-2 remain PARTIAL while work continues; this is not a deferral or waiver. No staging, merge, or deployment was performed. User retains merge.
+
+The queue-system E2E spec now uses the correct /registrar/queue route rather than the worklist /registrar. All ten cases collect; scoped ESLint passes. The live scenarios remain NOT_RUN because this spec mutates queue/patient records; no synthetic environment was started.
+
+Exact PR source/evidence head ac02dc2: Unified CI 40872202007 PASS, including Frontend E2E groups, unit tests, lint/type-check, build and PR Required Gate. PR Review Quality Gate 40873786628 PASS after PR-body correction; Lifecycle 40873786607 PASS; Gitleaks, Security and Agent Workflow Guards PASS. The CI E2E groups do not execute this legacy queue-system spec, so that spec remains NOT_RUN and T18 stays PARTIAL.
+
+The first PR Review Quality Gate run 40872202016 failed because required PR-body sections were omitted. The body was corrected and the local validator passed 19 tests, sample bodies and the live PR body. A rerun attempt was cancelled; a subsequent body edit triggered the passing run 40873786628.
+
+Next exact action: commit and push this evidence-only update; verify exact-head CI on the documentation checkpoint, then leave PR #3801 Draft for the user to merge. The other two legacy live specs and full docs/runbooks/STAGING_VALIDATION.md remain outstanding.
 ## Latest continuation — T18 explicitly remains partial; no repeated staging cycle — 2026-10-29T15:35+05:00
 
 Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final` at current `origin/main` `a14c8d5570cfaad7edc71b48fd3b5718c0141ba8`. Do not edit `C:\final` or another worktree.
@@ -1372,3 +1419,16 @@ Next: review staged diff, commit with normal hooks, push and open one PR; then u
 This branch now has an exact lockfile dependency install in its own worktree. The focused `QueueProfilesManager.interactions.test.tsx` suite passed 20/20, and `npm run build` passed. Locale key parity and static syntax checks also passed. Vite reported CSS-property and upstream Rollup annotation warnings; no build errors.
 
 The first commit attempt failed only because ESLint dependencies were absent. Nothing was bypassed. Rerun the normal commit hook now that `npm ci` completed; then inspect and push the branch, create one PR, and await exact-head CI. Keep all generated dependencies/artifacts in this worktree and clean them after the PR verification if safe. Do not run staging: user directed Tier-2 to stay PARTIAL with no deferral.
+## T18 — PR #3801 ambiguous selector P2 — checkpoint and local validation — 2026-10-29T23:13:37+05:00
+
+- PR state verified: OPEN, Ready for review, mergeable. Before the source edit, head was `2898fa2ce802a74da12af54bb997acbcbed2f463`; base was `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`; worktree branch was `codex/aqs-t18-queue-system-route-spec` and clean.
+- Finding: review #5702595713 reported ambiguous and Russian-locale-specific `text=Очередь` and `text=Онлайн-очередь` selectors.
+- Execution mode: `direct_execute`; the known root cause is limited to locators in one E2E spec. No risky runtime, canonical API, ownership, DB, auth, route-policy, or deployment behavior changed; the gate is not run in this mode.
+- Canonical anchors inspected: `frontend/e2e/queue-system.spec.ts`, `frontend/src/pages/registrar/views/QueueView.tsx`, `frontend/src/components/queue/ModernQueueManager.tsx`, `.agents/skills/playwright-best-practices/core/locators.md`.
+- Allowed source: `frontend/e2e/queue-system.spec.ts`; journals: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,EVIDENCE}.md`. Denied: runtime/app, backend/API/DB, auth/credentials, Playwright config, staging/Compose/WSL, production/deploy, other worktrees, review-thread writes, merge.
+- Change: use the Registrar `main` region and level-1 heading, then scope to the queue-controls card and assert its level-3 heading and stable date/doctor control IDs. Both localized text selectors were removed.
+- Local validation: `npm.cmd exec -- eslint e2e/queue-system.spec.ts` PASS; `npm.cmd exec -- tsc --noEmit -p e2e/tsconfig.json` PASS; `npm.cmd exec -- playwright test e2e/queue-system.spec.ts --list --project=chromium` PASS (6 collected, 0 executed); `git -c core.whitespace=cr-at-eol diff --check` PASS.
+- NOT_RUN: execution of the six queue E2E scenarios, staging, backend/integration, and full `STAGING_VALIDATION.md`. Tier-2 remains PARTIAL under the existing user disposition.
+- Normal commit hooks: first attempt stopped on journal formatting after PowerShell expanded Markdown backticks; no hook was bypassed. Journal tail is being corrected before retry.
+- Result: source P2 corrected; commit created locally and normal hooks passed; push and exact-head CI pending. No GitHub review reply/resolution, merge, or deployment.
+- Next exact action: push the current branch and verify exact-head CI. Keep review threads unresolved and merge user-controlled.
