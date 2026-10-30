@@ -90179,6 +90179,21 @@
             "title": "Daily Queue Id",
             "description": "ID канонической очереди строки (ограничивает операцию этой очередью)"
           },
+          "expected_entry_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Entry Ids",
+            "description": "Снимок ID записей из предпросмотра (обязателен при daily_queue_id)"
+          },
           "reason": {
             "type": "string",
             "minLength": 5,
@@ -90252,6 +90267,21 @@
             ],
             "title": "Daily Queue Id",
             "description": "ID канонической очереди строки (ограничивает операцию этой очередью)"
+          },
+          "expected_entry_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Entry Ids",
+            "description": "Снимок ID записей из предпросмотра (обязателен при daily_queue_id)"
           },
           "reason": {
             "type": "string",

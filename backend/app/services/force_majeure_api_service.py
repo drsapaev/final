@@ -47,6 +47,7 @@ class ForceMajeureApiService:
         daily_queue_id: int,
         specialist_id: int,
         queue_day: date,
+        lock: bool = False,
     ) -> DailyQueue:
         """3808 review round 2 (P1 queue identity): validate the row's
         canonical DailyQueue as the ONLY operation target.
@@ -55,8 +56,20 @@ class ForceMajeureApiService:
         by the specialist (their own queue or their registry tag surface).
         A doctor-owned row must never silently operate the shadow resource
         queue that ``resolve_registry_tag_queue_for_specialist`` would pick.
+
+        3808 review round 3 (P1 concurrent refund): with ``lock=True`` the
+        queue row is taken FOR UPDATE BEFORE the entry set is read — every
+        force-majeure mutation on this queue serializes on this one row, so
+        the loser of a concurrent pair re-reads committed state after the
+        winner commits and refuses on drift instead of double-refunding.
+        The locked fetch goes through the repository (boundary:
+        test_service_repository_boundary forbids direct session calls
+        here); SQLite (unit tests) ignores FOR UPDATE.
         """
-        queue = self.repository.db.get(DailyQueue, daily_queue_id)
+        if lock:
+            queue = self.repository.get_daily_queue_for_update(daily_queue_id)
+        else:
+            queue = self.repository.db.get(DailyQueue, daily_queue_id)
         if queue is None:
             raise ForceMajeureApiDomainError(404, "Очередь не найдена")
         if queue.day != queue_day:
@@ -75,26 +88,105 @@ class ForceMajeureApiService:
                 )
         return queue
 
-    def transfer_queue_to_tomorrow(self, *, request, current_user_id: int) -> dict[str, Any]:
-        service = get_force_majeure_service(self.repository.db)
-        # 3808 review round 2 (P1 transfer destination): the transfer day
-        # chain is derived from the SOURCE queue day (request.target_date or
-        # the clinic SSOT day) — the same day the entries are selected from.
-        if request.daily_queue_id is not None and request.entry_ids:
+    @staticmethod
+    def _validate_selector_contract(
+        *,
+        daily_queue_id: int | None,
+        entry_ids: list[int] | None,
+        expected_entry_ids: list[int] | None,
+    ) -> None:
+        """3808 review round 3 (P1 preview set binding): the request-shape
+        contract shared by both mutations.
+
+        * ``entry_ids`` (legacy explicit set) and ``daily_queue_id``
+          (canonical row queue) stay mutually exclusive — round 2 rule;
+        * ``expected_entry_ids`` is the PREVIEW SNAPSHOT: it only ever
+          pairs with ``daily_queue_id`` and is REQUIRED there — without
+          it a bound mutation would re-select the whole live queue and
+          could touch patients the registrar never saw in the preview
+          (the exact round 3 P1);
+        * a daily_queue_id mutation with an EMPTY snapshot is a missing
+          preview, not an empty-queue operation.
+        """
+        if daily_queue_id is not None and entry_ids:
             raise ForceMajeureApiDomainError(
                 422,
                 "daily_queue_id и entry_ids взаимоисключающие: укажите одно",
             )
+        if expected_entry_ids and entry_ids:
+            raise ForceMajeureApiDomainError(
+                422,
+                "entry_ids и expected_entry_ids взаимоисключающие: укажите одно",
+            )
+        if expected_entry_ids and daily_queue_id is None:
+            raise ForceMajeureApiDomainError(
+                422,
+                "expected_entry_ids применим только вместе с daily_queue_id",
+            )
+        if daily_queue_id is not None and not expected_entry_ids:
+            raise ForceMajeureApiDomainError(
+                422,
+                "daily_queue_id требует expected_entry_ids — снимок ID записей "
+                "из предпросмотра (повторите предпросмотр и передайте его результат)",
+            )
+
+    def _bound_pending_entries(
+        self,
+        *,
+        queue: DailyQueue,
+        expected_entry_ids: list[int] | None,
+        service,
+    ) -> list[Any]:
+        """3808 review round 3 (P1 preview set binding): the mutation must
+        touch EXACTLY the entries the registrar saw in the preview.
+
+        The current live pending set of the locked queue is compared to the
+        previewed snapshot: ANY drift (a patient added after the preview, or
+        a previewed entry gone) refuses with 409 — the registrar must
+        re-preview and re-confirm the NEW set. Callers hold the queue row
+        lock, so the comparison is race-free for force-majeure writers.
+        """
+        expected = {int(entry_id) for entry_id in (expected_entry_ids or [])}
+        entries = service.get_pending_entries(
+            queue_id=queue.id,
+            target_date=queue.day,
+        )
+        current = {entry.id for entry in entries}
+        if expected != current:
+            added = len(current - expected)
+            removed = len(expected - current)
+            raise ForceMajeureApiDomainError(
+                409,
+                "Состав очереди изменился после предпросмотра "
+                f"(добавилось: {added}, исчезло: {removed}). "
+                "Обновите предпросмотр и подтвердите новый состав",
+            )
+        return entries
+
+    def transfer_queue_to_tomorrow(self, *, request, current_user_id: int) -> dict[str, Any]:
+        service = get_force_majeure_service(self.repository.db)
+        # 3808 review round 3 (P1 preview set binding): request-shape
+        # contract first (selector exclusivity + snapshot requirement).
+        self._validate_selector_contract(
+            daily_queue_id=request.daily_queue_id,
+            entry_ids=request.entry_ids,
+            expected_entry_ids=getattr(request, "expected_entry_ids", None),
+        )
+        # 3808 review round 2 (P1 transfer destination): the transfer day
+        # chain is derived from the SOURCE queue day (request.target_date or
+        # the clinic SSOT day) — the same day the entries are selected from.
         queue_day = request.target_date or clinic_today(self.repository.db)
         if request.daily_queue_id is not None:
             queue = self._validated_daily_queue(
                 daily_queue_id=request.daily_queue_id,
                 specialist_id=request.specialist_id,
                 queue_day=queue_day,
+                lock=True,
             )
-            entries = service.get_pending_entries(
-                queue_id=queue.id,
-                target_date=queue.day,
+            entries = self._bound_pending_entries(
+                queue=queue,
+                expected_entry_ids=getattr(request, "expected_entry_ids", None),
+                service=service,
             )
         elif request.entry_ids:
             entries = self.repository.list_pending_entries_by_ids(
@@ -130,21 +222,25 @@ class ForceMajeureApiService:
                 f"Неверный тип возврата: {request.refund_type}",
             ) from exc
 
-        if request.daily_queue_id is not None and request.entry_ids:
-            raise ForceMajeureApiDomainError(
-                422,
-                "daily_queue_id и entry_ids взаимоисключающие: укажите одно",
-            )
+        # 3808 review round 3 (P1 preview set binding): request-shape
+        # contract first (selector exclusivity + snapshot requirement).
+        self._validate_selector_contract(
+            daily_queue_id=request.daily_queue_id,
+            entry_ids=request.entry_ids,
+            expected_entry_ids=getattr(request, "expected_entry_ids", None),
+        )
         queue_day = request.target_date or clinic_today(self.repository.db)
         if request.daily_queue_id is not None:
             queue = self._validated_daily_queue(
                 daily_queue_id=request.daily_queue_id,
                 specialist_id=request.specialist_id,
                 queue_day=queue_day,
+                lock=True,
             )
-            entries = service.get_pending_entries(
-                queue_id=queue.id,
-                target_date=queue.day,
+            entries = self._bound_pending_entries(
+                queue=queue,
+                expected_entry_ids=getattr(request, "expected_entry_ids", None),
+                service=service,
             )
         elif request.entry_ids:
             entries = self.repository.list_pending_entries_by_ids(

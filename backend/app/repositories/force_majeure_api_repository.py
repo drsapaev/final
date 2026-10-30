@@ -59,6 +59,25 @@ class ForceMajeureApiRepository:
             .all()
         )
 
+    def get_daily_queue_for_update(self, daily_queue_id: int) -> DailyQueue | None:
+        """3808 review round 3 (P1 concurrent refund): SELECT ... FOR UPDATE
+        on the canonical queue row, taken BEFORE the entry set is read —
+        every force-majeure mutation on this queue serializes on this one
+        row. populate_existing() keeps the session identity map from
+        shadowing the locked re-read. SQLite (unit tests) ignores FOR
+        UPDATE — the daily-queue creation locks have the same parity.
+
+        Lives in the repository so the API service keeps the
+        no-direct-session-calls boundary (test_service_repository_boundary).
+        """
+        return (
+            self.db.query(DailyQueue)
+            .filter(DailyQueue.id == daily_queue_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+
     def list_refund_requests(
         self,
         *,

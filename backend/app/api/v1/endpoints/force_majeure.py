@@ -45,6 +45,16 @@ class ForceMajeureTransferRequest(BaseModel):
     # и мутацию ЭТОЙ очередью — резолюция specialist→реестровая поверхность
     # больше не может молча подменить цель операции. Взаимоисключающе с entry_ids.
     daily_queue_id: int | None = Field(None, description="ID канонической очереди строки (ограничивает операцию этой очередью)")
+    # 3808 review round 3 (P1 preview set binding): снимок ID записей,
+    # показанных регистратору предпросмотром. ОБЯЗАТЕЛЕН при daily_queue_id:
+    # сервер выполняет мутацию ровно над этим набором и отказывает (409),
+    # если состав очереди успел измениться — пациент, добавленный в очередь
+    # после предпросмотра, не может попасть под перенос «молча».
+    # Взаимоисключающе с entry_ids; без daily_queue_id не задан.
+    expected_entry_ids: list[int] | None = Field(
+        None,
+        description="Снимок ID записей из предпросмотра (обязателен при daily_queue_id)",
+    )
     reason: str = Field(..., min_length=5, description="Причина переноса")
     entry_ids: list[int] | None = Field(None, description="ID конкретных записей (все если не указано)")
     send_notifications: bool = Field(True, description="Отправить уведомления пациентам")
@@ -57,6 +67,11 @@ class ForceMajeureCancelRequest(BaseModel):
     target_date: date | None = Field(None, description="Дата очереди (по умолчанию сегодня)")
     # 3808 review round 2 (P1 queue identity): см. ForceMajeureTransferRequest.
     daily_queue_id: int | None = Field(None, description="ID канонической очереди строки (ограничивает операцию этой очередью)")
+    # 3808 review round 3 (P1 preview set binding): см. ForceMajeureTransferRequest.
+    expected_entry_ids: list[int] | None = Field(
+        None,
+        description="Снимок ID записей из предпросмотра (обязателен при daily_queue_id)",
+    )
     reason: str = Field(..., min_length=5, description="Причина отмены")
     refund_type: str = Field("deposit", description="Тип возврата: deposit или bank_transfer")
     entry_ids: list[int] | None = Field(None, description="ID конкретных записей (все если не указано)")
@@ -210,11 +225,17 @@ async def get_pending_entries_for_force_majeure(
 
     Доступно: Admin, Registrar
     """
-    return ForceMajeureApiService(db).get_pending_entries(
-        specialist_id=specialist_id,
-        target_date=target_date,
-        daily_queue_id=daily_queue_id,
-    )
+    # 3808 review round 3 (P2 error mapping): несуществующая очередь или
+    # несовпадение дня/владельца — это доменные 404/422, а не ошибка
+    # сервера: без этого перехвата GET-preview отдавал HTTP 500.
+    try:
+        return ForceMajeureApiService(db).get_pending_entries(
+            specialist_id=specialist_id,
+            target_date=target_date,
+            daily_queue_id=daily_queue_id,
+        )
+    except ForceMajeureApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 # ========================= ЗАЯВКИ НА ВОЗВРАТ =========================

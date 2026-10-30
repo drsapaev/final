@@ -115,6 +115,8 @@ class ForceMajeureService:
             OnlineQueueEntry.priority.desc(), OnlineQueueEntry.queue_time
         ).all()
 
+    _PENDING_STATUSES = ("waiting", "called")
+
     def transfer_entries_to_tomorrow(
         self,
         entries: list[OnlineQueueEntry],
@@ -167,6 +169,10 @@ class ForceMajeureService:
 
         transferred = []
         failed = []
+        # 3808 review round 3 (P1 re-check under lock): entries processed
+        # by a concurrent writer after our selection are skipped, never
+        # transferred a second time.
+        skipped = []
         notification_targets = []
 
         # R19 P2 (E-039 snapshot integration, #3279): единый SSOT-счётчик
@@ -187,6 +193,17 @@ class ForceMajeureService:
 
         for entry in entries:
             try:
+                # 3808 review round 3 (P1 re-check): fresh statement per
+                # entry — READ COMMITTED re-read; an entry whose status was
+                # changed by a concurrent writer after selection is not
+                # transferred (and its payment is never touched twice).
+                self.db.refresh(entry)
+                if entry.status not in self._PENDING_STATUSES:
+                    skipped.append(
+                        {"entry_id": entry.id, "status": entry.status}
+                    )
+                    continue
+
                 # Создаём новую запись на завтра
                 new_entry = OnlineQueueEntry(
                     queue_id=tomorrow_queue.id,
@@ -260,17 +277,19 @@ class ForceMajeureService:
 
         logger.info(
             f"Форс-мажор перенос: {len(transferred)} записей перенесено на {tomorrow}, "
-            f"{len(failed)} ошибок. Причина: {reason}"
+            f"{len(failed)} ошибок, {len(skipped)} пропущено. Причина: {reason}"
         )
 
         return {
             "success": True,
             "transferred": len(transferred),
             "failed": len(failed),
+            "skipped": len(skipped),
             "new_date": str(tomorrow),
             "new_queue_id": tomorrow_queue.id,
             "details": transferred,
             "errors": failed,
+            "skipped_details": skipped,
             "reason": reason,
         }
 
@@ -305,10 +324,25 @@ class ForceMajeureService:
         cancelled = []
         failed = []
         refund_requests = []
+        # 3808 review round 3 (P1 re-check under lock): entries processed
+        # by a concurrent writer after our selection are skipped, never
+        # refunded a second time.
+        skipped = []
         notification_targets = []
 
         for entry in entries:
             try:
+                # 3808 review round 3 (P1 re-check): fresh statement per
+                # entry — READ COMMITTED re-read; an entry already processed
+                # by a concurrent writer is neither cancelled again nor
+                # refunded again (idempotent replay guard).
+                self.db.refresh(entry)
+                if entry.status not in self._PENDING_STATUSES:
+                    skipped.append(
+                        {"entry_id": entry.id, "status": entry.status}
+                    )
+                    continue
+
                 # Получаем связанный платёж
                 payment = self._get_payment_for_entry(entry)
 
@@ -376,16 +410,18 @@ class ForceMajeureService:
 
         logger.info(
             f"Форс-мажор отмена: {len(cancelled)} записей отменено, "
-            f"{len(failed)} ошибок. Причина: {reason}"
+            f"{len(failed)} ошибок, {len(skipped)} пропущено. Причина: {reason}"
         )
 
         return {
             "success": True,
             "cancelled": len(cancelled),
             "failed": len(failed),
+            "skipped": len(skipped),
             "refund_requests_created": len(refund_requests),
             "details": cancelled,
             "errors": failed,
+            "skipped_details": skipped,
             "reason": reason,
         }
 
@@ -468,10 +504,37 @@ class ForceMajeureService:
         visit_id: int | None,
         performed_by_id: int,
     ) -> dict[str, Any]:
-        """Добавить средства на депозит пациента"""
+        """Добавить средства на депозит пациента
+
+        3808 review round 3 (P1 double refund): IDEMPOTENT per payment —
+        if this payment was already credited (a previous force-majeure
+        leg), no second credit row and no balance change; the caller's
+        entry is still cancelled, the money is not moved twice. The
+        ``uq_deposit_transactions_credit_payment`` partial unique index
+        is the DB-level backstop for whatever this pre-check could miss
+        (see 0087 migration).
+        """
         from decimal import Decimal
 
         amount_decimal = Decimal(str(amount))
+
+        existing_credit = (
+            self.db.query(DepositTransaction)
+            .filter(
+                DepositTransaction.payment_id == payment_id,
+                DepositTransaction.transaction_type
+                == DepositTransactionType.CREDIT.value,
+            )
+            .first()
+        )
+        if existing_credit is not None:
+            return {
+                "type": "deposit",
+                "deposit_id": existing_credit.deposit_id,
+                "amount": float(existing_credit.amount),
+                "already_refunded": True,
+                "payment_id": payment_id,
+            }
 
         # Получаем или создаём депозит пациента
         deposit = (
@@ -518,10 +581,36 @@ class ForceMajeureService:
         refund_type: RefundType,
         is_automatic: bool = False,
     ) -> dict[str, Any]:
-        """Создать заявку на возврат"""
+        """Создать заявку на возврат
+
+        3808 review round 3 (P1 double refund): IDEMPOTENT for the
+        automatic (force majeure) leg — an existing automatic request for
+        the same payment is returned instead of a duplicate; manual
+        cashier requests (is_automatic=False) are not constrained here.
+        The ``uq_refund_requests_auto_payment`` partial unique index is
+        the DB-level backstop (see 0087 migration).
+        """
         from decimal import Decimal
 
         amount_decimal = Decimal(str(amount))
+
+        existing_request = (
+            self.db.query(RefundRequest)
+            .filter(
+                RefundRequest.payment_id == payment_id,
+                RefundRequest.is_automatic.is_(True),
+            )
+            .first()
+        )
+        if existing_request is not None:
+            return {
+                "type": "refund_request",
+                "request_id": existing_request.id,
+                "amount": float(existing_request.refund_amount),
+                "status": existing_request.status,
+                "already_refunded": True,
+                "payment_id": payment_id,
+            }
 
         refund_request = RefundRequest(
             patient_id=patient_id,

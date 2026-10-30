@@ -9,7 +9,9 @@
  *    day AND the row's daily_queue_id; the preview request carries the SAME
  *    specialist_id + target_date + daily_queue_id that the mutation will
  *    carry (round 2 P1: the backend targets exactly that queue instead of
- *    resolving the specialist onto a shared registry surface).
+ *    resolving the specialist onto a shared registry surface). Round 3:
+ *    the mutation also carries expected_entry_ids — the exact previewed
+ *    entry snapshot the backend mutates and refuses on drift (409).
  * 2. Typing ПОДТВЕРЖДАЮ + a reason only enables the destructive action
  *    after the (mocked) dry-run preview succeeds; the transfer POST is
  *    bound to the previewed specialist + date + queue.
@@ -263,7 +265,8 @@ test.describe('Registrar force majeure (#3808 REG-FE-025)', () => {
     await expect(transferButton).toBeEnabled();
     await transferButton.click();
 
-    // The mutation carries the SAME specialist + date + queue as the preview.
+    // The mutation carries the SAME specialist + date + queue + the
+    // previewed entry SNAPSHOT as the preview (round 3: expected_entry_ids).
     await expect
       .poll(() => transferBodies.length, { timeout: 10000 })
       .toBeGreaterThanOrEqual(1);
@@ -271,6 +274,7 @@ test.describe('Registrar force majeure (#3808 REG-FE-025)', () => {
       specialist_id: 3,
       target_date: targetDate,
       daily_queue_id: 41,
+      expected_entry_ids: [1, 2],
       reason: 'Затопление кабинета',
       send_notifications: true,
     });

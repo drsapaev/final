@@ -57,11 +57,28 @@ interface DryRunResult {
   totalAmount: number;
 }
 
+/**
+ * 3808 review round 3 (P1 preview set binding): серверный отказ 409 —
+ * состав очереди изменился после предпросмотра (дрейф против
+ * expected_entry_ids). Ошибки сети/валидации так не трактуются.
+ */
+const isPreviewDriftConflict = (err: unknown): boolean => {
+  const status = (err as { response?: { status?: number } } | null)?.response?.status;
+  return status === 409;
+};
+
 /** Скоуп, валидированный последним успешным preview (round 2 P1). */
 interface ValidatedPreviewScope {
   specialistId: string | number | null;
   targetDate: string | null;
   dailyQueueId: number | null;
+  /**
+   * 3808 review round 3 (P1 preview set binding): снимок ID записей,
+   * показанных ЭТИМ предпросмотром. Уходит в POST как
+   * expected_entry_ids: сервер выполняет мутацию ровно над этим набором
+   * и отказывает (409), если состав очереди изменился после preview.
+   */
+  entryIds: number[];
 }
 
 const ForceMajeureModal = ({
@@ -96,6 +113,9 @@ const ForceMajeureModal = ({
   // Скоуп последнего УСПЕШНОГО preview — авторизация действия
   // привязана к нему и должна совпадать с текущей целью модала.
   const validatedScope = useRef<ValidatedPreviewScope | null>(null);
+  // 3808 review round 3: снапшот последнего успешного preview читается
+  // хендлерами ДО их объявления (объявлен здесь, не после разметки).
+  const validated = validatedScope.current;
 
   // UX Audit: getAuthToken + tokenManager удалены — auth через axios-interceptor.
 
@@ -132,6 +152,7 @@ const ForceMajeureModal = ({
         specialistId,
         targetDate: targetDate ?? null,
         dailyQueueId: dailyQueueId ?? null,
+        entryIds: data.map((e: Record<string, unknown>) => Number(e.id)),
       };
     } catch (err) {
       if (seq !== previewSeq.current) return; // ошибка устаревшего запроса
@@ -198,7 +219,14 @@ const ForceMajeureModal = ({
           specialist_id: specialistId,
           // 3808: мутация привязана к той же дате и очереди, что и preview
           ...(targetDate ? { target_date: targetDate } : {}),
-          ...(dailyQueueId ? { daily_queue_id: dailyQueueId } : {}),
+          ...(dailyQueueId
+            ? {
+                daily_queue_id: dailyQueueId,
+                // round 3 P1: снапшот предпросмотра — сервер мутирует ровно
+                // этот набор и отказывает (409), если очередь успела измениться
+                expected_entry_ids: validated?.entryIds ?? [],
+              }
+            : {}),
           reason: reason,
           send_notifications: true
       });
@@ -209,7 +237,16 @@ const ForceMajeureModal = ({
       if (onSuccess) onSuccess('transfer', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Transfer error:', err);
-      setError(getErrorMessage(err) || t('misc.fm_network_error'));
+      if (isPreviewDriftConflict(err)) {
+        // round 3 P1: состав очереди изменился после предпросмотра —
+        // повторная авторизация обязательна: снапшот и карточку сбрасываем,
+        // действие снова заблокировано до свежего предпросмотра.
+        validatedScope.current = null;
+        setDryRunResult(null);
+        setPreviewError('misc.fm_queue_changed');
+      } else {
+        setError(getErrorMessage(err) || t('misc.fm_network_error'));
+      }
     } finally {
       submitInFlight.current = false;
       setLoading(false);
@@ -248,7 +285,14 @@ const ForceMajeureModal = ({
         specialist_id: specialistId,
         // 3808: мутация привязана к той же дате и очереди, что и preview
         ...(targetDate ? { target_date: targetDate } : {}),
-        ...(dailyQueueId ? { daily_queue_id: dailyQueueId } : {}),
+        ...(dailyQueueId
+          ? {
+              daily_queue_id: dailyQueueId,
+              // round 3 P1: снапшот предпросмотра — ровно этот набор,
+              // иначе сервер откажет (409) без движения денег
+              expected_entry_ids: validated?.entryIds ?? [],
+            }
+          : {}),
         reason: reason,
         refund_type: refundType,
         send_notifications: true
@@ -260,7 +304,15 @@ const ForceMajeureModal = ({
       if (onSuccess) onSuccess('cancel', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Cancel error:', err);
-      setError(getErrorMessage(err) || t('misc.fm_network_error'));
+      if (isPreviewDriftConflict(err)) {
+        // round 3 P1: дрейф состава — сбрасываем авторизацию до свежего
+        // предпросмотра; действие снова заблокировано.
+        validatedScope.current = null;
+        setDryRunResult(null);
+        setPreviewError('misc.fm_queue_changed');
+      } else {
+        setError(getErrorMessage(err) || t('misc.fm_network_error'));
+      }
     } finally {
       submitInFlight.current = false;
       setLoading(false);
@@ -274,7 +326,7 @@ const ForceMajeureModal = ({
   // 3808: серверный скоуп валидирован только успешным непустым dry-run,
   // причём скоуп этого dry-run обязан совпадать с ТЕКУЩЕЙ целью модала
   // (round 2 P1: поздний ответ другой строки не авторизует мутацию).
-  const validated = validatedScope.current;
+  // (validated объявлен выше — до хендлеров, round 3)
   const isScopeValidated =
     !previewLoading &&
     !previewError &&
@@ -361,11 +413,20 @@ const ForceMajeureModal = ({
           </button>
         </div>
 
-        {/* 3808: ошибка preview — разрушающее действие остаётся
-            заблокированным; ввод ПОДТВЕРЖДАЮ ничего не авторизует */}
+        {/* 3808: ошибка preview — разрушающее действие остаётся заблокированным;
+            ввод ПОДТВЕРЖДАЮ ничего не авторизует. Round 3: сюда же попадает
+            409-дрейф (состав изменился после предпросмотра) — кнопка обновления
+            здесь, потому что карточка dry-run в этом состоянии скрыта. */}
         {previewError &&
         <div className="fmm-error-box">
-          {t(previewError)}
+          <span className="fmm-preview-error-text">{t(previewError)}</span>
+          <button
+            type="button"
+            onClick={loadPendingEntries}
+            className="fmm-refresh-btn"
+            aria-label={t('misc.fm_aria_refresh')}>
+            <RefreshCw size={16} />
+          </button>
         </div>
         }
 

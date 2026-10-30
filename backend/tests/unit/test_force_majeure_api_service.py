@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -372,6 +372,7 @@ class TestForceMajeureApiService:
                 target_date=source_day,
                 daily_queue_id=source_queue.id,
                 entry_ids=None,
+                expected_entry_ids=[entry.id],
                 reason="doctor absent on Nov 5",
                 send_notifications=False,
             ),
@@ -460,6 +461,7 @@ class TestForceMajeureApiService:
                 target_date=today,
                 daily_queue_id=doctor_queue.id,
                 entry_ids=None,
+                expected_entry_ids=[own_entry.id],
                 reason="doctor emergency",
                 refund_type="deposit",
                 send_notifications=False,
@@ -730,3 +732,667 @@ class TestForceMajeureApiService:
         assert exc_info.value.status_code == 400
         assert deposit.balance == Decimal("100")
         assert state["flushed"] is False
+
+    # -- Review round 3 (#3809 P1/P2): preview set binding + serialization --
+
+    def test_transfer_daily_queue_id_requires_expected_entry_ids(self):
+        """Round 3 P1: a bound mutation without the preview snapshot is
+        refused — it would re-select the whole live queue and could touch
+        patients the registrar never saw in the preview."""
+        service = ForceMajeureApiService(db=None, repository=SimpleNamespace(db=None))
+        with pytest.raises(ForceMajeureApiDomainError) as exc_info:
+            service.transfer_queue_to_tomorrow(
+                request=SimpleNamespace(
+                    specialist_id=7,
+                    target_date=date.today(),
+                    daily_queue_id=5,
+                    entry_ids=None,
+                    expected_entry_ids=None,
+                    reason="reason",
+                    send_notifications=False,
+                ),
+                current_user_id=1,
+            )
+        assert exc_info.value.status_code == 422
+        assert "expected_entry_ids" in exc_info.value.detail
+
+    def test_cancel_daily_queue_id_requires_expected_entry_ids(self):
+        service = ForceMajeureApiService(db=None, repository=SimpleNamespace(db=None))
+        with pytest.raises(ForceMajeureApiDomainError) as exc_info:
+            service.cancel_queue_with_refund(
+                request=SimpleNamespace(
+                    specialist_id=7,
+                    target_date=date.today(),
+                    daily_queue_id=5,
+                    entry_ids=None,
+                    expected_entry_ids=[],
+                    reason="reason",
+                    refund_type="deposit",
+                    send_notifications=False,
+                ),
+                current_user_id=1,
+            )
+        # an EMPTY snapshot is a missing preview, not an empty-queue operation
+        assert exc_info.value.status_code == 422
+        assert "expected_entry_ids" in exc_info.value.detail
+
+    def test_expected_entry_ids_only_pairs_with_daily_queue_id(self):
+        service = ForceMajeureApiService(db=None, repository=SimpleNamespace(db=None))
+        with pytest.raises(ForceMajeureApiDomainError) as no_queue:
+            service.transfer_queue_to_tomorrow(
+                request=SimpleNamespace(
+                    specialist_id=7,
+                    target_date=None,
+                    daily_queue_id=None,
+                    entry_ids=None,
+                    expected_entry_ids=[11],
+                    reason="reason",
+                    send_notifications=False,
+                ),
+                current_user_id=1,
+            )
+        assert no_queue.value.status_code == 422
+        assert "daily_queue_id" in no_queue.value.detail
+
+        with pytest.raises(ForceMajeureApiDomainError) as with_entry_ids:
+            service.cancel_queue_with_refund(
+                request=SimpleNamespace(
+                    specialist_id=7,
+                    target_date=None,
+                    daily_queue_id=None,
+                    entry_ids=[11],
+                    expected_entry_ids=[12],
+                    reason="reason",
+                    refund_type="deposit",
+                    send_notifications=False,
+                ),
+                current_user_id=1,
+            )
+        assert with_entry_ids.value.status_code == 422
+        assert "взаимоисключающие" in with_entry_ids.value.detail
+
+    def test_transfer_rejects_patient_added_after_preview(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """The registrar previewed one patient; a second patient joined the
+        queue afterwards. The bound POST refuses with 409 and moves NOBODY:
+        the unpreviewed patient cannot be transferred silently."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        queue = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="doctor_preview_drift_queue",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+        previewed = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Previewed Patient",
+            status="waiting",
+            source="desk",
+        )
+        late_joiner = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=2,
+            patient_id=test_patient.id,
+            patient_name="Late Joiner",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add_all([previewed, late_joiner])
+        db_session.flush()
+
+        with pytest.raises(ForceMajeureApiDomainError) as exc_info:
+            ForceMajeureApiService(db_session).transfer_queue_to_tomorrow(
+                request=SimpleNamespace(
+                    specialist_id=test_doctor.id,
+                    target_date=today,
+                    daily_queue_id=queue.id,
+                    entry_ids=None,
+                    expected_entry_ids=[previewed.id],
+                    reason="doctor emergency",
+                    send_notifications=False,
+                ),
+                current_user_id=1,
+            )
+
+        assert exc_info.value.status_code == 409
+        assert "добавилось: 1" in exc_info.value.detail
+        assert "исчезло: 0" in exc_info.value.detail
+
+        # Refusal is total: no entry moved, no entry cancelled.
+        db_session.refresh(previewed)
+        db_session.refresh(late_joiner)
+        assert previewed.status == "waiting"
+        assert late_joiner.status == "waiting"
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .count()
+            == 0
+        )
+
+    def test_cancel_rejects_entry_removed_after_preview(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """The registrar previewed two patients; one was served by a
+        concurrent writer before the confirmation. The bound POST refuses
+        with 409: no cancellation and no refund money movement."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        queue = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="doctor_cancel_drift_queue",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=today,
+            visit_time="14:00",
+            status="open",
+            discount_mode="none",
+            department="cardiology",
+            created_at=datetime.now(UTC),
+        )
+        db_session.add(visit)
+        db_session.flush()
+        payment = Payment(
+            visit_id=visit.id,
+            amount=Decimal("150.00"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        staying = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Staying Patient",
+            status="waiting",
+            source="desk",
+        )
+        served = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=2,
+            patient_id=test_patient.id,
+            patient_name="Served Patient",
+            # The concurrent writer already processed this entry between
+            # the preview and the confirmation: at POST time it is NOT in
+            # the live pending set anymore → drift vs the snapshot.
+            status="served",
+            source="desk",
+        )
+        db_session.add_all([payment, staying, served])
+        db_session.flush()
+        staying.visit_id = visit.id
+        db_session.flush()
+
+        with pytest.raises(ForceMajeureApiDomainError) as exc_info:
+            ForceMajeureApiService(db_session).cancel_queue_with_refund(
+                request=SimpleNamespace(
+                    specialist_id=test_doctor.id,
+                    target_date=today,
+                    daily_queue_id=queue.id,
+                    entry_ids=None,
+                    expected_entry_ids=[staying.id, served.id],
+                    reason="doctor emergency",
+                    refund_type="deposit",
+                    send_notifications=False,
+                ),
+                current_user_id=1,
+            )
+
+        assert exc_info.value.status_code == 409
+        assert "добавилось: 0" in exc_info.value.detail
+
+        # Refusal is total: the remaining entry is intact and no money moved.
+        db_session.refresh(staying)
+        assert staying.status == "waiting"
+        assert (
+            db_session.query(PatientDeposit)
+            .filter(PatientDeposit.patient_id == test_patient.id)
+            .count()
+            == 0
+        )
+        assert (
+            db_session.query(DepositTransaction)
+            .filter(DepositTransaction.payment_id == payment.id)
+            .count()
+            == 0
+        )
+
+    def test_bound_mutation_takes_queue_row_lock(self):
+        """Characterization pin (the repo's established source-assertion
+        idiom): the bound path locks the queue row FOR UPDATE before the
+        entry set is read, and re-reads past the identity map. The lock
+        lives in the repository (session-calls boundary for services)."""
+        import inspect
+
+        from app.repositories.force_majeure_api_repository import (
+            ForceMajeureApiRepository,
+        )
+
+        repository_source = inspect.getsource(
+            ForceMajeureApiRepository.get_daily_queue_for_update
+        )
+        assert "with_for_update" in repository_source
+        assert "populate_existing" in repository_source
+
+        service_source = inspect.getsource(
+            ForceMajeureApiService._validated_daily_queue
+        )
+        assert "get_daily_queue_for_update" in service_source
+
+        bound_source = inspect.getsource(
+            ForceMajeureApiService._bound_pending_entries
+        )
+        assert "409" in bound_source
+
+    def test_cancel_skips_entry_processed_after_selection(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """Domain re-check: an entry whose status was changed by a
+        concurrent writer after selection is skipped, not cancelled and
+        not refunded a second time."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        queue = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="doctor_skip_queue",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Already Processed",
+            status="served",
+            source="desk",
+        )
+        db_session.add(entry)
+        db_session.commit()
+
+        result = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entry],
+            reason="Doctor emergency",
+            refund_type=RefundType.DEPOSIT,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+
+        assert result["cancelled"] == 0
+        assert result["skipped"] == 1
+        assert result["failed"] == 0
+        db_session.refresh(entry)
+        assert entry.status == "served"
+        assert (
+            db_session.query(PatientDeposit)
+            .filter(PatientDeposit.patient_id == test_patient.id)
+            .count()
+            == 0
+        )
+
+    def test_transfer_skips_entry_processed_after_selection(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        queue = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="doctor_skip_transfer_queue",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Already Cancelled",
+            status="cancelled",
+            source="desk",
+        )
+        db_session.add(entry)
+        db_session.commit()
+
+        result = ForceMajeureService(db_session).transfer_entries_to_tomorrow(
+            entries=[entry],
+            specialist_id=test_doctor.id,
+            reason="Doctor emergency",
+            performed_by_id=1,
+            send_notifications=False,
+        )
+
+        assert result["transferred"] == 0
+        assert result["skipped"] == 1
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .count()
+            == 0
+        )
+
+    def test_deposit_refund_is_idempotent_per_payment(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """A previous force-majeure leg already credited this payment to
+        the deposit: a replay does not create a second credit row and
+        does not change the balance."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        queue = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="doctor_idem_queue",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=today,
+            visit_time="14:00",
+            status="open",
+            discount_mode="none",
+            department="cardiology",
+            created_at=datetime.now(UTC),
+        )
+        db_session.add(visit)
+        db_session.flush()
+        payment = Payment(
+            visit_id=visit.id,
+            amount=Decimal("200.00"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            visit_id=visit.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Idempotent Patient",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add_all([payment, entry])
+        db_session.flush()
+
+        # The PREVIOUS force-majeure leg: credit already exists.
+        deposit = PatientDeposit(
+            patient_id=test_patient.id, balance=Decimal("200.00")
+        )
+        db_session.add(deposit)
+        db_session.flush()
+        previous_credit = DepositTransaction(
+            deposit_id=deposit.id,
+            transaction_type="credit",
+            amount=Decimal("200.00"),
+            balance_after=Decimal("200.00"),
+            description="Возврат (форс-мажор): earlier leg",
+            payment_id=payment.id,
+        )
+        db_session.add(previous_credit)
+        db_session.commit()
+
+        result = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entry],
+            reason="Doctor emergency replay",
+            refund_type=RefundType.DEPOSIT,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+
+        assert result["cancelled"] == 1
+        refund_info = result["details"][0]["refund_info"]
+        assert refund_info["already_refunded"] is True
+
+        db_session.refresh(deposit)
+        assert deposit.balance == Decimal("200.00")
+        assert (
+            db_session.query(DepositTransaction)
+            .filter(DepositTransaction.payment_id == payment.id)
+            .count()
+            == 1
+        )
+
+    def test_refund_request_is_idempotent_per_payment(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """bank_transfer leg: an existing automatic request for the same
+        payment is returned instead of a duplicate."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        from app.models.refund_deposit import RefundRequest
+
+        today = date.today()
+        queue = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="doctor_idem_request_queue",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=today,
+            visit_time="14:00",
+            status="open",
+            discount_mode="none",
+            department="cardiology",
+            created_at=datetime.now(UTC),
+        )
+        db_session.add(visit)
+        db_session.flush()
+        payment = Payment(
+            visit_id=visit.id,
+            amount=Decimal("300.00"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            visit_id=visit.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Idempotent Request Patient",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add_all([payment, entry])
+        db_session.flush()
+
+        existing_request = RefundRequest(
+            patient_id=test_patient.id,
+            payment_id=payment.id,
+            original_amount=Decimal("300.00"),
+            refund_amount=Decimal("300.00"),
+            commission_amount=Decimal("0"),
+            refund_type="bank_transfer",
+            status="pending",
+            reason="earlier leg",
+            is_automatic=True,
+        )
+        db_session.add(existing_request)
+        db_session.commit()
+
+        result = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entry],
+            reason="Doctor emergency replay",
+            refund_type=RefundType.BANK_TRANSFER,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+
+        assert result["cancelled"] == 1
+        refund_info = result["details"][0]["refund_info"]
+        assert refund_info["already_refunded"] is True
+        assert refund_info["request_id"] == existing_request.id
+
+        assert (
+            db_session.query(RefundRequest)
+            .filter(RefundRequest.payment_id == payment.id)
+            .count()
+            == 1
+        )
+
+    def test_deposit_credit_partial_unique_rejects_duplicate(
+        self, db_session, test_doctor, test_patient
+    ):
+        """Model-level backstop: two credit rows for the same payment are
+        impossible regardless of what any code path does (0087 index)."""
+        from sqlalchemy.exc import IntegrityError
+
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="14:00",
+            status="open",
+            discount_mode="none",
+            department="cardiology",
+            created_at=datetime.now(UTC),
+        )
+        db_session.add(visit)
+        db_session.flush()
+        payment = Payment(
+            visit_id=visit.id,
+            amount=Decimal("120.00"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        deposit = PatientDeposit(
+            patient_id=test_patient.id, balance=Decimal("0")
+        )
+        db_session.add_all([payment, deposit])
+        db_session.flush()
+
+        first = DepositTransaction(
+            deposit_id=deposit.id,
+            transaction_type="credit",
+            amount=Decimal("120.00"),
+            balance_after=Decimal("120.00"),
+            description="first refund leg",
+            payment_id=payment.id,
+        )
+        db_session.add(first)
+        db_session.flush()
+
+        duplicate = DepositTransaction(
+            deposit_id=deposit.id,
+            transaction_type="credit",
+            amount=Decimal("120.00"),
+            balance_after=Decimal("240.00"),
+            description="double refund leg",
+            payment_id=payment.id,
+        )
+        db_session.add(duplicate)
+        with pytest.raises(IntegrityError):
+            db_session.flush()
+        db_session.rollback()
+
+    def test_refund_request_auto_partial_unique_rejects_duplicate(
+        self, db_session, test_doctor, test_patient
+    ):
+        """Automatic (force majeure) refund requests are unique per
+        payment; the manual cashier leg stays unconstrained."""
+        from sqlalchemy.exc import IntegrityError
+
+        from app.models.refund_deposit import RefundRequest
+
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="14:00",
+            status="open",
+            discount_mode="none",
+            department="cardiology",
+            created_at=datetime.now(UTC),
+        )
+        db_session.add(visit)
+        db_session.flush()
+        payment = Payment(
+            visit_id=visit.id,
+            amount=Decimal("90.00"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        db_session.add(payment)
+        db_session.flush()
+
+        automatic = RefundRequest(
+            patient_id=test_patient.id,
+            payment_id=payment.id,
+            original_amount=Decimal("90.00"),
+            refund_amount=Decimal("90.00"),
+            commission_amount=Decimal("0"),
+            refund_type="bank_transfer",
+            status="pending",
+            reason="automatic leg",
+            is_automatic=True,
+        )
+        manual = RefundRequest(
+            patient_id=test_patient.id,
+            payment_id=payment.id,
+            original_amount=Decimal("90.00"),
+            refund_amount=Decimal("90.00"),
+            commission_amount=Decimal("0"),
+            refund_type="cash",
+            status="pending",
+            reason="manual cashier leg",
+            is_automatic=False,
+        )
+        db_session.add_all([automatic, manual])
+        db_session.flush()  # manual + automatic coexist legally
+
+        duplicate_automatic = RefundRequest(
+            patient_id=test_patient.id,
+            payment_id=payment.id,
+            original_amount=Decimal("90.00"),
+            refund_amount=Decimal("90.00"),
+            commission_amount=Decimal("0"),
+            refund_type="bank_transfer",
+            status="pending",
+            reason="double automatic leg",
+            is_automatic=True,
+        )
+        db_session.add(duplicate_automatic)
+        with pytest.raises(IntegrityError):
+            db_session.flush()
+        db_session.rollback()

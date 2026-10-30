@@ -10,7 +10,17 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -54,6 +64,25 @@ class RefundRequest(Base):
     и хочет вернуть деньги.
     """
     __tablename__ = "refund_requests"
+
+    # 3808 review round 3 (P1 double refund, PR #3809): the DB-level
+    # backstop for the concurrent cancel-with-refund race — one
+    # AUTOMATIC (force majeure) refund request per payment. Partial
+    # predicate on is_automatic only: manual cashier requests
+    # (is_automatic=False) may legitimately repeat for the same payment
+    # (partial refunds) and stay unconstrained. The predicate is
+    # mirrored dialect-by-dialect (postgresql_where AND sqlite_where)
+    # so the test dialect enforces the same partial contract — the
+    # daily_queues active-uniqueness precedent.
+    __table_args__ = (
+        Index(
+            "uq_refund_requests_auto_payment",
+            "payment_id",
+            unique=True,
+            postgresql_where=text("is_automatic"),
+            sqlite_where=text("is_automatic"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
@@ -211,6 +240,26 @@ class DepositTransaction(Base):
     Транзакции депозита (пополнения и списания)
     """
     __tablename__ = "deposit_transactions"
+
+    # 3808 review round 3 (P1 double refund, PR #3809): a paid payment
+    # may be credited to a patient deposit at most ONCE. Only the
+    # force-majeure flow writes credit rows with payment_id set (manual
+    # top-ups leave it NULL, deposit payments are debit rows), so the
+    # partial predicate pins exactly the force-majeure refund leg and
+    # never the manual deposit surfaces.
+    __table_args__ = (
+        Index(
+            "uq_deposit_transactions_credit_payment",
+            "payment_id",
+            unique=True,
+            postgresql_where=text(
+                "transaction_type = 'credit' AND payment_id IS NOT NULL"
+            ),
+            sqlite_where=text(
+                "transaction_type = 'credit' AND payment_id IS NOT NULL"
+            ),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 

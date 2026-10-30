@@ -9159,6 +9159,7 @@ const uzLatn = {
     fm_preview_failed: 'Navbatni oldindan ko\'rishni yuklashda xatolik. Amal mavjud emas.',
     fm_preview_required: 'Bajarishdan oldin navbatning muvaffaqiyatli oldindan ko\'rilishini kutib turing',
     fm_no_entries: 'Amal uchun yozuvlar yo\'q',
+    fm_queue_changed: 'Navbat tarkibi oldindan ko\'rilgandan keyin o\'zgardi. Oldindan ko\'rishni yangilang va yangi tarkibni tasdiqlang.',
     fm_transfer_success: 'Ko\'chirilgan yozuvlar: {count}',
     fm_network_error: 'Tarmoq xatosi',
     fm_cancel_success: 'Bekor qilingan yozuvlar: {cancelled}, qaytarilmalar: {refunds}',
