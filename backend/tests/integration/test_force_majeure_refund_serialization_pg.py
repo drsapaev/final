@@ -89,7 +89,16 @@ def db_engine():
 
     Base.metadata.create_all(engine)
     yield engine
-    Base.metadata.drop_all(engine)
+    # The job's postgres schema is ALEMBIC-provisioned (the full app
+    # schema), while this module's metadata imports only the subset it
+    # needs — a plain drop_all would hit dependent-object errors (invoices
+    # / package_purchases live in app/models/billing.py and friends, which
+    # reference `visits`). Reset the whole disposable schema instead.
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        conn.execute(text("DROP SCHEMA public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
     engine.dispose()
 
 
@@ -201,6 +210,10 @@ def _cancel_request(specialist_id, queue_id, snapshot, *, refund_type):
 
 def _run_cancel(session_factory, *, specialist_id, queue_id, snapshot, refund_type,
                 outcomes, tag, barrier=None, done=None):
+    # performed_by is NULL by design (DepositTransaction.performed_by is a
+    # nullable audit axis): the synthetic world has no users row, and on
+    # PostgreSQL (unlike the SQLite unit dialect) the FK to users.id is
+    # enforced — a bogus performed_by_id would abort the whole mutation.
     session = session_factory()
     try:
         service = ForceMajeureApiService(session)
@@ -211,7 +224,7 @@ def _run_cancel(session_factory, *, specialist_id, queue_id, snapshot, refund_ty
                 request=_cancel_request(
                     specialist_id, queue_id, snapshot, refund_type=refund_type
                 ),
-                current_user_id=1,
+                current_user_id=None,
             )
             outcomes[tag] = ("ok", result)
         except ForceMajeureApiDomainError as exc:
