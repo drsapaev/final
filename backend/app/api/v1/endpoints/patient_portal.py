@@ -122,9 +122,6 @@ from app.services.appointment_duration_snapshot import (
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.patient_access_audit import log_patient_access
-from app.services.public_booking_request_notification_outbox import (
-    PublicBookingRequestNotificationOutboxService,
-)
 from app.services.public_booking_request_service import (
     PublicBookingRequestError,
     PublicBookingRequestService,
@@ -1139,7 +1136,7 @@ def _execute_public_booking_request_mutation(
     action: str,
     operation: Callable[[int], PublicBookingRequestOut],
 ) -> PublicBookingRequestOut:
-    """Run request persistence, audit, and outbox attempt in one worker thread."""
+    """Run request persistence and audit in one worker thread."""
     patient_id = _require_patient_audited(
         db,
         request,
@@ -1169,10 +1166,6 @@ def _execute_public_booking_request_mutation(
         action=action,
         outcome="success",
         request=request,
-    )
-    PublicBookingRequestNotificationOutboxService(db).dispatch_request_now(
-        request_id=result.id,
-        request_version=result.version,
     )
     return result
 

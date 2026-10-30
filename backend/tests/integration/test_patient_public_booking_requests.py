@@ -213,12 +213,6 @@ async def test_booking_request_database_work_does_not_block_event_loop(
         PublicBookingRequestService, "resubmit_for_patient", blocking_write
     )
 
-    monkeypatch.setattr(
-        patient_portal.PublicBookingRequestNotificationOutboxService,
-        "dispatch_request_now",
-        lambda *args, **kwargs: {"claimed": 0, "delivered": 0, "deferred": 0},
-    )
-
     path = (
         f"{PATIENT_REQUESTS}/{request_id}/resubmit"
         if operation == "resubmit"
@@ -293,7 +287,8 @@ async def test_booking_request_database_work_does_not_block_event_loop(
 
 
 @pytest.mark.integration
-def test_patient_submission_is_idempotent_and_never_creates_appointment(
+@pytest.mark.asyncio
+async def test_patient_submission_is_idempotent_and_never_creates_appointment(
     client: TestClient, db_session: Session, public_booking_case, registrar_user
 ):
     case = public_booking_case
@@ -325,9 +320,20 @@ def test_patient_submission_is_idempotent_and_never_creates_appointment(
     )
     assert outbox_item.event_type == "public_booking_request_submitted"
     assert outbox_item.request_version == 1
+    assert outbox_item.attempt_count == 0
+    assert outbox_item.completed_at is None
+    assert db_session.query(Appointment).count() == 0
+    assert db_session.query(NotificationEvent).count() == 0
+
+    # Delivery is decoupled from the patient's response and handled by the
+    # scheduled outbox worker.
+    delivery_result = await PublicBookingRequestNotificationOutboxService(
+        db_session
+    ).process_due_batch()
+    assert delivery_result == {"claimed": 1, "delivered": 1, "deferred": 0}
+    db_session.refresh(outbox_item)
     assert outbox_item.attempt_count == 1
     assert outbox_item.completed_at is not None
-    assert db_session.query(Appointment).count() == 0
     notification = (
         db_session.query(NotificationEvent)
         .filter(
@@ -446,8 +452,17 @@ async def test_booking_notification_outbox_retries_without_duplicate_delivery(
         .filter(PublicBookingRequestNotificationOutbox.request_id == request_id)
         .one()
     )
-    assert outbox_item.attempt_count == 1
+    assert outbox_item.attempt_count == 0
     assert outbox_item.completed_at is None
+    assert outbox_item.last_error_code is None
+    assert attempts == 0
+
+    first_result = await PublicBookingRequestNotificationOutboxService(
+        db_session
+    ).process_due_batch()
+    assert first_result == {"claimed": 1, "delivered": 0, "deferred": 1}
+    db_session.refresh(outbox_item)
+    assert outbox_item.attempt_count == 1
     assert outbox_item.last_error_code == "delivery_not_recorded"
     assert (
         db_session.query(NotificationEvent)
@@ -534,6 +549,14 @@ async def test_booking_notification_outbox_recovers_after_inbox_commit_before_ac
         .filter(PublicBookingRequestNotificationOutbox.request_id == request_id)
         .one()
     )
+    assert outbox_item.attempt_count == 0
+    assert outbox_item.completed_at is None
+    assert db_session.query(NotificationEvent).count() == 0
+    first_result = await PublicBookingRequestNotificationOutboxService(
+        db_session
+    ).process_due_batch()
+    assert first_result == {"claimed": 1, "delivered": 0, "deferred": 1}
+    db_session.refresh(outbox_item)
     assert outbox_item.attempt_count == 1
     assert outbox_item.completed_at is None
     assert outbox_item.lease_expires_at is not None
@@ -625,7 +648,8 @@ def test_patient_request_creation_is_limited_per_patient(
 
 
 @pytest.mark.integration
-def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
+@pytest.mark.asyncio
+async def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
     client: TestClient, db_session: Session, public_booking_case, registrar_user
 ):
     case = public_booking_case
@@ -740,6 +764,10 @@ def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
     ]
     assert db_session.query(PublicBookingRequest).count() == 2
     assert db_session.query(Appointment).count() == 1
+    notification_result = await PublicBookingRequestNotificationOutboxService(
+        db_session
+    ).process_due_batch()
+    assert notification_result == {"claimed": 3, "delivered": 3, "deferred": 0}
     request_notifications = (
         db_session.query(NotificationEvent)
         .filter(NotificationEvent.entity_id == request_id)

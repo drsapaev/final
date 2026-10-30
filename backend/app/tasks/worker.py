@@ -761,8 +761,10 @@ async def run_data_retention(ctx) -> None:
         db.close()
 
 
-async def run_public_booking_request_notification_outbox(ctx) -> None:
-    """Retry due internal Registrar inbox notifications from the DB outbox."""
+def _process_public_booking_request_notification_outbox_batch(
+    database_url: str,
+) -> dict[str, int]:
+    """Own the synchronous database session inside its worker thread."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
 
@@ -770,12 +772,23 @@ async def run_public_booking_request_notification_outbox(ctx) -> None:
         PublicBookingRequestNotificationOutboxService,
     )
 
-    engine = create_engine(str(settings.DATABASE_URL))
-    db = Session(engine)
+    engine = create_engine(database_url)
     try:
-        result = await PublicBookingRequestNotificationOutboxService(
-            db
-        ).process_due_batch()
+        with Session(engine) as db:
+            return asyncio.run(
+                PublicBookingRequestNotificationOutboxService(db).process_due_batch()
+            )
+    finally:
+        engine.dispose()
+
+
+async def run_public_booking_request_notification_outbox(ctx) -> None:
+    """Retry due inbox notifications without blocking the ARQ event loop."""
+    try:
+        result = await asyncio.to_thread(
+            _process_public_booking_request_notification_outbox_batch,
+            str(settings.DATABASE_URL),
+        )
         logger.info(
             "job.public_booking_notification_outbox complete claimed=%d "
             "delivered=%d deferred=%d",
@@ -784,14 +797,10 @@ async def run_public_booking_request_notification_outbox(ctx) -> None:
             result["deferred"],
         )
     except Exception as exc:
-        db.rollback()
         logger.warning(
             "job.public_booking_notification_outbox failed error_type=%s",
             type(exc).__name__,
         )
-    finally:
-        db.close()
-        engine.dispose()
 
 
 async def generate_scheduled_report(

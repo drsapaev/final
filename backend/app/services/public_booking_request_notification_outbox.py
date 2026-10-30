@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -103,31 +102,6 @@ class PublicBookingRequestNotificationOutboxService:
                 result["deferred"] += 1
 
         return result
-
-    def dispatch_request_now(
-        self, *, request_id: UUID, request_version: int
-    ) -> dict[str, int]:
-        """Attempt immediate delivery from a FastAPI worker thread.
-
-        The request transaction has already committed its outbox row. Any
-        infrastructure failure leaves that row available to the ARQ sweep
-        and never changes the successful patient response.
-        """
-        try:
-            return asyncio.run(
-                self.process_due_batch(
-                    limit=1,
-                    request_id=request_id,
-                    request_version=request_version,
-                )
-            )
-        except Exception as exc:
-            self.db.rollback()
-            logger.warning(
-                "public booking notification immediate attempt deferred",
-                extra={"error_type": type(exc).__name__},
-            )
-            return {"claimed": 0, "delivered": 0, "deferred": 1}
 
     def _claim_due(
         self,
