@@ -5262,3 +5262,18 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: all-static-file provenance remains NOT_RUN; prior evidence proves only a served `sw.js` marker/hash. Full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete. Tier-2 remains PARTIAL as directed; no deferral is claimed.
 - Next: preserve this failure as harness evidence, update the existing PR #3805 journals/body and verify exact-head CI. Do not start another image build until the `container_read` failure is explained; do not mark T18 complete.
 - Local cleanup limitation: after confirming teardown, removal of the exact task-owned ignored env and harness files was rejected by the host command policy. No alternate deletion method was used; see `prework.md` for the exact generated paths.
+
+## T18 static frontend provenance diagnostic r2 — 2026-10-30T20:29:31+05:00
+
+- Commit under test: PR #3805 HEAD 86775c95cf009028af06d5f462e6075f065f7923; base/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. GitHub still reported PR #3805 OPEN after this run.
+- Execution mode: bounded validation-only continuation under the previously authorized T18 narrow_override. Gate result: narrow_override; gate_misroute=false; override_used=true; handoff prompt read. No application, tracked test, staging config, production, merge, or deployment change.
+- Environment: synthetic owned project clinic-aqs-t18-static-assets-r2-20261030; owner codex-t18-static-provenance-r2; ports 18892/18893/15538; ephemeral lease expiry was 2026-10-30T19:13:40Z.
+- Canonical Preflight attempt 1: FAIL before build with PUBLIC_HOST_INVALID. The launcher contract requires STAGING_PUBLIC_HOST to be exactly 127.0.0.1 or localhost without a port. Only the task-private env was corrected.
+- Canonical Preflight attempt 2: PASS; host C free 18 GiB, WSL backing D free 28 GiB, WSL available 3234 MiB, ports free, no warnings, runtime readiness NOT_RUN.
+- Canonical Start/build: PASS; storage reserve 10 GiB, frontend/backend/worker images built, readiness PASS, no warnings; WSL available 3206 MiB. The launcher still reported served_revision_verified=false pending byte comparison.
+- Harness prechecks: PowerShell syntax parse PASS for both r2 scripts. A host-WSL sh -n check of the manifest command and a sed path smoke check passed; these do not prove the same command works in the frontend container.
+- Canonical Session: FAIL; STATIC_FRONTEND_EXEC_PRECHECK=PASS. The subsequent frontend manifest docker compose exec returned exit 2, safe classification unknown. The Session child exited 11; no complete manifest was produced and no HTTP asset comparison ran.
+- Teardown: canonical Session reported STAGING_TEARDOWN=PASS. Canonical Stop also PASS. Independent label-filtered inventory: 0 owned containers, 0 volumes, 0 networks; Windows listeners on ports 18892, 18893, and 15538 were 0. The new private env file was removed after teardown.
+- Result: all-static-file served provenance is NOT_RUN. No product defect is inferred. Earlier writer/parser format mismatch was corrected in the generated harness, but the new container manifest command exit 2 remains unexplained. Tier-2 remains PARTIAL with no deferral; full T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete.
+- Scope check: only task-owned ignored harness/env plus the three T18 journals; runtime, tracked tests, application config, production, foreign Compose projects, and shared Docker cache were untouched. No browser scenarios were repeated.
+- Next exact action: preserve this diagnostic on PR #3805, update its body, and verify exact-head CI. After the user-owned merge, continue T18 in a fresh worktree by diagnosing the container-only manifest exit 2 with safe error-class/line-count reporting before any further image build.

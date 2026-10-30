@@ -2033,3 +2033,11 @@ Last updated: 2026-10-29T15:42:19+05:00
 - Current files changed for this attempt: T18 journals only. Runtime/tests/config untouched. The task-owned env and one harness were used for one unique isolated project.
 - Next exact action: finish the journal-only update, push it on existing PR #3805, refresh its description with the honest NOT_RUN result, and verify exact-head CI. Wait for the user-owned merge before beginning another PR cycle. Do not rebuild staging until `container_read` is diagnosed.
 - Local cleanup: host command policy rejected removal of the exact ignored env/harness files after teardown; no workaround used. No Compose resources remain.
+
+## Current checkpoint — T18 provenance manifest diagnostic — 2026-10-30T20:29:31+05:00
+
+- Worktree: codex/t18-queue-row-diagnostics at 86775c95cf009028af06d5f462e6075f065f7923 before this journal commit; origin/main and PR base 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. GitHub confirms PR #3805 remains OPEN.
+- T18 evidence already available: Registrar queue E2E 6/6, Admin navigation 3/3, Admin panel checks 2/2, and direction lifecycle 8/8 on their recorded synthetic source revisions.
+- New r2 static provenance cycle: Preflight retry PASS; Start/build/readiness PASS; frontend exec precheck PASS; manifest exec exit 2/class unknown; HTTP comparisons NOT_RUN; canonical teardown and Stop PASS; owned resources and listeners 0. Private env removed.
+- No app defect inferred. All-file provenance remains NOT_RUN; full T18 and the complete STAGING_VALIDATION.md remain incomplete. Tier-2 is PARTIAL; no deferral is claimed.
+- Next exact action: commit and push this journal-only update to existing PR #3805, refresh its body with the failed diagnostic and current limitation, then verify exact-head CI. After user-owned merge, use a new worktree and continue with a bounded diagnostic of the container-only manifest command before any new image build.
