@@ -5096,3 +5096,29 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Normal commit hooks: first attempt stopped on journal formatting after PowerShell expanded Markdown backticks; no hook was bypassed. Journal tail is being corrected before retry.
 - Result: source P2 corrected; commit created locally and normal hooks passed; push and exact-head CI pending. No GitHub review reply/resolution, merge, or deployment.
 - Next exact action: push the current branch and verify exact-head CI. Keep review threads unresolved and merge user-controlled.
+
+## T18 — PR #3801 merged; final bounded queue diagnostic — 2026-10-30T08:28+05:00
+
+- Commit under test: exact merged `origin/main` `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; PR #3801 merged.
+- Environment: isolated Windows worktree + synthetic `Ubuntu-24.04` Compose project `clinic-aqs-t18-queuefp-r8-20261030`; no production or foreign project access.
+- Execution mode: continuation of approved validation-only `narrow_override`; no tracked application/test change. Gate/router unchanged.
+- Scope: task harness under `.scratch/t18-final-acceptance-20261030/` and `output/staging/t18-final-acceptance-20261030/`; T18 journals only. Runtime, tracked E2E, database schema, production, merge, and deployment denied.
+- Prior r7 result: synthetic seed PASS; Registrar login HTTP 200; `queue-system.spec.ts` 2 PASS / 1 FAIL / 3 NOT_RUN (serial stop). The failing assertion was API-versus-rendered row signature equality; exact mismatch category remains unknown. Admin password login, first-time 2FA setup/verify, and Admin routes 4/4 PASS.
+- r8 result: seed and Registrar login PASS; generic fingerprint-harness failure; Session and owned teardown PASS. The fetched `sw.js` marker and checksum independently established exact commit provenance.
+- r9 result: harness syntax PASS; canonical Preflight PASS (C: 17 GiB, VHD backing: 28 GiB, WSL available memory about 3.1 GiB). `Start -NoBuild` failed because prior canonical teardown uses `compose --rmi local`; owned teardown PASS. Normal Start/build PASS; Session PASS; synthetic seed PASS; Registrar login HTTP 200.
+- Artifact provenance: served `sw.js` contains exact SHA marker `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; artifact byte count 15,933; SHA-256 `5a37c48cf59756b5172affd9326af9e149c3ce1ee17606481515a83073f6a5c1`. This Session's .NET checksum helper reported PASS; launcher metadata field `served_revision_verified` remains false and is not represented as launcher attestation.
+- Queue fingerprint: NOT_RUN to comparison result; safe failure code `DOCTOR_CANDIDATE:TimeoutError`. Queue suite in r9: NOT_RUN, because the diagnostic prerequisite failed. No claim that application behavior failed in r9.
+- Teardown: Session PASS; removed 5 containers, 3 volumes, 1 network; zero remaining owned containers/volumes/networks. No foreign resources touched.
+- Tier-2: PARTIAL; no deferral/waiver. Full `STAGING_VALIDATION.md` remains incomplete. Stop condition reached: do not rebuild unchanged harness/code until a narrow correction is selected from local source/evidence.
+- Next exact action: read-only analysis of the existing r7 queue-row failure and production queue selection/render code; decide whether a narrowly corrected assertion is supported. No additional staging cycle on unchanged source.
+## T18 — privacy-safe queue row comparison diagnostics — 2026-10-30T08:41:59+05:00
+
+- Commit under test: source commit 2a030c2f4e30ee9b3d44f490b775eb83b8dc437d, based on exact origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
+- Environment: Windows task worktree with existing frontend dependencies; no Compose project started before this entry.
+- Execution mode: gate_known_root_cause; confirmed file frontend/e2e/queue-system.spec.ts; gate_misroute=false, override_used=true, handoff_required=true; generated execution prompt read.
+- Allowed/actual scope: E2E spec plus the three plan journals. No runtime, backend/API/DB/auth, staging configuration, production, C:/final, or foreign resource changes.
+- Change: strict row count/order/number/patient-label/source equality retained. The poll now returns only safe aggregates: expected/actual row count and mismatch counts per field; no patient values are reported.
+- Original failure: r7 had 2 PASS / 1 FAIL / 3 NOT_RUN; its assertion reported only boolean API-vs-rendered row signature inequality, so mismatch category was unknown.
+- Validation: scoped ESLint PASS; tsc --noEmit -p e2e/tsconfig.json PASS; Playwright --list PASS (6 collected, 0 executed); npm run build PASS (1m 2s, existing dependency annotation/CSS warnings); CRLF-aware git diff --check PASS; normal source commit hooks PASS.
+- Result: local source validation PASS. Six named queue E2E tests, exact-head CI and synthetic staging are NOT_RUN at this checkpoint.
+- Remaining: push, exact-head CI, then one canonical synthetic Preflight → Start → Session with focused queue tests, exact service-worker revision provenance, and owned teardown. Tier-2 remains PARTIAL; full STAGING_VALIDATION.md remains incomplete.

@@ -1,3 +1,17 @@
+## Latest continuation — queue row mismatch diagnostics committed locally — 2026-10-30T08:41:59+05:00
+
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-live-specs/final on branch codex/t18-queue-row-diagnostics. Base is exact origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768; source commit is 2a030c2f4e30ee9b3d44f490b775eb83b8dc437d. PR #3801 is merged.
+
+The source change preserves the strict API-vs-rendered comparison for row count and per-index queue number, patient label and source badge. The poll result now reports only expected/actual row counts and mismatch counts by field, without returning row contents. This should identify the r7 mismatch class without weakening the oracle or exposing patient data.
+
+Gate: gate_known_root_cause, known file frontend/e2e/queue-system.spec.ts, with the three T18 journals in scope. Result: narrow_override; gate_misroute=false; override_used=true; handoff_required=true; generated prompt read.
+
+Local validation PASS: scoped ESLint; E2E tsc; Playwright collection (6 collected, 0 executed); frontend build with existing dependency annotation/CSS warnings; CRLF-aware diff-check; normal source commit hooks. The six named queue tests remain NOT_RUN on this patch.
+
+Next: commit the journal checkpoint, push the source and journal commits, open one PR, and verify exact-head CI. Then run a single fresh synthetic staging cycle with the six queue tests, served-revision verification, and teardown of only the owned Compose project. Full STAGING_VALIDATION.md remains incomplete; Tier-2 remains PARTIAL without waiver. No production or foreign resources.
+
+---
+---
 ## Latest continuation — PR #3801 two follow-up P2 fixes pushed; CI passed — 2026-10-29T22:22+05:00
 
 Continue task `481fdb95-b9e6-48fd-b813-572932858920` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`, branch `codex/aqs-t18-queue-system-route-spec`. Source-bearing commit `2dcbc06db26ba6c26dd3b635f86abe8242fc31bc` is in PR #3801; base/current `origin/main` is `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`. Any journal-only follow-up does not change the source tested by that run.

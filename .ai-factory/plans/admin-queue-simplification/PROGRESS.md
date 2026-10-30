@@ -1,27 +1,19 @@
-## Current checkpoint — PR #3801 two follow-up P2 fixes pushed; exact source-head CI passed — 2026-10-29T22:22+05:00
+## Current checkpoint — T18 queue E2E diagnostics committed locally — 2026-10-30T08:41:59+05:00
 
 - Plan version: 1.0
-- Current task: T18 follow-up for review #5701479576 on PR #3801
-- Current status: source fix and validation complete; journal records source-head evidence; PR awaits review/user disposition
-- Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
-- Branch: `codex/aqs-t18-queue-system-route-spec`
-- Base commit: `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`
-- PR/source HEAD: `2dcbc06db26ba6c26dd3b635f86abe8242fc31bc`
-- Last updated: `2026-10-29T22:22+05:00`
-
-## Current checkpoint
-- Completed: both review P2s are addressed in `frontend/e2e/queue-system.spec.ts`; exact-head CI run `40917888683` completed successfully. PR is OPEN, Ready for review, and mergeable.
-- Changed but not verified: no outstanding source changes. The named `queue-system.spec.ts` was collected only (6 tests, 0 executed), so its runtime behavior is not verified.
-- Remaining: the named mutating spec is NOT_RUN and Tier-2 remains PARTIAL; the two latest review threads remain unresolved.
-- Blocker: no source blocker. Do not publish a thread reply or resolve a thread without explicit user instruction.
-- Next exact action: no source change is pending. User retains merge; if more work is requested, first check the latest PR HEAD and review state.
-- Checks to rerun after the next source change: scoped E2E lint/type-check, Playwright collection (not execution), build, diff-check and exact-head CI. Do not run the named mutating spec or staging.
-
-- Both P2s are corrected: doctor selection resolves to exactly one ID from the observed available-specialists API response, asserts that exact ID in the route, and waits for the queue snapshot; queue lookup accepts the same per-queue `specialist_id` / `routing_specialists` matches as `useQueueManager.pickQueueForDoctor`.
-- Local validation PASS: scoped ESLint, E2E TypeScript check, Playwright collection (6 collected / 0 executed), frontend build, CRLF-aware diff check, and normal commit hooks. Build showed existing third-party Rollup annotation and CSS-property warnings.
-- Unified CI `40917888683` PASS on the exact source commit `2dcbc06d`: Frontend unit, build, lint, configured E2E job, PR Required Gate, PR Review Quality Gate, Lifecycle, security, CodeQL, gitleaks and scratch guards succeeded. Backend, integration, Docker, readiness, k6, DAST, parity and other path-aware jobs were SKIPPED, not PASS.
-- Tier-2 remains PARTIAL; named live spec, staging and full `STAGING_VALIDATION.md` remain NOT_RUN. No deferral/waiver. No runtime/backend/API change, no merge or deployment; user retains merge.
-
+- Current task: T18 integrated synthetic acceptance; queue-system failure diagnosis
+- Current status: source commit 2a030c2f4e30ee9b3d44f490b775eb83b8dc437d created; local validation and commit hooks PASS; push, exact-head CI and synthetic staging remain pending; Tier-2 PARTIAL without waiver
+- Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-live-specs/final
+- Branch: codex/t18-queue-row-diagnostics
+- Base commit: 22b21a8b7c3c0b9b56f4e388c35e329a4321f768 (exact origin/main)
+- Source change: strict row count/order/number/patient-label/source comparison is preserved; assertion diagnostics expose only aggregate mismatch counts.
+- Local checks: scoped ESLint PASS; E2E TypeScript PASS; Playwright collection PASS (6 collected, 0 executed); frontend build PASS with existing dependency/CSS warnings; CRLF-aware diff-check PASS; source commit hooks PASS.
+- Changed but not verified: journal checkpoint is being recorded; exact-head CI and live queue-system execution have not run on this source commit.
+- Remaining: commit this journal checkpoint, push and open one PR; then run exact-head CI and one canonical synthetic Preflight → Start → Session for the six queue cases with served revision provenance and owned teardown.
+- Blocker: none for source scope. Staging is pending exact-head CI and fresh resource/port preflight.
+- Next exact action: finish the journal-only commit, push the branch, and verify CI on the exact PR HEAD.
+- Checks to rerun after any source change: scoped ESLint, E2E TypeScript, Playwright collection, git diff --check, and exact-head CI.
+---
 ## Previous checkpoint — PR #3801 review fixes pushed; source CI pass; evidence push pending — 2026-10-29T21:16+05:00
 
 - Plan version: 1.0
