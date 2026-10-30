@@ -42,6 +42,9 @@
 | REG-FE-014 | P2 | Context action acknowledgement | Context menu emits success for status changes even when the action returned null after failure | SOURCE-OBSERVED / REPRO-PENDING | Batch J: action feedback |
 | REG-FE-015 | P2 | Partial batch status mutations | A partial server-side success yields an error but no worklist refresh/reconciliation | SOURCE-OBSERVED / REPRO-PENDING | Batch J: action feedback |
 | REG-FE-016 | P3 | Cart visit forecast | Wizard banner counts distinct doctor IDs, while the payload groups by resource tag and appointment time too | SOURCE-OBSERVED / REPRO-PENDING | Batch K: cart summary |
+| REG-FE-017 | P2 | Cancellation dialog handoff | Null/partial cancellation response can still resolve callback and trigger success/close | SOURCE-OBSERVED / REPRO-PENDING | Batch L: cancellation result contract |
+| REG-FE-018 | P2 | Post-wizard reconciliation | Intended retry does not run for swallowed network/429/reference-data failures | SOURCE-OBSERVED / REPRO-PENDING | Batch M: post-save data lifecycle |
+| REG-FE-019 | P3 | Wizard success feedback | Wizard and panel both trigger react-toastify success notifications for the same save | SOURCE-OBSERVED / REPRO-PENDING | Batch N: toast ownership |
 
 ### REG-FE-001 — Row activation does not open details (P2 candidate)
 
@@ -242,6 +245,49 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 - **Edit delta:** [AppointmentWizardV2.tsx L2394–L2484](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2394-L2484) routes a non-empty edit-delta to `applyRegistrarEditDelta` and returns on success/failure; QR full-update has its own return guard. The old batch→cart fallback at [L2494–L2588](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2494-L2588) is still present but **reachability is unproved** for the current canonical edit pathway; do not promote it to a duplicate-booking P1 without a concrete reproduction.
 - **No source edits, no tests:** backend and frontend were inspected read-only. The exact effects of these candidates remain subject to focused regression tests.
 
+
+### REG-FE-017 — CancelDialog reports success on no-op or partial cancel (P2 candidate)
+
+**Code evidence:** [RegistrarDialogsLayer.tsx L144–L168](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/RegistrarDialogsLayer.tsx#L144-L168) forwards an `onCancel` callback to `CancelDialog`. Its `if (!result) return;` branch resolves the callback normally when `runRegistrarRecordAction` produces `null` after missing record references or action unavailability ([useRegistrarActions.ts L44–L64](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarActions.ts#L44-L64)). For a partial server batch `{success:false,success_count>0,failed_count>0}`, the same callback displays `notify.warning`, refreshes, and resolves. [CancelDialog.tsx L58–L83](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/dialogs/CancelDialog.tsx#L58-L83) treats **every normally resolved** `onCancel` as complete success, displays `toast.success` and calls `onClose()`.
+
+**Potential impact:** a registrar may receive a "record successfully canceled" toast although no record was canceled; partial cancellation may produce a contradictory warning followed by a blanket success toast and automatic close. The user may incorrectly trust the cancellation of outstanding entries. This adds a **dialog-level acknowledgement defect** distinct from REG-FE-015 (stale worklist after partial status changes).
+
+**Fail-first test:** mount `CancelDialog` with real-like `RegistrarDialogsLayer` callback and synthetic records. For `runRegistrarRecordAction→null`, assert *no success toast*, no close, and an explicit error; for `{success:false,success_count:1,failed_count:1}`, assert partial feedback with failed record detail and no blanket complete-success; for all-success, assert exactly one success and close. Cover backend action unavailability and mixed aggregate record refs.
+
+**Fix direction:** define typed outcomes (`all_success`, `partial_success`, `no_op`, `failed`) across the dialog/command boundary. Require explicit positive result before success/close; partial outcomes should be reconciled with backend and identified to the registrar. Avoid interpreting "resolved promise" as proof of committed cancellation.
+
+### REG-FE-018 — Post-wizard retry is bypassed by swallowed fetch failures (P2 candidate)
+
+**Code evidence:** [useRegistrarWizard.ts L154–L168](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarWizard.ts#L154-L168) calls `Promise.all([loadAppointmentsRef.current({silent:true}),loadIntegratedData()])` and retries the worklist once only if the promise **rejects**. However [useRegistrarWorklistData.ts L347–L395](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarWorklistData.ts#L347-L395) handles HTTP 429 and network/API errors internally, dispatching failure state or returning and **not throwing**. [useRegistrarData.ts L54–L92 and L138–L165](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarData.ts#L54-L165) uses `Promise.allSettled` and catches failed reference-data fetches internally, so the outer `Promise.all` generally resolves even on incomplete data. Non-silent `loadIntegratedData` also clears doctors/services/departments before fetching ([L57–L70](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarData.ts#L57-L70)).
+
+**Potential impact:** after successful creation/edit, the wizard closes and presents a payment/print handoff, but a failed refresh may leave stale worklist rows (or empty reference lists) without executing the documented retry. This is **not** evidence that the successful backend save rolled back; it is a screen-reconciliation contract failure. A later periodic/foreground refresh may eventually repair it.
+
+**Fail-first test:** mock a successfully saved wizard result, make the worklist request respond with 429 or reject, and independently fail one of the reference-data requests. Assert a distinguishable refresh outcome reaches the coordinator, a bounded retry/reconciliation policy actually runs when appropriate, and the user sees a stale-data indication rather than an incorrect claim of refreshed data. Keep committed save success separate from refresh failure. Verify that a 429 cooldown is respected rather than blindly hammering it.
+
+**Fix direction:** return an explicit `LoadOutcome`/failure enum from the fetch hooks (including partial metadata failure) and evaluate it in `handleWizardComplete`; retry only retryable failures and give truthful stale-state feedback. Do not throw from already committed command paths in a way that encourages users to resubmit a booking.
+
+### REG-FE-019 — Duplicate success toasts after wizard save (P3 candidate)
+
+**Code evidence:** [AppointmentWizardV2.tsx L2827–L2835](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2827-L2835) calls `toast.success` immediately before `onComplete?.(result)` in the cart-save path; other successful branches have the same pattern ([L2461–L2468](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2461-L2468)). Parent [useRegistrarWizard.ts L122–L144](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarWizard.ts#L122-L144) invokes `notify.success` again on the completion callback. [notify.ts L1–L22](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/services/notify.ts#L1-L22) delegates `notify.success` to the *same* `react-toastify.toast.success`.
+
+**Potential impact:** one successful registration/edit may create two success notifications for the same mutation, increasing noise and reducing clarity when payment/print opens. This is cosmetic/feedback ownership, not a duplicate backend write.
+
+**Fail-first test:** render the wizard and parent callback in a synthetic saved-result path and assert exactly one successful save notification and the intended next dialog; repeat for edit-delta and create-cart.
+
+**Fix direction:** choose one owner for the success toast (typically the orchestration layer) and eliminate duplicate acknowledgement without changing save completion, payment handoff or error semantics.
+
+### Focused review pass: Group 1 — patient registration orchestration (2026-10-30)
+
+**Primary files source-read at `main` SHA `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`:**
+
+- [RegistrarPanel.tsx](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/RegistrarPanel.tsx#L1-L498) — routing, callback composition, open/close entrypoints, worklist and dialog wiring.
+- [useRegistrarWizard.ts](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarWizard.ts#L1-L196) — reducer transitions, open/edit/create state, post-save refresh and payment/print handoff.
+- [RegistrarDialogsLayer.tsx](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/RegistrarDialogsLayer.tsx#L1-L315) — cancellation/payment/wizard dialog callbacks and local ErrorBoundary.
+
+**Cross-checked:** `CancelDialog.tsx`, `useRegistrarActions.ts`, `useRegistrarWorklistData.ts`, `useRegistrarData.ts`, `AppointmentWizardV2.tsx`, `ErrorBoundary.tsx`, `useRegistrarNavigation.ts`, `useRegistrarHotkeys.ts`, `notify.ts`, `useRegistrarDialogs.test.ts` and source contract tests.
+
+**Not re-filed as a new bug:** the wizard reducer deliberately preserves edit state on `SET_OPEN`; direct normal wizard `onClose` in `RegistrarDialogsLayer` resets mode and initialData, and the Ctrl+N/new-appointment explicit path resets them as well. `onEmptyStateCta` opens with `SET_OPEN` only, so a stale-edit concern **needs a realistic preceding close-without-reset reproduction**, not just a theoretical reducer state. Similarly, the local ErrorBoundary does implement an explicit retry handler. No P0/P1 was established in this source-only group.
+
 ## Review coverage
 
 ### Actually inspected in first pass (source reads; not an exhaustive audit)
@@ -278,15 +324,15 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 - `backend/app/api/v1/endpoints/registrar_integration/_helpers.py` and relevant `_today_queues.py` mapping (read-only contract evidence)
 - Focused source-contract / worklist test files were partially inspected to identify regression-test owners.
 
-### Outstanding review slices (partially audited where noted)
+### Agreed five-group registrar review order
 
-1. Registration and editing: `AppointmentWizardV2`, wizard state, save/error paths and patient lookup (initial save-path review complete; full route/test coverage pending).
-2. Queue read-model: `useRegistrarWorklistData`, `registrarQueueAdapter`, `QueueView`, queue profile navigation; read-only comparison with canonical backend DTOs and ADR-001.
-3. Record actions: fuller audit of `useRegistrarActions`, backend command status/identity/error handling, cancellation, call/complete/reschedule (initial front-end read completed).
-4. Display and usability: `WelcomeView`, table renderers, modal accessibility, loading/empty/error states.
-5. API/privacy/performance: registrar API adapter, outbound requests, auth boundaries, PHI-safe diagnostics, existing tests/e2e.
+Run **one bounded file group per review pass**; for each group, verify the current `main` SHA, inspect the named files and only their necessary callers/tests/backend contract, de-duplicate against existing IDs, and append source evidence + fail-first tests here. Do not implement app fixes in this audit PR.
 
-Any further findings receive the next stable ID (`REG-FE-017`, etc.), a source-SHA anchor, an impact scenario, a reproduction/test, and a status. If refuted, mark **NOT A BUG** with evidence rather than silently deleting the row.
+1. **Group 1 — patient registration — SOURCE REVIEW DONE (2026-10-30), reproductions pending:** `frontend/src/pages/RegistrarPanel.tsx`, `frontend/src/pages/registrar/useRegistrarWizard.ts`, `frontend/src/pages/registrar/views/RegistrarDialogsLayer.tsx`. Added REG-FE-017–019; earlier cross-cutting issues remain pending tests.
+2. **Group 2 — queues — systematic review pending:** `frontend/src/pages/registrar/useRegistrarWorklistData.ts`, `frontend/src/pages/registrar/registrarWorklistRows.ts`, `frontend/src/pages/registrar/registrarQueueAdapter.ts`. Previously sampled in wider audit, but this bounded review has not been completed.
+3. **Group 3 — registrar actions — systematic review pending:** `frontend/src/pages/registrar/useRegistrarRowActions.ts`, `frontend/src/pages/registrar/useRegistrarActions.ts`. Parts previously inspected for REG-FE-014/015/017; full bounded review still pending.
+4. **Group 4 — interface — systematic review pending:** `frontend/src/pages/registrar/views/WorklistView.tsx`, `frontend/src/pages/registrar/views/WelcomeView.tsx`, `frontend/src/pages/registrar/views/QueueView.tsx`. Partial earlier observations REG-FE-001/004/006/008; full bounded review pending.
+5. **Group 5 — API and integration — systematic review pending:** `frontend/src/api/registrar.ts`, relevant clients/mappers and frontend/backend contract tests. Verify route/version compatibility, typed errors, refresh guarantees and PHI-safe diagnostics.
 
 ## Remediation plan — execute only after review triage
 
@@ -303,9 +349,12 @@ Any further findings receive the next stable ID (`REG-FE-017`, etc.), a source-S
 11. **Batch I — PHI-safe diagnostics:** verify/fix REG-FE-013 with synthetic logging tests.
 12. **Batch J — registrar command feedback:** verify REG-FE-014/015 with failure and partial-success contract tests; mandatory gate applies if backend action semantics/queue lifecycle is changed.
 13. **Batch K — prospective visit count:** verify REG-FE-016 against the same pure grouping that constructs the cart payload.
-14. **Additional batches:** one bounded fix PR per validated domain/root cause; never introduce a speculative blanket refactor or mix unrelated source fixes into this ledger PR.
-15. **Validation:** relevant Vitest components/contracts, `tsc`/ESLint, affected Playwright flows with synthetic data, relevant queue contract tests, PR quality gates, `git diff --check`, and code review. Record **actual commands/results**; do not claim tests passed without execution.
-16. **Closure:** update each ledger row with root cause, test evidence, fix PR/commit SHA, review outcome, and resolution status. Keep this audit PR as the index; merge it only when repository review and CI policy permit. Do not deploy as part of this audit.
+14. **Batch L — cancellation acknowledgement:** verify REG-FE-017 with a real CancelDialog + handler-level mock and explicit partial/no-op result contract.
+15. **Batch M — post-save refresh:** verify REG-FE-018 with rejected/429/degraded integrated-data loads, keeping committed saves independent of refresh.
+16. **Batch N — toast ownership:** verify REG-FE-019 and preserve a single save confirmation.
+17. **Additional batches:** one bounded fix PR per validated domain/root cause; never introduce a speculative blanket refactor or mix unrelated source fixes into this ledger PR.
+18. **Validation:** relevant Vitest components/contracts, `tsc`/ESLint, affected Playwright flows with synthetic data, relevant queue contract tests, PR quality gates, `git diff --check`, and code review. Record **actual commands/results**; do not claim tests passed without execution.
+19. **Closure:** update each ledger row with root cause, test evidence, fix PR/commit SHA, review outcome, and resolution status. Keep this audit PR as the index; merge it only when repository review and CI policy permit. Do not deploy as part of this audit.
 
 ## Change log
 
@@ -315,6 +364,7 @@ Any further findings receive the next stable ID (`REG-FE-017`, etc.), a source-S
 | 2026-10-29 | Review pass 2 | REG-FE-004–009: quick filters, URL date, Welcome confirmation, 429 handling, refresh notification, reschedule identity | Frontend hooks/views, backend read-model helpers and existing tests inspected; runtime tests not executed |
 | 2026-10-30 | Review pass 3 | REG-FE-010–013: existing patient edits, partial profile/queue save, stale wizard catalogue, development PII logging | Wizard UI/handlers, API mappers, privacy logger, wizard tests inspected; no runtime tests executed; new main source SHA `22b21a8b7c3c0b9b56f4e388c35e329a4321f768` |
 | 2026-10-30 | Review pass 4 | REG-FE-014–016: context-action false success, partial batch reconcile, cart visit-count display; pinned doctor/route guard inspected | Backend per-record command path and relevant frontend hooks/tests inspected; no runtime tests executed |
+| 2026-10-30 | Five-group protocol / Group 1 | REG-FE-017–019: cancellation acknowledgement, post-wizard retry, duplicate toasts. Ordered remaining Groups 2–5 per user request | Named three files and necessary callers/tests inspected at main SHA `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; no runtime tests |
 
 ## End-of-review acceptance criteria
 
