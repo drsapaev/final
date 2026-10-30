@@ -1,22 +1,23 @@
-## Current checkpoint — PR #3805 state reconciled; T18 remains partial — 2026-10-30T21:56+05:00
+## Current checkpoint — T18 Admin setup context live scenario passed — 2026-10-30T22:33+05:00
 
 - Plan version: 1.0.
 - Current task: T18 integrated synthetic acceptance; existing PR #3805.
-- Current status: IN_PROGRESS. PR #3801 is confirmed merged at `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`. PR #3805 remains OPEN / Ready for review at HEAD `5bc6bcdb5b270706cb994d09e71583cc2683b349`, based on that `origin/main` commit; GitHub reports mergeable, with no review decision or merge timestamp.
+- Current status: IN_PROGRESS. PR #3801 is merged at `22b21a8b7c3c0b9b56f4e388c35e329a4321f768` (merge commit). At validation start, PR #3805 was OPEN / Ready for review at target HEAD `0513a9863b137ad2bc4143f73d322f31ca481ee2`, based on that `origin/main`; GitHub reported mergeable and no merge timestamp. This journal-only follow-up will advance the PR head; refresh its current state after push.
 - Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final.
 - Branch: codex/t18-queue-row-diagnostics.
-- Base commit: 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
-- Current source/evidence commit: `5bc6bcdb5b270706cb994d09e71583cc2683b349`. R5 static-asset provenance was built from `b9dfbd4642e57492421c3ef15daa0317d7351279`; commits after that provenance source changed only plan journals.
-- Exact-head checks: Unified CI, frontend unit/E2E, lint/build, PR Required Gate, PR Review Quality Gate, security, CodeQL, Gitleaks and workflow guards PASS. Backend, integration, Docker, parity, readiness, load and DAST checks were skipped by path-aware rules, not passed.
-- R5 canonical Preflight: PASS; exact commit, tracked worktree clean, host disk C: 18 GiB, WSL backing D: 28 GiB, Ubuntu available memory 3193 MiB, ports 18898/18899/15541 free, no warnings.
-- R5 canonical Start: PASS; 10-GiB build reserve, backend/frontend/worker images built, readiness PASS, Ubuntu memory 3263 MiB.
-- R5 static artifact provenance: PASS for all 261 files. Container manifest SHA-256 22a4acfa1ba98934d07d854ca38333e4c412c14803bd0a26e9990101192b9d20; exact HTTP byte matches 261, mismatches 0; sw.js marker matches source commit; frontend image ID sha256:6216be5a85def3ac9da79048b5bd27653c16d219a8654858b46417e0f674970a.
-- Canonical Session teardown: PASS; removed 5 containers, 3 volumes, 1 network; remaining 0. Independent resource and port verification PASS; Ubuntu memory after session 2455 MiB.
-- Limitation: helper output still says served_revision_verified=false; independent byte-comparison evidence is recorded separately. Full integrated T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Tier-2 remains PARTIAL; no deferral is claimed.
-- Allowed scope: task-owned ignored provenance harness/env and T18 journals. Denied scope preserved: application/runtime, tracked tests, staging configuration, production, foreign projects, global Docker cleanup, merge, deployment.
-- PR description: updated to identify exact current HEAD `5bc6bcdb5b270706cb994d09e71583cc2683b349`, distinguish it from R5 provenance source `b9dfbd4642e57492421c3ef15daa0317d7351279`, and state the next action after merge. Tier-2 remains PARTIAL; no deferral is claimed.
-- This state-reconciliation step ran no tests and started no staging project; it only corrected PR metadata and this checkpoint.
-- Next exact action: user merges the already green PR #3805. After merge, fetch fresh `origin/main`, clean/retain this owned worktree per cycle policy, and continue only an uncovered T18 item. Do not repeat the passed queue-system 6/6, Admin 3/3 + 2/2, RQ18 8/8, or R5 261/261 asset comparison. Full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete.
+- T18 target commit: `0513a9863b137ad2bc4143f73d322f31ca481ee2`; tracked worktree was clean for both canonical Preflights, Start and Session.
+- Newly completed scenario 10 slice: synthetic seed PASS; ordinary Admin password login and first-time TOTP enrollment/verification PASS; typed queue-direction context survived queue-profiles → catalog → queue-profiles, browser back/forward, return to setup, reload, and user-management return. Focused Playwright: 1 passed, 0 failed, 0 skipped.
+- Canonical Preflight before Start: PASS; C: 18 GiB free, WSL backing D: 28 GiB free, Ubuntu available memory 3200 MiB; ports 18896/18897/15540 free; no warnings.
+- Canonical Start: PASS; backend/frontend/worker images and runtime readiness PASS; build reserve 10 GiB; frontend image `sha256:549994f685bd3cd948631020e0514f90b8398e14d25af1321ab1c70ec7fd820b`.
+- Browser Session: PASS; frontend `sw.js` SHA marker matched target commit `0513a9863b137ad2bc4143f73d322f31ca481ee2`; the canonical helper still reports `served_revision_verified=false`, so this marker is not claimed as full static-file attestation. Session teardown removed 5 containers, 3 volumes and 1 network; remaining counts were 0.
+- Independent teardown check: PASS; 0 project containers, 0 volumes, 0 networks; ports 18896/18897/15540 closed. Post-session canonical Preflight: PASS; C: 18 GiB free, WSL backing D: 28 GiB free, Ubuntu available memory 3242 MiB; no warnings.
+- Generated-file cleanup: the desktop policy rejected both recursive cleanup and a narrower exact-file cleanup. No deletion command ran. The task-owned ignored runner/prework and Playwright config/spec/result files remain under `.scratch/t18-route-context-20261030/` and `frontend/output/staging/t18-route-context-20261030/`; the pre-existing private env file was retained. No Docker resources remain.
+- Exact-head GitHub CI before this documentation update: applicable checks PASS; path-aware skipped checks remain SKIPPED, not PASS. No runtime or tracked-test changes were made.
+- Limitation: full integrated T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete. Tier-2 remains PARTIAL; no deferral is claimed.
+- Allowed scope: task-owned temporary browser harness, reused task-private synthetic env, and T18 journals. Denied scope preserved: application/runtime, tracked tests, staging configuration, production, foreign projects, global Docker cleanup, merge, deployment.
+- Next exact action: run `git diff --check`, commit/push only the three T18 journals to existing PR #3805, update its description to the new exact HEAD, and verify exact-head CI. Preserve the remaining generated files unless a supported cleanup action becomes available. After user merge, choose only a remaining unverified T18 acceptance item. Do not repeat queue-system 6/6, Admin navigation 3/3 + panel 2/2, RQ18 8/8, R5 static-file comparison 261/261, or this route-context scenario.
+
+## Previous checkpoint — PR #3805 state reconciled; T18 remains partial — 2026-10-30T21:56+05:00
 
 ## Previous checkpoint — PR #3805 queue E2E and Admin route checks passed — 2026-10-30T15:39+05:00
 
