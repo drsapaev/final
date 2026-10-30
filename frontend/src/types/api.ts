@@ -79,6 +79,8 @@ export type PublicBookingCompatiblePairDto = Schemas['PublicBookingCompatiblePai
 export type PublicBookingOptionsDto = Schemas['PublicBookingOptionsOut'];
 export type PublicBookingAvailabilityDto = Schemas['PublicBookingAvailabilityOut'];
 export type PublicBookingRequestCreateDto = Schemas['PublicBookingRequestCreate'];
+export type PublicBookingRequestOutDto = Schemas['PublicBookingRequestOut'];
+export type PublicBookingRequestListOutDto = Schemas['PublicBookingRequestListOut'];
 
 // Staff worklist for non-reserving public booking requests.
 export type PublicBookingRequestStatusDto = Schemas['PublicBookingRequestStatus'];
