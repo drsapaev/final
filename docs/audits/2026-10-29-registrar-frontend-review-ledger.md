@@ -35,6 +35,10 @@
 | REG-FE-007 | P2 | Rate-limit handling | HTTP 429 returns without failure/stale state; tests explicitly pin a `loading=false`/`dataSource=loading` quirk | SOURCE-OBSERVED / REPRO-PENDING | Batch D: fetch state |
 | REG-FE-008 | P2 | Refresh feedback | Welcome manual refresh announces success synchronously, before fetch outcome | SOURCE-OBSERVED / REPRO-PENDING | Batch D: fetch feedback |
 | REG-FE-009 | P2 | Reschedule presentation | Optimistic deletion compares IDs from different record namespaces, potentially hiding an unrelated row | SOURCE-OBSERVED / REPRO-PENDING | Batch E: reschedule UI |
+| REG-FE-010 | P2 | Existing patient selected in create mode | Form changes to existing patient profile are not sent to patient update API on create path | SOURCE-OBSERVED / REPRO-PENDING | Batch F: patient identity/profile UX |
+| REG-FE-011 | P2 | Partial patient save before edit | `updatePatient` can commit changes before later queue/edit-delta failure | SOURCE-OBSERVED / REPRO-PENDING | Batch G: patient/visit atomicity |
+| REG-FE-012 | P2 | Date-aware service catalogue | Older async service response can overwrite newer catalogue and rehydrate current cart | SOURCE-OBSERVED / REPRO-PENDING | Batch H: wizard data loading |
+| REG-FE-013 | P2 | Wizard diagnostic privacy | Direct patient-phone string and `fio` object field can pass through development logger | SOURCE-OBSERVED / REPRO-PENDING | Batch I: privacy guard |
 
 ### REG-FE-001 — Row activation does not open details (P2 candidate)
 
@@ -153,6 +157,51 @@
 
 **Fix direction:** compare type-scoped canonical record references, not bare cross-entity IDs. If a safe identity is not available, do not remove optimistically; let an authoritative reload determine the list.
 
+
+### REG-FE-010 — Existing patient profile edits may not persist in create mode (P2 candidate)
+
+**Code evidence:** [AppointmentWizardV2.tsx L850–L872](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L850-L872) stores the selected patient's `id` and editable form data; [PatientStepV2.tsx L290–L323](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/PatientStepV2.tsx#L290-L323) exposes birth date and address editing. On submit, [AppointmentWizardV2.tsx L2069–L2115](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2069-L2115) calls `createPatient` only when `!editMode && !patientId`. With `editMode === false` and the explicitly selected patient's non-null ID, that branch is skipped. The subsequent cart creation carries `patient_id` and service/quote fields but no patient profile changes ([L2690–L2702](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2690-L2702)).
+
+**Potential impact:** registrar chooses an existing patient, corrects address or birth date in the creation form, and successfully creates an appointment; the displayed correction is not saved to the patient card. This is contingent on those fields being intended as editable patient-profile data in create mode (product contract to verify).
+
+**Fail-first test:** select an existing synthetic patient and change their address/birth date, submit a new appointment. Assert the resulting patient record reflects the intended changes or that the UI explicitly prevents/makes clear that profile edits will not be saved. Confirm the cart is linked to the existing patient ID and never silently creates a second patient.
+
+**Remediation direction:** choose and document the workflow contract: update the existing profile through an explicit, independently verified patient-card save, or make profile fields read-only in booking mode with a deliberate "Edit patient" action. Avoid implicit phone/FIO reassociation.
+
+### REG-FE-011 — Separate patient mutation before queue edit can yield a partial save (P2 candidate)
+
+**Code evidence:** [AppointmentWizardV2.tsx L2180–L2196](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2180-L2196) calls `await updatePatient(patientId, { sex: ... })` before entering the queue/full-update/edit-delta paths. The later [edit-delta API call L2425–L2467](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2425-L2467) is an independent mutation that may reject (including quote/concurrent-update 409). A QR lookup path also updates an attached patient before the edit is committed ([L1992–L2025](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L1992-L2025)).
+
+**Potential impact:** when editing a queued visit, the patient sex/birth date/address can persist, followed by a rejected edit-delta/queue operation. The wizard reports an unsuccessful appointment edit while the patient record has already changed. This is a **partial cross-domain operation**, not evidence of wrong patient identity or a failed backend transaction.
+
+**Fail-first test:** with synthetic patient and queue entities, mock `updatePatient` success followed by `applyRegistrarEditDelta` rejection (409) or QR full-update failure. Assert the user receives truthful **partial-save** feedback, the patient card outcome is known, and retry cannot silently duplicate commands. Check the canonical backend ownership/transaction model before designing any atomicity change.
+
+**Remediation direction:** avoid a pre-save outside the authoritative edit operation when possible. Prefer backend transaction-aware command ownership if the domain allows it; otherwise explicitly surface the successful patient write and failed queue command, and prescribe safe reconciliation. Any modification requires the repository mandatory gate due to patient/clinical/queue boundaries.
+
+### REG-FE-012 — Stale service catalogue can overwrite active wizard data (P2 candidate)
+
+**Code evidence:** [AppointmentWizardV2.tsx L914–L951](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L914-L951) fetches a date-specific service catalogue, then unconditionally calls `setServicesData` / `setFilteredServices` on resolution, with no generation guard or abort. [L1045–L1060](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L1045-L1060) invokes the loader when `isOpen` or the loader identity/date changes. [L1009–L1039](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L1009-L1039) uses the resulting `servicesData` to resolve currently displayed cart references.
+
+**Potential impact:** open wizard for date A, start catalogue fetch; then open/edit record for date B while request A remains pending. If B resolves first and A later, A's catalogue can replace B's and hydrate the B cart against obsolete doctor/service metadata. Backend validation still owns queue assignment and may reject; this finding concerns misleading frontend choices/quote and potential wrong user decision, not proven unauthorized assignment.
+
+**Fail-first test:** with deferred promises, return date B before date A, assert that current selected date B catalogue stays visible and cart references/eligibility are not overwritten by A. Also test closing/reopening the wizard and a request failure after a successful catalogue load.
+
+**Remediation direction:** use an abort signal or monotonic request-ID/active-date guard; reset or explicitly mark catalogue stale during a date/record change. Verify quote and doctor-selection data update coherently.
+
+### REG-FE-013 — Development logging leaks patient-identifying strings (P2 privacy candidate)
+
+**Code evidence:** [AppointmentWizardV2.tsx L2034–L2046](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2034-L2046) constructs a `logger.warn(`...${wizardData.patient.phone}...`)` message with the raw phone in a **primitive string**. [L1931–L1940](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L1931-L1940) passes `{ fio, phone, birth_date }` as a log object. [logger.ts L15–L41](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/utils/logger.ts#L15-L41) does not list the bare field name `fio`, and [L146–L171](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/utils/logger.ts#L146-L171) passes primitive strings through without sanitization. Logger `warn` and `log` output only in development by default, so **no production log emission from these specific logger methods has been shown**.
+
+**Potential impact:** real patients' phone or name can appear in developer console during edit-mode QR patient resolution in development/test builds. This violates the repository privacy discipline even if production builds normally suppress these logger methods.
+
+**Fail-first test:** in a synthetic-only logger test, pass a fabricated phone in an interpolated string and `{ fio: 'SYNTHETIC Patient' }`; assert outputs are redacted (or replace these call sites with non-PII diagnostic facts) without weakening error observability. Verify production/dev behavior separately.
+
+**Remediation direction:** remove patient values from diagnostic message strings; log only safe flags/record-kind/error-code. Harden logging conventions so primitive PHI cannot bypass scrubber. Keep this entirely separate from patient/queue behavior changes.
+
+### Wizard follow-up investigation (not yet a numbered finding)
+
+There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.tsx L2495–L2590](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2495-L2590): after a batch error it can continue toward cart creation. The earlier `editDeltaBuild.items.length > 0` return and the QR full-update short-circuit appear to guard most real edit scenarios; **reachability and duplicate-write impact are not proven**. Do not label P1 or change the branch without a fail-first route-selection test and backend reconciliation evidence. The main `createRegistrarCart` path already uses a submission lock and payload-bound idempotency key.
+
 ## Review coverage
 
 ### Actually inspected in first pass (source reads; not an exhaustive audit)
@@ -170,6 +219,13 @@
 - `frontend/src/utils/registrarAggregation.ts`
 - `frontend/src/utils/logger.ts`
 - `frontend/src/api/registrar.ts`
+- `frontend/src/components/wizard/AppointmentWizardV2.tsx`
+- `frontend/src/components/wizard/wizardUtils.ts`
+- `frontend/src/components/wizard/PatientStepV2.tsx`
+- `frontend/src/components/wizard/CartStepV2.tsx`
+- `frontend/src/components/dialogs/ModernDialog.tsx`
+- `frontend/src/api/queue.ts` and `frontend/src/api/mappers/queue.ts`
+- Selected wizard regression/contract tests in `frontend/src/components/wizard/__tests__/`
 - `frontend/src/pages/registrar/views/WelcomeView.tsx`
 - `frontend/src/pages/registrar/views/QueueView.tsx`
 - `frontend/src/pages/registrar/useRegistrarWorklistData.ts`
@@ -179,15 +235,15 @@
 - `backend/app/api/v1/endpoints/registrar_integration/_helpers.py` and relevant `_today_queues.py` mapping (read-only contract evidence)
 - Focused source-contract / worklist test files were partially inspected to identify regression-test owners.
 
-### Outstanding review slices (not yet audited)
+### Outstanding review slices (partially audited where noted)
 
-1. Registration and editing: `AppointmentWizardV2`, wizard state, save/error paths and patient lookup.
+1. Registration and editing: `AppointmentWizardV2`, wizard state, save/error paths and patient lookup (initial save-path review complete; full route/test coverage pending).
 2. Queue read-model: `useRegistrarWorklistData`, `registrarQueueAdapter`, `QueueView`, queue profile navigation; read-only comparison with canonical backend DTOs and ADR-001.
 3. Record actions: fuller audit of `useRegistrarActions`, backend command status/identity/error handling, cancellation, call/complete/reschedule (initial front-end read completed).
 4. Display and usability: `WelcomeView`, table renderers, modal accessibility, loading/empty/error states.
 5. API/privacy/performance: registrar API adapter, outbound requests, auth boundaries, PHI-safe diagnostics, existing tests/e2e.
 
-Any further findings receive the next stable ID (`REG-FE-010`, etc.), a source-SHA anchor, an impact scenario, a reproduction/test, and a status. If refuted, mark **NOT A BUG** with evidence rather than silently deleting the row.
+Any further findings receive the next stable ID (`REG-FE-014`, etc.), a source-SHA anchor, an impact scenario, a reproduction/test, and a status. If refuted, mark **NOT A BUG** with evidence rather than silently deleting the row.
 
 ## Remediation plan — execute only after review triage
 
@@ -205,6 +261,7 @@ Any further findings receive the next stable ID (`REG-FE-010`, etc.), a source-S
 | --- | --- | --- | --- |
 | 2026-10-29 | Initial | Three provisional source-observed findings; coverage, scope and remediation plan | GitHub source reads; remote PR/commit verified |
 | 2026-10-29 | Review pass 2 | REG-FE-004–009: quick filters, URL date, Welcome confirmation, 429 handling, refresh notification, reschedule identity | Frontend hooks/views, backend read-model helpers and existing tests inspected; runtime tests not executed |
+| 2026-10-30 | Review pass 3 | REG-FE-010–013: existing patient edits, partial profile/queue save, stale wizard catalogue, development PII logging | Wizard UI/handlers, API mappers, privacy logger, wizard tests inspected; no runtime tests executed; new main source SHA `22b21a8b7c3c0b9b56f4e388c35e329a4321f768` |
 
 ## End-of-review acceptance criteria
 
