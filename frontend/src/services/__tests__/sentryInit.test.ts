@@ -30,6 +30,7 @@ type FakeEvent = {
   type?: string;
   message?: string;
   transaction?: string;
+  fingerprint?: string[];
   request?: Record<string, unknown>;
   spans?: FakeSpan[];
   breadcrumbs?: Array<Record<string, unknown>>;
@@ -37,6 +38,7 @@ type FakeEvent = {
   contexts?: Record<string, unknown>;
   logentry?: { message?: string; formatted?: string; params?: unknown[] };
   exception?: { values?: Array<{ type?: string; value?: string }> };
+  threads?: { values?: Array<{ stacktrace?: { frames?: Array<{ vars?: Record<string, unknown> }> } }> };
 };
 
 describe('initSentry scrubbing wiring (owner round-12 P1)', () => {
@@ -71,11 +73,22 @@ describe('initSentry scrubbing wiring (owner round-12 P1)', () => {
       transaction: '/patient/activate?token=SECRET123',
       request: { url: 'https://app.example.com/patient/activate?token=SECRET123&lang=ru' },
       spans: [
-        { description: 'GET https://api.example.com/patients/activate?token=SECRET123', data: { url: '/x?token=SECRET123' } },
+        {
+          description: 'GET https://api.example.com/patients/activate?token=SECRET123',
+          data: {
+            url: '/x?token=SECRET123',
+            'http.response.status_code': 503,
+            'gen_ai.request.messages': 'TRACE_PROMPT_CANARY',
+            'gen_ai.usage.input_tokens': 17,
+            'ai.invalid_input_tokens': 'INVALID_TOKEN_DIAGNOSTIC_CANARY',
+          },
+        },
         { description: 'db.query' },
         { description: 42 },
       ],
-      extra: { note: 'payload' },
+      extra: { note: 'payload', system_prompt: 'TRACE_SYSTEM_PROMPT_CANARY' },
+      contexts: { response: { status_code: 503, body: 'TRACE_BODY_CANARY' }, ai: { system_prompt: 'TRACE_CONTEXT_PROMPT_CANARY' } },
+      breadcrumbs: [{ message: 'TRACE_BREADCRUMB_CANARY' }],
     };
 
     const scrubbed = options.beforeSendTransaction!(event) as FakeEvent;
@@ -87,10 +100,20 @@ describe('initSentry scrubbing wiring (owner round-12 P1)', () => {
     expect(scrubbed.spans![0].description).toBe(
       'GET https://api.example.com/patients/activate?token=[REDACTED]'
     );
-    expect(scrubbed.spans![0].data).toEqual({ url: '/x?token=[REDACTED]' });
+    expect(scrubbed.spans![0].data!.url).toBe('/x?token=[REDACTED]');
     // Non-string and absent descriptions pass through untouched.
     expect(scrubbed.spans![1].description).toBe('db.query');
     expect(scrubbed.spans![2].description).toBe(42);
+    const serialized = JSON.stringify(scrubbed);
+    expect(serialized).not.toContain('TRACE_BODY_CANARY');
+    expect(serialized).not.toContain('TRACE_BREADCRUMB_CANARY');
+    expect(serialized).not.toContain('TRACE_PROMPT_CANARY');
+    expect(serialized).not.toContain('TRACE_SYSTEM_PROMPT_CANARY');
+    expect(serialized).not.toContain('TRACE_CONTEXT_PROMPT_CANARY');
+    expect(scrubbed.contexts!.response).toEqual({ status_code: 503 });
+    expect(scrubbed.spans![0].data!['http.response.status_code']).toBe(503);
+    expect(scrubbed.spans![0].data!['gen_ai.usage.input_tokens']).toBe(17);
+    expect(JSON.stringify(scrubbed)).not.toContain('INVALID_TOKEN_DIAGNOSTIC_CANARY');
   });
 
   it('beforeSend redacts credential query params inside request.url strings too', async () => {
@@ -137,8 +160,20 @@ describe('initSentry scrubbing wiring (owner round-12 P1)', () => {
         },
       ],
       exception: { values: [{ type: 'ProviderError', value: 'AI_EXCEPTION_CANARY' }] },
-      extra: { completion: 'AI_EXTRA_CANARY' },
-      contexts: { response: { status_code: 503 } },
+      extra: {
+        completion: 'AI_EXTRA_CANARY',
+        system_prompt: 'SYSTEM_PROMPT_CANARY',
+        provider_response: 'PROVIDER_RESPONSE_CANARY',
+        input: 'AI_INPUT_CANARY',
+        input_tokens: 24,
+        invalid_input_tokens: 'INVALID_TOKEN_DIAGNOSTIC_CANARY',
+      },
+      contexts: { response: { status_code: 503, body: 'HTTP_BODY_CANARY' } },
+      spans: [{ description: 'error.span', data: {
+        'gen_ai.request.messages': 'SPAN_PROMPT_CANARY',
+        'http.response.status_code': 502,
+      } }],
+      threads: { values: [{ stacktrace: { frames: [{ vars: { note: 'THREAD_LOCAL_CANARY' } }] } }] },
       logentry: {
         message: 'CLINICAL_LOGENTRY_MESSAGE_CANARY',
         formatted: 'CLINICAL_LOGENTRY_FORMAT_CANARY',
@@ -158,6 +193,13 @@ describe('initSentry scrubbing wiring (owner round-12 P1)', () => {
       'AI_BREADCRUMB_RESPONSE_CANARY',
       'AI_EXCEPTION_CANARY',
       'AI_EXTRA_CANARY',
+      'SYSTEM_PROMPT_CANARY',
+      'PROVIDER_RESPONSE_CANARY',
+      'AI_INPUT_CANARY',
+      'INVALID_TOKEN_DIAGNOSTIC_CANARY',
+      'HTTP_BODY_CANARY',
+      'SPAN_PROMPT_CANARY',
+      'THREAD_LOCAL_CANARY',
       'CLINICAL_LOGENTRY_MESSAGE_CANARY',
       'CLINICAL_LOGENTRY_FORMAT_CANARY',
       'CLINICAL_LOGENTRY_PARAM_CANARY',
@@ -165,6 +207,22 @@ describe('initSentry scrubbing wiring (owner round-12 P1)', () => {
       expect(serialized).not.toContain(marker);
     }
     expect(scrubbed.contexts!.response).toEqual({ status_code: 503 });
+    expect(scrubbed.spans![0].data!['http.response.status_code']).toBe(502);
+    expect(scrubbed.threads!.values![0].stacktrace!.frames![0].vars).toEqual({});
+    expect(scrubbed.extra!.input_tokens).toBe(24);
+
+    const diagnosticEvent: FakeEvent = {
+      logentry: { message: 'AI provider failed for patient clinical content' },
+      extra: {
+        diagnostic_code: 'ai_provider_failure',
+        provider: 'OPENAI',
+        error_type: 'TimeoutError',
+      },
+    };
+    const grouped = options.beforeSend!(diagnosticEvent) as FakeEvent;
+    expect(grouped.fingerprint).toEqual([
+      '{{ default }}', 'ai_provider_failure', 'OPENAI', 'TimeoutError',
+    ]);
   });
 
   it('drops an event when beforeSend cannot scrub its payload', async () => {

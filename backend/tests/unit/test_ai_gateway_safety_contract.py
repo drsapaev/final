@@ -97,9 +97,13 @@ async def test_ai_v2_unexpected_error_log_omits_exception_text(caplog) -> None:
         response = await gateway.execute(AITaskType.COMPLAINT_ANALYSIS, {}, user_id=1)
 
     assert response.status == "error"
-    assert "RuntimeError" in caplog.text
     assert "AI_RESPONSE_CANARY" not in caplog.text
     assert all(record.exc_info is None for record in caplog.records)
+    error_record = next(
+        record for record in caplog.records if record.levelno == logging.ERROR
+    )
+    assert error_record.diagnostic_code == "ai_gateway_unexpected_error"
+    assert error_record.error_type == "RuntimeError"
 
 
 @pytest.mark.asyncio
@@ -116,6 +120,12 @@ async def test_ai_v2_provider_failure_log_omits_exception_text(caplog) -> None:
 
     assert response.status == "error"
     assert "AI_TOOL_ARGUMENTS_CANARY" not in caplog.text
+    warning_record = next(
+        record for record in caplog.records if record.levelno == logging.WARNING
+    )
+    assert warning_record.diagnostic_code == "ai_provider_failure"
+    assert warning_record.provider == "mock"
+    assert warning_record.error_type == "RuntimeError"
 
 
 @pytest.mark.parametrize(

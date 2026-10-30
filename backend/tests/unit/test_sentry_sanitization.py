@@ -19,8 +19,8 @@ from app.core import sentry as sentry_module
 from app.core.sentry import sanitize_event
 
 
-def _make_before_send(monkeypatch):
-    """Return the callback actually passed to ``sentry_sdk.init``."""
+def _make_before_send(monkeypatch, callback_name="before_send"):
+    """Return a callback actually passed to ``sentry_sdk.init``."""
     sdk = ModuleType("sentry_sdk")
     sdk.__path__ = []
     sdk.init = Mock()
@@ -46,7 +46,7 @@ def _make_before_send(monkeypatch):
     sentry_module.init_sentry()
 
     assert sdk.init.call_count == 1
-    return sdk.init.call_args.kwargs["before_send"]
+    return sdk.init.call_args.kwargs[callback_name]
 
 
 class TestSanitizeEventPhoneScrubbing:
@@ -693,6 +693,15 @@ class TestRegisteredBeforeSendPayloadRedaction:
             },
             "extra": {"completion": "AI_EXTRA_CANARY"},
             "contexts": {"response": {"status_code": 503}},
+            "threads": {
+                "values": [
+                    {
+                        "stacktrace": {
+                            "frames": [{"vars": {"note": "THREAD_LOCAL_CANARY"}}]
+                        }
+                    }
+                ]
+            },
         }
 
         scrubbed = before_send(event, hint={})
@@ -708,10 +717,126 @@ class TestRegisteredBeforeSendPayloadRedaction:
             "AI_EXCEPTION_CANARY",
             "AI_FRAME_CANARY",
             "AI_EXTRA_CANARY",
+            "THREAD_LOCAL_CANARY",
         ):
             assert marker not in serialized
         assert scrubbed["breadcrumbs"]["values"][0]["data"]["action"] == "submit"
         assert scrubbed["contexts"]["response"]["status_code"] == 503
+
+    def test_registered_callback_scrubs_ai_keys_and_keeps_safe_diagnostics(
+        self, monkeypatch
+    ):
+        import json
+
+        before_send = _make_before_send(monkeypatch)
+        event = {
+            "extra": {
+                "system_prompt": "SYSTEM_PROMPT_CANARY",
+                "provider_response": "PROVIDER_RESPONSE_CANARY",
+                "input": "AI_INPUT_CANARY",
+                "input_tokens": 42,
+                "invalid_input_tokens": "INVALID_TOKEN_DIAGNOSTIC_CANARY",
+                "model": "gpt-4o-mini",
+                "diagnostic_code": "ai_provider_failure",
+                "provider": "OPENAI",
+                "error_type": "TimeoutError",
+            },
+            "contexts": {
+                "response": {
+                    "status_code": 503,
+                    "body": "HTTP_RESPONSE_BODY_CANARY",
+                }
+            },
+            "spans": [
+                {
+                    "data": {
+                        "gen_ai.request.messages": "GEN_AI_PROMPT_CANARY",
+                        "http.response.status_code": 502,
+                    }
+                }
+            ],
+        }
+
+        scrubbed = before_send(event, {})
+        serialized = json.dumps(scrubbed)
+
+        for marker in (
+            "SYSTEM_PROMPT_CANARY",
+            "PROVIDER_RESPONSE_CANARY",
+            "AI_INPUT_CANARY",
+            "HTTP_RESPONSE_BODY_CANARY",
+            "GEN_AI_PROMPT_CANARY",
+            "INVALID_TOKEN_DIAGNOSTIC_CANARY",
+        ):
+            assert marker not in serialized
+        assert scrubbed["extra"]["input_tokens"] == 42
+        assert scrubbed["extra"]["model"] == "gpt-4o-mini"
+        assert scrubbed["contexts"]["response"] == {"status_code": 503}
+        assert scrubbed["spans"][0]["data"]["http.response.status_code"] == 502
+        assert scrubbed["fingerprint"] == [
+            "{{ default }}",
+            "ai_provider_failure",
+            "OPENAI",
+            "TimeoutError",
+        ]
+
+
+class TestRegisteredBeforeSendTransaction:
+    def test_registered_callback_scrubs_transaction_payload(self, monkeypatch):
+        import json
+
+        callback = _make_before_send(
+            monkeypatch, callback_name="before_send_transaction"
+        )
+        event = {
+            "type": "transaction",
+            "transaction": "/api/ai/complaint",
+            "request": {"data": {"input": "TRACE_REQUEST_CANARY"}},
+            "contexts": {
+                "response": {
+                    "status_code": 503,
+                    "body": "TRACE_RESPONSE_BODY_CANARY",
+                }
+            },
+            "extra": {"system_prompt": "TRACE_SYSTEM_PROMPT_CANARY"},
+            "breadcrumbs": {"values": [{"message": "TRACE_BREADCRUMB_CANARY"}]},
+            "spans": [
+                {
+                    "description": "gen_ai.generate",
+                    "data": {
+                        "gen_ai.request.messages": "TRACE_PROMPT_CANARY",
+                        "gen_ai.usage.input_tokens": 24,
+                        "http.response.status_code": 503,
+                    },
+                }
+            ],
+        }
+
+        scrubbed = callback(event, {})
+        serialized = json.dumps(scrubbed)
+
+        for marker in (
+            "TRACE_REQUEST_CANARY",
+            "TRACE_RESPONSE_BODY_CANARY",
+            "TRACE_SYSTEM_PROMPT_CANARY",
+            "TRACE_BREADCRUMB_CANARY",
+            "TRACE_PROMPT_CANARY",
+        ):
+            assert marker not in serialized
+        assert scrubbed["contexts"]["response"] == {"status_code": 503}
+        assert scrubbed["spans"][0]["data"]["gen_ai.usage.input_tokens"] == 24
+        assert scrubbed["spans"][0]["data"]["http.response.status_code"] == 503
+
+    def test_registered_callback_drops_transaction_when_scrubber_fails(
+        self, monkeypatch
+    ):
+        callback = _make_before_send(
+            monkeypatch, callback_name="before_send_transaction"
+        )
+        with patch("app.core.sentry.mask_pii", side_effect=RuntimeError("synthetic")):
+            assert (
+                callback({"type": "transaction", "request": {"data": "x"}}, {}) is None
+            )
 
 
 class TestSanitizeEventStandardContextsPreserved:

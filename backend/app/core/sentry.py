@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any
 
 from app.core.pii_masker import mask_pii
@@ -60,6 +61,19 @@ _AI_CONTENT_KEYS = frozenset(
     {
         "prompt",
         "prompts",
+        "system_prompt",
+        "systemprompt",
+        "system_instructions",
+        "systeminstructions",
+        "user_prompt",
+        "input",
+        "user_input",
+        "patient_input",
+        "input_text",
+        "output",
+        "output_text",
+        "provider_response",
+        "providerresponse",
         "response",
         "responses",
         "content",
@@ -73,6 +87,70 @@ _AI_CONTENT_KEYS = frozenset(
         "toolarguments",
     }
 )
+_SAFE_HTTP_RESPONSE_FIELDS = frozenset({"status_code", "body_size"})
+_SAFE_AI_DIAGNOSTIC_FIELDS = frozenset(
+    {
+        "status_code",
+        "body_size",
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "model",
+    }
+)
+_SAFE_AI_DIAGNOSTIC_CODES = frozenset(
+    {
+        "ai_gateway_unexpected_error",
+        "ai_gateway_stream_error",
+        "ai_provider_failure",
+    }
+)
+
+
+def _scrub_http_response_context(value: Any) -> Any:
+    """Keep numeric response diagnostics and discard arbitrary response data."""
+    if not isinstance(value, dict):
+        return {}
+    return {
+        key: item
+        for key, item in value.items()
+        if str(key).lower() in _SAFE_HTTP_RESPONSE_FIELDS
+        and isinstance(item, int | float)
+        and not isinstance(item, bool)
+    }
+
+
+def _normalize_field_key(key: str) -> str:
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", key).lower().replace("-", "_")
+
+
+def _is_safe_ai_diagnostic(key: str, value: Any) -> bool:
+    leaf = key.rsplit(".", 1)[-1]
+    if leaf in {
+        "status_code",
+        "body_size",
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+    } or leaf.endswith("_tokens"):
+        return isinstance(value, int | float) and not isinstance(value, bool)
+    if leaf == "model":
+        return (
+            isinstance(value, str)
+            and re.fullmatch(r"[A-Za-z0-9_.:/-]{1,80}", value) is not None
+        )
+    return False
+
+
+def _is_diagnostic_field(key: str) -> bool:
+    leaf = key.rsplit(".", 1)[-1]
+    return leaf in _SAFE_AI_DIAGNOSTIC_FIELDS or leaf.endswith("_tokens")
+
+
+def _is_ai_content_key(key: str) -> bool:
+    normalized = _normalize_field_key(key)
+    leaf = normalized.rsplit(".", 1)[-1]
+    return any(content_key in normalized for content_key in _AI_CONTENT_KEYS)
 
 
 def _redact_ai_content(value: Any, parent_key: str = "") -> Any:
@@ -80,11 +158,19 @@ def _redact_ai_content(value: Any, parent_key: str = "") -> Any:
     if isinstance(value, dict):
         redacted = {}
         for key, item in value.items():
-            normalized_key = str(key).lower().replace("-", "_")
+            normalized_key = _normalize_field_key(str(key))
             is_http_response_context = (
                 parent_key == "contexts" and normalized_key == "response"
             )
-            if normalized_key in _AI_CONTENT_KEYS and not is_http_response_context:
+            if is_http_response_context:
+                redacted[key] = _scrub_http_response_context(item)
+            elif _is_diagnostic_field(normalized_key):
+                redacted[key] = (
+                    item
+                    if _is_safe_ai_diagnostic(normalized_key, item)
+                    else "[REDACTED]"
+                )
+            elif _is_ai_content_key(normalized_key):
                 redacted[key] = "[REDACTED]"
             else:
                 redacted[key] = _redact_ai_content(item, normalized_key)
@@ -133,6 +219,42 @@ def _redact_unstructured_event_text(event: dict[str, Any]) -> None:
                 for frame in frames:
                     if isinstance(frame, dict) and "vars" in frame:
                         frame["vars"] = {}
+
+    # sentry-python can attach a second stack under `threads`; those locals
+    # can contain the same patient objects as exception frame variables.
+    threads = event.get("threads")
+    thread_values = threads.get("values") if isinstance(threads, dict) else None
+    if isinstance(thread_values, list):
+        for thread in thread_values:
+            if not isinstance(thread, dict):
+                continue
+            stacktrace = thread.get("stacktrace")
+            frames = stacktrace.get("frames") if isinstance(stacktrace, dict) else None
+            if isinstance(frames, list):
+                for frame in frames:
+                    if isinstance(frame, dict) and "vars" in frame:
+                        frame["vars"] = {}
+
+    transaction = event.get("transaction")
+    if isinstance(transaction, str):
+        event["transaction"] = mask_pii(transaction)
+
+
+def _preserve_safe_ai_diagnostic_grouping(event: dict[str, Any]) -> None:
+    """Keep a stable, low-cardinality fingerprint for sanitized AI log events."""
+    extra = event.get("extra")
+    if not isinstance(extra, dict):
+        return
+    diagnostic_code = extra.get("diagnostic_code")
+    if diagnostic_code not in _SAFE_AI_DIAGNOSTIC_CODES:
+        return
+
+    fingerprint = ["{{ default }}", diagnostic_code]
+    for field in ("provider", "error_type"):
+        value = extra.get(field)
+        if isinstance(value, str) and value.replace("_", "").isalnum():
+            fingerprint.append(value)
+    event["fingerprint"] = fingerprint
 
 
 def _scrub_context(context_name: str, context_value: Any) -> Any:
@@ -341,7 +463,7 @@ def init_sentry() -> None:
     if AsyncPGIntegration is not None:
         integrations.append(AsyncPGIntegration())
 
-    def before_send(event: dict, hint: dict) -> dict | None:
+    def sanitize_for_sentry(event: dict, _hint: dict | None = None) -> dict | None:
         """Scrub PII from Sentry event before sending.
 
         Delegates all masking logic to ``sanitize_event()`` which uses
@@ -362,12 +484,19 @@ def init_sentry() -> None:
             sanitize_event(event)
             _redact_unstructured_event_text(event)
             event.update(_redact_ai_content(event))
+            _preserve_safe_ai_diagnostic_grouping(event)
         except Exception:
             # logger.warning (NOT logger.exception) — see docstring above
             # for the Sentry recursion risk that logger.exception creates.
             logger.warning("Sentry before_send sanitizer failed; event dropped")
             return None
         return event
+
+    def before_send(event: dict, hint: dict) -> dict | None:
+        return sanitize_for_sentry(event, hint)
+
+    def before_send_transaction(event: dict, hint: dict) -> dict | None:
+        return sanitize_for_sentry(event, hint)
 
     sentry_sdk.init(
         dsn=dsn,
@@ -376,6 +505,7 @@ def init_sentry() -> None:
         traces_sample_rate=sample_rate,  # 5% perf traces; errors always captured
         send_default_pii=False,  # CRITICAL: never send PII by default
         before_send=before_send,
+        before_send_transaction=before_send_transaction,
         integrations=integrations,
         # Drop errors from noisy HTTP clients / bots
         ignore_errors=[

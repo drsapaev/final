@@ -295,9 +295,12 @@ class AIGateway(IAIGateway):
 
         except Exception as e:
             logger.error(
-                "AI Gateway error (request_id=%s, error_type=%s)",
-                request_id,
-                type(e).__name__,
+                "AI Gateway request failed",
+                extra={
+                    "diagnostic_code": "ai_gateway_unexpected_error",
+                    "request_id": request_id,
+                    "error_type": type(e).__name__,
+                },
             )
             latency_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
@@ -360,7 +363,13 @@ class AIGateway(IAIGateway):
                 await asyncio.sleep(0.05)  # Simulate streaming delay
 
         except Exception as e:
-            logger.error("AI Gateway streaming error (error_type=%s)", type(e).__name__)
+            logger.error(
+                "AI Gateway stream failed",
+                extra={
+                    "diagnostic_code": "ai_gateway_stream_error",
+                    "error_type": type(e).__name__,
+                },
+            )
             yield "[ERROR] AI service temporarily unavailable"  # sanitized
 
     async def _execute_with_fallback(
@@ -423,10 +432,13 @@ class AIGateway(IAIGateway):
                 error_msg = f"{provider_type.value}: failed"  # sanitized
                 errors.append(error_msg)
                 logger.warning(
-                    "Provider failed (request_id=%s, provider=%s, error_type=%s)",
-                    request_id,
-                    provider_type.value,
-                    type(e).__name__,
+                    "AI provider call failed",
+                    extra={
+                        "diagnostic_code": "ai_provider_failure",
+                        "request_id": request_id,
+                        "provider": provider_type.value,
+                        "error_type": type(e).__name__,
+                    },
                 )
                 await self._circuit_breaker.record_failure(provider_type.value)
                 continue

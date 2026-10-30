@@ -51,9 +51,28 @@ const MEDICAL_PII_KEYS = [
 
 // AI content can include clinical notes and tool arguments under generic keys.
 const AI_CONTENT_KEYS = [
-  'prompt', 'prompts', 'response', 'responses', 'content', 'completion',
-  'completions', 'messages', 'arguments', 'tool_args', 'tool_arguments',
+  'system_prompt', 'systemprompt', 'system_instructions', 'provider_response',
+  'providerresponse', 'user_input', 'patient_input', 'input_text', 'output_text',
+  'prompt', 'prompts', 'input', 'output', 'response', 'responses', 'content',
+  'completion', 'completions', 'messages', 'arguments', 'tool_args', 'tool_arguments',
 ];
+const SAFE_DIAGNOSTIC_SUFFIXES = [
+  'status_code', 'body_size', 'model', 'input_tokens', 'output_tokens', 'total_tokens',
+];
+const SAFE_AI_DIAGNOSTIC_CODES = new Set([
+  'ai_gateway_unexpected_error', 'ai_gateway_stream_error', 'ai_provider_failure',
+]);
+
+type MutableSentryEvent = Record<string, unknown> & {
+  breadcrumbs?: Array<Record<string, unknown>>;
+  contexts?: Record<string, unknown>;
+  exception?: { values?: Array<Record<string, unknown>> };
+  extra?: Record<string, unknown>;
+  logentry?: Record<string, unknown>;
+  request?: Record<string, unknown>;
+  spans?: Array<Record<string, unknown>>;
+  threads?: { values?: Array<Record<string, unknown>> };
+};
 
 // Credential keys redacted INSIDE URL-shaped strings (owner round-12 P1):
 // request.url, breadcrumb from/to, Referer headers and pageload/http-span
@@ -112,12 +131,26 @@ export function scrubPIIFromObject(obj: unknown, parentKey = ''): unknown {
 
   const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    const lowerKey = key.toLowerCase();
+    const lowerKey = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().replace(/-/g, '_');
     const isHttpResponseContext = parentKey === 'contexts' && lowerKey === 'response';
-    const containsAiContent = AI_CONTENT_KEYS.some((contentKey) => lowerKey.includes(contentKey));
+    if (isHttpResponseContext) {
+      (cleaned as Record<string, unknown>)[key] = scrubHttpResponseContext(value);
+      continue;
+    }
+    const leafKey = lowerKey.split('.').pop() || lowerKey;
+    const isDiagnosticField = SAFE_DIAGNOSTIC_SUFFIXES.includes(leafKey) || leafKey.endsWith('_tokens');
+    const isSafeDiagnostic = leafKey === 'model'
+      ? typeof value === 'string' && /^[A-Za-z0-9_.:/-]{1,80}$/.test(value)
+      : isDiagnosticField && typeof value === 'number' && Number.isFinite(value);
+    if (isDiagnosticField) {
+      (cleaned as Record<string, unknown>)[key] = isSafeDiagnostic ? value : '[REDACTED]';
+      continue;
+    }
+    const containsAiContent =
+      !isSafeDiagnostic && AI_CONTENT_KEYS.some((contentKey) => lowerKey.includes(contentKey));
     if (
-      (!isHttpResponseContext && containsAiContent) ||
-      MEDICAL_PII_KEYS.some((pii) => lowerKey.includes(pii))
+      containsAiContent ||
+      (!isSafeDiagnostic && MEDICAL_PII_KEYS.some((pii) => lowerKey.includes(pii)))
     ) {
       (cleaned as Record<string, unknown>)[key] = '[REDACTED]';
     } else {
@@ -125,6 +158,89 @@ export function scrubPIIFromObject(obj: unknown, parentKey = ''): unknown {
     }
   }
   return cleaned;
+}
+
+function scrubHttpResponseContext(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const source = value as Record<string, unknown>;
+  const safe: Record<string, number> = {};
+  for (const field of ['status_code', 'body_size']) {
+    const diagnostic = source[field];
+    if (typeof diagnostic === 'number' && Number.isFinite(diagnostic)) safe[field] = diagnostic;
+  }
+  return safe;
+}
+
+function scrubStackLocals(value: unknown): void {
+  if (!value || typeof value !== 'object') return;
+  const stacktrace = value as { frames?: Array<Record<string, unknown>> };
+  if (Array.isArray(stacktrace.frames)) {
+    stacktrace.frames = stacktrace.frames.map((frame) => ({ ...frame, vars: {} }));
+  }
+}
+
+function scrubSentryEvent(event: MutableSentryEvent): MutableSentryEvent {
+  if (typeof event.message === 'string') event.message = '[REDACTED]';
+
+  if (event.logentry) {
+    if (event.logentry.message) event.logentry.message = '[REDACTED]';
+    if (event.logentry.formatted) event.logentry.formatted = '[REDACTED]';
+    if (event.logentry.params) event.logentry.params = [];
+  }
+
+  if (event.exception && Array.isArray(event.exception.values)) {
+    event.exception.values = event.exception.values.map((exception) => {
+      if (exception.value) exception.value = '[REDACTED]';
+      scrubStackLocals(exception.stacktrace);
+      return exception;
+    });
+  }
+
+  if (event.threads && Array.isArray(event.threads.values)) {
+    event.threads.values.forEach((thread) => scrubStackLocals(thread.stacktrace));
+  }
+
+  if (event.request) {
+    event.request = scrubPIIFromObject(event.request) as Record<string, unknown>;
+    if (event.request.data !== undefined) event.request.data = '[REDACTED]';
+  }
+
+  if (Array.isArray(event.breadcrumbs)) {
+    event.breadcrumbs = event.breadcrumbs.map((breadcrumb) => ({
+      ...breadcrumb,
+      message: breadcrumb.message ? '[REDACTED]' : breadcrumb.message,
+      data: scrubPIIFromObject(breadcrumb.data) as Record<string, unknown> | undefined,
+    }));
+  }
+
+  if (event.extra) event.extra = scrubPIIFromObject(event.extra) as Record<string, unknown>;
+  if (event.contexts) {
+    event.contexts = scrubPIIFromObject(event.contexts, 'contexts') as Record<string, unknown>;
+  }
+  if (Array.isArray(event.spans)) {
+    event.spans = event.spans.map((span) => ({
+      ...span,
+      description: typeof span.description === 'string'
+        ? redactCredentialQueryParams(span.description)
+        : span.description,
+      data: scrubPIIFromObject(span.data) as Record<string, unknown> | undefined,
+    }));
+  }
+  if (typeof event.transaction === 'string') {
+    event.transaction = redactCredentialQueryParams(event.transaction);
+  }
+
+  const diagnosticCode = event.extra?.diagnostic_code;
+  if (typeof diagnosticCode === 'string' && SAFE_AI_DIAGNOSTIC_CODES.has(diagnosticCode)) {
+    const fingerprint = ['{{ default }}', diagnosticCode];
+    for (const key of ['provider', 'error_type']) {
+      const value = event.extra?.[key];
+      if (typeof value === 'string' && /^[A-Za-z0-9_.-]{1,64}$/.test(value)) fingerprint.push(value);
+    }
+    event.fingerprint = fingerprint;
+  }
+
+  return event;
 }
 
 let isInitialized = false;
@@ -160,45 +276,7 @@ export function initSentry() {
     ],
     beforeSend(event) {
       try {
-        // Field-name matching cannot reliably recognize clinical narratives
-        // embedded in free-form event, exception, or breadcrumb messages.
-        if (typeof event.message === 'string') event.message = '[REDACTED]';
-        if (event.logentry) {
-          const logentry = event.logentry as typeof event.logentry & { formatted?: string };
-          if (logentry.message) logentry.message = '[REDACTED]';
-          if (logentry.formatted) logentry.formatted = '[REDACTED]';
-          if (logentry.params) logentry.params = [];
-        }
-        if (event.exception?.values) {
-          event.exception.values = event.exception.values.map((value) => ({
-            ...value,
-            value: value.value ? '[REDACTED]' : value.value,
-            stacktrace: value.stacktrace
-              ? {
-                  ...value.stacktrace,
-                  frames: value.stacktrace.frames?.map((frame) => ({ ...frame, vars: undefined })),
-                }
-              : value.stacktrace,
-          }));
-        }
-        if (event.request) {
-          event.request = scrubPIIFromObject(event.request) as typeof event.request;
-          if (event.request.data !== undefined) event.request.data = '[REDACTED]';
-        }
-        if (event.breadcrumbs) {
-          event.breadcrumbs = event.breadcrumbs.map((b) => ({
-            ...b,
-            message: b.message ? '[REDACTED]' : b.message,
-            data: scrubPIIFromObject(b.data) as Record<string, unknown> | undefined,
-          }));
-        }
-        if (event.extra) {
-          event.extra = scrubPIIFromObject(event.extra) as typeof event.extra;
-        }
-        if (event.contexts) {
-          event.contexts = scrubPIIFromObject(event.contexts, 'contexts') as typeof event.contexts;
-        }
-        return event;
+        return scrubSentryEvent(event as unknown as MutableSentryEvent) as unknown as typeof event;
       } catch {
         // Drop an event if its privacy scrubber fails; never send it raw.
         return null;
@@ -211,24 +289,7 @@ export function initSentry() {
     // sampled — both must be credential-free).
     beforeSendTransaction(event) {
       try {
-        if (event.request) {
-          event.request = scrubPIIFromObject(event.request) as typeof event.request;
-          if (event.request.data !== undefined) event.request.data = '[REDACTED]';
-        }
-        event.transaction = redactCredentialQueryParams(event.transaction);
-        if (event.spans?.length) {
-          event.spans = event.spans.map((span) => ({
-            ...span,
-            description:
-              typeof span.description === 'string'
-                ? redactCredentialQueryParams(span.description)
-                : span.description,
-            data: span.data
-              ? (scrubPIIFromObject(span.data) as typeof span.data)
-              : span.data,
-          }));
-        }
-        return event;
+        return scrubSentryEvent(event as unknown as MutableSentryEvent) as unknown as typeof event;
       } catch {
         return null;
       }
