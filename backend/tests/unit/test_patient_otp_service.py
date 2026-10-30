@@ -326,9 +326,9 @@ async def test_textbee_definite_rejection_releases_staging_send_reservation(
     assert svc.get_backend().get("patotp:code:+998901112233") is None
     assert svc.get_backend().get("patotp:textbee-staging-cap:+998901112233") is None
 
-    await svc.send_login_otp("+998901112233", "ru")
+    await svc.send_activation_otp("+998901112233", "ru")
     assert sends == 2
-    assert svc.get_backend().get("patotp:code:+998901112233") is not None
+    assert svc.get_backend().get("patact:code:+998901112233") is not None
     assert svc.get_backend().get("patotp:textbee-staging-cap:+998901112233") is not None
 
 
@@ -361,14 +361,15 @@ async def test_textbee_ambiguous_failure_keeps_staging_send_reservation(
     assert first_err.value.status_code == 503
 
     with pytest.raises(PatientOtpError) as retry_err:
-        await svc.send_login_otp("+998901112233", "ru")
+        await svc.send_activation_otp("+998901112233", "ru")
     assert retry_err.value.status_code == 429
     assert sends == 1
     assert svc.get_backend().get("patotp:code:+998901112233") is None
+    assert svc.get_backend().get("patact:code:+998901112233") is None
 
 
 @pytest.mark.asyncio
-async def test_textbee_concurrent_attempt_cannot_take_or_release_active_reservation(
+async def test_textbee_concurrent_login_and_activation_share_reservation(
     svc, monkeypatch
 ):
     from app.services import patient_otp_service as mod
@@ -408,7 +409,7 @@ async def test_textbee_concurrent_attempt_cannot_take_or_release_active_reservat
     first_attempt = asyncio.create_task(svc.send_login_otp("+998901112233", "ru"))
     await started.wait()
     with pytest.raises(PatientOtpError) as concurrent_err:
-        await svc.send_login_otp("+998901112233", "ru")
+        await svc.send_activation_otp("+998901112233", "ru")
     assert concurrent_err.value.status_code == 429
     assert sends == 1
 
@@ -417,9 +418,9 @@ async def test_textbee_concurrent_attempt_cannot_take_or_release_active_reservat
         await first_attempt
     assert first_err.value.status_code == 503
 
-    await svc.send_login_otp("+998901112233", "ru")
+    await svc.send_activation_otp("+998901112233", "ru")
     assert sends == 2
-    assert svc.get_backend().get("patotp:code:+998901112233") is not None
+    assert svc.get_backend().get("patact:code:+998901112233") is not None
 
 
 # ------------------------------------------------------------ normalization
