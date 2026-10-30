@@ -5294,3 +5294,15 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR: https://github.com/drsapaev/final/pull/3805. Merge commit: none; user retains merge authority.
 - Remaining limitation: full integrated T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Tier-2 remains PARTIAL; no deferral is claimed.
 - Next: commit/push these journal updates to existing PR #3805, update PR body, verify exact-head CI, then continue remaining T18 work.
+
+## T18 — PR #3805 state reconciliation — 2026-10-30T21:56+05:00
+
+- Repository/worktree: `drsapaev/final`, `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`; branch `codex/t18-queue-row-diagnostics`.
+- GitHub state: PR #3801 is merged at `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`. PR #3805 remains OPEN / Ready for review / mergeable at HEAD `5bc6bcdb5b270706cb994d09e71583cc2683b349`, base `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; no review decision or merge timestamp.
+- Exact-head checks: Unified CI and applicable frontend unit/E2E, lint/build, PR Required Gate, PR Review Quality Gate, security, CodeQL, Gitleaks, and workflow guards passed. Backend, integration, Docker, parity, readiness, load and DAST were skipped by path-aware rules; skipped checks are not PASS.
+- PR-description correction: replaced stale Tier-1 HEAD `b9dfbd4` with current exact PR HEAD `5bc6bcdb5b270706cb994d09e71583cc2683b349`; retained `b9dfbd4` as the exact source tree for R5 provenance. Clarified that the next T18 work follows the user-owned merge.
+- Validation commands: `gh pr view 3805 --json state,isDraft,mergedAt,headRefOid,baseRefOid,mergeable,statusCheckRollup`; `gh pr checks 3805`; source-path comparison `git diff --name-only b9dfbd4642e57492421c3ef15daa0317d7351279..HEAD` showed only `EVIDENCE.md`, `PROGRESS.md`, and `RESUME.md`.
+- Result: PR state/body agree on the current HEAD and exact evidence. No tests or staging were rerun because this change was documentation/metadata only and previous scenario evidence remains valid.
+- Scope check: no app/runtime/test, API, database, staging configuration, Compose project, production, merge, or deployment change. Only the existing PR description and task journals were touched.
+- Remaining limitation: PR #3805 is not merged. Tier-2 remains PARTIAL; full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete; no deferral is claimed.
+- Next: user merges #3805, then refresh `origin/main` and continue with an uncovered T18 scenario. Do not repeat queue-system 6/6, Admin navigation/panel 3/3 + 2/2, RQ18 8/8, or R5 static provenance 261/261.

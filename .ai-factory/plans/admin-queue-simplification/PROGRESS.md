@@ -1,20 +1,22 @@
-## Current checkpoint — PR #3805 static asset provenance passed; T18 remains partial — 2026-10-30T21:21+05:00
+## Current checkpoint — PR #3805 state reconciled; T18 remains partial — 2026-10-30T21:56+05:00
 
 - Plan version: 1.0.
 - Current task: T18 integrated synthetic acceptance; existing PR #3805.
-- Current status: IN_PROGRESS. PR #3805 is OPEN / Ready for review at HEAD b9dfbd4642e57492421c3ef15daa0317d7351279, based on origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. PR #3801 is confirmed merged at that base.
+- Current status: IN_PROGRESS. PR #3801 is confirmed merged at `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`. PR #3805 remains OPEN / Ready for review at HEAD `5bc6bcdb5b270706cb994d09e71583cc2683b349`, based on that `origin/main` commit; GitHub reports mergeable, with no review decision or merge timestamp.
 - Worktree: C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final.
 - Branch: codex/t18-queue-row-diagnostics.
 - Base commit: 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
-- Current source commit: b9dfbd4642e57492421c3ef15daa0317d7351279.
+- Current source/evidence commit: `5bc6bcdb5b270706cb994d09e71583cc2683b349`. R5 static-asset provenance was built from `b9dfbd4642e57492421c3ef15daa0317d7351279`; commits after that provenance source changed only plan journals.
+- Exact-head checks: Unified CI, frontend unit/E2E, lint/build, PR Required Gate, PR Review Quality Gate, security, CodeQL, Gitleaks and workflow guards PASS. Backend, integration, Docker, parity, readiness, load and DAST checks were skipped by path-aware rules, not passed.
 - R5 canonical Preflight: PASS; exact commit, tracked worktree clean, host disk C: 18 GiB, WSL backing D: 28 GiB, Ubuntu available memory 3193 MiB, ports 18898/18899/15541 free, no warnings.
 - R5 canonical Start: PASS; 10-GiB build reserve, backend/frontend/worker images built, readiness PASS, Ubuntu memory 3263 MiB.
 - R5 static artifact provenance: PASS for all 261 files. Container manifest SHA-256 22a4acfa1ba98934d07d854ca38333e4c412c14803bd0a26e9990101192b9d20; exact HTTP byte matches 261, mismatches 0; sw.js marker matches source commit; frontend image ID sha256:6216be5a85def3ac9da79048b5bd27653c16d219a8654858b46417e0f674970a.
 - Canonical Session teardown: PASS; removed 5 containers, 3 volumes, 1 network; remaining 0. Independent resource and port verification PASS; Ubuntu memory after session 2455 MiB.
 - Limitation: helper output still says served_revision_verified=false; independent byte-comparison evidence is recorded separately. Full integrated T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Tier-2 remains PARTIAL; no deferral is claimed.
 - Allowed scope: task-owned ignored provenance harness/env and T18 journals. Denied scope preserved: application/runtime, tracked tests, staging configuration, production, foreign projects, global Docker cleanup, merge, deployment.
-- Changed but not yet committed: PROGRESS.md, RESUME.md, EVIDENCE.md.
-- Next exact action: review and diff-check the three journal updates, commit and push them to the existing PR #3805 branch, update its description with the exact R5 result and remaining acceptance limits, then verify exact-head CI. Do not merge; the user owns merge.
+- PR description: updated to identify exact current HEAD `5bc6bcdb5b270706cb994d09e71583cc2683b349`, distinguish it from R5 provenance source `b9dfbd4642e57492421c3ef15daa0317d7351279`, and state the next action after merge. Tier-2 remains PARTIAL; no deferral is claimed.
+- This state-reconciliation step ran no tests and started no staging project; it only corrected PR metadata and this checkpoint.
+- Next exact action: user merges the already green PR #3805. After merge, fetch fresh `origin/main`, clean/retain this owned worktree per cycle policy, and continue only an uncovered T18 item. Do not repeat the passed queue-system 6/6, Admin 3/3 + 2/2, RQ18 8/8, or R5 261/261 asset comparison. Full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete.
 
 ## Previous checkpoint — PR #3805 queue E2E and Admin route checks passed — 2026-10-30T15:39+05:00
 
