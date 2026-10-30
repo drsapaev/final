@@ -1,8 +1,39 @@
-import { test, expect, type Page, type Response } from '@playwright/test';
+import { test as base, expect, type BrowserContext, type Page, type Response } from '@playwright/test';
 
 const REGISTRAR_USERNAME = process.env.QA_REGISTRAR_USERNAME || 'registrar@clinic.com';
 const REGISTRAR_QUEUE_PATH = '/registrar/queue';
 const QUEUE_SNAPSHOT_PATH = '/registrar/queues/today';
+
+type RegistrarWorkerFixtures = {
+  registrarStorageState: Awaited<ReturnType<BrowserContext['storageState']>>;
+};
+
+const test = base.extend<{}, RegistrarWorkerFixtures>({
+  registrarStorageState: [async ({ browser }, use, workerInfo) => {
+    const baseURL = workerInfo.project.use.baseURL;
+    expect(typeof baseURL, 'Queue system E2E requires a configured baseURL.').toBe('string');
+
+    const context = await browser.newContext({ baseURL: baseURL as string });
+    try {
+      const page = await context.newPage();
+      await page.goto('/login');
+      await page.fill('input[type="text"]', REGISTRAR_USERNAME);
+      await page.fill('input[type="password"]', requiredRegistrarPassword());
+      await page.click('button[type="submit"]');
+      await page.waitForLoadState('networkidle');
+      await expect(page, 'The synthetic Registrar login must leave the login screen.').not.toHaveURL(
+        /\/login(?:[?#].*)?$/
+      );
+
+      await use(await context.storageState());
+    } finally {
+      await context.close();
+    }
+  }, { scope: 'worker' }],
+  storageState: async ({ registrarStorageState }, provideState) => {
+    await provideState(registrarStorageState);
+  },
+});
 
 interface QueueEntrySnapshot {
   queue_number?: string | number | null;
@@ -351,11 +382,6 @@ test.describe('Queue System Tests', () => {
 
   test.beforeEach(async ({ page }) => {
     observeAvailableSpecialists(page);
-    await page.goto('/login');
-    await page.fill('input[type="text"]', REGISTRAR_USERNAME);
-    await page.fill('input[type="password"]', requiredRegistrarPassword());
-    await page.click('button[type="submit"]');
-    await page.waitForLoadState('networkidle');
   });
 
   test('should display queue management interface', async ({ page }) => {

@@ -1,21 +1,22 @@
-## Current checkpoint — PR #3805 corrected queue locator locally — 2026-10-30T09:24:24+05:00
+## Current checkpoint — PR #3805 single-login E2E fixture locally validated — 2026-10-30T09:59:33+05:00
 
 - Plan version: 1.0
 - Current task: T18 integrated synthetic acceptance; PR #3805
-- Current status: previous exact-head CI and owned staging lifecycle PASS. Synthetic seed, served frontend provenance, Admin 2FA/routes PASS. Previous target run: 2 PASS / 1 FAIL / 3 NOT_RUN because serial execution stopped after the failure. Source-backed E2E locator correction is local; focused lint, E2E TypeScript check, and Playwright collection PASS. Tier-2 remains PARTIAL; no waiver.
+- Current status: exact-head CI PASS on `fa519728`; latest canonical Preflight/Start/Session lifecycle PASS and teardown PASS. Synthetic seed and served revision provenance PASS. Queue suite: 4 PASS / 1 FAIL / 0 skipped; the fifth test's beforeEach login hit HTTP 429, and Admin login then hit 429 before 2FA. A worker-level single-login storageState correction is local; focused ESLint, E2E TypeScript, and Playwright collection PASS. Tier-2 remains PARTIAL; no waiver.
 - Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`
 - Branch: `codex/t18-queue-row-diagnostics`
 - Base commit: `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`
-- Current pushed PR HEAD: `5cd1e1e62b9f8e4daf6d121fff4a11f586497957`; local pending source correction is not yet committed or pushed.
-- Confirmed failure: failing test's accessible page snapshot contains two queue rows, but the test CSS locator returns zero. `DataTable.renderDataRow` renders raw `<tr>` elements with `aria-rowindex`; the test incorrectly requires `.mac-table-row`, a class used only by the separate `TableRow` primitive.
-- Chosen mode: `gate_known_root_cause` for a queue E2E selector correction. The first command stopped because `rendered table contract` matched the migration-intent keyword heuristic; no source edit followed. The single misroute retry retained the confirmed root and reviewed scope; result `gate_ok`, mode `execute`, `gate_misroute=false`, `override_used=false`, `handoff_required=true`. The generated execution prompt was read and its first-touch list limits edits to the E2E file and journals. No `narrow_override` was used.
-- Canonical read-only anchors: `frontend/src/components/queue/QueueTable.tsx`, `frontend/src/components/ui/DataTable.tsx`, and `frontend/src/hooks/useQueueManager.ts`. Reference-only; source changes denied.
-- First-touch allowed after gate: `frontend/e2e/queue-system.spec.ts`; local T18 journals `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Focused ESLint PASS; `tsc --noEmit -p e2e/tsconfig.json` PASS; Playwright collection PASS (30 project/test combinations, 6 scenarios). Next: commit/push, exact-head CI, then one fresh owned canonical Preflight → Start → Session target run and teardown.
-- Denied: app/runtime/backend/API/DB/auth changes, generated frontend output, production, `C:\final`, foreign worktrees/projects, merge/deployment, recording patient labels or credentials.
-- First stop condition: gate blocks without a valid explicit override, source shows queue rows are truly absent rather than locator mismatch, or the corrected test finds a second application contract defect. Keep Tier-2 PARTIAL and report the new failure without broadening scope.
-- Next exact action: commit/push the reviewed four-file change, wait for exact-head CI, then run one new owned synthetic staging cycle for the six target scenarios and teardown.
+- Current pushed PR HEAD: `fa519728dab30f795ccd66506670c97fbeb6cd6c`; local pending test-only correction is not committed/pushed.
+- First root cause confirmed: the prior zero-row mismatch was a stale CSS class; the E2E locator now uses accessible table/row/cell semantics, and the numbered-row test passed in synthetic staging.
+- New root cause confirmed from source and outcomes: `SecurityMiddleware` allows 5 login requests per IP per 300 seconds and counts every request. Staging ran one Registrar auth diagnostic, then the suite's `beforeEach` logged in again for each case. Four queue tests passed; the next login was rate-limited (doctor selector absent). Admin login then also returned 429. This is test-session rate-limit exhaustion, not evidence of a runtime auth defect.
+- Chosen mode: `gate_known_root_cause`; same confirmed first-touch `frontend/e2e/queue-system.spec.ts`. Gate returned `gate_ok`, mode `execute`, `gate_misroute=false`, `override_used=false`, `handoff_required=true`; generated prompt read. No narrow override used.
+- Canonical anchors: `frontend/e2e/queue-system.spec.ts`; `backend/app/middleware/security_middleware.py` reference-only. The test now logs in once per worker through the actual login UI, passes in-memory `storageState` to fresh test contexts, and no longer performs a password login in every `beforeEach`. Auth policy/runtime unchanged.
+- First-touch after gate: same E2E file and three journals. E2E TypeScript PASS; Playwright collection PASS (30 project/test combinations; six scenarios); focused ESLint PASS. Re-run final checks including build and `git diff --check`, then commit/push, wait exact-head CI, and run one new owned synthetic project for all six tests plus Admin 2FA/routes/provenance and teardown.
+- Denied: application/runtime/backend/API/DB/auth policy changes, generated application code, production, `C:\final`, foreign worktrees/projects, merge/deployment, logging patient labels or credentials.
+- Stop conditions: gate blocks without allowed basis; one-login fixture cannot preserve the existing Registrar auth contract; Admin still returns 429 after fewer than five successful/attempted logins; or another product contract issue appears. Do not raise or disable rate limits.
+- Next exact action: run final scoped checks, commit/push the test fixture and journals, wait for exact-head CI, then perform one new synthetic staging cycle.
 
-## Previous checkpoint — PR #3805 queue E2E locator diagnosis — 2026-10-30T09:05+05:00
+## Previous checkpoint — PR #3805 auth-throttle exhaustion diagnosed — 2026-10-30T09:40+05:00
 
 - Plan version: 1.0
 - Current task: T18 integrated synthetic acceptance; PR #3805
