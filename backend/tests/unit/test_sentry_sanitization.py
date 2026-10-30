@@ -597,8 +597,8 @@ class TestBeforeSendSanitizerFailure:
     def test_registered_before_send_accepts_none_hint(self, monkeypatch):
         """before_send must accept hint=None (Sentry SDK may pass None)."""
         before_send = _make_before_send(monkeypatch)
-        result = before_send({"event_id": "x"}, hint=None)
-        assert result["event_id"] == "x"
+        result = before_send({"event_id": "a" * 32}, hint=None)
+        assert result["event_id"] == "a" * 32
 
     def test_registered_before_send_uses_warning_and_drops_on_failure(
         self, caplog, monkeypatch
@@ -720,7 +720,7 @@ class TestRegisteredBeforeSendPayloadRedaction:
             "THREAD_LOCAL_CANARY",
         ):
             assert marker not in serialized
-        assert scrubbed["breadcrumbs"]["values"][0]["data"]["action"] == "submit"
+        assert "breadcrumbs" not in scrubbed
         assert scrubbed["contexts"]["response"]["status_code"] == 503
 
     def test_registered_callback_scrubs_ai_keys_and_keeps_safe_diagnostics(
@@ -736,9 +736,8 @@ class TestRegisteredBeforeSendPayloadRedaction:
                 "input": "AI_INPUT_CANARY",
                 "input_tokens": 42,
                 "invalid_input_tokens": "INVALID_TOKEN_DIAGNOSTIC_CANARY",
-                "model": "gpt-4o-mini",
                 "diagnostic_code": "ai_provider_failure",
-                "provider": "OPENAI",
+                "provider": "openai",
                 "error_type": "TimeoutError",
             },
             "contexts": {
@@ -770,13 +769,13 @@ class TestRegisteredBeforeSendPayloadRedaction:
         ):
             assert marker not in serialized
         assert scrubbed["extra"]["input_tokens"] == 42
-        assert scrubbed["extra"]["model"] == "gpt-4o-mini"
+        assert "model" not in scrubbed["extra"]
         assert scrubbed["contexts"]["response"] == {"status_code": 503}
         assert scrubbed["spans"][0]["data"]["http.response.status_code"] == 502
         assert scrubbed["fingerprint"] == [
             "{{ default }}",
             "ai_provider_failure",
-            "OPENAI",
+            "openai",
             "TimeoutError",
         ]
 
@@ -826,6 +825,9 @@ class TestRegisteredBeforeSendTransaction:
         assert scrubbed["contexts"]["response"] == {"status_code": 503}
         assert scrubbed["spans"][0]["data"]["gen_ai.usage.input_tokens"] == 24
         assert scrubbed["spans"][0]["data"]["http.response.status_code"] == 503
+        assert scrubbed["transaction"] == "[REDACTED TRANSACTION]"
+        assert "description" not in scrubbed["spans"][0]
+        assert "breadcrumbs" not in scrubbed
 
     def test_registered_callback_drops_transaction_when_scrubber_fails(
         self, monkeypatch
@@ -837,6 +839,141 @@ class TestRegisteredBeforeSendTransaction:
             assert (
                 callback({"type": "transaction", "request": {"data": "x"}}, {}) is None
             )
+
+    def test_registered_callbacks_drop_arbitrary_event_channels_and_keep_safe_diagnostics(
+        self, monkeypatch
+    ):
+        import json
+
+        callback = _make_before_send(monkeypatch)
+        event = {
+            "event_id": "a" * 32,
+            "request": {
+                "method": "GET",
+                "url": "/api/v1/patients?clinical_note=REQUEST_QUERY_CANARY",
+                "query_string": "name=QUERY_CANARY",
+                "headers": {"referer": "REFERER_CANARY"},
+            },
+            "user": {"email": "PATIENT_EMAIL_CANARY", "id": "PATIENT_ID_CANARY"},
+            "extra": {
+                "clinical_summary": "EXTRA_CANARY",
+                "diagnostic_code": "ai_provider_failure",
+                "provider": "openai",
+                "error_type": "TimeoutError",
+                "input_tokens": 27,
+                "model": "MODEL_CANARY",
+            },
+            "contexts": {
+                "ai": {"summary": "CUSTOM_CONTEXT_CANARY"},
+                "response": {
+                    "status_code": 503,
+                    "body_size": 42,
+                    "body": "RESPONSE_BODY_CANARY",
+                },
+                "trace": {"trace_id": "a" * 32, "detail": "TRACE_DETAIL_CANARY"},
+            },
+            "breadcrumbs": {
+                "values": [
+                    {
+                        "message": "BREADCRUMB_CANARY",
+                        "data": {"details": "CRUMB_DATA_CANARY"},
+                    }
+                ]
+            },
+            "spans": [
+                {
+                    "description": "SPAN_DESCRIPTION_CANARY",
+                    "op": "http.client",
+                    "data": {
+                        "http.response.status_code": 502,
+                        "gen_ai.usage.input_tokens": 19,
+                        "clinical_summary": "SPAN_DATA_CANARY",
+                    },
+                }
+            ],
+            "tags": {"severity": "error", "patient_name": "TAG_CANARY"},
+            "unrecognized_payload": "TOP_LEVEL_CANARY",
+            "transaction": "/patients/alice?note=TRANSACTION_QUERY_CANARY",
+            "transaction_info": {"source": "route"},
+            "fingerprint": ["PATIENT_FINGERPRINT_CANARY"],
+        }
+
+        scrubbed = callback(event, {})
+        serialized = json.dumps(scrubbed)
+
+        for marker in (
+            "REQUEST_QUERY_CANARY",
+            "QUERY_CANARY",
+            "REFERER_CANARY",
+            "PATIENT_EMAIL_CANARY",
+            "PATIENT_ID_CANARY",
+            "EXTRA_CANARY",
+            "MODEL_CANARY",
+            "CUSTOM_CONTEXT_CANARY",
+            "RESPONSE_BODY_CANARY",
+            "TRACE_DETAIL_CANARY",
+            "BREADCRUMB_CANARY",
+            "CRUMB_DATA_CANARY",
+            "SPAN_DESCRIPTION_CANARY",
+            "SPAN_DATA_CANARY",
+            "TAG_CANARY",
+            "TOP_LEVEL_CANARY",
+            "TRANSACTION_QUERY_CANARY",
+            "PATIENT_FINGERPRINT_CANARY",
+        ):
+            assert marker not in serialized
+        assert scrubbed["request"] == {"method": "GET"}
+        assert "user" not in scrubbed
+        assert "breadcrumbs" not in scrubbed
+        assert scrubbed["contexts"] == {
+            "response": {"status_code": 503, "body_size": 42},
+            "trace": {"trace_id": "a" * 32},
+        }
+        assert scrubbed["extra"] == {
+            "diagnostic_code": "ai_provider_failure",
+            "provider": "openai",
+            "error_type": "TimeoutError",
+            "input_tokens": 27,
+        }
+        assert scrubbed["spans"][0] == {
+            "op": "http.client",
+            "data": {
+                "http.response.status_code": 502,
+                "gen_ai.usage.input_tokens": 19,
+            },
+        }
+        assert scrubbed["tags"] == {"severity": "error"}
+        assert scrubbed["fingerprint"] == [
+            "{{ default }}",
+            "ai_provider_failure",
+            "openai",
+            "TimeoutError",
+        ]
+
+    def test_registered_callback_preserves_only_framework_route_templates(
+        self, monkeypatch
+    ):
+        callback = _make_before_send(
+            monkeypatch, callback_name="before_send_transaction"
+        )
+        event = {
+            "type": "transaction",
+            "transaction": "GET /api/v1/patients/{patient_id}",
+            "transaction_info": {"source": "route"},
+        }
+
+        scrubbed = callback(event, {})
+
+        assert scrubbed["transaction"] == "GET /api/v1/patients/{patient_id}"
+        assert scrubbed["transaction_info"] == {"source": "route"}
+
+    def test_registered_before_breadcrumb_discards_crumbs(self, monkeypatch):
+        _make_before_send(monkeypatch)
+        import sentry_sdk
+
+        sentry_sdk.init.assert_called_once()
+        before_breadcrumb = sentry_sdk.init.call_args.kwargs["before_breadcrumb"]
+        assert before_breadcrumb({"message": "CLINICAL_BREADCRUMB_CANARY"}) is None
 
 
 class TestSanitizeEventStandardContextsPreserved:
