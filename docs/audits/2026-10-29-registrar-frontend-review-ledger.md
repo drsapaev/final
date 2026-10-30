@@ -39,6 +39,9 @@
 | REG-FE-011 | P2 | Partial patient save before edit | `updatePatient` can commit changes before later queue/edit-delta failure | SOURCE-OBSERVED / REPRO-PENDING | Batch G: patient/visit atomicity |
 | REG-FE-012 | P2 | Date-aware service catalogue | Older async service response can overwrite newer catalogue and rehydrate current cart | SOURCE-OBSERVED / REPRO-PENDING | Batch H: wizard data loading |
 | REG-FE-013 | P2 | Wizard diagnostic privacy | Direct patient-phone string and `fio` object field can pass through development logger | SOURCE-OBSERVED / REPRO-PENDING | Batch I: privacy guard |
+| REG-FE-014 | P2 | Context action acknowledgement | Context menu emits success for status changes even when the action returned null after failure | SOURCE-OBSERVED / REPRO-PENDING | Batch J: action feedback |
+| REG-FE-015 | P2 | Partial batch status mutations | A partial server-side success yields an error but no worklist refresh/reconciliation | SOURCE-OBSERVED / REPRO-PENDING | Batch J: action feedback |
+| REG-FE-016 | P3 | Cart visit forecast | Wizard banner counts distinct doctor IDs, while the payload groups by resource tag and appointment time too | SOURCE-OBSERVED / REPRO-PENDING | Batch K: cart summary |
 
 ### REG-FE-001 — Row activation does not open details (P2 candidate)
 
@@ -202,6 +205,43 @@
 
 There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.tsx L2495–L2590](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2495-L2590): after a batch error it can continue toward cart creation. The earlier `editDeltaBuild.items.length > 0` return and the QR full-update short-circuit appear to guard most real edit scenarios; **reachability and duplicate-write impact are not proven**. Do not label P1 or change the branch without a fail-first route-selection test and backend reconciliation evidence. The main `createRegistrarCart` path already uses a submission lock and payload-bound idempotency key.
 
+
+### REG-FE-014 — Context-menu status actions claim success on rejected command (P2 candidate)
+
+**Code evidence:** [useRegistrarRowActions.ts L184–L196](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarRowActions.ts#L184-L196) and [L199–L214](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarRowActions.ts#L199-L214) `await updateAppointmentStatus(...)` and **unconditionally** emit `notify.success` for "in_cabinet" and "complete". [useRegistrarActions.ts L100–L126](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarActions.ts#L100-L126) catches HTTP/contract errors or rejects unsupported actions and resolves **`null`**, rather than rejecting. The latter also emits its own success toast on success, so a successful context action may produce **two** success notifications. [Existing row-actions test L105–L111](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/__tests__/useRegistrarRowActions.test.ts#L105-L111) mocks a void/undefined return and only asserts command invocation.
+
+**Potential impact:** an unsuccessful attempt to send a patient to a room or complete a visit is followed by a contradictory success toast; a genuine success may be toasted twice. Affected surface is the **context menu**, distinct from the earlier Welcome confirmation issue REG-FE-006.
+
+**Fail-first test:** render the row-action hook with `updateAppointmentStatus` returning `null` (for declined backend action, permission failure or network error), confirm the menu action, and assert **zero** success toasts. With an actual successful result, assert one coherent success toast from a single owner, not two. Include both `in_cabinet` and `complete`.
+
+**Remediation direction:** gate the context-menu acknowledgement on an explicit successful command result, ideally centralize success/error notifications in `useRegistrarActions`; preserve confirmation, auth/RBAC and backend-owned available-actions semantics.
+
+### REG-FE-015 — Partial batch status command leaves worklist unsynchronized (P2 candidate)
+
+**Code evidence:** [backend registrar_wizard/_visits.py L1471–L1493](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/backend/app/api/v1/endpoints/registrar_wizard/_visits.py#L1471-L1493) executes one command per record and returns `success=false` whenever **any** item failed, with `success_count`, `failed_count` and per-record results. Backend actions are not one all-or-nothing batch transaction; for instance, the cancel-visit record branch explicitly commits within the per-item operation ([L951–L981](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/backend/app/api/v1/endpoints/registrar_wizard/_visits.py#L951-L981)); an existing characterization test demonstrates the `success_count=1, failed_count=1` shape ([test_registrar_queue_cancel_r13.py](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/backend/tests/characterization/test_registrar_queue_cancel_r13.py#L1-L25)). [useRegistrarActions.ts L67–L81 and L109–L126](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarActions.ts#L67-L126) treats a response with `success=false` as a thrown error, and only refreshes the worklist in the all-success path. Its catch reports an error and returns `null`; neither handler reconciles successful records in a partial outcome.
+
+**Potential impact:** for an aggregated/multi-record action that succeeds on A and fails on B (e.g. concurrent status change or unavailable action), UI can continue displaying A as actionable in the old state, without explaining what succeeded. Repeating the command against stale rows can cause user confusion or an unnecessary second state transition attempt. This is *not* evidence of silent corruption: the server owns validation and may reject the duplicate.
+
+**Fail-first test:** feed `handleStartVisit` and `updateAppointmentStatus` a synthetic response `{success:false,success_count:1,failed_count:1,results:[{success:true,record_id:1},{success:false,record_id:2,error:'conflict'}]}`; assert one authoritative refresh/reconciliation happens even though overall action failed; assert user sees **partial success with failed record details** and cannot misread it as zero committed effects. Test all-failed and all-success outcomes separately, and backend permissions independently.
+
+**Remediation direction:** return typed structured outcomes rather than `null`-only errors for partial batches, refresh after any committed item and present precise partial-result feedback. Do not automatically retry the entire group; first reconcile fresh server state and target only records still actionable. Any implementation crossing visit/queue contracts requires mandatory gate.
+
+### REG-FE-016 — Cart banner counts doctors, not prospective visits (P3 candidate)
+
+**Code evidence:** [CartStepV2.tsx L589–L616](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/CartStepV2.tsx#L589-L616) builds `doctorGroups` keyed by `item.doctor_id || 'no_doctor'`, then labels its size as `Будет создано визитов`. In contrast, the actual payload grouping function [wizardUtils.ts L1084–L1154](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/wizardUtils.ts#L1084-L1154) keys each grouped visit by either **resource queue tag** or **doctor ID**, *plus visit date/time*. Different resource tags with no physician are two groups for save but just one `no_doctor` card group for the banner. Conversely, the same doctor with different visit times may form two grouped visits while banner still counts one.
+
+**Potential impact:** the registrar sees an inaccurate prospective visit count just before confirming a multi-resource or multi-time booking. This is a presentation forecast issue; it does not assert incorrect backend queue allocation.
+
+**Fail-first test:** for synthetic cart with two doctorless services on different resource tags and same date, assert the banner equals `groupCartItemsByVisit(...).length` (two), and for two same-doctor items with distinct visit times verify both counts. Cover grouped same-doctor same-time case (one). Only claim the payload forecast, not actual persisted visit count until backend reconciliation.
+
+**Remediation direction:** derive prospective count from the same pure grouping used to prepare the request or rename banner to a truthful count of distinct doctors/resource groups. Do not introduce a second client-side queue owner or override backend SSOT.
+
+### Verified guardrails and unconfirmed routing hypothesis
+
+- **Read and write doctor assignment:** [CartStepV2.tsx L310–L331](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/CartStepV2.tsx#L310-L331) uses `filterDoctorsForService`, [wizardUtils.ts L183–L209](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/wizardUtils.ts#L183-L209) honors the pinned `service.doctor_id`, and [backend registrar_doctor_eligibility.py L278–L355](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/backend/app/services/registrar_doctor_eligibility.py#L278-L355) rejects invalid pinned-doctor/resource routing in write commands. No claim of a missing doctor-owner check is made on the inspected path.
+- **Edit delta:** [AppointmentWizardV2.tsx L2394–L2484](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2394-L2484) routes a non-empty edit-delta to `applyRegistrarEditDelta` and returns on success/failure; QR full-update has its own return guard. The old batch→cart fallback at [L2494–L2588](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2494-L2588) is still present but **reachability is unproved** for the current canonical edit pathway; do not promote it to a duplicate-booking P1 without a concrete reproduction.
+- **No source edits, no tests:** backend and frontend were inspected read-only. The exact effects of these candidates remain subject to focused regression tests.
+
 ## Review coverage
 
 ### Actually inspected in first pass (source reads; not an exhaustive audit)
@@ -221,6 +261,9 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 - `frontend/src/api/registrar.ts`
 - `frontend/src/components/wizard/AppointmentWizardV2.tsx`
 - `frontend/src/components/wizard/wizardUtils.ts`
+- `frontend/src/pages/registrar/useRegistrarActions.ts` and `useRegistrarRowActions.ts` (context action return contract)
+- `backend/app/api/v1/endpoints/registrar_wizard/_visits.py` (per-record action semantics)
+- `backend/app/services/registrar_doctor_eligibility.py` (write-side pin and route guards)
 - `frontend/src/components/wizard/PatientStepV2.tsx`
 - `frontend/src/components/wizard/CartStepV2.tsx`
 - `frontend/src/components/dialogs/ModernDialog.tsx`
@@ -243,7 +286,7 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 4. Display and usability: `WelcomeView`, table renderers, modal accessibility, loading/empty/error states.
 5. API/privacy/performance: registrar API adapter, outbound requests, auth boundaries, PHI-safe diagnostics, existing tests/e2e.
 
-Any further findings receive the next stable ID (`REG-FE-014`, etc.), a source-SHA anchor, an impact scenario, a reproduction/test, and a status. If refuted, mark **NOT A BUG** with evidence rather than silently deleting the row.
+Any further findings receive the next stable ID (`REG-FE-017`, etc.), a source-SHA anchor, an impact scenario, a reproduction/test, and a status. If refuted, mark **NOT A BUG** with evidence rather than silently deleting the row.
 
 ## Remediation plan — execute only after review triage
 
@@ -251,9 +294,18 @@ Any further findings receive the next stable ID (`REG-FE-014`, etc.), a source-S
 2. **Triage risk and ownership:** address confirmed P0/P1 before P2/P3. If any fix touches queue ownership/fairness, clinical lifecycle, payment truth, authentication or API contracts, run the repository-required execution gate and inspect canonical source, ADRs and backend tests before editing.
 3. **Batch A — interaction:** `REG-FE-001`; decide desired row-click UX, add keyboard/pointer regression, smallest implementation change, review, CI.
 4. **Batch B — view model/localization:** `REG-FE-002` + `REG-FE-003` only if they remain purely presentation-level and independently tested; avoid altering backend SSOT and identity.
-5. **Additional batches:** one bounded fix PR per validated domain/root cause; never introduce a speculative blanket refactor or mix unrelated source fixes into this ledger PR.
-6. **Validation:** relevant Vitest components/contracts, `tsc`/ESLint, affected Playwright flows with synthetic data, relevant queue contract tests, PR quality gates, `git diff --check`, and code review. Record **actual commands/results**; do not claim tests passed without execution.
-7. **Closure:** update each ledger row with root cause, test evidence, fix PR/commit SHA, review outcome, and resolution status. Keep this audit PR as the index; merge it only when repository review and CI policy permit. Do not deploy as part of this audit.
+5. **Batch C — quick filters and status semantics:** verify REG-FE-004 against canonical queue status and payment-state DTOs.
+6. **Batch D — date and refresh lifecycle:** verify REG-FE-005, 007, 008 with effective-date and explicit fetch-state tests.
+7. **Batch E — reschedule UI identity:** verify REG-FE-009 with cross-namespace ID collisions.
+8. **Batch F — patient selection and persistence:** verify REG-FE-010 and implement an explicit profile-edit contract, if intended.
+9. **Batch G — patient/visit partial saves:** verify REG-FE-011; choose safe domain ownership with a mandatory execution gate.
+10. **Batch H — asynchronous wizard catalogue:** verify REG-FE-012 with out-of-order responses.
+11. **Batch I — PHI-safe diagnostics:** verify/fix REG-FE-013 with synthetic logging tests.
+12. **Batch J — registrar command feedback:** verify REG-FE-014/015 with failure and partial-success contract tests; mandatory gate applies if backend action semantics/queue lifecycle is changed.
+13. **Batch K — prospective visit count:** verify REG-FE-016 against the same pure grouping that constructs the cart payload.
+14. **Additional batches:** one bounded fix PR per validated domain/root cause; never introduce a speculative blanket refactor or mix unrelated source fixes into this ledger PR.
+15. **Validation:** relevant Vitest components/contracts, `tsc`/ESLint, affected Playwright flows with synthetic data, relevant queue contract tests, PR quality gates, `git diff --check`, and code review. Record **actual commands/results**; do not claim tests passed without execution.
+16. **Closure:** update each ledger row with root cause, test evidence, fix PR/commit SHA, review outcome, and resolution status. Keep this audit PR as the index; merge it only when repository review and CI policy permit. Do not deploy as part of this audit.
 
 ## Change log
 
@@ -262,6 +314,7 @@ Any further findings receive the next stable ID (`REG-FE-014`, etc.), a source-S
 | 2026-10-29 | Initial | Three provisional source-observed findings; coverage, scope and remediation plan | GitHub source reads; remote PR/commit verified |
 | 2026-10-29 | Review pass 2 | REG-FE-004–009: quick filters, URL date, Welcome confirmation, 429 handling, refresh notification, reschedule identity | Frontend hooks/views, backend read-model helpers and existing tests inspected; runtime tests not executed |
 | 2026-10-30 | Review pass 3 | REG-FE-010–013: existing patient edits, partial profile/queue save, stale wizard catalogue, development PII logging | Wizard UI/handlers, API mappers, privacy logger, wizard tests inspected; no runtime tests executed; new main source SHA `22b21a8b7c3c0b9b56f4e388c35e329a4321f768` |
+| 2026-10-30 | Review pass 4 | REG-FE-014–016: context-action false success, partial batch reconcile, cart visit-count display; pinned doctor/route guard inspected | Backend per-record command path and relevant frontend hooks/tests inspected; no runtime tests executed |
 
 ## End-of-review acceptance criteria
 
