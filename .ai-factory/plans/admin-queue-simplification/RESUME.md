@@ -1520,3 +1520,8 @@ The first commit attempt failed only because ESLint dependencies were absent. No
 - Normal commit hooks: first attempt stopped on journal formatting after PowerShell expanded Markdown backticks; no hook was bypassed. Journal tail is being corrected before retry.
 - Result: source P2 corrected; commit created locally and normal hooks passed; push and exact-head CI pending. No GitHub review reply/resolution, merge, or deployment.
 - Next exact action: push the current branch and verify exact-head CI. Keep review threads unresolved and merge user-controlled.
+
+## Latest continuation — T18 static provenance harness stopped before comparison — 2026-10-30T19:44+05:00
+
+PR #3801 is merged. PR #3805 remains open; do not treat the user's merge note as merge confirmation for #3805. One unique synthetic staging project passed Preflight, Start, and readiness. The provenance Session stopped when its manifest reader returned a nonzero container-read status, before comparing any HTTP asset bytes. Canonical teardown passed; zero owned containers/volumes/networks and free ports were verified; post-session Preflight passed. Record all-file provenance as NOT_RUN, not as an app failure. Tier-2 remains PARTIAL with no deferral. The next action is to commit/push this journal-only evidence to #3805, update its description and exact-head CI, then wait for the user-owned merge. No further image build until the manifest-read failure is diagnosed.
+The exact ignored env and provenance harness files remain in the worktree because host command policy rejected their deletion; do not use alternate deletion methods.

@@ -2023,3 +2023,13 @@ Last updated: 2026-10-29T15:42:19+05:00
 - Existing T18 evidence is in the dated entries in `EVIDENCE.md`: queue E2E 6/6, Admin navigation 3/3, Admin panel 2/2, and current QueueProfile lifecycle 8/8. No new staging session ran in this checkpoint. Full T18 acceptance and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete; served frontend evidence confirms only the `sw.js` marker, not all static assets. Tier-2 remains PARTIAL per the user's direction; no deferral is claimed.
 - This checkpoint changes only `PROGRESS.md`, an allowed journal path in PR #3805. No application/test source, staging resource, production surface, or merge was changed. The canonical status registry in the main plan still contains historical T09/T11/T16/T17 states; reconcile that registry in a separate in-scope plan update after the current PR cycle closes.
 - Next exact action: wait for the user-owned merge of PR #3805. Then refresh `origin/main`, reconcile the canonical plan status registry, and continue only with unmet T18 requirements. Do not mark the plan or Tier-2 complete from the partial evidence above.
+
+## Current checkpoint — static asset provenance attempt — 2026-10-30T19:44+05:00
+
+- Current worktree: `codex/t18-queue-row-diagnostics`, HEAD `8c606dc99d0bc9d19c49b025d2084d73dcd4e66a`; tracked tree clean before journal update. PR #3801 is merged; PR #3805 remains open at the last direct GitHub check.
+- T00–T17 implementation PRs are verified merged. T18 includes queue E2E 6/6, Admin navigation 3/3, Admin panel 2/2, and direction lifecycle 8/8 evidence from prior synthetic runs.
+- This turn's static-artifact probe: Preflight PASS; Start/build/readiness PASS; Session harness stopped before file comparison at `container_read`; canonical teardown and post-session Preflight PASS; zero owned Docker resources and free ports verified.
+- Actual all-file provenance result: NOT_RUN. No product defect inferred. Tier-2 remains PARTIAL, no deferral; full `STAGING_VALIDATION.md` is incomplete.
+- Current files changed for this attempt: T18 journals only. Runtime/tests/config untouched. The task-owned env and one harness were used for one unique isolated project.
+- Next exact action: finish the journal-only update, push it on existing PR #3805, refresh its description with the honest NOT_RUN result, and verify exact-head CI. Wait for the user-owned merge before beginning another PR cycle. Do not rebuild staging until `container_read` is diagnosed.
+- Local cleanup: host command policy rejected removal of the exact ignored env/harness files after teardown; no workaround used. No Compose resources remain.

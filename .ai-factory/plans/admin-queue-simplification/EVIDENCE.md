@@ -5248,3 +5248,17 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: this current UI flow PASS on exact commit. Overall Tier-2 remains PARTIAL. Full docs/runbooks/STAGING_VALIDATION.md and remaining integrated T18 scenarios are NOT_RUN; no deferral is claimed.
 - Scope check: no tracked runtime/test change, no production/foreign Compose, no merge or deployment. PR #3805 remains open at the time checked.
 - Next: commit and push the three journal updates to existing PR #3805, refresh the PR description with exact results/limitations, then verify exact-head CI. Await user-owned merge before starting a new PR cycle.
+
+## T18 — exact static asset provenance attempt — 2026-10-30T19:44+05:00
+
+- Commit under test: `8c606dc99d0bc9d19c49b025d2084d73dcd4e66a`; PR #3801 is merged at `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`. PR #3805 was confirmed OPEN / Ready for review / mergeable before this run.
+- Execution mode: validation-only continuation under the previously authorized T18 `narrow_override`; no application, tracked test, staging-config, production, merge, or deployment change.
+- Environment: isolated Ubuntu-24.04 project `clinic-aqs-t18-static-assets-20261030`, owner `codex-t18-static-assets-20261030`, host ports 18884/18885/15534; private synthetic environment only.
+- Canonical Preflight: PASS; host disk free 18 GiB, WSL backing disk free 28 GiB, WSL available memory 3206 MiB, no warnings, exact source HEAD and clean worktree. Canonical Start: PASS; 10-GiB storage reserve applied, runtime readiness PASS, images built, WSL available memory 3169 MiB.
+- Local harness validation: PowerShell parser PASS. Target was byte-for-byte comparison of every static file in the built frontend container against HTTP-served bytes, plus exact `sw.js` commit marker.
+- Canonical Session: FAIL at the harness manifest-read step (`STATIC_ASSET_MANIFEST=FAIL; reason=container_read`). The harness did not complete a manifest and made no per-file HTTP comparisons. Therefore static asset provenance is NOT_RUN; this is not evidence of an application defect.
+- Teardown: PASS from canonical Session. Read-only checks afterward found zero containers, volumes, or networks with the owned project label; ports 18884/18885/15534 were free. Post-Session canonical Preflight: PASS, no warnings.
+- Scope check: generated harness/env/checkpoint only; no tracked runtime/test/config source, no production or foreign project, no global Docker/WSL cleanup. No other browser checks were repeated.
+- Remaining limitation: all-static-file provenance remains NOT_RUN; prior evidence proves only a served `sw.js` marker/hash. Full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete. Tier-2 remains PARTIAL as directed; no deferral is claimed.
+- Next: preserve this failure as harness evidence, update the existing PR #3805 journals/body and verify exact-head CI. Do not start another image build until the `container_read` failure is explained; do not mark T18 complete.
+- Local cleanup limitation: after confirming teardown, removal of the exact task-owned ignored env and harness files was rejected by the host command policy. No alternate deletion method was used; see `prework.md` for the exact generated paths.
