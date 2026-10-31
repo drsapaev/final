@@ -343,7 +343,15 @@ const ForceMajeureModal = ({
       });
 
       const result = response.data;
-      setSuccess(t('misc.fm_cancel_success', { cancelled: result.cancelled || 0, refunds: result.refunds_created || 0 }));
+      // 3808 review round 12 (P2): реальные поля ответа API. Прежний
+      // result.refunds_created не существует — счётчик возвратов всегда
+      // показывался нулём; депозитные зачисления не считались вовсе.
+      const bankRefunds = result.refund_requests_created ?? 0;
+      const depositCredits = result.deposit_credits_created ?? 0;
+      setSuccess(t('misc.fm_cancel_success', {
+        cancelled: result.cancelled || 0,
+        refunds: bankRefunds + depositCredits,
+      }));
       logger.log('[ForceMajeureModal] Cancel successful:', result);
       if (onSuccess) onSuccess('cancel', result);
     } catch (err) {

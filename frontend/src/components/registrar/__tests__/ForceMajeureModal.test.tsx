@@ -31,8 +31,17 @@ vi.mock('../../../api/client', () => ({
 
 vi.mock('../../../i18n/useTranslation', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: Record<string, unknown>) =>
-      options && 'count' in options ? `${key}:${String(options.count)}` : key,
+    t: (key: string, options?: Record<string, unknown>) => {
+      if (!options) return key;
+      if ('count' in options) return `${key}:${String(options.count)}`;
+      // 3808 review round 12 (P2): success-сообщение отмены интерполирует
+      // cancelled/refunds — без этой ветки тест счётчика возвратов не
+      // видит подставленных значений.
+      if ('refunds' in options) {
+        return `${key}:${String(options.cancelled)}/${String(options.refunds)}`;
+      }
+      return key;
+    },
     language: 'ru',
     setLanguage: vi.fn(),
     availableLanguages: [],
@@ -426,5 +435,59 @@ describe('ForceMajeureModal (#3808 REG-FE-025)', () => {
     // drift semantics: the stale card is dropped and the action re-locks
     expect(screen.queryByText('misc.fm_entries_count:1')).not.toBeInTheDocument();
     expect(submitButton()).toBeDisabled();
+  });
+
+  it('cancel success shows the REAL refund counters — refunds_created never existed (#3809 P2)', async () => {
+    apiGet.mockResolvedValueOnce({ data: [{ id: 101, total_amount: 1 }] } as never);
+    renderModal();
+    fireEvent.click(screen.getByRole('button', { name: 'misc.fm_tab_cancel' }));
+    await waitFor(() => expect(screen.getByText('misc.fm_entries_count:1')).toBeInTheDocument());
+    await fillConfirmation();
+    expect(cancelButton()).toBeEnabled();
+
+    // Контракт API: refund_requests_created + deposit_credits_created.
+    // Поля refunds_created в ответе НЕТ — старый код показывал «возвратов: 0».
+    apiPost.mockResolvedValueOnce({
+      data: {
+        success: true,
+        cancelled: 3,
+        refund_requests_created: 1,
+        refund_requests_existing: 1,
+        deposit_credits_created: 2,
+        deposit_credits_existing: 0,
+      },
+    } as never);
+
+    fireEvent.click(cancelButton());
+    // success-бокс рендерит «{prefix} {success}» — матчер по подстроке;
+    // 1 банковская заявка + 2 зачисления на депозит = 3 фактических возврата
+    await waitFor(() =>
+      expect(screen.getByText(/misc\.fm_cancel_success:3\/3/)).toBeInTheDocument(),
+    );
+  });
+
+  it('deposit-only cancel counts deposit credits, not the absent bank counter (#3809 P2)', async () => {
+    apiGet.mockResolvedValueOnce({ data: [{ id: 101, total_amount: 1 }] } as never);
+    renderModal();
+    fireEvent.click(screen.getByRole('button', { name: 'misc.fm_tab_cancel' }));
+    await waitFor(() => expect(screen.getByText('misc.fm_entries_count:1')).toBeInTheDocument());
+    await fillConfirmation();
+
+    // Только депозитные зачисления: банковских заявок нет — 0
+    apiPost.mockResolvedValueOnce({
+      data: {
+        success: true,
+        cancelled: 2,
+        refund_requests_created: 0,
+        refund_requests_existing: 0,
+        deposit_credits_created: 2,
+        deposit_credits_existing: 0,
+      },
+    } as never);
+
+    fireEvent.click(cancelButton());
+    await waitFor(() =>
+      expect(screen.getByText(/misc\.fm_cancel_success:2\/2/)).toBeInTheDocument(),
+    );
   });
 });

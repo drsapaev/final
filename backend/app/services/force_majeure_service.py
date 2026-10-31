@@ -379,6 +379,14 @@ class ForceMajeureService:
         # чтобы refund_requests_created сообщал только реальные новые
         # заявки (финансовая честность ответа для вызывающих/аудита).
         refund_requests_existing = 0
+        # 3808 review round 12 (P2 refund counters): депозитная ветка не
+        # попадала ни в один счётчик — refund_requests_* считают только
+        # банковские заявки, а депозитные зачисления не считал никто.
+        # Отдельные счётчики зачислений: финансовая честность ответа для
+        # вызывающих/аудита/UI (фронтенд прежде читал несуществующее
+        # поле refunds_created и всегда показывал ноль возвратов).
+        deposit_credits_created = 0
+        deposit_credits_existing = 0
         # 3808 review round 3 (P1 re-check under lock): entries processed
         # by a concurrent writer after our selection are skipped, never
         # refunded a second time.
@@ -418,6 +426,13 @@ class ForceMajeureService:
                             visit_id=entry.visit_id,
                             performed_by_id=performed_by_id,
                         )
+                        # 3808 review round 12 (P2): зачисления на депозит —
+                        # в собственные счётчики (идемпотентный повтор, как
+                        # у банковских заявок, — в existing, не в created).
+                        if refund_info.get("already_refunded"):
+                            deposit_credits_existing += 1
+                        else:
+                            deposit_credits_created += 1
                     else:
                         refund_info = self._create_refund_request(
                             patient_id=entry.patient_id,
@@ -482,6 +497,8 @@ class ForceMajeureService:
             "skipped": len(skipped),
             "refund_requests_created": len(refund_requests),
             "refund_requests_existing": refund_requests_existing,
+            "deposit_credits_created": deposit_credits_created,
+            "deposit_credits_existing": deposit_credits_existing,
             "details": cancelled,
             "errors": failed,
             "skipped_details": skipped,
