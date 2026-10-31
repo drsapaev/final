@@ -333,3 +333,80 @@ class DepositTransaction(Base):
     performer: Mapped[User | None] = relationship(
         "User", foreign_keys=[performed_by]
     )
+
+
+class PaymentRefundClaim(Base):
+    """Единая защита возврата одного платежа (3808 round 4, P1 cross-channel).
+
+    0087 закрепил идемпотентность КАЖДОГО канала отдельно: частичный
+    уникальный индекс на ``deposit_transactions`` (credit c payment_id) и
+    отдельный — на ``refund_requests`` (is_automatic). Но если один
+    оплаченный визит ссылается из записей в РАЗНЫХ очередях, отмены этих
+    очередей могли выбрать РАЗНЫЕ каналы — и один платеж получал и
+    зачисление на депозит, и автоматическую банковскую заявку (двойной
+    возврат): ни один из двух индексов этого не видел.
+
+    Эта таблица — единая точка атомарности по ``payment_id`` НЕЗАВИСИМО от
+    канала: ``uq_payment_refund_claims_payment`` допускает ровно одну
+    заявку на платеж. Сервис вставляет claim внутри savepoint ДО создания
+    любых денежных записей (см. ForceMajeureService._claim_payment_refund);
+    конкурентный проигравший получает IntegrityError на savepoint-е и
+    возвращает already_refunded, а не второй возврат. Ручные кассовые
+    заявки (is_automatic=False) и ручные пополнения депозита (payment_id
+    IS NULL) каналом guard-а не считаются — как и в предикатах 0087.
+    """
+
+    __tablename__ = "payment_refund_claims"
+
+    __table_args__ = (
+        Index(
+            "uq_payment_refund_claims_payment",
+            "payment_id",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    # Единственный защищаемый платеж: один claim — один возврат, навсегда
+    payment_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("payments.id", ondelete="RESTRICT"),
+        nullable=False,
+        comment="Платёж, возврат которого занят этим claim-ом (UNIQUE)",
+    )
+
+    # Канал, которым платеж был возвращён: 'deposit' | 'refund_request'
+    channel: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        comment="deposit | refund_request — канал состоявшегося возврата",
+    )
+
+    # Аудит: какая именно строка осуществила возврат
+    deposit_transaction_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("deposit_transactions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    refund_request_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("refund_requests.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Временные метки
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    payment: Mapped[Payment] = relationship("Payment", foreign_keys=[payment_id])
+    deposit_transaction: Mapped[DepositTransaction | None] = relationship(
+        "DepositTransaction", foreign_keys=[deposit_transaction_id]
+    )
+    refund_request: Mapped[RefundRequest | None] = relationship(
+        "RefundRequest", foreign_keys=[refund_request_id]
+    )

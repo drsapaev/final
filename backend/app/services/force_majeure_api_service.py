@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today
@@ -257,13 +258,31 @@ class ForceMajeureApiService:
         if not entries:
             return {"success": True, "cancelled": 0, "message": "Нет записей для отмены"}
 
-        return service.cancel_entries_with_refund(
-            entries=entries,
-            reason=request.reason,
-            refund_type=refund_type,
-            performed_by_id=current_user_id,
-            send_notifications=request.send_notifications,
-        )
+        # 3808 review round 4 (P1 cross-channel): единый refund-claim
+        # (0088) сериализует возврат одного платежа между конкурентными
+        # отменами РАЗНЫХ очередей. В патологическом случае (одни и те же
+        # платежи в двух очередях в противоположном порядке обработки)
+        # PostgreSQL разрешает взаимоблокировку сам, отменяя одну из
+        # транзакций (40P01; сюда же — failure сериализации 40001).
+        # Переводим это в 409 с подсказкой повторить, а не в 500: инвариант
+        # «один возврат на платеж» не нарушен, повтор подтверждения
+        # добьётся already_refunded.
+        try:
+            return service.cancel_entries_with_refund(
+                entries=entries,
+                reason=request.reason,
+                refund_type=refund_type,
+                performed_by_id=current_user_id,
+                send_notifications=request.send_notifications,
+            )
+        except OperationalError as exc:
+            if getattr(exc.orig, "pgcode", None) in {"40P01", "40001"}:
+                raise ForceMajeureApiDomainError(
+                    409,
+                    "Конфликт параллельных возвратов одного платежа — "
+                    "повторите подтверждение отмены",
+                ) from exc
+            raise
 
     def get_pending_entries(
         self,

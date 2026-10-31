@@ -14,6 +14,8 @@ import logging
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
+from sqlalchemy import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today
@@ -29,6 +31,7 @@ from app.models.refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
     PatientDeposit,
+    PaymentRefundClaim,
     RefundRequest,
     RefundRequestStatus,
     RefundType,
@@ -116,6 +119,12 @@ class ForceMajeureService:
         ).all()
 
     _PENDING_STATUSES = ("waiting", "called")
+
+    # 3808 review round 4 (P1 cross-channel): каналы единого refund-guard
+    # (payment_refund_claims, миграция 0088) — значения закреплены и в
+    # backfill этой миграции.
+    REFUND_CHANNEL_DEPOSIT = "deposit"
+    REFUND_CHANNEL_REFUND_REQUEST = "refund_request"
 
     def transfer_entries_to_tomorrow(
         self,
@@ -495,6 +504,87 @@ class ForceMajeureService:
             .first()
         )
 
+    @staticmethod
+    def _already_refunded_by_claim(
+        payment_id: int, claim: PaymentRefundClaim
+    ) -> dict[str, Any]:
+        """3808 review round 4: ответ для проигравшего гонку за возврат —
+        платёж уже возвращён, указываем каким каналом (для UI/аудита)."""
+        return {
+            "already_refunded": True,
+            "payment_id": payment_id,
+            "prior_channel": claim.channel,
+            "prior_deposit_transaction_id": claim.deposit_transaction_id,
+            "prior_refund_request_id": claim.refund_request_id,
+        }
+
+    def _claim_payment_refund(
+        self,
+        payment_id: int,
+        channel: str,
+        *,
+        reason: str | None = None,
+    ) -> int | dict[str, Any]:
+        """Атомарно застолбить ЕДИНСТВЕННЫЙ возврат платежа (round 4, P1).
+
+        3808 review round 4 (P1 cross-channel double refund): два частичных
+        индекса 0087 видели только свой канал — один платёж из записей в
+        РАЗНЫХ очередях мог получить и депозит, и банковскую заявку.
+        Единый claim по ``payment_id`` (миграция 0088) не зависит от канала:
+
+        * вернёт ``int`` (id claim-а) — мы выиграли право на возврат;
+        * вернёт словарь already-refunded — платёж уже возвращён любым
+          каналом (или конкурент выиграл гонку).
+
+        Savepoint берётся НА УРОВНЕ ПОДКЛЮЧЕНИЯ
+        (``session.connection().begin_nested()``), а не сессии: session-level
+        begin_nested ломает внешнюю savepoint-машину тестовой фикстуры
+        db_session (listener after_transaction_end), а get_bind() для
+        сессии, привязанной к engine, возвращает сам engine. Явный flush
+        ДО savepoint выталкивает pending-изменения ORM (например,
+        status="cancelled" текущей записи) НАРУЖУ отката: IntegrityError
+        откатывает только INSERT claim-а, отмена записи не теряется.
+        Вставка — Core, без ORM объекта: после rollback в сессии не
+        остаётся рассинхронизированного состояния.
+        ``uq_payment_refund_claims_payment`` — DB-бэкстоп для любых путей
+        в обход сервиса.
+        """
+        existing = (
+            self.db.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == payment_id)
+            .first()
+        )
+        if existing is not None:
+            return self._already_refunded_by_claim(payment_id, existing)
+
+        # Pending-изменения ORM — наружу savepoint (см. docstring).
+        self.db.flush()
+        bind = self.db.connection()
+        try:
+            with bind.begin_nested():
+                result = self.db.execute(
+                    insert(PaymentRefundClaim)
+                    .values(payment_id=payment_id, channel=channel, reason=reason)
+                )
+        except IntegrityError:
+            # Проиграли гонку за платёж: другая транзакция закоммитила
+            # (или держит) claim — в READ COMMITTED после ожидания на
+            # уникальном индексе победитель уже виден. Деньги не двигаем.
+            winner = (
+                self.db.query(PaymentRefundClaim)
+                .filter(PaymentRefundClaim.payment_id == payment_id)
+                .first()
+            )
+            if winner is not None:
+                return self._already_refunded_by_claim(payment_id, winner)
+            return {
+                "already_refunded": True,
+                "payment_id": payment_id,
+                "prior_channel": channel,
+                "conflict": "unique_payment_refund_claim",
+            }
+        return int(result.inserted_primary_key[0])
+
     def _add_to_deposit(
         self,
         patient_id: int,
@@ -513,6 +603,14 @@ class ForceMajeureService:
         ``uq_deposit_transactions_credit_payment`` partial unique index
         is the DB-level backstop for whatever this pre-check could miss
         (see 0087 migration).
+
+        3808 review round 4 (P1 cross-channel double refund): защита
+        теперь ЕДИНАЯ по payment_id, а не по каналу. Кредит на депозит не
+        создаётся, если платёж уже возвращён ЛЮБОЙ автоматической ногой —
+        в том числе автоматической заявкой на банковский возврат из
+        отмены ДРУГОЙ очереди, где тот же визит остался в записях.
+        Право на возврат атомарно занимается в ``payment_refund_claims``
+        (миграция 0088) ДО первого денежного изменения.
         """
         from decimal import Decimal
 
@@ -534,7 +632,34 @@ class ForceMajeureService:
                 "amount": float(existing_credit.amount),
                 "already_refunded": True,
                 "payment_id": payment_id,
+                "prior_channel": self.REFUND_CHANNEL_DEPOSIT,
             }
+
+        # 3808 round 4: кросс-канальная проверка — платёж уже уходит
+        # банковским возвратом (строки могло не быть в claim-ах, если она
+        # создана до 0088 или напрямую, как в тестах).
+        prior_request = (
+            self.db.query(RefundRequest)
+            .filter(
+                RefundRequest.payment_id == payment_id,
+                RefundRequest.is_automatic.is_(True),
+            )
+            .first()
+        )
+        if prior_request is not None:
+            return {
+                "type": "deposit",
+                "already_refunded": True,
+                "payment_id": payment_id,
+                "prior_channel": self.REFUND_CHANNEL_REFUND_REQUEST,
+                "prior_request_id": prior_request.id,
+            }
+
+        claim_id = self._claim_payment_refund(
+            payment_id, self.REFUND_CHANNEL_DEPOSIT, reason=reason
+        )
+        if isinstance(claim_id, dict):
+            return {"type": "deposit", **claim_id}
 
         # Получаем или создаём депозит пациента
         deposit = (
@@ -563,12 +688,18 @@ class ForceMajeureService:
             performed_by=performed_by_id,
         )
         self.db.add(transaction)
+        self.db.flush()  # нужен id транзакции для аудита claim-а
+
+        # Аудит единого claim-а: какая строка осуществила возврат
+        claim_row = self.db.get(PaymentRefundClaim, claim_id)
+        claim_row.deposit_transaction_id = transaction.id
 
         return {
             "type": "deposit",
             "deposit_id": deposit.id,
             "amount": float(amount_decimal),
             "new_balance": float(deposit.balance),
+            "refund_claim_id": claim_id,
         }
 
     def _create_refund_request(
@@ -589,6 +720,14 @@ class ForceMajeureService:
         cashier requests (is_automatic=False) are not constrained here.
         The ``uq_refund_requests_auto_payment`` partial unique index is
         the DB-level backstop (see 0087 migration).
+
+        3808 review round 4 (P1 cross-channel double refund): как и в
+        ``_add_to_deposit``, защита ЕДИНАЯ по payment_id: автоматическая
+        заявка не создаётся, если платёж уже возвращён зачислением на
+        депозит (например, отменой другой очереди, где тот же визит
+        остался в записях). Атомарный арбитр — ``payment_refund_claims``
+        (миграция 0088); ручные кассовые заявки по-прежнему не
+        ограничены — как и в предикате 0087.
         """
         from decimal import Decimal
 
@@ -610,7 +749,36 @@ class ForceMajeureService:
                 "status": existing_request.status,
                 "already_refunded": True,
                 "payment_id": payment_id,
+                "prior_channel": self.REFUND_CHANNEL_REFUND_REQUEST,
             }
+
+        claim_id: int | None = None
+        if is_automatic:
+            # 3808 round 4: кросс-канальная проверка — платёж уже
+            # зачислен на депозит (строка могла быть создана до 0088).
+            prior_credit = (
+                self.db.query(DepositTransaction)
+                .filter(
+                    DepositTransaction.payment_id == payment_id,
+                    DepositTransaction.transaction_type
+                    == DepositTransactionType.CREDIT.value,
+                )
+                .first()
+            )
+            if prior_credit is not None:
+                return {
+                    "type": "refund_request",
+                    "already_refunded": True,
+                    "payment_id": payment_id,
+                    "prior_channel": self.REFUND_CHANNEL_DEPOSIT,
+                    "prior_deposit_transaction_id": prior_credit.id,
+                }
+
+            claim_id = self._claim_payment_refund(
+                payment_id, self.REFUND_CHANNEL_REFUND_REQUEST, reason=reason
+            )
+            if isinstance(claim_id, dict):
+                return {"type": "refund_request", **claim_id}
 
         refund_request = RefundRequest(
             patient_id=patient_id,
@@ -627,11 +795,17 @@ class ForceMajeureService:
         self.db.add(refund_request)
         self.db.flush()
 
+        # Аудит единого claim-а: какая заявка осуществила возврат
+        if claim_id is not None:
+            claim_row = self.db.get(PaymentRefundClaim, claim_id)
+            claim_row.refund_request_id = refund_request.id
+
         return {
             "type": "refund_request",
             "request_id": refund_request.id,
             "amount": float(amount_decimal),
             "status": refund_request.status,
+            "refund_claim_id": claim_id,
         }
 
     def _send_transfer_notifications(

@@ -1396,3 +1396,288 @@ class TestForceMajeureApiService:
         with pytest.raises(IntegrityError):
             db_session.flush()
         db_session.rollback()
+
+    def _seed_shared_payment_two_queues(
+        self, db_session, test_doctor, test_patient, *, queue_tag
+    ):
+        """3808 round 4 (P1 cross-channel): ОДИН оплаченный визит в записях
+        ДВУХ очередей — патологический дубликат-референс, на котором два
+        независимых канала 0087 давали двойной возврат."""
+        today = date.today()
+        queues = []
+        for suffix in ("a", "b"):
+            queue = DailyQueue(
+                day=today,
+                specialist_id=test_doctor.id,
+                queue_tag=f"{queue_tag}_{suffix}",
+                active=True,
+            )
+            db_session.add(queue)
+            db_session.flush()
+            queues.append(queue)
+
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=today,
+            visit_time="14:00",
+            status="open",
+            discount_mode="none",
+            department="cardiology",
+            created_at=datetime.now(UTC),
+        )
+        db_session.add(visit)
+        db_session.flush()
+
+        payment = Payment(
+            visit_id=visit.id,
+            amount=Decimal("180.00"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        db_session.add(payment)
+        db_session.flush()
+
+        entries = []
+        for number, queue in enumerate(queues, start=1):
+            entry = OnlineQueueEntry(
+                queue_id=queue.id,
+                visit_id=visit.id,
+                number=number,
+                patient_id=test_patient.id,
+                patient_name="Cross Channel",
+                status="waiting",
+                source="desk",
+            )
+            db_session.add(entry)
+            db_session.flush()
+            entries.append(entry)
+
+        db_session.commit()
+        return payment, entries
+
+    def test_cross_channel_deposit_then_bank_refunds_payment_once(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 round 4 (P1 cross-channel): deposit-нога первой очереди
+        возвращает платёж на депозит; bank-нога ВТОРОЙ очереди с тем же
+        визитом обязана увидеть возврат ЧЕРЕЗ канал и не создавать вторую
+        автоматическую заявку — единая защита по payment_id (0088), а не
+        два независимых частичных индекса 0087."""
+        from app.models.refund_deposit import PaymentRefundClaim, RefundRequest
+
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        payment, entries = self._seed_shared_payment_two_queues(
+            db_session, test_doctor, test_patient, queue_tag="fm_x_dep_bank"
+        )
+
+        first = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entries[0]],
+            reason="Doctor emergency",
+            refund_type=RefundType.DEPOSIT,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert first["cancelled"] == 1
+        assert not first["details"][0]["refund_info"].get("already_refunded")
+
+        second = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entries[1]],
+            reason="Doctor emergency",
+            refund_type=RefundType.BANK_TRANSFER,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert second["cancelled"] == 1
+        refund_info = second["details"][0]["refund_info"]
+        assert refund_info["already_refunded"] is True
+        assert refund_info["prior_channel"] == "deposit"
+
+        assert (
+            db_session.query(RefundRequest)
+            .filter(RefundRequest.payment_id == payment.id)
+            .count()
+            == 0
+        ), "банковская нога не создаётся поверх депозитной"
+        assert (
+            db_session.query(DepositTransaction)
+            .filter(DepositTransaction.payment_id == payment.id)
+            .count()
+            == 1
+        )
+        claims = (
+            db_session.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == payment.id)
+            .all()
+        )
+        assert len(claims) == 1, claims
+        assert claims[0].channel == "deposit"
+        assert claims[0].deposit_transaction_id is not None
+
+    def test_cross_channel_bank_then_deposit_refunds_payment_once(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 round 4 (P1 cross-channel), обратный порядок: автоматическая
+        банковская заявка первой очереди занимает возврат; deposit-нога
+        второй очереди не двигает баланс и не создаёт кредит."""
+        from app.models.refund_deposit import PaymentRefundClaim, RefundRequest
+
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        payment, entries = self._seed_shared_payment_two_queues(
+            db_session, test_doctor, test_patient, queue_tag="fm_x_bank_dep"
+        )
+
+        first = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entries[0]],
+            reason="Doctor emergency",
+            refund_type=RefundType.BANK_TRANSFER,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert first["cancelled"] == 1
+        assert not first["details"][0]["refund_info"].get("already_refunded")
+
+        second = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entries[1]],
+            reason="Doctor emergency",
+            refund_type=RefundType.DEPOSIT,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert second["cancelled"] == 1
+        refund_info = second["details"][0]["refund_info"]
+        assert refund_info["already_refunded"] is True
+        assert refund_info["prior_channel"] == "refund_request"
+
+        assert (
+            db_session.query(DepositTransaction)
+            .filter(DepositTransaction.payment_id == payment.id)
+            .count()
+            == 0
+        ), "депозитный кредит не создаётся поверх банковской заявки"
+        assert (
+            db_session.query(PatientDeposit)
+            .filter(PatientDeposit.patient_id == test_patient.id)
+            .count()
+            == 0
+        ), "баланс пациента не трогался"
+        assert (
+            db_session.query(RefundRequest)
+            .filter(RefundRequest.payment_id == payment.id)
+            .count()
+            == 1
+        )
+        claims = (
+            db_session.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == payment.id)
+            .all()
+        )
+        assert len(claims) == 1, claims
+        assert claims[0].channel == "refund_request"
+        assert claims[0].refund_request_id is not None
+
+    def test_payment_refund_claim_unique_rejects_duplicate(
+        self, db_session, test_doctor, test_patient
+    ):
+        """Модельный бэкстоп ЕДИНОГО guard-а: второй claim по тому же
+        payment_id невозможен, что бы ни делал код (миграция 0088)."""
+        from sqlalchemy.exc import IntegrityError
+
+        from app.models.refund_deposit import PaymentRefundClaim
+
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="14:00",
+            status="open",
+            discount_mode="none",
+            department="cardiology",
+            created_at=datetime.now(UTC),
+        )
+        db_session.add(visit)
+        db_session.flush()
+        payment = Payment(
+            visit_id=visit.id,
+            amount=Decimal("140.00"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        db_session.add(payment)
+        db_session.flush()
+
+        first = PaymentRefundClaim(
+            payment_id=payment.id,
+            channel="deposit",
+            reason="unified guard probe",
+        )
+        db_session.add(first)
+        db_session.flush()
+
+        duplicate = PaymentRefundClaim(
+            payment_id=payment.id,
+            channel="refund_request",
+            reason="must never persist",
+        )
+        db_session.add(duplicate)
+        with pytest.raises(IntegrityError):
+            db_session.flush()
+        db_session.rollback()
+
+    def test_cancel_deadlock_maps_to_409(self, monkeypatch):
+        """3808 round 4: единый refund-claim сериализует возвраты одного
+        платежа между очередями; на патологическом порядке обработки
+        PostgreSQL сам разрешает взаимоблокировку (40P01; сюда же —
+        failure сериализации 40001). Эта ситуация переводится в 409 с
+        подсказкой повторить, а не в 500: инвариант «один возврат на
+        платеж» не нарушен, повтор получит already_refunded."""
+        from sqlalchemy.exc import OperationalError
+
+        orig = Exception("deadlock detected")
+        orig.pgcode = "40P01"
+        deadlock = OperationalError(
+            "INSERT INTO payment_refund_claims ...", {}, orig
+        )
+
+        def raise_deadlock(**kwargs):
+            raise deadlock
+
+        force_service = SimpleNamespace(
+            cancel_entries_with_refund=raise_deadlock
+        )
+        monkeypatch.setattr(
+            "app.services.force_majeure_api_service.get_force_majeure_service",
+            lambda db: force_service,
+        )
+
+        repository = SimpleNamespace(
+            db=None,
+            list_pending_entries_by_ids=lambda *args, **kwargs: [
+                SimpleNamespace(id=5)
+            ],
+        )
+        service = ForceMajeureApiService(db=None, repository=repository)
+
+        with pytest.raises(ForceMajeureApiDomainError) as exc_info:
+            service.cancel_queue_with_refund(
+                request=SimpleNamespace(
+                    refund_type="deposit",
+                    entry_ids=[5],
+                    specialist_id=1,
+                    target_date=date.today(),
+                    daily_queue_id=None,
+                    reason="reason",
+                    send_notifications=False,
+                ),
+                current_user_id=10,
+            )
+
+        assert exc_info.value.status_code == 409
