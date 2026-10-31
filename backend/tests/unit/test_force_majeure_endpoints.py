@@ -17,7 +17,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.payment import Payment
 from app.models.refund_deposit import DepositTransaction, PatientDeposit
 from app.models.visit import Visit
@@ -303,3 +303,154 @@ class TestForceMajeureEndpoints:
         )
         assert response.status_code == 422, response.text[:300]
         assert "expected_entry_ids" in response.json()["detail"]
+
+    def _seed_resource_owned_queue(
+        self, db_session, test_doctor, test_patient, *, resource_tag
+    ):
+        """Resource-owned queue (specialist NULL) today + one waiting entry.
+        The registry row keeps the tag given by the caller — the caller
+        decides whether it still owns the source's tag (rebind case)."""
+        today = date.today()
+        resource = QueueResource(
+            code=f"res_{resource_tag}",
+            queue_tag=resource_tag,
+            display_name=f"Реестр {resource_tag}",
+            active=True,
+        )
+        db_session.add(resource)
+        db_session.flush()
+        source = DailyQueue(
+            day=today,
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        db_session.add(source)
+        db_session.flush()
+        entry = OnlineQueueEntry(
+            queue_id=source.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Resource Surface Patient",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add(entry)
+        db_session.commit()
+        return resource, source, entry
+
+    def test_transfer_owner_conflict_is_409_not_500(
+        self, client, db_session, test_doctor, test_patient, registrar_auth_headers
+    ):
+        """Round 10 P2: the fail-closed owner refusal (round 9) must reach
+        the registrar as an actionable 409 with an explanation — not as an
+        unhandled HTTP 500. Doctor-owned same-tag destination tomorrow +
+        active registry row for the tag."""
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        resource, source, entry = self._seed_resource_owned_queue(
+            db_session, test_doctor, test_patient, resource_tag=test_doctor.specialty
+        )
+        doctor_queue_tomorrow = DailyQueue(
+            day=tomorrow,
+            specialist_id=test_doctor.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        db_session.add(doctor_queue_tomorrow)
+        db_session.commit()
+
+        response = client.post(
+            TRANSFER_PATH,
+            json={
+                "specialist_id": test_doctor.id,
+                "target_date": str(today),
+                "daily_queue_id": source.id,
+                "expected_entry_ids": [entry.id],
+                "reason": "лаборатория недоступна",
+                "send_notifications": False,
+            },
+            headers=registrar_auth_headers,
+        )
+        assert response.status_code == 409, response.text[:400]
+        detail = response.json()["detail"]
+        assert "владельца назначения" in detail
+        assert "Операция отклонена" in detail
+        assert f"id={doctor_queue_tomorrow.id}" in detail
+
+        # данные не тронуты: запись ждёт в своей очереди, переносов нет,
+        # врачебная очередь завтра пуста и без дублей
+        db_session.refresh(entry)
+        assert entry.status == "waiting"
+        assert entry.queue_id == source.id
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .count()
+            == 0
+        )
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == doctor_queue_tomorrow.id)
+            .count()
+            == 0
+        )
+        assert (
+            db_session.query(DailyQueue).filter(DailyQueue.day == tomorrow).count()
+            == 1
+        )
+
+    def test_transfer_rebound_tag_owner_conflict_is_409_not_500(
+        self, client, db_session, test_doctor, test_patient, registrar_auth_headers
+    ):
+        """Round 10 P2, rebound case: the source's tag is re-bound in the
+        registry to another resource — the refusal must surface as 409
+        with zero writes (no destination queue created at all)."""
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        # ресурс-владелец источника уже отдал тег докторской specialty
+        # другому ряду; сам владеет осиротевшим тегом
+        _resource, source, entry = self._seed_resource_owned_queue(
+            db_session, test_doctor, test_patient, resource_tag="lab_orphan_r10"
+        )
+        rebound = QueueResource(
+            code="res_rebound_r10",
+            queue_tag=test_doctor.specialty,
+            display_name="Реестр-новый владелец тега",
+            active=True,
+        )
+        db_session.add(rebound)
+        db_session.commit()
+
+        response = client.post(
+            TRANSFER_PATH,
+            json={
+                "specialist_id": test_doctor.id,
+                "target_date": str(today),
+                "daily_queue_id": source.id,
+                "expected_entry_ids": [entry.id],
+                "reason": "лаборатория недоступна",
+                "send_notifications": False,
+            },
+            headers=registrar_auth_headers,
+        )
+        assert response.status_code == 409, response.text[:400]
+        detail = response.json()["detail"]
+        assert "владельца назначения" in detail
+        assert f"id={rebound.id}" in detail
+
+        # fail closed БЕЗ записей: источник не тронут, завтра очередей нет
+        db_session.refresh(entry)
+        assert entry.status == "waiting"
+        assert entry.queue_id == source.id
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .count()
+            == 0
+        )
+        assert (
+            db_session.query(DailyQueue).filter(DailyQueue.day == tomorrow).count()
+            == 0
+        )

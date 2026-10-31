@@ -875,9 +875,11 @@ class TestForceMajeureApiService:
             source="desk",
         )
         db_session.add(source_entry)
-        db_session.flush()
+        # round 10: сид-данные коммитятся — отказ (409) откатывает сессию,
+        # и объекты должны пережить этот rollback
+        db_session.commit()
 
-        with pytest.raises(ForceMajeureError) as exc_info:
+        with pytest.raises(ForceMajeureApiDomainError) as exc_info:
             ForceMajeureApiService(db_session).transfer_queue_to_tomorrow(
                 request=SimpleNamespace(
                     specialist_id=test_doctor.id,
@@ -890,9 +892,12 @@ class TestForceMajeureApiService:
                 ),
                 current_user_id=1,
             )
-        # отказ адресует именно смену владельца назначения
-        assert "владельца назначения" in str(exc_info.value)
-        assert f"id={doctor_queue_tomorrow.id}" in str(exc_info.value)
+        # 3808 review round 10 (P2 HTTP contract): доменный отказ —
+        # 409 с объяснением, а не необработанная серверная ошибка
+        assert exc_info.value.status_code == 409
+        assert "владельца назначения" in exc_info.value.detail
+        assert "Операция отклонена" in exc_info.value.detail
+        assert f"id={doctor_queue_tomorrow.id}" in exc_info.value.detail
         # fail closed: запись-источник не отменена и не перенесена
         db_session.refresh(source_entry)
         assert source_entry.status == "waiting"
@@ -967,9 +972,11 @@ class TestForceMajeureApiService:
             source="desk",
         )
         db_session.add(source_entry)
-        db_session.flush()
+        # round 10: сид-данные коммитятся — отказ (409) откатывает сессию,
+        # и объекты должны пережить этот rollback
+        db_session.commit()
 
-        with pytest.raises(ForceMajeureError) as exc_info:
+        with pytest.raises(ForceMajeureApiDomainError) as exc_info:
             ForceMajeureApiService(db_session).transfer_queue_to_tomorrow(
                 request=SimpleNamespace(
                     specialist_id=test_doctor.id,
@@ -982,9 +989,11 @@ class TestForceMajeureApiService:
                 ),
                 current_user_id=1,
             )
-        assert "владельца назначения" in str(exc_info.value)
+        # 3808 review round 10 (P2 HTTP contract): 409, не HTTP 500
+        assert exc_info.value.status_code == 409
+        assert "владельца назначения" in exc_info.value.detail
         # отказ объясняет перевязку тега
-        assert f"id={resource_a.id}" in str(exc_info.value)
+        assert f"id={resource_a.id}" in exc_info.value.detail
         # fail closed БЕЗ записей: источник не тронут
         db_session.refresh(source_entry)
         assert source_entry.status == "waiting"
@@ -1000,6 +1009,68 @@ class TestForceMajeureApiService:
             db_session.query(DailyQueue).filter(DailyQueue.day == tomorrow).count()
             == 0
         )
+
+    def test_domain_service_owner_conflict_raises_force_majeure_error(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 review round 10 (P2 HTTP contract), пин нижнего слоя:
+        доменный сервис отказывает именно ForceMajeureError — API-слой
+        отвечает за перевод в 409, но исходный контракт отказа остаётся
+        доменным (не HTTP-типом)."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        resource = QueueResource(
+            code="lab_surface_r10",
+            queue_tag=test_doctor.specialty,
+            display_name="Лаборатория (реестр)",
+            active=True,
+        )
+        db_session.add(resource)
+        db_session.flush()
+        source_today = DailyQueue(
+            day=today,
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        doctor_queue_tomorrow = DailyQueue(
+            day=tomorrow,
+            specialist_id=test_doctor.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        db_session.add_all([source_today, doctor_queue_tomorrow])
+        db_session.flush()
+        source_entry = OnlineQueueEntry(
+            queue_id=source_today.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Surface Patient R10",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add(source_entry)
+        db_session.commit()
+
+        service = ForceMajeureService(db_session)
+        entries = service.get_pending_entries(
+            queue_id=source_today.id, target_date=today
+        )
+        with pytest.raises(ForceMajeureError):
+            service.transfer_entries_to_tomorrow(
+                entries=entries,
+                specialist_id=test_doctor.id,
+                reason="лаборатория недоступна",
+                performed_by_id=1,
+                send_notifications=False,
+                source_date=today,
+                source_queue=source_today,
+            )
 
     def test_two_queue_repeated_bank_refund_counts_only_new_requests(
         self, db_session, test_doctor, test_patient, monkeypatch

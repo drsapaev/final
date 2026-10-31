@@ -23,7 +23,10 @@ from app.models.refund_deposit import (
     RefundType,
 )
 from app.repositories.force_majeure_api_repository import ForceMajeureApiRepository
-from app.services.force_majeure_service import get_force_majeure_service
+from app.services.force_majeure_service import (
+    ForceMajeureError,
+    get_force_majeure_service,
+)
 
 
 @dataclass
@@ -209,17 +212,25 @@ class ForceMajeureApiService:
         if not entries:
             return {"success": True, "transferred": 0, "message": "Нет записей для переноса"}
 
-        return service.transfer_entries_to_tomorrow(
-            entries=entries,
-            specialist_id=request.specialist_id,
-            reason=request.reason,
-            performed_by_id=current_user_id,
-            send_notifications=request.send_notifications,
-            source_date=queue_day,
-            # 3808 review round 7 (P1 destination owner): поверхность
-            # назначения сохраняет владельца источника.
-            source_queue=source_queue,
-        )
+        try:
+            return service.transfer_entries_to_tomorrow(
+                entries=entries,
+                specialist_id=request.specialist_id,
+                reason=request.reason,
+                performed_by_id=current_user_id,
+                send_notifications=request.send_notifications,
+                source_date=queue_day,
+                # 3808 review round 7 (P1 destination owner): поверхность
+                # назначения сохраняет владельца источника.
+                source_queue=source_queue,
+            )
+        except ForceMajeureError as exc:
+            # 3808 review round 10 (P2 HTTP contract): доменный отказ
+            # (fail-closed перенос: конфликт владельцев поверхности
+            # назначения, недоступный/перевязанный реестровый ряд) —
+            # ОЖИДАЕМЫЙ бизнес-исход, а не серверная ошибка: регистратор
+            # получает 409 с объяснением, а не HTTP 500.
+            raise self._as_domain_refusal(exc) from exc
 
     def cancel_queue_with_refund(self, *, request, current_user_id: int) -> dict[str, Any]:
         service = get_force_majeure_service(self.repository.db)
@@ -283,6 +294,10 @@ class ForceMajeureApiService:
                 performed_by_id=current_user_id,
                 send_notifications=request.send_notifications,
             )
+        except ForceMajeureError as exc:
+            # 3808 review round 10 (P2 HTTP contract): любой доменный
+            # отказ отмены — бизнес-исход (409), не HTTP 500.
+            raise self._as_domain_refusal(exc) from exc
         except OperationalError as exc:
             if getattr(exc.orig, "pgcode", None) in {"40P01", "40001"}:
                 raise ForceMajeureApiDomainError(
@@ -592,3 +607,21 @@ class ForceMajeureApiService:
 
     def rollback(self) -> None:
         self.repository.rollback()
+
+    def _as_domain_refusal(
+        self, exc: ForceMajeureError
+    ) -> ForceMajeureApiDomainError:
+        """3808 review round 10 (P2 HTTP contract): перевод доменного
+        отказа в доменную ошибку API.
+
+        ``ForceMajeureError`` — ожидаемый бизнес-отказ сервиса (fail-closed
+        ветки round 9: перенос не может сохранить владельца ресурсной
+        очереди). Раньше он уходил сквозь API-слой на HTTP-слой как
+        необработанный 500 — регистратор видел «ошибку сервера» вместо
+        объяснения. Теперь: 409 (конфликт состояния владельцев, не ошибка
+        валидации запроса) с безопасным описанием; сессия откатывается до
+        перевода, чтобы отказ гарантированно не оставил частичных записей
+        (round-9 ветки и так беззаписные, но контракт держим для любых
+        будущих доменных отказов посреди операции)."""
+        self.rollback()
+        return ForceMajeureApiDomainError(409, f"Операция отклонена: {exc}")
