@@ -41,7 +41,7 @@
 
 1. **Group 1 — composition, data reads, filters and tables: BOUNDED SOURCE REVIEW DONE (2026-11-01).** Inspected all core listed page hooks, data filters/search/sort and active table views, source tests and backend search contract. CSH-FE-001–006 are provisional.
 2. **Group 2 — financial commands and payment lifecycle: CORE SOURCE REVIEW DONE (2026-11-01), provider contracts deferred to Group 5.** Inspected cashier actions, contracts, cash/online widgets, usePayments mutation calls, backend direct/grouped/confirm, PaymentInvariantService and relevant existing tests. CSH-FE-007–010 are provisional.
-3. **Group 3 — refund requests, deposits and permissions: PENDING.** `RefundRequestsTable.tsx`, `useRefundRequests.ts`, columns/contracts, `/force-majeure/refund-requests` and cashier refund backend. Distinguish a refund request from a completed actual refund.
+3. **Group 3 — refund requests, deposits and permissions: BOUNDED SOURCE REVIEW DONE (2026-11-01), integration tests pending.** Reviewed four refund components, source tests, refund/deposit backend, canonical routes, CSRF/auth, available_actions and deposit ledger locking. CSH-FE-011–018 remain provisional; cash refund status does not prove external transfer.
 4. **Group 4 — dialogs, printing, filtering and accessibility: PENDING.** `CashierDialogsLayer.tsx`, UI views, receipt print path and toolbar. Verify role/action gating, keyboard UX, dates and error presentation.
 5. **Group 5 — API/backend contracts and regression coverage: PENDING.** `usePayments.ts`, `api/client.ts`, cashier endpoints/services, exact HTTP error shapes, CSV/receipt and status/refund contracts, test coverage, no false claims about CI.
 
@@ -59,6 +59,14 @@
 | CSH-FE-008 | P2 | Cash double submit | Modal async submit has no single-flight guard and its submit button remains enabled during POST | SOURCE-OBSERVED / REPRO-PENDING | two fast submits with deferred payment API |
 | CSH-FE-009 | P2 | Cash tender field | Blank received amount becomes zero and bypasses insufficient-cash check while a positive payment amount can be submitted | SOURCE-OBSERVED / REPRO-PENDING | cash due>0, received blank/0/less/equal/more |
 | CSH-FE-010 | P2 | Local smoke online settlement | DEV or localhost initializes provider payment then invokes real cashier manual confirmation before provider settlement | SOURCE-OBSERVED / REPRO-PENDING | isolated production build on localhost versus dev test-only backend |
+| CSH-FE-011 | P2 | Refund API URL | Origin-relative /force-majeure path misses /api/v1 and configured API origin | SOURCE-OBSERVED / REPRO-PENDING | dev proxy /api-only, separate API host, 404 |
+| CSH-FE-012 | P2 | Refund POST CSRF/refresh | Raw POST lacks X-CSRF-Token and bypasses shared token refresh handling | SOURCE-OBSERVED / REPRO-PENDING | CSRF enabled, 403 missing header, expired 401 |
+| CSH-FE-013 | P2 | Global refresh | Toolbar refresh reloads stats/pending/history but not mounted refund request table | SOURCE-OBSERVED / REPRO-PENDING | mount RefundRequestsTable then click global Refresh |
+| CSH-FE-014 | P2 | Refund list completeness | Backend defaults to 50 requests while UI provides no offset, pagination or total badge | SOURCE-OBSERVED / REPRO-PENDING | 51 and 201 refund requests, later pending item |
+| CSH-FE-015 | P2 | Refund fetch freshness | Old filter response can overwrite newly selected refund list and its loading flag | SOURCE-OBSERVED / REPRO-PENDING | deferred pending A and approved B, reverse responses |
+| CSH-FE-016 | P2 | Refund completion truthfulness | UI Выплатить triggers status-only complete, without verified payout evidence | SOURCE-OBSERVED / REPRO-PENDING | approved bank_transfer, no external transfer reference |
+| CSH-FE-017 | P3 | Refund error and empty UX | Failed initial fetch presents both AppError and genuine no-request empty state | SOURCE-OBSERVED / REPRO-PENDING | initial request fails versus HTTP 200 empty list |
+| CSH-FE-018 | P3 | Refund duplicate click | State-only processingId may allow two actions before disabled controls rerender | SOURCE-OBSERVED / REPRO-PENDING | two fast process invocations before first response |
 
 ### CSH-FE-001 — HTTP error is shown as a genuinely empty cashier selection (P2 candidate)
 
@@ -151,6 +159,80 @@
 - **Group 2 core SOURCE REVIEW DONE, external provider contract deferred to Group 5:** useCashierActions.ts, cashierPaymentContracts.ts, CashPaymentModal.tsx, PaymentWidget.tsx, usePayments.ts mutation calls and CashierDialogsLayer command wiring; backend cashier direct/grouped/confirm and PaymentInvariantService; source tests useCashierActions.test.ts and cashierPaymentContracts.test.ts. CSH-FE-007 through 010 are provisional. Backend owns grouped allocation/one DB commit, direct payment Visit locking and payment action availability. Do not mistake those code properties for end-to-end finance verification.
 - **Deferred:** Group 3 refund requests/deposits, Group 4 receipt/dialog/accessibility details, Group 5 provider status contracts, RBAC, network retry, idempotency and actual CI evidence. No runtime or automated tests executed. Payment source fixes require AGENTS.md mandatory gate.
 
+### CSH-FE-011 — Incorrect origin-relative refund endpoint (P2 candidate)
+
+**Source evidence:** The refund hook [useRefundRequests.ts:30-46](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/useRefundRequests.ts#L30-L46) fetches /force-majeure/refund-requests. Backend mounts /force-majeure inside an API router ([api.py:571-576](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/api.py#L571-L576)) with outer /api/v1 prefix ([main.py:424-427](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/main.py#L424-L427)). Vite proxies only /api ([vite.config.ts:119-132](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/vite.config.ts#L119-L132)) and runtime accepts a separate origin ([runtime.ts:99-116](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/api/runtime.ts#L99-L116)).
+
+**Impact and qualification:** Refunds may read from the static SPA origin or a wrong path. The production reverse proxy has not been tested.
+
+**Fail-first / safe direction:** Synthetic Vite/prod split-origin test: assert the canonical API URL and a real list; do not invent a root alias.
+
+### CSH-FE-012 — Refund commands bypass shared CSRF and reauthentication (P2 candidate)
+
+**Source evidence:** The POST [useRefundRequests.ts:66-81](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/useRefundRequests.ts#L66-L81) sends only Bearer and Content-Type; the shared Axios client adds CSRF and refresh handling ([client.ts:329-396](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/api/client.ts#L329-L396)). Backend middleware rejects state-changing requests without X-CSRF-Token and cookie ([csrf_middleware.py:184-245](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/middleware/csrf_middleware.py#L184-L245)); production enables CSRF by default ([main.py:361-369](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/main.py#L361-L369)).
+
+**Impact and qualification:** Commands may fail 403 after correcting the path; expired auth receives no shared recovery. This is a contract failure, not a proven unauthorized payment.
+
+**Fail-first / safe direction:** Run 401/403 integration with synthetic auth and middleware; use shared client, avoid blind retry of uncertain financial POST.
+
+### CSH-FE-013 — Global Refresh does not refresh refund requests (P2 candidate)
+
+**Source evidence:** CashierPanel mounts refund table with onRefresh={handleRefresh} ([CashierPanel.tsx:293-297](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/CashierPanel.tsx#L293-L297)); handleRefresh only calls triggerDataReload for regular cashier datasets ([useCashierActions.ts:314-317](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierActions.ts#L314-L317)); refund hook re-fetches on filter change/mount ([useRefundRequests.ts:29-65](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/useRefundRequests.ts#L29-L65)) and only calls parent refresh after a successful process ([useRefundRequests.ts:83-87](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/useRefundRequests.ts#L83-L87)).
+
+**Impact and qualification:** Current refund requests can remain stale despite a manual global refresh.
+
+**Fail-first / safe direction:** Write synthetic refresh click test with current filter and verify a new refund GET; prevent callbacks from recursively triggering each other.
+
+### CSH-FE-014 — Only first 50 refund requests are reachable (P2 candidate)
+
+**Source evidence:** Backend list takes limit=50 by default and offset (max limit 200) ([force_majeure.py:274-294](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/endpoints/force_majeure.py#L274-L294)); hook submits only status_filter ([useRefundRequests.ts:30-51](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/useRefundRequests.ts#L30-L51)); table badge is requests.length and has no paging controls ([RefundRequestsTable.tsx:32-57](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/RefundRequestsTable.tsx#L32-L57), [RefundRequestsTable.tsx:100-116](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/RefundRequestsTable.tsx#L100-L116)).
+
+**Impact and qualification:** Cashier may miss actionable requests beyond first page, and badge reports returned length, not total.
+
+**Fail-first / safe direction:** Fail-first with 51+ synthetic rows and an actionable row on page 2; add paging/load-more or backend total contract behind gate.
+
+### CSH-FE-015 — Concurrent refund list requests have no freshness guard (P2 candidate)
+
+**Source evidence:** Refund hook loadRequests is keyed by filter, and setRequests/setLoading is unconditional after await ([useRefundRequests.ts:22-65](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/useRefundRequests.ts#L22-L65)). Existing tests cover basic happy/failure path but no A/B overlap ([useRefundRequests.test.ts:32-82](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/__tests__/useRefundRequests.test.ts#L32-L82)).
+
+**Impact and qualification:** Displayed requests may not correspond to selected status filter. Backend validates status transitions under lock, so no wrong transfer has been shown.
+
+**Fail-first / safe direction:** Fail-first A/B response-order tests, stale error/late loading and unmount; use request epoch/abort with latest-only state writes.
+
+### CSH-FE-016 — Completed refund status does not prove actual payout (P2 candidate)
+
+**Source evidence:** UI button labels complete as Выплатить ([refundRequestsColumns.tsx:121-131](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/refundRequestsColumns.tsx#L121-L131)) and completed as Возвращено ([refundRequestsColumns.tsx:25-35](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/refundRequestsColumns.tsx#L25-L35)); hook posts action=complete ([useRefundRequests.ts:111-115](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/useRefundRequests.ts#L111-L115)). Backend only changes approved->completed and commits processed_by/at ([force_majeure_api_service.py:389-462](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/services/force_majeure_api_service.py#L389-L462)), and API documents complete as money already returned ([force_majeure.py:315-330](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/endpoints/force_majeure.py#L315-L330)).
+
+**Impact and qualification:** Operator may mistake recording a completed manual payout for executing a bank transfer. No bank transfer is shown in the service code; the manual workflow may be intended.
+
+**Fail-first / safe direction:** Synthetic test to distinguish actual bank transfer from manual attestation. Require clear confirmation/payout reference or verified backend provider contract after policy approval; no automatic financial change.
+
+### CSH-FE-017 — Load failure is simultaneously reported as an empty refund queue (P3 candidate)
+
+**Source evidence:** Hook sets error but leaves requests=[] on failure ([useRefundRequests.ts:22-59](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/useRefundRequests.ts#L22-L59)). Table independently renders AppError when error and AppEmpty when !loading && requests.length===0 ([RefundRequestsTable.tsx:79-110](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/RefundRequestsTable.tsx#L79-L110)).
+
+**Impact and qualification:** Conflicting messages reduce confidence in financial counts.
+
+**Fail-first / safe direction:** Test initial rejection and valid empty success; ensure error and true empty are mutually exclusive and retry stays available.
+
+### CSH-FE-018 — Refund processing lacks a synchronous single-flight guard (P3 candidate)
+
+**Source evidence:** Hook sets processingId then starts POST with no ref guard ([useRefundRequests.ts:66-97](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/useRefundRequests.ts#L66-L97)); buttons are hidden only after render observes processingId ([refundRequestsColumns.tsx:81-133](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/cashier/refundRequestsColumns.tsx#L81-L133)). Backend process locks row then validates status ([force_majeure_api_service.py:389-449](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/services/force_majeure_api_service.py#L389-L449)), so a second identical transition should be rejected.
+
+**Impact and qualification:** Duplicate command attempts/errors are possible; this does not prove duplicate bank payouts.
+
+**Fail-first / safe direction:** Use deferred promise and two synchronous submissions, assert single POST with clear failure recovery; preserve backend locking.
+
+### Group 3 bounded source checkpoint (2026-11-01)
+
+Reviewed RefundRequestsTable.tsx, useRefundRequests.ts, refundRequestsContracts.ts, refundRequestsColumns.tsx, their unit/source contract tests and related CSS; the force_majeure.py GET/POST refund and deposit endpoints; ForceMajeureApiService, row-locking repository, refund/deposit models; backend CSRF, Vite proxy, frontend API client/runtime and cashier tab wiring. **No tests run**; findings remain SOURCE-OBSERVED / REPRO-PENDING.
+
+**Confirmed design protections:** refund endpoints use Admin/Cashier RBAC ([force_majeure.py:274-340](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/endpoints/force_majeure.py#L274-L340)); backend determines available_actions from canonical status ([force_majeure_api_service.py:465-471](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/services/force_majeure_api_service.py#L465-L471)); refund process reads an exclusive locked row, validates status, and releases claims only for rejected requests ([force_majeure_api_service.py:389-449](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/services/force_majeure_api_service.py#L389-L449)); deposit credit/use takes a locked patient balance and appends transactions ([force_majeure_api_service.py:520-601](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/services/force_majeure_api_service.py#L520-L601)). No unsupported claim of current double refund or broken deposit concurrency.
+
+**Distinct money channels:** bank-transfer RefundRequest, manual completion, and PatientDeposit credit/transaction are not interchangeable. A deposit credit is not necessarily a row in RefundRequestsTable. The reviewed CashierPanel mounts the refund-request table but no dedicated deposit ledger view; whether a unified reconciliation interface is required is a product decision, not an established defect. Do not infer an actual bank transfer from the completed status alone.
+
+**Priority for reproduction:** CSH-FE-011/012 (routing/CSRF), CSH-FE-014 (incomplete action list), CSH-FE-016 (manual completion truthfulness). CSH-FE-013/015/017/018 are UI refresh/freshness/action-guard tests. All remain provisional, no P0/P1 demonstrated, no application edits or gate executed.
+
 ## Initial source positives / boundaries
 
 - The panel uses the canonical backend-provided `can_create_direct_payment` and `can_create_grouped_payment` in action availability ([CashierPendingTable.tsx L145–L169](https://github.com/drsapaev/final/blob/f308ed97e7f640a33e2bb255e23aaa109e69110a/frontend/src/pages/cashier/views/CashierPendingTable.tsx#L145-L169)), rather than guessing payment eligibility from display status.
@@ -163,6 +245,7 @@
 | --- | --- | --- | --- |
 | 2026-11-01 | Cashier active-source inventory + partial Group 1 | Enumerated direct page and component files from GitHub; read cashier panel, read hooks, active tables, existing tests and pending endpoint. Registered three provisional issues CSH-FE-001–003 | Read-only GitHub source checks. No tests, build, lint, browser, gate or backend writes. |
 | 2026-11-01 | Cashier Group 1 / Group 2 core | Added CSH-FE-004–010 (history grouping/action identity, locale sort, patient deep links, partially paid default, repeat submit, tender policy and local online smoke). Group 1 bounded source done; Group 2 core reviewed with provider contract deferred | GitHub code and existing test reads only; fresh-main compare 1 commit and no cashier React changes. No Vitest, pytest, browser, CI or gate. |
+| 2026-11-01 | Cashier Group 3 refunds/deposits/RBAC | Added CSH-FE-011–018: wrong URL root, missing CSRF/refresh, global refresh gap, 50-item cap, filter response races, manual completion vs payout, error/empty UX, duplicate action. Backend role/locking and deposits verified at source level | GitHub read-only inspection. No automated tests, browser, payment mutation or gate. |
 
 ## Closure
 
