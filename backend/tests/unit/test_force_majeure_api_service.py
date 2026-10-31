@@ -2457,6 +2457,18 @@ class TestForceMajeureApiService:
         assert refund_info["already_refunded"] is True
         assert refund_info["prior_channel"] == "deposit"
 
+        # 3808 review round 13 (P2 prior_channel): платёж уже возвращён
+        # ЗАЧИСЛЕНИЕМ НА ДЕПОЗИТ — банковской заявки не существует, поэтому
+        # идемпотентный повтор обязан попасть в deposit_credits_existing,
+        # а НЕ в refund_requests_existing (прежде приписывался несуществующий
+        # банковский повтор, UI/аудит видели «заявка уже была»).
+        assert second["refund_requests_created"] == 0
+        assert second["refund_requests_existing"] == 0, (
+            "приор — депозит, банковского existing-повтора нет"
+        )
+        assert second["deposit_credits_existing"] == 1
+        assert second["deposit_credits_created"] == 0
+
         assert (
             db_session.query(RefundRequest)
             .filter(RefundRequest.payment_id == payment.id)
@@ -2515,6 +2527,19 @@ class TestForceMajeureApiService:
         refund_info = second["details"][0]["refund_info"]
         assert refund_info["already_refunded"] is True
         assert refund_info["prior_channel"] == "refund_request"
+
+        # 3808 review round 13 (P2 prior_channel): платёж уже занят
+        # БАНКОВСКОЙ заявкой — депозитного зачисления не существует, поэтому
+        # идемпотентный повтор обязан попасть в refund_requests_existing,
+        # а НЕ в deposit_credits_existing (прежде инкремент приписывал
+        # несуществующее зачисление — UI показывал «деньги уже на депозите»,
+        # хотя они в pending-заявке).
+        assert second["deposit_credits_created"] == 0
+        assert second["deposit_credits_existing"] == 0, (
+            "приор — банковская заявка, депозитного existing-зачисления нет"
+        )
+        assert second["refund_requests_existing"] == 1
+        assert second["refund_requests_created"] == 0
 
         assert (
             db_session.query(DepositTransaction)

@@ -430,7 +430,23 @@ class ForceMajeureService:
                         # в собственные счётчики (идемпотентный повтор, как
                         # у банковских заявок, — в existing, не в created).
                         if refund_info.get("already_refunded"):
-                            deposit_credits_existing += 1
+                            # 3808 review round 13 (P2 prior_channel):
+                            # already_refunded говорит ТОЛЬКО «платёж уже
+                            # возвращён», но не каким каналом. Если ранее
+                            # оформлен БАНКОВСКИЙ возврат (prior_channel ==
+                            # refund_request), депозитного зачисления НЕ
+                            # существует — инкремент deposit_credits_existing
+                            # приписывал несуществующее зачисление (UI/аудит
+                            # видели «деньги уже на депозите», хотя они —
+                            # в pending-заявке). Честный счётчик для этого
+                            # случая — refund_requests_existing.
+                            if (
+                                refund_info.get("prior_channel")
+                                == self.REFUND_CHANNEL_REFUND_REQUEST
+                            ):
+                                refund_requests_existing += 1
+                            else:
+                                deposit_credits_existing += 1
                         else:
                             deposit_credits_created += 1
                     else:
@@ -448,7 +464,19 @@ class ForceMajeureService:
                         # НОВЫХ заявок не входит (двухочередной визит:
                         # второй банковский перенос создаёт 0 строк).
                         if refund_info.get("already_refunded"):
-                            refund_requests_existing += 1
+                            # 3808 review round 13 (P2 prior_channel):
+                            # симметрично депозитной ветке — платёж мог
+                            # быть возвращён ЗАЧИСЛЕНИЕМ НА ДЕПОЗИТ
+                            # (отменой другой очереди): банковской заявки
+                            # не существует, честный счётчик —
+                            # deposit_credits_existing, НЕ refund_requests_existing.
+                            if (
+                                refund_info.get("prior_channel")
+                                == self.REFUND_CHANNEL_DEPOSIT
+                            ):
+                                deposit_credits_existing += 1
+                            else:
+                                refund_requests_existing += 1
                         else:
                             refund_requests.append(refund_info)
 
