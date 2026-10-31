@@ -126,6 +126,22 @@ class ForceMajeureService:
     REFUND_CHANNEL_DEPOSIT = "deposit"
     REFUND_CHANNEL_REFUND_REQUEST = "refund_request"
 
+    # 3808 review round 5 (P1 claim lifecycle): статусы банковской заявки,
+    # при которых возврат считается живым — состоявшимся или в выплате.
+    # Только они удерживают единый claim платежа и входят в предикаты
+    # 0087/0088 (status IN ...).
+    REFUND_REQUEST_ACTIVE_STATUSES = (
+        "pending",
+        "approved",
+        "processing",
+        "completed",
+    )
+    # Терминальные не-платящие статусы: заявка НЕ вернула деньги — claim
+    # освобождается (reject в process_refund_request + ленивое
+    # самоисцеление в _claim_payment_refund), платёж снова доступен для
+    # возврата любым каналом, включая исправленную повторную заявку.
+    REFUND_REQUEST_FAILED_STATUSES = ("rejected", "cancelled")
+
     def transfer_entries_to_tomorrow(
         self,
         entries: list[OnlineQueueEntry],
@@ -518,6 +534,53 @@ class ForceMajeureService:
             "prior_refund_request_id": claim.refund_request_id,
         }
 
+    def _claim_is_stale(self, claim: PaymentRefundClaim) -> bool:
+        """3808 round 5 (P1 claim lifecycle): claim мёртв, если его
+        банковская заявка закончилась БЕЗ выплаты денег.
+
+        * ``deposit``-канал мёртвым быть не может: зачисление на депозит —
+          уже свершшееся движение денег, обратных статусов у него нет;
+        * ``refund_request``-канал мёртв, когда связанная заявка в
+          терминальном не-платящем статусе (rejected/cancelled) — деньги
+          пациенту НЕ ушли;
+        * если связанная заявка не найдена (строку удалили — FK SET NULL
+          обнулил ссылку), ищем любую ЖИВУЮ автоматическую заявку этого
+          платежа: есть — claim жив (fail-closed к деньгам); живых нет, но
+          есть отклонённые — мёртв; нет вообще — консервативно жив
+          (orphan-claim, разбирается вручную, логируем предупреждение).
+        """
+        if claim.channel == self.REFUND_CHANNEL_DEPOSIT:
+            return False
+        request = None
+        if claim.refund_request_id is not None:
+            request = self.db.get(RefundRequest, claim.refund_request_id)
+        if request is not None:
+            return request.status in self.REFUND_REQUEST_FAILED_STATUSES
+        automatic_requests = (
+            self.db.query(RefundRequest)
+            .filter(
+                RefundRequest.payment_id == claim.payment_id,
+                RefundRequest.is_automatic.is_(True),
+            )
+            .all()
+        )
+        if any(
+            req.status in self.REFUND_REQUEST_ACTIVE_STATUSES
+            for req in automatic_requests
+        ):
+            return False
+        if automatic_requests:
+            return True
+        logger.warning(
+            "PaymentRefundClaim %s (payment %s, channel %s) has no bound "
+            "refund request and no automatic requests — treating as live "
+            "(fail-closed); investigate manually",
+            claim.id,
+            claim.payment_id,
+            claim.channel,
+        )
+        return False
+
     def _claim_payment_refund(
         self,
         payment_id: int,
@@ -535,6 +598,13 @@ class ForceMajeureService:
         * вернёт ``int`` (id claim-а) — мы выиграли право на возврат;
         * вернёт словарь already-refunded — платёж уже возвращён любым
           каналом (или конкурент выиграл гонку).
+
+        3808 review round 5 (P1 claim lifecycle): существующий claim
+        проверяется на «живость» — claim банковской заявки, отклонённой
+        без выплаты, мёртв и освобождается (DELETE в этой же транзакции,
+        атомарно с последующим INSERT нового claim-а). Это ленивое
+        самоисцеление покрывает любой путь отклонения/отмены заявки,
+        включая строки, занесённые до этого фикса.
 
         Savepoint берётся НА УРОВНЕ ПОДКЛЮЧЕНИЯ
         (``session.connection().begin_nested()``), а не сессии: session-level
@@ -555,7 +625,20 @@ class ForceMajeureService:
             .first()
         )
         if existing is not None:
-            return self._already_refunded_by_claim(payment_id, existing)
+            if self._claim_is_stale(existing):
+                # 3808 round 5: терминальный не-платящий статус заявки —
+                # деньги не вернулись, платёж снова доступен для возврата.
+                logger.info(
+                    "Releasing stale PaymentRefundClaim %s (payment %s, "
+                    "channel %s): bound refund request ended without a payout",
+                    existing.id,
+                    payment_id,
+                    existing.channel,
+                )
+                self.db.delete(existing)
+                self.db.flush()
+            else:
+                return self._already_refunded_by_claim(payment_id, existing)
 
         # Pending-изменения ORM — наружу savepoint (см. docstring).
         self.db.flush()
@@ -637,12 +720,15 @@ class ForceMajeureService:
 
         # 3808 round 4: кросс-канальная проверка — платёж уже уходит
         # банковским возвратом (строки могло не быть в claim-ах, если она
-        # создана до 0088 или напрямую, как в тестах).
+        # создана до 0088 или напрямую, как в тестах). 3808 round 5:
+        # учитываются только ЖИВЫЕ заявки — отклонённая/отменённая заявка
+        # денег не вернула и повторному возврату не мешает.
         prior_request = (
             self.db.query(RefundRequest)
             .filter(
                 RefundRequest.payment_id == payment_id,
                 RefundRequest.is_automatic.is_(True),
+                RefundRequest.status.in_(self.REFUND_REQUEST_ACTIVE_STATUSES),
             )
             .first()
         )
@@ -728,6 +814,13 @@ class ForceMajeureService:
         остался в записях). Атомарный арбитр — ``payment_refund_claims``
         (миграция 0088); ручные кассовые заявки по-прежнему не
         ограничены — как и в предикате 0087.
+
+        3808 review round 5 (P1 claim lifecycle): блокирующая проверка и
+        предикат 0087 учитывают только ЖИВЫЕ заявки
+        (pending/approved/processing/completed). Отклонённая или
+        отменённая заявка денег не вернула: повторная АВТОМАТИЧЕСКАЯ
+        заявка (например, с исправленными реквизитами) создаётся
+        свободно, а её claim займёт освободившийся слот платежа.
         """
         from decimal import Decimal
 
@@ -738,6 +831,7 @@ class ForceMajeureService:
             .filter(
                 RefundRequest.payment_id == payment_id,
                 RefundRequest.is_automatic.is_(True),
+                RefundRequest.status.in_(self.REFUND_REQUEST_ACTIVE_STATUSES),
             )
             .first()
         )

@@ -382,6 +382,15 @@ class ForceMajeureApiService:
                 raise ForceMajeureApiDomainError(400, "Укажите причину отклонения")
             req.status = RefundRequestStatus.REJECTED.value
             req.rejection_reason = process_request.rejection_reason
+            # 3808 review round 5 (P1 claim lifecycle): reject — терминальный
+            # НЕ-платящий статус: деньги пациенту не ушли, поэтому единый
+            # claim платежа освобождается В ЭТОЙ ЖЕ транзакции (commit ниже),
+            # и повторный возврат — исправленная заявка или депозит —
+            # становится возможен. Удаляется только claim этой заявки;
+            # claim более поздней заявки не затрагивается. Ленивое
+            # самоисцеление в ForceMajeureService._claim_payment_refund
+            # покрывает пути отклонения в обход этого метода.
+            self.repository.release_refund_claim_for_request(req.id)
         elif action == "complete":
             if req.status != RefundRequestStatus.APPROVED.value:
                 raise ForceMajeureApiDomainError(

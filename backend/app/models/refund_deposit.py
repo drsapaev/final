@@ -67,8 +67,12 @@ class RefundRequest(Base):
 
     # 3808 review round 3 (P1 double refund, PR #3809): the DB-level
     # backstop for the concurrent cancel-with-refund race — one
-    # AUTOMATIC (force majeure) refund request per payment. Partial
-    # predicate on is_automatic only: manual cashier requests
+    # LIVE automatic (force majeure) refund request per payment.
+    # 3808 review round 5 (P1 claim lifecycle): the predicate is
+    # STATUS-AWARE — only statuses where the refund is pending, in
+    # flight or actually paid hold the uniqueness; a REJECTED or
+    # CANCELLED request paid nothing, leaves the index and a corrected
+    # retry (same channel) becomes insertable. Manual cashier requests
     # (is_automatic=False) may legitimately repeat for the same payment
     # (partial refunds) and stay unconstrained. The predicate is
     # mirrored dialect-by-dialect (postgresql_where AND sqlite_where)
@@ -79,8 +83,14 @@ class RefundRequest(Base):
             "uq_refund_requests_auto_payment",
             "payment_id",
             unique=True,
-            postgresql_where=text("is_automatic"),
-            sqlite_where=text("is_automatic"),
+            postgresql_where=text(
+                "is_automatic AND status IN "
+                "('pending', 'approved', 'processing', 'completed')"
+            ),
+            sqlite_where=text(
+                "is_automatic AND status IN "
+                "('pending', 'approved', 'processing', 'completed')"
+            ),
         ),
     )
 

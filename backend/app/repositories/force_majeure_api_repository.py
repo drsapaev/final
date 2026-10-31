@@ -12,6 +12,7 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.refund_deposit import (
     DepositTransaction,
     PatientDeposit,
+    PaymentRefundClaim,
     RefundRequest,
 )
 from app.models.visit import Visit
@@ -95,6 +96,32 @@ class ForceMajeureApiRepository:
 
     def get_refund_request(self, request_id: int) -> RefundRequest | None:
         return self.db.query(RefundRequest).filter(RefundRequest.id == request_id).first()
+
+    def release_refund_claim_for_request(self, refund_request_id: int) -> bool:
+        """3808 review round 5 (P1 claim lifecycle): кассирский ``reject``
+        — терминальный НЕ-платящий статус: деньги пациенту не ушли, и
+        единый claim платежа (``payment_refund_claims``, миграция 0088)
+        должен освободиться в ТОЙ ЖЕ транзакции, что и смена статуса,
+        чтобы повторный возврат (исправленная заявка или депозит) стал
+        возможен.
+
+        Удаляется ТОЛЬКО claim, связанный с ЭТОЙ заявкой; свежий claim
+        более поздней заявки (созданной после отклонения этой) не
+        затрагивается. True — claim найден и удалён, False — заявка
+        claim-а не держала (ручная заявка или строка до 0088).
+
+        Lives in the repository so the API service keeps the
+        no-direct-session-calls boundary (test_service_repository_boundary).
+        """
+        claim = (
+            self.db.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.refund_request_id == refund_request_id)
+            .first()
+        )
+        if claim is None:
+            return False
+        self.db.delete(claim)
+        return True
 
     def list_deposits(
         self,

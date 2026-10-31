@@ -1681,3 +1681,312 @@ class TestForceMajeureApiService:
             )
 
         assert exc_info.value.status_code == 409
+
+    def _seed_refund_lifecycle_world(self, db_session, test_doctor, test_patient):
+        """3808 round 5 (P1 claim lifecycle): мир раунда-4 «один платёж в
+        записях ДВУХ очередей» + КАССИР (processed_by FK): первая нога
+        отменяет запись очереди A, повторный возврат идёт через запись
+        очереди B (запись A к тому моменту уже cancelled)."""
+        from app.models.user import User
+
+        cashier = User(
+            username="fm_lifecycle_cashier",
+            full_name="FM Lifecycle Cashier",
+            email="fm-lifecycle-cashier@test.local",
+            hashed_password="not-a-real-hash",
+            role="admin",
+            is_active=True,
+        )
+        db_session.add(cashier)
+        db_session.flush()
+        db_session.commit()
+
+        payment, entries = self._seed_shared_payment_two_queues(
+            db_session, test_doctor, test_patient, queue_tag="fm_lifecycle"
+        )
+        return cashier, payment, entries
+
+    def _reject_request(self, db_session, request_id, cashier):
+        """Кассир отклоняет заявку через реальный API-сервис (тот же путь,
+        что и продакшн- эндпоинт)."""
+        service = ForceMajeureApiService(db=db_session)
+        return service.process_refund_request(
+            request_id=request_id,
+            process_request=SimpleNamespace(
+                action="reject",
+                rejection_reason="invalid bank details",
+                bank_card_number=None,
+                manager_notes=None,
+            ),
+            current_user=SimpleNamespace(id=cashier.id, full_name=cashier.full_name),
+        )
+
+    def test_rejected_bank_request_releases_claim_and_allows_deposit_retry(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 round 5 (P1 claim lifecycle): pending -> rejected заявка
+        денег не вернула — claim освобождается ТРАНЗАКЦИОННО с reject, и
+        повторный возврат на депозит проходит (баланс пополнен, ровно один
+        claim уже депозитного канала)."""
+        from app.models.refund_deposit import (
+            DepositTransaction,
+            PatientDeposit,
+            PaymentRefundClaim,
+            RefundRequest,
+        )
+
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        cashier, payment, entries = self._seed_refund_lifecycle_world(
+            db_session, test_doctor, test_patient
+        )
+
+        first = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entries[0]],
+            reason="Doctor emergency",
+            refund_type=RefundType.BANK_TRANSFER,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert first["cancelled"] == 1
+        request = (
+            db_session.query(RefundRequest)
+            .filter(RefundRequest.payment_id == payment.id)
+            .one()
+        )
+        assert request.status == "pending"
+        assert (
+            db_session.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == payment.id)
+            .count()
+            == 1
+        )
+
+        rejected = self._reject_request(db_session, request.id, cashier)
+        assert rejected["status"] == "rejected"
+        # claim освобождён в той же транзакции
+        assert (
+            db_session.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == payment.id)
+            .count()
+            == 0
+        ), "reject обязан освободить claim платежа"
+
+        # Повторный возврат на депозит: проходит без already_refunded
+        second = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entries[1]],
+            reason="Doctor emergency retry",
+            refund_type=RefundType.DEPOSIT,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert second["cancelled"] == 1
+        assert second["skipped"] == 0
+        refund_info = second["details"][0]["refund_info"]
+        assert not refund_info.get("already_refunded"), second
+
+        deposit = (
+            db_session.query(PatientDeposit)
+            .filter(PatientDeposit.patient_id == test_patient.id)
+            .one()
+        )
+        assert deposit.balance == payment.amount
+        assert (
+            db_session.query(DepositTransaction)
+            .filter(DepositTransaction.payment_id == payment.id)
+            .count()
+            == 1
+        )
+        claims = (
+            db_session.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == payment.id)
+            .all()
+        )
+        assert len(claims) == 1
+        assert claims[0].channel == "deposit"
+        assert claims[0].deposit_transaction_id is not None
+        # историческая заявка осталась rejected, денег по ней не уходило
+        db_session.refresh(request)
+        assert request.status == "rejected"
+
+    def test_rejected_bank_request_allows_corrected_bank_retry(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 round 5 (P1 claim lifecycle), тот же канал: после reject
+        создаётся ВТОРАЯ автоматическая заявка (исправленные реквизиты) —
+        статус-зависимый предикат 0087 это допускает; claim переходит к
+        новой заявке."""
+        from app.models.refund_deposit import PaymentRefundClaim, RefundRequest
+
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        cashier, payment, entries = self._seed_refund_lifecycle_world(
+            db_session, test_doctor, test_patient
+        )
+
+        first = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entries[0]],
+            reason="Doctor emergency",
+            refund_type=RefundType.BANK_TRANSFER,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert first["cancelled"] == 1
+        first_request = (
+            db_session.query(RefundRequest)
+            .filter(RefundRequest.payment_id == payment.id)
+            .one()
+        )
+        self._reject_request(db_session, first_request.id, cashier)
+
+        second = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entries[1]],
+            reason="Doctor emergency corrected details",
+            refund_type=RefundType.BANK_TRANSFER,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert second["cancelled"] == 1
+        refund_info = second["details"][0]["refund_info"]
+        assert not refund_info.get("already_refunded"), second
+
+        requests = (
+            db_session.query(RefundRequest)
+            .filter(RefundRequest.payment_id == payment.id)
+            .order_by(RefundRequest.id)
+            .all()
+        )
+        assert len(requests) == 2
+        assert [r.status for r in requests] == ["rejected", "pending"]
+
+        claims = (
+            db_session.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == payment.id)
+            .all()
+        )
+        assert len(claims) == 1
+        assert claims[0].channel == "refund_request"
+        assert claims[0].refund_request_id == requests[1].id
+
+    def test_auto_request_unique_index_ignores_failed_statuses(
+        self, db_session, test_doctor, test_patient
+    ):
+        """Предикат 0087 (round 5): терминальные не-платящие статусы
+        покидают частичный уникальный индекс — rejected + cancelled +
+        pending сосуществуют; ВТОРОЙ pending по-прежнему невозможен
+        (живые статусы строго уникальны)."""
+        from sqlalchemy.exc import IntegrityError
+
+        from app.models.refund_deposit import RefundRequest
+
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="14:00",
+            status="open",
+            discount_mode="none",
+            department="cardiology",
+            created_at=datetime.now(UTC),
+        )
+        db_session.add(visit)
+        db_session.flush()
+        payment = Payment(
+            visit_id=visit.id,
+            amount=Decimal("130.00"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        db_session.add(payment)
+        db_session.flush()
+
+        def _auto_request(status):
+            return RefundRequest(
+                patient_id=test_patient.id,
+                payment_id=payment.id,
+                original_amount=Decimal("130.00"),
+                refund_amount=Decimal("130.00"),
+                commission_amount=Decimal("0"),
+                refund_type="bank_transfer",
+                status=status,
+                reason=f"probe {status}",
+                is_automatic=True,
+            )
+
+        db_session.add(_auto_request("rejected"))
+        db_session.add(_auto_request("cancelled"))
+        db_session.add(_auto_request("pending"))
+        db_session.flush()  # сосуществуют: уникальность только среди живых
+
+        db_session.add(_auto_request("approved"))
+        with pytest.raises(IntegrityError):
+            db_session.flush()
+        db_session.rollback()
+
+    def test_stale_claim_self_heals_on_next_refund(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """Ленивое самоисцеление (round 5): claim, привязанный к уже
+        отклонённой заявке (симуляция строки до фикса или пути отклонения
+        в обход process_refund_request), при следующем возврате
+        распознаётся как мёртвый, освобождается и замещается живым."""
+        from app.models.refund_deposit import PaymentRefundClaim, RefundRequest
+
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        cashier, payment, entries = self._seed_refund_lifecycle_world(
+            db_session, test_doctor, test_patient
+        )
+        entry = entries[0]
+
+        # «Старый мир»: заявка была, её отклонили БЕЗ освобождения claim
+        dead_request = RefundRequest(
+            patient_id=test_patient.id,
+            payment_id=payment.id,
+            original_amount=Decimal("160.00"),
+            refund_amount=Decimal("160.00"),
+            commission_amount=Decimal("0"),
+            refund_type="bank_transfer",
+            status="rejected",
+            reason="legacy rejected leg",
+            is_automatic=True,
+        )
+        db_session.add(dead_request)
+        db_session.flush()
+        stale_claim = PaymentRefundClaim(
+            payment_id=payment.id,
+            channel="refund_request",
+            refund_request_id=dead_request.id,
+            reason="stale claim left by a pre-fix path",
+        )
+        db_session.add(stale_claim)
+        db_session.commit()
+
+        result = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entry],
+            reason="Doctor emergency after stale claim",
+            refund_type=RefundType.DEPOSIT,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert result["cancelled"] == 1
+        refund_info = result["details"][0]["refund_info"]
+        assert not refund_info.get("already_refunded"), result
+
+        claims = (
+            db_session.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == payment.id)
+            .all()
+        )
+        assert len(claims) == 1
+        assert claims[0].channel == "deposit"
+        assert claims[0].deposit_transaction_id is not None
+        # id-сравнение с stale_claim намеренно отсутствует: SQLite
+        # переиспользует rowid после DELETE

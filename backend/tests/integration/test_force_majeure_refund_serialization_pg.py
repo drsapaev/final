@@ -70,6 +70,7 @@ from app.models.refund_deposit import (  # noqa: E402
     PaymentRefundClaim,
     RefundRequest,
 )
+from app.models.user import User  # noqa: E402
 from app.models.visit import Visit  # noqa: E402
 from app.services.force_majeure_api_service import (  # noqa: E402
     ForceMajeureApiDomainError,
@@ -261,7 +262,22 @@ def _seed_two_queue_world(session) -> dict:
     два независимых канала 0087 в двойной возврат).
 
     Врач A владеет очередью A, врач B — очередью B; одна запись в каждой
-    очереди ссылается на один и тот же visit (и его платёж)."""
+    очереди ссылается на один и тот же visit (и его платёж).
+    3808 round 5 (P1 claim lifecycle): в мире есть и КАССИР — reject
+    автоматической заявки через process_refund_request ставит
+    processed_by (FK users.id), которого в синтетике раньше не было."""
+    suffix = uuid.uuid4().hex[:8]
+    cashier = User(
+        username=f"fm_cashier_{suffix}",
+        full_name="FM Cashier",
+        email=f"fm-cashier-{suffix}@test.local",
+        hashed_password="not-a-real-hash",
+        role="admin",
+        is_active=True,
+    )
+    session.add(cashier)
+    session.flush()
+
     doctors = {}
     queues = {}
     for tag in ("a", "b"):
@@ -347,6 +363,7 @@ def _seed_two_queue_world(session) -> dict:
         "payment_amount": payment.amount,
         "entry_a": entries["a"].id,
         "entry_b": entries["b"].id,
+        "cashier_id": cashier.id,
     }
 
 
@@ -846,5 +863,197 @@ def test_payment_refund_claim_unique_is_the_db_backstop(db_engine, session_facto
             .count()
         )
         assert persisted == 1
+    finally:
+        verify.close()
+
+
+def _reject_automatic_request(session_factory, request_id, cashier_id):
+    """Кассирский reject через реальный API-сервис (продакшн-путь
+    process_refund_request: статус + processed_by + освобождение claim
+    одной транзакцией)."""
+    from types import SimpleNamespace
+
+    session = session_factory()
+    try:
+        service = ForceMajeureApiService(session)
+        return service.process_refund_request(
+            request_id=request_id,
+            process_request=SimpleNamespace(
+                action="reject",
+                rejection_reason="invalid bank details",
+                bank_card_number=None,
+                manager_notes=None,
+            ),
+            current_user=SimpleNamespace(id=cashier_id, full_name="FM Cashier"),
+        )
+    finally:
+        session.close()
+
+
+def test_rejected_bank_request_releases_claim_for_deposit_retry(
+    db_engine, session_factory
+):
+    """3808 round 5 (P1 claim lifecycle), PostgreSQL-доказательство
+    сценария ревью: отмена очереди A каналом bank_transfer создаёт
+    автоматическую заявку; кассир её ОТКЛОНЯЕТ (деньги не ушли); отмена
+    очереди B каналом deposit обязана пройти — claim освобождён reject-ом
+    (плюс статус-зависимые pre-checks), платёж зачислен на депозит."""
+    seed = session_factory()
+    try:
+        world = _seed_two_queue_world(seed)
+    finally:
+        seed.close()
+
+    first = _cancel_once(
+        session_factory,
+        specialist_id=world["spec_a"],
+        queue_id=world["queue_a"],
+        snapshot=[world["entry_a"]],
+        refund_type="bank_transfer",
+    )
+    assert first["cancelled"] == 1, first
+
+    verify = session_factory()
+    try:
+        request = (
+            verify.query(RefundRequest)
+            .filter(RefundRequest.payment_id == world["payment_id"])
+            .one()
+        )
+        assert request.status == "pending"
+        claims = (
+            verify.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == world["payment_id"])
+            .all()
+        )
+        assert len(claims) == 1
+        request_id, cashier_id = request.id, world["cashier_id"]
+    finally:
+        verify.close()
+
+    rejected = _reject_automatic_request(session_factory, request_id, cashier_id)
+    assert rejected["status"] == "rejected"
+
+    second = _cancel_once(
+        session_factory,
+        specialist_id=world["spec_b"],
+        queue_id=world["queue_b"],
+        snapshot=[world["entry_b"]],
+        refund_type="deposit",
+    )
+    assert second["cancelled"] == 1, second
+    refund_info = second["details"][0]["refund_info"]
+    assert not refund_info.get("already_refunded"), second
+
+    verify = session_factory()
+    try:
+        claims = (
+            verify.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == world["payment_id"])
+            .all()
+        )
+        assert len(claims) == 1, claims
+        assert claims[0].channel == "deposit", claims
+        assert claims[0].deposit_transaction_id is not None, claims
+
+        credits = (
+            verify.query(DepositTransaction)
+            .filter(DepositTransaction.payment_id == world["payment_id"])
+            .count()
+        )
+        live_requests = (
+            verify.query(RefundRequest)
+            .filter(
+                RefundRequest.payment_id == world["payment_id"],
+                RefundRequest.status.in_(("pending", "approved", "processing", "completed")),
+            )
+            .count()
+        )
+        assert credits == 1
+        assert live_requests == 0, "отклонённая заявка не считается живой"
+
+        deposit = (
+            verify.query(PatientDeposit)
+            .filter(PatientDeposit.patient_id == world["patient_id"])
+            .one()
+        )
+        assert deposit.balance == world["payment_amount"], deposit.balance
+    finally:
+        verify.close()
+
+
+def test_rejected_bank_request_allows_corrected_bank_retry_pg(
+    db_engine, session_factory
+):
+    """3808 round 5 (P1 claim lifecycle), повтор ТОКИМ ЖЕ каналом на
+    PostgreSQL: после reject создаётся ВТОРАЯ автоматическая заявка —
+    статус-зависимый частичный индекс 0087 (status IN живых) допускает
+    это на уровне БД; единый claim переходит к новой заявке."""
+    seed = session_factory()
+    try:
+        world = _seed_two_queue_world(seed)
+    finally:
+        seed.close()
+
+    first = _cancel_once(
+        session_factory,
+        specialist_id=world["spec_a"],
+        queue_id=world["queue_a"],
+        snapshot=[world["entry_a"]],
+        refund_type="bank_transfer",
+    )
+    assert first["cancelled"] == 1, first
+
+    verify = session_factory()
+    try:
+        request = (
+            verify.query(RefundRequest)
+            .filter(RefundRequest.payment_id == world["payment_id"])
+            .one()
+        )
+        request_id, cashier_id = request.id, world["cashier_id"]
+    finally:
+        verify.close()
+
+    _reject_automatic_request(session_factory, request_id, cashier_id)
+
+    second = _cancel_once(
+        session_factory,
+        specialist_id=world["spec_b"],
+        queue_id=world["queue_b"],
+        snapshot=[world["entry_b"]],
+        refund_type="bank_transfer",
+    )
+    assert second["cancelled"] == 1, second
+    refund_info = second["details"][0]["refund_info"]
+    assert not refund_info.get("already_refunded"), second
+
+    verify = session_factory()
+    try:
+        requests = (
+            verify.query(RefundRequest)
+            .filter(RefundRequest.payment_id == world["payment_id"])
+            .order_by(RefundRequest.id)
+            .all()
+        )
+        assert [r.status for r in requests] == ["rejected", "pending"], [
+            r.status for r in requests
+        ]
+
+        claims = (
+            verify.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == world["payment_id"])
+            .all()
+        )
+        assert len(claims) == 1, claims
+        assert claims[0].channel == "refund_request", claims
+        assert claims[0].refund_request_id == requests[1].id, claims
+
+        credits = (
+            verify.query(DepositTransaction)
+            .filter(DepositTransaction.payment_id == world["payment_id"])
+            .count()
+        )
+        assert credits == 0, "банковский retry не трогает депозит"
     finally:
         verify.close()

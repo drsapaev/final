@@ -8,10 +8,18 @@ once as an automatic bank request (review round 4, P1).
 
 ``payment_refund_claims`` is the unified guard: ONE row per payment_id,
 regardless of the refund channel. ``ON CONFLICT (payment_id) DO NOTHING``
-backfill preserves the guarantee for rows that predate the guard (any
-historical cross-channel double is reported by the claim's channel, never
-compounded further). RLS is enabled per the public-schema guardrail
-(ops/scripts/check_public_rls.py).
+backfill preserves the guarantee for rows that predate the guard. RLS is
+enabled per the public-schema guardrail (ops/scripts/check_public_rls.py).
+
+3808 review round 5 (P1 claim lifecycle): the backfill is STATUS-AWARE —
+only requests whose refund is live (pending/approved/processing/completed)
+occupy a claim. A preexisting REJECTED or CANCELLED automatic request
+paid nothing and must NOT reserve the payment: on rollout such a payment
+stays claimable, so the patient can be refunded again (corrected bank
+request or deposit). COMPLETED requests — money actually returned — keep
+their claims strictly. Both 0087 and 0088 live only in this unmerged Draft
+PR (main's alembic head is 0086), so the lifecycle fix amends them in
+place instead of growing a 0089 cleanup for never-deployed schema.
 """
 
 from __future__ import annotations
@@ -80,8 +88,11 @@ def upgrade() -> None:
     )
 
     # Backfill — claim payments that were already refunded before the guard:
-    # automatic (force majeure) refund requests first, then deposit credits;
-    # DO NOTHING keeps the first channel when a payment somehow has both.
+    # LIVE automatic (force majeure) refund requests first, then deposit
+    # credits; DO NOTHING keeps the first channel when a payment somehow
+    # has both. 3808 round 5 (P1 lifecycle): rejected/cancelled requests
+    # paid nothing and are EXCLUDED — such payments stay claimable so a
+    # corrected retry (any channel) can proceed after rollout.
     op.execute(
         sa.text(
             """
@@ -91,6 +102,7 @@ def upgrade() -> None:
                    '0088 backfill: automatic refund request predates the unified guard'
             FROM refund_requests
             WHERE is_automatic AND payment_id IS NOT NULL
+              AND status IN ('pending', 'approved', 'processing', 'completed')
             ON CONFLICT (payment_id) DO NOTHING
             """
         )
