@@ -18,7 +18,6 @@ from app.models.online_queue import DailyQueue
 from app.models.refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
-    PatientDeposit,
     RefundRequestStatus,
     RefundType,
 )
@@ -520,12 +519,19 @@ class ForceMajeureApiService:
 
     def add_to_deposit(self, *, request, current_user_id: int) -> dict[str, Any]:
         amount = Decimal(str(request.amount))
-        deposit = self.repository.get_patient_deposit(patient_id=request.patient_id)
-
-        if not deposit:
-            deposit = PatientDeposit(patient_id=request.patient_id, balance=amount)
-            self.repository.add(deposit)
-        else:
+        # 3808 review round 13 (residual P1 deposit balance race): ЕДИНЫЙ
+        # механизм конкурентной безопасности для ВСЕХ трёх операций с
+        # балансом (форс-мажорный возврат / ручное пополнение / списание
+        # в оплату) — строка депозита берётся FOR UPDATE до read-modify-write,
+        # конкурентное создание — в connection-level savepoint с перечитыванием
+        # строки победителя (раньше: необученный INSERT ломал всю операцию
+        # poisoned-сессией -> 500, а ``+=`` поверх неблокированного чтения
+        # терял параллельное зачисление). SQLite (unit) игнорирует FOR UPDATE.
+        deposit, created = self.repository.get_or_create_patient_deposit_for_update(
+            patient_id=request.patient_id,
+            initial_balance=amount,
+        )
+        if not created:
             deposit.balance += amount
 
         self.repository.flush()
@@ -545,7 +551,18 @@ class ForceMajeureApiService:
 
     def use_deposit_for_payment(self, *, request, current_user_id: int) -> dict[str, Any]:
         amount = Decimal(str(request.amount))
-        deposit = self.repository.get_patient_deposit(patient_id=request.patient_id)
+        # 3808 review round 13 (residual P1 deposit balance race): строка
+        # берётся FOR UPDATE ДО проверок и списания. Прежний разомкнутый
+        # check-then-act (``balance < amount`` на неблокированном чтении,
+        # затем ``-=``) проигрывал гонку параллельному форс-мажорному
+        # зачислению: проверка проходила по устаревшему балансу, списание
+        # перезаписывало чужое зачисление (или наоборот — зачисление
+        # затирало списание, а ``balance_after`` debit-строки расходился с
+        # фактическим балансом). Теперь списание сериализуется с
+        # зачислением на самой строке депозита.
+        deposit = self.repository.get_patient_deposit_for_update(
+            patient_id=request.patient_id
+        )
         if not deposit:
             raise ForceMajeureApiDomainError(404, "Депозит пациента не найден")
         if deposit.balance < amount:

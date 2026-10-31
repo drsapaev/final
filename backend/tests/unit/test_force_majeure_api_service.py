@@ -1473,7 +1473,7 @@ class TestForceMajeureApiService:
         )
 
         class Repository:
-            def get_patient_deposit(self, *, patient_id):
+            def get_patient_deposit_for_update(self, *, patient_id):
                 return deposit
 
         service = ForceMajeureApiService(db=None, repository=Repository())
@@ -1502,7 +1502,7 @@ class TestForceMajeureApiService:
         state = {"flushed": False}
 
         class Repository:
-            def get_patient_deposit(self, *, patient_id):
+            def get_patient_deposit_for_update(self, *, patient_id):
                 return deposit
 
             def get_visit(self, visit_id):
@@ -1526,6 +1526,167 @@ class TestForceMajeureApiService:
         assert exc_info.value.status_code == 400
         assert deposit.balance == Decimal("100")
         assert state["flushed"] is False
+
+    # -- 3808 review round 13 (residual P1): единый механизм конкурентно-
+    # безопасного изменения депозита — ручные операции ходят через
+    # заблокированную строку (см. repository.get_*_for_update) --
+
+    def test_use_deposit_for_payment_debits_the_locked_row(self):
+        """Успешное списание: строка взята через
+        get_patient_deposit_for_update (единый механизм с форс-мажорной
+        ногой _add_to_deposit), баланс и balance_after сходятся."""
+        deposit = SimpleNamespace(
+            balance=Decimal("100"),
+            is_active=True,
+            patient=None,
+            id=1,
+            patient_id=2,
+            currency="UZS",
+            created_at=None,
+        )
+        state = {"flushed": 0, "added": []}
+
+        class Repository:
+            def get_patient_deposit_for_update(self, *, patient_id):
+                state["locked_patient_id"] = patient_id
+                return deposit
+
+            def flush(self):
+                state["flushed"] += 1
+
+            def add(self, obj):
+                state["added"].append(obj)
+
+            def commit(self):
+                state["committed"] = True
+
+            def refresh(self, obj):
+                state["refreshed"] = obj
+
+        service = ForceMajeureApiService(db=None, repository=Repository())
+        payload = service.use_deposit_for_payment(
+            request=SimpleNamespace(
+                patient_id=2,
+                amount=40,
+                visit_id=None,
+                description=None,
+            ),
+            current_user_id=7,
+        )
+
+        assert state["locked_patient_id"] == 2
+        assert deposit.balance == Decimal("60")
+        assert payload["balance"] == 60.0
+        [debit] = state["added"]
+        assert debit.transaction_type == "debit"
+        assert debit.amount == Decimal("40")
+        assert debit.balance_after == Decimal("60")
+        assert debit.performed_by == 7
+        assert state["committed"] is True
+        assert state["refreshed"] is deposit
+
+    def test_add_to_deposit_sums_into_locked_existing_row(self):
+        """Пополнение существующего депозита: get_or_create... возвращает
+        created=False — сумма прибавляется к заблокированной строке."""
+        deposit = SimpleNamespace(
+            balance=Decimal("100"),
+            is_active=True,
+            patient=None,
+            id=1,
+            patient_id=2,
+            currency="UZS",
+            created_at=None,
+        )
+        state = {"added": []}
+
+        class Repository:
+            def get_or_create_patient_deposit_for_update(
+                self, *, patient_id, initial_balance
+            ):
+                state["locked_patient_id"] = patient_id
+                state["initial_balance"] = initial_balance
+                return deposit, False
+
+            def flush(self):
+                pass
+
+            def add(self, obj):
+                state["added"].append(obj)
+
+            def commit(self):
+                pass
+
+            def refresh(self, obj):
+                pass
+
+        service = ForceMajeureApiService(db=None, repository=Repository())
+        payload = service.add_to_deposit(
+            request=SimpleNamespace(
+                patient_id=2,
+                amount=30,
+                description=None,
+            ),
+            current_user_id=5,
+        )
+
+        assert state["locked_patient_id"] == 2
+        assert deposit.balance == Decimal("130")
+        assert payload["balance"] == 130.0
+        [credit] = state["added"]
+        assert credit.transaction_type == "credit"
+        assert credit.amount == Decimal("30")
+        assert credit.balance_after == Decimal("130")
+
+    def test_add_to_deposit_uses_initial_balance_for_created_row(self):
+        """Создание депозита через конкурентно безопасную ветку: created=True
+        — строка уже создана с initial_balance, двойное прибавление
+        недопустимо (balance = amount, НЕ amount + amount)."""
+        deposit = SimpleNamespace(
+            balance=Decimal("30"),
+            is_active=True,
+            patient=None,
+            id=9,
+            patient_id=2,
+            currency="UZS",
+            created_at=None,
+        )
+        state = {"added": []}
+
+        class Repository:
+            def get_or_create_patient_deposit_for_update(
+                self, *, patient_id, initial_balance
+            ):
+                state["initial_balance"] = initial_balance
+                return deposit, True
+
+            def flush(self):
+                pass
+
+            def add(self, obj):
+                state["added"].append(obj)
+
+            def commit(self):
+                pass
+
+            def refresh(self, obj):
+                pass
+
+        service = ForceMajeureApiService(db=None, repository=Repository())
+        payload = service.add_to_deposit(
+            request=SimpleNamespace(
+                patient_id=2,
+                amount=30,
+                description=None,
+            ),
+            current_user_id=5,
+        )
+
+        # initial_balance = amount, и НИКАКОГО повторного += поверх
+        assert state["initial_balance"] == Decimal("30")
+        assert deposit.balance == Decimal("30"), "двойное зачисление!"
+        assert payload["balance"] == 30.0
+        [credit] = state["added"]
+        assert credit.balance_after == Decimal("30")
 
     # -- Review round 3 (#3809 P1/P2): preview set binding + serialization --
 

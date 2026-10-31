@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
+from sqlalchemy import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today
@@ -169,6 +172,93 @@ class ForceMajeureApiRepository:
 
     def get_patient_deposit(self, *, patient_id: int) -> PatientDeposit | None:
         return self.db.query(PatientDeposit).filter(PatientDeposit.patient_id == patient_id).first()
+
+    def get_patient_deposit_for_update(
+        self, *, patient_id: int
+    ) -> PatientDeposit | None:
+        """3808 review round 13 (residual P1 deposit balance race): SELECT
+        ... FOR UPDATE на строке депозита, взятый ДО проверок и изменений.
+
+        Форс-мажорная нога ``_add_to_deposit`` уже сериализует
+        read-modify-write баланса на самой строке (round 12), но ручные
+        операции — пополнение ``add_to_deposit`` и списание
+        ``use_deposit_for_payment`` — работали на НЕблокированном чтении:
+        параллельный форс-мажорный возврат и ручная операция перезаписывали
+        результат друг друга (lost update), а разомкнутый check-then-act
+        (``balance < amount`` и последующее ``-=``) мог списать поверх
+        параллельного зачисления и увести баланс в минус. Единый механизм:
+        ВСЕ три операции берут строку FOR UPDATE — ноги сериализуются на
+        самой строке депозита (SQLite-диалект молча игнорирует FOR UPDATE,
+        он и так однописательный — см. ``get_daily_queue_for_update``).
+
+        ``populate_existing()`` не даёт identity map подсунуть устаревший
+        объект после ожидания на блокировке (READ COMMITTED перечитывает
+        кортеж).
+
+        Lives in the repository so the API service keeps the
+        no-direct-session-calls boundary (test_service_repository_boundary).
+        """
+        return (
+            self.db.query(PatientDeposit)
+            .filter(PatientDeposit.patient_id == patient_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+
+    def get_or_create_patient_deposit_for_update(
+        self, *, patient_id: int, initial_balance: Decimal
+    ) -> tuple[PatientDeposit, bool]:
+        """Заблокированная строка депозита, при отсутствии — конкурентно
+        безопасное создание.
+
+        3808 review round 13 (residual P1): тот же контракт, что у
+        ``_add_to_deposit`` (round 12), распространён на РУЧНОЕ пополнение
+        ``add_to_deposit``. Возвращает ``(deposit, created)``:
+
+        * существующий депозит — строка FOR UPDATE, ``created=False``;
+        * депозита нет — Core-вставка в connection-level savepoint,
+          ``created=True``; проигравший уникальный индекс ``patient_id``
+          ловит IntegrityError ВНУТРИ savepoint (сессия не отравлена),
+          перечитывает строку победителя FOR UPDATE и возвращает её с
+          ``created=False`` — вызывающий прибавляет свою сумму поверх.
+
+        Паттерн ``_claim_payment_refund``: session-level ``begin_nested``
+        ломает внешнюю savepoint-машину тестовых фикстур, поэтому savepoint
+        берётся на уровне ПОДКЛЮЧЕНИЯ; явный flush ДО savepoint выталкивает
+        pending-изменения ORM наружу отката.
+        """
+        deposit = self.get_patient_deposit_for_update(patient_id=patient_id)
+        if deposit is not None:
+            return deposit, False
+
+        self.db.flush()  # pending-изменения ORM — наружу savepoint
+        bind = self.db.connection()
+        try:
+            with bind.begin_nested():
+                result = self.db.execute(
+                    insert(PatientDeposit).values(
+                        patient_id=patient_id,
+                        balance=initial_balance,
+                    )
+                )
+            deposit_id = int(result.inserted_primary_key[0])
+        except IntegrityError:
+            # Проиграли гонку создания: в READ COMMITTED после ожидания на
+            # уникальном индексе победитель уже закоммичен и виден. Строка
+            # перечитывается FOR UPDATE — вызывающий продолжит на ней.
+            deposit = self.get_patient_deposit_for_update(patient_id=patient_id)
+            if deposit is None:
+                # Уникальный индекс сработал, а строки нет — гонка удаления
+                # (FK RESTRICT делает это практически невозможным); не
+                # глотаем чужую ошибку, поднимаем исходную.
+                raise
+            return deposit, False
+        created = self.db.get(PatientDeposit, deposit_id)
+        # Только что вставлена ЭТОЙ транзакцией (savepoint уже закрыт,
+        # строка наша) — None возможен только при рассинхроне ядра.
+        assert created is not None
+        return created, True
 
     def get_visit(self, visit_id: int) -> Visit | None:
         return self.db.query(Visit).filter(Visit.id == visit_id).first()
