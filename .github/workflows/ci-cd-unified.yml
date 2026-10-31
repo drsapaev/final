@@ -1200,12 +1200,16 @@ jobs:
     # is a disposable service container (clinicdb), so opt in explicitly —
     # the module now builds its own one-off schema and never touches
     # public (no DROP SCHEMA public CASCADE anymore).
-    - name: 🧪 Reminder + QR-join + FM serialization PG concurrency (gate_d)
+    # 3808 round 12 (#3809 P1): the deposit balance race module joins this
+    # step — parallel refunds of DIFFERENT payments of ONE patient must
+    # SUM on the shared deposit row (FOR UPDATE + savepoint creation race).
+    # Same opt-in variable, same one-off-schema isolation.
+    - name: 🧪 Reminder + QR-join + FM serialization + FM deposit race PG concurrency (gate_d)
       env:
         FM_GATE_D_ALLOW_ANY_TARGET: '1'
       run: |
         cd backend
-        pytest tests/integration/test_reminder_pipeline_pg.py tests/integration/test_qr_join_probe_concurrency_pg.py tests/integration/test_force_majeure_refund_serialization_pg.py -m gate_d --noconftest
+        pytest tests/integration/test_reminder_pipeline_pg.py tests/integration/test_qr_join_probe_concurrency_pg.py tests/integration/test_force_majeure_refund_serialization_pg.py tests/integration/test_force_majeure_deposit_balance_concurrency_pg.py -m gate_d --noconftest
 
     - name: 🧪 Critical E2E Smoke
       run: |
