@@ -305,6 +305,9 @@ describe('ForceMajeureModal (#3808 REG-FE-025)', () => {
         },
       },
     } as never);
+    // round 11: этот мок намеренно БЕЗ заголовка X-Error-Code — тест
+    // пинирует фолбэк-дискриминатор по точному префиксу текста дрейфа
+    // (ответ старого бэкенда или прокси, стрипающего заголовки)
 
     fireEvent.click(submitButton());
     await waitFor(() => expect(screen.getByText('misc.fm_queue_changed')).toBeInTheDocument());
@@ -330,5 +333,98 @@ describe('ForceMajeureModal (#3808 REG-FE-025)', () => {
       reason: REASON,
       send_notifications: true,
     });
+  });
+
+  it('an owner-conflict 409 shows the server refusal instead of a drift message (round 11 P2)', async () => {
+    // Round 10 made the server refuse an owner-mismatched transfer as
+    // 409 force_majeure_domain_refusal. That is NOT a snapshot drift:
+    // the registrar must see the server's explanation as is — refreshing
+    // the preview cannot fix an owner conflict, so attributing it to
+    // «состав изменился» traps the operator in a misleading loop.
+    apiGet.mockResolvedValueOnce({ data: [{ id: 101, total_amount: 1 }] } as never);
+    renderModal();
+    await waitFor(() => expect(screen.getByText('misc.fm_entries_count:1')).toBeInTheDocument());
+    await fillConfirmation();
+    expect(submitButton()).toBeEnabled();
+
+    const refusal =
+      'Операция отклонена: перенос отклонён — поверхность назначения (id=77, тег lab, 2026-10-31) ' +
+      'принадлежит другому владельцу: активная врачебная очередь того же тега; ' +
+      'перенос ресурсных пациентов в неё запрещён';
+    apiPost.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        headers: { 'x-error-code': 'force_majeure_domain_refusal' },
+        data: { detail: refusal },
+      },
+    } as never);
+
+    fireEvent.click(submitButton());
+    await waitFor(() => expect(screen.getByText(refusal)).toBeInTheDocument());
+
+    // NOT attributed to snapshot drift: no misleading «состав изменился»,
+    // the valid preview card is kept and the action stays available —
+    // the server's refusal explains itself, a re-preview would not help.
+    expect(screen.queryByText('misc.fm_queue_changed')).not.toBeInTheDocument();
+    expect(screen.getByText('misc.fm_entries_count:1')).toBeInTheDocument();
+    expect(submitButton()).toBeEnabled();
+  });
+
+  it('an owner-conflict 409 on cancel-with-refund shows the server refusal too (round 11 P2)', async () => {
+    // The same refusal class through the SECOND financial mutation: the
+    // cancel handler shares the drift predicate, so a domain refusal
+    // must not be labelled as snapshot drift there either.
+    apiGet.mockResolvedValueOnce({ data: [{ id: 101, total_amount: 1 }] } as never);
+    renderModal();
+    fireEvent.click(screen.getByRole('button', { name: 'misc.fm_tab_cancel' }));
+    await waitFor(() => expect(screen.getByText('misc.fm_entries_count:1')).toBeInTheDocument());
+    await fillConfirmation();
+    expect(cancelButton()).toBeEnabled();
+
+    const refusal =
+      'Операция отклонена: отмена отклонена — очередь принадлежит другому владельцу, ' +
+      'возврат средств не выполнен';
+    apiPost.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        headers: { 'x-error-code': 'force_majeure_domain_refusal' },
+        data: { detail: refusal },
+      },
+    } as never);
+
+    fireEvent.click(cancelButton());
+    await waitFor(() => expect(screen.getByText(refusal)).toBeInTheDocument());
+
+    expect(screen.queryByText('misc.fm_queue_changed')).not.toBeInTheDocument();
+    expect(screen.getByText('misc.fm_entries_count:1')).toBeInTheDocument();
+  });
+
+  it('a 409 carrying the drift error code is drift even when the detail text differs (round 11)', async () => {
+    // The machine-readable X-Error-Code wins over the detail wording: a
+    // drift refusal keeps its re-lock semantics whatever the server's
+    // phrasing (here deliberately NOT matching the drift text prefix).
+    apiGet.mockResolvedValueOnce({ data: [{ id: 101, total_amount: 1 }] } as never);
+    renderModal();
+    await waitFor(() => expect(screen.getByText('misc.fm_entries_count:1')).toBeInTheDocument());
+    await fillConfirmation();
+    expect(submitButton()).toBeEnabled();
+
+    apiPost.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        headers: { 'x-error-code': 'force_majeure_preview_drift' },
+        data: {
+          detail:
+            'Queue composition changed after the preview (added: 1, removed: 0). Re-run the preview and confirm the new set',
+        },
+      },
+    } as never);
+
+    fireEvent.click(submitButton());
+    await waitFor(() => expect(screen.getByText('misc.fm_queue_changed')).toBeInTheDocument());
+
+    // drift semantics: the stale card is dropped and the action re-locks
+    expect(screen.queryByText('misc.fm_entries_count:1')).not.toBeInTheDocument();
+    expect(submitButton()).toBeDisabled();
   });
 });

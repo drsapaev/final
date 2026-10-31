@@ -211,6 +211,10 @@ class TestForceMajeureEndpoints:
         )
         assert response.status_code == 409, response.text[:300]
         assert "предпросмотра" in response.json()["detail"]
+        # round 11 (P2 409 disambiguation): дрейф состава помечен своим
+        # машинно-читаемым кодом в заголовке — клиент отличает его от
+        # конфликта владельцев (тот тоже 409)
+        assert response.headers.get("X-Error-Code") == "force_majeure_preview_drift"
 
         db_session.refresh(entries[0])
         db_session.refresh(late_joiner)
@@ -270,6 +274,8 @@ class TestForceMajeureEndpoints:
             CANCEL_PATH, json=confirmation, headers=registrar_auth_headers
         )
         assert replay.status_code == 409, replay.text[:300]
+        # round 11: дрейф состава (живой набор пуст против снимка) — свой код
+        assert replay.headers.get("X-Error-Code") == "force_majeure_preview_drift"
 
         db_session.refresh(deposit)
         assert deposit.balance == sum(p.amount for p in payments)
@@ -378,6 +384,12 @@ class TestForceMajeureEndpoints:
         assert "владельца назначения" in detail
         assert "Операция отклонена" in detail
         assert f"id={doctor_queue_tomorrow.id}" in detail
+        # round 11 (P2 409 disambiguation): конфликт владельцев — свой
+        # машинно-читаемый код (НЕ дрейф состава): клиент показывает
+        # объяснение сервера, а не «состав изменился» с бессмысленным
+        # обновлением предпросмотра
+        assert response.headers.get("X-Error-Code") == "force_majeure_domain_refusal"
+        assert "Состав очереди" not in detail
 
         # данные не тронуты: запись ждёт в своей очереди, переносов нет,
         # врачебная очередь завтра пуста и без дублей
@@ -439,6 +451,9 @@ class TestForceMajeureEndpoints:
         detail = response.json()["detail"]
         assert "владельца назначения" in detail
         assert f"id={rebound.id}" in detail
+        # round 11: конфликт владельцев (перевязка тега) — свой код, не дрейф
+        assert response.headers.get("X-Error-Code") == "force_majeure_domain_refusal"
+        assert "Состав очереди" not in detail
 
         # fail closed БЕЗ записей: источник не тронут, завтра очередей нет
         db_session.refresh(entry)

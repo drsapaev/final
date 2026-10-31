@@ -895,6 +895,9 @@ class TestForceMajeureApiService:
         # 3808 review round 10 (P2 HTTP contract): доменный отказ —
         # 409 с объяснением, а не необработанная серверная ошибка
         assert exc_info.value.status_code == 409
+        # round 11 (P2 409 disambiguation): код класса отказа — клиент
+        # отличает этот 409 от дрейфа состава предпросмотра
+        assert exc_info.value.code == "force_majeure_domain_refusal"
         assert "владельца назначения" in exc_info.value.detail
         assert "Операция отклонена" in exc_info.value.detail
         assert f"id={doctor_queue_tomorrow.id}" in exc_info.value.detail
@@ -991,6 +994,8 @@ class TestForceMajeureApiService:
             )
         # 3808 review round 10 (P2 HTTP contract): 409, не HTTP 500
         assert exc_info.value.status_code == 409
+        # round 11 (P2 409 disambiguation): код класса отказа
+        assert exc_info.value.code == "force_majeure_domain_refusal"
         assert "владельца назначения" in exc_info.value.detail
         # отказ объясняет перевязку тега
         assert f"id={resource_a.id}" in exc_info.value.detail
@@ -1653,6 +1658,9 @@ class TestForceMajeureApiService:
             )
 
         assert exc_info.value.status_code == 409
+        # round 11 (P2 409 disambiguation): дрейф состава помечен своим
+        # кодом — клиент не спутает его с конфликтом владельцев
+        assert exc_info.value.code == "force_majeure_preview_drift"
         assert "добавилось: 1" in exc_info.value.detail
         assert "исчезло: 0" in exc_info.value.detail
 
@@ -1746,6 +1754,8 @@ class TestForceMajeureApiService:
             )
 
         assert exc_info.value.status_code == 409
+        # round 11 (P2 409 disambiguation): дрейф состава помечен своим кодом
+        assert exc_info.value.code == "force_majeure_preview_drift"
         assert "добавилось: 0" in exc_info.value.detail
 
         # Refusal is total: the remaining entry is intact and no money moved.
@@ -2470,6 +2480,9 @@ class TestForceMajeureApiService:
             )
 
         assert exc_info.value.status_code == 409
+        # round 11 (P2 409 disambiguation): гонка возвратов — свой код,
+        # не force_majeure_preview_drift
+        assert exc_info.value.code == "force_majeure_concurrent_refund"
 
     def _seed_refund_lifecycle_world(self, db_session, test_doctor, test_patient):
         """3808 round 5 (P1 claim lifecycle): мир раунда-4 «один платёж в

@@ -33,6 +33,15 @@ from app.services.force_majeure_service import (
 class ForceMajeureApiDomainError(Exception):
     status_code: int
     detail: str
+    # 3808 review round 11 (P2 409 disambiguation): машинно-читаемый класс
+    # отказа. HTTP-слой отдаёт его в заголовке X-Error-Code, чтобы клиент
+    # мог отличить друг от друга ОЖИДАЕМЫЕ конфликты с одинаковым статусом:
+    # дрейф состава после предпросмотра (force_majeure_preview_drift —
+    # лечится повторным предпросмотром) от конфликта владельцев поверхности
+    # назначения (force_majeure_domain_refusal — повторный предпросмотр
+    # бессмыслен, нужно показывать объяснение сервера как есть).
+    # None = код не задан (ошибки валидации/адресации, не требующие ветвления).
+    code: str | None = None
 
 
 class ForceMajeureApiService:
@@ -164,6 +173,9 @@ class ForceMajeureApiService:
                 "Состав очереди изменился после предпросмотра "
                 f"(добавилось: {added}, исчезло: {removed}). "
                 "Обновите предпросмотр и подтвердите новый состав",
+                # round 11: код класса отказа — клиент отличает дрейф
+                # состава от конфликта владельцев (оба приходят как 409)
+                code="force_majeure_preview_drift",
             )
         return entries
 
@@ -304,6 +316,8 @@ class ForceMajeureApiService:
                     409,
                     "Конфликт параллельных возвратов одного платежа — "
                     "повторите подтверждение отмены",
+                    # round 11: своя причина 409 — тоже не дрейф состава
+                    code="force_majeure_concurrent_refund",
                 ) from exc
             raise
 
@@ -624,4 +638,10 @@ class ForceMajeureApiService:
         (round-9 ветки и так беззаписные, но контракт держим для любых
         будущих доменных отказов посреди операции)."""
         self.rollback()
-        return ForceMajeureApiDomainError(409, f"Операция отклонена: {exc}")
+        return ForceMajeureApiDomainError(
+            409,
+            f"Операция отклонена: {exc}",
+            # round 11: конфликт владельцев — НЕ дрейф состава: код даёт
+            # клиенту понять, что повторный предпросмотр не устранит причину
+            code="force_majeure_domain_refusal",
+        )

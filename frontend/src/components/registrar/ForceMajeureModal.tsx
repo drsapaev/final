@@ -58,13 +58,53 @@ interface DryRunResult {
 }
 
 /**
- * 3808 review round 3 (P1 preview set binding): серверный отказ 409 —
- * состав очереди изменился после предпросмотра (дрейф против
- * expected_entry_ids). Ошибки сети/валидации так не трактуются.
+ * 3808 review round 3 (P1 preview set binding) + round 11 (P2 owner
+ * conflict): серверный отказ 409 бывает ДВУХ несовместимых видов, и только
+ * один из них — дрейф состава против expected_entry_ids. Различаем их по
+ * машинно-читаемому коду класса отказа в заголовке X-Error-Code (бэкенд
+ * прикладывает его с round 11); для ответов без кода (старый бэкенд или
+ * прокси, стрипающий заголовки) — по точному префиксу текста дрейфа.
+ *
+ * Любой ДРУГОЙ 409 (force_majeure_domain_refusal — конфликт владельцев
+ * поверхности назначения; force_majeure_concurrent_refund — гонка
+ * параллельных возвратов) НЕ является дрейфом состава: предпросмотр
+ * остаётся валидным, ничего не сбрасывается — регистратору показывается
+ * объяснение сервера («Операция отклонена: …»), а не ложное «состав
+ * изменился», повторный предпросмотр причину не устраняет.
+ *
+ * Ошибки сети/валидации (без статуса 409) так не трактуются вовсе.
  */
+const PREVIEW_DRIFT_ERROR_CODE = 'force_majeure_preview_drift';
+const PREVIEW_DRIFT_DETAIL_PREFIX = 'Состав очереди изменился после предпросмотра';
+
+type FmHttpLikeError = {
+  response?: {
+    status?: number;
+    data?: { detail?: unknown };
+    headers?: Record<string, unknown>;
+  };
+} | null;
+
+const errorResponseStatus = (err: unknown): number | undefined =>
+  (err as FmHttpLikeError)?.response?.status;
+const errorResponseDetail = (err: unknown): unknown =>
+  (err as FmHttpLikeError)?.response?.data?.detail;
+const errorResponseCode = (err: unknown): string | undefined => {
+  const headers = (err as FmHttpLikeError)?.response?.headers;
+  if (!headers) return undefined;
+  const raw = headers['x-error-code'] ?? headers['X-Error-Code'];
+  return typeof raw === 'string' && raw ? raw : undefined;
+};
+
 const isPreviewDriftConflict = (err: unknown): boolean => {
-  const status = (err as { response?: { status?: number } } | null)?.response?.status;
-  return status === 409;
+  if (errorResponseStatus(err) !== 409) return false;
+  // машинно-читаемый код класса отказа приоритетен над текстом detail
+  const code = errorResponseCode(err);
+  if (code) return code === PREVIEW_DRIFT_ERROR_CODE;
+  // фолбэк без заголовка: точный префикс дрейфа (никакой другой 409
+  // бэкенда так не начинается)
+  const detail = errorResponseDetail(err);
+  return typeof detail === 'string' && detail.startsWith(PREVIEW_DRIFT_DETAIL_PREFIX);
 };
 
 /** Скоуп, валидированный последним успешным preview (round 2 P1). */
@@ -245,6 +285,10 @@ const ForceMajeureModal = ({
         setDryRunResult(null);
         setPreviewError('misc.fm_queue_changed');
       } else {
+        // round 11 P2: прочие 409 — НЕ дрейф состава (конфликт владельцев
+        // поверхности назначения и т.п.): предпросмотр остаётся валидным,
+        // ничего не сбрасываем. Регистратор видит объяснение сервера как
+        // есть; повторный предпросмотр причину не устраняет.
         setError(getErrorMessage(err) || t('misc.fm_network_error'));
       }
     } finally {
@@ -311,6 +355,9 @@ const ForceMajeureModal = ({
         setDryRunResult(null);
         setPreviewError('misc.fm_queue_changed');
       } else {
+        // round 11 P2: прочие 409 — НЕ дрейф (доменный отказ отмены/
+        // гонка возвратов): предпросмотр остаётся валидным, показываем
+        // объяснение сервера как есть.
         setError(getErrorMessage(err) || t('misc.fm_network_error'));
       }
     } finally {
