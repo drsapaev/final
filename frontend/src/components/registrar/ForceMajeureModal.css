@@ -350,3 +350,9 @@
 .fmm-confirm-input--valid {
     border-color: var(--mac-success);
 }
+
+/* 3808 review round 3 (P1 preview set binding): текст ошибки preview
+   (в т.ч. 409-дрейфа состава) занимает строку, кнопка обновления — справа. */
+.fmm-preview-error-text {
+    flex: 1;
+}

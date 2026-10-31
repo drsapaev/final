@@ -30550,6 +30550,16 @@ export type components = {
              */
             target_date?: string | null;
             /**
+             * Daily Queue Id
+             * @description ID канонической очереди строки (ограничивает операцию этой очередью)
+             */
+            daily_queue_id?: number | null;
+            /**
+             * Expected Entry Ids
+             * @description Снимок ID записей из предпросмотра (обязателен при daily_queue_id)
+             */
+            expected_entry_ids?: number[] | null;
+            /**
              * Reason
              * @description Причина отмены
              */
@@ -30587,6 +30597,16 @@ export type components = {
              * @description Дата очереди (по умолчанию сегодня)
              */
             target_date?: string | null;
+            /**
+             * Daily Queue Id
+             * @description ID канонической очереди строки (ограничивает операцию этой очередью)
+             */
+            daily_queue_id?: number | null;
+            /**
+             * Expected Entry Ids
+             * @description Снимок ID записей из предпросмотра (обязателен при daily_queue_id)
+             */
+            expected_entry_ids?: number[] | null;
             /**
              * Reason
              * @description Причина переноса
@@ -84270,6 +84290,8 @@ export interface operations {
                 specialist_id: number;
                 /** @description Дата очереди */
                 target_date?: string | null;
+                /** @description ID канонической очереди строки (ограничивает preview этой очередью) */
+                daily_queue_id?: number | null;
             };
             header?: never;
             path?: never;
