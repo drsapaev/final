@@ -16,7 +16,11 @@ from app.services.force_majeure_api_service import (
     ForceMajeureApiDomainError,
     ForceMajeureApiService,
 )
-from app.services.force_majeure_service import ForceMajeureService, get_force_majeure_service
+from app.services.force_majeure_service import (
+    ForceMajeureError,
+    ForceMajeureService,
+    get_force_majeure_service,
+)
 
 
 @pytest.mark.unit
@@ -819,6 +823,182 @@ class TestForceMajeureApiService:
             )
             .all()
             == []
+        )
+
+    def test_transfer_resource_owned_source_rejects_doctor_owned_same_tag_destination(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 review round 9 (P1 destination owner recheck): перенос с
+        ресурсной очереди закрывается отказом, когда поверхность
+        (day, tag) завтра занята АКТИВНОЙ врачебной очередью того же
+        тега при живом реестровом ряде — tag_routes_to_resource вернёт
+        именно её (queue_resource_id IS NULL, specialist_id NOT NULL),
+        и ресурсные пациенты не должны молча переезжать во врачебную
+        поверхность. Fail closed: источник не тронут, новых очередей
+        не создано."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        resource = QueueResource(
+            code="lab_surface_r9",
+            queue_tag=test_doctor.specialty,
+            display_name="Лаборатория (реестр)",
+            active=True,
+        )
+        db_session.add(resource)
+        db_session.flush()
+        source_today = DailyQueue(
+            day=today,
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        # завтра (day, tag) уже занят ВРАЧЕБНОЙ очередью того же тега
+        doctor_queue_tomorrow = DailyQueue(
+            day=tomorrow,
+            specialist_id=test_doctor.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        db_session.add_all([source_today, doctor_queue_tomorrow])
+        db_session.flush()
+        source_entry = OnlineQueueEntry(
+            queue_id=source_today.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Surface Patient R9",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add(source_entry)
+        db_session.flush()
+
+        with pytest.raises(ForceMajeureError) as exc_info:
+            ForceMajeureApiService(db_session).transfer_queue_to_tomorrow(
+                request=SimpleNamespace(
+                    specialist_id=test_doctor.id,
+                    target_date=today,
+                    daily_queue_id=source_today.id,
+                    entry_ids=None,
+                    expected_entry_ids=[source_entry.id],
+                    reason="лаборатория недоступна",
+                    send_notifications=False,
+                ),
+                current_user_id=1,
+            )
+        # отказ адресует именно смену владельца назначения
+        assert "владельца назначения" in str(exc_info.value)
+        assert f"id={doctor_queue_tomorrow.id}" in str(exc_info.value)
+        # fail closed: запись-источник не отменена и не перенесена
+        db_session.refresh(source_entry)
+        assert source_entry.status == "waiting"
+        assert source_entry.queue_id == source_today.id
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .count()
+            == 0
+        )
+        # врачебная очередь завтра не получила пациентов
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == doctor_queue_tomorrow.id)
+            .count()
+            == 0
+        )
+        # и никакой новой очереди на завтра не создано
+        assert (
+            db_session.query(DailyQueue).filter(DailyQueue.day == tomorrow).count()
+            == 1
+        )
+
+    def test_transfer_resource_owned_source_rejects_foreign_resource_same_tag_destination(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 review round 9 (P1 destination owner recheck), зеркальный
+        случай: тег источника ПЕРЕВЯЗАН в реестре на другой ресурс
+        (queue_tag глобально уникален — старый ряд сменил тег, новый
+        принял его). Поверхность (day, tag) завтра будет создана из
+        ЧУЖОГО ресурса — перенос отказом, а не тихий переезд; новых
+        очередей при отказе не создаётся (fail closed без записей)."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        # ресурс-владелец источника; после создания его тег перевязан
+        resource_b = QueueResource(
+            code="lab_surface_r9b",
+            queue_tag="lab_orphan_r9",
+            display_name="Лаборатория B",
+            active=True,
+        )
+        db_session.add(resource_b)
+        db_session.flush()
+        source_today = DailyQueue(
+            day=today,
+            specialist_id=None,
+            queue_resource_id=resource_b.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        db_session.add(source_today)
+        db_session.flush()
+        # тег specialty теперь ведёт к ДРУГОМУ активному ресурсу
+        resource_a = QueueResource(
+            code="lab_surface_r9a",
+            queue_tag=test_doctor.specialty,
+            display_name="Лаборатория A",
+            active=True,
+        )
+        db_session.add(resource_a)
+        db_session.flush()
+        source_entry = OnlineQueueEntry(
+            queue_id=source_today.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Surface Patient R9b",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add(source_entry)
+        db_session.flush()
+
+        with pytest.raises(ForceMajeureError) as exc_info:
+            ForceMajeureApiService(db_session).transfer_queue_to_tomorrow(
+                request=SimpleNamespace(
+                    specialist_id=test_doctor.id,
+                    target_date=today,
+                    daily_queue_id=source_today.id,
+                    entry_ids=None,
+                    expected_entry_ids=[source_entry.id],
+                    reason="лаборатория B недоступна",
+                    send_notifications=False,
+                ),
+                current_user_id=1,
+            )
+        assert "владельца назначения" in str(exc_info.value)
+        # отказ объясняет перевязку тега
+        assert f"id={resource_a.id}" in str(exc_info.value)
+        # fail closed БЕЗ записей: источник не тронут
+        db_session.refresh(source_entry)
+        assert source_entry.status == "waiting"
+        assert source_entry.queue_id == source_today.id
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .count()
+            == 0
+        )
+        # никакой очереди на завтра не создано (даже пустой)
+        assert (
+            db_session.query(DailyQueue).filter(DailyQueue.day == tomorrow).count()
+            == 0
         )
 
     def test_two_queue_repeated_bank_refund_counts_only_new_requests(

@@ -23,6 +23,8 @@ from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.crud.queue_resource_routing import (
     lock_daily_queue_creation,
     resolve_registry_tag_queue_for_specialist,
+    resolve_tag_resource,
+    tag_routes_to_resource,
 )
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -627,10 +629,15 @@ class ForceMajeureService:
           (``uq_daily_queues_active_doctor_day_tag``); реестровый
           surface и чужие теги не рассматриваются;
         * ресурсный источник (specialist_id IS NULL) — реестровая
-          поверхность (day, tag) СОБСТВЕННОГО тега источника; если
-          реестровая строка тега исчезла и активной (day, tag)-очереди
-          нет — отказ (ForceMajeureError): тихо подменять владельца
-          врачебной очередью нельзя;
+          поверхность (day, tag) СОБСТВЕННОГО тега источника;
+          поверхность дня назначения принимается только при ТОЧНОМ
+          совпадении владельца с источником (specialist_id IS NULL и
+          тот же queue_resource_id — round 9: tag_routes_to_resource
+          готов вернуть активную врачебную очередь того же тега или
+          поверхность другого ресурса); при любом несовпадении или
+          недоступности реестровой строки — отказ
+          (ForceMajeureError): тихо подменять владельца назначения
+          нельзя;
         * источник неизвестен — прежний порядок (реестр прежде врача)."""
         if source_queue is None:
             return self._get_or_create_queue(specialist_id, target_date)
@@ -641,18 +648,95 @@ class ForceMajeureService:
             )
 
         if source_queue.specialist_id is None:
+            # 3808 review round 9 (P1 destination owner recheck):
+            # поверхность (day, tag) НЕ обязана быть ресурсной строкой
+            # источника — tag_routes_to_resource готов вернуть и
+            # АКТИВНУЮ врачебную очередь того же тега (пока жив
+            # реестровый ряд), и поверхность ДРУГОГО ресурса (после
+            # перевязки тега в реестре). Сначала — ТОЛЬКО ЧТЕНИЕ:
+            # кандидат принимается при ТОЧНОМ совпадении владельца с
+            # источником (specialist_id IS NULL и тот же
+            # queue_resource_id); любое несовпадение — fail closed
+            # БЕЗ единой записи: ресурсные пациенты не переезжают на
+            # чужую поверхность молча (смена владельца — явная
+            # операция, не побочный эффект форс-мажора).
+            routing = tag_routes_to_resource(
+                self.db, source_queue.queue_tag, target_date
+            )
+            if routing is not None:
+                if (
+                    routing.specialist_id is None
+                    and routing.queue_resource_id
+                    == source_queue.queue_resource_id
+                ):
+                    return routing
+                raise ForceMajeureError(
+                    "Поверхность тега "
+                    f"{source_queue.queue_tag!r} на "
+                    f"{target_date.isoformat()} (очередь id={routing.id}) "
+                    "принадлежит не ресурсу источника ("
+                    f"specialist_id={routing.specialist_id!r}, "
+                    f"queue_resource_id={routing.queue_resource_id!r}; "
+                    "у источника queue_resource_id="
+                    f"{source_queue.queue_resource_id!r}): перенос с "
+                    "ресурсной очереди не может тихо сменить владельца "
+                    "назначения"
+                )
+            # Поверхности (day, tag) ещё нет: создавать её можно
+            # только из ТОГО ЖЕ ресурса, что владеет источником.
+            # Перевязка тега на другой реестровый ряд или исчезновение
+            # ряда — отказ, а не тихая смена владельца назначения.
+            resource = resolve_tag_resource(
+                self.db, source_queue.queue_tag
+            )
+            if (
+                resource is None
+                or source_queue.queue_resource_id is None
+                or int(resource.id) != int(source_queue.queue_resource_id)
+            ):
+                raise ForceMajeureError(
+                    "Реестровая поверхность тега "
+                    f"{source_queue.queue_tag!r} недоступна на "
+                    f"{target_date.isoformat()}"
+                    + (
+                        ""
+                        if resource is None
+                        else " (тег принадлежит другому ресурсу"
+                        f" id={resource.id}, у источника id="
+                        f"{source_queue.queue_resource_id})"
+                    )
+                    + ": перенос с ресурсной очереди не может тихо "
+                    "сменить владельца назначения"
+                )
             registry_queue = QueueApiRepository(
                 self.db
             ).get_or_create_registry_queue(
                 day=target_date, queue_tag=source_queue.queue_tag
             )
-            if registry_queue is not None:
+            # Создание сериализовано lock_registry_tag_creation с
+            # row-locked recheck, но результату не доверяем вслепую:
+            # итоговая строка обязана быть поверхностью ТОГО ЖЕ
+            # ресурса (бэкстоп против гонки перевязки тега).
+            if (
+                registry_queue is not None
+                and registry_queue.specialist_id is None
+                and registry_queue.queue_resource_id
+                == source_queue.queue_resource_id
+            ):
                 return registry_queue
             raise ForceMajeureError(
-                "Реестровая поверхность тега "
-                f"{source_queue.queue_tag!r} недоступна на "
-                f"{target_date.isoformat()}: перенос с ресурсной очереди "
-                "не может тихо сменить владельца назначения"
+                "Поверхность тега "
+                f"{source_queue.queue_tag!r} на "
+                f"{target_date.isoformat()} (очередь "
+                f"id={getattr(registry_queue, 'id', None)!r}) "
+                "принадлежит не ресурсу источника ("
+                f"specialist_id={getattr(registry_queue, 'specialist_id', None)!r}, "
+                "queue_resource_id="
+                f"{getattr(registry_queue, 'queue_resource_id', None)!r}; "
+                "у источника queue_resource_id="
+                f"{source_queue.queue_resource_id!r}): перенос с "
+                "ресурсной очереди не может тихо сменить владельца "
+                "назначения"
             )
 
         # Чужая врачебная очередь как источник — не валидируется здесь;
