@@ -9162,7 +9162,12 @@ const uzLatn = {
     fm_queue_changed: 'Navbat tarkibi oldindan ko\'rilgandan keyin o\'zgardi. Oldindan ko\'rishni yangilang va yangi tarkibni tasdiqlang.',
     fm_transfer_success: 'Ko\'chirilgan yozuvlar: {count}',
     fm_network_error: 'Tarmoq xatosi',
-    fm_cancel_success: 'Bekor qilingan yozuvlar: {cancelled}, qaytarilmalar: {refunds}',
+    // 3808 round 13 (residual P2): раздельные сообщения — банковская
+    // заявка (pending) не «возврат»; existing-повторы не показываем.
+    fm_cancel_success_cancelled: 'Bekor qilingan yozuvlar: {cancelled}.',
+    fm_cancel_success_bank_requests: 'Qaytarish uchun so\'rovlar yaratildi: {count}.',
+    fm_cancel_success_deposit_credits: 'Depozitga hisoblandi: {count}.',
+    fm_cancel_success_no_refunds: 'Yangi qaytarishlar yasalmadi.',
     fm_processing: 'Ishlanmoqda...',
     fm_transfer_button: 'Ko\'chirish',
     fm_cancel_button: 'Bekor qilish va qaytarish',

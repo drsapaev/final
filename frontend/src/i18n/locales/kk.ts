@@ -9162,7 +9162,12 @@ const kk = {
     fm_queue_changed: 'Состав очереди изменился после предпросмотра. Обновите предпросмотр и подтвердите новый состав.',
     fm_transfer_success: 'Перенесено записей: {count}',
     fm_network_error: 'Ошибка сети',
-    fm_cancel_success: 'Отменено записей: {cancelled}, возвратов: {refunds}',
+    // 3808 round 13 (residual P2): раздельные сообщения — банковская
+    // заявка (pending) не «возврат»; existing-повторы не показываем.
+    fm_cancel_success_cancelled: 'Отменено записей: {cancelled}.',
+    fm_cancel_success_bank_requests: 'Создано заявок на возврат: {count}.',
+    fm_cancel_success_deposit_credits: 'Зачислено на депозит: {count}.',
+    fm_cancel_success_no_refunds: 'Новых возвратов не оформлено.',
     fm_processing: 'Обработка...',
     fm_transfer_button: 'Перенести',
     fm_cancel_button: 'Отменить и вернуть',
