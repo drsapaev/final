@@ -97,6 +97,35 @@ class ForceMajeureApiRepository:
     def get_refund_request(self, request_id: int) -> RefundRequest | None:
         return self.db.query(RefundRequest).filter(RefundRequest.id == request_id).first()
 
+    def get_refund_request_for_update(self, request_id: int) -> RefundRequest | None:
+        """3808 review round 6 (P1 reject/complete race): SELECT ... FOR UPDATE
+        на строке заявки, взятый ДО проверки статуса и любого перехода.
+
+        ``reject`` и ``complete`` принимают один и тот же исходный статус
+        ``approved``, а обычный SELECT читает снапшот READ COMMITTED без
+        блокировки: две кассирские сессии одновременно видят ``approved``,
+        первая отклоняет и освобождает claim, вторая — завершает возврат по
+        устаревшей копии; выплаченный возврат остаётся без защиты от
+        повторного. Блокировка строки заявки сериализует переходы: проиграв
+        гонку, сессия после коммита победителя перечитывает (READ COMMITTED
+        перечитывает кортеж; ``populate_existing()`` не даёт identity map
+        подсунуть устаревший объект) и получает доменный отказ вместо
+        второго перехода.
+
+        SQLite (unit) игнорирует FOR UPDATE — гонка живёт в gate_d
+        (PostgreSQL): см. test_cashier_reject_vs_complete_race_*.
+
+        Lives in the repository so the API service keeps the
+        no-direct-session-calls boundary (test_service_repository_boundary).
+        """
+        return (
+            self.db.query(RefundRequest)
+            .filter(RefundRequest.id == request_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+
     def release_refund_claim_for_request(self, refund_request_id: int) -> bool:
         """3808 review round 5 (P1 claim lifecycle): кассирский ``reject``
         — терминальный НЕ-платящий статус: деньги пациенту не ушли, и

@@ -611,6 +611,11 @@ class TestForceMajeureApiService:
             def get_refund_request(self, request_id):
                 return request_obj
 
+            # 3808 round 6: process_refund_request читает заявку только
+            # через заблокированный (FOR UPDATE) путь
+            def get_refund_request_for_update(self, request_id):
+                return request_obj
+
         service = ForceMajeureApiService(db=None, repository=Repository())
         with pytest.raises(ForceMajeureApiDomainError) as exc_info:
             service.process_refund_request(
@@ -1990,3 +1995,67 @@ class TestForceMajeureApiService:
         assert claims[0].deposit_transaction_id is not None
         # id-сравнение с stale_claim намеренно отсутствует: SQLite
         # переиспользует rowid после DELETE
+
+    def test_process_refund_request_takes_row_lock_before_status_checks(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 round 6 (P1 reject/complete race): process_refund_request
+        читает заявку ТОЛЬКО через get_refund_request_for_update
+        (SELECT ... FOR UPDATE до проверки статуса) — сериализация
+        кассирских reject/complete на строке заявки. SQLite не
+        воспроизводит FOR UPDATE-гонку, поэтому здесь проверяется сам
+        путь чтения; поведенческое доказательство живёт в gate_d
+        (test_cashier_reject_vs_complete_race_serializes_on_request_row)."""
+        from app.models.refund_deposit import PaymentRefundClaim, RefundRequest
+
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        cashier, payment, entries = self._seed_refund_lifecycle_world(
+            db_session, test_doctor, test_patient
+        )
+
+        first = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entries[0]],
+            reason="Doctor emergency",
+            refund_type=RefundType.BANK_TRANSFER,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert first["cancelled"] == 1
+        request = (
+            db_session.query(RefundRequest)
+            .filter(RefundRequest.payment_id == payment.id)
+            .one()
+        )
+        assert request.status == "pending", request.status
+
+        calls = {"for_update": 0, "plain": 0}
+        locked_read = ForceMajeureApiRepository.get_refund_request_for_update
+        plain_read = ForceMajeureApiRepository.get_refund_request
+
+        def locked_spy(self, request_id):
+            calls["for_update"] += 1
+            return locked_read(self, request_id)
+
+        def plain_spy(self, request_id):
+            calls["plain"] += 1
+            return plain_read(self, request_id)
+
+        monkeypatch.setattr(
+            ForceMajeureApiRepository, "get_refund_request_for_update", locked_spy
+        )
+        monkeypatch.setattr(ForceMajeureApiRepository, "get_refund_request", plain_spy)
+
+        rejected = self._reject_request(db_session, request.id, cashier)
+        assert rejected["status"] == "rejected", rejected
+
+        assert calls["for_update"] == 1, calls
+        assert calls["plain"] == 0, calls
+        assert (
+            db_session.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == payment.id)
+            .count()
+            == 0
+        ), "reject по заблокированной строке всё так же освобождает claim"

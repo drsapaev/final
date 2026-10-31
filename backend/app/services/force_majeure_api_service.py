@@ -357,7 +357,18 @@ class ForceMajeureApiService:
         process_request,
         current_user,
     ) -> dict[str, Any]:
-        req = self.repository.get_refund_request(request_id)
+        # 3808 review round 6 (P1 reject/complete race): заявка читается с
+        # блокировкой строки (SELECT ... FOR UPDATE) ДО проверки статуса.
+        # ``reject`` и ``complete`` принимают один и тот же исходный
+        # ``approved``: без блокировки две кассирские сессии одновременно
+        # читают approved, первая отклоняет и освобождает claim, вторая
+        # завершает возврат по устаревшей копии — выплаченный возврат
+        # теряет защиту от повторного. Сериализация на строке заявки даёт
+        # проигравшей сессии свежий статус (READ COMMITTED +
+        # populate_existing) и доменный отказ вместо второго перехода;
+        # claim при этом остаётся у completed и освобождается только у
+        # rejected (см. ветку reject ниже).
+        req = self.repository.get_refund_request_for_update(request_id)
         if not req:
             raise ForceMajeureApiDomainError(404, "Заявка на возврат не найдена")
 
