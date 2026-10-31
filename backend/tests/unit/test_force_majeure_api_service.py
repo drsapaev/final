@@ -391,6 +391,299 @@ class TestForceMajeureApiService:
         moved_queue = db_session.get(DailyQueue, moved.queue_id)
         assert moved_queue.day == date(2026, 11, 6)
 
+    def test_transfer_doctor_owned_row_keeps_doctor_owned_destination(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 review round 7 (P1 destination owner): the registrar's
+        doctor-owned canonical row transfers ONLY into the doctor-owned
+        tomorrow queue. The registry surface of the same specialty tag
+        lives on BOTH days — the old destination re-resolution would
+        capture the doctor's patients into the shared resource queue."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        resource = QueueResource(
+            code="cardio_surface_r7",
+            queue_tag=test_doctor.specialty,
+            display_name="Кардиология (реестр)",
+            active=True,
+        )
+        db_session.add(resource)
+        db_session.flush()
+        # both surfaces live on the SOURCE day (round-2 two-surface setup)
+        surface_today = DailyQueue(
+            day=today,
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        doctor_queue = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="doctor_own_queue_r7",
+            active=True,
+        )
+        # the trap: the registry surface ALREADY exists on the destination
+        # day — the registry-first re-resolution would pick it
+        surface_tomorrow = DailyQueue(
+            day=tomorrow,
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        db_session.add_all([surface_today, doctor_queue, surface_tomorrow])
+        db_session.flush()
+
+        doctor_entry = OnlineQueueEntry(
+            queue_id=doctor_queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Doctor Queue Patient R7",
+            status="waiting",
+            source="desk",
+        )
+        surface_entry = OnlineQueueEntry(
+            queue_id=surface_today.id,
+            number=2,
+            patient_id=test_patient.id,
+            patient_name="Surface Queue Patient R7",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add_all([doctor_entry, surface_entry])
+        db_session.flush()
+
+        result = ForceMajeureApiService(db_session).transfer_queue_to_tomorrow(
+            request=SimpleNamespace(
+                specialist_id=test_doctor.id,
+                target_date=today,
+                daily_queue_id=doctor_queue.id,
+                entry_ids=None,
+                expected_entry_ids=[doctor_entry.id],
+                reason="doctor absent r7",
+                send_notifications=False,
+            ),
+            current_user_id=1,
+        )
+
+        assert result["transferred"] == 1
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        moved_queue = db_session.get(DailyQueue, moved.queue_id)
+        # the destination keeps the DOCTOR owner — never the registry surface
+        assert moved_queue.day == tomorrow
+        assert moved_queue.specialist_id == test_doctor.id
+        assert moved_queue.queue_resource_id is None
+        assert moved_queue.id != surface_tomorrow.id
+        # the shared resource queue on tomorrow stayed untouched
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == surface_tomorrow.id)
+            .count()
+            == 0
+        )
+        # worklist visibility: the registrar's bound preview of the new
+        # doctor-owned tomorrow row shows the transferred patient
+        visible = ForceMajeureApiService(db_session).get_pending_entries(
+            specialist_id=test_doctor.id,
+            target_date=tomorrow,
+            daily_queue_id=moved_queue.id,
+        )
+        assert [entry["id"] for entry in visible] == [moved.id]
+
+    def test_transfer_resource_owned_row_keeps_registry_destination(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 review round 7 (P1 destination owner), mirror case: the
+        resource-owned registry surface row transfers into the SAME
+        registry surface tomorrow — a doctor-owned fork must not appear."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        resource = QueueResource(
+            code="cardio_surface_r7b",
+            queue_tag=test_doctor.specialty,
+            display_name="Кардиология (реестр)",
+            active=True,
+        )
+        db_session.add(resource)
+        db_session.flush()
+        surface_today = DailyQueue(
+            day=today,
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        surface_tomorrow = DailyQueue(
+            day=tomorrow,
+            specialist_id=None,
+            queue_resource_id=resource.id,
+            queue_tag=test_doctor.specialty,
+            active=True,
+        )
+        db_session.add_all([surface_today, surface_tomorrow])
+        db_session.flush()
+        surface_entry = OnlineQueueEntry(
+            queue_id=surface_today.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Surface Patient R7b",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add(surface_entry)
+        db_session.flush()
+
+        result = ForceMajeureApiService(db_session).transfer_queue_to_tomorrow(
+            request=SimpleNamespace(
+                specialist_id=test_doctor.id,
+                target_date=today,
+                daily_queue_id=surface_today.id,
+                entry_ids=None,
+                expected_entry_ids=[surface_entry.id],
+                reason="resource downtime r7",
+                send_notifications=False,
+            ),
+            current_user_id=1,
+        )
+
+        assert result["transferred"] == 1
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        # the destination is the registry surface — owner preserved
+        assert moved.queue_id == surface_tomorrow.id
+        moved_queue = db_session.get(DailyQueue, moved.queue_id)
+        assert moved_queue.specialist_id is None
+        assert moved_queue.queue_resource_id == resource.id
+        # no doctor-owned fork on the destination day
+        assert (
+            db_session.query(DailyQueue)
+            .filter(
+                DailyQueue.day == tomorrow,
+                DailyQueue.specialist_id == test_doctor.id,
+            )
+            .all()
+            == []
+        )
+
+    def test_two_queue_repeated_bank_refund_counts_only_new_requests(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 review round 7 (P2): a visit with pending entries in two
+        queues — the second bank-transfer cancel is an idempotent replay:
+        zero new RefundRequest rows, and the response reports
+        refund_requests_created == 0 (the repeat is exposed separately as
+        refund_requests_existing == 1)."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        from app.models.refund_deposit import RefundRequest
+
+        today = date.today()
+        queue_a = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="two_queue_a_r7",
+            active=True,
+        )
+        queue_b = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="two_queue_b_r7",
+            active=True,
+        )
+        db_session.add_all([queue_a, queue_b])
+        db_session.flush()
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=today,
+            visit_time="14:00",
+            status="open",
+            discount_mode="none",
+            department="cardiology",
+            created_at=datetime.now(UTC),
+        )
+        db_session.add(visit)
+        db_session.flush()
+        payment = Payment(
+            visit_id=visit.id,
+            amount=Decimal("300.00"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        entry_a = OnlineQueueEntry(
+            queue_id=queue_a.id,
+            visit_id=visit.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Two Queue Patient A",
+            status="waiting",
+            source="desk",
+        )
+        entry_b = OnlineQueueEntry(
+            queue_id=queue_b.id,
+            visit_id=visit.id,
+            number=2,
+            patient_id=test_patient.id,
+            patient_name="Two Queue Patient B",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add_all([payment, entry_a, entry_b])
+        db_session.commit()
+
+        service = ForceMajeureService(db_session)
+
+        first = service.cancel_entries_with_refund(
+            entries=[entry_a],
+            reason="Doctor emergency queue A",
+            refund_type=RefundType.BANK_TRANSFER,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert first["cancelled"] == 1
+        assert first["refund_requests_created"] == 1
+        assert first["refund_requests_existing"] == 0
+
+        second = service.cancel_entries_with_refund(
+            entries=[entry_b],
+            reason="Doctor emergency queue B",
+            refund_type=RefundType.BANK_TRANSFER,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert second["cancelled"] == 1
+        # the replay created ZERO new bank requests — and says so
+        assert second["refund_requests_created"] == 0
+        assert second["refund_requests_existing"] == 1
+        refund_info = second["details"][0]["refund_info"]
+        assert refund_info["already_refunded"] is True
+        # exactly one RefundRequest row exists for the payment in total
+        assert (
+            db_session.query(RefundRequest)
+            .filter(RefundRequest.payment_id == payment.id)
+            .count()
+            == 1
+        )
+
     def test_cancel_with_refund_selects_only_the_bound_queue_entries(
         self, db_session, test_doctor, test_patient, monkeypatch
     ):

@@ -177,6 +177,10 @@ class ForceMajeureApiService:
         # chain is derived from the SOURCE queue day (request.target_date or
         # the clinic SSOT day) — the same day the entries are selected from.
         queue_day = request.target_date or clinic_today(self.repository.db)
+        # 3808 review round 7 (P1 destination owner): каноническая
+        # строка-источник; None для legacy-путей entry_ids/specialist —
+        # поверхность назначения сервис выводит из очередей самих записей.
+        source_queue: DailyQueue | None = None
         if request.daily_queue_id is not None:
             queue = self._validated_daily_queue(
                 daily_queue_id=request.daily_queue_id,
@@ -184,6 +188,7 @@ class ForceMajeureApiService:
                 queue_day=queue_day,
                 lock=True,
             )
+            source_queue = queue
             entries = self._bound_pending_entries(
                 queue=queue,
                 expected_entry_ids=getattr(request, "expected_entry_ids", None),
@@ -211,6 +216,9 @@ class ForceMajeureApiService:
             performed_by_id=current_user_id,
             send_notifications=request.send_notifications,
             source_date=queue_day,
+            # 3808 review round 7 (P1 destination owner): поверхность
+            # назначения сохраняет владельца источника.
+            source_queue=source_queue,
         )
 
     def cancel_queue_with_refund(self, *, request, current_user_id: int) -> dict[str, Any]:

@@ -150,6 +150,7 @@ class ForceMajeureService:
         performed_by_id: int,
         send_notifications: bool = True,
         source_date: date | None = None,
+        source_queue: DailyQueue | None = None,
     ) -> dict[str, Any]:
         """
         Массовый перенос записей на завтра
@@ -168,6 +169,9 @@ class ForceMajeureService:
                 очереди (например, 5 ноября) ведёт на 6 ноября, а не на
                 «завтра от сегодня» (3808 review round 2 P1 — раньше
                 записи будущей очереди пересоздавались задним числом).
+            source_queue: Каноническая очередь-источник (валидированная
+                строка из API-слоя, контракт daily_queue_id). Без неё
+                поверхность выводится из очередей самих записей.
 
         Returns:
             Результат операции с деталями
@@ -189,8 +193,20 @@ class ForceMajeureService:
         base_day = source_date or clinic_today(self.db)
         tomorrow = base_day + timedelta(days=1)
 
-        # Получаем или создаём очередь на завтра
-        tomorrow_queue = self._get_or_create_queue(specialist_id, tomorrow)
+        # Получаем или создаём очередь на завтра.
+        # 3808 review round 7 (P1 destination owner): поверхность
+        # назначения сохраняет владельца ИСТОЧНИКА. Врачебная
+        # каноническая строка (контракт daily_queue_id) переносится
+        # ТОЛЬКО во врачебную очередь следующего дня — никогда в
+        # общий ресурсный surface того же тега; ресурсный источник
+        # остаётся на реестровой поверхности своего тега. Смена
+        # владельца — явная операция, не побочный эффект форс-мажора.
+        effective_source = source_queue or self._entries_source_queue(
+            entries, specialist_id
+        )
+        tomorrow_queue = self._destination_queue(
+            effective_source, specialist_id, tomorrow
+        )
 
         transferred = []
         failed = []
@@ -349,6 +365,11 @@ class ForceMajeureService:
         cancelled = []
         failed = []
         refund_requests = []
+        # 3808 review round 7 (P2): идемпотентные повторы (платёж уже
+        # возвращён) НЕ создают строк RefundRequest — считаются отдельно,
+        # чтобы refund_requests_created сообщал только реальные новые
+        # заявки (финансовая честность ответа для вызывающих/аудита).
+        refund_requests_existing = 0
         # 3808 review round 3 (P1 re-check under lock): entries processed
         # by a concurrent writer after our selection are skipped, never
         # refunded a second time.
@@ -398,7 +419,14 @@ class ForceMajeureService:
                             refund_type=refund_type,
                             is_automatic=True,
                         )
-                        refund_requests.append(refund_info)
+                        # 3808 review round 7 (P2): already_refunded —
+                        # идемпотентный повтор без новой строки: в счётчик
+                        # НОВЫХ заявок не входит (двухочередной визит:
+                        # второй банковский перенос создаёт 0 строк).
+                        if refund_info.get("already_refunded"):
+                            refund_requests_existing += 1
+                        else:
+                            refund_requests.append(refund_info)
 
                 cancelled.append(
                     {
@@ -444,6 +472,7 @@ class ForceMajeureService:
             "failed": len(failed),
             "skipped": len(skipped),
             "refund_requests_created": len(refund_requests),
+            "refund_requests_existing": refund_requests_existing,
             "details": cancelled,
             "errors": failed,
             "skipped_details": skipped,
@@ -456,17 +485,36 @@ class ForceMajeureService:
         QD-2C (Codex round-6 P1): форс-мажор перенос идёт на
         поверхность реестра — ресурсную очередь (day, tag), а не
         параллельную врачебную; теги без строки реестра сохраняют
-        прежний путь врача байт-идентично."""
+        прежний путь врача байт-идентично.
+
+        3808 review round 7 (P1 destination owner): этот порядок
+        (реестр прежде врача) — только для вызовов БЕЗ известной
+        поверхности-источника; перенос с известным источником идёт
+        через ``_destination_queue`` и владельца не меняет."""
         doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
-        queue_tag = None
-        if doctor is not None and doctor.specialty:
-            queue_tag = doctor.specialty.lower().replace(" ", "_")
         if doctor is not None and doctor.specialty:
             registry_queue = QueueApiRepository(self.db).get_or_create_registry_queue(
                 day=target_date, queue_tag=doctor.specialty
             )
             if registry_queue is not None:
                 return registry_queue
+
+        return self._get_or_create_doctor_queue(specialist_id, target_date)
+
+    def _get_or_create_doctor_queue(
+        self, specialist_id: int, target_date: date
+    ) -> DailyQueue:
+        """Врачебная (specialist-owned) поверхность на дату — байт-идентично
+        прежнему legacy-пути ``_get_or_create_queue``.
+
+        3808 review round 7 (P1 destination owner): выделено, чтобы
+        перенос из врачебной канонической строки строил назначение
+        ТОЛЬКО здесь — реестровая поверхность того же тега не
+        перехватывала пациентов врача."""
+        doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
+        queue_tag = None
+        if doctor is not None and doctor.specialty:
+            queue_tag = doctor.specialty.lower().replace(" ", "_")
 
         # This legacy doctor-owned path creates tagged DailyQueue rows too.
         # Take the same profile/tag scope before the doctor/day lock and
@@ -500,6 +548,77 @@ class ForceMajeureService:
             self.db.flush()
 
         return queue
+
+    def _entries_source_queue(
+        self, entries: list[OnlineQueueEntry], specialist_id: int
+    ) -> DailyQueue | None:
+        """3808 review round 7 (P1 destination owner): вывести поверхность
+        источника из очередей самих записей, когда вызывающий слой не
+        передал каноническую строку (legacy-пути entry_ids/specialist).
+
+        Все записи во врачебных очередях ЭТОГО специалиста — врачебная
+        поверхность; все в ресурсных (specialist NULL) — реестровая.
+        Смешанный/неизвестный набор — None (прежний порядок реестра)."""
+        queue_ids = {entry.queue_id for entry in entries}
+        if not queue_ids:
+            return None
+        rows = (
+            self.db.query(DailyQueue)
+            .filter(DailyQueue.id.in_(queue_ids))
+            .all()
+        )
+        by_id = {row.id: row for row in rows}
+        resolved = [by_id.get(queue_id) for queue_id in queue_ids]
+        if any(row is None for row in resolved):
+            return None
+        if all(row.specialist_id == specialist_id for row in resolved):
+            return resolved[0]
+        if all(row.specialist_id is None for row in resolved):
+            return resolved[0]
+        return None
+
+    def _destination_queue(
+        self,
+        source_queue: DailyQueue | None,
+        specialist_id: int,
+        target_date: date,
+    ) -> DailyQueue:
+        """3808 review round 7 (P1 destination owner): очередь назначения
+        сохраняет владельца источника.
+
+        * врачебный источник (specialist_id == specialist_id) —
+          ВРАЧЕБНАЯ очередь следующего дня, реестровый surface того же
+          тега не рассматривается;
+        * ресурсный источник (specialist_id IS NULL) — реестровая
+          поверхность (day, tag) СОБСТВЕННОГО тега источника; если
+          реестровая строка тега исчезла и активной (day, tag)-очереди
+          нет — отказ (ForceMajeureError): тихо подменять владельца
+          врачебной очередью нельзя;
+        * источник неизвестен — прежний порядок (реестр прежде врача)."""
+        if source_queue is None:
+            return self._get_or_create_queue(specialist_id, target_date)
+
+        if source_queue.specialist_id == specialist_id:
+            return self._get_or_create_doctor_queue(specialist_id, target_date)
+
+        if source_queue.specialist_id is None:
+            registry_queue = QueueApiRepository(
+                self.db
+            ).get_or_create_registry_queue(
+                day=target_date, queue_tag=source_queue.queue_tag
+            )
+            if registry_queue is not None:
+                return registry_queue
+            raise ForceMajeureError(
+                "Реестровая поверхность тега "
+                f"{source_queue.queue_tag!r} недоступна на "
+                f"{target_date.isoformat()}: перенос с ресурсной очереди "
+                "не может тихо сменить владельца назначения"
+            )
+
+        # Чужая врачебная очередь как источник — не валидируется здесь;
+        # сохраняем прежний порядок для такого прямого вызова.
+        return self._get_or_create_queue(specialist_id, target_date)
 
     def _get_payment_for_entry(self, entry: OnlineQueueEntry) -> Payment | None:
         """Получить платёж для записи"""

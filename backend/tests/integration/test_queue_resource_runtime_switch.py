@@ -7623,7 +7623,12 @@ def test_force_majeure_transfer_numbers_from_day_snapshot_resource_queue(
     the old path floored at the LIVE
     QueueResource.start_number_online, so an admin bump after the day
     was frozen (41 -> 501) made transferred tickets jump outside the
-    frozen sequence while ordinary registration kept the snapshot."""
+    frozen sequence while ordinary registration kept the snapshot.
+
+    3808 review round 7 (P1 destination owner): источник — РЕСУРСНАЯ
+    очередь того же тега: перенос сохраняет владельца поверхности,
+    врачебный источник больше не «переезжает» на общий ресурсный
+    surface (для него назначение — врачебная очередь)."""
     from app.services.force_majeure_service import ForceMajeureService
 
     res_user = _make_user(db_session, username="fm_snap_res1", role="Resource")
@@ -7660,8 +7665,9 @@ def test_force_majeure_transfer_numbers_from_day_snapshot_resource_queue(
     source_queue = _make_queue(
         db_session,
         day=_dt_now_tashkent_day(),
-        specialist_id=synthetic.id,
+        specialist_id=None,
         queue_tag="lab_r19b",
+        queue_resource_id=resource.id,
     )
     entry = _make_waiting_entry(db_session, source_queue)
 
