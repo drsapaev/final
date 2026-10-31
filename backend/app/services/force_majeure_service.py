@@ -989,16 +989,53 @@ class ForceMajeureService:
         if isinstance(claim_id, dict):
             return {"type": "deposit", **claim_id}
 
-        # Получаем или создаём депозит пациента
+        # Получаем или создаём депозит пациента.
+        #
+        # 3808 review round 12 (P1 deposit balance race): идемпотентность
+        # ОДНОГО платежа закрыта claim-ами (0087/0088), но баланс — это
+        # read-modify-write на ОБЩЕЙ строке пациента: ПАРАЛЛЕЛЬНЫЕ возвраты
+        # РАЗНЫХ платежей одного пациента читали один и тот же balance и
+        # теряли одно из зачислений (balance_after аудита расходился с
+        # фактическими credit-строками). Строка берётся FOR UPDATE — ноги
+        # сериализуются на самой строке депозита (SQLite-диалект молча
+        # игнорирует FOR UPDATE, он и так однописательный — см.
+        # _validated_daily_queue).
         deposit = (
             self.db.query(PatientDeposit)
             .filter(PatientDeposit.patient_id == patient_id)
+            .with_for_update()
             .first()
         )
 
-        if not deposit:
-            deposit = PatientDeposit(patient_id=patient_id, balance=amount_decimal)
-            self.db.add(deposit)
+        if deposit is None:
+            # Конкурентное СОЗДАНИЕ: unique(patient_id) в БД есть, но
+            # необученный INSERT ломал всю отмену (poisoned session -> 500).
+            # Паттерн claim-а (_claim_payment_refund): Core-вставка в
+            # connection-level savepoint, проигравший перечитывает строку
+            # победителя и зачисляет на неё.
+            self.db.flush()  # pending-изменения ORM — наружу savepoint
+            bind = self.db.connection()
+            try:
+                with bind.begin_nested():
+                    result = self.db.execute(
+                        insert(PatientDeposit).values(
+                            patient_id=patient_id,
+                            balance=amount_decimal,
+                        )
+                    )
+                deposit_id = int(result.inserted_primary_key[0])
+            except IntegrityError:
+                # Проиграли гонку создания: в READ COMMITTED после ожидания
+                # на уникальном индексе победитель уже закоммичен и виден.
+                deposit = (
+                    self.db.query(PatientDeposit)
+                    .filter(PatientDeposit.patient_id == patient_id)
+                    .with_for_update()
+                    .one()
+                )
+                deposit.balance += amount_decimal
+            else:
+                deposit = self.db.get(PatientDeposit, deposit_id)
         else:
             deposit.balance += amount_decimal
 
