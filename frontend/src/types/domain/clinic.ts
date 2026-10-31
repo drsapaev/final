@@ -64,6 +64,10 @@ export interface Appointment {
   queue_owner_kind?: 'doctor' | 'resource' | null;
   queue_owner_id?: number | null;
   daily_queue_id?: number | null;
+  // #3808 (REG-FE-025): canonical day of the row from the registrar read
+  // model — the day the queue list was built for. Binds whole-queue
+  // commands (force majeure preview + mutation) to the same queue date.
+  record_date?: string | null;
   status?: AppointmentStatus | (string & {});
   type?: AppointmentType;
   date?: string;
@@ -72,6 +76,8 @@ export interface Appointment {
   service_name?: string;
   queue_entry_id?: QueueEntryId;
   queue_number?: number | string;
+  // display name of the owning queue bucket (read-model passthrough)
+  queue_name?: string;
   department?: string;
   specialty?: string;
   visit_id?: VisitId;

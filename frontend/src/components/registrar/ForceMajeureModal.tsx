@@ -8,7 +8,7 @@
  * - Safety confirmation (dry run + type CONFIRM)
  */
 import { api } from '../../api/client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -34,6 +34,20 @@ interface ForceMajeureModalProps {
   onClose: () => void;
   specialistId: string | number | null;
   specialistName?: string;
+  /**
+   * 3808 (REG-FE-025): канонический день очереди строки, открывшей
+   * модал. Preview и мутация обязаны ссылаться на одного специалиста и
+   * одну дату; null — SSOT-день клиники на бэкенде.
+   */
+  targetDate?: string | null;
+  /**
+   * 3808 review round 2 (P1 queue identity): канонический ID очереди
+   * (DailyQueue) строки. Preview и обе мутации передают его бэкенду,
+   * чтобы операция была жёстко привязана к очереди строки, а не к
+   * резолюции специалиста (которая может выбрать общую ресурсную
+   * очередь специальности).
+   */
+  dailyQueueId?: number | null;
   onSuccess?: (...args: unknown[]) => void;
 }
 
@@ -43,11 +57,77 @@ interface DryRunResult {
   totalAmount: number;
 }
 
+/**
+ * 3808 review round 3 (P1 preview set binding) + round 11 (P2 owner
+ * conflict): серверный отказ 409 бывает ДВУХ несовместимых видов, и только
+ * один из них — дрейф состава против expected_entry_ids. Различаем их по
+ * машинно-читаемому коду класса отказа в заголовке X-Error-Code (бэкенд
+ * прикладывает его с round 11); для ответов без кода (старый бэкенд или
+ * прокси, стрипающий заголовки) — по точному префиксу текста дрейфа.
+ *
+ * Любой ДРУГОЙ 409 (force_majeure_domain_refusal — конфликт владельцев
+ * поверхности назначения; force_majeure_concurrent_refund — гонка
+ * параллельных возвратов) НЕ является дрейфом состава: предпросмотр
+ * остаётся валидным, ничего не сбрасывается — регистратору показывается
+ * объяснение сервера («Операция отклонена: …»), а не ложное «состав
+ * изменился», повторный предпросмотр причину не устраняет.
+ *
+ * Ошибки сети/валидации (без статуса 409) так не трактуются вовсе.
+ */
+const PREVIEW_DRIFT_ERROR_CODE = 'force_majeure_preview_drift';
+const PREVIEW_DRIFT_DETAIL_PREFIX = 'Состав очереди изменился после предпросмотра';
+
+type FmHttpLikeError = {
+  response?: {
+    status?: number;
+    data?: { detail?: unknown };
+    headers?: Record<string, unknown>;
+  };
+} | null;
+
+const errorResponseStatus = (err: unknown): number | undefined =>
+  (err as FmHttpLikeError)?.response?.status;
+const errorResponseDetail = (err: unknown): unknown =>
+  (err as FmHttpLikeError)?.response?.data?.detail;
+const errorResponseCode = (err: unknown): string | undefined => {
+  const headers = (err as FmHttpLikeError)?.response?.headers;
+  if (!headers) return undefined;
+  const raw = headers['x-error-code'] ?? headers['X-Error-Code'];
+  return typeof raw === 'string' && raw ? raw : undefined;
+};
+
+const isPreviewDriftConflict = (err: unknown): boolean => {
+  if (errorResponseStatus(err) !== 409) return false;
+  // машинно-читаемый код класса отказа приоритетен над текстом detail
+  const code = errorResponseCode(err);
+  if (code) return code === PREVIEW_DRIFT_ERROR_CODE;
+  // фолбэк без заголовка: точный префикс дрейфа (никакой другой 409
+  // бэкенда так не начинается)
+  const detail = errorResponseDetail(err);
+  return typeof detail === 'string' && detail.startsWith(PREVIEW_DRIFT_DETAIL_PREFIX);
+};
+
+/** Скоуп, валидированный последним успешным preview (round 2 P1). */
+interface ValidatedPreviewScope {
+  specialistId: string | number | null;
+  targetDate: string | null;
+  dailyQueueId: number | null;
+  /**
+   * 3808 review round 3 (P1 preview set binding): снимок ID записей,
+   * показанных ЭТИМ предпросмотром. Уходит в POST как
+   * expected_entry_ids: сервер выполняет мутацию ровно над этим набором
+   * и отказывает (409), если состав очереди изменился после preview.
+   */
+  entryIds: number[];
+}
+
 const ForceMajeureModal = ({
   isOpen,
   onClose,
   specialistId,
   specialistName,
+  targetDate,
+  dailyQueueId,
   onSuccess
 }: ForceMajeureModalProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
@@ -57,8 +137,25 @@ const ForceMajeureModal = ({
   const [confirmText, setConfirmText] = useState('');
   const [loading, setLoading] = useState(false);
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  // 3808: хранит i18n-ключ ошибки preview (перевод — в рендере).
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // 3808: синхронный in-flight предохранитель — два клика в одном стеке
+  // (до ре-рендера) не могут повторить финансовую мутацию.
+  const submitInFlight = useRef(false);
+  // 3808 review round 2 (P1 stale preview): поколение запросов preview.
+  // Каждое новое открытие/перенаведение/refresh инвалидирует все
+  // предыдущие: поздний (out-of-order) ответ чужой строки отбрасывается
+  // и не может авторизовать мутацию текущей.
+  const previewSeq = useRef(0);
+  // Скоуп последнего УСПЕШНОГО preview — авторизация действия
+  // привязана к нему и должна совпадать с текущей целью модала.
+  const validatedScope = useRef<ValidatedPreviewScope | null>(null);
+  // 3808 review round 3: снапшот последнего успешного preview читается
+  // хендлерами ДО их объявления (объявлен здесь, не после разметки).
+  const validated = validatedScope.current;
 
   // UX Audit: getAuthToken + tokenManager удалены — auth через axios-interceptor.
 
@@ -66,20 +163,51 @@ const ForceMajeureModal = ({
   const loadPendingEntries = useCallback(async () => {
     if (!specialistId) return;
 
+    // 3808 review round 2 (P1 stale preview): фиксируем поколение запроса;
+    // ответ применяется только если он всё ещё последний.
+    const seq = ++previewSeq.current;
+
+    // 3808: предыдущий снапшот сбрасывается ДО загрузки — устаревший
+    // preview (другая строка/дата/очередь) не может авторизовать мутацию.
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setDryRunResult(null);
+    validatedScope.current = null;
+
     try {
-      const response = await api.get(`/force-majeure/pending-entries?specialist_id=${specialistId}`);
+      // Preview и мутация связаны одним контрактом: specialist_id +
+      // target_date + daily_queue_id. Дата и очередь передаются явно,
+      // а не выводятся хостом или резолюцией специалиста на бэкенде.
+      const targetParam = targetDate ? `&target_date=${encodeURIComponent(targetDate)}` : '';
+      const queueParam = dailyQueueId ? `&daily_queue_id=${dailyQueueId}` : '';
+      const response = await api.get(`/force-majeure/pending-entries?specialist_id=${specialistId}${targetParam}${queueParam}`);
+      if (seq !== previewSeq.current) return; // поздний ответ чужой цели
       const data = response.data;
       setDryRunResult({
         count: data.length,
         entries: data,
         totalAmount: data.reduce((sum: number, e: Record<string, unknown>) => sum + (Number(e.total_amount) || 0), 0)
       });
+      validatedScope.current = {
+        specialistId,
+        targetDate: targetDate ?? null,
+        dailyQueueId: dailyQueueId ?? null,
+        entryIds: data.map((e: Record<string, unknown>) => Number(e.id)),
+      };
     } catch (err) {
+      if (seq !== previewSeq.current) return; // ошибка устаревшего запроса
       logger.error('[ForceMajeureModal] Error loading pending entries:', err);
+      // ключ, а не перевод: t нестабильна между рендерами и не должна
+      // попадать в deps этого callback (иначе reset-effect зациклится)
+      setPreviewError('misc.fm_preview_failed');
+    } finally {
+      if (seq === previewSeq.current) {
+        setPreviewLoading(false);
+      }
     }
-  }, [specialistId]);
+  }, [specialistId, targetDate, dailyQueueId]);
 
-  // Reset state when modal opens
+  // Reset state when modal opens (or is re-targeted at another row/day/queue)
   useEffect(() => {
     if (isOpen) {
       setReason('');
@@ -87,12 +215,23 @@ const ForceMajeureModal = ({
       setError(null);
       setSuccess(null);
       setDryRunResult(null);
+      setPreviewError(null);
+      setPreviewLoading(false);
+      validatedScope.current = null;
       loadPendingEntries();
+    } else {
+      // Закрытие модала инвалидирует висящий preview этого экземпляра.
+      previewSeq.current += 1;
+      validatedScope.current = null;
     }
-  }, [isOpen, specialistId, loadPendingEntries]);
+  }, [isOpen, specialistId, targetDate, dailyQueueId, loadPendingEntries]);
 
   // Transfer to tomorrow
   const handleTransfer = async () => {
+    // 3808: in-flight предохранитель — повторный клик в том же стеке
+    // не может запустить вторую финансовую мутацию.
+    if (submitInFlight.current || loading) return;
+
     if (!reason.trim() || reason.length < 5) {
       setError(t('misc.fm_reason_required'));
       return;
@@ -103,12 +242,31 @@ const ForceMajeureModal = ({
       return;
     }
 
+    // 3808: разрушающее действие разрешено только после успешного
+    // непустого dry-run — ввод ПОДТВЕРЖДАЮ сам по себе ничего не
+    // авторизует.
+    if (!isScopeValidated) {
+      setError(t('misc.fm_preview_required'));
+      return;
+    }
+
+    submitInFlight.current = true;
     setLoading(true);
     setError(null);
 
     try {
       const response = await api.post('/force-majeure/transfer', {
           specialist_id: specialistId,
+          // 3808: мутация привязана к той же дате и очереди, что и preview
+          ...(targetDate ? { target_date: targetDate } : {}),
+          ...(dailyQueueId
+            ? {
+                daily_queue_id: dailyQueueId,
+                // round 3 P1: снапшот предпросмотра — сервер мутирует ровно
+                // этот набор и отказывает (409), если очередь успела измениться
+                expected_entry_ids: validated?.entryIds ?? [],
+              }
+            : {}),
           reason: reason,
           send_notifications: true
       });
@@ -119,14 +277,32 @@ const ForceMajeureModal = ({
       if (onSuccess) onSuccess('transfer', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Transfer error:', err);
-      setError(getErrorMessage(err) || t('misc.fm_network_error'));
+      if (isPreviewDriftConflict(err)) {
+        // round 3 P1: состав очереди изменился после предпросмотра —
+        // повторная авторизация обязательна: снапшот и карточку сбрасываем,
+        // действие снова заблокировано до свежего предпросмотра.
+        validatedScope.current = null;
+        setDryRunResult(null);
+        setPreviewError('misc.fm_queue_changed');
+      } else {
+        // round 11 P2: прочие 409 — НЕ дрейф состава (конфликт владельцев
+        // поверхности назначения и т.п.): предпросмотр остаётся валидным,
+        // ничего не сбрасываем. Регистратор видит объяснение сервера как
+        // есть; повторный предпросмотр причину не устраняет.
+        setError(getErrorMessage(err) || t('misc.fm_network_error'));
+      }
     } finally {
+      submitInFlight.current = false;
       setLoading(false);
     }
   };
 
   // Cancel with refund
   const handleCancel = async () => {
+    // 3808: in-flight предохранитель — повторный клик в том же стеке
+    // не может запустить вторую финансовую мутацию.
+    if (submitInFlight.current || loading) return;
+
     if (!reason.trim() || reason.length < 5) {
       setError(t('misc.fm_reason_required'));
       return;
@@ -137,25 +313,63 @@ const ForceMajeureModal = ({
       return;
     }
 
+    // 3808: разрушающее действие разрешено только после успешного
+    // непустого dry-run.
+    if (!isScopeValidated) {
+      setError(t('misc.fm_preview_required'));
+      return;
+    }
+
+    submitInFlight.current = true;
     setLoading(true);
     setError(null);
 
     try {
       const response = await api.post('/force-majeure/cancel-with-refund', {
         specialist_id: specialistId,
+        // 3808: мутация привязана к той же дате и очереди, что и preview
+        ...(targetDate ? { target_date: targetDate } : {}),
+        ...(dailyQueueId
+          ? {
+              daily_queue_id: dailyQueueId,
+              // round 3 P1: снапшот предпросмотра — ровно этот набор,
+              // иначе сервер откажет (409) без движения денег
+              expected_entry_ids: validated?.entryIds ?? [],
+            }
+          : {}),
         reason: reason,
         refund_type: refundType,
         send_notifications: true
       });
 
       const result = response.data;
-      setSuccess(t('misc.fm_cancel_success', { cancelled: result.cancelled || 0, refunds: result.refunds_created || 0 }));
+      // 3808 review round 12 (P2): реальные поля ответа API. Прежний
+      // result.refunds_created не существует — счётчик возвратов всегда
+      // показывался нулём; депозитные зачисления не считались вовсе.
+      const bankRefunds = result.refund_requests_created ?? 0;
+      const depositCredits = result.deposit_credits_created ?? 0;
+      setSuccess(t('misc.fm_cancel_success', {
+        cancelled: result.cancelled || 0,
+        refunds: bankRefunds + depositCredits,
+      }));
       logger.log('[ForceMajeureModal] Cancel successful:', result);
       if (onSuccess) onSuccess('cancel', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Cancel error:', err);
-      setError(getErrorMessage(err) || t('misc.fm_network_error'));
+      if (isPreviewDriftConflict(err)) {
+        // round 3 P1: дрейф состава — сбрасываем авторизацию до свежего
+        // предпросмотра; действие снова заблокировано.
+        validatedScope.current = null;
+        setDryRunResult(null);
+        setPreviewError('misc.fm_queue_changed');
+      } else {
+        // round 11 P2: прочие 409 — НЕ дрейф (доменный отказ отмены/
+        // гонка возвратов): предпросмотр остаётся валидным, показываем
+        // объяснение сервера как есть.
+        setError(getErrorMessage(err) || t('misc.fm_network_error'));
+      }
     } finally {
+      submitInFlight.current = false;
       setLoading(false);
     }
   };
@@ -164,6 +378,19 @@ const ForceMajeureModal = ({
 
   const isConfirmValid = confirmText === 'ПОДТВЕРЖДАЮ';
   const isReasonValid = reason.trim().length >= 5;
+  // 3808: серверный скоуп валидирован только успешным непустым dry-run,
+  // причём скоуп этого dry-run обязан совпадать с ТЕКУЩЕЙ целью модала
+  // (round 2 P1: поздний ответ другой строки не авторизует мутацию).
+  // (validated объявлен выше — до хендлеров, round 3)
+  const isScopeValidated =
+    !previewLoading &&
+    !previewError &&
+    dryRunResult !== null &&
+    dryRunResult.count > 0 &&
+    validated !== null &&
+    validated.specialistId === specialistId &&
+    validated.targetDate === (targetDate ?? null) &&
+    validated.dailyQueueId === (dailyQueueId ?? null);
   const primaryActionLabel = loading ? t('misc.fm_processing') : activeTab === 'transfer' ? t('misc.fm_transfer_button') : t('misc.fm_cancel_button');
   const primaryActionIcon = loading ? <Loader2 size={18} className="animate-spin" /> : activeTab === 'transfer' ? <ArrowRight size={18} /> : <XCircle size={18} />;
   const dialogSurfaceStyle = {
@@ -206,7 +433,7 @@ const ForceMajeureModal = ({
       variant: activeTab === 'transfer' ? 'primary' : 'danger',
       icon: primaryActionIcon,
       onClick: activeTab === 'transfer' ? handleTransfer : handleCancel,
-      disabled: loading || !isConfirmValid || !isReasonValid || Boolean(success)
+      disabled: loading || !isConfirmValid || !isReasonValid || !isScopeValidated || Boolean(success)
     }
   ];
 
@@ -241,6 +468,23 @@ const ForceMajeureModal = ({
           </button>
         </div>
 
+        {/* 3808: ошибка preview — разрушающее действие остаётся заблокированным;
+            ввод ПОДТВЕРЖДАЮ ничего не авторизует. Round 3: сюда же попадает
+            409-дрейф (состав изменился после предпросмотра) — кнопка обновления
+            здесь, потому что карточка dry-run в этом состоянии скрыта. */}
+        {previewError &&
+        <div className="fmm-error-box">
+          <span className="fmm-preview-error-text">{t(previewError)}</span>
+          <button
+            type="button"
+            onClick={loadPendingEntries}
+            className="fmm-refresh-btn"
+            aria-label={t('misc.fm_aria_refresh')}>
+            <RefreshCw size={16} />
+          </button>
+        </div>
+        }
+
         {dryRunResult &&
         <div className="fmm-dry-run-card">
           <Users size={32} className="fmm-dry-run-icon" />
@@ -252,6 +496,11 @@ const ForceMajeureModal = ({
               {t('misc.fm_entries_action', { action: activeTab === 'transfer' ? t('misc.fm_transferred_word') : t('misc.fm_cancelled_word') })}
               {dryRunResult.totalAmount > 0 && t('misc.fm_entries_amount', { amount: dryRunResult.totalAmount.toLocaleString() })}
             </p>
+            {dryRunResult.count === 0 &&
+            <p className="fmm-error-text">
+              {t('misc.fm_no_entries')}
+            </p>
+            }
           </div>
           <button
             type="button"
