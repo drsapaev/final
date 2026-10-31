@@ -42,7 +42,7 @@
 1. **Group 1 — composition, data reads, filters and tables: BOUNDED SOURCE REVIEW DONE (2026-11-01).** Inspected all core listed page hooks, data filters/search/sort and active table views, source tests and backend search contract. CSH-FE-001–006 are provisional.
 2. **Group 2 — financial commands and payment lifecycle: CORE SOURCE REVIEW DONE (2026-11-01), provider contracts deferred to Group 5.** Inspected cashier actions, contracts, cash/online widgets, usePayments mutation calls, backend direct/grouped/confirm, PaymentInvariantService and relevant existing tests. CSH-FE-007–010 are provisional.
 3. **Group 3 — refund requests, deposits and permissions: BOUNDED SOURCE REVIEW DONE (2026-11-01), integration tests pending.** Reviewed four refund components, source tests, refund/deposit backend, canonical routes, CSRF/auth, available_actions and deposit ledger locking. CSH-FE-011–018 remain provisional; cash refund status does not prove external transfer.
-4. **Group 4 — dialogs, printing, filtering and accessibility: PENDING.** `CashierDialogsLayer.tsx`, UI views, receipt print path and toolbar. Verify role/action gating, keyboard UX, dates and error presentation.
+4. **Group 4 — dialogs, printing, filtering and accessibility: BOUNDED SOURCE REVIEW DONE (2026-11-01), browser/test proof pending.** Read all cashier dialogs, session warning, print/receipt construction + backend PDF endpoint, hotkeys, sortable headers, refund validation and dates. CSH-FE-019–027 remain provisional. Existing test source inspected, not executed.
 5. **Group 5 — API/backend contracts and regression coverage: PENDING.** `usePayments.ts`, `api/client.ts`, cashier endpoints/services, exact HTTP error shapes, CSV/receipt and status/refund contracts, test coverage, no false claims about CI.
 
 ## Findings index
@@ -67,6 +67,15 @@
 | CSH-FE-016 | P2 | Refund completion truthfulness | UI Выплатить triggers status-only complete, without verified payout evidence | SOURCE-OBSERVED / REPRO-PENDING | approved bank_transfer, no external transfer reference |
 | CSH-FE-017 | P3 | Refund error and empty UX | Failed initial fetch presents both AppError and genuine no-request empty state | SOURCE-OBSERVED / REPRO-PENDING | initial request fails versus HTTP 200 empty list |
 | CSH-FE-018 | P3 | Refund duplicate click | State-only processingId may allow two actions before disabled controls rerender | SOURCE-OBSERVED / REPRO-PENDING | two fast process invocations before first response |
+| CSH-FE-019 | P2 | Receipt source of truth | Browser receipt prints view-model rows without authoritative server receipt; backend permits print for all statuses | SOURCE-OBSERVED / REPRO-PENDING | stale row vs server-paid/refunded status and receipt PDF |
+| CSH-FE-020 | P2 | Receipt line reconciliation | When several service names exist, the receipt builder assigns entire payment total to each line | SOURCE-OBSERVED / REPRO-PENDING | two named services, total 100: line sum must equal total |
+| CSH-FE-021 | P3 | Print fallback notification | Successful backend PDF download still causes misleading 'print dialog failed' warning | SOURCE-OBSERVED / REPRO-PENDING | popup blocked then GET PDF succeeds |
+| CSH-FE-022 | P2 | Session extension semantics | 'Extend session' action only closes warning and says extension started; never refreshes access token | SOURCE-OBSERVED / REPRO-PENDING | expiry within 30 sec, click Extend, JWT exp unchanged |
+| CSH-FE-023 | P2 | Session expiry during mutation | Expired-token callback forces /login even if a payment/refund request has not completed | SOURCE-OBSERVED / REPRO-PENDING | deferred payment POST and expired token event |
+| CSH-FE-024 | P3 | Refund dialog validation | Min/max DOM hints are not enforced by click handler; parseFloat accepts malformed/truncated input and original total is the max | SOURCE-OBSERVED / REPRO-PENDING | refund 100 already 70; blank, -5, 40, 2.5e2, text |
+| CSH-FE-025 | P3 | Sortable headers accessibility | Cashier history clickable th has no keyboard focus/Enter/Space semantics or aria-sort | SOURCE-OBSERVED / REPRO-PENDING | keyboard tab, Enter/Space and screen-reader sort announcement |
+| CSH-FE-026 | P3 | Global hotkeys in dialogs | Ctrl+F/R/E and F5 hijack browser operations even while input/textarea is focused | SOURCE-OBSERVED / REPRO-PENDING | focused refund reason / cash amount, Ctrl+E or Ctrl+F |
+| CSH-FE-027 | P3 | Hourly analytics date scope | Range-mode analytics uses stale hidden single-day selectedDate instead of visible date range | SOURCE-OBSERVED / REPRO-PENDING | select range Sept1–5, click Hourly statistics |
 
 ### CSH-FE-001 — HTTP error is shown as a genuinely empty cashier selection (P2 candidate)
 
@@ -233,6 +242,88 @@ Reviewed RefundRequestsTable.tsx, useRefundRequests.ts, refundRequestsContracts.
 
 **Priority for reproduction:** CSH-FE-011/012 (routing/CSRF), CSH-FE-014 (incomplete action list), CSH-FE-016 (manual completion truthfulness). CSH-FE-013/015/017/018 are UI refresh/freshness/action-guard tests. All remain provisional, no P0/P1 demonstrated, no application edits or gate executed.
 
+### CSH-FE-019 — A printable receipt can be generated from unverified client list data (P2 candidate)
+
+**Evidence:** [useCashierActions.ts L350–387](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierActions.ts#L350-L387) prints `buildReceiptPrintPayload(paymentRow)` in browser before querying any backend receipt; the server PDF is only a fallback when browser print window fails. [cashierPaymentContracts.ts L212–248](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/cashierPaymentContracts.ts#L212-L248) derives date/number/status/amount/services from row fields and even synthesizes a `PAY-<id>` number. Backend [_helpers.py L77–98](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/endpoints/cashier/_helpers.py#L77-L98) exposes `can_print_receipt=true` on all payment states, not solely settled payments; browser template [panelPrint.ts L1113–1144](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/services/panelPrint.ts#L1113-L1144) is prominently headed `ЧЕК ОБ ОПЛАТЕ`. The authoritative PDF endpoint exists at [_visits.py L125–141](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/endpoints/cashier/_visits.py#L125-L141). Source test [useCashierActions.test.ts L240–247](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/__tests__/useCashierActions.test.ts#L240-L247) explicitly expects no server call on successful popup.
+
+**Potential impact and uncertainty:** A stale or grouped list row, or a pending/cancelled/refunded status, can be printed as a payment receipt using client-derived fields, possibly not matching the canonical payment. No falsified real receipt is demonstrated.
+
+**Fail-first test and safe fix boundary:** Synthetic paid->refunded status drift, grouped row, and pending payment; verify print obtains server-supported receipt for exact ID or clearly marks client view as unofficial. Maintain existing backend receipt contract; payment/receipt changes require gate.
+
+### CSH-FE-020 — Multi-service printable receipt item totals can exceed the charged total (P2 candidate)
+
+**Evidence:** [cashierPaymentContracts.ts L157–175](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/cashierPaymentContracts.ts#L157-L175) maps each `services_names` entry to `price:totalAmount` and `total:totalAmount` regardless of service count. [panelPrint.ts L1009–1025](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/services/panelPrint.ts#L1009-L1025) prints those totals per service and [panelPrint.ts L1157–1169](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/services/panelPrint.ts#L1157-L1169) prints only one overall amount. Existing [cashierPaymentContracts.test.ts L126–132](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/__tests__/cashierPaymentContracts.test.ts#L126-L132) explicitly *pins* two service items priced 100 each when payment total is 100.
+
+**Potential impact and uncertainty:** With two service names and 100 UZS payment, printed service rows sum to 200 UZS while printed total is 100 UZS. The backend history DTO may omit service breakdown: this is conditional on a row carrying multiple service names, not proof that every live cashier receipt is affected.
+
+**Fail-first test and safe fix boundary:** Fail-first names-only two-service row; assert sum(line totals)=100 or display no invented per-service prices. Prefer server-provided allocation/receipt for real amounts, and do not split 100 heuristically.
+
+### CSH-FE-021 — Successful server PDF fallback is reported as a printing failure (P3 candidate)
+
+**Evidence:** [useCashierActions.ts L370–385](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierActions.ts#L370-L385) calls `getReceipt` when popup is blocked; on `success:true` it runs `notify.warning(print_dialog_failed)` without a successful fallback message. [usePayments.ts L395–415](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/hooks/usePayments.ts#L395-L415) downloads an actual `receipt_<paymentId>.pdf` and returns success. Backend [_visits.py L125–141](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/endpoints/cashier/_visits.py#L125-L141) generates the PDF.
+
+**Potential impact and uncertainty:** The cashier receives a failure warning despite receiving the downloaded PDF; misleading but not evidence of a missing receipt or payment mutation.
+
+**Fail-first test and safe fix boundary:** Synthetic window.open=null and mocked PDF success/error; success must report download rather than print dialog, and failure must be distinct.
+
+### CSH-FE-022 — Session warning 'Extend' control does not extend the session (P2 candidate)
+
+**Evidence:** [CashierDialogsLayer.tsx L398–426](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/views/CashierDialogsLayer.tsx#L398-L426) implements Extend as `dismissSessionWarning(); notify.info(session_extending)`. [useCashierSessionWarning.ts L34–65](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierSessionWarning.ts#L34-L65) exposes only onWarning/onExpired and dismiss state, no refresh action. Shared API client supports token refresh separately ([client.ts L207–254](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/api/client.ts#L207-L254)), but this button does not call it.
+
+**Potential impact and uncertainty:** A cashier can believe they extended a session, although the existing JWT may expire during the next financial operation. A later automatic API refresh might occur independently; it does not make the button truthful.
+
+**Fail-first test and safe fix boundary:** Synthetic near-expired token and button click; assert a real refresh/recovery is invoked and user sees its real outcome, or relabel button as dismiss. Avoid promising successful refresh before verification.
+
+### CSH-FE-023 — Session expiration can hard-navigate over an in-flight financial command (P2 candidate)
+
+**Evidence:** [useCashierSessionWarning.ts L34–49](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierSessionWarning.ts#L34-L49) immediately assigns `window.location.href='/login'` on expiry and does not check pending cashier operations. Meanwhile [useCashierActions.ts L178–216](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierActions.ts#L178-L216) and [useCashierActions.ts L323–347](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierActions.ts#L323-L347) await money commands. A pre-existing [usePendingAwareSessionExpiry.ts L1–37](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/hooks/usePendingAwareSessionExpiry.ts#L1-L37) explicitly documents and addresses the class of unconfirmed commit + hard navigation in another module, but the cashier still uses the basic warning hook.
+
+**Potential impact and uncertainty:** If server commits while browser navigates away, cashier may lose the response and repeat payment/refund without reconciliation. This is an uncertainty window; actual duplicated charges are not proven.
+
+**Fail-first test and safe fix boundary:** Synthetic pending payment and refund promises, fire expired event, assert no immediate hard navigation before command outcome is safely reconciled. Integrate with authoritative pending signal, never block logout indefinitely; mandatory security/payment gate.
+
+### CSH-FE-024 — Refund form allows invalid amounts to reach the server instead of rejecting locally (P3 candidate)
+
+**Evidence:** [CashierDialogsLayer.tsx L299–343](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/views/CashierDialogsLayer.tsx#L299-L343) uses type=number min=1/max=`refundPaymentAmount`, but submit is a separate onClick button, not a form validity check. [useCashierActions.ts L323–345](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierActions.ts#L323-L345) validates only non-empty amount and reason length, uses parseFloat on the input and sends it; [useCashierDialogs.ts L125–138](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierDialogs.ts#L125-L138) stores original payment amount and prefilled outstanding amount separately. Backend [_helpers.py L220–224](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/endpoints/cashier/_helpers.py#L220-L224) enforces refund amount >0 and [_payments.py L1147–1189](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/endpoints/cashier/_payments.py#L1147-L1189) atomically rejects refunds exceeding remaining amount.
+
+**Potential impact and uncertainty:** Bad or excessive amounts reach the API and cause preventable validation/errors, not successful negative/over-limit refunds based on inspected guards. Rendered max may exceed refundable remainder.
+
+**Fail-first test and safe fix boundary:** Test negative/zero/NaN/exponent/beyond available remainder and valid partial amounts; fail closed in UI with exact backend remaining amount. Keep backend invariant authoritative.
+
+### CSH-FE-025 — History sort controls are mouse-only table header elements (P3 candidate)
+
+**Evidence:** [CashierHistoryTable.tsx L98–114](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/views/CashierHistoryTable.tsx#L98-L114) wires onClick to bare `<th>` for date/patient/amount; no `<button>`, tabIndex, keyboard callback or `aria-sort`. The current sort hook [useCashierSort.ts L14–32](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierSort.ts#L14-L32) supports toggling but not accessible semantics.
+
+**Potential impact and uncertainty:** Keyboard-only users cannot reliably change sort and screen readers cannot determine the active sort direction.
+
+**Fail-first test and safe fix boundary:** React Testing Library keyboard tab and Enter/Space plus axe header test; wrap title in real button, and add aria-sort to current column's th.
+
+### CSH-FE-026 — Cashier hotkeys override native shortcuts while editing payment forms (P3 candidate)
+
+**Evidence:** [useCashierActions.ts L116–139](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierActions.ts#L116-L139) registers Ctrl+F, F5, Ctrl+R, Ctrl+E and claims only to handle non-input focus, but provides no element guard. Shared [useHotkeys.ts L34–67](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/hooks/useHotkeys.ts#L34-L67) globally catches keyboard events on document and immediately `preventDefault`/invoke action, without an input/dialog exclusion.
+
+**Potential impact and uncertainty:** While typing a refund reason or editing a payment amount, Ctrl+E can initiate export and Ctrl+F takes focus from the form; F5/Ctrl+R replace browser actions. Not a payment write by itself.
+
+**Fail-first test and safe fix boundary:** Focus textarea/input inside an active dialog, dispatch shortcuts and assert browser editing shortcuts are untouched or explicitly scoped; preserve intentional navigation when form is not active.
+
+### CSH-FE-027 — Hourly stats action ignores the selected range-mode filter (P3 candidate)
+
+**Evidence:** [CashierPanel.tsx L180–207](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/CashierPanel.tsx#L180-L207) makes dateMode/dateFrom/dateTo visible in filters while always showing hourly stats button. Yet [useCashierActions.ts L390–398](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierActions.ts#L390-L398) loads stats by `target_date:selectedDate` alone, and [CashierDialogsLayer.tsx L348–355](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/views/CashierDialogsLayer.tsx#L348-L355) labels the modal using the same selectedDate. [useCashierWorklistData.ts L94–107](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/useCashierWorklistData.ts#L94-L107) uses dateFrom/dateTo for the other datasets when dateMode=range.
+
+**Potential impact and uncertainty:** The hourly chart can silently show the old single-day selection while all other cashiers' metrics show the chosen multi-day period. Backend hourly endpoint accepts target_date, so interpreting a range requires explicit UI policy.
+
+**Fail-first test and safe fix boundary:** Switch to range, click hourly analytics; show an explicit single-day selector/mode or valid range aggregation contract, not silently stale selectedDate.
+
+### Group 4 bounded source checkpoint (2026-11-01)
+
+Reviewed all 435 lines of `CashierDialogsLayer.tsx`; reducer/hook `useCashierDialogs.ts`; `useCashierSessionWarning.ts` and shared `useSessionTimeoutWarning.ts` plus pending-aware alternative; `useCashierActions.ts` print, refund, cancel, hotkeys and hourly stats; receipt payload builder `cashierPaymentContracts.ts`, `panelPrint.ts`, `printWindow.ts`; `CashierHistoryTable.tsx` actions and sortable headers; `CashierPanel.tsx` filters/toolbar; backend receipt endpoint, refund schema/invariant and payment available-action contract. Examined source unit tests for action/reducer/receipt/i18n; none executed.
+
+**Positive source evidence:** backend cashier GET receipt produces authoritative PDF behind Admin/Cashier RBAC ([_visits.py L125–141](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/endpoints/cashier/_visits.py#L125-L141)); refund backend validates positive amount and atomic remaining debt ([_helpers.py L220–224](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/endpoints/cashier/_helpers.py#L220-L224), [_payments.py L1147–1189](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/backend/app/api/v1/endpoints/cashier/_payments.py#L1147-L1189)), so CSH-FE-024 is not a server money-integrity bypass. Browser-print utility sanitizes HTML before document.write ([printWindow.ts L1–16](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/utils/printWindow.ts#L1-L16)). History actions are still gated by backend-provided available_actions ([CashierHistoryTable.tsx L159–200](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/cashier/views/CashierHistoryTable.tsx#L159-L200)), and generic Dialog components may already handle focus-trapping; this audit does NOT assert a focus-trap defect without browser verification.
+
+**Top priorities for synthetic reproduction:** CSH-FE-019/020 (receipt truth and arithmetic), CSH-FE-022/023 (session truth and pending mutation), then smaller UX CSH-FE-021/024–027. CSH-FE-004 remains a separate history grouping/action defect; do not duplicate it as a new receipt-specific root cause. No evidence of actual duplicate payment, provider settlement failure, or incorrectly paid real patient; all new findings `SOURCE-OBSERVED / REPRO-PENDING`.
+
+**Still open:** Group 5 end-to-end API/backend/provider contract and regression coverage. Passing tests, live browser, real auth, CI status, financial-policy decisions and gate for implementation are not established in this docs-only audit.
+
 ## Initial source positives / boundaries
 
 - The panel uses the canonical backend-provided `can_create_direct_payment` and `can_create_grouped_payment` in action availability ([CashierPendingTable.tsx L145–L169](https://github.com/drsapaev/final/blob/f308ed97e7f640a33e2bb255e23aaa109e69110a/frontend/src/pages/cashier/views/CashierPendingTable.tsx#L145-L169)), rather than guessing payment eligibility from display status.
@@ -246,6 +337,7 @@ Reviewed RefundRequestsTable.tsx, useRefundRequests.ts, refundRequestsContracts.
 | 2026-11-01 | Cashier active-source inventory + partial Group 1 | Enumerated direct page and component files from GitHub; read cashier panel, read hooks, active tables, existing tests and pending endpoint. Registered three provisional issues CSH-FE-001–003 | Read-only GitHub source checks. No tests, build, lint, browser, gate or backend writes. |
 | 2026-11-01 | Cashier Group 1 / Group 2 core | Added CSH-FE-004–010 (history grouping/action identity, locale sort, patient deep links, partially paid default, repeat submit, tender policy and local online smoke). Group 1 bounded source done; Group 2 core reviewed with provider contract deferred | GitHub code and existing test reads only; fresh-main compare 1 commit and no cashier React changes. No Vitest, pytest, browser, CI or gate. |
 | 2026-11-01 | Cashier Group 3 refunds/deposits/RBAC | Added CSH-FE-011–018: wrong URL root, missing CSRF/refresh, global refresh gap, 50-item cap, filter response races, manual completion vs payout, error/empty UX, duplicate action. Backend role/locking and deposits verified at source level | GitHub read-only inspection. No automated tests, browser, payment mutation or gate. |
+| 2026-11-01 | Cashier Group 4 dialog/receipt/session/keyboard source audit | Added CSH-FE-019–027: unverified client-side receipt, duplicated service totals, misleading PDF fallback toast, fake session extension, logout during pending money command, local refund validation, sortable header accessibility, hotkey focus hijack, hourly date scope | GitHub source and existing test reads only. No Vitest, Playwright, backend tests, gate, financial mutations or app changes. |
 
 ## Closure
 
