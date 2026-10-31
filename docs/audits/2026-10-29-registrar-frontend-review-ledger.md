@@ -61,6 +61,20 @@
 | REG-FE-033 | P3 | Default tabpanel label | All-departments tabpanel has no labelledby; corresponding control is not a real tab | SOURCE-OBSERVED / REPRO-PENDING | Batch U: accessibility |
 | REG-FE-034 | P2 | Queue API response validation | Canonical queue response lacking queues is silently parsed as empty legacy response; null payload mapper also returns empty queues | SOURCE-OBSERVED / REPRO-PENDING | Batch V: API contract fail-closed |
 | REG-FE-035 | P2 | Queue-manager async identity | Older doctor/date queue snapshot can overwrite more recent selection because hook has no request epoch guard | SOURCE-OBSERVED / REPRO-PENDING | Batch W: queue snapshot lifecycle |
+| REG-FE-036 | P2 | Patient IDs treated as demos | Patient ID >=1000 is never hydrated from real patient API, regardless of backend identity | SOURCE-OBSERVED / REPRO-PENDING | X patient card identity |
+| REG-FE-037 | P2 | Reference catalog request races | Older doctors/services/departments response may overwrite newer session-revalidation results | SOURCE-OBSERVED / REPRO-PENDING | Y reference-data freshness |
+| REG-FE-038 | P2 | Patient deep-link identity | ?patientId selects all same-name records through q=FIO rather than filtering by the exact patient ID | SOURCE-OBSERVED / REPRO-PENDING | Z exact identity links |
+| REG-FE-039 | P2 | Patient deep-link async freshness | A late lookup for patient A can overwrite q after navigation to patient B | SOURCE-OBSERVED / REPRO-PENDING | Z URL lifecycle |
+| REG-FE-040 | P2 | Reschedule modal state leak | Date/time entered for one visit persist after closing and reopening modal for another visit | SOURCE-OBSERVED / REPRO-PENDING | AA reschedule lifecycle |
+| REG-FE-041 | P2 | Grouped reschedule command | Aggregated row reschedule picks visit_ids[0] and then removes row identities as if all records moved | SOURCE-OBSERVED / REPRO-PENDING | AA aggregated reschedule |
+| REG-FE-042 | P2 | Doctor queue absent vs empty | Queue manager synthesizes empty queue on no-match, bypassing not-found display and making missing scope appear empty | SOURCE-OBSERVED / REPRO-PENDING | AB queue read model |
+| REG-FE-043 | P2 | Inline action permission SSOT | Registrar cancel/reschedule visibility is inferred solely from status rather than backend available_actions/can_* flags | SOURCE-OBSERVED / REPRO-PENDING | AC action authorization view |
+| REG-FE-044 | P2 | Welcome revenue SSOT | Welcome revenue uses sum of appointment status/cost, not settled payment ledger, including partials/refunds | SOURCE-OBSERVED / REPRO-PENDING | AD truthful statistics |
+| REG-FE-045 | P3 | Registrar CSV services/zero cost | CSV joins object services as [object Object], and hides legitimate zero cost by || fallback | SOURCE-OBSERVED / REPRO-PENDING | AE export semantics |
+| REG-FE-046 | P3 | CSV formula whitespace gap | CSV formula neutralization only guards first-character =,+,-,@, not whitespace/control-prefixes | SOURCE-OBSERVED / REPRO-PENDING | AF spreadsheet export hardening |
+| REG-FE-047 | P3 | Welcome analytics export | Statistics Export button does not export anything; callback only writes a log | SOURCE-OBSERVED / REPRO-PENDING | AG dead analytics control |
+| REG-FE-048 | P3 | Registrar global shortcut semantics | Ctrl+2/3/4 do not prevent browser shortcuts and remain active when a select/contenteditable has focus | SOURCE-OBSERVED / REPRO-PENDING | AH keyboard coexistence |
+| REG-FE-049 | P3 | Dialog focus timer | Delayed focus timeout is never cleared and can steal focus after quick close/reopen | SOURCE-OBSERVED / REPRO-PENDING | AI modal focus lifecycle |
 
 ### REG-FE-001 — Row activation does not open details (P2 candidate)
 
@@ -507,6 +521,143 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 
 **Five-group inventory outcome:** **SOURCE REVIEW COMPLETE / REPRODUCTIONS PENDING.** All REG-FE issues are provisional until fail-first focused tests or equivalent controlled reproduction. No P0/P1 has been demonstrated, no app/test/backend files edited, no CI/build/test results claimed. Next stage is dedup/priority triage and small separate fix PRs, with mandatory gate for queue ownership/fairness, RBAC, payment, clinical lifecycle or API contracts.
 
+### REG-FE-036 — Real patient numeric IDs from 1000 upward are silently excluded from hydration (P2 candidate)
+
+**Code evidence:** [useRegistrarData.ts L218–L235](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/useRegistrarData.ts#L218-L235) returns null for every numeric `patientId >=1000`, assuming demo. [useRegistrarData.ts L267–L301](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/useRegistrarData.ts#L267-L301) depends on that call to hydrate missing patient name/phone/sex/address. [patients.ts L57–L69](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/api/patients.ts#L57-L69) has no comparable ID ceiling. Source tests [useRegistrarData.focusRefresh.test.tsx L82–L115](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/__tests__/useRegistrarData.focusRefresh.test.tsx#L82-L115) cover focus refresh, not high patient IDs.
+
+**Potential impact / scope:** For an actual patient row with ID=1001 and incomplete display/gender read-model, the UI permanently skips the available patient GET and leaves missing/different profile facts. Real-ID scenario requires test fixture; no evidence that all >1000 IDs are demos.
+
+**Synthetic fail-first and safe direction:** Synthetic patient ID 1001 and missing display contract, expect GET and correct patient; demo behavior must be an explicit backend flag, never numeric threshold.
+
+### REG-FE-037 — Catalog revalidation lacks latest-request protection across overlapping loads (P2 candidate)
+
+**Code evidence:** [useRegistrarData.ts L54–L81](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/useRegistrarData.ts#L54-L81) starts independent loadIntegratedData requests via Promise.allSettled; [useRegistrarData.ts L118–L151](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/useRegistrarData.ts#L118-L151) commits any fulfilled doctors/departments/services result without request epoch/abort. Focus/visibility revalidation is active; existing [useRegistrarData.focusRefresh.test.tsx L93–L159](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/__tests__/useRegistrarData.focusRefresh.test.tsx#L93-L159) checks single success/failure/throttle but not reversed A/B responses.
+
+**Potential impact / scope:** Newly changed department/service/doctor settings could be reverted on screen by an earlier delayed request, including a newer reference-data refresh after wizard operations; backend remains authoritative.
+
+**Synthetic fail-first and safe direction:** Start catalog request A, then B; resolve B followed by A with contradictory synthetic catalog; only B may update UI. Repeat silent and non-silent paths.
+
+### REG-FE-038 — Patient deep-link loses the exact patient identity when converted into a name query (P2 candidate)
+
+**Code evidence:** [useRegistrarNavigation.ts L145–L169](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/useRegistrarNavigation.ts#L145-L169) resolves `patientId` but writes only a textual `q=last_name first_name` into URL. [registrarWorklistRows.ts L179–L207](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/registrarWorklistRows.ts#L179-L207) matches this query against FIO, row ID and phone; it does not constrain `patient_id`. Existing test [useRegistrarNavigation.test.tsx L104–L111](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/__tests__/useRegistrarNavigation.test.tsx#L104-L111) pins the lossy name-query behavior.
+
+**Potential impact / scope:** Two patients with identical FIO can both appear in a link meant for one patient; this is a selection/identity ambiguity, not evidence of a wrong patient mutation.
+
+**Synthetic fail-first and safe direction:** Two distinct patient IDs with identical names; navigate to ?patientId=ID, confirm the worklist preserves exact ID scope or clearly states broad name search; no name-to-ID guessing.
+
+### REG-FE-039 — Out-of-order patient deep-link lookups can leave search for the wrong URL patient (P2 candidate)
+
+**Code evidence:** [useRegistrarNavigation.ts L151–L183](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/useRegistrarNavigation.ts#L151-L183) launches async `getPatient(patientIdFromUrl)` inside effect and unconditionally `setSearchParams` after await, without cleanup, cancellation or a request generation check. Tests [useRegistrarNavigation.test.tsx L104–L118](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/__tests__/useRegistrarNavigation.test.tsx#L104-L118) cover one successful fetch or 404, not A/B races.
+
+**Potential impact / scope:** Rapidly changing patientId can leave q matching an outdated patient despite the current URL indicating the new ID. This is UI mismatch, not evidence of backend reassignment.
+
+**Synthetic fail-first and safe direction:** Deferred GET A/B, navigate from A to B while mounted, resolve B then A; search remains B, and stale A failure must not override state.
+
+### REG-FE-040 — Reschedule dialog retains stale date/time between patient records (P2 candidate)
+
+**Code evidence:** [RescheduleSlots.tsx L47–L65](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/views/RescheduleSlots.tsx#L47-L65) keeps customRescheduleDate/customRescheduleTime in component state, but `ModernDialog onClose={onClose}` does not call resetForm. Resets only after confirmation at [RescheduleSlots.tsx L90–L100](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/views/RescheduleSlots.tsx#L90-L100) and [RescheduleSlots.tsx L159–L169](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/views/RescheduleSlots.tsx#L159-L169); same component is mounted continuously inside [RegistrarDialogsLayer.tsx L130–L144](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/views/RegistrarDialogsLayer.tsx#L130-L144) structure.
+
+**Potential impact / scope:** Cancel modal for A after entering 2026-11-10, reopen for B, date can still be prefilled; a careless confirmation could reschedule B to an unintended date.
+
+**Synthetic fail-first and safe direction:** Open modal for A, type date/time, close without submission, open for B; expect blank or explicit B-specific values. Reset by target/open state, preserve only current user edit.
+
+### REG-FE-041 — Rescheduling a grouped patient row can move only the first visit while hiding the group (P2 candidate)
+
+**Code evidence:** [useRegistrarReschedule.ts L23–L29](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/useRegistrarReschedule.ts#L23-L29) chooses `visit_ids[0]` even for multiple visits. [RescheduleSlots.tsx L159–L171](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/views/RescheduleSlots.tsx#L159-L171) sends one `rescheduleVisit`, then removes the row; [useRegistrarReschedule.ts L31–L81](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/useRegistrarReschedule.ts#L31-L81) removes IDs from the grouped row, including all `visit_ids`. Prior REG-FE-009 covers cross-namespace optimistic removal, but not the separate first-visit-only command semantics.
+
+**Potential impact / scope:** A grouped patient with two visits may get one visit rescheduled and other visit visually removed until refresh, misleading staff about the changed appointments. Requires a fixture proving grouped rows can reach this action.
+
+**Synthetic fail-first and safe direction:** Synthetic row visit_ids=[101,102], click reschedule; assert both are intentionally handled through a backend-authorized group contract or require explicit visit selection and preserve untouched 102.
+
+### REG-FE-042 — Selected doctor with no matching queue appears to have an empty queue instead of no queue (P2 candidate)
+
+**Code evidence:** [useQueueManager.ts L75–L82](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/hooks/useQueueManager.ts#L75-L82) returns null for missing payload queues, and [useQueueManager.ts L181–L203](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/hooks/useQueueManager.ts#L181-L203) replaces any null pickQueueForDoctor result with invented `{id:Number(specialistId), entries:[], stats:null}`. [QueueTable.tsx L161–L187](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/queue/QueueTable.tsx#L161-L187) intentionally distinguishes `queueData=null` («Очередь не найдена») from a known queue with zero entries («Очередь пуста»). Existing source test [QueueManager.contract.test.tsx L38–L59](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/queue/__tests__/QueueManager.contract.test.tsx#L38-L59) checks explicit selection only.
+
+**Potential impact / scope:** Missing/unconfigured doctor queue and a genuinely zero-patient queue become indistinguishable; this may mask wrong specialist or resource ownership.
+
+**Synthetic fail-first and safe direction:** Backend returns queues for doctor B only, select doctor A; assert a truthful no-queue state, without invented queue ID or mutating server data.
+
+### REG-FE-043 — Inline Cancel/Reschedule controls bypass backend-driven action availability (P2 candidate)
+
+**Code evidence:** [appointmentsTableColumns.tsx L1263–L1275](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableColumns.tsx#L1263-L1275) correctly uses `getBackendActionAvailability` for payment, call, print, complete and other actions; immediately after, [appointmentsTableColumns.tsx L1276–L1289](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableColumns.tsx#L1276-L1289) computes `canCancel`/`canReschedule` from local status strings. [appointmentsTableContracts.ts L55–L71](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableContracts.ts#L55-L71) already exposes fail-closed backend action lookup.
+
+**Potential impact / scope:** Commands can be offered for a record whose backend denied them, or hidden despite an explicit backend allowance. Server must still reject unauthorized mutation, so this is a contract/presentation defect only.
+
+**Synthetic fail-first and safe direction:** Same status, conflicting server `available_actions` / capability flags; buttons follow backend. Review aggregated record actions and undefined capabilities; no optimistic permission.
+
+### REG-FE-044 — Registrar dashboard revenue is calculated from appointments rather than canonical payments (P2 candidate)
+
+**Code evidence:** [WelcomeView.tsx L287–L299](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/views/WelcomeView.tsx#L287-L299) passes loaded `appointments` to active ModernStatistics. [ModernStatistics.tsx L191–L223](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/statistics/ModernStatistics.tsx#L191-L223) filters `payment_status==='paid'` and sums `payment_amount || cost` without net refunds, actual settlement identities or reconciliation, while the same component labels this as revenue.
+
+**Potential impact / scope:** Dashboard can overstate/understate income for partial payments, refunded receipts and multiple records per patient. This is not the actual cash register; no database alteration claimed.
+
+**Synthetic fail-first and safe direction:** Synthetic one patient with partial, fully paid, refunded payments and duplicate appointment records; compare read-model with backend server-owned net settled revenue or relabel the card as non-financial record estimate.
+
+### REG-FE-045 — CSV export can lose service labels and zero-price values (P3 candidate)
+
+**Code evidence:** [registrarCsv.ts L57–L79](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/registrarCsv.ts#L57-L79) applies `row.services.join('; ')` even when service DTO elements are objects, producing `[object Object]`; `row.cost || row.total_amount || ''` treats explicit zero as absent. Active table calls generateCSV(filteredData) at [EnhancedAppointmentsTable.tsx L89–L101](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/EnhancedAppointmentsTable.tsx#L89-L101) and read models can carry service objects.
+
+**Potential impact / scope:** Exported report can have illegible service names and blank cost for free services, without affecting saved appointments.
+
+**Synthetic fail-first and safe direction:** Synthetic rows with services [{name:'Echo',code:'K2'}] and cost=0; assert meaningful service labels and numeric zero are preserved. Use presentation-only formatting.
+
+### REG-FE-046 — Formula neutralizer does not inspect leading whitespace/control characters in CSV cells (P3 candidate)
+
+**Code evidence:** [registrarCsv.ts L82–L95](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/registrarCsv.ts#L82-L95) uses `/^[=+\-@]/` against raw escaped text and prefixes apostrophe only on immediate match. An untrusted name/note beginning with tab/CR or spaces before formula marker is not neutralized by this predicate. Direct `=SUM(...)` is protected; applicability depends on spreadsheet import normalization.
+
+**Potential impact / scope:** Possible spreadsheet formula interpretation if a consumer strips/ignores leading control whitespace. No exploit or running formula was observed; this is conditional and requires an isolated Excel/LibreOffice reproduction.
+
+**Synthetic fail-first and safe direction:** Synthetic names with '=1+1', '\t=1+1', '\r=1+1', ' =1+1' and ordinary strings; validate safe spreadsheet import while preserving human-readable text. Security gate before code change.
+
+### REG-FE-047 — Statistics Export button is wired to a logger-only callback (P3 candidate)
+
+**Code evidence:** [WelcomeView.tsx L287–L298](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/views/WelcomeView.tsx#L287-L298) passes onExport={()=>logger.info('Экспорт статистики')} to mounted `ModernStatistics`, whose button [ModernStatistics.tsx L401–L410](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/statistics/ModernStatistics.tsx#L401-L410) invokes onExport. This is different from the separate appointment CSV export in EnhancedAppointmentsTable.
+
+**Potential impact / scope:** Registrar clicks Export in analytics and receives no downloaded report or visible feedback; not evidence that the main appointment export is broken.
+
+**Synthetic fail-first and safe direction:** Render WelcomeView stats and trigger export, assert actual stats artifact generation/download or remove the unsupported control explicitly.
+
+### REG-FE-048 — Registrar shortcuts can conflict with browser tab switching and select focus (P3 candidate)
+
+**Code evidence:** [useRegistrarHotkeys.ts L48–L57](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/useRegistrarHotkeys.ts#L48-L57) checks INPUT/TEXTAREA only, not SELECT or contentEditable; [useRegistrarHotkeys.ts L74–L93](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/useRegistrarHotkeys.ts#L74-L93) calls setActiveTab on Ctrl+2/3/4 without preventDefault. Existing [useRegistrarHotkeys.modalGate.test.tsx L42–L87](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/__tests__/useRegistrarHotkeys.modalGate.test.tsx#L42-L87) checks modal handling and INPUT but not focused select or native Ctrl+digit conflict.
+
+**Potential impact / scope:** Ctrl+2 may select a browser tab and update hidden registrar state; keyboard use in select/custom editors is not isolated. Browser handling varies, so confirm experimentally.
+
+**Synthetic fail-first and safe direction:** Synthetic keyboard focus on SELECT/contentEditable and Ctrl+2; verify no hidden navigation and no unintended browser conflict or scope opt-in.
+
+### REG-FE-049 — ModernDialog delayed focus has no cancellation across modal lifecycle (P3 candidate)
+
+**Code evidence:** [ModernDialog.tsx L57–L106](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/dialogs/ModernDialog.tsx#L57-L106) sets a 100-ms timeout to focus the first interactive control on open, but cleanup only removes keydown listener and overflow style. Because dialogRef can reference a quickly reopened instance, an old timeout can target a newer modal.
+
+**Potential impact / scope:** On rapid close/reopen of registrar dialogs, delayed focus may jump after user interaction. On a closed/unmounted dialog ref is null, so no unconditional focus leak claimed.
+
+**Synthetic fail-first and safe direction:** Fake timers: open A, close, reopen B and interact before 100ms; verify only current modal controls focus and timers are cancelled on cleanup.
+
+### Supplemental full-directory source sweep — 2026-11-01 (fresh main)
+
+**Base and method:** Pinned current main `a770ce3373b6e4b69f54b51723e1f2775dac4088`, reviewed 3-commit drift from original audit baseline `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`. This second pass **extends** earlier 35 candidates with REG-FE-036–049; all are SOURCE-OBSERVED/REPRO-PENDING. No synthetic runtime or browser tests were executed in this chat.
+
+**Exhaustive file-name inventory and bounded source scans in these *direct registrar and shared registrar-connected directories*:**
+
+| Source directory | Files in GitHub tree | Role / source-scan treatment |
+| --- | ---: | --- |
+| `frontend/src/pages/registrar/` | 42 | All page-local runtime files, CSS, source contract tests, views, README/design docs inspected by module/source scan; particularly useRegistrarData, navigation, reschedule, CSV |
+| `frontend/src/components/registrar/` | 6 | Current ForceMajeureModal + test/CSS inspected; remaining selectors/price approval scanned but no active RegistrarPanel import established |
+| `frontend/src/components/queue/` | 13 | ModernQueueManager, QueueTable, qrExpiry, QueueManagementCard, tests/CSS/stories source scanned; QueueManagementCard is not a proven registrar-rendered component (doctor-specific paths elsewhere) |
+| `frontend/src/components/tables/` | 11 | Main table, action columns, helpers, pagination, tests/CSS/stories scanned; backend action flags checked |
+| `frontend/src/components/wizard/` | 33 | Master and wizardUtils high-risk paths and component sources, corresponding 20 source tests, CSS/stories inspected; 3331-LOC wizard and 2343-LOC utils were **targeted, not fully branch-by-branch proven** |
+| `frontend/src/components/dialogs/` | 11 | PaymentDialog, CancelDialog, PrintDialog, ModernDialog, source test, CSS and stories inspected |
+
+**Other traceable active dependencies examined:** `RegistrarPanel.tsx`, `QueueJoin.tsx` (separate public join route), `frontend/src/components/statistics/ModernStatistics.tsx`, shared patient/visits/queue/queueResources and registrar APIs, hooks `useQueueManager`, `useQueueApi`, `useQueueWebSocket`, `useRegistrarApi`, and relevant backend registrar/refund/payment/queue contracts. These are scoped to registrar behavior; this is **not** a claim to have reviewed every general-purpose component in the 5,984-item entire GitHub tree, every transitive dependency, or every CSS selector for browser correctness.
+
+**Excluded from active issue count:** `IntegratedServiceSelector.tsx` still contains hardcoded demo service IDs/prices and keeps them after API failure ([IntegratedServiceSelector.tsx L55–L85](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/registrar/IntegratedServiceSelector.tsx#L55-L85), [IntegratedServiceSelector.tsx L126–L183](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/registrar/IntegratedServiceSelector.tsx#L126-L183)); repository code search found no active import in RegistrarPanel/wizard, so **do not** call this a demonstrated production pricing defect. `PriceOverrideApproval.tsx` and `IntegratedDoctorSelector.tsx` likewise require reachability proof; orphan cleanup is architectural work, not an observed active UI failure. `QueueManagementCard.tsx` logs action failures without a toast ([QueueManagementCard.tsx L142–L183](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/queue/QueueManagementCard.tsx#L142-L183)), but active registrar QueueView mounts ModernQueueManager/QueueTable, not this doctor-side card; exclude from registrar bug tally without proof of a registrar consumer.
+
+**Main drift revalidation for existing REG-FE-025:** new main `a770ce3373b6e4b69f54b51723e1f2775dac4088` includes new `useRegistrarRowActions.ts`, ForceMajeureModal and tests. Source now requires canonical doctor queue owner and `daily_queue_id` before mass action, binds pending-entry preview to owner/day/queue and `expected_entry_ids`, and synchronously guards double financial submissions; `ForceMajeureModal.test.tsx` source includes out-of-order preview, owner-conflict, bank-vs-deposit, idempotent replay cases. Prior `CONFIRMED / FIX-IN-REVIEW` is historical audit disposition. **Do not represent the old main bug as definitely still unfixed.** This read-only session did not run the tests or verify production.
+
+**Verified protections worth retaining:** PaymentDialog uses server `payment_snapshot`, a synchronous in-flight ref and an explicit remaining-debt check; the wizard requires server quote, uses Idempotency-Key and read-back verification and has existing targeted contract tests. QueueWebSocket sends bearer JWT via subprotocol, not query-string token. Supplemental tests did not reproduce these fixes; evidence is source inspection only.
+
+**Priority to test:** REG-FE-036 high patient-ID contract, 038/039 identity deep links, 040/041 reschedule target state/group semantics, 042 queue absent vs empty, 043 server action capability, 044 real revenue read-model; then reference data races 037 and export/keyboard/focus 045–049. Require the repository mandatory agent gate before changing queue ownership, financial read-models, patient identity, RBAC or clinical lifecycle. No code/migration/config/production edit in this docs-only PR.
+
 ## Review coverage
 
 ### Actually inspected in first pass (source reads; not an exhaustive audit)
@@ -694,6 +845,7 @@ Cloud agents operate on a *fresh* base fetched from `origin/main`, in an isolate
 | 2026-10-30 | Cloud remediation plan (documentation only) | Added Stage 0 triage, 18 candidate small-PR packages with **exact 35-ID coverage**, cloud agent workflow, risk gate, test matrix, dependencies and release stop conditions. No app fixes or deployment authorized | Current #3803 draft and audit/main SHA inspected; plan text/index coverage checked; no source, runtime tests or CI executed |
 | 2026-10-30 | CR-01 start / gate blocker checkpoint | Created GitHub issue #3808 with precise fail-first/owner/preview requirements; source rechecked. Mandatory PowerShell gate cannot run in this no-checkout/no-pwsh execution container | No code/test edits, no gate/test/CI execution; issue confirmed in GitHub. Status remains SOURCE-OBSERVED / REPRO-PENDING |
 | 2026-10-30 | CR-01 cloud cycle 1 | REG-FE-025 → CONFIRMED / FIX-IN-REVIEW: mandatory gate run (narrow_override), fail-first RED 15 → GREEN, Draft PR #3809 opened with CI green (22 success / 0 fail) | Worktree gate payload + vitest/tsc/eslint/build/Playwright logs; PR #3809 checks on commit 4776cb279 |
+| 2026-11-01 | Comprehensive remaining registrar frontend directory source sweep | REG-FE-036–049 provisional; inspected additional hooks, reschedule, actual patient ID hydrating, queue manager state, inline permissions, ModernStatistics, CSV, dialog focus, CSS, stories and named unit-test case inventory across six dirs | GitHub source reads at fresh main a770ce3373b6e4b69f54b51723e1f2775dac4088; no browser/Vitest/pytest/Playwright/agent gate or production action. Existing REG-FE-025 recent-main safeguards rechecked source only. |
 
 ## End-of-review acceptance criteria
 
