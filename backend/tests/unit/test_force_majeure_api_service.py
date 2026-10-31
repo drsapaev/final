@@ -483,6 +483,10 @@ class TestForceMajeureApiService:
         assert moved_queue.specialist_id == test_doctor.id
         assert moved_queue.queue_resource_id is None
         assert moved_queue.id != surface_tomorrow.id
+        # 3808 review round 8 (P1 queue tag): the destination keeps the
+        # source TAG as well — the doctor's own surface is not silently
+        # re-labeled as the specialty-derived consultation queue
+        assert moved_queue.queue_tag == "doctor_own_queue_r7"
         # the shared resource queue on tomorrow stayed untouched
         assert (
             db_session.query(OnlineQueueEntry)
@@ -498,6 +502,242 @@ class TestForceMajeureApiService:
             daily_queue_id=moved_queue.id,
         )
         assert [entry["id"] for entry in visible] == [moved.id]
+
+    def test_transfer_doctor_owned_two_tags_keep_entries_in_matching_queue(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 review round 8 (P1 queue tag): у одного врача в один день
+        сосуществуют активные очереди РАЗНЫХ тегов
+        (``uq_daily_queues_active_doctor_day_tag`` — консультация и ЭКГ
+        кардиолога). Перенос канонической ЭКГ-строки обязан привести
+        пациентов в ЭКГ-очередь следующего дня (созданную, если её нет), а
+        не в очередь консультаций того же врача; очередь консультаций не
+        затрагивается."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        ecg_source = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="ecg_r8",
+            active=True,
+        )
+        # ловушка round 8: завтра у врача УЖЕ есть АКТИВНАЯ очередь другого
+        # тега — прежний поиск по (specialist_id, day) уходил именно в неё
+        consult_tomorrow = DailyQueue(
+            day=tomorrow,
+            specialist_id=test_doctor.id,
+            queue_tag="consultation_r8",
+            active=True,
+        )
+        db_session.add_all([ecg_source, consult_tomorrow])
+        db_session.flush()
+
+        ecg_entry = OnlineQueueEntry(
+            queue_id=ecg_source.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="ECG Patient R8",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add(ecg_entry)
+        db_session.flush()
+
+        result = ForceMajeureApiService(db_session).transfer_queue_to_tomorrow(
+            request=SimpleNamespace(
+                specialist_id=test_doctor.id,
+                target_date=today,
+                daily_queue_id=ecg_source.id,
+                entry_ids=None,
+                expected_entry_ids=[ecg_entry.id],
+                reason="ЭКГ-аппарат сломан",
+                send_notifications=False,
+            ),
+            current_user_id=1,
+        )
+
+        assert result["transferred"] == 1
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        moved_queue = db_session.get(DailyQueue, moved.queue_id)
+        # назначение — врачебная очередь ТОГО ЖЕ тега, что и источник
+        assert moved_queue.day == tomorrow
+        assert moved_queue.specialist_id == test_doctor.id
+        assert moved_queue.queue_tag == "ecg_r8"
+        assert moved_queue.id not in {ecg_source.id, consult_tomorrow.id}
+        # очередь консультаций не тронута: ни перенесённых, ни новых записей
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == consult_tomorrow.id)
+            .count()
+            == 0
+        )
+
+    def test_transfer_doctor_owned_two_tags_reuse_matching_destination(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 review round 8 (P1 queue tag), зеркальный случай: подходящая
+        (день, врач, тег, active) очередь завтра УЖЕ есть — перенос
+        переиспользует её, а не создаёт дубль и не уходит в очередь другого
+        тега того же врача."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        ecg_source = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="ecg_r8",
+            active=True,
+        )
+        ecg_tomorrow = DailyQueue(
+            day=tomorrow,
+            specialist_id=test_doctor.id,
+            queue_tag="ecg_r8",
+            active=True,
+        )
+        consult_tomorrow = DailyQueue(
+            day=tomorrow,
+            specialist_id=test_doctor.id,
+            queue_tag="consultation_r8",
+            active=True,
+        )
+        db_session.add_all([ecg_source, ecg_tomorrow, consult_tomorrow])
+        db_session.flush()
+
+        ecg_entry = OnlineQueueEntry(
+            queue_id=ecg_source.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="ECG Patient R8b",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add(ecg_entry)
+        db_session.flush()
+
+        result = ForceMajeureApiService(db_session).transfer_queue_to_tomorrow(
+            request=SimpleNamespace(
+                specialist_id=test_doctor.id,
+                target_date=today,
+                daily_queue_id=ecg_source.id,
+                entry_ids=None,
+                expected_entry_ids=[ecg_entry.id],
+                reason="ЭКГ-аппарат сломан",
+                send_notifications=False,
+            ),
+            current_user_id=1,
+        )
+
+        assert result["transferred"] == 1
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        # переиспользована существующая ЭКГ-очередь следующего дня
+        assert moved.queue_id == ecg_tomorrow.id
+        assert db_session.get(DailyQueue, moved.queue_id).queue_tag == "ecg_r8"
+        # дубля врачебной ЭКГ-очереди не появилось
+        assert (
+            db_session.query(DailyQueue)
+            .filter(
+                DailyQueue.day == tomorrow,
+                DailyQueue.specialist_id == test_doctor.id,
+                DailyQueue.queue_tag == "ecg_r8",
+                DailyQueue.active.is_(True),
+            )
+            .count()
+            == 1
+        )
+        # очередь консультаций не тронута
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == consult_tomorrow.id)
+            .count()
+            == 0
+        )
+
+    def test_transfer_doctor_owned_untagged_source_stays_untagged(
+        self, db_session, test_doctor, test_patient, monkeypatch
+    ):
+        """3808 review round 8 (P1 queue tag), NULL-тег: источник без тега
+        (batch-писатели создают такие строки) переносится в NULL-тег
+        врачебную очередь следующего дня — по COALESCE-ключу
+        ``uq_daily_queues_active_doctor_day_tag``, а не в тегированную
+        очередь консультаций того же врача."""
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        untagged_source = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag=None,
+            active=True,
+        )
+        consult_tomorrow = DailyQueue(
+            day=tomorrow,
+            specialist_id=test_doctor.id,
+            queue_tag="consultation_r8",
+            active=True,
+        )
+        db_session.add_all([untagged_source, consult_tomorrow])
+        db_session.flush()
+
+        untagged_entry = OnlineQueueEntry(
+            queue_id=untagged_source.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Untagged Patient R8",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add(untagged_entry)
+        db_session.flush()
+
+        result = ForceMajeureApiService(db_session).transfer_queue_to_tomorrow(
+            request=SimpleNamespace(
+                specialist_id=test_doctor.id,
+                target_date=today,
+                daily_queue_id=untagged_source.id,
+                entry_ids=None,
+                expected_entry_ids=[untagged_entry.id],
+                reason="врач отсутствует",
+                send_notifications=False,
+            ),
+            current_user_id=1,
+        )
+
+        assert result["transferred"] == 1
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        moved_queue = db_session.get(DailyQueue, moved.queue_id)
+        # назначение — NULL-тег врачебная очередь, не консультация
+        assert moved_queue.day == tomorrow
+        assert moved_queue.specialist_id == test_doctor.id
+        assert moved_queue.queue_tag is None
+        assert moved_queue.id not in {untagged_source.id, consult_tomorrow.id}
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == consult_tomorrow.id)
+            .count()
+            == 0
+        )
 
     def test_transfer_resource_owned_row_keeps_registry_destination(
         self, db_session, test_doctor, test_patient, monkeypatch

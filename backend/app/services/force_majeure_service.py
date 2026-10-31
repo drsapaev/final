@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, Final
 
-from sqlalchemy import insert
+from sqlalchemy import func, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -42,6 +42,13 @@ from app.services.fcm_service import get_fcm_service
 from app.services.queue_service import queue_service
 
 logger = logging.getLogger(__name__)
+
+
+# 3808 review round 8 (P1 queue tag): sentinel «тег источника НЕ передан».
+# Отличается от None: явный None — валидированный источник БЕЗ тега (сохрани
+# NULL-тег назначения), sentinel — legacy-вызов, у которого тег выводится из
+# Doctor.specialty (байт-идентичное прежнее поведение до этого раунда).
+_SOURCE_TAG_UNSET: Final[object] = object()
 
 
 class ForceMajeureError(Exception):
@@ -502,19 +509,38 @@ class ForceMajeureService:
         return self._get_or_create_doctor_queue(specialist_id, target_date)
 
     def _get_or_create_doctor_queue(
-        self, specialist_id: int, target_date: date
+        self,
+        specialist_id: int,
+        target_date: date,
+        *,
+        queue_tag: str | None | object = _SOURCE_TAG_UNSET,
     ) -> DailyQueue:
-        """Врачебная (specialist-owned) поверхность на дату — байт-идентично
-        прежнему legacy-пути ``_get_or_create_queue``.
+        """Врачебная (specialist-owned) поверхность на дату.
 
         3808 review round 7 (P1 destination owner): выделено, чтобы
         перенос из врачебной канонической строки строил назначение
         ТОЛЬКО здесь — реестровая поверхность того же тега не
-        перехватывала пациентов врача."""
+        перехватывала пациентов врача.
+
+        3808 review round 8 (P1 queue tag): вместе с владельцем
+        сохраняется ТЕГ источника. Модель разрешает несколько
+        активных врачебных очередей одного врача в день, различаемых
+        тегом (``uq_daily_queues_active_doctor_day_tag``): консультация
+        и ЭКГ кардиолога — разные поверхности. Валидированный
+        источник передаёт свой ``queue_tag`` (включая ``None`` —
+        источник без тега), и назначение ищется/создаётся по
+        ``(day, specialist_id, effective tag, active)``: перенос
+        ЭКГ-очереди не заводит пациентов в очередь консультаций.
+        Без ``queue_tag`` (legacy-путь врача) — байт-идентично
+        прежнему поведению: тег выводится из ``Doctor.specialty``,
+        поиск по ``(specialist_id, day)`` без фильтра тега.
+        """
         doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
-        queue_tag = None
-        if doctor is not None and doctor.specialty:
-            queue_tag = doctor.specialty.lower().replace(" ", "_")
+        tag_preserved = queue_tag is not _SOURCE_TAG_UNSET
+        if not tag_preserved:
+            queue_tag = None
+            if doctor is not None and doctor.specialty:
+                queue_tag = doctor.specialty.lower().replace(" ", "_")
 
         # This legacy doctor-owned path creates tagged DailyQueue rows too.
         # Take the same profile/tag scope before the doctor/day lock and
@@ -523,13 +549,21 @@ class ForceMajeureService:
             self.db, target_date, specialist_id, queue_tag=queue_tag
         )
 
-        queue = (
-            self.db.query(DailyQueue)
-            .filter(
-                DailyQueue.specialist_id == specialist_id, DailyQueue.day == target_date
-            )
-            .first()
+        destination_query = self.db.query(DailyQueue).filter(
+            DailyQueue.specialist_id == specialist_id, DailyQueue.day == target_date
         )
+        if tag_preserved:
+            # Effective tag mirrors the uq_daily_queues_active_doctor_day_tag
+            # key (COALESCE(queue_tag, '')): NULL-тег источника совпадает с
+            # пустым тегом назначения и наоборот. Переиспользуется только
+            # АКТИВНАЯ строка: неактивная очередь того же тега не должна
+            # принять перенесённых пациентов — создаётся свежая активная
+            # поверхность (partial unique это разрешает).
+            destination_query = destination_query.filter(
+                func.coalesce(DailyQueue.queue_tag, "") == (queue_tag or ""),
+                DailyQueue.active.is_(True),
+            )
+        queue = destination_query.first()
 
         if not queue:
             queue = DailyQueue(
@@ -587,8 +621,11 @@ class ForceMajeureService:
         сохраняет владельца источника.
 
         * врачебный источник (specialist_id == specialist_id) —
-          ВРАЧЕБНАЯ очередь следующего дня, реестровый surface того же
-          тега не рассматривается;
+          ВРАЧЕБНАЯ очередь следующего дня ТОГО ЖЕ ТЕГА, что и
+          источник (round 8): у врача в день могут сосуществовать
+          активные очереди разных тегов — консультация и ЭКГ
+          (``uq_daily_queues_active_doctor_day_tag``); реестровый
+          surface и чужие теги не рассматриваются;
         * ресурсный источник (specialist_id IS NULL) — реестровая
           поверхность (day, tag) СОБСТВЕННОГО тега источника; если
           реестровая строка тега исчезла и активной (day, tag)-очереди
@@ -599,7 +636,9 @@ class ForceMajeureService:
             return self._get_or_create_queue(specialist_id, target_date)
 
         if source_queue.specialist_id == specialist_id:
-            return self._get_or_create_doctor_queue(specialist_id, target_date)
+            return self._get_or_create_doctor_queue(
+                specialist_id, target_date, queue_tag=source_queue.queue_tag
+            )
 
         if source_queue.specialist_id is None:
             registry_queue = QueueApiRepository(
