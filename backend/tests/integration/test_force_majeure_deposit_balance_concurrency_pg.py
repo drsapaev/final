@@ -12,6 +12,14 @@ Runtime-доказательство фикса ``_add_to_deposit``: идемп�
 claim-ы не помогают — платежи РАЗНЫЕ. Гонка живёт ровно в окне
 read-modify-write баланса.
 
+3808 review round 13 (residual P1): модуль расширен на РУЧНЫЕ операции —
+форс-мажорный возврат одновременно со СПИСАНИЕМ в оплату визита
+(``use_deposit_for_payment``) и с РУЧНЫМ пополнением (``add_to_deposit``),
+включая конкурентное СОЗДАНИЕ депозита этими ногами. Единый механизм
+конкурентной безопасности: все три операции берут строку депозита
+FOR UPDATE (репозиторий ``get_patient_deposit_for_update`` /
+``get_or_create_patient_deposit_for_update``).
+
 Гонка, закрытая фиксом (READ COMMITTED, PostgreSQL):
 
   * существующий депозит: обе ноги берут строку FOR UPDATE — вторая ждёт
@@ -86,6 +94,12 @@ _SCHEMA_PREFIX = "fm_dep_race_"
 _AMOUNT_A = Decimal("150.00")
 _AMOUNT_B = Decimal("200.00")
 _TOTAL = _AMOUNT_A + _AMOUNT_B  # 350.00
+
+# 3808 review round 13 (residual P1): ручные ноги гонки — списание в
+# оплату визита и ручное пополнение против форс-мажорного зачисления.
+_DEBIT = Decimal("30.00")
+_TOPUP = Decimal("40.00")
+_INITIAL = Decimal("50.00")  # стартовый баланс депозита в _seed_round
 
 
 def _one_off_schema() -> str:
@@ -306,15 +320,15 @@ def _run_parallel_cancels(session_factory, world) -> dict:
     threads = [
         threading.Thread(
             target=_run_cancel,
-            kwargs=dict(
-                session_factory=session_factory,
-                specialist_id=world[f"specialist_{tag}"],
-                queue_id=world[f"queue_{tag}"],
-                snapshot=[world[f"entry_{tag}"]],
-                outcomes=outcomes,
-                tag=tag,
-                barrier=barrier,
-            ),
+            kwargs={
+                "session_factory": session_factory,
+                "specialist_id": world[f"specialist_{tag}"],
+                "queue_id": world[f"queue_{tag}"],
+                "snapshot": [world[f"entry_{tag}"]],
+                "outcomes": outcomes,
+                "tag": tag,
+                "barrier": barrier,
+            },
         )
         for tag in ("a", "b")
     ]
@@ -323,6 +337,85 @@ def _run_parallel_cancels(session_factory, world) -> dict:
     for thread in threads:
         thread.join(timeout=30)
         assert not thread.is_alive(), "cancel-with-refund завис на блокировке"
+    return outcomes
+
+
+def _run_use_deposit(session_factory, *, patient_id, amount, outcomes, tag,
+                    barrier=None):
+    """Ручная нога: списание с депозита в оплату (use_deposit_for_payment)."""
+    session = session_factory()
+    try:
+        service = ForceMajeureApiService(session)
+        if barrier is not None:
+            barrier.wait(timeout=10)
+        try:
+            payload = service.use_deposit_for_payment(
+                request=SimpleNamespace(
+                    patient_id=patient_id,
+                    amount=amount,
+                    visit_id=None,
+                    description="refund vs payment race probe",
+                ),
+                current_user_id=None,
+            )
+            outcomes[tag] = ("ok", payload)
+        except ForceMajeureApiDomainError as exc:
+            session.rollback()
+            outcomes[tag] = ("domain_error", exc.status_code)
+    except Exception as exc:  # noqa: BLE001 - исход гонки целиком в outcomes
+        session.rollback()
+        outcomes[tag] = ("error", repr(exc))
+    finally:
+        session.close()
+
+
+def _run_add_deposit(session_factory, *, patient_id, amount, outcomes, tag,
+                     barrier=None):
+    """Ручная нога: пополнение депозита кассиром (add_to_deposit)."""
+    session = session_factory()
+    try:
+        service = ForceMajeureApiService(session)
+        if barrier is not None:
+            barrier.wait(timeout=10)
+        try:
+            payload = service.add_to_deposit(
+                request=SimpleNamespace(
+                    patient_id=patient_id,
+                    amount=amount,
+                    description="refund vs topup race probe",
+                ),
+                current_user_id=None,
+            )
+            outcomes[tag] = ("ok", payload)
+        except ForceMajeureApiDomainError as exc:
+            session.rollback()
+            outcomes[tag] = ("domain_error", exc.status_code)
+    except Exception as exc:  # noqa: BLE001 - исход гонки целиком в outcomes
+        session.rollback()
+        outcomes[tag] = ("error", repr(exc))
+    finally:
+        session.close()
+
+
+def _run_parallel_legs(leg_specs) -> dict:
+    """N потоков со стартовым барьером; leg_spec — (target, kwargs_without
+    outcomes/tag/barrier). Каждая нога получает СВОЙ outcomes-tag."""
+    outcomes: dict[str, tuple] = {}
+    barrier = threading.Barrier(len(leg_specs))
+    threads = []
+    for tag, (target, kwargs) in leg_specs.items():
+        threads.append(
+            threading.Thread(
+                target=target,
+                kwargs={**kwargs, "outcomes": outcomes, "tag": tag,
+                        "barrier": barrier},
+            )
+        )
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+        assert not thread.is_alive(), "нога гонки зависла на блокировке"
     return outcomes
 
 
@@ -459,5 +552,481 @@ def test_sequential_deposit_credits_same_patient(db_engine, session_factory):
             )
         ).scalar_one()
         assert balance == _TOTAL, balance
+    finally:
+        verify.close()
+
+
+# ============================================================================
+# 3808 review round 13 (residual P1): форс-мажорный возврат × РУЧНЫЕ операции
+# ============================================================================
+
+def _single_leg_world(session_factory, *, with_deposit: bool) -> dict:
+    """Мир одного раунда для одной FM-ноги: сид _seed_round создаёт ДВЕ
+    очереди (a/b) — используется только «a» (визит, платёж 150, запись
+    waiting); очередь «b» остаётся нетронутой и на инварианты не влияет."""
+    seed = session_factory()
+    try:
+        return _seed_round(seed, with_deposit=with_deposit)
+    finally:
+        seed.close()
+
+
+def _fm_cancel_leg(session_factory, world):
+    """FM-нога: отмена очереди «a» пациента с депозитным возвратом 150."""
+    return (
+        _run_cancel,
+        {
+            "session_factory": session_factory,
+            "specialist_id": world["specialist_a"],
+            "queue_id": world["queue_a"],
+            "snapshot": [world["entry_a"]],
+        },
+    )
+
+
+def test_force_majeure_refund_concurrent_with_deposit_payment(
+    db_engine, session_factory
+):
+    """Требование ревью round 13: форс-мажорный возврат ОДНОВРЕМЕННО с
+    оплатой визита С ДЕПОЗИТА одного пациента.
+
+    До фикса ``use_deposit_for_payment`` читал баланс БЕЗ блокировки:
+    разомкнутый check-then-act (``balance < amount`` → ``-=``) терял
+    параллельное зачисление (итог 200 — списание стёрто) или зачисление
+    затирало списание (итог 20, а баланс debit-строки расходился с
+    фактическим). После фикса обе ноги сериализуются FOR UPDATE на строке
+    депозита: итог всегда 50 + 150 − 30 = 170, обе строки транзакций
+    существуют, финальный balance_after сходится."""
+    for _ in range(8):
+        world = _single_leg_world(session_factory, with_deposit=True)
+
+        outcomes = _run_parallel_legs(
+            {
+                "fm": _fm_cancel_leg(session_factory, world),
+                "pay": (
+                    _run_use_deposit,
+                    {
+                        "session_factory": session_factory,
+                        "patient_id": world["patient_id"],
+                        "amount": _DEBIT,
+                    },
+                ),
+            }
+        )
+        kinds = sorted(outcomes[tag][0] for tag in ("fm", "pay"))
+        assert kinds == ["ok", "ok"], outcomes
+
+        verify = session_factory()
+        try:
+            deposits = (
+                verify.query(PatientDeposit)
+                .filter(PatientDeposit.patient_id == world["patient_id"])
+                .all()
+            )
+            assert len(deposits) == 1, deposits
+
+            credits = (
+                verify.query(DepositTransaction)
+                .filter(
+                    DepositTransaction.deposit_id == deposits[0].id,
+                    DepositTransaction.transaction_type
+                    == DepositTransactionType.CREDIT.value,
+                )
+                .all()
+            )
+            debits = (
+                verify.query(DepositTransaction)
+                .filter(
+                    DepositTransaction.deposit_id == deposits[0].id,
+                    DepositTransaction.transaction_type
+                    == DepositTransactionType.DEBIT.value,
+                )
+                .all()
+            )
+            assert len(credits) == 1, credits
+            assert len(debits) == 1, debits
+
+            # Финальный баланс — точная алгебра обеих ног (никто не потерян)
+            assert deposits[0].balance == _INITIAL + _AMOUNT_A - _DEBIT, (
+                deposits[0].balance
+            )
+            # balance_after каждой строки — один из двух легитимных
+            # порядков сериализации, и максимум обязан сходиться с итогом
+            assert credits[0].amount == _AMOUNT_A
+            assert credits[0].balance_after in (
+                _INITIAL + _AMOUNT_A,
+                _INITIAL + _AMOUNT_A - _DEBIT,
+            ), credits[0].balance_after
+            assert debits[0].amount == _DEBIT
+            assert debits[0].balance_after in (
+                _INITIAL - _DEBIT,
+                _INITIAL + _AMOUNT_A - _DEBIT,
+            ), debits[0].balance_after
+            assert max(credits[0].balance_after, debits[0].balance_after) == (
+                _INITIAL + _AMOUNT_A - _DEBIT
+            )
+        finally:
+            verify.close()
+
+
+def test_force_majeure_refund_concurrent_with_manual_topup(
+    db_engine, session_factory
+):
+    """Симметричная гонка для ручного ПОПОЛНЕНИЯ: кассир вносит деньги на
+    депозит того же пациента, пока форс-мажорная отмена зачисляет возврат.
+
+    До фикса ``add_to_deposit`` делал ``+=`` поверх неблокированного
+    чтения — потерялась одна из сумм (итог 200 или 90 вместо 240). После
+    фикса — FOR UPDATE: итог всегда 50 + 150 + 40 = 240, обе credit-строки
+    существуют."""
+    for _ in range(8):
+        world = _single_leg_world(session_factory, with_deposit=True)
+
+        outcomes = _run_parallel_legs(
+            {
+                "fm": _fm_cancel_leg(session_factory, world),
+                "topup": (
+                    _run_add_deposit,
+                    {
+                        "session_factory": session_factory,
+                        "patient_id": world["patient_id"],
+                        "amount": _TOPUP,
+                    },
+                ),
+            }
+        )
+        kinds = sorted(outcomes[tag][0] for tag in ("fm", "topup"))
+        assert kinds == ["ok", "ok"], outcomes
+
+        verify = session_factory()
+        try:
+            deposits = (
+                verify.query(PatientDeposit)
+                .filter(PatientDeposit.patient_id == world["patient_id"])
+                .all()
+            )
+            assert len(deposits) == 1, deposits
+
+            credits = (
+                verify.query(DepositTransaction)
+                .filter(
+                    DepositTransaction.deposit_id == deposits[0].id,
+                    DepositTransaction.transaction_type
+                    == DepositTransactionType.CREDIT.value,
+                )
+                .all()
+            )
+            # FM-зачисление (150, с payment_id) + ручное пополнение (40)
+            assert len(credits) == 2, credits
+            credited = sum(credit.amount for credit in credits)
+            assert credited == _AMOUNT_A + _TOPUP, credited
+            assert deposits[0].balance == _INITIAL + _AMOUNT_A + _TOPUP, (
+                deposits[0].balance
+            )
+            after_values = sorted(
+                credit.balance_after for credit in credits
+            )
+            assert after_values[-1] == _INITIAL + _AMOUNT_A + _TOPUP
+            assert after_values[0] in (
+                _INITIAL + _AMOUNT_A,
+                _INITIAL + _TOPUP,
+            ), after_values
+        finally:
+            verify.close()
+
+
+def test_manual_topup_concurrent_with_fm_refund_deposit_creation(
+    db_engine, session_factory
+):
+    """Конкурентное СОЗДАНИЕ депозита ручной и форс-мажорной ногами
+    (депозита у пациента ещё нет).
+
+    До фикса ``add_to_deposit`` делал необученный ORM-INSERT: проигравший
+    уникальный индекс patient_id отравлял сессию → 500, вся операция
+    ломалась. После фикса — connection-level savepoint (паттерн claim-а):
+    проигравший перечитывает строку победителя FOR UPDATE и зачисляет на
+    неё: одна строка, баланс 150 + 40 = 190, обе credit-строки."""
+    for _ in range(5):
+        world = _single_leg_world(session_factory, with_deposit=False)
+
+        outcomes = _run_parallel_legs(
+            {
+                "fm": _fm_cancel_leg(session_factory, world),
+                "topup": (
+                    _run_add_deposit,
+                    {
+                        "session_factory": session_factory,
+                        "patient_id": world["patient_id"],
+                        "amount": _TOPUP,
+                    },
+                ),
+            }
+        )
+        kinds = sorted(outcomes[tag][0] for tag in ("fm", "topup"))
+        assert kinds == ["ok", "ok"], outcomes
+
+        verify = session_factory()
+        try:
+            deposits = (
+                verify.query(PatientDeposit)
+                .filter(PatientDeposit.patient_id == world["patient_id"])
+                .all()
+            )
+            assert len(deposits) == 1, deposits
+
+            credits = (
+                verify.query(DepositTransaction)
+                .filter(
+                    DepositTransaction.deposit_id == deposits[0].id,
+                    DepositTransaction.transaction_type
+                    == DepositTransactionType.CREDIT.value,
+                )
+                .all()
+            )
+            assert len(credits) == 2, credits
+            credited = sum(credit.amount for credit in credits)
+            assert credited == _AMOUNT_A + _TOPUP, credited
+            assert deposits[0].balance == _AMOUNT_A + _TOPUP, (
+                deposits[0].balance
+            )
+            after_values = sorted(
+                credit.balance_after for credit in credits
+            )
+            assert after_values[-1] == _AMOUNT_A + _TOPUP
+            assert after_values[0] in (_AMOUNT_A, _TOPUP), after_values
+        finally:
+            verify.close()
+
+
+# ---------------------------------------------------------------------------
+# 3808 round 13: ДЕТЕРМИНИРОВАННЫЕ proof-ы сериализации на строке депозита
+# (паттерн lock-parity: холдер держит блокировку, реальный сервис обязан
+# сериализоваться и применить свою арифметику к ИТОГОВОМУ балансу).
+# Параллельные тесты выше фиксируют end-to-end инвариант; эти proof-ы
+# гарантированно ЛОВЯТ регресс: без FOR UPDATE нога читает баланс ДО
+# ожидания и применяет абсолютное значение ПОВЕРХ чужого коммита (lost
+# update), с фиксом — перечитывает итог после снятия блокировки.
+# ---------------------------------------------------------------------------
+
+
+def _locked_holder(session_factory, patient_id: int):
+    """Холдер: берёт строку депозита FOR UPDATE тем же репозиторным
+    методом, что и продакшн-код (честный parity), баланс в +150 (эмуляция
+    параллельного форс-мажорного зачисления), НЕ коммитит."""
+    from app.repositories.force_majeure_api_repository import (
+        ForceMajeureApiRepository,
+    )
+
+    session = session_factory()
+    repository = ForceMajeureApiRepository(session)
+    deposit = repository.get_patient_deposit_for_update(patient_id=patient_id)
+    assert deposit is not None
+    deposit.balance = deposit.balance + _AMOUNT_A
+    session.flush()
+    return session, deposit
+
+
+def _wait_blocked(future, seconds: float = 1.5) -> None:
+    """Нога обязана ЗАБЛОКИРОВАТЬСЯ на строке холдера (с фикс — ожидание
+    FOR UPDATE, без — ожидание UPDATE в flush): за отведённое время
+    результат не получен. Зависание навсегда исключено join-таймаутами."""
+    import time
+
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if future.done():
+            pytest.fail(
+                "нога завершилась, пока холдер держал блокировку строки "
+                f"депозита: {future.result()!r} — сериализации нет"
+            )
+        time.sleep(0.05)
+
+
+def test_use_deposit_for_payment_serializes_on_locked_row(db_engine, session_factory):
+    """Списание обязано читать баланс ПОД блокировкой.
+
+    Холдер держит FOR UPDATE и поднимает баланс 50 → 200 (параллельное
+    форс-мажорное зачисление), затем коммитит. С фиктом списание (30)
+    применяется к ИТОГУ: 200 − 30 = 170. Без фикса use-нога прочитала 50
+    ДО ожидания и записала абсолютные 20 поверх чужих 200 — зачисление
+    потеряно, баланс-аудит debit-строки разошёлся с фактом."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    seed = session_factory()
+    try:
+        world = _seed_round(seed, with_deposit=True)
+    finally:
+        seed.close()
+
+    holder, _held = _locked_holder(session_factory, world["patient_id"])
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
+        future = executor.submit(
+            _run_use_deposit,
+            session_factory,
+            patient_id=world["patient_id"],
+            amount=_DEBIT,
+            outcomes={},
+            tag="pay",
+            barrier=None,
+        )
+        _wait_blocked(future)
+
+        holder.commit()  # 200 закоммичен, блокировка снята
+        assert future.result(timeout=30) is None  # _run_* пишет в outcomes
+    finally:
+        holder.rollback()
+        holder.close()
+        executor.shutdown(wait=False)
+
+    verify = session_factory()
+    try:
+        balance = verify.execute(
+            select(PatientDeposit.balance).where(
+                PatientDeposit.patient_id == world["patient_id"]
+            )
+        ).scalar_one()
+        assert balance == _INITIAL + _AMOUNT_A - _DEBIT, balance
+        debit = (
+            verify.query(DepositTransaction)
+            .filter(
+                DepositTransaction.deposit_id
+                == verify.query(PatientDeposit.id)
+                .filter(
+                    PatientDeposit.patient_id == world["patient_id"]
+                )
+                .scalar_subquery(),
+                DepositTransaction.transaction_type
+                == DepositTransactionType.DEBIT.value,
+            )
+            .one()
+        )
+        assert debit.balance_after == _INITIAL + _AMOUNT_A - _DEBIT
+    finally:
+        verify.close()
+
+
+def test_add_to_deposit_serializes_on_locked_row(db_engine, session_factory):
+    """Ручное пополнение обязано читать баланс ПОД блокировкой.
+
+    Холдер держит FOR UPDATE и поднимает баланс 50 → 200, затем
+    коммитит. С фиктом пополнение (40) применяется к ИТОГУ: 240. Без
+    фикса add-нога прочитала 50 ДО ожидания и записала 90 поверх чужих
+    200 — зачисление холдера потеряно."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    seed = session_factory()
+    try:
+        world = _seed_round(seed, with_deposit=True)
+    finally:
+        seed.close()
+
+    holder, _held = _locked_holder(session_factory, world["patient_id"])
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
+        future = executor.submit(
+            _run_add_deposit,
+            session_factory,
+            patient_id=world["patient_id"],
+            amount=_TOPUP,
+            outcomes={},
+            tag="topup",
+            barrier=None,
+        )
+        _wait_blocked(future)
+
+        holder.commit()
+        assert future.result(timeout=30) is None
+    finally:
+        holder.rollback()
+        holder.close()
+        executor.shutdown(wait=False)
+
+    verify = session_factory()
+    try:
+        balance = verify.execute(
+            select(PatientDeposit.balance).where(
+                PatientDeposit.patient_id == world["patient_id"]
+            )
+        ).scalar_one()
+        assert balance == _INITIAL + _AMOUNT_A + _TOPUP, balance
+    finally:
+        verify.close()
+
+
+def test_add_to_deposit_creation_waits_and_reuses_committed_row(
+    db_engine, session_factory
+):
+    """Конкурентное СОЗДАНИЕ: победитель уже держит незакоммиченный INSERT
+    строки депозита (уникальный patient_id). Проигравшая add-нога обязана
+    НЕ упасть (poisoned session → 500 прежде), а дождаться коммита
+    победителя, перечитать его строку FOR UPDATE и прибавить свою сумму:
+    150 + 40 = 190. Симметрия паттерна ``_claim_payment_refund`` для
+    ручной ветки."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from app.repositories.force_majeure_api_repository import (
+        ForceMajeureApiRepository,
+    )
+
+    seed = session_factory()
+    try:
+        world = _seed_round(seed, with_deposit=False)
+    finally:
+        seed.close()
+
+    # Холдер = «победитель создания» (эмуляция FM-ноги: вставка депозита
+    # с балансом 150, коммит отложен).
+    holder = session_factory()
+    repository = ForceMajeureApiRepository(holder)
+    repository.db.add(
+        PatientDeposit(
+            patient_id=world["patient_id"], balance=_AMOUNT_A
+        )
+    )
+    holder.flush()
+    try:
+        executor = ThreadPoolExecutor(max_workers=1)
+        try:
+            future = executor.submit(
+                _run_add_deposit,
+                session_factory,
+                patient_id=world["patient_id"],
+                amount=_TOPUP,
+                outcomes={},
+                tag="topup",
+                barrier=None,
+            )
+            _wait_blocked(future, seconds=2.0)
+
+            holder.commit()  # победитель закоммитил 150
+            assert future.result(timeout=30) is None
+        finally:
+            executor.shutdown(wait=False)
+    finally:
+        holder.rollback()
+        holder.close()
+
+    verify = session_factory()
+    try:
+        deposits = (
+            verify.query(PatientDeposit)
+            .filter(PatientDeposit.patient_id == world["patient_id"])
+            .all()
+        )
+        assert len(deposits) == 1, deposits
+        assert deposits[0].balance == _AMOUNT_A + _TOPUP, deposits[0].balance
+        credits = (
+            verify.query(DepositTransaction)
+            .filter(
+                DepositTransaction.deposit_id == deposits[0].id,
+                DepositTransaction.transaction_type
+                == DepositTransactionType.CREDIT.value,
+            )
+            .all()
+        )
+        assert len(credits) == 1, credits
+        assert credits[0].amount == _TOPUP
+        assert credits[0].balance_after == _AMOUNT_A + _TOPUP
     finally:
         verify.close()
