@@ -69,7 +69,7 @@ const EnhancedAppointmentsTable = ({
     handleSort,
     handleRowSelect,
     handleSelectAll,
-  } = useAppointmentsTableState({ data, externalSelectedRows, onRowSelect });
+  } = useAppointmentsTableState({ data, externalSelectedRows, onRowSelect, preferCanonicalQueueNumber });
 
   const isDark = theme === 'dark';
   const isDoctorView = String(view).toLowerCase() === 'doctor';
