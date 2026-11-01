@@ -123,6 +123,8 @@ export interface EnhancedAppointmentsTableProps {
   services?: Record<string, unknown>;
   outerBorder?: boolean;
   showCheckboxes?: boolean;
+  /** Explicit opt-in for backend-only ticket numbers in the registrar worklist. */
+  preferCanonicalQueueNumber?: boolean;
   view?: string;
   rawEntries?: AppointmentRow[];
   appointments?: AppointmentRow[];
