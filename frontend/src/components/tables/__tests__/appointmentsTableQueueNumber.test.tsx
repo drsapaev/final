@@ -13,11 +13,12 @@ afterEach(() => cleanup());
 
 const t = (key: string) => key;
 
-const renderTicket = (row: Record<string, unknown>, otherRows: Record<string, unknown>[] = []) => {
+const renderTicket = (row: Record<string, unknown>, otherRows: Record<string, unknown>[] = [], strict = true) => {
   const { result } = renderHook(() => useAppointmentsTableRenderers({
     t,
     services: {},
     data: [...otherRows, row] as unknown as AppointmentRow[],
+    preferCanonicalQueueNumber: strict,
   }));
   render(<div>{result.current.renderQueueNumbers(row as unknown as Appointment)}</div>);
 };
@@ -69,4 +70,45 @@ describe('REG-FE-056: registrar ticket column', () => {
     expect(screen.queryByText('1')).toBeNull();
     expect(screen.queryByText('205')).toBeNull();
   });
+
+  it('retains the previous default for other screens that did not opt into the registrar ticket contract', () => {
+    const today = getLocalDateString();
+    renderTicket({
+      id: 504,
+      date: today,
+      appointment_date: today,
+      queue_number: null,
+      queue_numbers: [],
+    }, [], false);
+    expect(screen.getByText('1')).toBeTruthy();
+    expect(screen.queryByText('—')).toBeNull();
+  });
+
+  it.each([0, '0'])('does not display an unassigned backend fallback number %s as a real ticket', (sentinel) => {
+    const today = getLocalDateString();
+    renderTicket({
+      id: 505,
+      date: today,
+      appointment_date: today,
+      queue_number: sentinel,
+      queue_numbers: [{ number: sentinel, queue_tag: 'cardiology', status: 'waiting' }],
+      daily_queue_id: null,
+    });
+    expect(screen.getByText('—')).toBeTruthy();
+    expect(screen.queryByText(String(sentinel))).toBeNull();
+  });
+
+  it('keeps the supplied queue_numbers fallback when the selected row has no top-level ticket', () => {
+    const today = getLocalDateString();
+    renderTicket({
+      id: 506,
+      date: today,
+      appointment_date: today,
+      queue_number: null,
+      queue_numbers: [{ number: 12, queue_tag: 'lab', status: 'waiting' }],
+    });
+    expect(screen.getByText('12')).toBeTruthy();
+    expect(screen.queryByText('—')).toBeNull();
+  });
+
 });
