@@ -31,7 +31,7 @@ interface RescheduleSlotsDialogProps {
   onClose: () => void;
   /** useConfirm hook result from the panel (portal-mounted ConfirmDialog). */
   confirm: (options: Record<string, unknown>) => Promise<boolean>;
-  /** REG-FE-041 (#3820): full ordered visit-id list of the row — the dialog
+  /** REG-FE-041 (issue 3820): full ordered visit-id list of the row — the dialog
    *  requires an explicit target-visit choice when the row is a group. */
   getRescheduleVisitIds: (appointmentRow: Record<string, unknown>) => unknown[];
   resolveRescheduleVisitId: (appointmentRow: Record<string, unknown>) => unknown;
@@ -57,7 +57,7 @@ const RescheduleSlotsDialog = ({
   const [customRescheduleDate, setCustomRescheduleDate] = useState('');
   // R-27 fix: optional time picker for reschedule (HH:MM)
   const [customRescheduleTime, setCustomRescheduleTime] = useState('');
-  // REG-FE-041 (#3820): explicit target-visit choice for grouped rows.
+  // REG-FE-041 (issue 3820): explicit target-visit choice for grouped rows.
   const [selectedVisitId, setSelectedVisitId] = useState('');
 
   const resetForm = () => {
@@ -66,7 +66,7 @@ const RescheduleSlotsDialog = ({
     setSelectedVisitId('');
   };
 
-  // REG-FE-040 (#3820): reset the form on EVERY close path. Escape, backdrop
+  // REG-FE-040 (issue 3820): reset the form on EVERY close path. Escape, backdrop
   // and the close button all route through the onClose prop — previously the
   // fields were cleared only after a confirmed submit, so one patient's
   // chosen date/time leaked into the next patient's dialog.
@@ -75,7 +75,7 @@ const RescheduleSlotsDialog = ({
     onClose();
   };
 
-  // REG-FE-041 (#3820): candidate visits of the row. A grouped row
+  // REG-FE-041 (issue 3820): candidate visits of the row. A grouped row
   // (multi-visit booking) requires an explicit choice; a plain row has
   // exactly one candidate and keeps the previous behavior.
   const candidateVisitIds = rescheduleData ? getRescheduleVisitIds(rescheduleData) : [];
@@ -120,7 +120,7 @@ const RescheduleSlotsDialog = ({
             if (!ok) return;
 
             try {
-              // REG-FE-041 (#3820): resolve the target visit BEFORE closing —
+              // REG-FE-041 (issue 3820): resolve the target visit BEFORE closing —
               // a grouped row must have an explicit selection, and the dialog
               // stays open so the user can pick one.
               const targetVisitId = resolveTargetVisitId();
@@ -196,7 +196,7 @@ const RescheduleSlotsDialog = ({
             if (!ok) return;
 
             try {
-              // REG-FE-041 (#3820): resolve the target visit BEFORE closing —
+              // REG-FE-041 (issue 3820): resolve the target visit BEFORE closing —
               // a grouped row must have an explicit selection, and the dialog
               // stays open so the user can pick one.
               const targetVisitId = resolveTargetVisitId();
@@ -239,7 +239,7 @@ const RescheduleSlotsDialog = ({
           </div>
         </div>
 
-        {/* REG-FE-041 (#3820): a grouped row (several visits from one
+        {/* REG-FE-041 (issue 3820): a grouped row (several visits from one
             multi-service booking) must NOT silently reschedule
             visit_ids[0] — require an explicit target-visit choice. */}
         {isGroupedRow && (

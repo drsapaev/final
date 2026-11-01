@@ -80,7 +80,7 @@ interface RegistrarDialogsLayerProps {
   runRegistrarRecordAction: (record: Record<string, unknown>, action: string, payload?: Record<string, unknown>) => Promise<{ success?: boolean; success_count?: number; failed_count?: number; results?: { success?: boolean; error?: string }[] } | null>;
   handlePayment: (appointment: Record<string, unknown>, paymentData: RegistrarPaymentInput) => Promise<RegistrarPaymentSummary>;
   resolveRescheduleVisitId: (appointmentRow: Record<string, unknown>) => unknown;
-  /** REG-FE-041 (#3820): full visit-id list for the explicit target-visit choice. */
+  /** REG-FE-041 (issue 3820): full visit-id list for the explicit target-visit choice. */
   getRescheduleVisitIds: (appointmentRow: Record<string, unknown>) => unknown[];
   removeRescheduledAppointmentFromView: (appointmentRow: Record<string, unknown>, visitId: unknown) => void;
   confirm: (options: Record<string, unknown>) => Promise<boolean>;
