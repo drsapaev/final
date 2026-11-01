@@ -33,7 +33,6 @@ import { QueueActionButtons } from '../queue/QueueManagementCard';
 import logger from '../../utils/logger';
 import { getRegistrarTimestampDisplay } from '../../utils/dateUtils';
 import type { RegistrarTimestampRecord } from '../../utils/dateUtils';
-import { getLocalDateString } from '../../utils/dateUtils';
 import { getServiceDisplayName } from '../../utils/serviceCodeResolver';
 import type { Appointment, QueueNumberInfo } from '../../types/domain/clinic';
 import {
@@ -51,7 +50,7 @@ export interface UseAppointmentsTableRenderersParams {
   data: AppointmentRow[];
 }
 
-export const useAppointmentsTableRenderers = ({ t, services, data }: UseAppointmentsTableRenderersParams) => {
+export const useAppointmentsTableRenderers = ({ t, services }: UseAppointmentsTableRenderersParams) => {
   // ⭐ SSOT: Display helper for services with queue numbers
   // Format: "K01 (1), D01 (2), L10 (3)"
   void useCallback((rows: Appointment[]) => {
@@ -530,17 +529,8 @@ export const useAppointmentsTableRenderers = ({ t, services, data }: UseAppointm
 
   // Функция для отображения номеров очередей
   const renderQueueNumbers = useCallback((row: Appointment) => {
-    // Получаем текущую дату
-    const today = getLocalDateString();
-
-    // Helper для форматирования времени
-
-
-
-
-
-    // Если запись на текущий день - показываем номер в очереди
-    if (row.date === today || row.appointment_date === today) {
+    // Canonical ticket numbers apply on every selected date (past or future).
+    // The number is selected by the backend/registrar adapter for this row.
       // ✅ ИСПРАВЛЕНО: Используем queue_number (уже выбран для текущей вкладки в RegistrarPanel)
       // вместо отображения всех номеров из queue_numbers, что вызывало дублирование
       if (row.queue_number !== undefined && row.queue_number !== null) {
@@ -717,45 +707,9 @@ export const useAppointmentsTableRenderers = ({ t, services, data }: UseAppointm
       );
       }
 
-      // Если нет номеров очередей, но запись на сегодня - показываем порядковый номер
-      // Для этого нужно найти позицию записи среди всех записей на сегодня
-      const todayAppointments = data.filter((item) =>
-      item.date === today || item.appointment_date === today
-      );
-      const todayIndex = todayAppointments.findIndex((item: AppointmentRow) => item.id === row.id) + 1;
-
-      return (
-        <span style={{
-          padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
-          backgroundColor: 'var(--mac-accent-blue)',
-          color: 'var(--mac-text-primary)',
-          borderRadius: 'var(--mac-radius-sm)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-bold)',
-          minWidth: '32px',
-          textAlign: 'center',
-          display: 'inline-block',
-          boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
-        }}>
-          {todayIndex}
-        </span>);
-
-    }
-
-    // Для записей не на сегодня показываем дефолтный номер
-    const fallbackIndex = data.findIndex((item) => item.id === row.id) + 1;
-    return (
-      <span style={{
-        color: 'var(--mac-text-secondary)',
-        fontSize: 'var(--mac-font-size-xs)',
-        padding: '2px 6px',
-        backgroundColor: withOpacity('var(--mac-text-secondary)', 0.06),
-        borderRadius: 'var(--mac-radius-sm)'
-      }}>
-        #{fallbackIndex}
-      </span>);
-
-  }, [data, t]);
+    // No backend ticket is available: never infer one from the row index.
+    return <span>—</span>;
+  }, [t]);
 
   return {
     renderStatus,
