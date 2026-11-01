@@ -91,6 +91,7 @@ The migration contract pinned here:
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import os
 import re
@@ -319,7 +320,7 @@ def _seed_historical_userless_doctor(conn, specialty: str, *, active: bool) -> i
 
 def _usernames_present(conn) -> set[str]:
     rows = conn.execute(
-        sa.text("SELECT username FROM users WHERE username IN " "(:a, :b, :c)"),
+        sa.text("SELECT username FROM users WHERE username IN (:a, :b, :c)"),
         {"a": _PAIR_USERNAMES[0], "b": _PAIR_USERNAMES[1], "c": _PAIR_USERNAMES[2]},
     ).fetchall()
     return {row[0] for row in rows}
@@ -445,12 +446,10 @@ def test_sqlite_scratch_skips_pair_row_locking_with_a_note(capsys) -> None:
         module.upgrade_with_conn(conn)
         conn.commit()
         out = capsys.readouterr().out
-        assert (
-            "pair-row locking skipped" in out
-        ), "the SQLite dialect gate must print its skip note"
-        assert "FOR UPDATE" not in out.replace(
-            "pair-row locking skipped", ""
-        ), "no locking SQL may run on the SQLite scratch dialect"
+        skip_note = "pair-row locking skipped"
+        assert skip_note in out, "the SQLite dialect gate must print its skip note"
+        locking_output = out.replace(skip_note, "")
+        assert "FOR UPDATE" not in locking_output, "no locking SQL may run on SQLite"
         assert _usernames_present(conn) == set()
     finally:
         conn.close()
@@ -1046,16 +1045,35 @@ def test_alembic_chain_single_head_0069() -> None:
     graph: dict[str, tuple[str, ...]] = {}
     for path in sorted(versions.glob("*.py")):
         source = path.read_text(encoding="utf-8")
-        revision_match = re.search(r'^revision\s*=\s*["\']([^"\']+)["\']', source, re.M)
-        if not revision_match:
+        assignments: dict[str, object] = {}
+        syntax_tree = ast.parse(source, filename=str(path))
+        for node in syntax_tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            try:
+                value = ast.literal_eval(node.value)
+            except (ValueError, SyntaxError, TypeError):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in {
+                    "revision",
+                    "down_revision",
+                }:
+                    assignments[target.id] = value
+        revision = assignments.get("revision")
+        if not isinstance(revision, str):
             continue
-        down_match = re.search(r"^down_revision\s*=\s*(.+)$", source, re.M)
+        down_revision = assignments.get("down_revision")
         parents = (
-            tuple(re.findall(r'["\']([^"\']+)["\']', down_match.group(1)))
-            if down_match
-            else ()
+            ()
+            if down_revision is None
+            else (
+                (down_revision,)
+                if isinstance(down_revision, str)
+                else tuple(down_revision)
+            )
         )
-        graph[revision_match.group(1)] = parents
+        graph[revision] = parents
     assert module.revision == "0069_sentinel_pair_retirement"
     assert module.down_revision == "0068_direction_public_address"
     assert graph["0069_sentinel_pair_retirement"] == ("0068_direction_public_address",)
@@ -1106,8 +1124,7 @@ def retirement_pg_engine():
         pool_pre_ping=True,
         connect_args={
             "options": (
-                f"-csearch_path={schema} "
-                "-cstatement_timeout=10000 -clock_timeout=8000"
+                f"-csearch_path={schema} -cstatement_timeout=10000 -clock_timeout=8000"
             )
         },
     )
@@ -1561,9 +1578,9 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
             env=env,
             timeout=600,
         )
-        assert (
-            result.returncode == 0
-        ), f"alembic upgrade head failed:\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}"
+        failure_details = "\n".join((result.stdout[-2000:], result.stderr[-2000:]))
+        if result.returncode != 0:
+            raise AssertionError("alembic upgrade head failed:\n" + failure_details)
 
         head_result = subprocess.run(
             [sys.executable, "-m", "alembic", "-c", "alembic.ini", "heads"],
@@ -1596,9 +1613,7 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
                 # public-site content/media schemas;
                 # the retirement end-state (no synthetic usernames/doctors)
                 # is a head-agnostic invariant.
-                assert (
-                    version == heads[0]
-                ), f"database revision {version!r} != Alembic head {heads[0]!r}"
+                assert version == heads[0], f"revision {version!r} != head {heads[0]!r}"
 
                 usernames = {
                     row[0]
@@ -1983,7 +1998,7 @@ def test_pg_allowlist_does_not_inherit_across_schemas(
         with engine.begin() as conn:
             conn.execute(
                 sa.text(
-                    f'INSERT INTO "{foreign}".login_attempts (user_id)' " VALUES (:u)"
+                    f'INSERT INTO "{foreign}".login_attempts (user_id) VALUES (:u)'
                 ),
                 {"u": pairs["general_resource"][0]},
             )
@@ -2080,7 +2095,7 @@ def test_pg_foreign_surface_on_non_pair_rows_does_not_false_abort(
             assert int(child_rows) == 1
             (linked,) = conn.execute(
                 sa.text(
-                    f'SELECT COUNT(*) FROM "{foreign}".audit_rows' " WHERE user_id = :u"
+                    f'SELECT COUNT(*) FROM "{foreign}".audit_rows WHERE user_id = :u'
                 ),
                 {"u": int(real_user_id)},
             ).fetchone()
@@ -2184,9 +2199,7 @@ def test_pg_introspection_aborts_on_fk_to_doctors_alternate_key(
             # the child row holds the synthetic DOCTOR's user_id value
             # (the alternate-key value) — invisible to an id-valued count.
             conn.execute(
-                sa.text(
-                    f'INSERT INTO "{foreign}".audit (doctor_user_id)' " VALUES (:u)"
-                ),
+                sa.text(f'INSERT INTO "{foreign}".audit (doctor_user_id) VALUES (:u)'),
                 {"u": pairs["ecg_resource"][0]},
             )
 

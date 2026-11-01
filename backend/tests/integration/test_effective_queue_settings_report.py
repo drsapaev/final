@@ -97,8 +97,7 @@ def _scratch_url(admin_url: str) -> tuple[str, str]:
     if not u.host and u.query.get("host"):
         socket_dir = u.query["host"]
         conninfo = (
-            f"postgresql://{u.username}:{u.password}@/{SCRATCH_DB}"
-            f"?host={socket_dir}"
+            f"postgresql://{u.username}:{u.password}@/{SCRATCH_DB}?host={socket_dir}"
         )
         sa_url = (
             f"postgresql+psycopg://{u.username}:{u.password}@/{SCRATCH_DB}"
@@ -550,7 +549,7 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    assert revision == "0087_booking_notification_outbox"
+    assert revision == "0089_merge_booking_refund_heads"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",
