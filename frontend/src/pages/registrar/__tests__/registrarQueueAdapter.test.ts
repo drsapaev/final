@@ -294,6 +294,25 @@ describe('adaptQueueEntry (PR-UI-13-1)', () => {
     expect(row.queue_number).toBe(42);
   });
 
+  it('REG-FE-022: null number/queue_position (no allocated ticket) maps to the 0 no-ticket sentinel', () => {
+    // The backend today read model (issue 3822) now returns null number and
+    // queue_position for rows without a proven queue allocation instead of
+    // fabricating a list ordinal. The adapter must map that to the
+    // established 0 sentinel — the registrar EAT opt-in (PR #3821) renders
+    // 0/blank as «—», never as a fake ticket.
+    const row = adaptQueueEntry(
+      { id: 17, queue_position: null, number: null },
+      baseQueue,
+      baseData,
+      '2026-08-29',
+      FALLBACK,
+    ) as Record<string, unknown>;
+    expect(row.queue_number).toBe(0);
+    expect(row.queue_numbers).toEqual([
+      expect.objectContaining({ number: 0, queue_tag: 'cardio' }),
+    ]);
+  });
+
   it('date fields fall back to data.date then dateParam', () => {
     const rowA = adaptQueueEntry({ id: 16 }, baseQueue, { date: '2026-08-29' }, '2026-08-30', FALLBACK) as Record<string, unknown>;
     expect(rowA.date).toBe('2026-08-29');
