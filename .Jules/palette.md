@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-11-01 - [Custom Tooltips for Dismiss/Close Buttons]
+ **Learning:** [Accessibility & Polish] Native `title` attributes on close and dismiss buttons create redundant screen reader announcements alongside `aria-label` and do not match the visual language of the design system. Furthermore, icon-only dismiss buttons in alerts completely lack visual tooltips if `title` is missing.
+ **Action:** Always wrap icon-only dismiss/close buttons (like in Alerts and Modals) in the custom `<Tooltip>` component and ensure the button itself has an `aria-label`. Do not use native `title` attributes on these elements.
