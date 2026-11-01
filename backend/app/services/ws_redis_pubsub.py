@@ -29,10 +29,7 @@ class RedisPubSubBridge:
     ) -> None:
         self.channel_prefix = channel_prefix
         self.redis_url = (
-            redis_url
-            or os.getenv("WS_REDIS_URL")
-            or os.getenv("REDIS_URL")
-            or ""
+            redis_url or os.getenv("WS_REDIS_URL") or os.getenv("REDIS_URL") or ""
         )
         self.instance_id = instance_id or os.getenv("WS_INSTANCE_ID") or uuid4().hex
         self.enabled = bool(self.redis_url)
@@ -58,17 +55,84 @@ class RedisPubSubBridge:
             "payload": payload,
         }
         channel = self._channel(logical_channel)
-        await self._redis_client.publish(channel, json.dumps(envelope, ensure_ascii=False))
+        await self._redis_client.publish(
+            channel, json.dumps(envelope, ensure_ascii=False)
+        )
         return True
 
+    async def publish_ephemeral(self, logical_channel: str, payload: dict) -> bool:
+        """Publish from short-lived event loops without creating a listener.
+
+        ARQ outbox batches run inside ``asyncio.run`` on a worker thread. The
+        regular ``publish`` path initializes a pub/sub listener tied to that
+        temporary loop, so this one-shot publisher owns and closes its Redis
+        client before the loop exits.
+        """
+        if not self.enabled:
+            return False
+
+        client = None
+        try:
+            if self._redis_mod is None:
+                import redis.asyncio as redis_asyncio
+
+                self._redis_mod = redis_asyncio
+
+            client = self._redis_mod.from_url(
+                self.redis_url,
+                socket_connect_timeout=1.0,
+                socket_timeout=1.0,
+            )
+            envelope = {
+                "source": self.instance_id,
+                "payload": payload,
+            }
+            await client.publish(
+                self._channel(logical_channel),
+                json.dumps(envelope, ensure_ascii=False),
+            )
+            return True
+        except Exception as exc:
+            if not self._warned_unavailable:
+                logger.warning(
+                    "Redis pub/sub publish unavailable: %s", type(exc).__name__
+                )
+                self._warned_unavailable = True
+            return False
+        finally:
+            if client is not None:
+                try:
+                    await client.aclose()
+                except Exception as exc:
+                    logger.warning(
+                        "Redis pub/sub publisher close failed: %s",
+                        type(exc).__name__,
+                    )
+
     async def subscribe(self, logical_channel: str, handler: Handler) -> None:
-        self._handlers[logical_channel].add(handler)
+        handlers = self._handlers[logical_channel]
+        was_added = handler not in handlers
+        handlers.add(handler)
         if not await self._ensure_ready():
             return
 
         assert self._pubsub is not None
-        if len(self._handlers[logical_channel]) == 1:
-            await self._pubsub.subscribe(self._channel(logical_channel))
+        if was_added and len(handlers) == 1:
+            try:
+                await self._pubsub.subscribe(self._channel(logical_channel))
+            except Exception as exc:
+                handlers.discard(handler)
+                if not handlers:
+                    self._handlers.pop(logical_channel, None)
+                logger.warning(
+                    "Redis pub/sub subscription failed: %s", type(exc).__name__
+                )
+            else:
+                # redis-py's listen() iterator exits immediately when the
+                # PubSub has no channels. Start it only after the first
+                # subscription is active, and restart it after an idle period.
+                if self._listener_task is None or self._listener_task.done():
+                    self._listener_task = asyncio.create_task(self._listen_loop())
 
     async def unsubscribe(self, logical_channel: str, handler: Handler) -> None:
         handlers = self._handlers.get(logical_channel)
@@ -100,7 +164,6 @@ class RedisPubSubBridge:
 
                 self._redis_client = self._redis_mod.from_url(self.redis_url)
                 self._pubsub = self._redis_client.pubsub()
-                self._listener_task = asyncio.create_task(self._listen_loop())
                 logger.info(
                     "Redis pub/sub bridge enabled: prefix=%s instance=%s",
                     self.channel_prefix,
@@ -126,8 +189,14 @@ class RedisPubSubBridge:
                 if not raw_channel or raw_data is None:
                     continue
 
-                channel = raw_channel.decode() if isinstance(raw_channel, bytes) else str(raw_channel)
-                data = raw_data.decode() if isinstance(raw_data, bytes) else str(raw_data)
+                channel = (
+                    raw_channel.decode()
+                    if isinstance(raw_channel, bytes)
+                    else str(raw_channel)
+                )
+                data = (
+                    raw_data.decode() if isinstance(raw_data, bytes) else str(raw_data)
+                )
 
                 if not channel.startswith(f"{self.channel_prefix}:"):
                     continue
