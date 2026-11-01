@@ -20,11 +20,12 @@ Pins here mirror the N-3 (test_nurse_retirement.py) and M-2
 - the migration logic: strict exactly-2 precondition, idempotent
   already-migrated pass, abort-with-no-changes on drifted state,
   unrelated 'Nurse' rows never touched, lab_resource untouched;
-- the alembic chain stays single-headed with 0056 as the new head.
+- the revision links stay intact and the repository graph stays single-headed.
 """
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import importlib.util
 import re
@@ -519,16 +520,35 @@ def _revision_graph() -> dict[str, tuple[str, ...]]:
     graph: dict[str, tuple[str, ...]] = {}
     for path in sorted(versions_dir.glob("*.py")):
         source = path.read_text(encoding="utf-8")
-        revision_match = re.search(r'^revision\s*=\s*["\']([^"\']+)["\']', source, re.M)
-        if not revision_match:
+        assignments: dict[str, object] = {}
+        syntax_tree = ast.parse(source, filename=str(path))
+        for node in syntax_tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            try:
+                value = ast.literal_eval(node.value)
+            except (ValueError, SyntaxError, TypeError):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in {
+                    "revision",
+                    "down_revision",
+                }:
+                    assignments[target.id] = value
+        revision = assignments.get("revision")
+        if not isinstance(revision, str):
             continue
-        down_match = re.search(r"^down_revision\s*=\s*(.+)$", source, re.M)
+        down_revision = assignments.get("down_revision")
         parents = (
-            tuple(re.findall(r'["\']([^"\']+)["\']', down_match.group(1)))
-            if down_match
-            else ()
+            ()
+            if down_revision is None
+            else (
+                (down_revision,)
+                if isinstance(down_revision, str)
+                else tuple(down_revision)
+            )
         )
-        graph[revision_match.group(1)] = parents
+        graph[revision] = parents
     return graph
 
 

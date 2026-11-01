@@ -159,7 +159,11 @@ from .payment import Payment
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from .payment_webhook import PaymentProvider, PaymentTransaction, PaymentWebhook
 from .print_config import PrinterConfig, PrintJob, PrintTemplate
-from .public_booking_request import PublicBookingRequest, PublicBookingRequestEvent
+from .public_booking_request import (
+    PublicBookingRequest,
+    PublicBookingRequestEvent,
+    PublicBookingRequestNotificationOutbox,
+)
 from .public_site_media import PublicSiteMedia
 from .push_device import PushDevice  # noqa: F401  # PR-6: registry re-export
 from .queue_direction_public_address import (  # noqa: F401  # RQ-16.c: public-address registry re-export
@@ -345,6 +349,7 @@ __all__ = [
     "PaymentInvoiceVisit",
     "PublicBookingRequest",
     "PublicBookingRequestEvent",
+    "PublicBookingRequestNotificationOutbox",
     "PublicSiteMedia",
     "Department",
     "DepartmentService",

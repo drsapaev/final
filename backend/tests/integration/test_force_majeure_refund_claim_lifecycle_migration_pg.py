@@ -37,6 +37,7 @@ gate_d-модуле сериализации; ЭТОТ модуль доказы
 пруфа: свежая scratch-база, alembic-сабпроцессы, skip без одноразового
 PostgreSQL (в CI backend-tests job его предоставляет сервис-контейнер).
 """
+
 from __future__ import annotations
 
 import os
@@ -228,16 +229,15 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
         # render_as_string(hide_password=False): plain str(URL) masks the
         # password as *** (SQLAlchemy 2.0) and the alembic subprocess would
         # authenticate with literal asterisks (the sentinel full-chain lesson).
-        sa_url = (
-            u.set(drivername="postgresql+psycopg", database=scratch_db)
-            .render_as_string(hide_password=False)
-        )
+        sa_url = u.set(
+            drivername="postgresql+psycopg", database=scratch_db
+        ).render_as_string(hide_password=False)
 
         # ---- 1) мир ДО 0087/0088 --------------------------------------
         result = _alembic(sa_url, "upgrade", "0086_public_booking_confirm")
-        assert result.returncode == 0, (
-            f"alembic upgrade 0086 failed:\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}"
-        )
+        failure_details = "\n".join((result.stdout[-2000:], result.stderr[-2000:]))
+        if result.returncode != 0:
+            raise AssertionError("alembic upgrade 0086 failed:\n" + failure_details)
 
         engine = sa.create_engine(sa_url, future=True)
         try:
@@ -319,9 +319,9 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
 
         # ---- 2) прогоняем amended 0087 + 0088 --------------------------
         result = _alembic(sa_url, "upgrade", "head")
-        assert result.returncode == 0, (
-            f"alembic upgrade head failed:\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}"
-        )
+        failure_details = "\n".join((result.stdout[-2000:], result.stderr[-2000:]))
+        if result.returncode != 0:
+            raise AssertionError("alembic upgrade head failed:\n" + failure_details)
 
         engine = sa.create_engine(sa_url, future=True)
         try:
@@ -329,7 +329,7 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
                 version = conn.execute(
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
-                assert version == "0088_fm_refund_claim", version
+                assert version == "0089_merge_booking_refund_heads", version
 
                 def _claims(payment_id: int) -> list[tuple]:
                     return conn.execute(

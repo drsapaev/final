@@ -35,7 +35,12 @@ import { confirmActivation, requestActivationOtp } from '../../api/patientAccess
 import { replaceAccessOnlySession } from '../../stores/auth';
 import { takePatientActivationFragmentToken } from '../../utils/patientActivateDeepLink';
 import { getRouteForProfile } from '../../constants/routes';
-import { getPendingPublicBookingLocale, getPublicBookingPath } from '../../api/publicBooking';
+import {
+  getPendingPublicBookingLocale,
+  getPublicBookingPath,
+  getPublicBookingResubmitHandoffLocale,
+  hasPublicBookingResubmitHandoff,
+} from '../../api/publicBooking';
 import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
 import type { HttpApiError } from '../../types/errors';
@@ -177,12 +182,22 @@ const PatientActivatePage = () => {
       });
 
       const user = session.user as unknown as Record<string, unknown>;
+      const hasResubmitHandoff = hasPublicBookingResubmitHandoff(location.state);
+      const handoffLocale = getPublicBookingResubmitHandoffLocale(location.state);
       const pendingBookingLocale = getPendingPublicBookingLocale();
+      const fallbackLocale = language === 'uz' || language === 'uz-Latn' || language === 'uz-Cyrl'
+        ? 'uz-Latn'
+        : 'ru';
+      const bookingLocale = handoffLocale ?? pendingBookingLocale
+        ?? (hasResubmitHandoff ? fallbackLocale : null);
       const isPatient = String(user.role ?? '').toLowerCase() === 'patient';
-      const target = pendingBookingLocale && isPatient
-        ? getPublicBookingPath(pendingBookingLocale)
+      const target = bookingLocale && isPatient
+        ? getPublicBookingPath(bookingLocale)
         : getRouteForProfile(user);
-      navigate(target, { replace: true });
+      navigate(target, {
+        replace: true,
+        ...(bookingLocale && isPatient && hasResubmitHandoff ? { state: location.state } : {}),
+      });
     } catch (err) {
       logger.warn('[PatientActivate] confirm failed:', err);
       setError(normalizeError(err));

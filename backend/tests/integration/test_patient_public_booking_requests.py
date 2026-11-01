@@ -2,29 +2,44 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
 from datetime import UTC, datetime, time, timedelta
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi import Request, Response
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+import app.api.v1.endpoints.patient_portal as patient_portal
 from app.models.appointment import Appointment
 from app.models.clinic import ClinicSettings, Doctor, Schedule
 from app.models.department import Department
+from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.patient import Patient
 from app.models.patient_access_audit import PatientAccessAuditLog
 from app.models.public_booking_request import (
     PublicBookingRequest,
     PublicBookingRequestEvent,
+    PublicBookingRequestNotificationOutbox,
 )
 from app.models.service import Service
 from app.models.user import User
+from app.schemas.public_booking_request import (
+    PublicBookingRequestCreate,
+    PublicBookingRequestResubmit,
+)
 from app.services.public_booking_availability import PUBLIC_BOOKING_TIMEZONE
+from app.services.public_booking_request_notification_outbox import (
+    PublicBookingRequestNotificationOutboxService,
+)
 from app.services.public_booking_request_service import (
     PublicBookingRequestError,
     PublicBookingRequestService,
 )
+from app.services.registrar_notification_service import RegistrarNotificationService
 from tests.conftest import mint_access_token
 
 PATIENT_REQUESTS = "/api/v1/patients/booking-requests"
@@ -172,9 +187,109 @@ def _confirm_request(
     )
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["create", "resubmit"])
+async def test_booking_request_database_work_does_not_block_event_loop(
+    operation: str, monkeypatch: pytest.MonkeyPatch
+):
+    request_id = uuid4()
+    operation_started = threading.Event()
+    release_operation = threading.Event()
+
+    def blocking_write(*args, **kwargs):
+        operation_started.set()
+        if not release_operation.wait(timeout=1):
+            raise AssertionError("the booking database call blocked the event loop")
+        return SimpleNamespace(id=request_id, version=2)
+
+    monkeypatch.setattr(
+        patient_portal, "_require_patient_audited", lambda *args, **kwargs: 321
+    )
+    monkeypatch.setattr(patient_portal, "log_patient_access", lambda **kwargs: None)
+    monkeypatch.setattr(
+        PublicBookingRequestService, "create_for_patient", blocking_write
+    )
+    monkeypatch.setattr(
+        PublicBookingRequestService, "resubmit_for_patient", blocking_write
+    )
+
+    path = (
+        f"{PATIENT_REQUESTS}/{request_id}/resubmit"
+        if operation == "resubmit"
+        else PATIENT_REQUESTS
+    )
+    request = Request(
+        {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": path,
+            "raw_path": path.encode("ascii"),
+            "query_string": b"",
+            "headers": [],
+            "server": ("testserver", 80),
+            "client": ("testclient", 123),
+        }
+    )
+    response = Response()
+    current_user = SimpleNamespace(id=12)
+    target_date = datetime.now(PUBLIC_BOOKING_TIMEZONE).date() + timedelta(days=2)
+
+    async def release_after_event_loop_yields() -> bool:
+        assert await asyncio.to_thread(operation_started.wait, 1)
+        await asyncio.sleep(0.01)
+        event_loop_remained_responsive = not release_operation.is_set()
+        release_operation.set()
+        return event_loop_remained_responsive
+
+    release_task = asyncio.create_task(release_after_event_loop_yields())
+    if operation == "create":
+        result = await asyncio.wait_for(
+            patient_portal.create_patient_public_booking_request(
+                PublicBookingRequestCreate(
+                    service_slug="service",
+                    doctor_slug="doctor",
+                    appointment_date=target_date,
+                    appointment_time=time(9),
+                    expected_settings_version=1,
+                ),
+                request,
+                response,
+                "event-loop-test-key",
+                object(),
+                current_user,
+            ),
+            timeout=2,
+        )
+    else:
+        result = await asyncio.wait_for(
+            patient_portal.resubmit_patient_public_booking_request(
+                request_id,
+                PublicBookingRequestResubmit(
+                    expected_version=1,
+                    appointment_date=target_date,
+                    appointment_time=time(9),
+                    expected_settings_version=1,
+                ),
+                request,
+                response,
+                "event-loop-test-key",
+                object(),
+                current_user,
+            ),
+            timeout=2,
+        )
+
+    assert await release_task
+    assert result.id == request_id
+
+
 @pytest.mark.integration
-def test_patient_submission_is_idempotent_and_never_creates_appointment(
-    client: TestClient, db_session: Session, public_booking_case
+@pytest.mark.asyncio
+async def test_patient_submission_is_idempotent_and_never_creates_appointment(
+    client: TestClient, db_session: Session, public_booking_case, registrar_user
 ):
     case = public_booking_case
     idempotency_key = uuid4().hex
@@ -195,7 +310,51 @@ def test_patient_submission_is_idempotent_and_never_creates_appointment(
     assert "patient_id" not in first.json()
     assert db_session.query(PublicBookingRequest).count() == 1
     assert db_session.query(PublicBookingRequestEvent).count() == 1
+    outbox_item = (
+        db_session.query(PublicBookingRequestNotificationOutbox)
+        .filter(
+            PublicBookingRequestNotificationOutbox.request_id
+            == UUID(first.json()["id"])
+        )
+        .one()
+    )
+    assert outbox_item.event_type == "public_booking_request_submitted"
+    assert outbox_item.request_version == 1
+    assert outbox_item.attempt_count == 0
+    assert outbox_item.completed_at is None
     assert db_session.query(Appointment).count() == 0
+    assert db_session.query(NotificationEvent).count() == 0
+
+    # Delivery is decoupled from the patient's response and handled by the
+    # scheduled outbox worker.
+    delivery_result = await PublicBookingRequestNotificationOutboxService(
+        db_session
+    ).process_due_batch()
+    assert delivery_result == {"claimed": 1, "delivered": 1, "deferred": 0}
+    db_session.refresh(outbox_item)
+    assert outbox_item.attempt_count == 1
+    assert outbox_item.completed_at is not None
+    notification = (
+        db_session.query(NotificationEvent)
+        .filter(
+            NotificationEvent.event_type == "public_booking_request_submitted",
+            NotificationEvent.entity_id == first.json()["id"],
+        )
+        .one()
+    )
+    delivery = (
+        db_session.query(NotificationDelivery)
+        .filter(NotificationDelivery.event_id == notification.id)
+        .one()
+    )
+    assert delivery.recipient_id == registrar_user.id
+    assert notification.entity_type == "public_booking_request"
+    assert notification.deep_link == "/registrar/booking-requests"
+    assert "Синтетический пациент" not in notification.message
+    assert notification.payload_snapshot["metadata"] == {
+        "request_id": first.json()["id"],
+        "request_version": 1,
+    }
 
     # Exercise the persisted idempotency record directly as well: the HTTP
     # middleware may short-circuit a retry while its response cache is warm.
@@ -252,6 +411,206 @@ def test_patient_submission_is_idempotent_and_never_creates_appointment(
 
 
 @pytest.mark.integration
+@pytest.mark.asyncio
+async def test_booking_notification_outbox_retries_without_duplicate_delivery(
+    client: TestClient,
+    db_session: Session,
+    public_booking_case,
+    registrar_user,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    case = public_booking_case
+    original_notify = RegistrarNotificationService.notify_public_booking_request
+    attempts = 0
+
+    async def fail_once_then_deliver(self, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return False
+        return await original_notify(self, **kwargs)
+
+    monkeypatch.setattr(
+        RegistrarNotificationService,
+        "notify_public_booking_request",
+        fail_once_then_deliver,
+    )
+
+    response = client.post(
+        PATIENT_REQUESTS,
+        headers={
+            **case["patient_headers"],
+            "Idempotency-Key": uuid4().hex,
+        },
+        json=_create_body(case),
+    )
+
+    assert response.status_code == 201, response.text
+    request_id = UUID(response.json()["id"])
+    outbox_item = (
+        db_session.query(PublicBookingRequestNotificationOutbox)
+        .filter(PublicBookingRequestNotificationOutbox.request_id == request_id)
+        .one()
+    )
+    assert outbox_item.attempt_count == 0
+    assert outbox_item.completed_at is None
+    assert outbox_item.last_error_code is None
+    assert attempts == 0
+
+    first_result = await PublicBookingRequestNotificationOutboxService(
+        db_session
+    ).process_due_batch()
+    assert first_result == {"claimed": 1, "delivered": 0, "deferred": 1}
+    db_session.refresh(outbox_item)
+    assert outbox_item.attempt_count == 1
+    assert outbox_item.last_error_code == "delivery_not_recorded"
+    assert (
+        db_session.query(NotificationEvent)
+        .filter(NotificationEvent.entity_id == str(request_id))
+        .count()
+        == 0
+    )
+
+    outbox_item.next_attempt_at = datetime.now(UTC) - timedelta(seconds=1)
+    db_session.commit()
+
+    retry_result = await PublicBookingRequestNotificationOutboxService(
+        db_session
+    ).process_due_batch()
+
+    assert retry_result == {"claimed": 1, "delivered": 1, "deferred": 0}
+    db_session.refresh(outbox_item)
+    assert outbox_item.attempt_count == 2
+    assert outbox_item.completed_at is not None
+    assert outbox_item.last_error_code is None
+    assert attempts == 2
+
+    repeated_result = await PublicBookingRequestNotificationOutboxService(
+        db_session
+    ).process_due_batch()
+    assert repeated_result == {"claimed": 0, "delivered": 0, "deferred": 0}
+    notification = (
+        db_session.query(NotificationEvent)
+        .filter(
+            NotificationEvent.event_type == "public_booking_request_submitted",
+            NotificationEvent.entity_id == str(request_id),
+        )
+        .one()
+    )
+    deliveries = (
+        db_session.query(NotificationDelivery)
+        .filter(NotificationDelivery.event_id == notification.id)
+        .all()
+    )
+    assert [delivery.recipient_id for delivery in deliveries] == [registrar_user.id]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_booking_notification_outbox_recovers_after_inbox_commit_before_ack(
+    client: TestClient,
+    db_session: Session,
+    public_booking_case,
+    registrar_user,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    case = public_booking_case
+    original_mark_completed = (
+        PublicBookingRequestNotificationOutboxService._mark_completed
+    )
+    acknowledgements = 0
+
+    def fail_first_ack(self, outbox_id: int):
+        nonlocal acknowledgements
+        acknowledgements += 1
+        if acknowledgements == 1:
+            raise RuntimeError("synthetic acknowledgement outage")
+        original_mark_completed(self, outbox_id)
+
+    monkeypatch.setattr(
+        PublicBookingRequestNotificationOutboxService,
+        "_mark_completed",
+        fail_first_ack,
+    )
+
+    response = client.post(
+        PATIENT_REQUESTS,
+        headers={
+            **case["patient_headers"],
+            "Idempotency-Key": uuid4().hex,
+        },
+        json=_create_body(case),
+    )
+
+    assert response.status_code == 201, response.text
+    request_id = UUID(response.json()["id"])
+    outbox_item = (
+        db_session.query(PublicBookingRequestNotificationOutbox)
+        .filter(PublicBookingRequestNotificationOutbox.request_id == request_id)
+        .one()
+    )
+    assert outbox_item.attempt_count == 0
+    assert outbox_item.completed_at is None
+    assert db_session.query(NotificationEvent).count() == 0
+    first_result = await PublicBookingRequestNotificationOutboxService(
+        db_session
+    ).process_due_batch()
+    assert first_result == {"claimed": 1, "delivered": 0, "deferred": 1}
+    db_session.refresh(outbox_item)
+    assert outbox_item.attempt_count == 1
+    assert outbox_item.completed_at is None
+    assert outbox_item.lease_expires_at is not None
+    assert (
+        db_session.query(NotificationEvent)
+        .filter(
+            NotificationEvent.event_type == "public_booking_request_submitted",
+            NotificationEvent.entity_id == str(request_id),
+        )
+        .count()
+        == 1
+    )
+    assert (
+        db_session.query(NotificationDelivery)
+        .join(NotificationEvent)
+        .filter(NotificationEvent.entity_id == str(request_id))
+        .count()
+        == 1
+    )
+
+    # Model a worker restart after the canonical inbox transaction committed
+    # but before the outbox acknowledgment could be persisted.
+    outbox_item.next_attempt_at = datetime.now(UTC) - timedelta(seconds=1)
+    outbox_item.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    db_session.commit()
+
+    retry_result = await PublicBookingRequestNotificationOutboxService(
+        db_session
+    ).process_due_batch()
+
+    assert retry_result == {"claimed": 1, "delivered": 1, "deferred": 0}
+    db_session.refresh(outbox_item)
+    assert outbox_item.attempt_count == 2
+    assert outbox_item.completed_at is not None
+    assert acknowledgements == 2
+    assert (
+        db_session.query(NotificationEvent)
+        .filter(
+            NotificationEvent.event_type == "public_booking_request_submitted",
+            NotificationEvent.entity_id == str(request_id),
+        )
+        .count()
+        == 1
+    )
+    assert (
+        db_session.query(NotificationDelivery)
+        .join(NotificationEvent)
+        .filter(NotificationEvent.entity_id == str(request_id))
+        .count()
+        == 1
+    )
+
+
+@pytest.mark.integration
 def test_patient_request_creation_is_limited_per_patient(
     client: TestClient, db_session: Session, public_booking_case
 ):
@@ -289,7 +648,8 @@ def test_patient_request_creation_is_limited_per_patient(
 
 
 @pytest.mark.integration
-def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
+@pytest.mark.asyncio
+async def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
     client: TestClient, db_session: Session, public_booking_case, registrar_user
 ):
     case = public_booking_case
@@ -404,6 +764,51 @@ def test_staff_can_ask_for_new_time_and_patient_resubmits_same_request(
     ]
     assert db_session.query(PublicBookingRequest).count() == 2
     assert db_session.query(Appointment).count() == 1
+    notification_result = await PublicBookingRequestNotificationOutboxService(
+        db_session
+    ).process_due_batch()
+    assert notification_result == {"claimed": 3, "delivered": 3, "deferred": 0}
+    request_notifications = (
+        db_session.query(NotificationEvent)
+        .filter(NotificationEvent.entity_id == request_id)
+        .order_by(NotificationEvent.id)
+        .all()
+    )
+    assert [event.event_type for event in request_notifications] == [
+        "public_booking_request_submitted",
+        "public_booking_request_resubmitted",
+    ]
+    assert all(
+        event.entity_type == "public_booking_request"
+        and event.deep_link == "/registrar/booking-requests"
+        and "Синтетический пациент" not in event.message
+        for event in request_notifications
+    )
+    request_notification_deliveries = (
+        db_session.query(NotificationDelivery)
+        .filter(
+            NotificationDelivery.event_id.in_(
+                [event.id for event in request_notifications]
+            )
+        )
+        .all()
+    )
+    assert {delivery.recipient_id for delivery in request_notification_deliveries} == {
+        registrar_user.id
+    }
+    assert len(request_notification_deliveries) == 2
+    request_outbox = (
+        db_session.query(PublicBookingRequestNotificationOutbox)
+        .filter(PublicBookingRequestNotificationOutbox.request_id == UUID(request_id))
+        .order_by(PublicBookingRequestNotificationOutbox.request_version)
+        .all()
+    )
+    assert [item.event_type for item in request_outbox] == [
+        "public_booking_request_submitted",
+        "public_booking_request_resubmitted",
+    ]
+    assert [item.request_version for item in request_outbox] == [1, 3]
+    assert all(item.completed_at is not None for item in request_outbox)
 
     rejected = client.post(
         f"{STAFF_REQUESTS}/{request_id}/reject",

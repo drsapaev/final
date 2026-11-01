@@ -26,6 +26,7 @@ migration 0063_queue_resource_contract writes into the schema:
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import io
 import re
@@ -91,8 +92,7 @@ def _make_resource(db_session: Session, *, code: str, queue_tag: str) -> QueueRe
 def _raw_owners(db_session: Session, queue_id: int) -> tuple[int | None, int | None]:
     row = db_session.execute(
         sa.text(
-            "SELECT specialist_id, queue_resource_id FROM daily_queues"
-            " WHERE id = :qid"
+            "SELECT specialist_id, queue_resource_id FROM daily_queues WHERE id = :qid"
         ),
         {"qid": queue_id},
     ).fetchone()
@@ -771,16 +771,35 @@ def test_alembic_chain_single_head_0063() -> None:
     graph: dict[str, tuple[str, ...]] = {}
     for path in sorted((BACKEND_ROOT / "alembic" / "versions").glob("*.py")):
         source = path.read_text(encoding="utf-8")
-        revision_match = re.search(r'^revision\s*=\s*["\']([^"\']+)["\']', source, re.M)
-        if not revision_match:
+        assignments: dict[str, object] = {}
+        syntax_tree = ast.parse(source, filename=str(path))
+        for node in syntax_tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            try:
+                value = ast.literal_eval(node.value)
+            except (ValueError, SyntaxError, TypeError):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in {
+                    "revision",
+                    "down_revision",
+                }:
+                    assignments[target.id] = value
+        revision = assignments.get("revision")
+        if not isinstance(revision, str):
             continue
-        down_match = re.search(r"^down_revision\s*=\s*(.+)$", source, re.M)
+        down_revision = assignments.get("down_revision")
         parents = (
-            tuple(re.findall(r'["\']([^"\']+)["\']', down_match.group(1)))
-            if down_match
-            else ()
+            ()
+            if down_revision is None
+            else (
+                (down_revision,)
+                if isinstance(down_revision, str)
+                else tuple(down_revision)
+            )
         )
-        graph[revision_match.group(1)] = parents
+        graph[revision] = parents
 
     assert graph["0063_queue_resource_contract"] == ("0062_telegram_webhook_dedup",)
     # PR-6: the chain head moved to 0064 (push_devices registry — the
