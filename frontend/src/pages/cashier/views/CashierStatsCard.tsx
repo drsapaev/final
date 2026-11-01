@@ -60,6 +60,25 @@ const CashierStatsCard = ({ isHistoryTab, stats, onRefresh, onExport, onHourlySt
                   {tI18n('cashier.method_card')}
                 </div>
               </div>
+              {/* CSH-FE-036 (PR 3813 follow-up): обе финансовые величины —
+                  возвраты и поступления за вычетом возвратов — рядом с
+                  валовыми; смысл существующих плиток не меняется молча. */}
+              <div className="cashier-text-center">
+                <div className="cashier-stat-num cashier-stat-danger">
+                  {format(stats.refunded_amount || 0)}
+                </div>
+                <div className="cashier-stat-cap">
+                  {tI18n('cashier.refunded_total')}
+                </div>
+              </div>
+              <div className="cashier-text-center">
+                <div className="cashier-stat-num cashier-stat-green">
+                  {format(stats.net_total_amount || 0)}
+                </div>
+                <div className="cashier-stat-cap">
+                  {tI18n('cashier.net_total')}
+                </div>
+              </div>
               <div className="cashier-text-center">
                 <div className="cashier-stat-num cashier-stat-purple">
                   {stats.paid_count}

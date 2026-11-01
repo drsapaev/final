@@ -42,6 +42,13 @@ async def get_cashier_stats(
 ):
     """
     Получить агрегированную статистику платежей за период.
+
+    CSH-FE-036 (#3813 follow-up): контракт фиксирован — ОБЕ финансовые
+    величины. ``total_amount``/``cash_amount``/``card_amount`` — валовые
+    поступления (исходные суммы ``paid``/``completed`` без вычета возвратов;
+    значение существующих полей не меняется молча).
+    ``refunded_amount``/``net_*`` — поступления за вычетом возвратов.
+    ``pending_amount`` с CSH-FE-028 (#3814) считается за вычетом возвратов.
     """
     try:
         query = db.query(Payment)
@@ -56,6 +63,9 @@ async def get_cashier_stats(
         total_amount = Decimal("0")
         cash_amount = Decimal("0")
         card_amount = Decimal("0")
+        refunded_amount = Decimal("0")
+        refunded_cash_amount = Decimal("0")
+        refunded_card_amount = Decimal("0")
         pending_amount = Decimal("0")
         paid_count = 0
         cancelled_count = 0
@@ -65,10 +75,23 @@ async def get_cashier_stats(
             if p.status in ["paid", "completed"]:
                 total_amount += p.amount
                 paid_count += 1
+                # CSH-FE-036: partial refunds keep the payment inside the
+                # gross set (status stays paid/completed, refunded_amount
+                # grows). A FULL refund flips the status to 'refunded' —
+                # such a payment has already left this set and never entered
+                # the gross sums, so it is not counted here either.
+                p_refunded = (
+                    Decimal(str(p.refunded_amount or 0))
+                    if getattr(p, "refunded_amount", None) is not None
+                    else Decimal("0")
+                )
+                refunded_amount += p_refunded
                 if hasattr(p, 'method') and p.method == "cash":
                     cash_amount += p.amount
+                    refunded_cash_amount += p_refunded
                 elif hasattr(p, 'method') and p.method == "card":
                     card_amount += p.amount
+                    refunded_card_amount += p_refunded
             elif p.status in ["cancelled", "refunded"]:
                 cancelled_count += 1
 
@@ -114,6 +137,10 @@ async def get_cashier_stats(
             total_amount=total_amount,
             cash_amount=cash_amount,
             card_amount=card_amount,
+            refunded_amount=refunded_amount,
+            net_total_amount=total_amount - refunded_amount,
+            net_cash_amount=cash_amount - refunded_cash_amount,
+            net_card_amount=card_amount - refunded_card_amount,
             pending_count=pending_count,
             pending_amount=pending_amount,
             paid_count=paid_count,

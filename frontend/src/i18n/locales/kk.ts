@@ -746,6 +746,8 @@ const kk = {
     tab_history: 'Тарих',
     tab_pending: 'Күтуде',
     total_period: 'Кезең бойынша жалпы',
+    refunded_total: 'Қайтарулар',
+    net_total: 'Қайтаруларды шегергендегі',
   },
   cardio: {
     cancel_appointment_title: 'Отменить запись?',

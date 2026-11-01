@@ -153,8 +153,11 @@ describe('useCashierWorklistData (PR-UI-14-1)', () => {
     const { result } = renderWorklist(api);
 
     await waitFor(() => {
+      // CSH-FE-036 (#3813 follow-up): the empty snapshot includes the
+      // net-of-refunds fields (refunded_amount + net_* stay gross-neutral).
       expect(result.current.stats).toEqual({
         total_amount: 0, cash_amount: 0, card_amount: 0,
+        refunded_amount: 0, net_total_amount: 0, net_cash_amount: 0, net_card_amount: 0,
         pending_count: 0, pending_amount: 0, paid_count: 0, cancelled_count: 0,
       });
     });

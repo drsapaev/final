@@ -30,12 +30,43 @@ from app.services.payment_read_service import PaymentReadService  # noqa: F401
 logger = logging.getLogger(__name__)
 
 class CashierStatsResponse(BaseModel):
-    """Агрегированная статистика для кассира"""
-    total_amount: Decimal
-    cash_amount: Decimal
-    card_amount: Decimal
+    """Агрегированная статистика для кассира.
+
+    CSH-FE-036 (#3813 follow-up, 2026-11-02) — контракт сумм зафиксирован:
+    ``total_amount``/``cash_amount``/``card_amount`` остаются ВАЛОВЫМИ
+    поступлениями (исходные суммы платежей ``paid``/``completed`` без вычета
+    возвратов; полностью возвращённые платежи покидают набор при переходе
+    статуса в ``refunded`` и в валовые суммы не входят). Значение существующих
+    полей НЕ меняется молча: интерфейс и отчётность продолжают читать те же
+    величины. Дополнительно экспонируются поступления за вычетом возвратов
+    (``refunded_amount`` + ``net_*``); ``pending_amount`` с CSH-FE-028
+    (#3814) также считается за вычетом возвратов.
+    """
+    total_amount: Decimal = Field(
+        ..., description="Валовые поступления: исходные суммы paid/completed, БЕЗ вычета возвратов"
+    )
+    cash_amount: Decimal = Field(
+        ..., description="Валовые поступления наличными (gross, без вычета возвратов)"
+    )
+    card_amount: Decimal = Field(
+        ..., description="Валовые поступления картой (gross, без вычета возвратов)"
+    )
+    refunded_amount: Decimal = Field(
+        ..., description="Сумма возвратов по платежам, входящим в gross (частичные возвраты при статусе paid/completed)"
+    )
+    net_total_amount: Decimal = Field(
+        ..., description="Поступления за вычетом возвратов: total_amount − refunded_amount"
+    )
+    net_cash_amount: Decimal = Field(
+        ..., description="Наличные за вычетом возвратов"
+    )
+    net_card_amount: Decimal = Field(
+        ..., description="Карта за вычетом возвратов"
+    )
     pending_count: int
-    pending_amount: Decimal
+    pending_amount: Decimal = Field(
+        ..., description="Ожидаемая задолженность; с CSH-FE-028 (#3814) считается за вычетом возвратов"
+    )
     paid_count: int
     cancelled_count: int
 

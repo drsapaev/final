@@ -25,10 +25,17 @@ import type { Appointment } from '../../types/domain/clinic';
 import type { UsePaymentsReturn } from '../../hooks/usePayments';
 
 // ✅ УЛУЧШЕНИЕ: Статистика из API (shape moved verbatim from CashierPanel).
+// CSH-FE-036 (#3813 follow-up): BOTH financial semantics are exposed —
+// total/cash/card stay gross; refunded_amount + net_* carry the same
+// period net of refunds. pending_amount has been net since CSH-FE-028.
 export interface CashierStatsSnapshot {
   total_amount: number;
   cash_amount: number;
   card_amount: number;
+  refunded_amount: number;
+  net_total_amount: number;
+  net_cash_amount: number;
+  net_card_amount: number;
   pending_count: number;
   pending_amount: number;
   paid_count: number;
@@ -40,6 +47,10 @@ const EMPTY_STATS: CashierStatsSnapshot = {
   total_amount: 0,
   cash_amount: 0,
   card_amount: 0,
+  refunded_amount: 0,
+  net_total_amount: 0,
+  net_cash_amount: 0,
+  net_card_amount: 0,
   pending_count: 0,
   pending_amount: 0,
   paid_count: 0,
