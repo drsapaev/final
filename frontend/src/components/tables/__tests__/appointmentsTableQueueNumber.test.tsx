@@ -111,4 +111,44 @@ describe('REG-FE-056: registrar ticket column', () => {
     expect(screen.queryByText('—')).toBeNull();
   });
 
+
+  it('REG-FE-057: queue badge status belongs to the selected queue tag, not a same-number ticket from another queue', () => {
+    renderTicket({
+      id: 507,
+      date: getLocalDateString(),
+      queue_number: 7,
+      queue_tag: 'ecg',
+      queue_numbers: [
+        { number: 7, queue_tag: 'cardiology', status: 'served' },
+        { number: 7, queue_tag: 'ecg', status: 'waiting' },
+      ],
+    });
+    expect(screen.getByTitle('№7')).toHaveAttribute('data-queue-status', 'waiting');
+  });
+
+  it('REG-FE-057: ambiguous equal-number tickets do not borrow an unrelated queue status', () => {
+    renderTicket({
+      id: 508,
+      date: getLocalDateString(),
+      queue_number: 7,
+      queue_numbers: [
+        { number: 7, queue_tag: 'cardiology', status: 'served' },
+        { number: 7, queue_tag: 'ecg', status: 'waiting' },
+      ],
+    });
+    expect(screen.getByTitle('№7')).toHaveAttribute('data-queue-status', 'unknown');
+  });
+
+  it('REG-FE-057: an explicit backend-selected queue_number_status takes precedence', () => {
+    renderTicket({
+      id: 509,
+      date: getLocalDateString(),
+      queue_number: 7,
+      queue_number_status: 'called',
+      queue_tag: 'ecg',
+      queue_numbers: [{ number: 7, queue_tag: 'ecg', status: 'served' }],
+    });
+    expect(screen.getByTitle('№7')).toHaveAttribute('data-queue-status', 'called');
+  });
+
 });
