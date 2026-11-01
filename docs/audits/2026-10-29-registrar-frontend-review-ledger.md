@@ -81,6 +81,12 @@
 | REG-FE-053 | P3 | Search nested service DTOs | Search stringifies nested arrays of service objects as [object Object], excluding visible service names/codes from table search | SOURCE-OBSERVED / REPRO-PENDING | AM displayed-data search parity |
 | REG-FE-054 | P3 | Context menu keyboard access | Context menu lacks menu role, initial focus and focus management; focus stays on underlying trigger while full-screen overlay is displayed | SOURCE-OBSERVED / REPRO-PENDING | AN table context menu accessibility |
 | REG-FE-055 | P3 | DataTable row key stability | Row identity includes page-relative index; sorting/filtering/page transitions remount same record even when canonical IDs are unchanged | SOURCE-OBSERVED / REPRO-PENDING | AO table stable keys |
+| REG-FE-056 | P2 | Historical queue badge truthfulness | Historical-date rows display local #index instead of the already supplied canonical queue number | SOURCE-OBSERVED / REPRO-PENDING | AP historical ticket identity |
+| REG-FE-057 | P2 | Selected queue identity across sort/badge | Header sorts by queue_numbers[0] while badge shows row.queue_number; status lookup matches number alone (not queue identity) | SOURCE-OBSERVED / REPRO-PENDING | AQ resource-specific number/status |
+| REG-FE-058 | P3 | Service mapping rebuild per row | Service index is rebuilt from entire catalog inside every row's renderServices() rather than memoized once | SOURCE-OBSERVED / REPRO-PENDING | AR render complexity |
+| REG-FE-059 | P3 | Context menu small viewport overflow | Full action menu is absolutely positioned without max-height or overflow-y and can extend beyond landscape/mobile viewport | SOURCE-OBSERVED / REPRO-PENDING | AS responsive menu reachability |
+| REG-FE-060 | P3 | Pagination CSS alignment | CSS uses invalid justify-content: between; earlier center rule wins instead of requested space-between | SOURCE-OBSERVED / REPRO-PENDING | AT pagination presentation |
+| REG-FE-061 | P3 | Truncated 998 phone formatting | A phone with 998 prefix but too few digits is formatted as a complete Uzbekistan number with missing groups | SOURCE-OBSERVED / REPRO-PENDING | AU partial-phone display |
 
 ### REG-FE-001 — Row activation does not open details (P2 candidate)
 
@@ -687,6 +693,69 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 
 **Synthetic fail-first and safe direction:** Stable synthetic record identity across reordering and pages, check remount count and keyboard focus; separate queue-entry, visit and appointment namespaces; duplicate-ID negative test before removing index.
 
+### REG-FE-056 — Historical records discard the real queue number when date differs from today (P2 candidate)
+
+**Code evidence:** [appointmentsTableColumns.tsx L531–L546](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableColumns.tsx#L531-L546) gates the canonical queue_number/queue_numbers badge on `row.date === today || row.appointment_date === today`; [appointmentsTableColumns.tsx L743–L756](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableColumns.tsx#L743-L756) otherwise fabricates `#${data.findIndex(...)+1}` even if the record has `queue_number` and queue ID. The active registrar loader [useRegistrarWorklistData.ts L242–L249](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/useRegistrarWorklistData.ts#L242-L249) supports `target_date` for historical clinic dates and [registrarQueueAdapter.ts L104–L117](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/registrarQueueAdapter.ts#L104-L117) retains the backend number. This is different from pre-existing REG-FE-022 (inventing a queue from absent queue identity).
+
+**Risk, scope, caveats:** On a historical visit (e.g. requested date 2026-10-20), a persisted queue ticket #17 may instead appear as #1 according to list position. The displayed value cannot be used to reconcile a historic queue audit. No backend write occurs.
+
+**Fail-first test:** Synthetic row with appointment_date != getLocalDateString(), queue_number=17, queue_numbers=[{number:17,queue_tag:'cardio',status:'served'}], other rows before it: expect 17 rather than #row-index. If backend supplies no valid number, display explicit 'no queue ticket' rather than an invented ticket. Check date changes and multi-queue.
+
+### REG-FE-057 — Queue number sorting and status color can bind to a different queue than the displayed ticket (P2 candidate)
+
+**Code evidence:** [appointmentsTableContracts.ts L247–L253](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableContracts.ts#L247-L253) sorts by `queue_numbers[0].number` even when displayed `row.queue_number` is different; [appointmentsTableColumns.tsx L542–L555](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableColumns.tsx#L542-L555) prints `row.queue_number` but resolves the badge status with `queue_numbers.find(q=>q.number===row.queue_number)`, ignoring `queue_tag` and ownership, falling back to the first item's status. Backend preserves the distinct `queue_owner_id`/`daily_queue_id` and tag ([registrarQueueAdapter.ts L68–L72](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/registrarQueueAdapter.ts#L68-L72), [registrarQueueAdapter.ts L104–L118](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/pages/registrar/registrarQueueAdapter.ts#L104-L118)); queue numbers are local to a queue, not globally unique. Existing REG-FE-050 (numeric-only string sort) and REG-FE-052 (unhandled canonical status) have different root causes.
+
+**Risk, scope, caveats:** A row with displayed queue #8 and first queue_numbers item #1 sorts under #1. Two distinct resources can each assign #1 but one be served and another waiting; the badge may color the chosen queue using the unrelated first match. Requires a constructed multi-queue/selected-owner fixture to confirm active reachability.
+
+**Fail-first test:** Two resources (cardio, lab), same number 1 but statuses served/waiting; selected row is lab: assert queue identity resolves lab's status. Separate synthetic displayed queue number 8 with first array number 1; header sort must use displayed selected queue's number while preserving backend-supplied queue_time/fairness.
+
+### REG-FE-058 — Per-row service rendering repeatedly rebuilds the full catalog mapping (P3 candidate)
+
+**Code evidence:** [appointmentsTableColumns.tsx L242–L252](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableColumns.tsx#L242-L252) calls `createServiceMapping(services)` inside `renderServices`, and [appointmentsTableColumns.tsx L1000–L1025](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableColumns.tsx#L1000-L1025) invokes it once per table row. [appointmentsTableContracts.ts L160–L197](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableContracts.ts#L160-L197) iterates the full services catalog per call. Despite comment about O(1) lookups, the map itself is rebuilt O(catalog size) for each visible row on each render; [EnhancedAppointmentsTable.tsx L81–L130](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/EnhancedAppointmentsTable.tsx#L81-L130) already has a stable upper-level rendering hook suitable for memoizing a common mapping.
+
+**Risk, scope, caveats:** Repeated allocation and catalog scanning could degrade table responsiveness on a large services catalog or frequent refreshes; actual performance impact has not been benchmarked. This is an optimization candidate, not a correctness or money-loss proof.
+
+**Fail-first test:** Instrument createServiceMapping with a synthetic 500-service catalog and 20-row table; assert no more than one mapping rebuild per catalog revision while preserving current service code/name and tooltip behavior. Measure before/after with React profiler and regression tests.
+
+### REG-FE-059 — Context menu cannot guarantee reachability of lower actions on short viewports (P3 candidate)
+
+**Code evidence:** [AppointmentContextMenu.tsx L204–L228](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/AppointmentContextMenu.tsx#L204-L228) estimates height from menuItems.length*40 and only clamps top with `Math.max(10,...)`; [AppointmentContextMenu.tsx L238–L268](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/AppointmentContextMenu.tsx#L238-L268) renders absolutely positioned menu with no `maxHeight`/`overflowY`. [AppointmentContextMenu.tsx L270–L316](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/AppointmentContextMenu.tsx#L270-L316) renders multiple action buttons/dividers. [EnhancedAppointmentsTable.css L435–L450](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/EnhancedAppointmentsTable.css#L435-L450) and the `.context-menu` class don't provide a scroll cap (check applied CSS); on short screens a taller menu cannot fit by changing top alone. This is independent of REG-FE-054 (keyboard focus/roles).
+
+**Risk, scope, caveats:** On narrow phone/landscape tablet, especially with many backend-allowed actions, lower menu items can fall outside viewport behind the fixed overlay. Browser/device validation still required.
+
+**Fail-first test:** Playwright with e.g. 568×320, 667×375, 390×844 viewport and all allowed actions. Assert the last menu action can be reached by keyboard/touch and menu stays inside viewport or scrolls; preserve overlay close and Escape.
+
+### REG-FE-060 — Pagination layout contains an invalid CSS alignment value (P3 candidate)
+
+**Code evidence:** [EnhancedAppointmentsTable.css L495–L503](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/EnhancedAppointmentsTable.css#L495-L503) sets `.eat-pagination {justify-content: center;}`; later same selector [EnhancedAppointmentsTable.css L855–L864](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/EnhancedAppointmentsTable.css#L855-L864) attempts to override with `justify-content: between`, which is not a valid CSS `justify-content` keyword. Thus that override is ignored by CSS parsing; the older center alignment remains. [EnhancedAppointmentsTable.tsx L233–L295](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/EnhancedAppointmentsTable.tsx#L233-L295) groups page selector, shown count and previous/next controls which likely intend spacing across the toolbar.
+
+**Risk, scope, caveats:** The pagination controls may cluster centrally instead of distributing across available width; visual impact depends on viewport and UI design intent, and no screenshot comparison was performed.
+
+**Fail-first test:** Static CSS validation asserting only valid justify-content keywords; browser screenshot of 3 pagination groups at desktop and mobile widths against accepted design, with intentional wrap rules.
+
+### REG-FE-061 — Phone formatter presents incomplete 998-prefixed inputs as malformed formatted numbers (P3 candidate)
+
+**Code evidence:** [appointmentsTableContracts.ts L206–L226](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableContracts.ts#L206-L226) enters the `digits.startsWith('998')` branch with NO length check and slices groups unconditionally; for `'99890'` it produces `'+998 (90) --'`. Current [appointmentsTableContracts.test.ts L130–L137](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/__tests__/appointmentsTableContracts.test.ts#L130-L137) covers valid 12-/9-digit numbers and a short unprefixed `'123'`, but not a short `998`-prefixed entry. [appointmentsTableColumns.tsx L920–L934](https://github.com/drsapaev/final/blob/a770ce3373b6e4b69f54b51723e1f2775dac4088/frontend/src/components/tables/appointmentsTableColumns.tsx#L920-L934) shows this formatter in the registrar phone column.
+
+**Risk, scope, caveats:** Incomplete clinic/QR contact data may be given deceptive fixed-format punctuation rather than displayed as an incomplete number, impairing staff recognition; stored phone values and tel: action are not changed.
+
+**Fail-first test:** Synthetic phones '998', '99890', '998901234567', '901234567', and too-long 998 number; only valid-length numbers receive groups, incomplete inputs stay as unformatted or are flagged without inventing digits; handle privacy and locale format rules.
+
+### Third focused table pass — 2026-11-01 (main a770ce3373b6e4b69f54b51723e1f2775dac4088)
+
+This is a code-path and cross-identity pass over the same 11 table module files, plus backend queue ownership/status read-model, clinic adapter, historical `target_date` loader, rendered queue-number branch, CSS and source unit tests. **New REG-FE-056–061** comprise two queue-identity P2 and four bounded P3 presentation/performance findings. All are `SOURCE-OBSERVED / REPRO-PENDING`.
+
+**Key distinctions to prevent duplicate claims:**
+
+- REG-FE-056 is an archival render bug even when a real queue_number is supplied. REG-FE-022 already covers synthetic queue numbers when identity is absent; the two should share a future backend-owned display contract, but are not identical.
+- REG-FE-057 is a selected **queue resource** mismatch: sorting uses first array item, badge-color status matches local number without resource ID, versus backend `queue_owner_id`/`daily_queue_id`/queue_tag. REG-FE-050 is numeric-only sort comparator and REG-FE-052 is missing canonical-status vocabulary. Do not conflate the three or change queue numbering/fairness logic in the browser.
+- Extend existing REG-FE-052's future tests: renderQueueNumbers has its own `waiting/called/served/no_show` status palette, falling back to `unknown` for `in_service`/`diagnostics`/`incomplete`/rescheduled statuses; do not create a duplicate ID for the same status vocabulary gap.
+- Extend existing REG-FE-031's tests: page-select-all compares only `selectedRows.size` against `paginatedData.length`, and replaces or clears the entire selection instead of the visible page subset. No active bulk-print consumer in WelcomeView; keep it non-actionable until identity and page scope resolved.
+- **Do not report already working features as bugs:** `DataTable` handles header Enter/Space, `aria-sort`, and does not require the consumer to implement keyboard sorting. `call_patient` is handled by the registrar action router. `AppointmentPagination.tsx` is dormant in active EAT; report its bugs only if routed.
+
+**Validation boundary:** GitHub source inspection only, no Vitest/Playwright/axe/performance profiling/CSS browser screenshots, no mandatory agent gate execution, no executable or production changes. Future queue-identity contract changes require the repository gate, synthetic RED→GREEN, targeted tests and a separate Draft fix PR.
+
+
 ### Focused registrar table files source audit — 2026-11-01
 
 **Reviewed at pinned main `a770ce3373b6e4b69f54b51723e1f2775dac4088`:** All 11 paths in `frontend/src/components/tables/`: `EnhancedAppointmentsTable.tsx`, `useAppointmentsTableState.ts`, `appointmentsTableContracts.ts`, `appointmentsTableColumns.tsx`, `AppointmentContextMenu.tsx`, `AppointmentPagination.tsx`, CSS, Storybook fixtures and three focused test files. Also read active parent renderers `WelcomeView.tsx` and `WorklistView.tsx`, `DataTable.tsx` sort/row key/keyboard contract, backend canonical queue-status vocabulary and registrar queue response shape. `AppointmentPagination.tsx` is a dormant extracted component (main EAT renders its own inline pagination); no active-specific finding without a consumer.
@@ -926,6 +995,8 @@ Cloud agents operate on a *fresh* base fetched from `origin/main`, in an isolate
 | 2026-11-01 | Follow-up triage + implementation issues | Source-to-backend contracts strengthened for REG-FE-036 and REG-FE-040/041; opened implementation tracking issues #3819 and #3820 with synthetic red-first tests, and checked REG-FE-038/039/043 | GitHub source-only; no tests, mandatory gate, runtime edits, merge, deploy, or live patient data |
 
 | 2026-11-01 | Focused table files audit | Added REG-FE-050–055: string/date sorting, filter/page false-empty, canonical status mislabel, nested services search, context menu keyboard/focus, unstable row keys. Expanded existing REG-FE-004/031 without duplicating | Pinned GitHub main source, 11 table files and parent/backend contracts; no new runtime tests, gate, source edits or deploy |
+
+| 2026-11-01 | Third table files pass | REG-FE-056–061: past-date ticket number discarded, resource-specific badge/sort mismatch, per-cell catalog map rebuild, short-screen menu overflow, invalid pagination CSS, truncated 998 phone formatting | GitHub main source at pinned SHA, original 11 table paths plus active loaders/backend contracts; source-only, no Vitest, Playwright, gate, code edit, merge, deploy |
 
 ## End-of-review acceptance criteria
 
