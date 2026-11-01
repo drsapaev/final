@@ -88,15 +88,10 @@ async def get_cashier_stats(
         visit_ids = [v.id for v in visits]
 
         if visit_ids:
-            # Получаем суммы платежей для каждого визита
-            from collections import defaultdict
-            paid_by_visit = defaultdict(Decimal)
-            existing = db.query(Payment).filter(
-                Payment.visit_id.in_(visit_ids),
-                Payment.status.in_(["paid", "completed"])
-            ).all()
-            for ep in existing:
-                paid_by_visit[ep.visit_id] += ep.amount
+            # CSH-FE-028: net settled (unrefunded) paid amounts via the
+            # canonical invariant service — gross sums understate pending
+            # debt after partial refunds.
+            paid_by_visit = _cashier_paid_amounts_by_visit_id(db, visit_ids)
 
             for v in visits:
                 # Считаем стоимость визита

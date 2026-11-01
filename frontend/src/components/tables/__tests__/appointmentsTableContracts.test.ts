@@ -45,6 +45,22 @@ describe('appointmentsTableContracts — sortAppointmentsData (PR-UI-09e-2)', ()
     expect(sorted.map((r) => r.id)).toEqual([1, 3, 2]);
   });
 
+  it('REG-FE-057: registrar № sorting follows the visible selected ticket, not another queue ticket', () => {
+    const rows: AppointmentRow[] = [
+      { id: 'lab-9', queue_number: 9, queue_numbers: [{ number: 1, queue_tag: 'cardiology' } as never] },
+      { id: 'ecg-2', queue_number: 2, queue_numbers: [{ number: 50, queue_tag: 'cardiology' } as never] },
+      { id: 'fallback-7', queue_numbers: [{ number: 7, queue_tag: 'lab' } as never] },
+      { id: 'unassigned', queue_number: 0, queue_numbers: [{ number: 0, queue_tag: 'lab' } as never] },
+    ];
+    expect(sortAppointmentsData(rows, { key: 'queue_number', direction: 'asc' }, true).map((r) => r.id))
+      .toEqual(['ecg-2', 'fallback-7', 'lab-9', 'unassigned']);
+    expect(sortAppointmentsData(rows, { key: 'queue_number', direction: 'desc' }, true).map((r) => r.id))
+      .toEqual(['lab-9', 'fallback-7', 'ecg-2', 'unassigned']);
+    // Existing non-registrar sort compatibility is intentionally preserved.
+    expect(sortAppointmentsData(rows, { key: 'queue_number', direction: 'asc' }).map((r) => r.id))
+      .toEqual(['unassigned', 'lab-9', 'fallback-7', 'ecg-2']);
+  });
+
   it('queue_number sorts by the first queue_numbers entry, missing numbers sink (999999)', () => {
     const withQueues: AppointmentRow[] = [
       { id: 'a' },
