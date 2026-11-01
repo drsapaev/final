@@ -625,6 +625,7 @@ const WelcomeView = React.memo(({
               language={language}
               outerBorder={true}
               services={services}
+              preferCanonicalQueueNumber
               showCheckboxes={true} // UX Audit Registrar #13: включаем чекбоксы для bulk print
               onRowClick={(row) => {
                 logger.info('Открыть детали записи:', row);
