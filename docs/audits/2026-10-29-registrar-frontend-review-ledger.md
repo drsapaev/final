@@ -87,6 +87,11 @@
 | REG-FE-059 | P3 | Context menu small viewport overflow | Full action menu is absolutely positioned without max-height or overflow-y and can extend beyond landscape/mobile viewport | SOURCE-OBSERVED / REPRO-PENDING | AS responsive menu reachability |
 | REG-FE-060 | P3 | Pagination CSS alignment | CSS uses invalid justify-content: between; earlier center rule wins instead of requested space-between | SOURCE-OBSERVED / REPRO-PENDING | AT pagination presentation |
 | REG-FE-061 | P3 | Truncated 998 phone formatting | A phone with 998 prefix but too few digits is formatted as a complete Uzbekistan number with missing groups | SOURCE-OBSERVED / REPRO-PENDING | AU partial-phone display |
+| REG-FE-062 | P1 | Appointment queue binding is key-based | The #3827 uniqueness guard counts queue-entry candidates per (patient, day, doctor) key but cannot distinguish two appointments sharing that key, so one unlinked ticket can attach to several appointments | SOURCE-OBSERVED / REPRO-PENDING | two appointments same patient/doctor/day + one unlinked queue entry |
+| REG-FE-063 | P1 | All-departments aggregation loses same-tag tickets | queue_numbers dedup needs `id` or `queue_tag`+`service_id`, but the queue adapter emits elements without either, so a patient's second standalone ticket with the same queue_tag is dropped | SOURCE-OBSERVED / REPRO-PENDING | two doctors of one specialty, one patient, tickets 7 and 12 |
+| REG-FE-064 | P2 | Reschedule visit selector uninformative | Grouped-row target-visit options render only «Визит №<id>» without doctor/service/original date-time, so the registrar cannot tell which visit is being moved | SOURCE-OBSERVED / REPRO-PENDING | grouped booking with different doctors/services |
+| REG-FE-065 | P2 | Reschedule closes before server confirmation | Both confirm handlers call `onClose()` and `resetForm()` before awaiting the API; on failure the dialog is gone and entered parameters are lost | SOURCE-OBSERVED / REPRO-PENDING | failing reschedule API; retry must preserve input |
+| REG-FE-066 | P2 | print_ticket without ticket existence | `_registrar_can_print_ticket` checks role + payment/queue status only; a row with `number=null` and `waiting` status can carry `can_print_ticket=true` | SOURCE-OBSERVED / REPRO-PENDING | queue entry without allocated number, waiting status |
 
 ### REG-FE-001 — Row activation does not open details (P2 candidate)
 
@@ -974,6 +979,61 @@ Cloud agents operate on a *fresh* base fetched from `origin/main`, in an isolate
 - **Evidence:** RED 15 → GREEN 40/40 (3 suites) + 216/216 affected modules, strict `tsc` 0, eslint 0 (pre-existing warnings only), `npm run build` ✓, Playwright synthetic scenario 2 passed, `git diff --check` clean; **Draft PR #3809** commit `4776cb279` — CI 40 check-runs, 22 success, 0 failures (incl. Frontend e2e with the new spec).
 - **Tracking:** REG-FE-025 → `CONFIRMED / FIX-IN-REVIEW` (see findings index). Draft only — no merge/deploy from the cloud job; `RESOLVED` when #3809 is reviewed and merged.
 
+### Post-merge follow-up review — 2026-11-02 (main `a50f7c40a043d1d749a164684e53d25cfe2ae094`)
+
+Follow-up review of the five queue/registrar merges already on `main`: #3814 (`f82fb2ab`), #3821 (`82f9df73`), #3825 (`a8e5e7d4`), #3826 (`39c1e27e`), #3827 (`a50f7c40a` — current HEAD of `main`, reconfirmed via `git ls-remote`). All five had green Unified CI before merge — green CI does not prove absence of the logical defects below. Because all five are already merged, any fix must be a NEW commit/PR, never an edit to the original PR branches. Verdict: 0 P0, 2 P1, 3 P2 → REG-FE-062–066 below, all `SOURCE-OBSERVED / REPRO-PENDING` (no new tests were run for this pass). The #3825 patient-ID part produced no new findings: the `patient_id >= 1000` restriction removal is covered by its big-ID/404/network-error tests.
+
+**Key distinctions to prevent duplicate claims:**
+
+- REG-FE-062 is multi-APPOINTMENT ambiguity on one (patient, day, doctor) key; REG-FE-022 (#3827) addressed fabricated ordinals and multi-ENTRY ambiguity. Same domain, different root cause; the fix must add a "two appointments + one ticket" integration test.
+- REG-FE-063 is the aggregation-layer merge loss in `registrarAggregation.ts`; REG-FE-057 is the EAT sort/badge resource mismatch. Both need queue-entry identity, but in different files — do not conflate.
+- REG-FE-064/065 extend the REG-FE-040/041 (#3826) family: the option label and the close-before-confirm ordering are new post-fix gaps, not regressions of #3826 itself.
+- REG-FE-066 is the action-contract side of the ticket-identity family (REG-FE-022/056) and must be fixed in the backend contract, not by hiding the button in CSS.
+
+**Validation boundary:** source and diff review only, at pinned `main a50f7c40a043d1d749a164684e53d25cfe2ae094`; no Vitest, pytest or Playwright, no agent gate, no runtime edits, no GitHub changes and no deployment.
+
+### REG-FE-062 — The same unlinked ticket can attach to several appointments sharing one (patient, day, doctor) key (P1 candidate)
+
+**Code evidence:** The #3827 guard in [_queue_ops.py L200–L224](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/backend/app/api/v1/endpoints/registrar_integration/_queue_ops.py#L200-L224) selects unlinked `OnlineQueueEntry` rows by `(patient_id, day, specialist_id)` and stores metadata on that KEY only when exactly one candidate exists (`if len(candidates) == 1: appointment_queue_metadata[key] = candidates[0]`, L217–L224). The per-row resolver in [_queue_ops.py L1474–L1511](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/backend/app/api/v1/endpoints/registrar_integration/_queue_ops.py#L1474-L1511) then resolves that same key for each appointment row (cache path L1485–L1487; direct path with `len(candidate_rows) == 1` at L1511). The check proves "exactly one unlinked ENTRY per key"; it never proves "this entry belongs to THIS `Appointment.id`". Two appointments of one patient to the same doctor on the same date share the key, so both appointment rows resolve the same single entry and both display its ticket number.
+
+**Reproduction scenario (source-derived):** patient with two appointments to one doctor on one date and exactly one `OnlineQueueEntry` (e.g. №9) without `visit_id`; both appointment rows receive №9, although a separate ticket for the second appointment is unconfirmed.
+
+**Fail-first test:** Integration — two appointments (same patient, doctor, day) plus one unlinked queue entry; assert each appointment gets a number ONLY through a proved per-appointment link to a concrete queue entry; without that link both rows must show no ticket, never the same number on both.
+
+**Fix direction (from the review):** do not assign a number by (patient, day, doctor) coincidence — require a reliable link to the specific queue entry for that appointment, or return `null`.
+
+### REG-FE-063 — All-departments aggregation drops a patient's second standalone ticket with the same queue_tag (P1 candidate)
+
+**Code evidence:** [registrarAggregation.ts L395–L406](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/frontend/src/utils/registrarAggregation.ts#L395-L406) deduplicates a patient's `queue_numbers` with the key `qn.id` or, failing that, `queue_tag` plus `service_id`. The queue adapter [registrarQueueAdapter.ts L106–L118](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/frontend/src/pages/registrar/registrarQueueAdapter.ts#L106-L118) emits each element with `number`, `queue_tag`, `queue_name`, `specialty`, `status` and timestamps but WITHOUT `id` and `service_id`, so every element's key degenerates to `<queue_tag>_undefined`. Two standalone tickets of different doctors with the same `queue_tag` (e.g. two cardiologists) then share one key and the second ticket is dropped from the patient's aggregated row: №7 of one cardiologist and №12 of the other can render as only №7.
+
+**Fail-first test:** One patient, two doctors of the same specialty (same `queue_tag`), different standalone ticket numbers (7 and 12); the aggregated cross-department row must show BOTH numbers.
+
+**Fix direction (from the review):** carry the real queue-entry identity (`queue_entry_id` plus owner `daily_queue_id`) inside every `queue_numbers` element and deduplicate by queue-entry identity, not by tag coincidence.
+
+### REG-FE-064 — Grouped reschedule target-visit options show only the raw visit ID (P2 candidate)
+
+**Code evidence:** [RescheduleSlots.tsx L261–L264](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/frontend/src/pages/registrar/views/RescheduleSlots.tsx#L261-L264) renders each candidate as `tI18n('registrar.reschedule_visit_option', { id: String(visitId) })` — i.e. «Визит №101», «Визит №102» and nothing else. For a grouped booking with different doctors or services the registrar cannot tell which visit an option refers to before moving it.
+
+**Fail-first test:** A grouped row with two visits belonging to different doctors/services; the selector must present doctor, service and the original date/time next to the ID, sourced from server row data — not just the numeric ID.
+
+**Fix direction (from the review):** enrich the option label with doctor, service and original date/time taken from the server data already available on the row.
+
+### REG-FE-065 — Reschedule dialog closes and resets before the server confirms the move (P2 candidate)
+
+**Code evidence:** In both confirm handlers of [RescheduleSlots.tsx](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/frontend/src/pages/registrar/views/RescheduleSlots.tsx) the dialog is dismissed and the form cleared BEFORE the request: the "tomorrow" handler calls `onClose(); resetForm();` at L135–L136 and only then awaits `rescheduleTomorrow(...)` at L138; the date handler does the same at L211–L212 before `await rescheduleVisit(...)` at L214. The catch blocks (L142–L145, L218–L221) only notify — by then the dialog is gone and the entered parameters are lost, with no in-place retry.
+
+**Fail-first test:** Failing reschedule API (or network error) after confirmation; the dialog must stay open with the chosen date/time and selected visit preserved so the user can retry, and close only after a successful response.
+
+**Fix direction (from the review):** close/reset only after the successful response; on error keep the dialog open.
+
+### REG-FE-066 — print_ticket is advertised even when no ticket number exists (P2 candidate)
+
+**Code evidence:** [_helpers.py L70](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/backend/app/api/v1/endpoints/registrar_integration/_helpers.py#L70) defines `REGISTRAR_PRINT_STATUSES = {"waiting", "queued"}` and [_helpers.py L106–L120](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/backend/app/api/v1/endpoints/registrar_integration/_helpers.py#L106-L120) grants `print_ticket` from role + (payment paid OR queue status) only — it takes no input about whether an allocated ticket number exists. The call site [_today_queues.py L646](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/backend/app/api/v1/endpoints/registrar_integration/_today_queues.py#L646) can therefore serialize a row with `number=null` and `waiting` status that simultaneously carries `print_ticket` in `available_actions` / `can_print_ticket=true` — the contract offers to print a ticket that was never issued.
+
+**Fail-first test:** A queue entry without an allocated number in a print-granting status; `available_actions` must NOT contain `print_ticket` — absence of a ticket must never be presented as a printable one.
+
+**Fix direction (from the review):** align the print contract: require the existence of an issued ticket number before advertising print. Backend contract fix; do not patch by hiding the button in CSS.
+
 ## Change log
 
 | Date | Ledger revision | Added / updated | Verification |
@@ -997,6 +1057,8 @@ Cloud agents operate on a *fresh* base fetched from `origin/main`, in an isolate
 | 2026-11-01 | Focused table files audit | Added REG-FE-050–055: string/date sorting, filter/page false-empty, canonical status mislabel, nested services search, context menu keyboard/focus, unstable row keys. Expanded existing REG-FE-004/031 without duplicating | Pinned GitHub main source, 11 table files and parent/backend contracts; no new runtime tests, gate, source edits or deploy |
 
 | 2026-11-01 | Third table files pass | REG-FE-056–061: past-date ticket number discarded, resource-specific badge/sort mismatch, per-cell catalog map rebuild, short-screen menu overflow, invalid pagination CSS, truncated 998 phone formatting | GitHub main source at pinned SHA, original 11 table paths plus active loaders/backend contracts; source-only, no Vitest, Playwright, gate, code edit, merge, deploy |
+
+| 2026-11-02 | Post-merge follow-up review of #3814/#3821/#3825/#3826/#3827 | Added REG-FE-062–066: 2 P1 (key-based appointment-to-ticket binding, same-tag ticket loss in all-departments aggregation) and 3 P2 (uninformative reschedule selector, close-before-confirm, print_ticket without ticket). No new findings for the #3825 patient-ID part | Source and diff review at main `a50f7c40a043d1d749a164684e53d25cfe2ae094`; no tests executed; all findings provisional |
 
 ## End-of-review acceptance criteria
 
