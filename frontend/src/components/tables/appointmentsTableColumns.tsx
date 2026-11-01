@@ -552,15 +552,26 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
         // ✅ ИСПРАВЛЕНО: Используем статус из queue_number_status (соответствует текущей вкладке)
         // или ищем соответствующий queue_number в queue_numbers для получения его статуса
         let queueStatus: string | undefined = row.queue_number_status;
-        if (!queueStatus && row.queue_numbers && Array.isArray(row.queue_numbers)) {
-          // Ищем queue_number в queue_numbers и берём его статус
-          const matchingQueue = row.queue_numbers.find((q: QueueNumberInfo) => q.number === row.queue_number);
-          if (matchingQueue) {
-            queueStatus = matchingQueue.status as string | undefined;
-          } else if (row.queue_numbers.length > 0) {
-            // ✅ ИСПРАВЛЕНО: Если не нашли точное совпадение, используем статус из первого queue_number
-            // вместо общего row.status, так как статусы отдельных очередей могут отличаться
-            queueStatus = row.queue_numbers[0].status as string | undefined;
+        if (!queueStatus && Array.isArray(row.queue_numbers)) {
+          if (preferCanonicalQueueNumber) {
+            // Ticket numbers repeat across doctors/resources. Never borrow a
+            // different queue's status just because the number is equal.
+            const sameNumber = row.queue_numbers.filter((q: QueueNumberInfo) =>
+              String(q.number) === String(row.queue_number));
+            const selectedTag = typeof row.queue_tag === 'string' ? row.queue_tag.trim() : '';
+            const sameQueue = selectedTag
+              ? sameNumber.filter((q: QueueNumberInfo) => q.queue_tag === selectedTag)
+              : sameNumber;
+            const distinctStatuses = [...new Set(sameQueue.map((q: QueueNumberInfo) => q.status).filter(Boolean))];
+            queueStatus = distinctStatuses.length === 1 ? distinctStatuses[0] : undefined;
+          } else {
+            // Preserve the historic shared-table behavior outside the registrar.
+            const matchingQueue = row.queue_numbers.find((q: QueueNumberInfo) => q.number === row.queue_number);
+            if (matchingQueue) {
+              queueStatus = matchingQueue.status as string | undefined;
+            } else if (row.queue_numbers.length > 0) {
+              queueStatus = row.queue_numbers[0].status as string | undefined;
+            }
           }
         }
         const queueStatusKey = queueStatus || 'unknown';
@@ -614,6 +625,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
               display: 'inline-block',
               boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
             }}
+            data-queue-status={queueStatusKey}
             title={`№${String(row.queue_number ?? '')}`}>
 
             {String(row.queue_number ?? '')}
