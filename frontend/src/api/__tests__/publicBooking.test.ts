@@ -12,10 +12,13 @@ import {
   getPublicBookingAvailability,
   getPublicBookingErrorCode,
   getPublicBookingOptions,
+  listPatientPublicBookingRequests,
   getPublicBookingPath,
   isUnknownPublicBookingOutcome,
+  resubmitPatientPublicBookingRequest,
   savePublicBookingSelection,
   takePendingPublicBookingResume,
+  withdrawPatientPublicBookingRequest,
   PUBLIC_BOOKING_SELECTION_TTL_MS,
 } from '../publicBooking';
 
@@ -64,6 +67,47 @@ describe('publicBooking API adapter', () => {
     expect(body).not.toHaveProperty('patient_id');
   });
 
+  it('loads only the authenticated patient booking request list without caching', async () => {
+    mockedApi.get.mockResolvedValueOnce({ data: { items: [{ id: 'request-1' }] } });
+
+    const result = await listPatientPublicBookingRequests({ limit: 20, offset: 10 });
+
+    expect(result).toEqual([{ id: 'request-1' }]);
+    expect(mockedApi.get).toHaveBeenCalledWith('/patients/booking-requests', {
+      params: { limit: 20, offset: 10 },
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+  });
+
+  it('withdraws a request using its current version', async () => {
+    mockedApi.post.mockResolvedValueOnce({ data: { id: 'request-1', status: 'withdrawn' } });
+
+    await withdrawPatientPublicBookingRequest('request-1', 3);
+
+    expect(mockedApi.post).toHaveBeenCalledWith(
+      '/patients/booking-requests/request-1/withdraw',
+      { expected_version: 3 },
+    );
+  });
+
+  it('resubmits the same request with its version and a mandatory idempotency key', async () => {
+    mockedApi.post.mockResolvedValueOnce({ data: { id: 'request-1', status: 'pending' } });
+    const body = {
+      expected_version: 4,
+      appointment_date: '2026-10-30',
+      appointment_time: '09:40',
+      expected_settings_version: 7,
+    };
+
+    await resubmitPatientPublicBookingRequest('request/1', body, 'resubmit-key');
+
+    expect(mockedApi.post).toHaveBeenCalledWith(
+      '/patients/booking-requests/request%2F1/resubmit',
+      body,
+      { headers: { 'Idempotency-Key': 'resubmit-key' } },
+    );
+  });
+
   it('keeps a short-lived selection only in memory and consumes it once', () => {
     const now = 1_800_000_000_000;
     const selection = {
@@ -84,6 +128,31 @@ describe('publicBooking API adapter', () => {
     savePublicBookingSelection(selection);
     expect(takePendingPublicBookingResume(now + PUBLIC_BOOKING_SELECTION_TTL_MS + 1))
       .toEqual({ kind: 'expired', locale: 'ru' });
+  });
+
+  it('marks an expired tab handoff as requiring resubmit so it cannot become a new request', () => {
+    const now = 1_800_000_000_000;
+    savePublicBookingSelection({
+      locale: 'ru',
+      serviceSlug: 'cardiology',
+      doctorSlug: 'doctor-one',
+      date: '2026-10-28',
+      time: '09:00',
+      settingsVersion: 3,
+      createdAt: now,
+      resubmit: {
+        requestId: '3d7bdb53-c26e-46ed-81ec-9e7bdebd12ab',
+        expectedVersion: 4,
+        serviceSlug: 'cardiology',
+        doctorSlug: 'doctor-one',
+      },
+    });
+
+    expect(takePendingPublicBookingResume(now + PUBLIC_BOOKING_SELECTION_TTL_MS + 1)).toEqual({
+      kind: 'expired',
+      locale: 'ru',
+      resubmitRequired: true,
+    });
   });
 
   it('maps structured API errors and treats ambiguous outcomes as unsafe to resubmit with a new key', () => {

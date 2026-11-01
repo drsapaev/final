@@ -292,17 +292,18 @@ def _cashier_visit_total_amount(visit: Visit) -> Decimal:
 
 
 def _cashier_paid_amounts_by_visit_id(db: Session, visit_ids: list[int]) -> dict[int, Decimal]:
-    if not visit_ids:
-        return {}
+    """Net settled (unrefunded) paid amounts per visit — canonical SSOT delegate.
 
-    paid_amounts = {visit_id: Decimal("0") for visit_id in visit_ids}
-    payments = db.query(Payment).filter(
-        Payment.visit_id.in_(visit_ids),
-        Payment.status.in_(["paid", "completed"]),
-    ).all()
-    for payment in payments:
-        paid_amounts[payment.visit_id] = paid_amounts.get(payment.visit_id, Decimal("0")) + Decimal(str(payment.amount or 0))
-    return paid_amounts
+    CSH-FE-028: this helper used to sum gross ``Payment.amount`` and diverged
+    from ``PaymentInvariantService.compute_paid_amount`` after partial refunds
+    (a 70 000 refund from a paid 100 000 visit still counted as 100 000 paid,
+    hiding the re-opened debt). It is now a thin delegate over the canonical
+    batch netting so the pending list, stats, grouped allocation and the
+    direct-payment pre-check all agree with the invariant service.
+    """
+    from app.services.payment_invariant_service import PaymentInvariantService
+
+    return PaymentInvariantService(db).compute_net_paid_amounts_by_visit_id(visit_ids)
 
 
 async def _emit_payment_notification(

@@ -30,6 +30,14 @@ vi.mock('../../../stores/auth', () => ({
 vi.mock('../../../api/publicBooking', () => ({
   getPendingPublicBookingLocale: vi.fn(() => null),
   getPublicBookingPath: (locale: string) => locale === 'ru' ? '/ru/booking' : '/booking',
+  hasPublicBookingResubmitHandoff: (state: unknown) => Boolean(state && typeof state === 'object'
+    && Object.prototype.hasOwnProperty.call(state, 'publicBookingResubmitRequired')),
+  getPublicBookingResubmitHandoffLocale: (state: unknown) => {
+    if (!state || typeof state !== 'object'
+      || !Object.prototype.hasOwnProperty.call(state, 'publicBookingResubmitRequired')) return null;
+    const locale = (state as { publicBookingLocale?: unknown }).publicBookingLocale;
+    return locale === 'ru' || locale === 'uz-Latn' ? locale : null;
+  },
 }));
 
 vi.mock('../../../i18n/useTranslation', () => ({

@@ -211,6 +211,7 @@ const RegistrarPanel = () => {
 
   // Reschedule helpers (wired to the worklist setAppointments shim).
   const {
+    getRescheduleVisitIds,
     resolveRescheduleVisitId,
     removeRescheduledAppointmentFromView,
   } = useRegistrarReschedule({ setAppointments: setAppointments as unknown as (updater: (prev: Record<string, unknown>[]) => Record<string, unknown>[]) => void });
@@ -482,6 +483,7 @@ const RegistrarPanel = () => {
         runRegistrarRecordAction={runRegistrarRecordAction}
         handlePayment={handlePayment}
         resolveRescheduleVisitId={resolveRescheduleVisitId}
+        getRescheduleVisitIds={getRescheduleVisitIds}
         removeRescheduledAppointmentFromView={removeRescheduledAppointmentFromView}
         confirm={confirm}
         tI18n={tI18n}
