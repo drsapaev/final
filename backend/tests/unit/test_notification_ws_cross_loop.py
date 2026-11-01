@@ -14,14 +14,63 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import threading
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
 import pytest
 
 from app.services.notification_websocket import NotificationWebSocketManager
 from app.services.ws_redis_pubsub import RedisPubSubBridge
+
+
+def _staging_compose_service_environment(service_name: str) -> dict[str, str]:
+    compose_path = Path(__file__).resolve().parents[3] / "ops" / "compose.staging.yml"
+    compose_text = compose_path.read_text(encoding="utf-8")
+    service_match = re.search(
+        rf"(?ms)^  {re.escape(service_name)}:\n(.*?)(?=^  [A-Za-z][A-Za-z0-9_-]*:\n|\Z)",
+        compose_text,
+    )
+    assert service_match is not None, f"staging Compose service missing: {service_name}"
+
+    environment_match = re.search(
+        r"(?m)^    environment:\s*\n((?:^      .*\n?)*)",
+        service_match.group(1),
+    )
+    assert environment_match is not None, f"staging environment missing: {service_name}"
+
+    environment: dict[str, str] = {}
+    for line in environment_match.group(1).splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        key, separator, value = stripped.partition(":")
+        if separator:
+            environment[key] = value.strip()
+    return environment
+
+
+@pytest.mark.parametrize("service_name", ("backend", "worker"))
+def test_staging_compose_enables_notification_relay_for_each_process(
+    service_name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    environment = _staging_compose_service_environment(service_name)
+    configured_url = environment.get("WS_REDIS_URL", "")
+    expected_url = "redis://redis:6379/0"
+    if configured_url != f"${{WS_REDIS_URL:-{expected_url}}}":
+        raise AssertionError(
+            f"{service_name} must provide the shared staging WS_REDIS_URL default"
+        )
+
+    # Compose resolves this fallback before starting each process. Constructing
+    # the bridge with that value verifies the service can enable its relay.
+    monkeypatch.setenv("WS_REDIS_URL", expected_url)
+    bridge = RedisPubSubBridge("notification_ws")
+
+    assert bridge.enabled
+    assert bridge.redis_url == expected_url
 
 
 class _FakeWebSocket:

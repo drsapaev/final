@@ -97,6 +97,9 @@ services:
       # can create duplicate visits/invoices/queue entries.
       IDEMPOTENCY_REDIS_URL: ${IDEMPOTENCY_REDIS_URL:-redis://redis:6379/0}
       ARQ_REDIS_URL: ${ARQ_REDIS_URL:-redis://redis:6379/0}
+      # The API WebSocket listeners and ARQ worker publishers share this
+      # Redis Pub/Sub transport for cross-process notification delivery.
+      WS_REDIS_URL: ${WS_REDIS_URL:-redis://redis:6379/0}
     volumes:
       - ../backend:/app:rw
       - ../backend/backups:/app/backups
@@ -174,6 +177,9 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       ARQ_REDIS_URL: redis://redis:6379/0
+      # The API WebSocket listeners and ARQ worker publishers share this
+      # Redis Pub/Sub transport for cross-process notification delivery.
+      WS_REDIS_URL: ${WS_REDIS_URL:-redis://redis:6379/0}
       ENV: staging
       SECRET_KEY: ${SECRET_KEY}
       TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
