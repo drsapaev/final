@@ -84,6 +84,7 @@
 | CSH-FE-033 | P3 | CSV refund status | CSV maps refunded statuses to pending 'Ожидает' instead of returned | SOURCE-OBSERVED / REPRO-PENDING | paid, refunded, cancelled, processing distinct CSV rows |
 | CSH-FE-034 | P2 | Spreadsheet injection on export | Cashier CSV writes patient names and free-text notes without spreadsheet formula neutralization | SOURCE-OBSERVED / REPRO-PENDING | untrusted name/note starting =,+,-,@, tab and safe text |
 | CSH-FE-035 | P2 | Successful HTTP envelope validation | usePayments GET accepts malformed 200 JSON as success/empty with unvalidated pagination metadata | SOURCE-OBSERVED / REPRO-PENDING | HTTP 200 with {message:'error'}, string, missing items, invalid total |
+| CSH-FE-036 | Undecided | Stats totals gross vs net-of-refunds | `/cashier/stats` `total_amount`/`cash_amount`/`card_amount` still sum original payment amounts while `pending_amount` is now net-of-refunds; owner decision required before classification as an error | SOURCE-OBSERVED / DECISION-PENDING | paid 100 + partial refund 30: totals show 100, pending debt uses 70 |
 
 ### CSH-FE-001 — HTTP error is shown as a genuinely empty cashier selection (P2 candidate)
 
@@ -410,6 +411,18 @@ Reviewed all 435 lines of `CashierDialogsLayer.tsx`; reducer/hook `useCashierDia
 
 **Review conclusion:** All **five named source-review groups** now have bounded source coverage. This is **SOURCE REVIEW COMPLETE (BOUNDED)**, not exhaustive line-by-line review of every indirect frontend dependency, not confirmation of browser/runtime behavior, and not verification that any source-observed finding has been reproduced or fixed. Every CSH-FE-001–035 remains provisional until test or browser evidence; conditional semantics (e.g. tender policy and manual payout attestation) require owner decisions.
 
+### Post-merge follow-up review — 2026-11-02 (main `a50f7c40a043d1d749a164684e53d25cfe2ae094`)
+
+Follow-up review of #3814 (`f82fb2ab`, the CSH-FE-028 net-of-refund debt fix), already merged into `main` (current HEAD `a50f7c40a043d1d749a164684e53d25cfe2ae094`, reconfirmed via `git ls-remote`). No new P0/P1 was found in the changed lines: pending-list/stats/grouped-allocation debt now correctly subtracts partial refunds via the canonical invariant. One divergence stays unclassified as an error and is recorded below as an open question so it is not lost. Because #3814 is already merged, any fix must be a NEW commit/PR, never an edit to the original PR branch.
+
+### CSH-FE-036 — Payment stats totals: gross vs net-of-refunds semantics undecided (open question, not classified as a defect)
+
+**Evidence:** After #3814, pending debt is refund-aware via the canonical invariant ([_stats.py L90–L94](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/backend/app/api/v1/endpoints/cashier/_stats.py#L90-L94), CSH-FE-028 marker). The same endpoint's receipt totals, however, still sum ORIGINAL amounts: [_stats.py L56–L71](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/backend/app/api/v1/endpoints/cashier/_stats.py#L56-L71) adds `p.amount` for status `paid`/`completed` into `total_amount`/`cash_amount`/`card_amount` with no refund subtraction; fully `refunded` payments only increment `cancelled_count` ([_stats.py L72–L73](https://github.com/drsapaev/final/blob/a50f7c40a043d1d749a164684e53d25cfe2ae094/backend/app/api/v1/endpoints/cashier/_stats.py#L72-L73)), and partial refunds on paid payments do not reduce these sums at all. `pending_amount` in the same response is net-aware, so the endpoint currently mixes two semantics in one payload.
+
+**Open decision required (from the review):** must `total_amount`/`cash_amount`/`card_amount` mean gross receipts (current behavior) or receipts net of refunds? Until the owner decides, this divergence is NOT classified as an error. Whatever the answer: document it in the endpoint contract and pin it with a test — paid 100 + partial refund 30 must show 100 (gross) or 70 (net) consistently, and fully refunded payments must be included or excluded per the decision.
+
+**Validation boundary:** source review only; no tests were executed for this entry.
+
 ## Initial source positives / boundaries
 
 - The panel uses the canonical backend-provided `can_create_direct_payment` and `can_create_grouped_payment` in action availability ([CashierPendingTable.tsx L145–L169](https://github.com/drsapaev/final/blob/f308ed97e7f640a33e2bb255e23aaa109e69110a/frontend/src/pages/cashier/views/CashierPendingTable.tsx#L145-L169)), rather than guessing payment eligibility from display status.
@@ -425,6 +438,8 @@ Reviewed all 435 lines of `CashierDialogsLayer.tsx`; reducer/hook `useCashierDia
 | 2026-11-01 | Cashier Group 3 refunds/deposits/RBAC | Added CSH-FE-011–018: wrong URL root, missing CSRF/refresh, global refresh gap, 50-item cap, filter response races, manual completion vs payout, error/empty UX, duplicate action. Backend role/locking and deposits verified at source level | GitHub read-only inspection. No automated tests, browser, payment mutation or gate. |
 | 2026-11-01 | Cashier Group 4 dialog/receipt/session/keyboard source audit | Added CSH-FE-019–027: unverified client-side receipt, duplicated service totals, misleading PDF fallback toast, fake session extension, logout during pending money command, local refund validation, sortable header accessibility, hotkey focus hijack, hourly date scope | GitHub source and existing test reads only. No Vitest, Playwright, backend tests, gate, financial mutations or app changes. |
 | 2026-11-01 | Cashier Group 5 source contracts/provider/CI audit | Added CSH-FE-028–035: net refund mismatch, stale online polling, provider effect refetch loop, wrong timeout status, truncated exports, refunded CSV mislabel, CSV formula injection, malformed 200 envelope. Reviewed relevant backend service, routes and existing tests. CI log explains PR template red gate | GitHub source and CI read-only checks; no runtime tests/browser or actual payment. All findings provisional. |
+
+| 2026-11-02 | Post-merge follow-up review of #3814 (f82fb2ab) | Added CSH-FE-036 open question: `/cashier/stats` totals/cash/card remain gross sums of original payment amounts while pending debt is now net-of-refunds; owner decision required. No new P0/P1 in #3814's changed lines | Source review at main `a50f7c40a043d1d749a164684e53d25cfe2ae094`; no tests executed |
 
 ## Closure
 
