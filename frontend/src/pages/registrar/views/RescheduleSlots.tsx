@@ -31,6 +31,9 @@ interface RescheduleSlotsDialogProps {
   onClose: () => void;
   /** useConfirm hook result from the panel (portal-mounted ConfirmDialog). */
   confirm: (options: Record<string, unknown>) => Promise<boolean>;
+  /** REG-FE-041 (#3820): full ordered visit-id list of the row — the dialog
+   *  requires an explicit target-visit choice when the row is a group. */
+  getRescheduleVisitIds: (appointmentRow: Record<string, unknown>) => unknown[];
   resolveRescheduleVisitId: (appointmentRow: Record<string, unknown>) => unknown;
   removeRescheduledAppointmentFromView: (appointmentRow: Record<string, unknown>, visitId: unknown) => void;
   loadAppointments: (options?: unknown) => Promise<void> | void;
@@ -42,6 +45,7 @@ const RescheduleSlotsDialog = ({
   rescheduleData,
   onClose,
   confirm,
+  getRescheduleVisitIds,
   resolveRescheduleVisitId,
   removeRescheduledAppointmentFromView,
   loadAppointments,
@@ -53,16 +57,44 @@ const RescheduleSlotsDialog = ({
   const [customRescheduleDate, setCustomRescheduleDate] = useState('');
   // R-27 fix: optional time picker for reschedule (HH:MM)
   const [customRescheduleTime, setCustomRescheduleTime] = useState('');
+  // REG-FE-041 (#3820): explicit target-visit choice for grouped rows.
+  const [selectedVisitId, setSelectedVisitId] = useState('');
 
   const resetForm = () => {
     setCustomRescheduleDate('');
     setCustomRescheduleTime('');
+    setSelectedVisitId('');
+  };
+
+  // REG-FE-040 (#3820): reset the form on EVERY close path. Escape, backdrop
+  // and the close button all route through the onClose prop — previously the
+  // fields were cleared only after a confirmed submit, so one patient's
+  // chosen date/time leaked into the next patient's dialog.
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  // REG-FE-041 (#3820): candidate visits of the row. A grouped row
+  // (multi-visit booking) requires an explicit choice; a plain row has
+  // exactly one candidate and keeps the previous behavior.
+  const candidateVisitIds = rescheduleData ? getRescheduleVisitIds(rescheduleData) : [];
+  const isGroupedRow = candidateVisitIds.length > 1;
+
+  // Resolves the exact visit the command must address. Grouped rows: the
+  // explicitly selected visit (never a silent visit_ids[0]). Plain rows:
+  // the single candidate (previous resolveRescheduleVisitId semantics).
+  const resolveTargetVisitId = (): unknown => {
+    if (isGroupedRow) {
+      return candidateVisitIds.find((id) => String(id) === selectedVisitId) ?? null;
+    }
+    return resolveRescheduleVisitId(rescheduleData as Record<string, unknown>);
   };
 
   return (
     <ModernDialog
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={`📅 ${tI18n('registrarPanel.available_slots')}`}
       maxWidth="32rem"
       dialogStyle={{
@@ -88,13 +120,20 @@ const RescheduleSlotsDialog = ({
             if (!ok) return;
 
             try {
-              onClose();
-              resetForm();
-              const targetVisitId = resolveRescheduleVisitId(rescheduleData);
+              // REG-FE-041 (#3820): resolve the target visit BEFORE closing —
+              // a grouped row must have an explicit selection, and the dialog
+              // stays open so the user can pick one.
+              const targetVisitId = resolveTargetVisitId();
               if (!targetVisitId) {
-                notify.error(tI18n('registrar.no_visit_for_postpone'));
+                if (isGroupedRow) {
+                  notify.error(tI18n('registrar.reschedule_select_visit_required'));
+                } else {
+                  notify.error(tI18n('registrar.no_visit_for_postpone'));
+                }
                 return;
               }
+              onClose();
+              resetForm();
               logger.info(`Перенос визита ${targetVisitId} на завтра`);
               await rescheduleTomorrow(targetVisitId as string | number);
               notify.success(tI18n('registrar.visit_postponed'));
@@ -157,13 +196,20 @@ const RescheduleSlotsDialog = ({
             if (!ok) return;
 
             try {
-              onClose();
-              resetForm();
-              const targetVisitId = resolveRescheduleVisitId(rescheduleData);
+              // REG-FE-041 (#3820): resolve the target visit BEFORE closing —
+              // a grouped row must have an explicit selection, and the dialog
+              // stays open so the user can pick one.
+              const targetVisitId = resolveTargetVisitId();
               if (!targetVisitId) {
-                notify.error(tI18n('registrar.no_visit_for_postpone'));
+                if (isGroupedRow) {
+                  notify.error(tI18n('registrar.reschedule_select_visit_required'));
+                } else {
+                  notify.error(tI18n('registrar.no_visit_for_postpone'));
+                }
                 return;
               }
+              onClose();
+              resetForm();
               logger.info(`Перенос визита ${targetVisitId} на ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
               await rescheduleVisit(targetVisitId as string | number, dateStr, timeStr || undefined);
               notify.success(tI18n('registrar.visit_postponed_date') + ` ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
@@ -192,6 +238,37 @@ const RescheduleSlotsDialog = ({
             </div>
           </div>
         </div>
+
+        {/* REG-FE-041 (#3820): a grouped row (several visits from one
+            multi-service booking) must NOT silently reschedule
+            visit_ids[0] — require an explicit target-visit choice. */}
+        {isGroupedRow && (
+          <div className="registrar-reschedule-card registrar-reschedule-card-neutral">
+            <label
+              htmlFor="reschedule-visit-select"
+              className="registrar-reschedule-label registrar-reschedule-label-text"
+            >
+              {tI18n('registrar.reschedule_select_visit_label')}
+            </label>
+            <select
+              id="reschedule-visit-select"
+              value={selectedVisitId}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedVisitId(e.target.value)}
+              aria-label={tI18n('registrar.reschedule_select_visit_label')}
+              className="registrar-reschedule-input registrar-reschedule-input-themed"
+            >
+              <option value="">{tI18n('registrar.reschedule_select_visit_placeholder')}</option>
+              {candidateVisitIds.map((visitId: unknown) => (
+                <option key={String(visitId)} value={String(visitId)}>
+                  {tI18n('registrar.reschedule_visit_option', { id: String(visitId) })}
+                </option>
+              ))}
+            </select>
+            <div className="registrar-reschedule-hint registrar-reschedule-hint-text">
+              {tI18n('registrar.reschedule_select_visit_label')}
+            </div>
+          </div>
+        )}
 
         {/* QW-02 fix: inline date picker replacing window.prompt().
             min=today prevents selecting past dates natively in the picker. */}
