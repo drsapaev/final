@@ -251,6 +251,37 @@ class PaymentInvariantService:
             Decimal("0"),
         )
 
+    def compute_net_paid_amounts_by_visit_id(
+        self, visit_ids: list[int]
+    ) -> dict[int, Decimal]:
+        """Compute net settled amounts for many visits in one query.
+
+        Batch counterpart of ``compute_paid_amount``: sums the unrefunded
+        portion (``max(amount - refunded_amount, 0)``) of ``paid`` and
+        ``completed`` payments per visit. Readers that display outstanding
+        debt for many visits (cashier pending list, cashier stats, grouped
+        payment allocation) must use this method instead of re-implementing
+        a gross ``Payment.amount`` sum that ignores refunds (CSH-FE-028).
+        """
+        if not visit_ids:
+            return {}
+        payments = (
+            self.db.query(Payment)
+            .filter(
+                Payment.visit_id.in_(list(visit_ids)),
+                Payment.status.in_(["paid", "completed"]),
+            )
+            .populate_existing()
+            .all()
+        )
+        net_by_visit: dict[int, Decimal] = dict.fromkeys(visit_ids, Decimal("0"))
+        for payment in payments:
+            net_by_visit[payment.visit_id] = (
+                net_by_visit.get(payment.visit_id, Decimal("0"))
+                + self._net_settled_amount(payment)
+            )
+        return net_by_visit
+
     @staticmethod
     def _net_settled_amount(payment: Payment) -> Decimal:
         """Return money still settled after partial or full refunds."""
