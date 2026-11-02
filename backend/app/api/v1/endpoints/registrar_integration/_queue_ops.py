@@ -214,13 +214,37 @@ def _prime_registrar_queue_read_cache(
         # when EXACTLY ONE unlinked entry matches (patient, day, doctor).
         # Several candidates cannot prove which entry owns the appointment,
         # so the key stays absent and the resolver attaches no ticket.
+        #
+        # REG-FE-062 (#3803 follow-up, 2026-11-02): uniqueness of the ENTRY is
+        # still not a binding to a specific Appointment.id. When SEVERAL
+        # non-hidden appointments share the (patient, day, doctor) key, a
+        # single unlinked entry cannot prove which appointment owns it —
+        # previously BOTH appointments displayed that ticket number. The
+        # key is stored only when the entry is unique AND exactly one
+        # appointment can own it. ``appointments`` is already scoped to
+        # ``appointment_date == target_day`` with hidden statuses excluded,
+        # i.e. precisely the appointment rows this payload can display.
         candidates_by_key: dict[tuple[int, date, int], list[Any]] = {}
         for entry, queue_day, specialist_id in rows:
             candidates_by_key.setdefault(
                 (entry.patient_id, queue_day, specialist_id), []
             ).append(entry)
+        appointments_per_key: dict[tuple[int, date, int], int] = {}
+        for appointment in appointments:
+            if getattr(appointment, "patient_id", None) is None:
+                continue
+            if getattr(appointment, "doctor_id", None) is None:
+                continue
+            appointment_key = (
+                appointment.patient_id,
+                appointment.appointment_date,
+                appointment.doctor_id,
+            )
+            appointments_per_key[appointment_key] = (
+                appointments_per_key.get(appointment_key, 0) + 1
+            )
         for key, candidates in candidates_by_key.items():
-            if len(candidates) == 1:
+            if len(candidates) == 1 and appointments_per_key.get(key, 0) == 1:
                 appointment_queue_metadata[key] = candidates[0]
 
     payment_truth_by_visit: dict[int, dict[str, Any]] = {}
@@ -1482,6 +1506,9 @@ def _resolve_queue_entry_metadata(
                 # REG-FE-022 (issue 3822): the cache stores a key ONLY when
                 # exactly one unlinked candidate matches (patient, day,
                 # doctor); an absent key means no unique proof — no ticket.
+                #
+                # REG-FE-062 (#3803 follow-up): the cache now ALSO requires
+                # exactly one appointment per key — see the builder.
                 queue_entry_row = cache["appointment_queue_metadata"].get(
                     (patient_id, appointment_date, doctor_id)
                 )
@@ -1489,6 +1516,12 @@ def _resolve_queue_entry_metadata(
                 # REG-FE-022 (issue 3822): same uniqueness rule for the direct
                 # query path — several matching unlinked entries cannot prove
                 # which one owns this appointment, so none may be attached.
+                #
+                # REG-FE-062 (#3803 follow-up): a single unlinked entry may
+                # attach only when exactly ONE non-hidden appointment shares
+                # the (patient, day, doctor) key; with several appointments
+                # the binding to a specific Appointment.id is unprovable, so
+                # no ticket may be attached to any of them.
                 candidate_rows = db.execute(
                     text(
                         """
@@ -1508,7 +1541,27 @@ def _resolve_queue_entry_metadata(
                     "doctor_id": doctor_id,
                     },
                 ).all()
-                queue_entry_row = candidate_rows[0] if len(candidate_rows) == 1 else None
+                from sqlalchemy import func as sa_func
+
+                from app.models.appointment import Appointment
+
+                matching_appointments = (
+                    db.query(Appointment)
+                    .filter(
+                        Appointment.patient_id == patient_id,
+                        Appointment.appointment_date == appointment_date,
+                        Appointment.doctor_id == doctor_id,
+                        ~sa_func.lower(
+                            sa_func.coalesce(Appointment.status, "")
+                        ).in_(REGISTRAR_HIDDEN_QUEUE_STATUSES),
+                    )
+                    .count()
+                )
+                queue_entry_row = (
+                    candidate_rows[0]
+                    if len(candidate_rows) == 1 and matching_appointments == 1
+                    else None
+                )
             if queue_entry_row:
                 queue_entry_number = queue_entry_row.number
                 queue_entry_time = queue_entry_row.queue_time
