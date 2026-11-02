@@ -23,7 +23,7 @@ interface CashierStatsCardProps {
 }
 
 /**
- * CSH-FE-036 P2 (PR #3830 review, comment 4439005298): a MISSING stats
+ * CSH-FE-036 P2 (PR 3830 review, comment 4439005298): a MISSING stats
  * field is not a zero. On a rolling frontend/backend deploy this frontend
  * may be served by an older /cashier/stats without refunded_amount /
  * net_* — formatUZS(undefined) would render a fake «0 сум» that

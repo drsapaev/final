@@ -29,7 +29,7 @@ import type { UsePaymentsReturn } from '../../hooks/usePayments';
 // total/cash/card stay gross; refunded_amount + net_* carry the same
 // period net of refunds. pending_amount has been net since CSH-FE-028.
 //
-// P2 (PR #3830 review, comment 4439005298): the CSH-FE-036 fields are
+// P2 (PR 3830 review, comment 4439005298): the CSH-FE-036 fields are
 // OPTIONAL — during a rolling frontend/backend deploy the frontend may
 // talk to an older /cashier/stats that does not return them. The payload
 // is stored verbatim and zeros are never invented: an absent key stays
@@ -53,7 +53,7 @@ export interface CashierStatsSnapshot {
   [k: string]: unknown;
 }
 
-// P2 (PR #3830 review, comment 4439005298): the CSH-FE-036 fields are
+// P2 (PR 3830 review, comment 4439005298): the CSH-FE-036 fields are
 // intentionally ABSENT from the empty snapshot — before the first
 // successful load (and after a failed one) their values are UNKNOWN, not
 // zero. The legacy gross counters keep the historical zero convention of

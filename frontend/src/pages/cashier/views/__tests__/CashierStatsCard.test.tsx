@@ -1,5 +1,5 @@
 /**
- * CSH-FE-036 P2 regression (PR #3830 review, comment 4439005298):
+ * CSH-FE-036 P2 regression (PR 3830 review, comment 4439005298):
  * CashierStatsCard must distinguish a MISSING stats field from a real zero.
  *
  * Rolling deployments can pair this frontend with an older /cashier/stats
