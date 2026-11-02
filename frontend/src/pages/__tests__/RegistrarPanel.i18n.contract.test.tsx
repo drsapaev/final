@@ -92,10 +92,11 @@ describe('RegistrarPanel STRAT#30 — i18n migration', () => {
     // PR-UI-13-1: registrar.backend_unavailable lives in useRegistrarWorklistData.
     // PR-UI-13-3: registrar.appointment_created lives in useRegistrarWizard;
     // the postpone/notify keys live in RescheduleSlots.
-    // PR-UI-13-5: sent_to_cabinet/visit_completed live in useRegistrarRowActions
-    // — all checked against the tree.
-    expect(sourceTree).toContain("tI18n('registrar.sent_to_cabinet')");
-    expect(sourceTree).toContain("tI18n('registrar.visit_completed')");
+    // REG-FE-014 (registrar audit ledger 3803): the context-menu success
+    // toasts for sent_to_cabinet/visit_completed moved OUT of
+    // useRegistrarRowActions — useRegistrarActions is the single ack owner,
+    // so the source tree no longer references these two keys (they stay in
+    // the locale files for backward compatibility).
     expect(sourceTree).toContain("tI18n('registrar.appointment_created')");
     expect(sourceTree).toContain("tI18n('registrar.visit_postponed')");
     expect(sourceTree).toContain("tI18n('registrar.no_visit_for_postpone')");
