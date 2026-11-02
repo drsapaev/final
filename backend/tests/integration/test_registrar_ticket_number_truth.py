@@ -20,6 +20,10 @@ Fail-first contract (issue 3822 acceptance):
 4. Multiple unlinked queue entries matching the same (patient, day, doctor)
    heuristic are ambiguous: the appointment gets NO ticket.
 5. A unique heuristic match still attaches the ticket.
+6. REG-FE-062 (#3803 follow-up): TWO appointments sharing one
+   (patient, day, doctor) key with a SINGLE unlinked entry are ambiguous —
+   the entry's uniqueness proves nothing about WHICH appointment owns it,
+   so NEITHER appointment may display that ticket (cache and direct paths).
 """
 
 from datetime import date, timedelta
@@ -324,6 +328,163 @@ def test_unique_appointment_match_attaches_ticket(
     appointment_row = _find(rows, "appointment", appointment.id)
     assert appointment_row["number"] == 9
     assert appointment_row["queue_position"] == 9
+
+
+def test_two_appointments_one_entry_attach_no_ticket_to_either(
+    client, db_session, auth_headers, admin_user, test_doctor, test_service
+):
+    """REG-FE-062 (#3803 follow-up): one unlinked entry, TWO appointments
+    sharing the same (patient, day, doctor) key.
+
+    The #3827 guard proved only that exactly one unlinked ENTRY exists per
+    key; it never proved the entry belongs to a specific ``Appointment.id``.
+    Both appointments then displayed the same ticket number. With two
+    appointments the binding is unprovable: NEITHER row may carry it.
+    """
+    today = clinic_today(db_session)
+    queue = DailyQueue(day=today, specialist_id=test_doctor.id, queue_tag="cardiology_common")
+    db_session.add(queue)
+    db_session.flush()
+
+    patient = Patient(first_name="Тест", last_name="Пациент Двух Записей")
+    db_session.add(patient)
+    db_session.flush()
+
+    entry = OnlineQueueEntry(
+        queue_id=queue.id, number=9, patient_id=patient.id,
+        visit_id=None, source="online", status="waiting",
+    )
+    first = Appointment(
+        patient_id=patient.id,
+        doctor_id=test_doctor.id,
+        appointment_date=today,
+        status="scheduled",
+        services=[test_service.name],
+    )
+    second = Appointment(
+        patient_id=patient.id,
+        doctor_id=test_doctor.id,
+        appointment_date=today,
+        status="scheduled",
+        services=[test_service.name],
+    )
+    db_session.add_all([entry, first, second])
+    db_session.commit()
+
+    rows = _rows_for(client.get(
+        f"/api/v1/registrar/queues/today?target_date={today.isoformat()}",
+        headers=auth_headers,
+    ))
+    first_row = _find(rows, "appointment", first.id)
+    second_row = _find(rows, "appointment", second.id)
+    assert first_row["number"] is None
+    assert first_row["queue_position"] is None
+    assert second_row["number"] is None
+    assert second_row["queue_position"] is None
+
+
+def test_resolver_direct_path_two_appointments_one_entry_attach_no_ticket(
+    db_session, test_doctor, test_service
+):
+    """REG-FE-062, direct (non-cached) resolver path.
+
+    The cache path is covered above; this exercises the fallback query
+    path used when the payload cache is absent. Same rule: one unlinked
+    entry + two appointments per key ⇒ no ticket for any of them, while
+    a single-appointment key keeps the unique match.
+    """
+    from app.api.v1.endpoints.registrar_integration._queue_ops import (
+        _REGISTRAR_QUEUE_CACHE_KEY,
+        _resolve_queue_entry_metadata,
+    )
+
+    today = clinic_today(db_session)
+    queue = DailyQueue(day=today, specialist_id=test_doctor.id, queue_tag="cardiology_common")
+    db_session.add(queue)
+    db_session.flush()
+
+    patient = Patient(first_name="Тест", last_name="Пациент Прямого Пути")
+    db_session.add(patient)
+    db_session.flush()
+
+    entry = OnlineQueueEntry(
+        queue_id=queue.id, number=9, patient_id=patient.id,
+        visit_id=None, source="online", status="waiting",
+    )
+    first = Appointment(
+        patient_id=patient.id,
+        doctor_id=test_doctor.id,
+        appointment_date=today,
+        status="scheduled",
+        services=[test_service.name],
+    )
+    second = Appointment(
+        patient_id=patient.id,
+        doctor_id=test_doctor.id,
+        appointment_date=today,
+        status="scheduled",
+        services=[test_service.name],
+    )
+    # A second patient with a single appointment keeps the unique match
+    # on the direct path (control against over-tightening).
+    other_patient = Patient(first_name="Тест", last_name="Контроль Одной Записи")
+    db_session.add(other_patient)
+    db_session.flush()
+    other_entry = OnlineQueueEntry(
+        queue_id=queue.id, number=15, patient_id=other_patient.id,
+        visit_id=None, source="online", status="waiting",
+    )
+    other_appointment = Appointment(
+        patient_id=other_patient.id,
+        doctor_id=test_doctor.id,
+        appointment_date=today,
+        status="scheduled",
+        services=[test_service.name],
+    )
+    db_session.add_all([entry, first, second, other_entry, other_appointment])
+    db_session.commit()
+
+    # Direct path precondition: no payload cache on this session.
+    assert _REGISTRAR_QUEUE_CACHE_KEY not in db_session.info
+
+    ambiguous = _resolve_queue_entry_metadata(
+        db=db_session,
+        entry_type="appointment",
+        entry_data=first,
+        entry_wrapper={"id": first.id},
+        record_id=first.id,
+        patient_id=patient.id,
+        appointment_date=today,
+        doctor_id=test_doctor.id,
+        idx=1,
+    )
+    assert ambiguous[0] is None
+
+    ambiguous_second = _resolve_queue_entry_metadata(
+        db=db_session,
+        entry_type="appointment",
+        entry_data=second,
+        entry_wrapper={"id": second.id},
+        record_id=second.id,
+        patient_id=patient.id,
+        appointment_date=today,
+        doctor_id=test_doctor.id,
+        idx=2,
+    )
+    assert ambiguous_second[0] is None
+
+    control = _resolve_queue_entry_metadata(
+        db=db_session,
+        entry_type="appointment",
+        entry_data=other_appointment,
+        entry_wrapper={"id": other_appointment.id},
+        record_id=other_appointment.id,
+        patient_id=other_patient.id,
+        appointment_date=today,
+        doctor_id=test_doctor.id,
+        idx=3,
+    )
+    assert control[0] == 15
 
 
 def test_ticket_identity_is_stable_across_pagination_pages(
