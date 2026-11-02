@@ -628,37 +628,39 @@ const WelcomeView = React.memo(({
               preferCanonicalQueueNumber
               showCheckboxes={true} // UX Audit Registrar #13: включаем чекбоксы для bulk print
               onRowClick={(row) => {
-                logger.info('Открыть детали записи:', row);
+                // REG-FE-013 (audit ledger 3803): безопасные факты вместо
+                // дампа строки — без ФИО/телефона пациента.
+                logger.info('[Welcome] Row action: open details', { recordId: row.id });
                 // Здесь можно открыть модальное окно с деталями записи
               }}
               onActionClick={(action, row, event) => {
                 switch (action) {
                   case 'view':
-                    logger.info('Просмотр записи:', row);
+                    logger.info('[Welcome] Row action: view', { recordId: row.id });
                     openRecordPreview(row);
                     break;
                   case 'edit':
-                    logger.info('[RegistrarPanel] Открытие мастера редактирования для:', row.patient_fio || row.patient_name);
+                    logger.info('[Welcome] Row action: edit', { recordId: row.id });
                     openRecordEditor(row);
                     break;
                   case 'payment':
-                    logger.info('Открытие модального окна оплаты для записи (welcome):', row);
+                    logger.info('[Welcome] Row action: payment', { recordId: row.id });
                     setPaymentDialog({ open: true, row, paid: false, source: 'welcome' });
                     break;
                   case 'in_cabinet':
-                    logger.info('Отправка пациента в кабинет (welcome):', row);
+                    logger.info('[Welcome] Row action: in_cabinet', { recordId: row.id });
                     updateAppointmentStatus(row.id, 'in_cabinet', '', row);
                     break;
                   case 'call':
-                    logger.info('Вызов пациента (welcome):', row);
+                    logger.info('[Welcome] Row action: call', { recordId: row.id });
                     handleStartVisit(row);
                     break;
                   case 'complete':
-                    logger.info('Завершение приёма (welcome):', row);
+                    logger.info('[Welcome] Row action: complete', { recordId: row.id });
                     updateAppointmentStatus(row.id, 'done', '', row);
                     break;
                   case 'print':
-                    logger.info('Печать талона (welcome):', row);
+                    logger.info('[Welcome] Row action: print', { recordId: row.id });
                     setPrintDialog({ open: true, type: 'ticket', data: row });
                     break;
                   case 'more':{
