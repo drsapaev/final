@@ -100,6 +100,24 @@ const PaymentWidget = ({
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [paymentStatus, setPaymentStatus] = useState('pending');
 
+  // CSH-FE-029: the polling interval is created once per payment and
+  // closes over the first-render closure where paymentData is still null —
+  // the status GET then never fires. A ref keeps the polling path pointed at
+  // the CURRENT payment data regardless of which render created the timer.
+  const paymentDataRef = useRef<PaymentData | null>(null);
+  useEffect(() => {
+    paymentDataRef.current = paymentData;
+  }, [paymentData]);
+
+  // CSH-FE-030: the translation wrapper returns a new t identity on
+  // every render; keeping t in loadProviders deps made the providers effect
+  // refetch in a loop after every state update. tRef gives loadProviders a
+  // stable dependency surface ([currency] only).
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  });
+
   // HIGH #7 fix: auto-polling for online payment status.
   // Previously the cashier had to click "Проверить статус" manually.
   // Now we poll every 5 seconds for up to 5 minutes (60 attempts),
@@ -137,18 +155,25 @@ const PaymentWidget = ({
         );
         setProviders(availableProviders);
 
-        // Автовыбор первого доступного провайдера
+        // Автовыбор первого доступного провайдера.
+        // CSH-FE-030: ручной выбор кассира не сбрасывается при повторной
+        // загрузке (смена валюты/рефреш) — автозамена только если текущий
+        // выбор пуст или отсутствует в новом списке.
         if (availableProviders.length > 0) {
-          setSelectedProvider(availableProviders[0].code);
+          setSelectedProvider((current) =>
+            current && availableProviders.some((provider: PaymentProviderDto) => provider.code === current)
+              ? current
+              : availableProviders[0].code
+          );
         }
       }
     } catch (err) {
       logger.error('Ошибка загрузки провайдеров:', err);
-      setError(getErrorMessage(err, t('payment.pay_widg_load_providers_error')));
+      setError(getErrorMessage(err, tRef.current('payment.pay_widg_load_providers_error')));
     } finally {
       setProvidersLoading(false);
     }
-  }, [currency, t]);
+  }, [currency]);
 
   // Загрузка доступных провайдеров
   useEffect(() => {
@@ -206,8 +231,11 @@ const PaymentWidget = ({
       }
       if (attemptsRef.current >= MAX_POLLING_ATTEMPTS) {
         clearPolling();
-        setError(t('payment.pay_widg_timeout'));
-        setPaymentStatus('failed');
+        // CSH-FE-031: five minutes of frontend polling is an
+        // observation limit, NOT provider failure — the payment may still
+        // complete. Surface an explicit monitoring-timeout state with a
+        // manual check instead of inventing a 'failed' payment status.
+        setPaymentStatus('status_check_timeout');
       }
     }, POLLING_INTERVAL_MS);
   }, [clearPolling, t]);
@@ -336,10 +364,13 @@ const PaymentWidget = ({
 
   // Проверка статуса платежа
   const checkPaymentStatus = async () => {
-    if (!paymentData?.payment_id) return;
+    // CSH-FE-029: polling reads the CURRENT payment data from the ref —
+    // the interval's closure cannot go stale.
+    const currentPaymentData = paymentDataRef.current;
+    if (!currentPaymentData?.payment_id) return;
 
     try {
-      const response = await apiClient.get(`/payments/${paymentData.payment_id}`);
+      const response = await apiClient.get(`/payments/${currentPaymentData.payment_id}`);
 
       if (response.data?.status) {
         // Keep exact backend payment status; frontend must not collapse provider/status aliases.
@@ -348,7 +379,7 @@ const PaymentWidget = ({
 
         if (nextStatus === 'paid' && onSuccess) {
           onSuccess({
-            ...paymentData,
+            ...currentPaymentData,
             ...(response.data as Record<string, unknown>),
             status: response.data.status
           });
@@ -430,6 +461,29 @@ const PaymentWidget = ({
                     {t('payment.pay_widg_start_tracking')}
                   </Button>
                 )}
+              </div>
+            </div>
+          </Alert>);
+
+      case 'status_check_timeout':
+        // CSH-FE-031: мониторинг остановлен по лимиту наблюдения — платёж
+        // НЕ считается проваленным; предупреждение + ручная сверка статуса.
+        return (
+          <Alert severity="warning" icon={<InfoIcon />}>
+            <div className="pw-provider-option-row">
+              <span>{t('payment.pay_widg_timeout')}</span>
+              <div className="pw-provider-option-badges">
+                <Button
+                  size="small"
+                  onClick={checkPaymentStatus}>
+                  {t('payment.pay_widg_check_status')}
+                </Button>
+                <Button
+                  size="small"
+                  variant="outline"
+                  onClick={startPolling}>
+                  {t('payment.pay_widg_start_tracking')}
+                </Button>
               </div>
             </div>
           </Alert>);
