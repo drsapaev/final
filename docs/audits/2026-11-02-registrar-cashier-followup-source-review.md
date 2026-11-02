@@ -117,6 +117,68 @@ The `loadServices` helper [AppointmentWizardV2.tsx L922–948](https://github.co
 - Review did **not** perform Vitest, pytest, Playwright, browser smoke, PowerShell execution gate, staging or production changes. Findings retain `REPRO-PENDING`.
 - Reproduction and any code changes belong to independent, domain-gated implementation PRs, not this documentation Draft.
 
+
+## Focused auxiliary registrar selector review (2026-11-02, main `1595ce3dc907c64da57fd221de330646e4a9ed90`)
+
+**Requested paths (source read):** `frontend/src/components/registrar/IntegratedDoctorSelector.tsx` (276 LOC), `IntegratedServiceSelector.tsx` (441 LOC), and `PriceOverrideApproval.tsx` (408 LOC). Cross-read `frontend/src/api/registrar.ts`, `frontend/src/hooks/useRegistrarApi.ts`, `frontend/src/App.tsx`, `frontend/src/pages/RegistrarPanel.tsx`, `backend/app/api/v1/endpoints/registrar_integration/_services_doctors.py`, `_queue_ops.py`, `backend/app/api/v1/endpoints/registrar_wizard/_cart.py`, `backend/app/models/visit.py`, and the existing `PriceOverrideApproval.contract.test.tsx`. Read installed React review skill and project SSOT repair skill. Note `main` has advanced since the audit branch was created at `ee7763e7`; the changes seen on current main include the merged Sentry fix #3804 and do not establish any of these components have a new runtime consumer.
+
+### Critical reachability boundary (NO active registrar route proved)
+
+Exact-identifier code search on current `main` returned each component's **own declaration**, API-wrapper comments, ADR mention, UI-baseline configuration, and a source-only PriceOverrideApproval contract test, but **no JSX import, route lazy import, barrel export used by a live consumer, or render call** for any of the three. `App.tsx` lazily mounts `RegistrarPanel`, which has no import of the three. This is **evidence of likely dormant UI**, not a proof that dynamic/plugin-loading is impossible. Neither `PriceOverrideApproval` nor the two selectors may be counted as a demonstrated **production registrar UI** problem without an actual mounted route or import trace.
+
+**Prior finding, DO NOT duplicate:** `IntegratedServiceSelector` [L45–85, L126–183](https://github.com/drsapaev/final/blob/1595ce3dc907c64da57fd221de330646e4a9ed90/frontend/src/components/registrar/IntegratedServiceSelector.tsx#L45-L183) contains hardcoded `DEMO_SERVICES` IDs/prices, sets them as selectable data before API resolution, and retains them on HTTP 401/403, other failures, or legitimate empty catalog responses. The default demo option IDs may collide with actual unrelated service records and the local sum is not a server quote. **Already explicitly unnumbered** in [registrar ledger PR #3803](https://github.com/drsapaev/final/pull/3803), at old ledger lines 536 and 795. It **must not** get a fresh REG-FE ID in this pass. Until these dormant components are removed or safely reactivated, never wire the demo selector to real booking actions.
+
+### Newly distinct findings
+
+| ID | Priority candidate | Evidence | Reachability/reproduction |
+| --- | --- | --- | --- |
+| **REG-FE-071** | P2 conditional | Doctor selector accepts `specialty` prop but does not filter fetched/rendered doctors by it | **DORMANT / SOURCE-OBSERVED / REPRO-PENDING** |
+| **REG-FE-072** | P2 conditional | Doctor selector presents per-specialty static limits as actual doctor's queue number range | **DORMANT / SOURCE-OBSERVED / REPRO-PENDING** |
+| **REG-FE-073** | P2 conditional | Price override list has no request-epoch guard for concurrent filter changes | **DORMANT / SOURCE-OBSERVED / REPRO-PENDING** |
+| **REG-FE-074** | P2 conditional | An optional queue-settings network failure rejects `Promise.all` and hides otherwise successfully loaded doctor roster | **DORMANT / SOURCE-OBSERVED / REPRO-PENDING** |
+| **REG-XC-001** | **P1 candidate, backend cross-contract** | Second price approval on an existing nonempty `Visit.doctor_price_override` uses in-place JSON mutation without SQLAlchemy dirty tracking | **BACKEND SOURCE-OBSERVED / DB-REPRO-PENDING**; API endpoint exists even if UI is dormant |
+
+#### REG-FE-071 — `specialty` filter ignored
+
+In [IntegratedDoctorSelector.tsx L29–41, L73–91, L167–183](https://github.com/drsapaev/final/blob/1595ce3dc907c64da57fd221de330646e4a9ed90/frontend/src/components/registrar/IntegratedDoctorSelector.tsx#L29-L183), the component declares a `specialty` prop, calls `fetchRegistrarDoctors()` **without a specialty argument**, and renders `doctors.map` without filtering. `specialty` appears only in the empty-state label. Backend `/registrar/doctors` supports a specialty filter, and clinic policy separately enforces eligible doctor/service associations. If a future mounted consumer supplies `specialty="cardiology"`, dermatologists and dentists remain selectable despite the prop. This does not prove an unauthorized booking (backend policy remains authoritative).
+
+**Red-first test (not run):** mount with synthetic doctor roster including cardio/derma/dental, `specialty="cardiology"`; assert only eligible matching records appear and only selected doctor IDs in canonical allowed scope can reach `onDoctorChange`. Retain server-side eligibility at save, do not substitute front-end specialty string as a policy decision.
+
+#### REG-FE-072 — displayed queue range is not the doctor's actual ticket sequence
+
+[IntegratedDoctorSelector.tsx L118–129, L226–237](https://github.com/drsapaev/final/blob/1595ce3dc907c64da57fd221de330646e4a9ed90/frontend/src/components/registrar/IntegratedDoctorSelector.tsx#L118-L129) computes `start_number-(start_number+max_per_day-1)` from `queueSettings.specialties[doctor.specialty]` and labels it the doctor's **online queue**. The backend [`/registrar/queue-settings` L479–523](https://github.com/drsapaev/final/blob/1595ce3dc907c64da57fd221de330646e4a9ed90/backend/app/api/v1/endpoints/registrar_integration/_queue_ops.py#L479-L523) explicitly returns a **specialty aggregate**, while the [`/registrar/doctors` L315–353](https://github.com/drsapaev/final/blob/1595ce3dc907c64da57fd221de330646e4a9ed90/backend/app/api/v1/endpoints/registrar_integration/_services_doctors.py#L315-L353) includes doctor-specific `start_number_online` and `max_online_per_day`. Actual DailyQueue numbers are backend/day/owner scoped, including snapshot policy, and must not be fabricated from a general specialty configuration. The displayed hypothetical range may disagree with the individual doctor, and with already issued tickets. Reword as **specialty limit settings** or consume canonical doctor/day queue facts, never label range as issued/guaranteed ticket numbers.
+
+**Red-first test:** doctors A and B share specialty but have different per-doctor limits; assert no fake per-doctor range from the shared specialty. Cover day with an already frozen queue snapshot.
+
+#### REG-FE-073 — stale filter response can overwrite latest approval list
+
+[PriceOverrideApproval.tsx L64–88](https://github.com/drsapaev/final/blob/1595ce3dc907c64da57fd221de330646e4a9ed90/frontend/src/components/registrar/PriceOverrideApproval.tsx#L64-L88) defines `loadPriceOverrides` dependent on `statusFilter`; each response unconditionally calls `setPriceOverrides(data)` and `setLoading(false)`. Rapid filter change `pending → approved`, with deferred `pending` response resolving after the `approved` response, renders pending entries under the approved filter. The mutation handler [L90–115](https://github.com/drsapaev/final/blob/1595ce3dc907c64da57fd221de330646e4a9ed90/frontend/src/components/registrar/PriceOverrideApproval.tsx#L90-L115) also calls `loadPriceOverrides()` without awaiting it or reconciling a stale response. Backend permissions and `available_actions` are correctly server-provided; this is a read-display freshness concern, not a proven authorization bypass.
+
+**Red-first test:** render component with deferred `fetchPriceOverrides({statusFilter:'pending'})` A and approved B; resolve B then A; visible list and loading must belong to B. Repeat after approve/reject and immediately changing filter. Use request-epoch/abort guard; optimistic UI success remains gated to acknowledged command, but list refresh must not revert newer filters.
+
+#### REG-FE-074 — optional settings failure blocks healthy doctor roster
+
+[IntegratedDoctorSelector.tsx L73–101](https://github.com/drsapaev/final/blob/1595ce3dc907c64da57fd221de330646e4a9ed90/frontend/src/components/registrar/IntegratedDoctorSelector.tsx#L73-L101) uses `Promise.all([fetchRegistrarDoctors(),fetchRegistrarQueueSettings()])` inside a single try/catch. If doctors succeeds but queue-settings fails 500/network, the component enters a global error state instead of showing doctors with queue metadata unavailable. This is an optional-display dependency blocking the primary selection surface. Backend read paths are independent. **Conditional dormant UI concern**.
+
+**Red-first test:** doctor API resolves with valid roster, settings API rejects; doctor selection should remain available, queue range omitted, with a separate settings warning. A genuine doctors API failure must still not invent a roster.
+
+#### REG-XC-001 — backend price approval can be acknowledged without persisting the visit override JSON (P1 candidate)
+
+This is a **cross-contract finding in backend source** uncovered while reviewing `PriceOverrideApproval`; do **not** present it as a frontend production incident or ship it in this docs-only PR.
+
+[Backend `_cart.py` L1314–1351](https://github.com/drsapaev/final/blob/1595ce3dc907c64da57fd221de330646e4a9ed90/backend/app/api/v1/endpoints/registrar_wizard/_cart.py#L1314-L1351) sets the override `status="approved"`, then mutates `visit.doctor_price_override[str(service_id)]` in place. [Visit model L64](https://github.com/drsapaev/final/blob/1595ce3dc907c64da57fd221de330646e4a9ed90/backend/app/models/visit.py#L64) maps this field as ordinary `mapped_column(JSON)` — **not `MutableDict`**. SQLAlchemy ordinarily does not detect in-place mutations to plain JSON-mapped dicts. For a **first** approval when JSON was empty, explicit `visit.doctor_price_override = {}` marks it changed; but for a **second** approval against a nonempty dict, there is no assignment/flag_modified, so the visit JSON may not be updated even though the DoctorPriceOverride record has an `approved` status and 2xx is returned. No `flag_modified` or explicit reassignment appears in this handler.
+
+**DB red-first (not run):** create one Visit with price override for service A already persisted; create pending override for service B on same Visit; call the actual approval endpoint under Registrar; **open a new DB session** and assert both A and B are present in Visit JSON, B matches approved price and approval status is committed. A mock-only unit test cannot reveal ORM dirty tracking. Validate invoice/visit price invariants separately (do not claim amount changed in the financial ledger). Repair as canonical backend mutation (new dict assignment or correct tracking), with mandatory DB/financial/clinical policy gate before source edits.
+
+### Positive checks and disposition
+
+- `PriceOverrideApproval` *does* gate approve/reject UI actions by backend `available_actions` / `can_approve` / `can_reject`, failing closed when absent. Backend GET `/registrar/price-overrides` response explicitly includes these flags and `POST /registrar/price-override/approve` checks `Admin` or `Registrar` + pending state. No new RBAC-bypass claim is justified.
+- `IntegratedDoctorSelector` schedule weekday order (Mon 0 → Sun 6) matches backend `ScheduleBase`; no weekday-offset bug found.
+- `IntegratedServiceSelector` helper `getTotalPrice` is client-calculated demo/read-side display only; no consumer of this selector was found in live wizard. Avoid claiming production invoice corruption.
+- Other unnumbered latent quality observations: `IntegratedDoctorSelector` uses a clickable `Card` with no keyboard/button semantics; `PriceOverrideApproval` requests only the latest 100 overrides, without pagination; do not inflate these into proven active user defects without route confirmation.
+- State **SOURCE-OBSERVED / REPRO-PENDING** for all new candidates. No Vitest/pytest/Playwright/real payment requests and no SQLAlchemy session test were executed. A source-contract test for `PriceOverrideApproval` exists, but it checks action-gate string patterns, not mounted filter races or DB persistence.
+- **Preferred owner decision before fixes:** If these components are intentionally retired, archive/remove legacy UI after import/build verification, with no need to turn them into production flows. If reactivation is planned, remove demo fallback, make date-aware server catalog and doctor ownership authoritative, and test the three components as mounted integrations. Backend REG-XC-001 should be triaged **independently**, because its endpoint remains reachable through HTTP even if the React UI is orphaned.
+
 ## Validation and rollback
 
 - Checked: prior audit indices, current repository `AGENTS.md`, project SSOT skill, canonical producer/consumer source and recent main commit via connected GitHub. Cross-checked the exact `refund_amount` name in both Pydantic and serializer; checked the actual `RecordPreview` consumer and `RefundType` enum.
