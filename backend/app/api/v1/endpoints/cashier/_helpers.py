@@ -337,6 +337,25 @@ def _cashier_paid_amounts_by_visit_id(db: Session, visit_ids: list[int]) -> dict
     return PaymentInvariantService(db).compute_net_paid_amounts_by_visit_id(visit_ids)
 
 
+def _cashier_external_refunds_by_payment_id(
+    db: Session, payment_ids: list[int]
+) -> dict[int, Decimal]:
+    """Completed refunds recorded OUTSIDE ``Payment.refunded_amount`` — SSOT delegate.
+
+    CSH-FE-036 (#3830 review follow-up): the force-majeure legs return money
+    without touching the payment column — a deposit credit rows a
+    ``DepositTransaction`` CREDIT (completed by construction, the patient
+    balance already rose) and a bank claim is money-returned only at
+    ``RefundRequest.status == 'completed'``. Thin delegate over the canonical
+    invariant so the stats endpoint and the invariant service agree.
+    """
+    from app.services.payment_invariant_service import PaymentInvariantService
+
+    return PaymentInvariantService(db).compute_completed_refunds_by_payment_id(
+        payment_ids
+    )
+
+
 async def _emit_payment_notification(
     *,
     db: Session,
