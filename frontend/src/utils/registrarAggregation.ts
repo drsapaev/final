@@ -141,6 +141,45 @@ const pickQueueNumberEntryId = (queueNumber: unknown): string | number | null =>
   return hasQueueIdentityValue(qn.id) ? (qn.id as string | number) : null;
 };
 
+// REG-FE-063 (registrar audit #3803, P1): a bare queue_tag is NOT a ticket
+// identity. The queue adapter used to emit queue_numbers elements without
+// any identity, so the all-departments merge key degenerated to
+// `<queue_tag>_undefined` and silently dropped a patient's second standalone
+// ticket of the same specialty (№7 of one cardiologist hid №12 of another).
+//
+// Merge priority (element-derived only — the key must stay recomputable for
+// elements accumulated from earlier rows):
+// 1. proven queue-entry identity (queue_entry_id / original_queue_id /
+//    doctor_queue_entry_id; legacy `id` only without the DailyQueue marker);
+// 2. owning daily queue + ticket number — numbers are per-queue, so the pair
+//    identifies the ticket even when the entry id is unknown. The legacy
+//    `queue_id` field carries the same DailyQueue ownership (resolver parity,
+//    see pickQueueNumberEntryId), so it scopes the key exactly like
+//    daily_queue_id instead of falling through to the opaque branch;
+// 3. legacy (queue_tag + service_id) scoping for elements that carry one —
+//    keyed WITH the ticket number when known: two live tickets of one
+//    service differ by number and must never merge (PR #3829 review);
+// 4. fully identical opaque content — never merges different numbers.
+const queueNumbersMergeKey = (queueNumber: Record<string, unknown>): string => {
+  const entryIdentity = pickQueueNumberEntryId(queueNumber);
+  if (hasQueueIdentityValue(entryIdentity)) {
+    return `queue-entry:${String(entryIdentity)}`;
+  }
+  const owningDailyQueueId = hasQueueIdentityValue(queueNumber.daily_queue_id)
+    ? queueNumber.daily_queue_id
+    : queueNumber.queue_id;
+  if (hasQueueIdentityValue(owningDailyQueueId) && hasQueueIdentityValue(queueNumber.number)) {
+    return `daily-queue:${String(owningDailyQueueId)}#${String(queueNumber.number)}`;
+  }
+  if (hasQueueIdentityValue(queueNumber.service_id)) {
+    const serviceScope = `${String(queueNumber.queue_tag ?? '')}_${String(queueNumber.service_id)}`;
+    return hasQueueIdentityValue(queueNumber.number)
+      ? `${serviceScope}#${String(queueNumber.number)}`
+      : serviceScope;
+  }
+  return `opaque:${String(queueNumber.queue_tag ?? '')}:${String(queueNumber.number ?? '')}:${String(queueNumber.created_at ?? queueNumber.queue_time ?? '')}`;
+};
+
 const pickCanonicalQueueEntryId = (appointment: Record<string, unknown>) => {
   const explicitQueueEntryId = appointment?.queue_entry_id ??
     appointment?.original_queue_id ??
@@ -394,11 +433,11 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
 
       if (Array.isArray(appointment.queue_numbers)) {
         const existingQueueIds = new Set(
-          (patientGroups[patientKey].queue_numbers || []).map((qn: Record<string, unknown>) => qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`),
+          (patientGroups[patientKey].queue_numbers || []).map((qn: Record<string, unknown>) => queueNumbersMergeKey(qn)),
         );
 
         appointment.queue_numbers.forEach((qn: Record<string, unknown>) => {
-          const queueId = qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`;
+          const queueId = queueNumbersMergeKey(qn);
           if (!existingQueueIds.has(queueId)) {
             patientGroups[patientKey].queue_numbers.push(qn);
             existingQueueIds.add(queueId);
