@@ -6695,6 +6695,7 @@ const uzLatn = {
     pay_cash_exact_btn: 'Qaytimsiz',
     pay_cash_insufficient: 'Mablagʻ yetarli emas. Yana kerak: {amount}',
     pay_cash_change_due: 'Qaytim: {amount}',
+    pay_cash_advance_notice: 'Ogohlantirish: summa qoldiq qarzdan {amount} ga ortiq. Ortiqcha qismi bemorning avansi sifatida saqlanadi.',
     pay_cash_note_label: 'Izoh (ixtiyoriy)',
     pay_cash_note_aria: 'Toʻlov izohi',
     pay_cash_note_placeholder: 'Qoʻshimcha maʼlumot',

@@ -6824,6 +6824,7 @@ const ru = {
     pay_cash_exact_btn: 'Без сдачи',
     pay_cash_insufficient: 'Недостаточно средств. Нужно ещё: {amount}',
     pay_cash_change_due: 'Сдача: {amount}',
+    pay_cash_advance_notice: 'Внимание: сумма превышает остаток долга на {amount}. Излишек будет сохранён как аванс пациента.',
     pay_cash_note_label: 'Примечание (необязательно)',
     pay_cash_note_aria: 'Примечание к оплате',
     pay_cash_note_placeholder: 'Дополнительная информация',
