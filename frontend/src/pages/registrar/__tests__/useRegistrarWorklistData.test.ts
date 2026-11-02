@@ -435,3 +435,225 @@ describe('useRegistrarWorklistData — REG-FE-034 malformed 200 envelopes fail c
     expect(result.current.dataSource).toBe('api');
   });
 });
+
+/**
+ * REG-FE-007 / REG-FE-020 / REG-FE-021 (registrar audit ledger 3803) —
+ * worklist refresh lifecycle.
+ *
+ * 007: HTTP 429 must surface as an explicit load failure (error on the
+ *      primary fetch, kept rows + stale on a refresh) — the 60s auto-refresh
+ *      cooldown alone is not user-visible state.
+ * 020: the shared in-flight guard and the 429 cooldown belong to the
+ *      AUTHORITATIVE request: a superseded request settling early must not
+ *      release the guard for a newer pending load (letting an unnecessary
+ *      auto-refresh C claim the newest sequence id), and a superseded 429
+ *      must not freeze auto-refresh after the newer request succeeded.
+ * 021: the auto-refresh interval reads the any-dialog flag on EVERY tick,
+ *      so opening a dialog pauses refresh and closing it resumes — without
+ *      waiting for an effect re-run; an interval created while a dialog was
+ *      open still recovers after it closes.
+ */
+describe('useRegistrarWorklistData — refresh lifecycle (REG-FE-007/020/021)', () => {
+  const hookDeps = (anyDialogOpenRef: { current: boolean } = { current: false }) => ({
+    searchParams: new URLSearchParams(),
+    activeTab: null,
+    showCalendar: false,
+    historyDate: '',
+    showWizard: false,
+    anyDialogOpenRef,
+    enrichAppointmentsWithPatientData: async (rows: Record<string, unknown>[]) => rows,
+    loadIntegratedData: () => undefined,
+    tI18n: (key: string) => key,
+  });
+
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
+  const rateLimited = () => Promise.reject({ response: { status: 429 } });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('REG-FE-007: a non-silent 429 primary load surfaces an explicit error state, not a silent spinner', async () => {
+    vi.mocked(api.get).mockImplementation(() => rateLimited() as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.dataSource).toBe('error');
+    expect(result.current.appointmentsLoading).toBe(false);
+  });
+
+  it('REG-FE-007: a 429 during a refresh keeps the loaded rows and marks them stale', async () => {
+    // Lazy factories: a rejected promise created before its consumer attaches
+    // a handler would surface as an unhandled rejection between act blocks.
+    const callQueue = [
+      () => Promise.resolve({ data: { queues: [{ entries: [{ id: 'row-1' }] }] } }),
+      () => rateLimited(),
+    ];
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift()!() as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+
+    await act(async () => {
+      result.current.loadAppointments({ silent: false, source: 'reg_fe_007_refresh' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+    expect(result.current.stale).toBe(true);
+    expect(result.current.dataSource).toBe('api');
+  });
+
+  it('REG-FE-020: a superseded request settling early keeps the in-flight guard for the newer pending load', async () => {
+    const lateA = deferred<{ data: { queues: unknown[] } }>();
+    const freshB = deferred<{ data: { queues: unknown[] } }>();
+    const callQueue: Array<Promise<{ data: { queues: unknown[] } }>> = [
+      Promise.resolve({ data: { queues: [] } }),
+      lateA.promise,
+      freshB.promise,
+    ];
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift() as never);
+
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const baselineCalls = vi.mocked(api.get).mock.calls.length;
+
+    // A (old date) starts and hangs; B (new date) starts and stays pending.
+    let aPromise: Promise<unknown> | null = null;
+    await act(async () => {
+      aPromise = result.current.loadAppointments({ silent: false, source: 'race_a' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      void result.current.loadAppointments({ silent: false, source: 'race_b' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // A settles while B is still pending: the shared in-flight guard must
+    // stay held by B, so the next auto-refresh tick must NOT start request C.
+    await act(async () => {
+      lateA.resolve({ data: { queues: [{ entries: [{ id: 'old-row' }] }] } });
+      await aPromise;
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      result.current.loadAppointments({ silent: true, source: 'auto_refresh' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(vi.mocked(api.get).mock.calls.length).toBe(baselineCalls + 2); // A and B only — no C
+
+    // B resolves and releases the guard: a later auto-refresh may run again.
+    await act(async () => {
+      freshB.resolve({ data: { queues: [{ entries: [{ id: 'new-row' }] }] } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['new-row']);
+    await act(async () => {
+      result.current.loadAppointments({ silent: true, source: 'auto_refresh' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(vi.mocked(api.get).mock.calls.length).toBe(baselineCalls + 3);
+  });
+
+  it('REG-FE-020: a superseded 429 does not freeze auto-refresh after the newer request succeeds', async () => {
+    const lateA = deferred<{ data: { queues: unknown[] } }>();
+    const freshB = deferred<{ data: { queues: unknown[] } }>();
+    const callQueue: Array<Promise<{ data: { queues: unknown[] } }>> = [
+      Promise.resolve({ data: { queues: [] } }),
+      lateA.promise,
+      freshB.promise,
+      Promise.resolve({ data: { queues: [{ entries: [{ id: 'post-cooldown-row' }] }] } }),
+    ];
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift() as never);
+
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    let aPromise: Promise<unknown> | null = null;
+    await act(async () => {
+      aPromise = result.current.loadAppointments({ silent: false, source: 'race_a_429' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      void result.current.loadAppointments({ silent: false, source: 'race_b_ok' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // A (superseded) rejects with 429: must NOT install the 60s cooldown.
+    await act(async () => {
+      lateA.reject({ response: { status: 429 } });
+      await aPromise!.then(() => undefined, () => undefined);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    // B succeeds.
+    await act(async () => {
+      freshB.resolve({ data: { queues: [{ entries: [{ id: 'b-row' }] }] } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['b-row']);
+
+    // An auto-refresh right after must NOT be blocked by A's stale cooldown.
+    await act(async () => {
+      result.current.loadAppointments({ silent: true, source: 'auto_refresh' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['post-cooldown-row']);
+  });
+
+  it('REG-FE-021: opening a dialog pauses the interval refresh and closing it resumes', async () => {
+    const anyDialogOpenRef = { current: false };
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: { queues: [] } }) as never);
+    renderHook(() => useRegistrarWorklistData(hookDeps(anyDialogOpenRef)));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const baselineCalls = vi.mocked(api.get).mock.calls.length;
+
+    // A payment/cancel dialog opens — no effect re-run, only the ref flips.
+    anyDialogOpenRef.current = true;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61_000);
+    });
+    expect(vi.mocked(api.get).mock.calls.length).toBe(baselineCalls); // paused
+
+    // The dialog closes: the next ticks refresh again.
+    anyDialogOpenRef.current = false;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61_000);
+    });
+    expect(vi.mocked(api.get).mock.calls.length).toBeGreaterThan(baselineCalls); // resumed
+  });
+
+  it('REG-FE-021: an interval created while a dialog was open still refreshes after it closes', async () => {
+    const anyDialogOpenRef = { current: true };
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: { queues: [] } }) as never);
+    renderHook(() => useRegistrarWorklistData(hookDeps(anyDialogOpenRef)));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const baselineCalls = vi.mocked(api.get).mock.calls.length;
+
+    // The dialog closes without any effect re-run (ref flip only).
+    anyDialogOpenRef.current = false;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61_000);
+    });
+    expect(vi.mocked(api.get).mock.calls.length).toBeGreaterThan(baselineCalls);
+  });
+});

@@ -340,12 +340,23 @@ export const useRegistrarWorklistData = ({
       }
     } catch (error: unknown) {
       if ((error as HttpApiError)?.response?.status === 429) {
-        autoRefreshCooldownUntilRef.current = Date.now() + 60_000;
-        autoRefreshCooldownLoggedRef.current = false;
-        logger.warn('⏳ Регистраторская очередь ограничена по частоте, включаем cooldown на 60с', {
-          source: callSource,
-          dateParam: showCalendar && historyDate ? historyDate : getLocalDateString()
-        });
+        // REG-FE-020 (audit ledger 3803): cooldown принадлежит авторитетному
+        // запросу — сменённый 429 не должен замораживать auto-refresh после
+        // успеха более нового запроса.
+        if (!isSuperseded()) {
+          autoRefreshCooldownUntilRef.current = Date.now() + 60_000;
+          autoRefreshCooldownLoggedRef.current = false;
+          logger.warn('⏳ Регистраторская очередь ограничена по частоте, включаем cooldown на 60с', {
+            source: callSource,
+            dateParam: showCalendar && historyDate ? historyDate : getLocalDateString()
+          });
+          // REG-FE-007 (audit ledger 3803): 429 — явный сбой загрузки, а не
+          // молчаливое «ничего»: primary → error + retry, refresh → строки
+          // остаются с явным stale. Автообновление честно заморожено cooldown.
+          startTransition(() => {
+            dispatch({ type: 'LOAD_FAILED', silent: Boolean(silent) });
+          });
+        }
         return;
       }
 
@@ -377,11 +388,17 @@ export const useRegistrarWorklistData = ({
         }
       }
     } finally {
-      loadAppointmentsInFlightRef.current = false;
-      // RQ-22: the finally cleanup of a SUPERSEDED request must not clear
-      // the loading flag of the newer in-flight load.
-      if (!isSuperseded() && !silent) {
-        dispatch({ type: 'LOAD_FINALLY', silent: Boolean(silent) });
+      // REG-FE-020 (audit ledger 3803): in-flight guard принадлежит новейшему
+      // запросу — finally сменённого запроса не должен освобождать его, иначе
+      // следующий auto-refresh tick стартует (и перехватит seq id у ещё
+      // висящего более нового запроса).
+      if (!isSuperseded()) {
+        loadAppointmentsInFlightRef.current = false;
+        // RQ-22: the finally cleanup of a SUPERSEDED request must not clear
+        // the loading flag of the newer in-flight load.
+        if (!silent) {
+          dispatch({ type: 'LOAD_FINALLY', silent: Boolean(silent) });
+        }
       }
     }
     // NOTE: tI18n is intentionally NOT in the dependency array — this mirrors
@@ -476,12 +493,18 @@ export const useRegistrarWorklistData = ({
     // NOTE (PR-UI-13-1): the dialog flags other than showWizard are read from
     // anyDialogOpenRef at effect-run time — they were intentionally NOT in the
     // original dependency array, and that stale-closure semantics is preserved.
-    const anyDialogOpen = showWizard || Boolean(anyDialogOpenRef.current);
-    if (anyDialogOpen) return;
+    // REG-FE-021 (audit ledger 3803): флаг anyDialogOpenRef читается НА
+    // КАЖДОМ тике интервала, а не один раз при создании эффекта —
+    // открытие/закрытие диалога теперь реально управляет паузой без
+    // ожидания ре-рана эффекта (реф не триггерит зависимости).
+    if (showWizard) return;
     if (!autoRefresh) return;
     if (Date.now() < autoRefreshCooldownUntilRef.current) return;
 
     const id = setInterval(() => {
+      if (anyDialogOpenRef.current) {
+        return;
+      }
       if (Date.now() < autoRefreshCooldownUntilRef.current || loadAppointmentsInFlightRef.current) {
         return;
       }
