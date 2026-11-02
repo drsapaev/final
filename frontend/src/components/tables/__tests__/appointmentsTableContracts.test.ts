@@ -122,17 +122,20 @@ describe('appointmentsTableContracts — getBackendActionAvailability (PR-UI-09e
 });
 
 describe('appointmentsTableContracts — getEnhancedAppointmentRowKey (PR-UI-09e-2)', () => {
-  it('builds the composite type:id:session:doctor:time:index key', () => {
+  // REG-FE-055 (audit ledger 3803): the key no longer embeds the
+  // page-relative index for records with a canonical id — the index made the
+  // same record remount on every reorder/page change.
+  it('builds the composite type:id:session:doctor:time key without the page index', () => {
     const row = {
       record_type: 'appointment', appointment_id: 42, session_id: 's1',
       doctor_id: 9, appointment_time: '10:00',
     } as AppointmentRow;
-    expect(getEnhancedAppointmentRowKey(row as never, 3)).toBe('appointment:42:s1:9:10:00:3');
+    expect(getEnhancedAppointmentRowKey(row as never, 3)).toBe('appointment:42:s1:9:10:00');
   });
 
   it('falls back through the id chain when appointment_id is missing', () => {
     const row = { visit_id: 7 } as AppointmentRow;
-    expect(getEnhancedAppointmentRowKey(row as never, 0)).toBe('appointment:7::::0');
+    expect(getEnhancedAppointmentRowKey(row as never, 0)).toBe('appointment:7:::');
   });
 });
 
@@ -190,4 +193,125 @@ describe('appointmentsTableContracts — createServiceMapping (PR-UI-09e-2)', ()
     expect(m.nameToService).toEqual({});
     expect(m.codeToService).toEqual({});
   });
+});
+
+// REG-FE-050/053/055/061 (registrar audit ledger 3803) — table contract
+// truthfulness: sortable text/date/status columns actually sort, search
+// matches the nested service names it renders, row keys stay stable across
+// reordering, and truncated 998 phones are not dressed up as complete
+// numbers.
+describe('appointmentsTableContracts — REG-FE-050 typed sorting', () => {
+  const rows: AppointmentRow[] = [
+    { id: 1, patient_fio: 'Янов Ярослав' },
+    { id: 2, patient_fio: 'Ivanov Ivan' },
+    { id: 3, patient_fio: 'Абрамов Абрам' },
+  ];
+
+  it('sorts Cyrillic/Latin patient names instead of leaving the input order (NaN comparator)', () => {
+    const asc = sortAppointmentsData(rows, { key: 'patient_fio', direction: 'asc' });
+    // ru collation: Cyrillic sorts before Latin (Абрамов < Янов < Ivanov);
+    // the contract is a real ordering, not the frozen input order.
+    expect(asc.map((r) => r.id)).toEqual([3, 1, 2]);
+    const desc = sortAppointmentsData(rows, { key: 'patient_fio', direction: 'desc' });
+    expect(desc.map((r) => r.id)).toEqual([2, 1, 3]);
+  });
+
+  it('sorts ISO appointment dates chronologically', () => {
+    const dateRows: AppointmentRow[] = [
+      { id: 1, appointment_date: '2026-11-03' },
+      { id: 2, appointment_date: '2026-01-15' },
+      { id: 3, appointment_date: '2026-10-01' },
+    ];
+    expect(sortAppointmentsData(dateRows, { key: 'appointment_date', direction: 'asc' }).map((r) => r.id))
+      .toEqual([2, 3, 1]);
+  });
+
+  it('sorts canonical status strings alphabetically', () => {
+    const statusRows: AppointmentRow[] = [
+      { id: 1, status: 'waiting' },
+      { id: 2, status: 'in_service' },
+      { id: 3, status: 'diagnostics' },
+    ];
+    expect(sortAppointmentsData(statusRows, { key: 'status', direction: 'asc' }).map((r) => r.id))
+      .toEqual([3, 2, 1]);
+  });
+
+  it('keeps numeric sorting for cost (missing cost coerces to 0 by the cost special case)', () => {
+    const mixed: AppointmentRow[] = [
+      { id: 1, patient_fio: 'a' },
+      { id: 2, cost: 200 },
+      { id: 3, cost: 100 },
+    ];
+    expect(sortAppointmentsData(mixed, { key: 'cost', direction: 'asc' }).map((r) => r.id))
+      .toEqual([1, 3, 2]);
+    expect(sortAppointmentsData(mixed, { key: 'cost', direction: 'desc' }).map((r) => r.id))
+      .toEqual([2, 3, 1]);
+  });
+
+  it('pushes missing text values last regardless of direction', () => {
+    const mixed: AppointmentRow[] = [
+      { id: 1, patient_fio: undefined },
+      { id: 2, patient_fio: 'b' },
+      { id: 3, patient_fio: 'a' },
+    ];
+    expect(sortAppointmentsData(mixed, { key: 'patient_fio', direction: 'asc' }).map((r) => r.id))
+      .toEqual([3, 2, 1]);
+    expect(sortAppointmentsData(mixed, { key: 'patient_fio', direction: 'desc' }).map((r) => r.id))
+      .toEqual([2, 3, 1]);
+  });
+});
+
+describe('appointmentsTableContracts — REG-FE-053 nested service search', () => {
+  const rows: AppointmentRow[] = [
+    { id: 1, services: [{ name: 'ЭхоКГ', code: 'K11' }] as never },
+    { id: 2, services: ['Терапия'] as never },
+    { id: 3, patient_fio: 'Другой Пациент' },
+  ];
+
+  it('matches a query against nested service object names and codes', () => {
+    expect(filterAppointmentsData(rows, { search: 'эхокг', status: '', dateFrom: '', dateTo: '', doctor: '', department: '' }).map((r) => r.id))
+      .toEqual([1]);
+    expect(filterAppointmentsData(rows, { search: 'K11', status: '', dateFrom: '', dateTo: '', doctor: '', department: '' }).map((r) => r.id))
+      .toEqual([1]);
+  });
+
+  it('still matches flat patient names and plain-string services', () => {
+    expect(filterAppointmentsData(rows, { search: 'терапия', status: '', dateFrom: '', dateTo: '', doctor: '', department: '' }).map((r) => r.id))
+      .toEqual([2]);
+    expect(filterAppointmentsData(rows, { search: 'другой', status: '', dateFrom: '', dateTo: '', doctor: '', department: '' }).map((r) => r.id))
+      .toEqual([3]);
+  });
+});
+
+describe('appointmentsTableContracts — REG-FE-055 stable row keys', () => {
+  it('the same record keeps its key when reordering changes its index', () => {
+    const row = { appointment_id: 42, record_type: 'visit' } as never;
+    const keyAtPosition0 = getEnhancedAppointmentRowKey(row, 0);
+    const keyAtPosition7 = getEnhancedAppointmentRowKey(row, 7);
+    expect(keyAtPosition7).toBe(keyAtPosition0);
+  });
+
+  it('rows without any canonical id keep the index discriminator', () => {
+    const bare = {} as never;
+    expect(getEnhancedAppointmentRowKey(bare, 3)).not.toBe(getEnhancedAppointmentRowKey(bare, 4));
+  });
+});
+
+describe('appointmentsTableContracts — REG-FE-061 phone formatting length guards', () => {
+  it('formats a complete 12-digit 998 number', () => {
+    expect(formatPhoneNumber('+998 90 123 45 67')).toBe('+998 (90) 123-45-67');
+  });
+
+  it('formats a complete 9-digit local number', () => {
+    expect(formatPhoneNumber('901234567')).toBe('+998 (90) 123-45-67');
+  });
+
+  it.each(['998', '99890', '9989012345', '+998 90 123 45'])(
+    'an incomplete 998-prefixed input %j is NOT dressed up as a complete number',
+    (input) => {
+      const formatted = formatPhoneNumber(input);
+      expect(formatted).toBe(input);
+      expect(formatted).not.toMatch(/\(\d+\)\s*--/);
+    },
+  );
 });
