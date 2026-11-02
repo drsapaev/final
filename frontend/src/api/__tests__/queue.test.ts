@@ -14,8 +14,10 @@ import {
   completeQueueJoinSession,
   fetchPublicQueueProfiles,
   fetchQrTokenInfo,
+  fetchQueuesToday,
   startQueueJoinSession,
 } from '../queue';
+import { mapQueuePayloadDto } from '../mappers/queue';
 
 // Cast api through unknown so we can call vitest mock methods on its
 // members without fighting the real AxiosInstance type.
@@ -93,5 +95,52 @@ describe('queue API', () => {
       existing_queue_entry_ids: [10, 11],
     });
     expect(data).toEqual({ success: true, total_amount: 25000 });
+  });
+});
+
+// REG-FE-034 (registrar audit ledger 3803): канонический конверт ответа
+// /registrar/queues/today — объект с МАССИВОМ queues. Всё остальное
+// (null, чужой конверт, отсутствие queues) — ошибка контракта, а не
+// «пустая очередь»: замалчивание превращает регрессию API/прокси в
+// «сегодня записей нет».
+describe('queue API envelope fail-closed (REG-FE-034)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('mapQueuePayloadDto rejects null and non-object payloads instead of inventing an empty queue', () => {
+    expect(() => mapQueuePayloadDto(null as never)).toThrow();
+    expect(() => mapQueuePayloadDto(undefined as never)).toThrow();
+    expect(() => mapQueuePayloadDto('nope' as never)).toThrow();
+  });
+
+  it('mapQueuePayloadDto rejects objects without a queues array', () => {
+    expect(() => mapQueuePayloadDto({ message: 'temporary issue' } as never)).toThrow();
+    expect(() => mapQueuePayloadDto({ queues: null } as never)).toThrow();
+    expect(() => mapQueuePayloadDto({ other: [] } as never)).toThrow();
+  });
+
+  it('mapQueuePayloadDto passes a valid envelope through', () => {
+    const payload = { queues: [] } as never;
+    expect(mapQueuePayloadDto(payload)).toEqual({ queues: [] });
+  });
+
+  it('fetchQueuesToday rejects a malformed 200 body', async () => {
+    apiMock.get.mockResolvedValueOnce({ data: { message: 'unexpected envelope' } });
+    await expect(fetchQueuesToday('2026-11-03')).rejects.toThrow();
+    expect(apiMock.get).toHaveBeenCalledWith(
+      '/registrar/queues/today',
+      expect.objectContaining({ params: { target_date: '2026-11-03' } }),
+    );
+  });
+
+  it('fetchQueuesToday rejects a null body', async () => {
+    apiMock.get.mockResolvedValueOnce({ data: null });
+    await expect(fetchQueuesToday('2026-11-03')).rejects.toThrow();
+  });
+
+  it('fetchQueuesToday resolves a valid empty envelope', async () => {
+    apiMock.get.mockResolvedValueOnce({ data: { queues: [] } });
+    await expect(fetchQueuesToday('2026-11-03')).resolves.toEqual({ queues: [] });
   });
 });

@@ -367,3 +367,71 @@ describe('useRegistrarWorklistData — RQ-22 late-response race guard (S-19)', (
     expect(result.current.dataSource).toBe('api');
   });
 });
+
+/**
+ * REG-FE-034 (registrar audit ledger 3803): malformed HTTP 200 envelopes
+ * must fail closed. A 200 body without a queues array (contract regression,
+ * proxy, bad deploy) is a LOAD FAILURE — not a valid empty clinical day.
+ * The valid empty day remains { queues: [] }.
+ */
+describe('useRegistrarWorklistData — REG-FE-034 malformed 200 envelopes fail closed', () => {
+  const hookDeps = () => ({
+    searchParams: new URLSearchParams(),
+    activeTab: null,
+    showCalendar: false,
+    historyDate: '',
+    showWizard: false,
+    anyDialogOpenRef: { current: false },
+    enrichAppointmentsWithPatientData: async (rows: Record<string, unknown>[]) => rows,
+    loadIntegratedData: () => undefined,
+    tI18n: (key: string) => key,
+  });
+
+  it.each([
+    { queues: null },
+    { message: 'temporary issue' },
+    { other: [] },
+  ])('a primary 200 body %j is a load error, not a valid empty queue', async (body) => {
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: body }) as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.dataSource).toBe('error');
+    expect(result.current.appointments).toEqual([]);
+  });
+
+  it('{ queues: [] } remains a valid authoritative empty day', async () => {
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: { queues: [] } }) as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.dataSource).toBe('api');
+    expect(result.current.appointments).toEqual([]);
+    expect(result.current.stale).toBe(false);
+  });
+
+  it('a malformed 200 during a refresh keeps the loaded rows and marks them stale', async () => {
+    const loaded = [{ id: 'row-1' }];
+    const callQueue = [
+      Promise.resolve({ data: { queues: [{ entries: loaded }] } }),
+      Promise.resolve({ data: { queues: null } }),
+    ];
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift() as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+
+    await act(async () => {
+      result.current.loadAppointments({ silent: false, source: 'reg_fe_034_refresh' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    // Rows survive the contract failure with an explicit stale flag.
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+    expect(result.current.stale).toBe(true);
+    expect(result.current.dataSource).toBe('api');
+  });
+});

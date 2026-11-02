@@ -256,40 +256,36 @@ export const useRegistrarWorklistData = ({
       // Axios successful response
       const data = response.data;
 
-      // Новый формат: данные сгруппированы по специальностям
+      // REG-FE-034 (audit ledger 3803): контракт канонического ответа —
+      // объект с массивом queues (backend _today_queues.py сериализует
+      // именно такой конверт). Старый произвольный fallback «объединить
+      // все массивы по ключам» удалён: конверт 200 без массива queues —
+      // это ошибка контракта (LOAD_FAILED → error/stale), а не «пустой
+      // день». { queues: [] } остаётся валидным пустым днём.
+      const rawQueues = data && typeof data === 'object'
+        ? (data as { queues?: unknown }).queues
+        : undefined;
+      if (!Array.isArray(rawQueues)) {
+        logger.warn('⚠️ Получены некорректные данные от сервера: queues array missing');
+        throw new Error(tI18n('registrarPanel.rp_err_invalid_data'));
+      }
+
+      // ⭐ SSOT: Simple flatMap - no deduplication, no aggregation
+      // Each backend entry = one frontend row
+      // Removed: appointmentsMap, mergedByPatientKey, getAppointmentKey, calcPriority, mergeAppointments
+
+      // ⭐ SSOT: flatMap all entries without any deduplication or aggregation
       let appointmentsData: Record<string, unknown>[] = [];
+      const queuesList = rawQueues as Record<string, unknown>[];
+      appointmentsData = queuesList.flatMap((queue) =>
+      (Array.isArray(queue.entries) ? queue.entries : [] as unknown[]).
+      map((entry: Record<string, unknown>) => adaptQueueEntry(entry, queue, data, dateParam, tI18n('registrarPanel.rp_unknown_patient'))).
+      filter((entry: Record<string, unknown> | null) => entry !== null) // Remove entries without ID
+      );
 
-      if (data && typeof data === 'object') {
-        // Обрабатываем формат от эндпоинта registrar_integration.py
-        if (data.queues && Array.isArray(data.queues)) {
-          // ⭐ SSOT: Simple flatMap - no deduplication, no aggregation
-          // Each backend entry = one frontend row
-          // Removed: appointmentsMap, mergedByPatientKey, getAppointmentKey, calcPriority, mergeAppointments
+      logger.info(`📊 SSOT: Loaded ${appointmentsData.length} entries (no dedup, no aggregation)`);
 
-          // ⭐ SSOT: flatMap all entries without any deduplication or aggregation
-          const queuesList = data.queues as Record<string, unknown>[];
-          appointmentsData = queuesList.flatMap((queue) =>
-          (Array.isArray(queue.entries) ? queue.entries : [] as unknown[]).
-          map((entry: Record<string, unknown>) => adaptQueueEntry(entry, queue, data, dateParam, tI18n('registrarPanel.rp_unknown_patient'))).
-          filter((entry: Record<string, unknown> | null) => entry !== null) // Remove entries without ID
-          );
-
-          logger.info(`📊 SSOT: Loaded ${appointmentsData.length} entries (no dedup, no aggregation)`);
-        } else {
-          // Обрабатываем старый формат для совместимости
-          if (activeTab && data[activeTab]) {
-            appointmentsData = Array.isArray(data[activeTab]) ? data[activeTab] : [];
-          } else {
-            // Берем все специальности и объединяем
-            for (const dept in data) {
-              const deptData = data[dept];
-              if (Array.isArray(deptData)) {
-                appointmentsData.push(...deptData);
-              }
-            }
-          }
-        }
-
+      {
         dispatch({
           type: 'PAGINATION_REPLACED',
           pagination: {
@@ -313,9 +309,6 @@ export const useRegistrarWorklistData = ({
           dispatch({ type: 'LOAD_EMPTY' });
           return; // ✅ Выходим из функции, не загружаем демо-данные
         }
-      } else {
-        logger.warn('⚠️ Получены некорректные данные от сервера:', data);
-        throw new Error(tI18n('registrarPanel.rp_err_invalid_data'));
       }
 
       if (appointmentsData.length > 0) {
