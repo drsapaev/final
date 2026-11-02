@@ -125,7 +125,7 @@ describe('useRegistrarRowActions (PR-UI-13-5)', () => {
     expect(updateAppointmentStatus).toHaveBeenCalledWith(7, 'in_cabinet', '', row);
   });
 
-  // REG-FE-014 (audit #3803): контекстное меню не подтверждает команду,
+  // REG-FE-014 (audit 3803): контекстное меню не подтверждает команду,
   // которая была отклонена сервером. runRegistrarRecordAction резолвит
   // null после ошибки/недоступности действия — success-тост из меню
   // превращал отказ в «Пациент отправлен в кабинет».

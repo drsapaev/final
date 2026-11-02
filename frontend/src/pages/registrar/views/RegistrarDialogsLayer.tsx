@@ -148,7 +148,7 @@ const RegistrarDialogsLayer = ({
       onClose={() => setCancelDialog({ open: false, row: null, reason: '' })}
       appointment={cancelDialog.row}
       onCancel={async (appointmentId, reason): Promise<CancelCommandOutcome> => {
-        // REG-FE-017 (#3803): колбэк возвращает типизированный результат
+        // REG-FE-017 (ledger PR 3803): колбэк возвращает типизированный результат
         // команды; тосты и закрытие — ответственность диалога. Рефреш
         // ворклиста — best-effort реконсиляция: его сбой не превращает
         // реальный результат отмены в противоположный.

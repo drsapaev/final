@@ -1,5 +1,5 @@
 /**
- * REG-FE-017 (registrar audit ledger #3803) — CancelDialog result contract.
+ * REG-FE-017 (registrar audit ledger 3803) — CancelDialog result contract.
  *
  * The cancel command can resolve WITHOUT cancelling anything:
  * runRegistrarRecordAction returns null after missing record refs or backend

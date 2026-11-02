@@ -12,7 +12,7 @@ import type { Appointment } from '../../types/domain/clinic';
 import { getErrorMessage } from '../../utils/type-guards';
 
 /**
- * REG-FE-017 (audit #3803): результат команды отмены — типизированный
+ * REG-FE-017 (audit 3803): результат команды отмены — типизированный
  * факт, а не «промис разрешился». resolve без отмены (null-результат
  * команды) и частичный батч больше не считаются полным успехом.
  */
@@ -75,7 +75,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
     try {
       if (onCancel && appointment) {
         const result = await onCancel(appointment.id, reason.trim());
-        // REG-FE-017 (#3803): успех подтверждается только явным
+        // REG-FE-017 (ledger PR 3803): успех подтверждается только явным
         // результатом команды. no_op/failed/partial держат диалог открытым;
         // легаси-void-контракт не считается доказательством отмены.
         if (result && typeof result === 'object' && 'outcome' in result) {

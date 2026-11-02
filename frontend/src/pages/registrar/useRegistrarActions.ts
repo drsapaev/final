@@ -39,7 +39,7 @@ import type { RegistrarRecordLike } from './registrarHelpers';
 import type { RegistrarPaymentInput, RegistrarPaymentSummary } from '../../api/registrarPayments';
 
 /**
- * REG-FE-015 (audit #3803): серверный /registrar/records/actions батч
+ * REG-FE-015 (audit 3803): серверный /registrar/records/actions батч
  * исполняется по-записи и не атомарен — success_count>0 при failed_count>0
  * означает, что часть записей УЖЕ изменена. Результат батча классифицируется
  * до какого-либо пользовательского сообщения.
