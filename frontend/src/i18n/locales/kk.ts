@@ -6695,6 +6695,7 @@ const kk = {
     pay_cash_exact_btn: 'Без сдачи',
     pay_cash_insufficient: 'Недостаточно средств. Нужно ещё: {amount}',
     pay_cash_change_due: 'Сдача: {amount}',
+    pay_cash_advance_notice: 'Ескерту: сома қалған борыштан {amount}-ға асады. Артылып тұрған бөлігі науқастың авансы ретінде сақталады.',
     pay_cash_note_label: 'Примечание (необязательно)',
     pay_cash_note_aria: 'Примечание к оплате',
     pay_cash_note_placeholder: 'Дополнительная информация',

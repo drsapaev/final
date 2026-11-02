@@ -132,7 +132,11 @@ const CashierPendingTable = ({
                     <CashierServiceBadges serviceCodes={appointment.services} serviceNames={appointment.services_names} tI18n={tI18n} />
                   </td>
                   <td className="cashier-text-sm cashier-text-accent">
-                    {format(Number(appointment.total_amount || appointment.remaining_amount || appointment.payment_amount || 0))}
+                    {/* CSH-FE-007: показываем канонический остаток долга, а не
+                        исходную сумму — после частичной оплаты строка не должна
+                        выглядеть как полная цена. `??` не даёт легитимному
+                        remaining_amount = 0 провалиться на total_amount. */}
+                    {format(Number(appointment.remaining_amount ?? appointment.total_amount ?? appointment.payment_amount ?? 0))}
                   </td>
                   <td className="cashier-cell-padded">
                     <Badge

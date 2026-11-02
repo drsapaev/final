@@ -1,7 +1,7 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useMemo } from 'react';
-import { CheckCircle, XCircle, Info } from 'lucide-react';
+import { CheckCircle, XCircle, Info, AlertTriangle } from 'lucide-react';
 import {
   Button,
   Input,
@@ -50,10 +50,14 @@ interface CashPaymentModalProps {
 
 const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymentModalProps) => {
     const { t: rawT } = useTranslation(); const t = rawT;
-    // Auto-fill amount from appointment data
-    const defaultAmount = appointment?.total_amount ||
-        appointment?.remaining_amount ||
-        appointment?.payment_amount ||
+    // Auto-fill amount from appointment data.
+    // CSH-FE-007: the canonical default is the remaining debt (remaining_amount),
+    // not the original total — a partially paid visit must not silently re-charge
+    // its full price. The `??` chain keeps a legitimate remaining_amount of 0
+    // from falling through to the full amount (0 means nothing left to collect).
+    const defaultAmount = appointment?.remaining_amount ??
+        appointment?.total_amount ??
+        appointment?.payment_amount ??
         '';
 
     const [paymentData, setPaymentData] = useState({
@@ -65,15 +69,25 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymen
 
     // Update amount when appointment changes
     useEffect(() => {
-        const newAmount = appointment?.total_amount ||
-            appointment?.remaining_amount ||
-            appointment?.payment_amount ||
+        const newAmount = appointment?.remaining_amount ??
+            appointment?.total_amount ??
+            appointment?.payment_amount ??
             '';
         setPaymentData(prev => ({ ...prev, amount: newAmount, receivedAmount: '' }));
     }, [appointment]);
 
     const numericAmount = Number(paymentData.amount) || 0;
     const numericReceived = Number(paymentData.receivedAmount) || 0;
+    // CSH-FE-007: canonical debt basis for this visit (remaining first) and the
+    // deliberate-overpay (advance) amount derived from what the cashier entered.
+    const remainingDebt = useMemo(() => {
+        const basis = Number(appointment?.remaining_amount ?? appointment?.total_amount ?? appointment?.payment_amount ?? 0);
+        return Number.isFinite(basis) ? basis : 0;
+    }, [appointment]);
+    const advanceAmount = useMemo(() => {
+        if (remainingDebt <= 0) return 0;
+        return Math.max(0, numericAmount - remainingDebt);
+    }, [remainingDebt, numericAmount]);
     const changeDue = useMemo(() => {
         if (paymentData.method !== 'cash') return 0;
         if (numericReceived <= 0) return 0;
@@ -169,6 +183,21 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymen
                             placeholder={t('payment.pay_cash_amount_placeholder')}
                             required
                         />
+                        {/* CSH-FE-007: deliberate overpay is an explicit advance — the
+                            cashier must see it before submitting, not discover it
+                            in the receipt. */}
+                        {advanceAmount > 0 && (
+                            <Box
+                                mt={1}
+                                px={1.5}
+                                py={1}
+                                className="cpm-advance-notice-box"
+                                role="alert"
+                                data-testid="cash-advance-notice">
+                                <AlertTriangle size={14} aria-hidden="true" />{' '}
+                                {t('payment.pay_cash_advance_notice', { amount: formatUZS(advanceAmount) })}
+                            </Box>
+                        )}
                     </Box>
 
                     <Box mb={2}>
