@@ -1,8 +1,9 @@
 # Cashier frontend audit ledger — 2026-11-01
 
-> **Status:** SOURCE REVIEW COMPLETE (BOUNDED) / read-only audit. No execution proof or production-readiness or financial-safety certification.
+> **Status:** CUMULATIVE AUDIT JOURNAL — actualized 2026-11-02 against `main` `1595ce3dc`: 2/36 items resolved — CSH-FE-028 via merged PR #3814, open question CSH-FE-036 by owner decision implemented in merged PR #3830; 34 remain REPRO-PENDING. Read-only audit origin; no production-readiness or financial-safety certification.
 >
 > **Baseline:** `origin/main` at `f308ed97e7f640a33e2bb255e23aaa109e69110a` (GitHub code search + pinned file reads). All findings provisional (`SOURCE-OBSERVED / REPRO-PENDING`); no Vitest, Playwright, pytest or CI was run. No application code, tests, backend, payments, database, secrets, or production touched.
+> **Actualized:** `main` at `1595ce3dc907c64da57fd221de330646e4a9ed90` (2026-11-02, post #3804 Sentry fail-closed merge).
 >
 > **Scope:** Only the cashier route and components that its active import graph reaches; the inventory lists directly mounted files and explicitly marked shared dependencies. This audit is **not** a statement that all frontend files or every indirect helper have been line-reviewed.
 
@@ -76,7 +77,7 @@
 | CSH-FE-025 | P3 | Sortable headers accessibility | Cashier history clickable th has no keyboard focus/Enter/Space semantics or aria-sort | SOURCE-OBSERVED / REPRO-PENDING | keyboard tab, Enter/Space and screen-reader sort announcement |
 | CSH-FE-026 | P3 | Global hotkeys in dialogs | Ctrl+F/R/E and F5 hijack browser operations even while input/textarea is focused | SOURCE-OBSERVED / REPRO-PENDING | focused refund reason / cash amount, Ctrl+E or Ctrl+F |
 | CSH-FE-027 | P3 | Hourly analytics date scope | Range-mode analytics uses stale hidden single-day selectedDate instead of visible date range | SOURCE-OBSERVED / REPRO-PENDING | select range Sept1–5, click Hourly statistics |
-| CSH-FE-028 | P2 | Refund-aware outstanding balance | Pending list, stats and grouped allocation count gross paid amounts after partial refunds; canonical invariant uses net settled amount | SOURCE-OBSERVED / REPRO-PENDING | single and grouped visit partial refund, pending due net vs gross |
+| CSH-FE-028 | P2 | Refund-aware outstanding balance | Pending list, stats and grouped allocation count gross paid amounts after partial refunds; canonical invariant uses net settled amount | RESOLVED / FIXED-VERIFIED — PR #3814 (merged f82fb2abd, main-CI green) | single and grouped visit partial refund |
 | CSH-FE-029 | P2 | Online payment automatic polling | Polling interval closes over first-render paymentData=null, so repeated checks may never reach canonical status GET | SOURCE-OBSERVED / REPRO-PENDING | provider init returns payment_id; fake clock 5/10 sec; expect GET /payments/id |
 | CSH-FE-030 | P2 | Provider load effect stability | Translation t identity changes each render, causing loadProviders useCallback and useEffect to fetch again after state updates | SOURCE-OBSERVED / REPRO-PENDING | mock providers 200, render PaymentWidget; GET count stable across rerenders |
 | CSH-FE-031 | P2 | Payment poll timeout semantics | Five-minute observation limit sets backend payment UI status to failed even without provider failure | SOURCE-OBSERVED / REPRO-PENDING | provider pending for 60 polls, then provider paid after timeout |
@@ -84,7 +85,7 @@
 | CSH-FE-033 | P3 | CSV refund status | CSV maps refunded statuses to pending 'Ожидает' instead of returned | SOURCE-OBSERVED / REPRO-PENDING | paid, refunded, cancelled, processing distinct CSV rows |
 | CSH-FE-034 | P2 | Spreadsheet injection on export | Cashier CSV writes patient names and free-text notes without spreadsheet formula neutralization | SOURCE-OBSERVED / REPRO-PENDING | untrusted name/note starting =,+,-,@, tab and safe text |
 | CSH-FE-035 | P2 | Successful HTTP envelope validation | usePayments GET accepts malformed 200 JSON as success/empty with unvalidated pagination metadata | SOURCE-OBSERVED / REPRO-PENDING | HTTP 200 with {message:'error'}, string, missing items, invalid total |
-| CSH-FE-036 | Undecided | Stats totals gross vs net-of-refunds | `/cashier/stats` `total_amount`/`cash_amount`/`card_amount` still sum original payment amounts while `pending_amount` is now net-of-refunds; owner decision required before classification as an error | SOURCE-OBSERVED / DECISION-PENDING | paid 100 + partial refund 30: totals show 100, pending debt uses 70 |
+| CSH-FE-036 | Resolved (decision) | Stats totals gross vs net-of-refunds | `/cashier/stats` `total_amount`/`cash_amount`/`card_amount` still sum original payment amounts while `pending_amount` is now net-of-refunds; owner decision required before classification as an error | RESOLVED / DECISION-IMPLEMENTED — PR #3830 (merged fb5fc995c): BOTH semantics exposed — gross receipts AND net-of-refunds; absent net fields render «—», no invented zeros | paid 100 + partial refund 30: totals show 100 (gross), net tiles show 70 |
 
 ### CSH-FE-001 — HTTP error is shown as a genuinely empty cashier selection (P2 candidate)
 
@@ -423,6 +424,8 @@ Follow-up review of #3814 (`f82fb2ab`, the CSH-FE-028 net-of-refund debt fix), a
 
 **Validation boundary:** source review only; no tests were executed for this entry.
 
+**Resolution (2026-11-02):** owner decision — expose **BOTH** semantics instead of choosing one. Implemented by PR #3830 (merged `fb5fc995c`, main-CI green): the stats card now shows gross receipts and net-of-refunds side by side; a legacy API without net fields renders «—» for those tiles instead of inventing zeros (real zero still shows «0 сум»). Contract pinned by tests at both levels (hook regression "no invented zeros" + component CashierStatsCard scenarios). The endpoint no longer mixes semantics silently: each tile is labelled gross or net.
+
 ## Initial source positives / boundaries
 
 - The panel uses the canonical backend-provided `can_create_direct_payment` and `can_create_grouped_payment` in action availability ([CashierPendingTable.tsx L145–L169](https://github.com/drsapaev/final/blob/f308ed97e7f640a33e2bb255e23aaa109e69110a/frontend/src/pages/cashier/views/CashierPendingTable.tsx#L145-L169)), rather than guessing payment eligibility from display status.
@@ -440,6 +443,7 @@ Follow-up review of #3814 (`f82fb2ab`, the CSH-FE-028 net-of-refund debt fix), a
 | 2026-11-01 | Cashier Group 5 source contracts/provider/CI audit | Added CSH-FE-028–035: net refund mismatch, stale online polling, provider effect refetch loop, wrong timeout status, truncated exports, refunded CSV mislabel, CSV formula injection, malformed 200 envelope. Reviewed relevant backend service, routes and existing tests. CI log explains PR template red gate | GitHub source and CI read-only checks; no runtime tests/browser or actual payment. All findings provisional. |
 
 | 2026-11-02 | Post-merge follow-up review of #3814 (f82fb2ab) | Added CSH-FE-036 open question: `/cashier/stats` totals/cash/card remain gross sums of original payment amounts while pending debt is now net-of-refunds; owner decision required. No new P0/P1 in #3814's changed lines | Source review at main `a50f7c40a043d1d749a164684e53d25cfe2ae094`; no tests executed |
+| 2026-11-02 | Actualization against main `1595ce3dc` (post #3804) | Marked RESOLVED with PR links: CSH-FE-028→#3814 (merged f82fb2abd), open question CSH-FE-036→owner decision "both semantics", implemented by #3830 (merged fb5fc995c, dual gross+net tiles, «—» for absent net fields). The other 34 findings stay REPRO-PENDING with the original remediation order (next: CSH-FE-007, then 011/012, then 029/030/031); all historical sections and evidence records preserved. This ledger is a historical audit journal, independently tracked from registrar #3803 | Merged diffs of #3814/#3830 verified at their merge SHAs (API); post-merge main-CI green on record for each; no new runtime tests in this round |
 
 ## Closure
 
