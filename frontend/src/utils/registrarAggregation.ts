@@ -483,6 +483,13 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
       payment_status: normalizedPayment,
       payment_type: appointment.payment_type || null,
       cost: appointmentCost,
+      // REG-FE-064 (audit ledger 3803): per-record факты для честного
+      // выбора визита при переносе групповой записи — врач, услуги и
+      // исходные дата/время конкретного визита, а не только его числовой id.
+      doctor_name: appointment.doctor_name || appointment.specialist_name || null,
+      services: Array.isArray(appointment.services) ? [...appointment.services] : [],
+      record_date: appointment.record_date ?? appointment.date ?? null,
+      appointment_time: appointment.appointment_time ?? appointment.time ?? null,
     });
 
     if (Array.isArray(appointment.services)) {
