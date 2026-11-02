@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import logger from '../utils/logger';
 import {
   fetchAvailableSpecialists,
@@ -160,6 +160,8 @@ const buildStatsFromEntries = (entries: QueueEntry[] = []): QueueStats => ({
 
 export const useQueueManager = (): UseQueueManagerReturn => {
   const [loading, setLoading] = useState<boolean>(false);
+  // REG-FE-035: монотонная эпоха снапшот-запросов (см. loadQueueSnapshot).
+  const snapshotEpochRef = useRef(0);
   const [specialists, setSpecialists] = useState<QueueSpecialist[]>([]);
   const [queueData, setQueueData] = useState<QueueData | null>(null);
   const [statistics, setStatistics] = useState<QueueStats | null>(null);
@@ -184,23 +186,31 @@ export const useQueueManager = (): UseQueueManagerReturn => {
         return null;
       }
 
+      // REG-FE-035 (audit ledger 3803): эпоха запроса — последний выбранный
+      // врач/дата владеет состоянием. Запоздалый ответ сменённого запроса
+      // (успех, отказ или finally) не должен ни перезаписать более новый
+      // снапшот, ни снять общий loading пока новый запрос в полёте.
+      const epoch = ++snapshotEpochRef.current;
       setLoading(true);
       try {
         const payload = (await fetchQueuesToday(targetDate)) as QueuePayload;
-        const queue: QueueData =
-          pickQueueForDoctor(payload, specialistId, doctor) || {
-            id: Number(specialistId),
-            entries: [],
-            stats: null,
-            opened_at: null,
-          };
+        if (epoch !== snapshotEpochRef.current) {
+          return null;
+        }
+
+        // REG-FE-042 (audit ledger 3803): null = «Очередь не найдена» —
+        // QueueTable различает не-найденную очередь и реальную пустую.
+        // Фабрика «пустой» очереди с id специалиста стирает это различие
+        // и маскирует неверный выбор/владение — больше не подменяем.
+        const queue: QueueData | null = pickQueueForDoctor(payload, specialistId, doctor);
 
         setQueueData(queue);
 
-        const statsPayload: QueueStats =
-          queue.stats ||
-          queue.statistics ||
-          buildStatsFromEntries(queue.entries);
+        const statsPayload: QueueStats = queue
+          ? queue.stats ||
+            queue.statistics ||
+            buildStatsFromEntries(queue.entries)
+          : { total_entries: 0, waiting: 0, completed: 0 };
 
         setStatistics({
           total_entries:
@@ -222,9 +232,16 @@ export const useQueueManager = (): UseQueueManagerReturn => {
 
         return queue;
       } catch (err: unknown) {
+        if (epoch !== snapshotEpochRef.current) {
+          // Отказ сменённого запроса не должен падать в UI более нового
+          // вызова — его владелец уже другой.
+          return null;
+        }
         throw toError(err, 'Ошибка загрузки очереди');
       } finally {
-        setLoading(false);
+        if (epoch === snapshotEpochRef.current) {
+          setLoading(false);
+        }
       }
     },
     []

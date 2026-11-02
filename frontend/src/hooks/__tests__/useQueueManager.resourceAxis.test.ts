@@ -132,10 +132,15 @@ describe('useQueueManager resource-axis queue matching (QD-2C round-17 P1)', () 
     expect(result.current.statistics?.waiting).toBe(1);
   });
 
-  it('still substitutes an empty queue for an id on neither ownership axis', async () => {
+  // REG-FE-042 (registrar audit ledger 3803): re-contracted. An id on
+  // neither ownership axis means NO queue — queueData stays null so
+  // QueueTable renders «Очередь не найдена» — distinct from a real empty
+  // queue. The former fabricated { id, entries: [] } substitution masked
+  // wrong specialist/resource ownership as an empty queue.
+  it('keeps queueData null for an id on neither ownership axis (REG-FE-042)', async () => {
     const { result } = renderHook(() => useQueueManager());
 
-    let picked: unknown = null;
+    let picked: unknown = 'sentinel';
     await act(async () => {
       picked = await result.current.loadQueueSnapshot({
         specialistId: 999,
@@ -143,10 +148,9 @@ describe('useQueueManager resource-axis queue matching (QD-2C round-17 P1)', () 
       });
     });
 
-    const queue = picked as { entries?: unknown[]; id?: number };
-    expect(queue.id).toBe(999);
-    expect(queue.entries).toHaveLength(0);
-    expect(result.current.statistics?.waiting).toBe(0);
+    expect(picked).toBeNull();
+    expect(result.current.queueData).toBeNull();
+    expect(result.current.statistics).toEqual({ total_entries: 0, waiting: 0, completed: 0 });
   });
 
   it('keeps the exact specialist_id match for doctor-owned queues', async () => {
