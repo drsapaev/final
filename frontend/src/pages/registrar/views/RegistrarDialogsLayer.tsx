@@ -80,6 +80,8 @@ interface RegistrarDialogsLayerProps {
   runRegistrarRecordAction: (record: Record<string, unknown>, action: string, payload?: Record<string, unknown>) => Promise<{ success?: boolean; success_count?: number; failed_count?: number; results?: { success?: boolean; error?: string }[] } | null>;
   handlePayment: (appointment: Record<string, unknown>, paymentData: RegistrarPaymentInput) => Promise<RegistrarPaymentSummary>;
   resolveRescheduleVisitId: (appointmentRow: Record<string, unknown>) => unknown;
+  /** REG-FE-041 (issue 3820): full visit-id list for the explicit target-visit choice. */
+  getRescheduleVisitIds: (appointmentRow: Record<string, unknown>) => unknown[];
   removeRescheduledAppointmentFromView: (appointmentRow: Record<string, unknown>, visitId: unknown) => void;
   confirm: (options: Record<string, unknown>) => Promise<boolean>;
   tI18n: (key: string, options?: Record<string, unknown>) => string;
@@ -125,6 +127,7 @@ const RegistrarDialogsLayer = ({
   runRegistrarRecordAction,
   handlePayment,
   resolveRescheduleVisitId,
+  getRescheduleVisitIds,
   removeRescheduledAppointmentFromView,
   confirm,
   tI18n,
@@ -268,6 +271,7 @@ const RegistrarDialogsLayer = ({
       onClose={closeRescheduleDialog}
       confirm={confirm}
       resolveRescheduleVisitId={resolveRescheduleVisitId}
+      getRescheduleVisitIds={getRescheduleVisitIds}
       removeRescheduledAppointmentFromView={removeRescheduledAppointmentFromView}
       loadAppointments={loadAppointments}
       tI18n={tI18n}
@@ -300,9 +304,11 @@ const RegistrarDialogsLayer = ({
     {/* ✅ Форс-мажор модальное окно */}
     <ForceMajeureModal
       isOpen={forceMajeureModal.open}
-      onClose={() => setForceMajeureModal({ open: false, specialistId: null, specialistName: '' })}
+      onClose={() => setForceMajeureModal({ open: false, specialistId: null, specialistName: '', targetDate: null, dailyQueueId: null })}
       specialistId={forceMajeureModal.specialistId}
       specialistName={forceMajeureModal.specialistName}
+      targetDate={forceMajeureModal.targetDate}
+      dailyQueueId={forceMajeureModal.dailyQueueId}
       onSuccess={(action, result) => {
         logger.info('[RegistrarPanel] Force majeure action completed:', action, result);
         notify.success(action === 'transfer' ? tI18n('registrarPanel.rp_notify_force_majeure_transfer') : tI18n('registrarPanel.rp_notify_force_majeure_cancel'));

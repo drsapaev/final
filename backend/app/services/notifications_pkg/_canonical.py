@@ -2,6 +2,7 @@
 
 Split from notifications.py.
 """
+
 from __future__ import annotations
 
 from app.services.notifications_pkg._base import (
@@ -150,7 +151,6 @@ class CanonicalMixin(NotificationSenderMixinBase):
             )
             return False
 
-
     async def send_canonical_notification_to_roles(
         self,
         *,
@@ -168,7 +168,7 @@ class CanonicalMixin(NotificationSenderMixinBase):
         actor_role: str | None = None,
         entity_type: str | None = None,
         entity_id: str | int | None = None,
-        ) -> bool:
+    ) -> bool:
         """Record one canonical inbox delivery fan-out for role recipients."""
         try:
             normalized_event_type = _normalize_notification_event_type(
@@ -230,7 +230,6 @@ class CanonicalMixin(NotificationSenderMixinBase):
             )
             return False
 
-
     async def send_lab_event_notification(
         self,
         *,
@@ -279,9 +278,9 @@ class CanonicalMixin(NotificationSenderMixinBase):
             actor_id=getattr(actor_user, "id", None),
             actor_role=getattr(actor_user, "role", None),
             entity_type="lab_result",
-            entity_id=(metadata or {}).get("result_id") or (metadata or {}).get("order_id"),
+            entity_id=(metadata or {}).get("result_id")
+            or (metadata or {}).get("order_id"),
         )
-
 
     async def send_registrar_event_notification(
         self,
@@ -294,6 +293,8 @@ class CanonicalMixin(NotificationSenderMixinBase):
         roles: list[str] | None = None,
         deep_link: str | None = None,
         actor_user: User | None = None,
+        entity_type: str | None = None,
+        entity_id: str | int | None = None,
     ) -> bool:
         """Typed producer helper for registrar/admin canonical events."""
         normalized_type = _normalize_notification_event_type(event_type)
@@ -308,13 +309,17 @@ class CanonicalMixin(NotificationSenderMixinBase):
             return False
 
         resolved_roles = roles or ["registrar"]
-        if normalized_type in {
-            "registrar_system_alert",
-            "security_alert",
-            "billing_alert",
-            "all_free_requested",
-            "patient_registered",
-        } and "admin" not in resolved_roles:
+        if (
+            normalized_type
+            in {
+                "registrar_system_alert",
+                "security_alert",
+                "billing_alert",
+                "all_free_requested",
+                "patient_registered",
+            }
+            and "admin" not in resolved_roles
+        ):
             resolved_roles = [*resolved_roles, "admin"]
 
         return await self.send_canonical_notification_to_roles(
@@ -326,18 +331,23 @@ class CanonicalMixin(NotificationSenderMixinBase):
             source_module="registrar",
             metadata=metadata,
             deep_link=deep_link or "/registrar",
-            severity="critical"
-            if normalized_type in {"security_alert", "billing_alert"}
-            else "info",
-            priority="urgent"
-            if normalized_type in {"security_alert", "billing_alert"}
-            else "high",
+            severity=(
+                "critical"
+                if normalized_type in {"security_alert", "billing_alert"}
+                else "info"
+            ),
+            priority=(
+                "urgent"
+                if normalized_type in {"security_alert", "billing_alert"}
+                else "high"
+            ),
             actor_id=getattr(actor_user, "id", None),
             actor_role=getattr(actor_user, "role", None),
-            entity_type="visit",
-            entity_id=(metadata or {}).get("visit_id"),
+            entity_type=entity_type or "visit",
+            entity_id=(
+                entity_id if entity_id is not None else (metadata or {}).get("visit_id")
+            ),
         )
-
 
     async def send_queue_position_event_notification(
         self,
@@ -378,7 +388,6 @@ class CanonicalMixin(NotificationSenderMixinBase):
             entity_type="queue",
             entity_id=(metadata or {}).get("queue_id"),
         )
-
 
     async def send_patient_registered_notification(
         self,
@@ -423,5 +432,3 @@ class CanonicalMixin(NotificationSenderMixinBase):
             entity_type="patient",
             entity_id=patient_id,
         )
-
-

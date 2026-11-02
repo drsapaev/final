@@ -98,6 +98,12 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.refund_deposit import (
+    DepositTransaction,
+    DepositTransactionType,
+    RefundRequest,
+    RefundRequestStatus,
+)
 from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
@@ -250,6 +256,101 @@ class PaymentInvariantService:
             (self._net_settled_amount(payment) for payment in payments),
             Decimal("0"),
         )
+
+    def compute_net_paid_amounts_by_visit_id(
+        self, visit_ids: list[int]
+    ) -> dict[int, Decimal]:
+        """Compute net settled amounts for many visits in one query.
+
+        Batch counterpart of ``compute_paid_amount``: sums the unrefunded
+        portion (``max(amount - refunded_amount, 0)``) of ``paid`` and
+        ``completed`` payments per visit. Readers that display outstanding
+        debt for many visits (cashier pending list, cashier stats, grouped
+        payment allocation) must use this method instead of re-implementing
+        a gross ``Payment.amount`` sum that ignores refunds (CSH-FE-028).
+        """
+        if not visit_ids:
+            return {}
+        payments = (
+            self.db.query(Payment)
+            .filter(
+                Payment.visit_id.in_(list(visit_ids)),
+                Payment.status.in_(["paid", "completed"]),
+            )
+            .populate_existing()
+            .all()
+        )
+        net_by_visit: dict[int, Decimal] = dict.fromkeys(visit_ids, Decimal("0"))
+        for payment in payments:
+            net_by_visit[payment.visit_id] = (
+                net_by_visit.get(payment.visit_id, Decimal("0"))
+                + self._net_settled_amount(payment)
+            )
+        return net_by_visit
+
+    def compute_completed_refunds_by_payment_id(
+        self, payment_ids: list[int]
+    ) -> dict[int, Decimal]:
+        """Completed refunds recorded OUTSIDE ``Payment.refunded_amount``.
+
+        CSH-FE-036 (#3830 review follow-up): the force-majeure refund
+        channels return money without ever touching the payment column —
+
+        * a deposit credit inserts a ``DepositTransaction`` CREDIT row tied
+          to the payment (the patient balance rises immediately, so the
+          refund is completed by construction);
+        * a bank claim is money-returned only at
+          ``RefundRequest.status == 'completed'`` — ``pending`` / ``approved``
+          / ``processing`` have not sent anything yet and must not reduce
+          net receipts.
+
+        The two force-majeure channels are mutually exclusive per payment
+        (``payment_refund_claims``, migrations 0087/0088) and disjoint from
+        direct cashier refunds, which only ever write
+        ``Payment.refunded_amount`` — so per-channel sums cannot double count
+        one money movement. Callers must still cap the result at
+        ``amount - refunded_amount`` per payment: an over-refunded payment
+        cannot produce negative net receipts (parity with
+        ``_net_settled_amount``).
+        """
+        if not payment_ids:
+            return {}
+        completed: dict[int, Decimal] = {}
+
+        deposit_credits = (
+            self.db.query(DepositTransaction)
+            .filter(
+                DepositTransaction.payment_id.in_(list(payment_ids)),
+                DepositTransaction.transaction_type
+                == DepositTransactionType.CREDIT.value,
+            )
+            .all()
+        )
+        for credit in deposit_credits:
+            if credit.payment_id is None:
+                continue
+            completed[credit.payment_id] = (
+                completed.get(credit.payment_id, Decimal("0"))
+                + Decimal(str(credit.amount or 0))
+            )
+
+        completed_requests = (
+            self.db.query(RefundRequest)
+            .filter(
+                RefundRequest.payment_id.in_(list(payment_ids)),
+                RefundRequest.status == RefundRequestStatus.COMPLETED.value,
+            )
+            .all()
+        )
+        for request in completed_requests:
+            if request.payment_id is None:
+                continue
+            completed[request.payment_id] = (
+                completed.get(request.payment_id, Decimal("0"))
+                + Decimal(str(request.refund_amount or 0))
+            )
+
+        return completed
 
     @staticmethod
     def _net_settled_amount(payment: Payment) -> Decimal:

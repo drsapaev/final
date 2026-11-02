@@ -19,12 +19,14 @@ export interface UseAppointmentsTableStateParams {
   data: AppointmentRow[];
   externalSelectedRows?: Set<unknown>;
   onRowSelect?: (id: unknown, checked?: boolean) => void;
+  preferCanonicalQueueNumber?: boolean;
 }
 
 export const useAppointmentsTableState = ({
   data,
   externalSelectedRows,
   onRowSelect,
+  preferCanonicalQueueNumber = false,
 }: UseAppointmentsTableStateParams) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: string }>({ key: null, direction: 'asc' });
@@ -69,8 +71,8 @@ export const useAppointmentsTableState = ({
 
   // Сортировка данных
   const sortedData = useMemo(() => {
-    return sortAppointmentsData(data, sortConfig);
-  }, [data, sortConfig]);
+    return sortAppointmentsData(data, sortConfig, preferCanonicalQueueNumber);
+  }, [data, sortConfig, preferCanonicalQueueNumber]);
 
   // Фильтрация данных
   const filteredData = useMemo(() => {

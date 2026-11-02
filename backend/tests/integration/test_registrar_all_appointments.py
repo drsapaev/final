@@ -423,6 +423,11 @@ class TestRegistrarAllAppointments:
             if entry["record_kind"] == "appointment" and entry["id"] == appointment.id
         )
 
+        # REG-FE-022 (issue 3822): an appointment without a provable queue
+        # link carries NO ticket — null, not a fabricated list ordinal and
+        # not the unrelated entry's number.
+        assert appointment_row["number"] is None
+        assert appointment_row["queue_position"] is None
         assert appointment_row["number"] != unrelated_entry.number
         assert appointment_row["queue_position"] != unrelated_entry.number
         assert appointment_row["queue_time"] != _serialize_registrar_datetime(
@@ -647,6 +652,11 @@ class TestRegistrarAllAppointments:
         assert found_visit is not None
         assert found_visit["patient_id"] == test_patient.id
         assert found_visit["queue_entry_id"] is None
+        # REG-FE-022 (issue 3822): a visit without a linked OnlineQueueEntry
+        # carries NO ticket — null, never a list ordinal or the stale entry's
+        # number.
+        assert found_visit["number"] is None
+        assert found_visit["queue_position"] is None
         assert found_visit["number"] != stale_entry.number
         assert all(entry.get("queue_entry_id") != stale_entry.id for entry in entries)
         assert all(

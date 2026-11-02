@@ -15,14 +15,19 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogIn, Phone, ShieldCheck } from 'lucide-react';
 import { Alert, Button, Card, CardContent, CardHeader, CardTitle, Input } from '../../components/ui/macos';
 import { ensureCSRFToken } from '../../api/client';
 import { patientLogin, requestPatientOtp, verifyPatientOtp } from '../../api/patientAccess';
 import { replaceAccessOnlySession } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
-import { getPendingPublicBookingLocale, getPublicBookingPath } from '../../api/publicBooking';
+import {
+  getPendingPublicBookingLocale,
+  getPublicBookingPath,
+  getPublicBookingResubmitHandoffLocale,
+  hasPublicBookingResubmitHandoff,
+} from '../../api/publicBooking';
 import { isValidUzbekPhone, normalizeUzbekPhoneForApi } from '../../utils/phoneUtils';
 import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
@@ -51,6 +56,7 @@ const PatientLoginPage = () => {
   const { t: rawT, language } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [step, setStep] = useState<PatientLoginStep>('phone');
   const [phone, setPhone] = useState('');
@@ -156,12 +162,22 @@ const PatientLoginPage = () => {
       });
 
       const user = session.user as unknown as Record<string, unknown>;
+      const hasResubmitHandoff = hasPublicBookingResubmitHandoff(location.state);
+      const handoffLocale = getPublicBookingResubmitHandoffLocale(location.state);
       const pendingBookingLocale = getPendingPublicBookingLocale();
+      const fallbackLocale = language === 'uz' || language === 'uz-Latn' || language === 'uz-Cyrl'
+        ? 'uz-Latn'
+        : 'ru';
+      const bookingLocale = handoffLocale ?? pendingBookingLocale
+        ?? (hasResubmitHandoff ? fallbackLocale : null);
       const isPatient = String(user.role ?? '').toLowerCase() === 'patient';
-      const target = pendingBookingLocale && isPatient
-        ? getPublicBookingPath(pendingBookingLocale)
+      const target = bookingLocale && isPatient
+        ? getPublicBookingPath(bookingLocale)
         : getRouteForProfile(user);
-      navigate(target, { replace: true });
+      navigate(target, {
+        replace: true,
+        ...(bookingLocale && isPatient && hasResubmitHandoff ? { state: location.state } : {}),
+      });
     } catch (err) {
       logger.warn('[PatientLogin] verify/login failed:', err);
       setError(normalizeError(err, 'patientPortal.pl_login_error'));

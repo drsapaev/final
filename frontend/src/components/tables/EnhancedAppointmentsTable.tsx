@@ -53,6 +53,7 @@ const EnhancedAppointmentsTable = ({
   services = {},
   outerBorder = true,
   showCheckboxes = true,
+  preferCanonicalQueueNumber = false,
   view = 'registrar'
 }: EnhancedAppointmentsTableProps): React.JSX.Element | null => {
   const {
@@ -68,7 +69,7 @@ const EnhancedAppointmentsTable = ({
     handleSort,
     handleRowSelect,
     handleSelectAll,
-  } = useAppointmentsTableState({ data, externalSelectedRows, onRowSelect });
+  } = useAppointmentsTableState({ data, externalSelectedRows, onRowSelect, preferCanonicalQueueNumber });
 
   const isDark = theme === 'dark';
   const isDoctorView = String(view).toLowerCase() === 'doctor';
@@ -84,7 +85,7 @@ const EnhancedAppointmentsTable = ({
     renderVisitType,
     renderPaymentType,
     renderQueueNumbers,
-  } = useAppointmentsTableRenderers({ t, services, data });
+  } = useAppointmentsTableRenderers({ t, services, data, preferCanonicalQueueNumber });
 
   // Экспорт данных
   // UX Audit R-3.1: используем единую generateCSV из registrarCsv.js с PHI masking.

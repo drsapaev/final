@@ -289,6 +289,7 @@ const WorklistView = ({
       language={legacyLanguage}
       outerBorder={false}
       services={services}
+      preferCanonicalQueueNumber
       showCheckboxes={false} // UX Audit R-4.7: bulk-action UI удалён (QW-01 fix),
                             // поэтому чекбоксы отключены — они были dead UI
                             // (видны, но ничего не делают). Nielsen #2 + #4.

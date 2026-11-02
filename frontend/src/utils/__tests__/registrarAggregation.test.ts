@@ -267,6 +267,147 @@ describe('aggregatePatientsForAllDepartments', () => {
     expect(result[0].grouped_record_refs).toEqual([]);
   });
 
+  it('REG-FE-063 (#3803): keeps BOTH same-tag tickets of different doctors (№7 + №12)', () => {
+    // Two doctors of one specialty, one patient: the old merge key
+    // degenerated to `<queue_tag>_undefined` and dropped the second ticket.
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 101,
+        record_kind: 'online_queue',
+        record_type: 'online_queue',
+        queue_entry_id: 101,
+        queue_numbers: [
+          { queue_entry_id: 101, daily_queue_id: 91, number: 7, queue_tag: 'cardio', status: 'waiting' },
+        ],
+      }),
+      makeAppointment({
+        id: 102,
+        record_kind: 'online_queue',
+        record_type: 'online_queue',
+        queue_entry_id: 102,
+        queue_numbers: [
+          { queue_entry_id: 102, daily_queue_id: 92, number: 12, queue_tag: 'cardio', status: 'waiting' },
+        ],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    const numbers = (result[0].queue_numbers as Array<Record<string, unknown>>).map((qn) => qn.number);
+    expect(numbers).toEqual([7, 12]);
+  });
+
+  it('REG-FE-063 (#3803): same ticket number in two different daily queues is TWO tickets, not one', () => {
+    // Backend contract (test_two_doctor_queues_with_same_ticket_number_keep_own_values):
+    // two doctors of one specialty may both hold №7 — the merge must keep both.
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 201,
+        record_kind: 'visit',
+        queue_numbers: [
+          { daily_queue_id: 91, number: 7, queue_tag: 'cardio', status: 'waiting' },
+        ],
+      }),
+      makeAppointment({
+        id: 202,
+        record_kind: 'visit',
+        queue_numbers: [
+          { daily_queue_id: 92, number: 7, queue_tag: 'cardio', status: 'waiting' },
+        ],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    const keys = (result[0].queue_numbers as Array<Record<string, unknown>>)
+      .map((qn) => `${qn.daily_queue_id}#${qn.number}`);
+    expect(keys).toEqual(['91#7', '92#7']);
+  });
+
+  it('REG-FE-063 (#3803): a repeated identical ticket (same entry identity) is still merged once', () => {
+    const element = { queue_entry_id: 300, daily_queue_id: 93, number: 5, queue_tag: 'cardio', status: 'waiting' };
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({ id: 301, record_kind: 'online_queue', queue_entry_id: 300, queue_numbers: [element] }),
+      makeAppointment({ id: 302, record_kind: 'online_queue', queue_entry_id: 300, queue_numbers: [{ ...element }] }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].queue_numbers).toHaveLength(1);
+    expect((result[0].queue_numbers as Array<Record<string, unknown>>)[0].number).toBe(5);
+  });
+
+  it('REG-FE-063 (#3803): legacy service scoping (queue_tag + service_id) still merges equal elements', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 401,
+        queue_numbers: [{ queue_tag: 'cardio', service_id: 55, number: 3, status: 'waiting' }],
+      }),
+      makeAppointment({
+        id: 402,
+        queue_numbers: [{ queue_tag: 'cardio', service_id: 55, number: 3, status: 'waiting' }],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].queue_numbers).toHaveLength(1);
+  });
+
+  it('REG-FE-063 (#3829 review): legacy service scoping must NOT merge different numbers (№7 + №12)', () => {
+    // Review case: {queue_tag:'cardio', service_id:55, number:7} and
+    // {queue_tag:'cardio', service_id:55, number:12} shared the `cardio_55`
+    // key, so the second standalone ticket of the same service was dropped.
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 501,
+        queue_numbers: [{ queue_tag: 'cardio', service_id: 55, number: 7, status: 'waiting' }],
+      }),
+      makeAppointment({
+        id: 502,
+        queue_numbers: [{ queue_tag: 'cardio', service_id: 55, number: 12, status: 'waiting' }],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    const numbers = (result[0].queue_numbers as Array<Record<string, unknown>>).map((qn) => qn.number);
+    expect(numbers).toEqual([7, 12]);
+  });
+
+  it('REG-FE-063 (#3829 review): legacy queue_id marks the owning DailyQueue — two queues keep their own №7', () => {
+    // queue_id is a DailyQueue.id (resolver parity), not an entry id. Two
+    // elements with different queue_id but equal tag/number/time are tickets
+    // of DIFFERENT queues; the opaque fallback must not collapse them.
+    const created_at = '2026-11-02T09:15:00+05:00';
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 601,
+        queue_numbers: [{ queue_id: 31, queue_tag: 'cardio', number: 7, created_at }],
+      }),
+      makeAppointment({
+        id: 602,
+        queue_numbers: [{ queue_id: 32, queue_tag: 'cardio', number: 7, created_at }],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    const queueIds = (result[0].queue_numbers as Array<Record<string, unknown>>).map((qn) => qn.queue_id);
+    expect(queueIds).toEqual([31, 32]);
+  });
+
+  it('REG-FE-063 (#3829 review): the same legacy ticket (queue_id + number) seen in two rows still merges once', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 701,
+        queue_numbers: [{ queue_id: 31, queue_tag: 'cardio', number: 7, status: 'waiting' }],
+      }),
+      makeAppointment({
+        id: 702,
+        queue_numbers: [{ queue_id: 31, queue_tag: 'cardio', number: 7, status: 'served' }],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].queue_numbers).toHaveLength(1);
+    expect((result[0].queue_numbers as Array<Record<string, unknown>>)[0].number).toBe(7);
+  });
+
   it('preserves the earliest queue_time when grouping all departments', () => {
     const result = aggregatePatientsForAllDepartments([
       makeAppointment({

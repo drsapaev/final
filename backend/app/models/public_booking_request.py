@@ -169,3 +169,66 @@ class PublicBookingRequestEvent(Base):
 
     request = relationship("PublicBookingRequest", back_populates="events")
     actor = relationship("User", foreign_keys=[actor_user_id])
+
+
+class PublicBookingRequestNotificationOutbox(Base):
+    """Durable, retryable intent to create one Registrar inbox notification.
+
+    This contains only the request identity/version and delivery state. The
+    patient-facing request remains the source of truth; no patient details or
+    external-channel payloads are copied into the outbox.
+    """
+
+    __tablename__ = "public_booking_request_notification_outbox"
+    __table_args__ = (
+        CheckConstraint(
+            "request_version > 0",
+            name="ck_public_booking_notification_outbox_version",
+        ),
+        CheckConstraint(
+            "attempt_count >= 0",
+            name="ck_public_booking_notification_outbox_attempts",
+        ),
+        CheckConstraint(
+            "event_type IN ('public_booking_request_submitted', "
+            "'public_booking_request_resubmitted')",
+            name="ck_public_booking_notification_outbox_type",
+        ),
+        UniqueConstraint(
+            "request_id",
+            "request_version",
+            name="uq_public_booking_notification_outbox_request_version",
+        ),
+        Index(
+            "ix_public_booking_notification_outbox_due",
+            "next_attempt_at",
+            "id",
+            postgresql_where=text("completed_at IS NULL"),
+            sqlite_where=text("completed_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    request_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("public_booking_requests.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    request_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
