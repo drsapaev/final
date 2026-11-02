@@ -79,13 +79,29 @@ export const useAppointmentsTableState = ({
     return filterAppointmentsData(sortedData, filterConfig);
   }, [sortedData, filterConfig]);
 
+  // REG-FE-051 (audit ledger 3803): смена фильтра — новая выборка, пользователь
+  // возвращается на первую страницу (стр. 3 при двух совпадениях раньше
+  // рисовала «пустую таблицу», скрывая совпавшие записи).
+  const filterSignature = `${filterConfig.search}|${filterConfig.status}|${filterConfig.dateFrom}|${filterConfig.dateTo}|${filterConfig.doctor}|${filterConfig.department}`;
+  const lastFilterSignatureRef = useRef(filterSignature);
+  useEffect(() => {
+    if (lastFilterSignatureRef.current !== filterSignature) {
+      lastFilterSignatureRef.current = filterSignature;
+      setCurrentPage(1);
+    }
+  }, [filterSignature]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+  // REG-FE-051: данные сократились (refresh/фильтр) — страница зажимается в
+  // диапазон, чтобы таблица никогда не показывала пустую страницу вместо
+  // существующих совпадений.
+  const effectiveCurrentPage = Math.min(currentPage, totalPages);
+
   // Пагинация
   const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (effectiveCurrentPage - 1) * pageSize;
     return filteredData.slice(start, start + pageSize);
-  }, [filteredData, currentPage, pageSize]);
-
-  const totalPages = Math.ceil(filteredData.length / pageSize);
+  }, [filteredData, effectiveCurrentPage, pageSize]);
 
   // Обработчик сортировки
   const handleSort = useCallback((key: string) => {
@@ -135,7 +151,9 @@ export const useAppointmentsTableState = ({
     containerRef,
     filterConfig,
     setFilterConfig,
-    currentPage,
+    // REG-FE-051: наружу отдаётся зажатая страница — селектор пагинации
+    // показывает реальную текущую страницу, а не зависшее значение.
+    currentPage: effectiveCurrentPage,
     setCurrentPage,
     filteredData,
     paginatedData,

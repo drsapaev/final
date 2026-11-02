@@ -71,13 +71,19 @@ export const getBackendActionAvailability = (row: Record<string, unknown> | null
 };
 
 export const getEnhancedAppointmentRowKey = (row: Appointment, index: number) => {
+  // REG-FE-055 (audit ledger 3803): ключ строки стабилен при сортировке/
+  // фильтрации/пагинации — page-relative index больше НЕ входит в ключ записи
+  // с каноническим идентификатором (иначе та же запись ремоунтится на каждой
+  // перестановке, теряя фокус/inline-состояние). Индекс остаётся только для
+  // строк без какого-либо канонического id — там он единственный дискриминатор.
+  const canonicalId = row?.appointment_id ?? row?.visit_id ?? row?.queue_entry_id
+    ?? row?.queue_id ?? row?.payment_id ?? row?.id ?? null;
   const parts = [
     row?.record_type || row?.source_type || row?.source || row?.entity_type || 'appointment',
-    row?.appointment_id ?? row?.visit_id ?? row?.queue_entry_id ?? row?.queue_id ?? row?.payment_id ?? row?.id ?? 'no-id',
+    canonicalId ?? `no-id-${index}`,
     row?.session_id || row?.queue_number || row?.number || '',
     row?.doctor_id || row?.specialist_id || row?.department_id || row?.department || '',
     row?.appointment_time || row?.visit_time || row?.time || row?.start_time || '',
-    index
   ];
 
   return parts.map((part) => String(part)).join(':');
@@ -212,16 +218,18 @@ export const formatPhoneNumber = (phone: string) => {
   // Убираем все нецифровые символы
   const digits = phone.replace(/\D/g, '');
 
-  // Если номер начинается с 998, добавляем +
-  if (digits.startsWith('998')) {
-    const formatted = `+998 (${digits.slice(3, 5)}) ${digits.slice(5, 8)}-${digits.slice(8, 10)}-${digits.slice(10, 12)}`;
-    return formatted;
+  // REG-FE-061 (audit ledger 3803): фиксированную группировку получает
+  // только полный номер. Неполный 998-префикс ('99890') раньше рисовался
+  // как «полный» номер с прочерками на месте отсутствующих групп —
+  // обманчивая разметка вместо честного «сырого» значения.
+  // Полный узбекский номер: 998 + 9 цифр = 12.
+  if (digits.startsWith('998') && digits.length === 12) {
+    return `+998 (${digits.slice(3, 5)}) ${digits.slice(5, 8)}-${digits.slice(8, 10)}-${digits.slice(10, 12)}`;
   }
 
-  // Если номер начинается с 9 (без кода страны)
-  if (digits.startsWith('9') && digits.length >= 9) {
-    const formatted = `+998 (${digits.slice(0, 2)}) ${digits.slice(2, 5)}-${digits.slice(5, 7)}-${digits.slice(7, 9)}`;
-    return formatted;
+  // Номер без кода страны: ровно 9 цифр, начинается с 9.
+  if (digits.startsWith('9') && digits.length === 9) {
+    return `+998 (${digits.slice(0, 2)}) ${digits.slice(2, 5)}-${digits.slice(5, 7)}-${digits.slice(7, 9)}`;
   }
 
   // Если номер короткий или нестандартный, возвращаем как есть
@@ -274,11 +282,25 @@ export const sortAppointmentsData = (
       bVal = b.queue_numbers && b.queue_numbers.length > 0 ? b.queue_numbers[0].number : 999999;
     }
 
+    // REG-FE-050 (audit ledger 3803): типизированный компаратор. Прежний
+    // numeric-only Number(val) превращал ФИО/дату/статус в NaN — колонки
+    // объявлены sortable, но фактически не сортировались. Числа сравниваются
+    // численно, остальное — localeCompare; отсутствующие значения уходят в
+    // конец независимо от направления.
+    const direction = sortConfig.direction === 'asc' ? 1 : -1;
+    const aMissing = aVal === null || aVal === undefined || String(aVal).trim() === '';
+    const bMissing = bVal === null || bVal === undefined || String(bVal).trim() === '';
+    if (aMissing && bMissing) return 0;
+    if (aMissing) return 1;
+    if (bMissing) return -1;
+
     const aNum = Number(aVal);
     const bNum = Number(bVal);
-    if (aNum < bNum) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aNum > bNum) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
+    const bothNumeric = aVal !== '' && bVal !== '' && Number.isFinite(aNum) && Number.isFinite(bNum);
+    if (bothNumeric) return (aNum - bNum) * direction;
+
+    const cmp = String(aVal).localeCompare(String(bVal), 'ru', { numeric: true, sensitivity: 'base' });
+    return cmp * direction;
   });
 };
 
@@ -287,10 +309,29 @@ export const filterAppointmentsData = (
   sortedData: AppointmentRow[],
   filterConfig: AppointmentsTableFilterConfig,
 ): AppointmentRow[] => {
+  // REG-FE-053 (audit ledger 3803): поиск по видимым данным, а не по
+  // '[object Object]'. Вложенные объекты услуг (name/code) и массивы
+  // сериализуются в читаемые строки до сопоставления.
+  const serializeSearchValue = (val: unknown): string => {
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'string') return val;
+    if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+    if (Array.isArray(val)) return val.map((item) => serializeSearchValue(item)).join(' ');
+    if (typeof val === 'object') {
+      const record = val as Record<string, unknown>;
+      // Все скалярные «подписи» объекта: имя услуги И её код оба видимы
+      // пользователю — поиск должен матчить и то, и другое.
+      return [record.name, record.code, record.title, record.label, record.specialty]
+        .filter((label) => typeof label === 'string' && label !== '')
+        .join(' ');
+    }
+    return '';
+  };
+
   return sortedData.filter((row: AppointmentRow) => {
     const searchMatch = !filterConfig.search ||
     Object.values(row).some((val) =>
-    String(val).toLowerCase().includes(filterConfig.search.toLowerCase())
+    serializeSearchValue(val).toLowerCase().includes(filterConfig.search.toLowerCase())
     );
 
     const statusMatch = !filterConfig.status || row.status === filterConfig.status;
