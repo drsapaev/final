@@ -81,6 +81,7 @@ from fastapi import (
     Response,
     status,
 )
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -1127,6 +1128,48 @@ def _raise_public_booking_request_error(exc: PublicBookingRequestError) -> None:
     ) from exc
 
 
+def _execute_public_booking_request_mutation(
+    *,
+    db: Session,
+    request: Request,
+    current_user: User,
+    action: str,
+    operation: Callable[[int], PublicBookingRequestOut],
+) -> PublicBookingRequestOut:
+    """Run request persistence and audit in one worker thread."""
+    patient_id = _require_patient_audited(
+        db,
+        request,
+        current_user,
+        resource_type="public_booking_request",
+        action=action,
+    )
+    scope = _patient_portal_scope(patient_id)
+    try:
+        result = operation(patient_id)
+    except PublicBookingRequestError as exc:
+        _log_portal_denied(
+            db,
+            request=request,
+            current_user=current_user,
+            resource_type="public_booking_request",
+            action=action,
+            reason=exc.code,
+            scope=scope,
+        )
+        _raise_public_booking_request_error(exc)
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="public_booking_request",
+        resource_id=str(result.id),
+        action=action,
+        outcome="success",
+        request=request,
+    )
+    return result
+
+
 def _patient_request_idempotency_scope(request: Request) -> str:
     # Match IdempotencyMiddleware._normalize_idem_path: preserve the route
     # identity and collapse only trailing slashes.
@@ -1157,7 +1200,7 @@ def _patient_request_idempotency_scope(request: Request) -> str:
     operation_id="patient_create_public_booking_request",
     summary="Submit a non-reserving request for a public booking time",
 )
-def create_patient_public_booking_request(
+async def create_patient_public_booking_request(
     body: PublicBookingRequestCreate,
     request: Request,
     response: Response,
@@ -1180,16 +1223,13 @@ def create_patient_public_booking_request(
     response; staff must review the request separately.
     """
     response.headers["Cache-Control"] = "no-store"
-    patient_id = _require_patient_audited(
-        db,
-        request,
-        current_user,
-        resource_type="public_booking_request",
+    result = await run_in_threadpool(
+        _execute_public_booking_request_mutation,
+        db=db,
+        request=request,
+        current_user=current_user,
         action="create",
-    )
-    scope = _patient_portal_scope(patient_id)
-    try:
-        result = PublicBookingRequestService(db).create_for_patient(
+        operation=lambda patient_id: PublicBookingRequestService(db).create_for_patient(
             patient_id=patient_id,
             actor_user_id=current_user.id,
             service_slug=body.service_slug,
@@ -1199,26 +1239,7 @@ def create_patient_public_booking_request(
             expected_settings_version=body.expected_settings_version,
             idempotency_key=idempotency_key,
             operation_scope=_patient_request_idempotency_scope(request),
-        )
-    except PublicBookingRequestError as exc:
-        _log_portal_denied(
-            db,
-            request=request,
-            current_user=current_user,
-            resource_type="public_booking_request",
-            action="create",
-            reason=exc.code,
-            scope=scope,
-        )
-        _raise_public_booking_request_error(exc)
-    log_patient_access(
-        db=db,
-        scope=scope,
-        resource_type="public_booking_request",
-        resource_id=str(result.id),
-        action="create",
-        outcome="success",
-        request=request,
+        ),
     )
     return result
 
@@ -1343,7 +1364,7 @@ def withdraw_patient_public_booking_request(
     operation_id="patient_resubmit_public_booking_request",
     summary="Choose a different time after staff requested one",
 )
-def resubmit_patient_public_booking_request(
+async def resubmit_patient_public_booking_request(
     request_id: UUID,
     body: PublicBookingRequestResubmit,
     request: Request,
@@ -1361,16 +1382,15 @@ def resubmit_patient_public_booking_request(
     ),
 ) -> PublicBookingRequestOut:
     response.headers["Cache-Control"] = "no-store"
-    patient_id = _require_patient_audited(
-        db,
-        request,
-        current_user,
-        resource_type="public_booking_request",
+    result = await run_in_threadpool(
+        _execute_public_booking_request_mutation,
+        db=db,
+        request=request,
+        current_user=current_user,
         action="resubmit",
-    )
-    scope = _patient_portal_scope(patient_id)
-    try:
-        result = PublicBookingRequestService(db).resubmit_for_patient(
+        operation=lambda patient_id: PublicBookingRequestService(
+            db
+        ).resubmit_for_patient(
             request_id=request_id,
             patient_id=patient_id,
             actor_user_id=current_user.id,
@@ -1380,25 +1400,6 @@ def resubmit_patient_public_booking_request(
             expected_settings_version=body.expected_settings_version,
             idempotency_key=idempotency_key,
             operation_scope=_patient_request_idempotency_scope(request),
-        )
-    except PublicBookingRequestError as exc:
-        _log_portal_denied(
-            db,
-            request=request,
-            current_user=current_user,
-            resource_type="public_booking_request",
-            action="resubmit",
-            reason=exc.code,
-            scope=scope,
-        )
-        _raise_public_booking_request_error(exc)
-    log_patient_access(
-        db=db,
-        scope=scope,
-        resource_type="public_booking_request",
-        resource_id=str(result.id),
-        action="resubmit",
-        outcome="success",
-        request=request,
+        ),
     )
     return result

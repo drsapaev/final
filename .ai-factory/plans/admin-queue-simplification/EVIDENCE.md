@@ -1,3 +1,47 @@
+## T18 — PR #3801 review fixes locally validated — 2026-10-29T20:43+05:00
+
+- Commit under test: local working-tree delta based on PR HEAD `ebf2715790bb484d0df62bc943edd77bab81abb4`; base/current `origin/main` `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
+- Environment: Windows PowerShell; isolated worktree `aqs-t18-live-specs`; branch `codex/aqs-t18-queue-system-route-spec`.
+- Execution mode: prior `gate_known_root_cause` for the same source/journal scope; result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt read. No gate/router change.
+- Allowed and actual changed paths: `frontend/e2e/queue-system.spec.ts`; plan `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: application/runtime, backend/API/DB/auth/route, Playwright config/credentials, staging/Compose/WSL, production/deploy, other worktrees, live execution of this mutating spec, merge.
+- Original findings: review #5700225111 reports action buttons clicked without a doctor, stale/vacuous queue selectors and unsupported guarded cases, and doctor-specific coverage that checked only the URL.
+- Changes: doctor selection is required before scoped controls; action enabled/disabled states are asserted; obsolete patient creation/duplicate-phone/visit-completion scenarios and browser-mocked 07:00 window are removed because those are not QueueView/server contracts; canonical DataTable rows are checked against the selected doctor's queue snapshot; switching doctors requires and verifies two distinct synthetic doctor queues; call-next checks successful response and waiting-to-called state transition.
+- Privacy/safety: visible synthetic patient labels are compared only in memory to confirm the correct rows; assertions report booleans and generic messages, not names/phones. The call-next E2E is mutating but was not run; when enabled it requires a disposable synthetic database seeded with waiting entries. No staging or patient data was used in this validation.
+- Validation commands and results: `npm.cmd exec -- eslint e2e/queue-system.spec.ts` PASS; `npm.cmd exec -- tsc --noEmit -p e2e/tsconfig.json` PASS; `npm.cmd exec -- playwright test e2e/queue-system.spec.ts --list --project=chromium` PASS (6 collected, 0 executed); `npm.cmd run build` PASS (43.88s; existing dependency annotation/CSS warnings); `git -c core.whitespace=cr-at-eol diff --check` PASS.
+- Result: local source checks PASS. Exact-head GitHub CI is NOT_RUN/PENDING until this delta is committed and pushed. The named queue-system scenarios remain NOT_RUN; collection is not execution.
+- Remaining limitation: Tier-2 stays PARTIAL by user direction; no deferral/waiver. Full T18 and staging validation remain incomplete.
+- PR: `https://github.com/drsapaev/final/pull/3801`, OPEN / Ready for review at base HEAD.
+- Merge: none; user retains merge.
+
+## T18 — PR #3801 review P1/P2 correction pre-edit checkpoint — 2026-10-29T20:36+05:00
+
+- Commit under review: exact PR/local HEAD `ebf2715790bb484d0df62bc943edd77bab81abb4`; base/current `origin/main` `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
+- Environment: Windows PowerShell; isolated worktree `aqs-t18-live-specs`; branch `codex/aqs-t18-queue-system-route-spec`; worktree clean before this record.
+- Execution mode: previously run `gate_known_root_cause` for `frontend/e2e/queue-system.spec.ts` and the three plan journals. Gate result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; prompt read. No gate/router edit.
+- Allowed paths: `frontend/e2e/queue-system.spec.ts`; `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: runtime/backend/API/DB/auth/route, Playwright configuration/credentials, staging/Compose/WSL, production/deploy, other worktrees, live execution of the mutating spec, merge.
+- Original findings: review #5700225111 reports clicks against disabled reception/call controls before doctor selection; stale queue table locators and guarded false-green cases; specialist selection asserted only the URL. Source review additionally confirms patient creation/duplicate validation/visit completion controls are absent from `/registrar/queue`, and the backend reception endpoint has no 07:00–08:00 restriction that browser Date mocking could validate.
+- Planned source change: replace obsolete cases with actual QueueView behavior; select a doctor before action checks; require explicit synthetic queue seed prerequisites; compare visible ticket/name signatures to the selected doctor-owned API queue without printing patient values; keep this test-only.
+- Validation target: scoped ESLint, `tsc --noEmit -p e2e/tsconfig.json`, Playwright collection (`--list`, zero execution), frontend build, CRLF-aware `git diff --check`, normal hooks and GitHub exact-head CI.
+- Result: NOT_RUN at pre-edit checkpoint; source edit has not started.
+- Remaining limitation: do not execute `queue-system.spec.ts` or start staging under the current Tier-2 PARTIAL decision; no deferral/waiver.
+- PR: `https://github.com/drsapaev/final/pull/3801`, OPEN / Ready for review at recorded HEAD.
+- Merge: none; user retains merge.
+
+## T18 — PR #3801 statistics E2E P2 correction — 2026-10-29T19:31+05:00
+
+- Commit under test: source commit `9cc0cabf8035f4a8b7f577eadc1531770f9fc59c`; PR HEAD `b02e1f15a1478def02be4e7f70f34be69849ae62` at checkpoint time includes the plan checkpoint. This evidence update will advance the PR head.
+- Environment: Windows PowerShell; isolated worktree `aqs-t18-live-specs`; branch `codex/aqs-t18-queue-system-route-spec`.
+- Execution mode: `gate_known_root_cause`. Gate result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt inspected. User's standing T18 instruction is the narrow basis. No gate/router changes.
+- Allowed paths: `frontend/e2e/queue-system.spec.ts`; `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md` for this plan. Denied: runtime/backend/API/DB/route/RBAC, staging/Compose/WSL, production/deploy, other worktrees, live execution of the mutating spec, merge.
+- Actual source path changed: `frontend/e2e/queue-system.spec.ts`. The statistics test now selects a doctor before checking the statistics grid; the shared helper waits for a selectable option and reports the synthetic doctor seed requirement. The specialist test reuses it.
+- Original failure: the test opened `/registrar/queue` without a doctor. `QueueView` passes an empty selection, and `ModernQueueManager` hides statistics until a doctor-specific queue snapshot loads.
+- Validation commands: `npm.cmd exec -- eslint e2e/queue-system.spec.ts`; `npm.cmd exec -- tsc --noEmit -p e2e/tsconfig.json`; `npm.cmd exec -- playwright test e2e/queue-system.spec.ts --list --project=chromium`; `npm.cmd run build`; `git -c core.whitespace=cr-at-eol diff --check`; normal commit hooks.
+- Result: all listed local validations PASS; Playwright collected 10 tests, 0 executed. Frontend build completed; only existing dependency/CSS warnings were emitted. PR body validation and the latest PR Quality Gate/Lifecycle runs PASS. Unified CI was IN_PROGRESS on exact HEAD `b02e1f1` when recorded; the newer documentation HEAD must have its own checks. Previous HEAD checks do not cover this fix.
+- Scope check: source delta is test-only; no application/runtime behavior changed. No staging, production, or patient data was used. No merge or review-thread update was performed.
+- Remaining limitation: the live `queue-system.spec.ts`, other remaining live scenarios, and full `docs/runbooks/STAGING_VALIDATION.md` remain NOT_RUN. Tier-2 stays PARTIAL by user direction; no deferral/waiver.
+- PR: `https://github.com/drsapaev/final/pull/3801` (OPEN / Ready for review; mergeable, not merged at the last check).
+- Merge commit: none; user retains merge.
+
 ## Latest checkpoint — T17 first staging attempt cleaned; retry plan tightened — 2026-10-20T13:33:21+05:00
 
 - PR #3721 remains Draft at exact HEAD 1c3007c590d98ea6ce15a1c7358ceebbf86d410; base cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43. Exact-head Tier 1 PASS; local check-theme PASS.
@@ -4940,3 +4984,380 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Backend/integration/Docker/parity/readiness/k6/DAST paths were skipped or out of scope; not reported as PASS. Tier-2 for this UI slice NOT RUN; overall T18 remains `PARTIAL` by user instruction. No staging, deferral/waiver, merge or deployment.
 - Scope: only existing frontend code/test/locales and plan journals; no backend/API/OpenAPI/DB/route or staging changes. Ignored local dependency/build/scratch artifacts remain because host policy blocked cleanup; no alternate cleanup method used.
 - Next: push the evidence-only journal update to trigger fresh PR review-body/lifecycle gates; verify the current body passes on the new PR event. Keep PR Draft; user performs merge. Continue T18 only after that PR cycle ends.
+
+## T18 — Registrar queue-system spec route correction — 2026-10-29T17:12+05:00
+
+- Commit under test: bb28a6c73a96327ef7e0045e5e8ccd90eb06e479, based on fresh origin/main 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1; branch codex/aqs-t18-queue-system-route-spec in C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final.
+- Environment: Windows PowerShell; no staging or live application session. PR #3800 was verified merged at 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1, which equals fetched origin/main.
+- Execution mode: gate_known_root_cause, root frontend/e2e/queue-system.spec.ts. Gate returned narrow_override, gate_misroute=true, override_used=true, handoff_required=true; generated prompt was read. Basis: user's standing instruction to continue the implementation plan while keeping Tier-2 partial. No gate/router change.
+- Allowed paths: frontend/e2e/queue-system.spec.ts and this plan's PROGRESS.md, RESUME.md, EVIDENCE.md. Denied: app/runtime/backend/API/DB/auth/route implementation, Playwright config or credentials, staging/Compose/WSL, production, other worktrees, merge/deployment.
+- Original finding: route source maps /registrar to the worklist and /registrar/queue to QueueView, while this legacy queue spec navigated to /registrar. The stats test and specialist test had conditional branches that only logged when controls were absent, allowing those regressions to pass vacuously.
+- Change: all ten scenarios now navigate to /registrar/queue; first scenario checks the canonical path; stats asserts the visible .mqm-stats-grid and three .mqm-stat-card elements; doctor filter uses #modern-queue-doctor, selects the first non-placeholder option and asserts doctor in the URL. No product/runtime code changed.
+- Validation command: npm.cmd exec -- eslint e2e/queue-system.spec.ts; result PASS (exit 0). npm.cmd exec -- playwright test e2e/queue-system.spec.ts --list --project=chromium; result PASS, 10 tests collected, zero executed. git -c core.whitespace=cr-at-eol diff --check; result PASS. The app build was not rerun for this spec-only change; application source is unchanged.
+- Commit bb28a6c73 was created with normal hooks. First attempt failed because end-of-file/trailing-whitespace hooks corrected files; changes were re-staged and the normal hook suite passed on retry.
+- Live test execution: NOT_RUN. This legacy spec creates/mutates queue and patient records; no synthetic staging environment was started under the user's current Tier-2-partial direction. The spec's runtime data prerequisites (at least one selectable doctor and queue stats) remain unverified.
+- Scope check: only the named E2E spec and plan progress/evidence/resume journals changed locally. No staging, production, live data, other worktree, PR, merge, deployment, or deferral/waiver action occurred. Review threads and user merge authority remain untouched.
+- Remaining limitation: the two other legacy live specs and full docs/runbooks/STAGING_VALIDATION.md remain outstanding. T18 is still PARTIAL, not complete.
+- PR / merge commit: not created / not applicable at this checkpoint.
+
+## T18 — PR #3801 opened — 2026-10-29T17:18+05:00
+
+- PR: https://github.com/drsapaev/final/pull/3801, Draft; title: test(queue): align Registrar queue E2E with canonical route.
+- Exact PR HEAD at creation: bb1e8eaf3d356cd6176f74babf513034365d82f2; base/main: 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1. GitHub reports 2 commits and 4 changed files. CI is pending at this checkpoint; mergeability is not assumed from the creation response.
+- PR body lists only verified local results and clearly marks live Playwright, synthetic staging, and full T18 as NOT_RUN / PARTIAL.
+- PR attached to the current Codex task. User retains merge; no review, merge, deployment, staging, deferral, or waiver action was taken.
+- Next: poll exact-head checks, fix any in-scope failure, update this journal, and leave PR Draft for user disposition.
+
+## T18 — PR #3801 checks and PR-body gate corrected — 2026-10-29T17:33+05:00
+
+- Exact source/evidence head: ac02dc2798a74fa4b27f972259cc66ba1fbf4aba; source-bearing commit bb28a6c73a96327ef7e0045e5e8ccd90eb06e479. PR #3800 merge/base is 9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1.
+- Unified CI run 40872202007: SUCCESS. Frontend unit tests, lint/type-check, build, PR Required Gate and Frontend E2E job passed. E2E groups Registrar time, UX/visual, Lab dirty-guard, Lab full-path, Business/Security/Concurrency and Load/Chaos passed; visual baseline update was skipped by design.
+- PR Review Quality Gate 40872202016 initially failed because the PR body omitted required sections. The corrected body passed the local validator (19 unit tests, two documented samples, and live PR body). One explicit failed-job rerun was cancelled; a later PR body edit caused fresh Quality Gate run 40873786628, which passed. Lifecycle run 40873786607 passed. Security, Gitleaks and Agent Workflow Guards passed.
+- Important limit: CI type-checked the Playwright spec and passed unrelated configured E2E groups; it did not execute frontend/e2e/queue-system.spec.ts. That live/mutating spec is NOT_RUN; Tier-2 remains PARTIAL.
+- Scope: no application changes beyond the test-only spec committed as bb28a6c73. No local staging, production, live queue/patient data, deferral, waiver, merge, or deployment.
+- Current PR state: https://github.com/drsapaev/final/pull/3801 is OPEN/Draft and awaits an evidence-only docs commit plus exact-head checks; user retains merge.
+- Next: run normal hooks, push the docs-only evidence update, and verify checks on the resulting exact head before leaving the PR for user merge.
+
+## T18 — PR #3801 review findings fixed; source-head CI retry passed — 2026-10-29T21:16+05:00
+
+- Commit under test: `0041bcd14dfd1b5b40054928313a630348306331`, on branch `codex/aqs-t18-queue-system-route-spec`, based on `origin/main` `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`. PR #3801 is OPEN / Ready for review, not merged.
+- Execution mode/gate: continuation of the existing `gate_known_root_cause` scope for `frontend/e2e/queue-system.spec.ts` and the three plan journals; recorded outcome was `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`, with prompt read. No gate/router change.
+- Allowed paths: queue-system spec and this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: app/runtime/backend/API/DB/auth/route policy, Playwright config/credentials, live execution of this mutating spec, staging/Compose/WSL, production/deploy, other worktrees, and merge.
+- Change in `0041bcd`: replaced stale/vacuous QueueView checks with six meaningful tests using doctor selection, the canonical table, API-backed doctor snapshots, distinct doctor queues, explicit synthetic-data requirements, and a real call-next response/state transition. Removed assertions for patient creation, duplicate-phone validation, completion controls, and browser-mocked reception hours that the canonical route/server contract do not provide. No application code changed.
+- Local validation on the source commit: scoped ESLint PASS; `tsc --noEmit -p e2e/tsconfig.json` PASS; Playwright collection PASS (6 listed, 0 executed); frontend build PASS (existing third-party/CSS warnings); CRLF-aware `git diff --check` PASS; normal commit hooks PASS.
+- Exact-head Unified CI run `40904558075`, attempt 1: FAIL. Frontend unit, build, and lint/type-check PASS. Configured Frontend E2E failed only in unrelated `frontend/e2e/lab-dirty-guard.spec.ts:1654`: 60 passed, one existing scenario timed out waiting for the next synthetic patient's button. PR Required Gate consequently failed. Review Quality `40904557960`, Lifecycle `40904557935`, Agent Workflow Guards `40904558102`, Gitleaks `40904558362`, and Security `40904558251` PASS. Backend/integration/Docker/readiness and other path-aware jobs SKIPPED, not PASS.
+- A single retry of only the failed Frontend E2E job was started to diagnose the unrelated CI failure. Attempt 2 passed Lab dirty-guard and all remaining configured E2E groups; the run concluded SUCCESS, including Frontend unit/build/lint, Frontend E2E and PR Required Gate. No source test or Lab code was changed for this unrelated failure.
+- Result: the three queue-spec review findings are fixed in source commit `0041bcd`; source-head CI retry PASS. The named `queue-system.spec.ts` remains NOT_RUN; Tier-2 remains PARTIAL by user direction with no deferral/waiver. Backend/integration/Docker/readiness and other path-aware jobs are SKIPPED, not PASS. No staging, production, merge, or deployment.
+- Scope: source changes remain confined to `frontend/e2e/queue-system.spec.ts`; this checkpoint updates only plan journals. User retains merge. The docs-only checkpoint will advance PR HEAD and requires checks on that resulting SHA.
+- Next: commit/push the evidence checkpoint, verify exact-head CI, reply to and resolve only the three addressed review threads, and update the PR description without altering its Ready status.
+
+## T18 — PR #3801 follow-up review P2 scope — pre-edit checkpoint
+
+- Current PR HEAD: `8f4d9a8e283716960bef8e790ad73e1f5b5189c5`; PR remains OPEN / Ready for review. No source edit for the new findings has started at this checkpoint.
+- User request: fix the two new test-review findings in this PR and continue. The user's existing disposition remains Tier-2 PARTIAL; staging and execution of this mutating spec are outside this follow-up.
+- Execution mode: `narrow_override`, based on the user's explicit request for these exact test-only fixes. The canonical launcher reported no misroute, `override_used=true`, and `handoff_required=true`; its generated prompt was read. No gate/router change.
+- Gate command: `ai/langgraph/scripts/run_agent_gate.ps1` with task “Fix review findings in the Registrar queue E2E spec: wait for the exact newly selected doctor and support QueueResource queues through routing_specialists”, `--known-root-cause frontend/e2e/queue-system.spec.ts`, and repeated `--scope` for that spec plus `PROGRESS.md`, `RESUME.md`, and `EVIDENCE.md`.
+- Root cause / first-touch: `frontend/e2e/queue-system.spec.ts`. Canonical reference-only anchors inspected: `frontend/src/pages/registrar/views/QueueView.tsx`, `frontend/src/components/queue/ModernQueueManager.tsx`, `frontend/src/components/ui/macos/Select.tsx`, `frontend/src/hooks/useQueueManager.ts`, `frontend/src/types/domain/queue.ts`, `frontend/src/api/queue.ts`, `frontend/src/api/mappers/queue.ts`, and `backend/app/api/v1/endpoints/registrar_integration/_queue_ops.py`.
+- Confirmed contract: QueueView writes the selected specialist ID into the `doctor` query parameter; the UI Select exposes its displayed label but not its option value in the DOM. `useQueueManager.pickQueueForDoctor` selects an exact `specialist_id` match, then a queue whose `routing_specialists` contains the selected ID. Snapshot data also carries the resource owner ID.
+- Allowed paths: `frontend/e2e/queue-system.spec.ts` and this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: runtime/app, backend/API/DB, authentication/route policy, Playwright config or credentials, staging/Compose/WSL, production/deploy, other worktrees, merge.
+- Validation target: scoped ESLint, `tsc --noEmit -p e2e/tsconfig.json`, Playwright `--list` only (zero executions), frontend build, CRLF-aware `git diff --check`, normal hooks and exact-head CI. The named mutating spec stays NOT_RUN.
+- First stop condition: stop if the clicked option cannot be mapped unambiguously to its exact doctor ID from the observed available-specialists response, or if matching resource routing would require changing runtime/API code.
+- Planned correction: compare the route's doctor ID with the ID resolved for the clicked option and wait for the resulting queue snapshot; update the test queue resolver to mirror the canonical direct-owner then `routing_specialists` selection rule.
+
+## T18 — PR #3801 follow-up review P2 corrections — local validation
+
+- Commit under test: local source and journal changes; prior pushed PR HEAD `8f4d9a8e283716960bef8e790ad73e1f5b5189c5`; base `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
+- Environment: Windows PowerShell; no app session or staging. PR #3801 remains OPEN / Ready for review.
+- Execution mode: `narrow_override` under the user's direct request to fix both exact test-only findings. Gate reported no misroute, override used, handoff required; generated prompt read. No gate/router change.
+- Allowed / actual source path: `frontend/e2e/queue-system.spec.ts`. Journal paths: `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. No runtime/backend/API/DB changes.
+- Original P2s in review #5701479576: a non-null route assertion could accept the prior doctor ID during selection; queue discovery excluded `QueueResource` queues exposed through `routing_specialists`.
+- Correction: observe the same available-specialists GET consumed by the UI, map the clicked option label to exactly one API doctor ID, assert the URL reaches that exact ID, assert the selected trigger label, and wait for the queue snapshot. The snapshot selector now mirrors `useQueueManager.pickQueueForDoctor`: exact `specialist_id` match, otherwise a match in `routing_specialists`. This allows resource-routed queues and keeps the canonical owner's resource ID in the payload type.
+- Local validation: `npm.cmd exec -- eslint e2e/queue-system.spec.ts` PASS; `npm.cmd exec -- tsc --noEmit -p e2e/tsconfig.json` PASS; `npm.cmd exec -- playwright test e2e/queue-system.spec.ts --list --project=chromium` PASS (6 collected, 0 executed); `npm.cmd run build` PASS (existing third-party Rollup annotation and CSS-property warnings).
+- NOT_RUN: the six mutating/live E2E cases, staging, backend integration, and full `STAGING_VALIDATION.md`. Tier-2 remains PARTIAL by explicit user direction; no deferral or waiver was accepted.
+- No commit or push for this follow-up yet. Next: CRLF-aware `git diff --check`, normal hooks, commit/push, exact-head CI, then reply to and resolve only the two newly addressed threads and refresh the PR body. User retains merge; no APPROVE or merge action.
+
+## T18 — PR #3801 follow-up review P2 scope — pre-edit checkpoint
+
+- Current PR HEAD: `8f4d9a8e283716960bef8e790ad73e1f5b5189c5`; PR remains OPEN / Ready for review. No source edit for the new findings has started at this checkpoint.
+- User request: fix the two new test-review findings in this PR and continue. The user's existing disposition remains Tier-2 PARTIAL; staging and execution of this mutating spec are not authorized by this follow-up.
+- Execution mode: `narrow_override`, based on the user's explicit request for these exact test-only fixes. The canonical launcher reported no misroute, `override_used=true`, and `handoff_required=true`; its generated prompt was read. No gate/router change.
+- Gate command: `ai/langgraph/scripts/run_agent_gate.ps1` with task “Fix review findings in the Registrar queue E2E spec: wait for the exact newly selected doctor and support QueueResource queues through routing_specialists”, `--known-root-cause frontend/e2e/queue-system.spec.ts`, and repeated `--scope` for that spec plus `PROGRESS.md`, `RESUME.md`, and `EVIDENCE.md`.
+- Root cause / first-touch: `frontend/e2e/queue-system.spec.ts`. Canonical reference-only anchors inspected: `frontend/src/pages/registrar/views/QueueView.tsx`, `frontend/src/components/queue/ModernQueueManager.tsx`, `frontend/src/components/ui/macos/Select.tsx`, `frontend/src/hooks/useQueueManager.ts`, `frontend/src/types/domain/queue.ts`, `frontend/src/api/queue.ts`, `frontend/src/api/mappers/queue.ts`, and `backend/app/api/v1/endpoints/registrar_integration/_queue_ops.py`.
+- Confirmed contract: QueueView writes the selected specialist ID into the `doctor` query parameter; the UI Select exposes its displayed label but not its option value in the DOM. `useQueueManager.pickQueueForDoctor` chooses an exact `specialist_id` match, then a queue whose `routing_specialists` contains the selected ID. Snapshot data also carries the resource owner ID.
+- Allowed paths: `frontend/e2e/queue-system.spec.ts` and this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Denied: runtime/app, backend/API/DB, authentication/route policy, Playwright config or credentials, staging/Compose/WSL, production/deploy, other worktrees, merge.
+- Validation target: scoped ESLint, `tsc --noEmit -p e2e/tsconfig.json`, Playwright `--list` only (zero executions), frontend build, CRLF-aware `git diff --check`, normal hooks and exact-head CI. The named mutating spec stays NOT_RUN.
+- First stop condition: stop if the clicked option cannot be mapped unambiguously to its exact doctor ID from the observed available-specialists response, or if matching resource routing would require changing runtime/API code.
+- Planned correction: compare the route's doctor ID with the ID resolved for the clicked option and wait for the resulting queue snapshot; update the test queue resolver to mirror the canonical direct-owner then `routing_specialists` selection rule.
+## T18 — PR #3801 follow-up P2 corrections — exact source-head CI PASS — 2026-10-29T22:22+05:00
+
+- Commit under test: `2dcbc06db26ba6c26dd3b635f86abe8242fc31bc`; PR #3801 base `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`.
+- Environment: Windows PowerShell in the isolated worktree; no local app session or staging.
+- Execution mode: continuation of the recorded `narrow_override` for the exact test-only findings; prior gate had no misroute, used the override, required handoff, and its prompt was read. No gate/router change.
+- Allowed paths: `frontend/e2e/queue-system.spec.ts` and this plan's `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`. Source commit changed only the E2E spec; the checkpoint refresh changes only these journals.
+- Original findings (review #5701479576): the doctor switch could accept the previous non-null route ID; queue lookup omitted valid resource-owned queues routed through `routing_specialists`.
+- Fix: resolve the selected option to exactly one specialist ID from the observed `/queue/available-specialists` response; assert route equality to that ID and await the queue snapshot. The queue helper now mirrors the production hook's per-queue matching: exact `specialist_id` or a matching `routing_specialists` entry.
+- Local validation on source commit: `npm.cmd exec -- eslint e2e/queue-system.spec.ts` PASS; `npm.cmd exec -- tsc --noEmit -p e2e/tsconfig.json` PASS; Playwright `--list --project=chromium` PASS (6 collected, 0 executed); `npm.cmd run build` PASS (existing Rollup annotation/CSS-property warnings); CRLF-aware `git diff --check` PASS; normal commit hooks PASS.
+- Hosted validation: Unified CI `40917888683` SUCCESS on exact source HEAD. Frontend unit, build, lint, configured Frontend E2E, PR Required Gate, PR Review Quality, lifecycle, CodeQL, security, Gitleaks, GitGuardian and scratch guards PASS. Backend tests, integration, Docker, staging/production readiness, k6, DAST and path-aware unrelated checks SKIPPED, not PASS.
+- NOT_RUN: execution of the named six-case `queue-system.spec.ts`, staging, and full `STAGING_VALIDATION.md`. Tier-2 remains PARTIAL; no deferral/waiver.
+- Scope check: no runtime, backend, API, DB, auth, Playwright config, credentials, staging, production, or other-worktree changes. PR #3801 is OPEN/Ready for review and mergeable; no merge or deployment.
+- Review thread state: both new comments (`4415182939`, `4415182956`) remain unresolved; no reply/resolution was sent. PR metadata and body were not changed in this source-fix task.
+- Result: both P2 code findings are fixed and exact source-head CI passed. Remaining are an unexecuted named live spec/Tier-2 PARTIAL and review-thread administrative follow-up.
+- Next: no source change is pending; keep the live-spec/Tier-2 limitation visible and leave merge to the user.
+## T18 — PR #3801 ambiguous selector P2 — checkpoint and local validation — 2026-10-29T23:13:37+05:00
+
+- PR state verified: OPEN, Ready for review, mergeable. Before the source edit, head was `2898fa2ce802a74da12af54bb997acbcbed2f463`; base was `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1`; worktree branch was `codex/aqs-t18-queue-system-route-spec` and clean.
+- Finding: review #5702595713 reported ambiguous and Russian-locale-specific `text=Очередь` and `text=Онлайн-очередь` selectors.
+- Execution mode: `direct_execute`; the known root cause is limited to locators in one E2E spec. No risky runtime, canonical API, ownership, DB, auth, route-policy, or deployment behavior changed; the gate is not run in this mode.
+- Canonical anchors inspected: `frontend/e2e/queue-system.spec.ts`, `frontend/src/pages/registrar/views/QueueView.tsx`, `frontend/src/components/queue/ModernQueueManager.tsx`, `.agents/skills/playwright-best-practices/core/locators.md`.
+- Allowed source: `frontend/e2e/queue-system.spec.ts`; journals: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,RESUME,EVIDENCE}.md`. Denied: runtime/app, backend/API/DB, auth/credentials, Playwright config, staging/Compose/WSL, production/deploy, other worktrees, review-thread writes, merge.
+- Change: use the Registrar `main` region and level-1 heading, then scope to the queue-controls card and assert its level-3 heading and stable date/doctor control IDs. Both localized text selectors were removed.
+- Local validation: `npm.cmd exec -- eslint e2e/queue-system.spec.ts` PASS; `npm.cmd exec -- tsc --noEmit -p e2e/tsconfig.json` PASS; `npm.cmd exec -- playwright test e2e/queue-system.spec.ts --list --project=chromium` PASS (6 collected, 0 executed); `git -c core.whitespace=cr-at-eol diff --check` PASS.
+- NOT_RUN: execution of the six queue E2E scenarios, staging, backend/integration, and full `STAGING_VALIDATION.md`. Tier-2 remains PARTIAL under the existing user disposition.
+- Normal commit hooks: first attempt stopped on journal formatting after PowerShell expanded Markdown backticks; no hook was bypassed. Journal tail is being corrected before retry.
+- Result: source P2 corrected; commit created locally and normal hooks passed; push and exact-head CI pending. No GitHub review reply/resolution, merge, or deployment.
+- Next exact action: push the current branch and verify exact-head CI. Keep review threads unresolved and merge user-controlled.
+
+## T18 — PR #3801 merged; final bounded queue diagnostic — 2026-10-30T08:28+05:00
+
+- Commit under test: exact merged `origin/main` `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; PR #3801 merged.
+- Environment: isolated Windows worktree + synthetic `Ubuntu-24.04` Compose project `clinic-aqs-t18-queuefp-r8-20261030`; no production or foreign project access.
+- Execution mode: continuation of approved validation-only `narrow_override`; no tracked application/test change. Gate/router unchanged.
+- Scope: task harness under `.scratch/t18-final-acceptance-20261030/` and `output/staging/t18-final-acceptance-20261030/`; T18 journals only. Runtime, tracked E2E, database schema, production, merge, and deployment denied.
+- Prior r7 result: synthetic seed PASS; Registrar login HTTP 200; `queue-system.spec.ts` 2 PASS / 1 FAIL / 3 NOT_RUN (serial stop). The failing assertion was API-versus-rendered row signature equality; exact mismatch category remains unknown. Admin password login, first-time 2FA setup/verify, and Admin routes 4/4 PASS.
+- r8 result: seed and Registrar login PASS; generic fingerprint-harness failure; Session and owned teardown PASS. The fetched `sw.js` marker and checksum independently established exact commit provenance.
+- r9 result: harness syntax PASS; canonical Preflight PASS (C: 17 GiB, VHD backing: 28 GiB, WSL available memory about 3.1 GiB). `Start -NoBuild` failed because prior canonical teardown uses `compose --rmi local`; owned teardown PASS. Normal Start/build PASS; Session PASS; synthetic seed PASS; Registrar login HTTP 200.
+- Artifact provenance: served `sw.js` contains exact SHA marker `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; artifact byte count 15,933; SHA-256 `5a37c48cf59756b5172affd9326af9e149c3ce1ee17606481515a83073f6a5c1`. This Session's .NET checksum helper reported PASS; launcher metadata field `served_revision_verified` remains false and is not represented as launcher attestation.
+- Queue fingerprint: NOT_RUN to comparison result; safe failure code `DOCTOR_CANDIDATE:TimeoutError`. Queue suite in r9: NOT_RUN, because the diagnostic prerequisite failed. No claim that application behavior failed in r9.
+- Teardown: Session PASS; removed 5 containers, 3 volumes, 1 network; zero remaining owned containers/volumes/networks. No foreign resources touched.
+- Tier-2: PARTIAL; no deferral/waiver. Full `STAGING_VALIDATION.md` remains incomplete. Stop condition reached: do not rebuild unchanged harness/code until a narrow correction is selected from local source/evidence.
+- Next exact action: read-only analysis of the existing r7 queue-row failure and production queue selection/render code; decide whether a narrowly corrected assertion is supported. No additional staging cycle on unchanged source.
+## T18 — privacy-safe queue row comparison diagnostics — 2026-10-30T08:41:59+05:00
+
+- Commit under test: source commit 2a030c2f4e30ee9b3d44f490b775eb83b8dc437d, based on exact origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
+- Environment: Windows task worktree with existing frontend dependencies; no Compose project started before this entry.
+- Execution mode: gate_known_root_cause; confirmed file frontend/e2e/queue-system.spec.ts; gate_misroute=false, override_used=true, handoff_required=true; generated execution prompt read.
+- Allowed/actual scope: E2E spec plus the three plan journals. No runtime, backend/API/DB/auth, staging configuration, production, C:/final, or foreign resource changes.
+- Change: strict row count/order/number/patient-label/source equality retained. The poll now returns only safe aggregates: expected/actual row count and mismatch counts per field; no patient values are reported.
+- Original failure: r7 had 2 PASS / 1 FAIL / 3 NOT_RUN; its assertion reported only boolean API-vs-rendered row signature inequality, so mismatch category was unknown.
+- Validation: scoped ESLint PASS; tsc --noEmit -p e2e/tsconfig.json PASS; Playwright --list PASS (6 collected, 0 executed); npm run build PASS (1m 2s, existing dependency annotation/CSS warnings); CRLF-aware git diff --check PASS; normal source commit hooks PASS.
+- Result: local source validation PASS. Six named queue E2E tests, exact-head CI and synthetic staging are NOT_RUN at this checkpoint.
+- Remaining: push, exact-head CI, then one canonical synthetic Preflight → Start → Session with focused queue tests, exact service-worker revision provenance, and owned teardown. Tier-2 remains PARTIAL; full STAGING_VALIDATION.md remains incomplete.
+
+## T18 — PR #3805 staging build attempt — 2026-10-30T09:05+05:00
+
+- Commit under test: exact PR HEAD `5cd1e1e62b9f8e4daf6d121fff4a11f586497957`; base/current `origin/main`: `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`.
+- Environment: Windows task worktree and own project `clinic-aqs-t18-pr3805-20261030` on Ubuntu-24.04; synthetic credentials only.
+- Execution mode: continuation of previously authorized validation-only `narrow_override`; no application source, runtime, auth, production or merge action.
+- Allowed paths: `.scratch/t18-final-acceptance-20261030/`, `output/staging/t18-final-acceptance-20261030/`, and T18 plan journals. No foreign Compose resources or production targets.
+- Exact-head CI: Frontend unit, Frontend E2E, build, lint, PR Required Gate, latest PR Review Quality Gate, CodeQL, Gitleaks, security and scratch guards PASS. Docker build/staging readiness/backend integration are SKIPPED, not PASS. Earlier body-triggered Quality Gate failures were superseded by a successful check after the PR-body correction.
+- Canonical validation: Preflight PASS; worktree clean, C: 17 GiB free, D: 28 GiB backing-volume free, WSL available 3222 MiB, backend/frontend/Postgres ports free, no warnings.
+- Original failure: canonical `Start` returned `NATIVE_FAILED (compose-up)`, category `image_build`. It automatically tore down only the verified task project and reported `STAGING_TEARDOWN=PASS`.
+- Follow-up: no Session or browser tests ran. Read-only checks showed WSL free memory ~3.1 GiB after failure and no OOM/no-space kernel messages. Docker client plugin inventory listed Compose/trust but not Buildx; `docker buildx history ls` returned unknown command. This is a likely missing build prerequisite, not a confirmed exact cause because raw Compose stderr is intentionally suppressed. No package installation or second build attempted.
+- Result: Preflight PASS; Start FAIL; teardown PASS; synthetic seed, served frontend provenance, Admin 2FA/routes and all six queue E2E cases `NOT_RUN` on this HEAD. Tier-2 remains PARTIAL; no deferral/waiver.
+- Stop condition: do not repeat image build until the builder prerequisite is resolved. A persistent WSL package installation is pending user authorization.
+- Next: if authorized, install the official Buildx plugin in Ubuntu-24.04; rerun Preflight; then execute one Start → Session and verify exact served revision, target test results, Admin flow and teardown. Full `STAGING_VALIDATION.md` remains incomplete.
+
+## T18 — PR #3805 queue E2E locator correction — 2026-10-30T09:24:24+05:00
+
+- Commit under test: local uncommitted correction based on exact pushed PR HEAD `5cd1e1e62b9f8e4daf6d121fff4a11f586497957`; current main/base `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`.
+- Environment: prior own synthetic Compose project `clinic-aqs-t18-pr3805-20261030`; canonical Session already performed teardown. No new project launched in this entry.
+- Execution mode: `gate_known_root_cause`. First attempt STOPped because the task phrase `rendered table contract` matched the migration-intent heuristic. One adjusted retry returned `gate_ok`, mode `execute`, `gate_misroute=false`, `override_used=false`, `handoff_required=true`; generated prompt read. No narrow override used.
+- Confirmed root cause: prior browser failure reported 2 expected rows / 0 matched rows while the accessibility snapshot showed two rows. `DataTable.renderDataRow` emits raw `<tr aria-rowindex=...>` without `.mac-table-row`; that class belongs to a separate `TableRow` primitive. The E2E CSS selector required `.mac-table-row` and therefore matched nothing.
+- Change: `frontend/e2e/queue-system.spec.ts` now identifies the numbered queue table by its column-header role and its data rows by row/cell roles. Runtime/UI code, API, queue identity and test oracle are unchanged.
+- Allowed paths: `frontend/e2e/queue-system.spec.ts` and the three T18 journals. Denied: runtime/backend/API/DB/auth, production, `C:\final`, foreign projects, merge and deployment.
+- Validation: focused ESLint PASS; `npx tsc --noEmit -p e2e/tsconfig.json` PASS; Playwright `--list` PASS (30 browser/project combinations representing 6 scenarios). CRLF-aware `git diff --check` had passed before this correction; rerun before commit. No target E2E rerun yet.
+- Previous staging result (pre-correction): synthetic seed `DEV-DEMO` PASS; service-worker provenance PASS for commit `5cd1e1e62b9f8e4daf6d121fff4a11f586497957`, `sw.js` SHA-256 `a73f592aa9442a898d5a781363c29d40db82355a7eaf786eea572d7598d4b01d`; Registrar login PASS and canonical `/registrar/queue`; queue E2E 2 PASS / 1 FAIL / 3 NOT_RUN (serial stop); normal Admin login + 2FA PASS; Admin routes 4/4 PASS.
+- Teardown: canonical Session PASS; removed only the owned project's 5 containers, 3 volumes, 1 network; post-teardown owned-resource counts zero. No foreign resources touched.
+- Result: selector correction is locally validated but not yet pushed; target E2E behavior after correction NOT_RUN. Exact-head CI for the pending patch NOT_RUN. Tier-2 remains PARTIAL; full `STAGING_VALIDATION.md` is incomplete; no waiver.
+- Next: run CRLF-aware diff check and commit/push this scoped patch plus journals; wait for exact-head CI; if green, use one new uniquely named synthetic project for the six focused scenarios, Admin 2FA/routes and provenance, then confirm owned teardown.
+
+## T18 — PR #3805 queue row locator and login-throttle follow-up — 2026-10-30T09:59:33+05:00
+
+- Commit under test: exact pushed PR HEAD `fa519728dab30f795ccd66506670c97fbeb6cd6c`; base/current main `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`. A second E2E-only change is currently local and uncommitted.
+- Environment: own Ubuntu-24.04 synthetic project `clinic-aqs-t18-pr3805-rowfix-retry-20261030`; private task env retained its synthetic credentials, project/owner/expiry were changed only after the prior project's verified teardown. No production or foreign resources used.
+- Preflight: PASS; C: 16 GiB, D: 28 GiB backing volume, Ubuntu available 3137 MiB, ports 18881/18880/15532 free, no warnings. Exact commit `fa519728…`, worktree clean.
+- Start: PASS; backend/frontend/worker images built, runtime readiness PASS; available memory 3208 MiB at return.
+- Session harness first attempt: child stopped before seeding because `StagingEnvRelativePath` was omitted and its pinned expected SHA was stale. Canonical Session teardown PASS. Harness was corrected locally to pass the relative env path and current SHA; no runtime source changed.
+- Successful lifecycle Session on the fresh retry project: synthetic seed PASS (`DEV-DEMO`); frontend provenance PASS for `fa519728dab30f795ccd66506670c97fbeb6cd6c`, served `sw.js` SHA-256 `cbff56e49e84e6dbb2dc85a4f65992d5e0a32602e2330ac15a5ce602483621c4`; Registrar diagnostic login HTTP 200 and canonical `/registrar/queue` PASS.
+- Queue E2E result on `fa519728`: 4 PASS / 1 FAIL / 0 skipped; failing scenario was switching between doctors, where the next login page lacked `#modern-queue-doctor`. Admin password login returned HTTP 429 before 2FA; 2FA and four route checks NOT_RUN. Do not report these as passing.
+- Confirmed harness root cause: `backend/app/middleware/security_middleware.py` sets a limit of 5 login requests per client IP per 300 seconds and records each request before forwarding it. The staging script performed one Registrar diagnostic login and the spec logged in again in every case. After four passing cases, the next login was the sixth request and returned 429; the later Admin login also returned 429. This is test-session exhaustion, not a verified application auth defect. Rate limiter/auth code is read-only for this task.
+- Test-only correction in progress: a worker-scoped real Registrar UI login captures `BrowserContext.storageState()` in memory; fresh test pages reuse that state, while `beforeEach` only observes the available-specialists response. This should reduce normal Registrar login to one request and preserve the actual login flow. No bypass or persistent credential artifact is introduced.
+- Gate: `gate_known_root_cause`, known file `frontend/e2e/queue-system.spec.ts`, exact scope the E2E spec and three plan journals; result `gate_ok`, mode `execute`, `gate_misroute=false`, `override_used=false`, `handoff_required=true`; execution prompt read.
+- Local validation after the worker-state patch: ESLint PASS; `tsc --noEmit -p e2e/tsconfig.json` PASS; Playwright collection PASS (30 project/test combinations, six scenarios). Frontend build PASS on the previous local selector-only revision; rerun after the final current patch before commit. Final CRLF-aware diff check also pending.
+- Teardown: canonical Session reported PASS; removed the retry project's 5 containers, 3 volumes and 1 network; remaining owned resources all zero. No foreign resources touched. WSL available memory after the test session was 2567 MiB; no OOM or disk refusal reported.
+- Result: build/lifecycle and frontend provenance are confirmed; queue suite and Admin/2FA acceptance remain incomplete due repeated-login throttling. Current worker-storage correction is not yet pushed or tested in staging. Exact-head CI for the pending correction NOT_RUN. Tier-2 remains PARTIAL; full `STAGING_VALIDATION.md` is incomplete; no deferral/waiver.
+- Next: rerun build and diff checks, commit/push the E2E test and journals, wait for exact-head CI, then use one new project to repeat the six queue tests, Admin 2FA/routes and provenance; confirm teardown.
+
+
+## T18 — PR #3805 sessionStorage auth transfer follow-up — 2026-10-30T10:36+05:00
+
+- Commit under test: pushed source commit 0d253227ea2fb8dd01c8df62f75f3b5b2b5fd53d; local sessionStorage fixture correction is not yet committed.
+- Environment: own synthetic Ubuntu-24.04 Compose project clinic-aqs-t18-pr3805-workerlogin-20261030; no production or foreign resources.
+- Gate: known root cause frontend/e2e/queue-system.spec.ts; result narrow_override, gate_misroute=false, override_used=true, handoff_required=true; prompt read. Basis: user's existing authorization for repeated isolated synthetic T18 cycles.
+- Exact-head CI: 19 checks success, 18 skipped, 0 failures; Frontend unit/E2E/build/lint and PR Required Gate passed. Skipped jobs are not counted as pass.
+- Canonical Preflight: PASS for 0d253227; C: 16 GiB free, WSL backing D: 28 GiB, Ubuntu available 3184 MiB, ports 18881/18880/15532 free, warnings none, worktree clean.
+- Canonical Start: PASS; backend/frontend/worker images built; runtime readiness PASS; WSL available 3231 MiB at return.
+- Session: synthetic seed PASS with DEV-DEMO marker; served sw.js exact commit provenance PASS for 0d253227; served sw.js SHA-256 72b715193d88dcaf775af38f340d0c2a9d74a9a751579a7eea1c3faae6e680d9; Registrar diagnostic login HTTP 200 and canonical /registrar/queue PASS.
+- Queue E2E: wrapper reported 0 passed / 1 failed / 0 skipped, exit 1. First scenario timed out waiting for queue controls; error context identified an absent element at the display-interface scenario. Remaining suite execution is not proven.
+- Admin: normal password login HTTP 200; new synthetic account required 2FA setup; setup HTTP 200 and verification HTTP 200; Admin 2FA PASS. Admin route smoke 4/4 PASS.
+- Root cause: frontend/src/utils/tokenManager.ts stores auth tokens in sessionStorage. Playwright storageState does not capture sessionStorage; the authenticated worker state was therefore lost by fresh test contexts. This is a test harness defect, not a product auth/rate-limit defect.
+- Local test-only correction in progress: capture sessionStorage entries in worker memory and restore them with same-origin addInitScript before each test app loads. Tokens are neither logged nor written to files. Auth policy/runtime unchanged.
+- Local validation on the correction: ESLint PASS; E2E TypeScript PASS; Playwright collection PASS (6 scenarios, 0 executed); frontend build PASS (3m06s; existing third-party annotation/CSS warnings). CRLF-aware diff check PASS; normal commit hooks remain pending.
+- Teardown: Session PASS; removed 5 containers, 3 volumes, 1 network; zero owned containers/volumes/networks remaining. WSL available memory after the test session: 1237 MiB.
+- Port guard: an immediate post-Session canonical Preflight failed with WINDOWS_PORT_OWNER on 18880. Read-only netstat observed a loopback listener with PID 0; later Get-NetTCPConnection showed no LISTEN entry. No process/resource was killed or changed. A fresh canonical Preflight on the next pushed SHA is required before Start.
+- Scope check: changed only the test harness and T18 journals; no app/runtime/backend/auth code, production, foreign resources, merge or deployment.
+- Tier-2: PARTIAL. Full STAGING_VALIDATION.md remains incomplete. No deferral/waiver.
+- Next: commit/push the corrected E2E fixture and this evidence; verify exact-head CI; then update the existing private env file to a new unique owned project identity and exact SHA, run canonical Preflight, and only if it passes perform Start → Session → teardown.
+
+
+## T18 — PR #3805 final queue E2E synthetic cycle — 2026-10-30T15:39+05:00
+
+- Source commit under test: 9e1cf85cc89e19969799cac6d5833f7d78389b2c; PR base/current main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
+- Environment: own Ubuntu-24.04 synthetic project clinic-aqs-t18-pr3805-sessionstorage-20261030. Private synthetic env only; no production/foreign project or Compose resource.
+- Exact-head CI: 19 success, 18 skipped, 0 failure; Frontend build/lint/unit/E2E and PR Required Gate passed. Skipped jobs are not counted as passed.
+- Local validation: scoped ESLint PASS; tsc --noEmit -p e2e/tsconfig.json PASS; Playwright collection PASS (6 collected, 0 executed locally); npm run build PASS (3m06s, existing third-party Zod/Rollup/CSS warnings); CRLF-aware git diff --check PASS; normal commit hooks PASS.
+- Gate for sessionStorage fixture correction: known root cause frontend/e2e/queue-system.spec.ts; narrow_override, gate_misroute=false, override_used=true, handoff_required=true; generated execution prompt read. This follows the user's existing authorization for repeated synthetic T18 cycles.
+- Lease handling: initial Start refused because CLINIC_EXPIRES_AT had elapsed during CI wait; launcher teardown PASS occurred before service startup. The private synthetic env expiry was updated to a future time; no source/config tracked by Git changed.
+- Canonical Preflight after lease refresh: PASS on exact SHA; C: 17 GiB free; WSL backing D: 28 GiB; Ubuntu available 3228 MiB; ports 18881/18880/15532 free; warnings none; worktree clean.
+- Canonical Start: PASS; backend/frontend/worker images built; runtime readiness PASS.
+- Session: synthetic seed PASS with DEV-DEMO marker. Served frontend provenance PASS for exact source commit 9e1cf85cc89e19969799cac6d5833f7d78389b2c; served sw.js SHA-256 0515e270aa911445918d12255f32d2e728c07e64fcc2b454e3c0a6f51a950767.
+- Registrar smoke: login HTTP 200, no 2FA required, canonical /registrar/queue, login screen absent. Diagnostic token_persisted=false is a localStorage-only check; it does not describe sessionStorage.
+- Queue suite: T18_QUEUE_E2E=PASS; tests=6; failed=0; skipped=0. Auth fixture logs in through normal UI once per worker and copies captured sessionStorage only in memory into fresh same-origin contexts. It asserts the auth_token key exists without printing the value.
+- Admin smoke: password login HTTP 200; setup required for the synthetic account; 2FA setup HTTP 200; 2FA verify HTTP 200; ADMIN_2FA PASS; Admin routes 4/4 PASS.
+- Teardown: Session PASS; removed 5 containers, 3 volumes, 1 network; remaining owned resources 0. Post-session canonical Preflight PASS; ports free; Ubuntu available memory 3190 MiB.
+- Scope check: only frontend/e2e/queue-system.spec.ts and T18 journals changed. No application/runtime/backend/auth policy/DB, production, foreign resource, deployment, approval or merge.
+- Remaining limitation: full STAGING_VALIDATION.md and remaining T18 scenarios are NOT_RUN in this cycle. Tier-2 remains PARTIAL; no waiver/deferral.
+- Local cleanup limitation: generated Playwright results under frontend/output/staging/t18-final-acceptance-20261030/results retain the prior failure error-context. Exact in-worktree path was verified, but host command policy rejected file and directory deletion. No alternate delete mechanism was used.
+- Next: update PR body and mark Ready for review; await user merge before another PR cycle.
+
+## T18 — PR #3805 Admin live panel checks — 2026-10-30T17:07+05:00
+
+- Commit under test: `b74cdb4d1393bcdab31bbf6e95fbf60130473b68`; executable source/test code was `9e1cf85cc89e19969799cac6d5833f7d78389b2c`, with only the T18 evidence checkpoint added in `b74cdb4`. PR #3801 is merged at base/current main `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; PR #3805 remains OPEN / Ready for review.
+- Environment: own synthetic WSL Ubuntu-24.04 Compose projects r5, r6, and r7 using the existing private env file in place; no production or foreign project/resource.
+- Execution mode: validation-only continuation under the previously recorded T18 `narrow_override`; no application/runtime edit. Existing gate prompt and scope record remain in the task checkpoint.
+- Allowed/actual paths: task-owned `.scratch/t18-admin-live-20261030/`, reused private `.scratch/t18-final-acceptance-20261030/staging.env`, and these T18 journals. No tracked runtime or test source changed.
+- r5 original failure: Admin password login and first-time TOTP setup/verification passed; Admin navigation passed 3/3. The first panel test waited only for a page-level button that remains visible behind the modal, so its result did not prove form submission. The panel suite stopped after that failure; no patient creation pass was claimed. Session teardown and post-session Preflight passed.
+- r6 diagnostic: strengthened the harness to wait for the synthetic POST and verify successful response fields. The API returned HTTP 422 because the optional fixture email used the reserved `.test` domain. A local schema-only reproduction of the exact synthetic payload returned `EmailStr` `email:value_error`; no PHI, response payload, or secret was logged. Session teardown and post-session Preflight passed.
+- r7 correction: removed the unused optional email; required the successful patient POST, expected synthetic response fields, and modal form dismissal before asserting the row. Only ADM-05 and ADM-06 were run to avoid repeating the already-passing navigation checks.
+- Canonical Preflight r7: PASS; commit exact; worktree clean; no warnings; C: 17 GiB free; WSL backing D: 28 GiB free; Ubuntu available memory 3205 MiB before Start.
+- Canonical Start r7: PASS; backend/frontend/worker built; runtime readiness PASS; Ubuntu available memory 3260 MiB at return.
+- Session r7: synthetic seed PASS (`DEV-DEMO`); service-worker `sw.js` marker matched commit `b74cdb4d1393bcdab31bbf6e95fbf60130473b68`, SHA-256 `7693a0276b889ecc6845039f7bd3e3616f15c5e5d0ada4434ac63833d6466fc5`; guarded synthetic Admin bootstrap PASS; ordinary password login and first-time 2FA setup/verification PASS; ADM-05/ADM-06 PASS (2 passed, 0 failed, 0 skipped).
+- Teardown r7: PASS; removed 5 containers, 3 volumes, 1 network; remaining owned resources 0. Post-session canonical Preflight PASS, no warnings, ports available, Ubuntu memory 3190 MiB.
+- Combined Admin evidence at the same exact executable source: navigation 3/3 (r5) and panel tests 2/2 (r7) passed, with normal Admin TOTP in both new synthetic accounts. These suites ran in separate cycles. The earlier six queue-system scenarios already passed in the prior synthetic PR #3805 cycle on source `9e1cf85`.
+- Served-artifact limitation: the marker/hash proves the served service-worker revision; the canonical helper still reports `served_revision_verified=false`. Do not present this as full attestation of all static frontend assets.
+- Validation commands: `node --check` for scratch Playwright spec/fixture; PowerShell parser for validation script; Playwright collection (`--list --grep 'ADM-0[56]'`, 2 collected); local Pydantic schema reproduction for the r6 failure; canonical Preflight → Start → Session → post-session Preflight for r7.
+- Result: targeted Admin panel checks PASS; overall Admin live slice PASS across r5/r7. r5/r6 failed attempts are retained as diagnostic history, not converted to PASS. Full `docs/runbooks/STAGING_VALIDATION.md` and remaining integrated T18 scenarios are NOT_RUN. Tier-2 remains PARTIAL; no deferral/waiver.
+- Scope check: only scratch harness/env and plan journals; no runtime/backend/auth policy/database/production/foreign resource, approval, merge, or deployment changes.
+- Next: commit the three journal updates to the existing PR #3805 branch, update the PR description, and verify exact-head CI. User retains merge authority.
+
+## T18 — PR #3805 current UI direction lifecycle — 2026-10-30T18:42+05:00
+
+- Commit under test: 38ecd42927fee6fe867a75188d5cb941e081ec6f; PR #3805 base/current origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
+- GitHub state: OPEN / Ready for review, mergedAt null at the time of this checkpoint, despite the user reporting merge.
+- Environment: own synthetic WSL Ubuntu-24.04 project clinic-aqs-t18-rq18-20261030-r8; host ports 18882/18883/15533; worktree and WSL backing disk had adequate reserve at Preflight. No production or foreign project was used.
+- Execution mode: validation-only continuation under the previously recorded T18 narrow_override; no runtime or tracked test source edits. Scratch harness only.
+- Actual scratch paths: .scratch/t18-final-acceptance-20261030/validate-rq18-session.ps1 and frontend/output/staging/t18-final-acceptance-20261030/rq18-current-ui.{spec.ts,config.ts}. The validation script captured command output in memory and printed only safe status markers/hash; QR code, TOTP secret, credentials and synthetic patient values were not written to evidence.
+- Pre-session canonical Preflight: PASS; commit exact; tracked worktree clean; no warnings. At the last Preflight before Session, host free disk was 18 GiB, WSL backing free disk 28 GiB and Ubuntu available memory approximately 3.2 GiB.
+- Session build/readiness: PASS. Synthetic DEV-DEMO seed: PASS.
+- Served frontend evidence: served sw.js contained exact tested SHA 38ecd42927fee6fe867a75188d5cb941e081ec6f; SHA-256 8038d6d1637df1f61d4995fe25d38cafa1ac7a0b30237a5280a3e70d879f645e. Canonical launcher still reported served_revision_verified=false; only the service-worker marker is attested, not every served static asset.
+- Browser validation: 1 Playwright test, 8/8 checkpoints PASS, 0 failures: normal Admin login and TOTP setup/verification; new QueueProfile hidden by default; doctorless service creation; explicit QR publication; permanent address recovered unchanged after reload; synthetic anonymous join; hide/republish preserves the address; QueueResource archive and restore control availability.
+- Earlier harness-only failures were diagnosed from canonical UI contracts and corrected in scratch: service creation required category/code/price/duration and displays profile title for queue-tag selection; checkbox state belongs to its accessible role wrapper; QR block must be expanded and uses a provision button before the address exists. No product/runtime defect was inferred from these harness failures.
+- Session teardown: PASS; removed 5 containers, 3 volumes and 1 network; remaining owned containers/volumes/networks all 0; local images removed.
+- Post-Session canonical Preflight: FAIL with WINDOWS_PORT_OWNER. Session teardown itself passed; do not begin another staging session until a fresh Preflight passes.
+- Validation commands: PowerShell syntax parse PASS; targeted TypeScript check for scratch spec/config PASS; Playwright collection PASS (1 collected, not counted as execution); canonical Preflight PASS → Session PASS for the final run → teardown PASS. Earlier failed Sessions and the no-build attempt are retained as diagnostic history and not reported as successful.
+- Result: this current UI flow PASS on exact commit. Overall Tier-2 remains PARTIAL. Full docs/runbooks/STAGING_VALIDATION.md and remaining integrated T18 scenarios are NOT_RUN; no deferral is claimed.
+- Scope check: no tracked runtime/test change, no production/foreign Compose, no merge or deployment. PR #3805 remains open at the time checked.
+- Next: commit and push the three journal updates to existing PR #3805, refresh the PR description with exact results/limitations, then verify exact-head CI. Await user-owned merge before starting a new PR cycle.
+
+## T18 — exact static asset provenance attempt — 2026-10-30T19:44+05:00
+
+- Commit under test: `8c606dc99d0bc9d19c49b025d2084d73dcd4e66a`; PR #3801 is merged at `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`. PR #3805 was confirmed OPEN / Ready for review / mergeable before this run.
+- Execution mode: validation-only continuation under the previously authorized T18 `narrow_override`; no application, tracked test, staging-config, production, merge, or deployment change.
+- Environment: isolated Ubuntu-24.04 project `clinic-aqs-t18-static-assets-20261030`, owner `codex-t18-static-assets-20261030`, host ports 18884/18885/15534; private synthetic environment only.
+- Canonical Preflight: PASS; host disk free 18 GiB, WSL backing disk free 28 GiB, WSL available memory 3206 MiB, no warnings, exact source HEAD and clean worktree. Canonical Start: PASS; 10-GiB storage reserve applied, runtime readiness PASS, images built, WSL available memory 3169 MiB.
+- Local harness validation: PowerShell parser PASS. Target was byte-for-byte comparison of every static file in the built frontend container against HTTP-served bytes, plus exact `sw.js` commit marker.
+- Canonical Session: FAIL at the harness manifest-read step (`STATIC_ASSET_MANIFEST=FAIL; reason=container_read`). The harness did not complete a manifest and made no per-file HTTP comparisons. Therefore static asset provenance is NOT_RUN; this is not evidence of an application defect.
+- Teardown: PASS from canonical Session. Read-only checks afterward found zero containers, volumes, or networks with the owned project label; ports 18884/18885/15534 were free. Post-Session canonical Preflight: PASS, no warnings.
+- Scope check: generated harness/env/checkpoint only; no tracked runtime/test/config source, no production or foreign project, no global Docker/WSL cleanup. No other browser checks were repeated.
+- Remaining limitation: all-static-file provenance remains NOT_RUN; prior evidence proves only a served `sw.js` marker/hash. Full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete. Tier-2 remains PARTIAL as directed; no deferral is claimed.
+- Next: preserve this failure as harness evidence, update the existing PR #3805 journals/body and verify exact-head CI. Do not start another image build until the `container_read` failure is explained; do not mark T18 complete.
+- Local cleanup limitation: after confirming teardown, removal of the exact task-owned ignored env and harness files was rejected by the host command policy. No alternate deletion method was used; see `prework.md` for the exact generated paths.
+
+## T18 static frontend provenance diagnostic r2 — 2026-10-30T20:29:31+05:00
+
+- Commit under test: PR #3805 HEAD 86775c95cf009028af06d5f462e6075f065f7923; base/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. GitHub still reported PR #3805 OPEN after this run.
+- Execution mode: bounded validation-only continuation under the previously authorized T18 narrow_override. Gate result: narrow_override; gate_misroute=false; override_used=true; handoff prompt read. No application, tracked test, staging config, production, merge, or deployment change.
+- Environment: synthetic owned project clinic-aqs-t18-static-assets-r2-20261030; owner codex-t18-static-provenance-r2; ports 18892/18893/15538; ephemeral lease expiry was 2026-10-30T19:13:40Z.
+- Canonical Preflight attempt 1: FAIL before build with PUBLIC_HOST_INVALID. The launcher contract requires STAGING_PUBLIC_HOST to be exactly 127.0.0.1 or localhost without a port. Only the task-private env was corrected.
+- Canonical Preflight attempt 2: PASS; host C free 18 GiB, WSL backing D free 28 GiB, WSL available 3234 MiB, ports free, no warnings, runtime readiness NOT_RUN.
+- Canonical Start/build: PASS; storage reserve 10 GiB, frontend/backend/worker images built, readiness PASS, no warnings; WSL available 3206 MiB. The launcher still reported served_revision_verified=false pending byte comparison.
+- Harness prechecks: PowerShell syntax parse PASS for both r2 scripts. A host-WSL sh -n check of the manifest command and a sed path smoke check passed; these do not prove the same command works in the frontend container.
+- Canonical Session: FAIL; STATIC_FRONTEND_EXEC_PRECHECK=PASS. The subsequent frontend manifest docker compose exec returned exit 2, safe classification unknown. The Session child exited 11; no complete manifest was produced and no HTTP asset comparison ran.
+- Teardown: canonical Session reported STAGING_TEARDOWN=PASS. Canonical Stop also PASS. Independent label-filtered inventory: 0 owned containers, 0 volumes, 0 networks; Windows listeners on ports 18892, 18893, and 15538 were 0. The new private env file was removed after teardown.
+- Result: all-static-file served provenance is NOT_RUN. No product defect is inferred. Earlier writer/parser format mismatch was corrected in the generated harness, but the new container manifest command exit 2 remains unexplained. Tier-2 remains PARTIAL with no deferral; full T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete.
+- Scope check: only task-owned ignored harness/env plus the three T18 journals; runtime, tracked tests, application config, production, foreign Compose projects, and shared Docker cache were untouched. No browser scenarios were repeated.
+- Next exact action: preserve this diagnostic on PR #3805, update its body, and verify exact-head CI. After the user-owned merge, continue T18 in a fresh worktree by diagnosing the container-only manifest exit 2 with safe error-class/line-count reporting before any further image build.
+
+## T18 static frontend provenance R5 — 2026-10-30T21:21+05:00
+
+- Commit under test: PR #3805 source HEAD b9dfbd4642e57492421c3ef15daa0317d7351279; base/current origin/main 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. PR #3801 merged at that base; #3805 remains OPEN / Ready for review.
+- Environment: own synthetic Ubuntu-24.04 project clinic-aqs-t18-static-provenance-r5-20261030; owner codex-t18-static-provenance-r5; host ports 18898/18899/15541; private synthetic environment only.
+- Execution mode: validation-only narrow_override for confirmed harness root cause. Gate result: narrow_override; gate_misroute=false; override_used=true; handoff_required=true; execution prompt read. No runtime or tracked test source edit.
+- Allowed scope: task-owned ignored harness/env and T18 journals. Denied: application/runtime, tracked tests, staging configuration, production, foreign projects, shared Docker cleanup, merge/deployment.
+- Canonical Preflight: PASS; exact commit; tracked worktree clean; C free 18 GiB; WSL backing D free 28 GiB; Ubuntu available memory 3193 MiB; ports free; no warnings.
+- Canonical Start: PASS; 10-GiB build reserve; backend/frontend/worker images built; runtime readiness PASS; no warnings; Ubuntu memory 3263 MiB.
+- Original harness failure: R4 generated manifest completed but Windows PowerShell .NET Framework failed before HTTP comparison because DecompressionMethods.All is unsupported. Local exact-runtime GZip|Deflate flag check and PowerShell parser passed. No application defect inferred.
+- Validation command: canonical ops/scripts/wsl_staging.ps1 Preflight → Start → Session; Session ran direct container find, batched sha256sum, HTTP byte comparison and sw.js commit marker check.
+- Result: PASS. Container manifest contained 261 static files; HTTP-served byte comparison 261 matches / 0 mismatches; sw.js marker matched exact commit b9dfbd4642e57492421c3ef15daa0317d7351279. Manifest SHA-256: 22a4acfa1ba98934d07d854ca38333e4c412c14803bd0a26e9990101192b9d20. Served frontend image ID: sha256:6216be5a85def3ac9da79048b5bd27653c16d219a8654858b46417e0f674970a.
+- Helper limitation: canonical helper continues to report served_revision_verified=false. The independent byte comparison is recorded as a separate exact-build provenance result; helper behavior was not changed.
+- Teardown: PASS; Session removed 5 containers, 3 volumes, 1 network and local images. Remaining owned resources 0. Independent project-label inventory: 0 containers/volumes/networks; ports 18898/18899/15541 free. Ubuntu memory after Session 2455 MiB.
+- PR: https://github.com/drsapaev/final/pull/3805. Merge commit: none; user retains merge authority.
+- Remaining limitation: full integrated T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Tier-2 remains PARTIAL; no deferral is claimed.
+- Next: commit/push these journal updates to existing PR #3805, update PR body, verify exact-head CI, then continue remaining T18 work.
+
+## T18 — PR #3805 state reconciliation — 2026-10-30T21:56+05:00
+
+- Repository/worktree: `drsapaev/final`, `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final`; branch `codex/t18-queue-row-diagnostics`.
+- GitHub state: PR #3801 is merged at `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`. PR #3805 remains OPEN / Ready for review / mergeable at HEAD `5bc6bcdb5b270706cb994d09e71583cc2683b349`, base `22b21a8b7c3c0b9b56f4e388c35e329a4321f768`; no review decision or merge timestamp.
+- Exact-head checks: Unified CI and applicable frontend unit/E2E, lint/build, PR Required Gate, PR Review Quality Gate, security, CodeQL, Gitleaks, and workflow guards passed. Backend, integration, Docker, parity, readiness, load and DAST were skipped by path-aware rules; skipped checks are not PASS.
+- PR-description correction: replaced stale Tier-1 HEAD `b9dfbd4` with current exact PR HEAD `5bc6bcdb5b270706cb994d09e71583cc2683b349`; retained `b9dfbd4` as the exact source tree for R5 provenance. Clarified that the next T18 work follows the user-owned merge.
+- Validation commands: `gh pr view 3805 --json state,isDraft,mergedAt,headRefOid,baseRefOid,mergeable,statusCheckRollup`; `gh pr checks 3805`; source-path comparison `git diff --name-only b9dfbd4642e57492421c3ef15daa0317d7351279..HEAD` showed only `EVIDENCE.md`, `PROGRESS.md`, and `RESUME.md`.
+- Result: PR state/body agree on the current HEAD and exact evidence. No tests or staging were rerun because this change was documentation/metadata only and previous scenario evidence remains valid.
+- Scope check: no app/runtime/test, API, database, staging configuration, Compose project, production, merge, or deployment change. Only the existing PR description and task journals were touched.
+- Remaining limitation: PR #3805 is not merged. Tier-2 remains PARTIAL; full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete; no deferral is claimed.
+- Next: user merges #3805, then refresh `origin/main` and continue with an uncovered T18 scenario. Do not repeat queue-system 6/6, Admin navigation/panel 3/3 + 2/2, RQ18 8/8, or R5 static provenance 261/261.
+## T18 Admin setup return-context live browser check — 2026-10-30T22:33+05:00
+
+- Commit under test: `0513a9863b137ad2bc4143f73d322f31ca481ee2`.
+- Environment: Ubuntu-24.04, synthetic owned Compose project `clinic-aqs-t18-route-context-20261030-r1`, owner `codex-t18-route-context-r1`; ports backend/frontend/PostgreSQL `18896/18897/15540`; lease was valid for Preflight, Start and Session. Private environment values were not logged.
+- Execution mode: validation-only continuation under the previously authorized T18 `narrow_override`; gate result for this scope was `narrow_override`, `gate_misroute=false`, `override_used=true`; its execution prompt was read. No runtime source or tracked tests were changed.
+- Allowed paths: task-owned `.scratch/t18-route-context-20261030/`, `frontend/output/staging/t18-route-context-20261030/`, existing T18 journals, and this owned synthetic project. Denied: production, patient data, auth-policy changes, runtime/API/tracked-test edits, foreign Compose resources, global Docker cleanup, merge and deployment.
+- Actual tracked paths changed for this record: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Temporary runner/spec/config were task-owned validation harness files only.
+- Original failure: no product failure was being repaired; this live acceptance slice lacked browser evidence for typed setup context across editor tabs, reload and browser history.
+- Validation: canonical `Preflight` PASS; canonical `Start -TimeoutSec 180` PASS with runtime readiness PASS; canonical `Session -NoBuild` executed the bounded child runner and returned PASS; post-session `Preflight` PASS.
+- Browser scope: one Playwright scenario, ordinary synthetic Admin password login plus first-time TOTP enrollment and verification; no auth bypass, patient data, queue join, publication, or mutation of clinical records.
+- Result: PASS. Synthetic seed and target `sw.js` commit marker PASS. Browser markers PASS for Admin 2FA, profile→catalog state preservation, back/forward, setup return/reload, and users return. Playwright count: 1 passed, 0 failed, 0 skipped.
+- Provenance limit: `sw.js` contained target commit `0513a9863b137ad2bc4143f73d322f31ca481ee2`; launcher output remained `served_revision_verified=false`. This run does not claim a full served-static-file byte attestation. Separate prior R5 byte-comparison evidence remains anchored to its own source commit.
+- Cleanup: Session teardown PASS; removed 5 containers, 3 volumes and 1 network; remaining counts 0. Independent inventory confirmed 0 project containers/volumes/networks and all three ports closed. Post-session Preflight PASS; WSL backing volume free 28 GiB and host C: free 18 GiB.
+- Generated-file cleanup: recursive and exact-file removal commands were both rejected by the desktop policy before execution. No files were deleted. Task-owned ignored harness files remain under `.scratch/t18-route-context-20261030/` and `frontend/output/staging/t18-route-context-20261030/`; the pre-existing env file `.scratch/t18-final-acceptance-20261030/staging.env` was retained. No Docker resources remain.
+- Scope check: no production, unrelated worktree, foreign Compose project, patient data, application source, auth policy or global Docker resource was accessed or changed. Session-owned local images were removed by canonical teardown.
+- Remaining limitation: Tier-2 remains PARTIAL. Full T18 integration and every item in `docs/runbooks/STAGING_VALIDATION.md` are not complete; no deferral is claimed.
+- PR: https://github.com/drsapaev/final/pull/3805. Merge commit: none; PR #3805 remains open and user retains merge authority.
+- Next: commit/push the three T18 journals to existing PR #3805, update its description to the new exact HEAD and verify CI; then continue only a distinct unverified T18 item after user-owned merge.
+
+
+## T18 — PR #3805 exact-head CI completion — 2026-10-30T23:10+05:00
+
+- Commit under test: 8be11af929c1faa9e0d091427e055ab512540923; base/current origin/main: 22b21a8b7c3c0b9b56f4e388c35e329a4321f768.
+- Environment: GitHub Actions; local Windows host with repository Python 3.11 launcher.
+- Execution mode: exact-head validation and evidence update within the existing approved T18 scope. No source, staging, production or auth operation.
+- Allowed paths: T18 journals, task-owned prework checkpoint, existing PR #3805 body. Denied: runtime/tests, production, foreign projects, merge/deploy.
+- Original CI anomaly: Windows Git scratch guard attempt 1 concluded CANCELLED after its log showed five test cases and “Ran 5 tests ... OK”; cause of cancellation was not established. It was not recorded as PASS.
+- Validation commands/results:
+  - scripts/run_python.ps1 invoking unittest discovery for scripts/tests/test_agent_scratch_ignore.py: PASS, 5 tests.
+  - GitHub Actions Unified CI run 41100443815 at exact HEAD: Frontend build/unit/lint/E2E and PR Required Gate PASS.
+  - Agent Workflow Guards run 41100443810, attempt 2: Windows and Ubuntu scratch guards PASS; Windows duration 22s.
+  - Security, CodeQL, Gitleaks, PR Review Quality Gate and lifecycle recommendation: PASS.
+  - Backend, integration, Docker, parity, staging/production readiness, load and DAST jobs: SKIPPED by workflow scope, not PASS.
+  - git -c core.whitespace=cr-at-eol diff --check origin/main...HEAD: PASS. Repository baseline uses CRLF; no line-ending rewrite was kept.
+- Result: exact-head applicable CI PASS. PR body updated with current CI state and explicit path-aware skips. At verification PR #3805 was OPEN / Ready for review / mergeable; this journal-only follow-up advances its head. No approval or merge performed.
+- Scope check: only PROGRESS.md, RESUME.md, EVIDENCE.md are changed by this follow-up; no application/runtime/test, staging, production, or Docker resource changes.
+- Remaining limitation: T18 Tier-2 is PARTIAL; full integrated T18 and full docs/runbooks/STAGING_VALIDATION.md remain NOT_RUN/incomplete. No deferral is claimed. Exact staging evidence stays anchored to its recorded source commit; no scenario was repeated.
+- Next exact action: re-read current PR #3805 HEAD/state and exact-head CI after this docs-only follow-up; if green, await user-owned merge. Then sync latest origin/main in a fresh worktree and run only one remaining T18 scenario. Preserve task-owned ignored harness paths; no alternate cleanup was attempted.
+
+## T18 — queue defaults consumed without restart; prior daily snapshot preserved — 2026-11-02T11:03:49+05:00
+
+- Commit under test: dc39b0f0fd1217c8d5ac585c6aee9256e9defbc4 (exact clean runtime worktree reported by canonical launcher). Evidence documentation is recorded on a fresh worktree based on origin/main fb5fc995c80875b478929716515be8810523f6b7; PR #3805 was merged at bb010816b2e30e3b70cf14e73fb6e0626dee247f.
+- Environment: Windows host; WSL Ubuntu-24.04; synthetic project clinic-aqs-t18-defaults-20261102-r5; loopback ports 18121/18181/55521. Private env values and synthetic credentials are not recorded.
+- Execution mode: validation-only T18 continuation under the previously authorized narrow override. Gate on the evidence-update scope: narrow_override, gate_misroute=yes, override_used=yes, handoff_required=true; generated prompt read. The root-cause defect was in the local scratch validator, not product code.
+- Allowed paths: task-owned scratch harness/env/results and these three T18 journals. Denied: runtime/application/tests, staging config, production, foreign projects, global Docker cleanup, merge, deployment.
+- Original harness failure: r4 Admin 2FA and fixture setup passed; baseline queue creation and settings PUT returned success. Readback assertion then failed because PowerShell ConvertFrom-Json produced a PSCustomObject, while the validator indexed start_numbers as an IDictionary. Focused local probe reproduced the null lookup. This is a harness FAIL, not evidence of an application defect. The corrected property lookup passed its local probe.
+- Validation: r5 canonical Preflight PASS; canonical Start with staging build PASS and runtime readiness PASS; canonical Session PASS. Session ran the corrected scratch validator. No tracked tests were executed or modified.
+- Result: PASS for T18 scenario 6. Ordinary Admin password login and first TOTP setup/verification PASS; second ordinary password+TOTP login PASS. Admin settings save and independent readback PASS. Existing legacy daily queue snapshot stayed unchanged for all 11 fields (day, owner IDs/type, tag, policy version, counter, times, start number, max, active). A new distinct daily queue consumed saved queue_start_hour=08:00 and start_number=47 (baseline start hour 07:00; baseline start number 1). Backend container ID was unchanged; restart count was 0.
+- Diagnostics: an earlier r4 Start session result became unavailable; a fresh canonical Preflight and Start -NoBuild rerun both returned PASS before Session. r4 Session returned FAIL with STAGING_TEARDOWN=PASS; the failure was isolated to harness map lookup. The final r5 Session reported teardown PASS, removing 5 containers, 3 volumes and 1 network; remaining counts were zero. Independent post-session Docker label inventory also found zero r5 containers, volumes and networks. No OOM.
+- Resources: at r5 Preflight host C: had 18 GiB free, WSL backing D: had 28 GiB free, Ubuntu reported 3215 MiB available, and no warnings; after Session WSL memory was 2425 MiB. Worktree HEAD remained dc39b0f0fd1217c8d5ac585c6aee9256e9defbc4.
+- Served frontend provenance: served_revision_verified=false; no frontend byte comparison was required or performed for this API-focused scenario. This does not close the separate T18 frontend-provenance gap.
+- Actual tracked paths: .ai-factory/plans/admin-queue-simplification/PROGRESS.md, EVIDENCE.md, RESUME.md; no runtime, API, tracked tests, migrations, staging configuration, production, or unrelated paths changed.
+- Remaining limitation: T18/Tier-2 remains PARTIAL. Full integrated T18 and docs/runbooks/STAGING_VALIDATION.md are incomplete; no deferral/waiver is claimed. Other scenario statuses remain as previously recorded; this entry closes only scenario 6.
+- PR: https://github.com/drsapaev/final/pull/3832; opened Ready for review from base fb5fc995c80875b478929716515be8810523f6b7. Initial PR head was dfe5b56cd4b7a41abf1a12c8a28f800ee91142de; this journal-only follow-up advances the head. Merge commit: none; user retains merge authority.
+- Next exact action: verify required checks on the new exact PR head, wait for user merge, then resume with one unverified T18 case; do not repeat scenario 6.

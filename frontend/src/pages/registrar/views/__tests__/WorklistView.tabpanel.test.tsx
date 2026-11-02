@@ -26,7 +26,8 @@ vi.mock('../../../../i18n/useTranslation', () => ({
 }));
 
 vi.mock('../../../../components/tables/EnhancedAppointmentsTable', () => ({
-  default: () => <div data-testid="appointments-stub" />,
+  default: ({ preferCanonicalQueueNumber }: { preferCanonicalQueueNumber?: boolean }) =>
+    <div data-testid="appointments-stub" data-canonical-ticket={String(Boolean(preferCanonicalQueueNumber))} />,
 }));
 
 vi.mock('../../../../components/ui', () => ({
@@ -71,6 +72,15 @@ const baseProps = {
   onEmptyStateCta: vi.fn(),
   tI18n: (key: string) => key,
 };
+
+describe('REG-FE-056 — registrar ticket scope', () => {
+  it('opts into canonical tickets for visible registrar rows, without changing other table consumers', () => {
+    render(<WorklistView {...baseProps} filteredAppointments={[{
+      id: 'synthetic-17', patient_fio: 'SYNTHETIC PATIENT', queue_number: 17,
+    }]} />);
+    expect(screen.getByTestId('appointments-stub')).toHaveAttribute('data-canonical-ticket', 'true');
+  });
+});
 
 describe('RQ-19 — worklist tabpanel wiring', () => {
   it('panel is the main-content tabpanel; aria-labelledby matches the shared tab-id contract', () => {

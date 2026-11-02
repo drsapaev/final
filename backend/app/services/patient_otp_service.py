@@ -36,6 +36,7 @@ import logging
 import os
 import re
 import secrets
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -46,7 +47,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.user import User
 from app.models.user_profile import UserProfile
-from app.services.sms_providers import get_sms_manager
+from app.services.sms_providers import SMSMessage, get_sms_manager
+from app.services.textbee_sms_provider import TextBeeSMSProvider
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,7 @@ CODE_TTL_SECONDS = 300
 MAX_ATTEMPTS = 3
 RESEND_COOLDOWN_SECONDS = 60
 HOURLY_SEND_CAP = 5
+TEXTBEE_STAGING_SEND_CAP_TTL_SECONDS = 24 * 60 * 60
 GRANT_TTL_SECONDS = 600
 
 LOCALES = ("ru", "uz")
@@ -110,6 +113,7 @@ class _MemoryBackend:
     def __init__(self) -> None:
         self._store: dict[str, tuple[str, float]] = {}
         self._counters: dict[str, tuple[int, float]] = {}
+        self._reservation_lock = threading.Lock()
 
     def _alive(self, expires_at: float) -> bool:
         return time.monotonic() < expires_at
@@ -139,6 +143,24 @@ class _MemoryBackend:
         count += 1
         self._counters[key] = (count, expires_at)
         return count
+
+    def reserve_once(self, key: str, value: str, ttl: int) -> bool:
+        """Atomically reserve a single-use key in the TESTING backend."""
+        with self._reservation_lock:
+            current = self._store.get(key)
+            if current and self._alive(current[1]):
+                return False
+            self._store[key] = (value, time.monotonic() + ttl)
+            return True
+
+    def release_if_value(self, key: str, value: str) -> bool:
+        """Release only the live reservation owned by this send attempt."""
+        with self._reservation_lock:
+            current = self._store.get(key)
+            if current and self._alive(current[1]) and current[0] == value:
+                self._store.pop(key, None)
+                return True
+            return False
 
     # TEST HOOK: populated ONLY when TESTING=1 (never in production path).
     last_sent_code: dict[str, str] = {}
@@ -191,6 +213,20 @@ class _RedisBackend:
         pipe.expire(key, ttl, nx=True)
         count, _ = self._run(pipe.execute)
         return int(count)
+
+    def reserve_once(self, key: str, value: str, ttl: int) -> bool:
+        """Atomically reserve a single-use key with Redis SET NX EX."""
+        return bool(self._run(self._client.set, key, value, ex=ttl, nx=True))
+
+    def release_if_value(self, key: str, value: str) -> bool:
+        """Compare-and-delete so a stale send cannot release a newer lease."""
+        script = """
+        if redis.call('GET', KEYS[1]) == ARGV[1] then
+            return redis.call('DEL', KEYS[1])
+        end
+        return 0
+        """
+        return bool(self._run(self._client.eval, script, 1, key, value))
 
 
 class PatientOtpService:
@@ -248,31 +284,75 @@ class PatientOtpService:
             raise PatientOtpError(400, ERR_OTP_INVALID)
         lang = locale if locale in LOCALES else _DEFAULT_LOCALE
 
+        provider_override = (
+            (getattr(settings, "PATIENT_OTP_SMS_PROVIDER", None) or "").strip().lower()
+        )
+        provider = (settings.SMS_DEFAULT_PROVIDER or "").strip().lower()
+        if provider_override:
+            environment = (settings.ENV or "").strip().lower()
+            api_key = (getattr(settings, "TEXTBEE_API_KEY", None) or "").strip()
+            allowed_recipient = (
+                getattr(settings, "TEXTBEE_ALLOWED_RECIPIENT", None) or ""
+            ).strip()
+            if (
+                provider_override != "textbee"
+                or environment != "staging"
+                or not api_key
+                or normalize_phone(allowed_recipient) != normalized
+            ):
+                logger.error("patient OTP: configured provider override is unavailable")
+                raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
+        elif provider == "mock" and not _testing_mode():
+            # Owner gate #6: Mock SMS is dev/test-only for patient access.
+            logger.error("patient OTP: MockSMSProvider refused outside TESTING")
+            raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
+
         backend = self._get_backend()
         cooldown_key = f"{namespace}:cd:{normalized}"
         if backend.get(cooldown_key) is not None:
             raise PatientOtpError(429, ERR_RATE_LIMITED)
 
-        cap_key = f"{namespace}:cap:{normalized}"
-        if backend.incr_with_ttl(cap_key, 3600) > HOURLY_SEND_CAP:
+        cap_key = (
+            f"{_PREFIX}:textbee-staging-cap:{normalized}"
+            if provider_override == "textbee"
+            else f"{namespace}:cap:{normalized}"
+        )
+        cap_ttl = (
+            TEXTBEE_STAGING_SEND_CAP_TTL_SECONDS
+            if provider_override == "textbee"
+            else 3600
+        )
+        cap_reservation_token: str | None = None
+        if provider_override == "textbee":
+            cap_reservation_token = secrets.token_urlsafe(24)
+            if not backend.reserve_once(cap_key, cap_reservation_token, cap_ttl):
+                raise PatientOtpError(429, ERR_RATE_LIMITED)
+        elif backend.incr_with_ttl(cap_key, cap_ttl) > HOURLY_SEND_CAP:
             raise PatientOtpError(429, ERR_RATE_LIMITED)
-
-        provider = (settings.SMS_DEFAULT_PROVIDER or "").strip().lower()
-        if provider == "mock" and not _testing_mode():
-            # Owner gate #6: Mock SMS is dev/test-only for patient access.
-            logger.error("patient OTP: MockSMSProvider refused outside TESTING")
-            raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
 
         code = "".join(str(secrets.randbelow(10)) for _ in range(6))
         message = _OTP_MESSAGES[lang].format(code=code)
 
         try:
-            sms_manager = get_sms_manager()
-            result = await sms_manager.send_sms(phone=normalized, text=message)
+            if provider_override == "textbee":
+                provider_client = TextBeeSMSProvider(
+                    api_key=api_key,
+                    device_id=getattr(settings, "TEXTBEE_DEVICE_ID", None),
+                )
+                result = await provider_client.send_sms(
+                    SMSMessage(phone=normalized, text=message)
+                )
+            else:
+                sms_manager = get_sms_manager()
+                result = await sms_manager.send_sms(phone=normalized, text=message)
         except Exception as exc:  # noqa: BLE001
             logger.error("patient OTP: send_sms error: %s", exc)
             raise PatientOtpError(503, ERR_SMS_UNAVAILABLE) from exc
         if not getattr(result, "success", False):
+            if cap_reservation_token is not None and getattr(
+                result, "definitely_not_accepted", False
+            ):
+                backend.release_if_value(cap_key, cap_reservation_token)
             logger.error(
                 "patient OTP: send_sms failed: %s", getattr(result, "error", "")
             )

@@ -103,16 +103,11 @@ async def get_pending_payments(
             patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
             patients_map = {p.id: p for p in patients}
 
-        # Batch Loading: Платежи для всех визитов (этот запрос всё ещё нужен)
+        # CSH-FE-028: net settled (unrefunded) paid amounts via the canonical
+        # invariant service — gross sums understate remaining debt after
+        # partial refunds.
         visit_ids = [v.id for v in all_visits]
-        payments_map = defaultdict(list)  # visit_id -> list[Payment]
-        if visit_ids:
-            payments_batch = db.query(Payment).filter(
-                Payment.visit_id.in_(visit_ids),
-                Payment.status.in_(["paid", "completed"])
-            ).all()
-            for p in payments_batch:
-                payments_map[p.visit_id].append(p)
+        net_paid_by_visit = _cashier_paid_amounts_by_visit_id(db, visit_ids)
 
         # =====================================================
         # ГРУППИРОВКА ПО ПАЦИЕНТУ
@@ -175,10 +170,8 @@ async def get_pending_payments(
                     })
                     group["total_amount"] += Decimal(str(service_price)) * service_qty
 
-            # Оплаченная сумма для этого визита
-            visit_payments = payments_map.get(visit.id, [])
-            for payment in visit_payments:
-                group["paid_amount"] += payment.amount
+            # Оплаченная сумма для этого визита — net of refunds (CSH-FE-028)
+            group["paid_amount"] += net_paid_by_visit.get(visit.id, Decimal("0"))
 
         # Считаем remaining и фильтруем оплаченных
         pending_groups = []
@@ -691,14 +684,13 @@ async def create_payment(
                 elif hasattr(visit, 'total_amount') and visit.total_amount:
                     total_cost = Decimal(str(visit.total_amount))
 
-            # 2. Считаем уже оплаченное
-            paid_amount = Decimal("0")
-            existing_payments = db.query(Payment).filter(
-                Payment.visit_id == visit.id,
-                Payment.status.in_(["paid", "completed"])
-            ).all()
-            for p in existing_payments:
-                paid_amount += p.amount
+            # 2. Считаем уже оплаченное — net of refunds via the canonical
+            # invariant service (CSH-FE-028): a partially refunded payment
+            # re-opens debt that the cashier must be able to accept here,
+            # matching what the service check below computes.
+            paid_amount = _cashier_paid_amounts_by_visit_id(db, [visit.id]).get(
+                visit.id, Decimal("0")
+            )
 
             # 3. Проверяем остаток
             remaining_debt = total_cost - paid_amount

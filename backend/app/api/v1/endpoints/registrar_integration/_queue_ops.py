@@ -210,10 +210,42 @@ def _prime_registrar_queue_read_cache(
             .order_by(OnlineQueueEntry.created_at.desc())
             .all()
         )
+        # REG-FE-022 (issue 3822): attach an appointment's queue metadata only
+        # when EXACTLY ONE unlinked entry matches (patient, day, doctor).
+        # Several candidates cannot prove which entry owns the appointment,
+        # so the key stays absent and the resolver attaches no ticket.
+        #
+        # REG-FE-062 (#3803 follow-up, 2026-11-02): uniqueness of the ENTRY is
+        # still not a binding to a specific Appointment.id. When SEVERAL
+        # non-hidden appointments share the (patient, day, doctor) key, a
+        # single unlinked entry cannot prove which appointment owns it —
+        # previously BOTH appointments displayed that ticket number. The
+        # key is stored only when the entry is unique AND exactly one
+        # appointment can own it. ``appointments`` is already scoped to
+        # ``appointment_date == target_day`` with hidden statuses excluded,
+        # i.e. precisely the appointment rows this payload can display.
+        candidates_by_key: dict[tuple[int, date, int], list[Any]] = {}
         for entry, queue_day, specialist_id in rows:
-            appointment_queue_metadata.setdefault(
-                (entry.patient_id, queue_day, specialist_id), entry
+            candidates_by_key.setdefault(
+                (entry.patient_id, queue_day, specialist_id), []
+            ).append(entry)
+        appointments_per_key: dict[tuple[int, date, int], int] = {}
+        for appointment in appointments:
+            if getattr(appointment, "patient_id", None) is None:
+                continue
+            if getattr(appointment, "doctor_id", None) is None:
+                continue
+            appointment_key = (
+                appointment.patient_id,
+                appointment.appointment_date,
+                appointment.doctor_id,
             )
+            appointments_per_key[appointment_key] = (
+                appointments_per_key.get(appointment_key, 0) + 1
+            )
+        for key, candidates in candidates_by_key.items():
+            if len(candidates) == 1 and appointments_per_key.get(key, 0) == 1:
+                appointment_queue_metadata[key] = candidates[0]
 
     payment_truth_by_visit: dict[int, dict[str, Any]] = {}
     payment_checked_visit_ids = set(all_visits)
@@ -1181,7 +1213,7 @@ def _serialize_queue_entry(
     source: str,
     appointment_id_value: int | None,
     entry_visit_id: int | None,
-    queue_entry_number: int,
+    queue_entry_number: int | None,
     patient_id: int | None,
     patient_name: str,
     patient_birth_year: int | None,
@@ -1409,16 +1441,23 @@ def _resolve_queue_entry_metadata(
     appointment_date: Any,
     doctor_id: int | None,
     idx: int,
-) -> tuple[int, Any, Any]:
+) -> tuple[int | None, Any, Any]:
     """R-22 Phase 5: Resolve (queue_entry_number, queue_entry_time, queue_entry_updated_at).
 
     Lookup priority depends on entry_type:
     - online_queue: read directly from OnlineQueueEntry (or entry_wrapper for QR-visits)
-    - visit: lookup via _same_patient_queue_entry_for_visit_id
-    - appointment: SQL query against queue_entries table (same patient + day + doctor)
-    Falls back to (idx, None, None) on any error.
+    - visit: lookup via _same_patient_queue_entry_for_visit_id (exact visit_id+patient_id link)
+    - appointment: unlinked queue entries matching (patient + day + doctor),
+      attached ONLY when exactly one candidate exists (REG-FE-022, issue 3822)
+
+    REG-FE-022 (issue 3822): the ordinal ``idx`` is NOT a ticket. Without a
+    proven linked queue entry the number is ``None`` — the previous ``idx``
+    fallback fabricated positive ticket numbers for unlinked rows, and a
+    multi-candidate (patient, day, doctor) heuristic silently borrowed the
+    latest entry. ``idx`` stays in the signature solely for pagination/
+    test accounting (see test_lab_reporting_api.py) and is never serialized.
     """
-    queue_entry_number = idx
+    queue_entry_number: int | None = None
     queue_entry_time = None
     queue_entry_updated_at = None
 
@@ -1431,14 +1470,14 @@ def _resolve_queue_entry_metadata(
             is_visit_object = hasattr(entry_data, 'visit_date') and not hasattr(entry_data, 'queue_id')
 
             if is_visit_object:
-                queue_entry_number = entry_wrapper.get("oqe_number") or idx
+                queue_entry_number = entry_wrapper.get("oqe_number") or None
                 queue_entry_time = entry_wrapper.get("oqe_queue_time")
                 queue_entry_updated_at = entry_wrapper.get("oqe_updated_at")
             else:
                 queue_entry_number = (
                     entry_data.number
                     if hasattr(entry_data, 'number') and entry_data.number is not None
-                    else idx
+                    else None
                 )
                 queue_entry_time = (
                     entry_data.queue_time
@@ -1464,11 +1503,26 @@ def _resolve_queue_entry_metadata(
         ):
             cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
             if cache is not None and cache.get("appointment_queue_metadata_ready"):
+                # REG-FE-022 (issue 3822): the cache stores a key ONLY when
+                # exactly one unlinked candidate matches (patient, day,
+                # doctor); an absent key means no unique proof — no ticket.
+                #
+                # REG-FE-062 (#3803 follow-up): the cache now ALSO requires
+                # exactly one appointment per key — see the builder.
                 queue_entry_row = cache["appointment_queue_metadata"].get(
                     (patient_id, appointment_date, doctor_id)
                 )
             else:
-                queue_entry_row = db.execute(
+                # REG-FE-022 (issue 3822): same uniqueness rule for the direct
+                # query path — several matching unlinked entries cannot prove
+                # which one owns this appointment, so none may be attached.
+                #
+                # REG-FE-062 (#3803 follow-up): a single unlinked entry may
+                # attach only when exactly ONE non-hidden appointment shares
+                # the (patient, day, doctor) key; with several appointments
+                # the binding to a specific Appointment.id is unprovable, so
+                # no ticket may be attached to any of them.
+                candidate_rows = db.execute(
                     text(
                         """
                     SELECT qe.number, qe.queue_time, qe.updated_at
@@ -1479,7 +1533,6 @@ def _resolve_queue_entry_metadata(
                       AND dq.day = :appointment_date
                       AND dq.specialist_id = :doctor_id
                     ORDER BY qe.created_at DESC
-                    LIMIT 1
                     """
                 ),
                     {
@@ -1487,7 +1540,28 @@ def _resolve_queue_entry_metadata(
                     "appointment_date": appointment_date,
                     "doctor_id": doctor_id,
                     },
-                ).first()
+                ).all()
+                from sqlalchemy import func as sa_func
+
+                from app.models.appointment import Appointment
+
+                matching_appointments = (
+                    db.query(Appointment)
+                    .filter(
+                        Appointment.patient_id == patient_id,
+                        Appointment.appointment_date == appointment_date,
+                        Appointment.doctor_id == doctor_id,
+                        ~sa_func.lower(
+                            sa_func.coalesce(Appointment.status, "")
+                        ).in_(REGISTRAR_HIDDEN_QUEUE_STATUSES),
+                    )
+                    .count()
+                )
+                queue_entry_row = (
+                    candidate_rows[0]
+                    if len(candidate_rows) == 1 and matching_appointments == 1
+                    else None
+                )
             if queue_entry_row:
                 queue_entry_number = queue_entry_row.number
                 queue_entry_time = queue_entry_row.queue_time

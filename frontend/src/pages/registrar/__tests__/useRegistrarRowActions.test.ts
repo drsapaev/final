@@ -22,6 +22,17 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { useRegistrarRowActions } from '../useRegistrarRowActions';
 
+vi.mock('../../../services/notify', () => ({
+  default: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+  },
+}));
+
+import notify from '../../../services/notify';
+
 function createSetters() {
   const setters = {
     setRecordPreviewDialog: vi.fn(),
@@ -53,6 +64,10 @@ function renderRowActions(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 describe('useRegistrarRowActions (PR-UI-13-5)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('view action opens the record preview dialog', async () => {
     const { hook, setters } = renderRowActions();
     const row = { id: 7, patient_fio: 'A B' };
@@ -160,17 +175,124 @@ describe('useRegistrarRowActions (PR-UI-13-5)', () => {
     });
   });
 
-  it('force_majeure action opens the modal with the row specialist fields', async () => {
+  // #3808 (CR-01 / REG-FE-025): the force-majeure target comes from the
+  // canonical per-row owner facts of the registrar read model — never from
+  // the legacy doctor fallback, which can silently retarget a whole-queue
+  // financial mutation onto an incidental doctor. Review round 2: the row's
+  // canonical daily_queue_id is a REQUIRED fact — without it the mass
+  // operation cannot be bound to one concrete queue (the backend may resolve
+  // the specialist onto the shared registry surface), so the action must be
+  // visibly unavailable instead.
+  it('force_majeure targets the canonical doctor owner when legacy doctor fields are absent', async () => {
     const { hook, setters, tI18n } = renderRowActions();
     await act(async () => {
-      await hook.current.handleContextMenuAction('force_majeure', { id: 7, doctor_id: 3, doctor_name: 'Dr X' } as never);
+      await hook.current.handleContextMenuAction('force_majeure', {
+        id: 7,
+        queue_owner_kind: 'doctor',
+        queue_owner_id: 3,
+        daily_queue_id: 41,
+        record_date: '2026-10-30',
+        doctor_name: 'Dr X',
+      } as never);
     });
+    expect(setters.setForceMajeureModal).toHaveBeenCalledTimes(1);
     expect(setters.setForceMajeureModal).toHaveBeenCalledWith({
       open: true,
       specialistId: 3,
       specialistName: 'Dr X',
+      targetDate: '2026-10-30',
+      dailyQueueId: 41,
     });
     expect(tI18n).not.toHaveBeenCalledWith('registrarPanel.rp_all_specialists');
+    expect(notify.warning).not.toHaveBeenCalled();
+  });
+
+  it('force_majeure falls back to the queue day field when record_date is absent', async () => {
+    const { hook, setters } = renderRowActions();
+    await act(async () => {
+      await hook.current.handleContextMenuAction('force_majeure', {
+        id: 71,
+        queue_owner_kind: 'doctor',
+        queue_owner_id: 3,
+        daily_queue_id: 41,
+        date: '2026-10-29',
+        queue_name: 'Терапия',
+      } as never);
+    });
+    expect(setters.setForceMajeureModal).toHaveBeenCalledWith({
+      open: true,
+      specialistId: 3,
+      specialistName: 'Терапия',
+      targetDate: '2026-10-29',
+      dailyQueueId: 41,
+    });
+  });
+
+  it('force_majeure is unavailable for a doctor row without the canonical queue id (round 2 P1)', async () => {
+    const { hook, setters, tI18n } = renderRowActions();
+    await act(async () => {
+      await hook.current.handleContextMenuAction('force_majeure', {
+        id: 72,
+        queue_owner_kind: 'doctor',
+        queue_owner_id: 3,
+        daily_queue_id: null,
+        record_date: '2026-10-30',
+        doctor_name: 'Dr X',
+      } as never);
+    });
+    // Without the row's daily_queue_id the preview/mutation cannot be bound
+    // to one concrete queue — the backend may resolve the specialist onto the
+    // shared registry surface. Fail closed: no modal, explicit warning.
+    expect(setters.setForceMajeureModal).not.toHaveBeenCalled();
+    expect(notify.warning).toHaveBeenCalledTimes(1);
+    expect(tI18n).toHaveBeenCalledWith('misc.fm_queue_unbound');
+  });
+
+  it('force_majeure does not retarget a resource-owned row onto its incidental doctor', async () => {
+    const { hook, setters, tI18n } = renderRowActions();
+    await act(async () => {
+      await hook.current.handleContextMenuAction('force_majeure', {
+        id: 8,
+        queue_owner_kind: 'resource',
+        queue_owner_id: 7,
+        daily_queue_id: 12,
+        doctor_id: 3,
+        doctor_name: 'Dr X',
+        record_date: '2026-10-30',
+      } as never);
+    });
+    expect(setters.setForceMajeureModal).not.toHaveBeenCalled();
+    expect(notify.warning).toHaveBeenCalledTimes(1);
+    expect(tI18n).toHaveBeenCalledWith('misc.fm_owner_unsupported');
+  });
+
+  it('force_majeure is unavailable for unknown-owner rows even with legacy specialist fields', async () => {
+    const { hook, setters } = renderRowActions();
+    await act(async () => {
+      await hook.current.handleContextMenuAction('force_majeure', {
+        id: 9,
+        queue_owner_kind: null,
+        queue_owner_id: null,
+        daily_queue_id: null,
+        specialist_id: 5,
+        specialist_name: 'Dr Y',
+      } as never);
+    });
+    expect(setters.setForceMajeureModal).not.toHaveBeenCalled();
+    expect(notify.warning).toHaveBeenCalledTimes(1);
+  });
+
+  it('force_majeure no longer consults the legacy doctor fallback when owner facts are absent', async () => {
+    const { hook, setters } = renderRowActions();
+    await act(async () => {
+      await hook.current.handleContextMenuAction('force_majeure', {
+        id: 10,
+        doctor_id: 3,
+        doctor_name: 'Dr X',
+      } as never);
+    });
+    expect(setters.setForceMajeureModal).not.toHaveBeenCalled();
+    expect(notify.warning).toHaveBeenCalledTimes(1);
   });
 
   it('unknown actions are a no-op', async () => {
