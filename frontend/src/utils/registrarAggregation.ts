@@ -152,19 +152,30 @@ const pickQueueNumberEntryId = (queueNumber: unknown): string | number | null =>
 // 1. proven queue-entry identity (queue_entry_id / original_queue_id /
 //    doctor_queue_entry_id; legacy `id` only without the DailyQueue marker);
 // 2. owning daily queue + ticket number — numbers are per-queue, so the pair
-//    identifies the ticket even when the entry id is unknown;
-// 3. legacy (queue_tag + service_id) scoping for elements that carry one;
+//    identifies the ticket even when the entry id is unknown. The legacy
+//    `queue_id` field carries the same DailyQueue ownership (resolver parity,
+//    see pickQueueNumberEntryId), so it scopes the key exactly like
+//    daily_queue_id instead of falling through to the opaque branch;
+// 3. legacy (queue_tag + service_id) scoping for elements that carry one —
+//    keyed WITH the ticket number when known: two live tickets of one
+//    service differ by number and must never merge (PR #3829 review);
 // 4. fully identical opaque content — never merges different numbers.
 const queueNumbersMergeKey = (queueNumber: Record<string, unknown>): string => {
   const entryIdentity = pickQueueNumberEntryId(queueNumber);
   if (hasQueueIdentityValue(entryIdentity)) {
     return `queue-entry:${String(entryIdentity)}`;
   }
-  if (hasQueueIdentityValue(queueNumber.daily_queue_id) && hasQueueIdentityValue(queueNumber.number)) {
-    return `daily-queue:${String(queueNumber.daily_queue_id)}#${String(queueNumber.number)}`;
+  const owningDailyQueueId = hasQueueIdentityValue(queueNumber.daily_queue_id)
+    ? queueNumber.daily_queue_id
+    : queueNumber.queue_id;
+  if (hasQueueIdentityValue(owningDailyQueueId) && hasQueueIdentityValue(queueNumber.number)) {
+    return `daily-queue:${String(owningDailyQueueId)}#${String(queueNumber.number)}`;
   }
   if (hasQueueIdentityValue(queueNumber.service_id)) {
-    return `${String(queueNumber.queue_tag ?? '')}_${String(queueNumber.service_id)}`;
+    const serviceScope = `${String(queueNumber.queue_tag ?? '')}_${String(queueNumber.service_id)}`;
+    return hasQueueIdentityValue(queueNumber.number)
+      ? `${serviceScope}#${String(queueNumber.number)}`
+      : serviceScope;
   }
   return `opaque:${String(queueNumber.queue_tag ?? '')}:${String(queueNumber.number ?? '')}:${String(queueNumber.created_at ?? queueNumber.queue_time ?? '')}`;
 };
