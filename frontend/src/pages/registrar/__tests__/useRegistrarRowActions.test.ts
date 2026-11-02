@@ -117,12 +117,45 @@ describe('useRegistrarRowActions (PR-UI-13-5)', () => {
     expect(updateAppointmentStatus).not.toHaveBeenCalled();
   });
 
-  it('in_cabinet from the context menu awaits the status command and notifies on success', async () => {
+  it('in_cabinet from the context menu awaits the status command (ack ownership: useRegistrarActions)', async () => {
     const row = { id: 7, patient_fio: 'A B' };
     const updateAppointmentStatus = vi.fn().mockResolvedValue(undefined);
     const { hook } = renderRowActions({ updateAppointmentStatus });
     await act(async () => { await hook.current.handleContextMenuAction('in_cabinet', row as never); });
     expect(updateAppointmentStatus).toHaveBeenCalledWith(7, 'in_cabinet', '', row);
+  });
+
+  // REG-FE-014 (audit 3803): контекстное меню не подтверждает команду,
+  // которая была отклонена сервером. runRegistrarRecordAction резолвит
+  // null после ошибки/недоступности действия — success-тост из меню
+  // превращал отказ в «Пациент отправлен в кабинет».
+  it('context-menu in_cabinet emits no success acknowledgement when the command failed (REG-FE-014)', async () => {
+    const row = { id: 7, patient_fio: 'A B' };
+    const updateAppointmentStatus = vi.fn().mockResolvedValue(null);
+    const { hook } = renderRowActions({ updateAppointmentStatus });
+    await act(async () => { await hook.current.handleContextMenuAction('in_cabinet', row as never); });
+    expect(updateAppointmentStatus).toHaveBeenCalledWith(7, 'in_cabinet', '', row);
+    expect(notify.success).not.toHaveBeenCalled();
+  });
+
+  it('context-menu complete emits no success acknowledgement when the command failed (REG-FE-014)', async () => {
+    const row = { id: 9, patient_name: 'C D' };
+    const updateAppointmentStatus = vi.fn().mockResolvedValue(null);
+    const { hook } = renderRowActions({ updateAppointmentStatus });
+    await act(async () => { await hook.current.handleContextMenuAction('complete', row as never); });
+    expect(updateAppointmentStatus).toHaveBeenCalledWith(9, 'done', '', row);
+    expect(notify.success).not.toHaveBeenCalled();
+  });
+
+  it('context-menu status success is acknowledged once — by the status hook, not the router (REG-FE-014)', async () => {
+    const row = { id: 7, patient_fio: 'A B' };
+    const updateAppointmentStatus = vi.fn().mockResolvedValue({ success: true });
+    const { hook } = renderRowActions({ updateAppointmentStatus });
+    await act(async () => { await hook.current.handleContextMenuAction('in_cabinet', row as never); });
+    expect(updateAppointmentStatus).toHaveBeenCalledTimes(1);
+    // Единственный владелец success-тоста — useRegistrarActions: меню
+    // больше не дублирует подтверждение.
+    expect(notify.success).not.toHaveBeenCalled();
   });
 
   it('complete from the table routes to the done status after confirmation', async () => {
