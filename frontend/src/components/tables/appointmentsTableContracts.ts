@@ -123,6 +123,8 @@ export interface EnhancedAppointmentsTableProps {
   services?: Record<string, unknown>;
   outerBorder?: boolean;
   showCheckboxes?: boolean;
+  /** Explicit opt-in for backend-only ticket numbers in the registrar worklist. */
+  preferCanonicalQueueNumber?: boolean;
   view?: string;
   rawEntries?: AppointmentRow[];
   appointments?: AppointmentRow[];
@@ -227,13 +229,34 @@ export const formatPhoneNumber = (phone: string) => {
 };
 
 // Сортировка данных (sortedData memo body from EnhancedAppointmentsTable, verbatim)
+// In registrar mode the visible ticket is the backend-selected row.queue_number.
+// Shared-table default sorting must remain unchanged for other consumers.
+const registrarTicketValue = (row: AppointmentRow): number | null => {
+  const candidates = [row.queue_number, row.queue_numbers?.[0]?.number];
+  for (const candidate of candidates) {
+    if (candidate === null || candidate === undefined || String(candidate).trim() === '') continue;
+    const numeric = Number(candidate);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  }
+  return null;
+};
+
 export const sortAppointmentsData = (
   data: AppointmentRow[],
   sortConfig: AppointmentsTableSortConfig,
+  preferCanonicalQueueNumber = false,
 ): AppointmentRow[] => {
   if (!sortConfig.key) return data;
 
   return [...data].sort((a, b) => {
+    if (sortConfig.key === 'queue_number' && preferCanonicalQueueNumber) {
+      const aTicket = registrarTicketValue(a);
+      const bTicket = registrarTicketValue(b);
+      if (aTicket === null) return bTicket === null ? 0 : 1;
+      if (bTicket === null) return -1;
+      return sortConfig.direction === 'asc' ? aTicket - bTicket : bTicket - aTicket;
+    }
+
     const sortKey = sortConfig.key;
     let aVal: unknown = sortKey ? a[sortKey] : undefined;
     let bVal: unknown = sortKey ? b[sortKey] : undefined;

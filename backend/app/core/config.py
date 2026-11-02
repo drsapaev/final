@@ -414,6 +414,14 @@ class Settings(BaseSettings):
     PLAYMOBILE_API_KEY: str | None = None
     PLAYMOBILE_API_SECRET: str | None = None
 
+    # TextBee is an isolated staging-only OTP transport. Its key is never
+    # sent to frontend builds or enabled by the production provider factory.
+    TEXTBEE_API_KEY: str | None = None
+    TEXTBEE_DEVICE_ID: str | None = None
+    TEXTBEE_ALLOWED_RECIPIENT: str | None = None
+    # Only "textbee" is supported here, and only when ENV=staging.
+    PATIENT_OTP_SMS_PROVIDER: str | None = None
+
     # SMS общие настройки
     SMS_SENDER: str = "Clinic"
     SMS_DEFAULT_PROVIDER: str = "mock"  # eskiz, playmobile, mock

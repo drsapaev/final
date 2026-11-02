@@ -39,8 +39,11 @@ describe('EnhancedAppointmentsTable — PR-UI-09e-2 decomposition AC guard', () 
   it('implementation delegated to the extracted modules (wiring present)', () => {
     expect(source).toContain("import { useAppointmentsTableState } from './useAppointmentsTableState'");
     expect(source).toMatch(/import \{ useAppointmentsTableRenderers, buildAppointmentsTableColumns \} from '\.\/appointmentsTableColumns'/);
-    expect(source).toContain('useAppointmentsTableState({ data, externalSelectedRows, onRowSelect })');
-    expect(source).toContain('useAppointmentsTableRenderers({ t, services, data })');
+    expect(source).toContain('useAppointmentsTableState({ data, externalSelectedRows, onRowSelect, preferCanonicalQueueNumber })');
+    expect(source).toContain('useAppointmentsTableRenderers({ t, services, data, preferCanonicalQueueNumber })');
+    // Registrar-only ticket semantics must remain opt-in: the shared table
+    // serves Appointments and doctor screens without this change.
+    expect(source).toContain('preferCanonicalQueueNumber = false');
     expect(source).toMatch(/buildAppointmentsTableColumns\(\{/);
   });
 

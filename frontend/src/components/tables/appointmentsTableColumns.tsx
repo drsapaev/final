@@ -49,9 +49,11 @@ export interface UseAppointmentsTableRenderersParams {
   t: AppointmentsTranslationFn;
   services: Record<string, unknown>;
   data: AppointmentRow[];
+  /** Registrar worklist only: never invent an assigned ticket from row order. */
+  preferCanonicalQueueNumber?: boolean;
 }
 
-export const useAppointmentsTableRenderers = ({ t, services, data }: UseAppointmentsTableRenderersParams) => {
+export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonicalQueueNumber = false }: UseAppointmentsTableRenderersParams) => {
   // ⭐ SSOT: Display helper for services with queue numbers
   // Format: "K01 (1), D01 (2), L10 (3)"
   void useCallback((rows: Appointment[]) => {
@@ -532,6 +534,9 @@ export const useAppointmentsTableRenderers = ({ t, services, data }: UseAppointm
   const renderQueueNumbers = useCallback((row: Appointment) => {
     // Получаем текущую дату
     const today = getLocalDateString();
+    // The backend uses 0 as an ordinal fallback when there is no allocated ticket.
+    // In the registrar worklist, zero/blank must never masquerade as a ticket.
+    const isTicket = (value: unknown) => value !== null && value !== undefined && String(value).trim() !== '' && String(value).trim() !== '0';
 
     // Helper для форматирования времени
 
@@ -540,22 +545,33 @@ export const useAppointmentsTableRenderers = ({ t, services, data }: UseAppointm
 
 
     // Если запись на текущий день - показываем номер в очереди
-    if (row.date === today || row.appointment_date === today) {
+    if (preferCanonicalQueueNumber || row.date === today || row.appointment_date === today) {
       // ✅ ИСПРАВЛЕНО: Используем queue_number (уже выбран для текущей вкладки в RegistrarPanel)
       // вместо отображения всех номеров из queue_numbers, что вызывало дублирование
-      if (row.queue_number !== undefined && row.queue_number !== null) {
+      if (row.queue_number !== undefined && row.queue_number !== null && (!preferCanonicalQueueNumber || isTicket(row.queue_number))) {
         // ✅ ИСПРАВЛЕНО: Используем статус из queue_number_status (соответствует текущей вкладке)
         // или ищем соответствующий queue_number в queue_numbers для получения его статуса
         let queueStatus: string | undefined = row.queue_number_status;
-        if (!queueStatus && row.queue_numbers && Array.isArray(row.queue_numbers)) {
-          // Ищем queue_number в queue_numbers и берём его статус
-          const matchingQueue = row.queue_numbers.find((q: QueueNumberInfo) => q.number === row.queue_number);
-          if (matchingQueue) {
-            queueStatus = matchingQueue.status as string | undefined;
-          } else if (row.queue_numbers.length > 0) {
-            // ✅ ИСПРАВЛЕНО: Если не нашли точное совпадение, используем статус из первого queue_number
-            // вместо общего row.status, так как статусы отдельных очередей могут отличаться
-            queueStatus = row.queue_numbers[0].status as string | undefined;
+        if (!queueStatus && Array.isArray(row.queue_numbers)) {
+          if (preferCanonicalQueueNumber) {
+            // Ticket numbers repeat across doctors/resources. Never borrow a
+            // different queue's status just because the number is equal.
+            const sameNumber = row.queue_numbers.filter((q: QueueNumberInfo) =>
+              String(q.number) === String(row.queue_number));
+            const selectedTag = typeof row.queue_tag === 'string' ? row.queue_tag.trim() : '';
+            const sameQueue = selectedTag
+              ? sameNumber.filter((q: QueueNumberInfo) => q.queue_tag === selectedTag)
+              : sameNumber;
+            const distinctStatuses = [...new Set(sameQueue.map((q: QueueNumberInfo) => q.status).filter(Boolean))];
+            queueStatus = distinctStatuses.length === 1 ? distinctStatuses[0] : undefined;
+          } else {
+            // Preserve the historic shared-table behavior outside the registrar.
+            const matchingQueue = row.queue_numbers.find((q: QueueNumberInfo) => q.number === row.queue_number);
+            if (matchingQueue) {
+              queueStatus = matchingQueue.status as string | undefined;
+            } else if (row.queue_numbers.length > 0) {
+              queueStatus = row.queue_numbers[0].status as string | undefined;
+            }
           }
         }
         const queueStatusKey = queueStatus || 'unknown';
@@ -609,6 +625,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data }: UseAppointm
               display: 'inline-block',
               boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
             }}
+            data-queue-status={queueStatusKey}
             title={`№${String(row.queue_number ?? '')}`}>
 
             {String(row.queue_number ?? '')}
@@ -638,7 +655,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data }: UseAppointm
       }
 
       // Fallback: Если есть номера очередей, но нет queue_number - показываем первый
-      if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0) {
+      if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0 && (!preferCanonicalQueueNumber || isTicket(row.queue_numbers[0].number))) {
         const firstQueue = row.queue_numbers[0];
         const queueStatusKey = firstQueue.status || 'unknown';
         const statusConfig = {
@@ -717,6 +734,9 @@ export const useAppointmentsTableRenderers = ({ t, services, data }: UseAppointm
       );
       }
 
+      // On the registrar worklist only, an absent ticket is truly absent.
+      if (preferCanonicalQueueNumber) return <span>—</span>;
+
       // Если нет номеров очередей, но запись на сегодня - показываем порядковый номер
       // Для этого нужно найти позицию записи среди всех записей на сегодня
       const todayAppointments = data.filter((item) =>
@@ -755,7 +775,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data }: UseAppointm
         #{fallbackIndex}
       </span>);
 
-  }, [data, t]);
+  }, [data, t, preferCanonicalQueueNumber]);
 
   return {
     renderStatus,

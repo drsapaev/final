@@ -19,6 +19,7 @@ import PanelEmptyState from '../components/patient/PanelEmptyState';
 import PatientBookingPanel from '../components/patient/PatientBookingPanel';
 import PatientCabinetSummary from '../components/patient/PatientCabinetSummary';
 import PatientFormsPreview from '../components/patient/PatientFormsPreview';
+import PublicBookingRequestsPanel from '../components/patient/PublicBookingRequestsPanel';
 import './patient.css';
 import { useTranslation } from '../i18n/useTranslation';
 import { AlertTriangle, Calendar, FileText, Heart, Home, RotateCw, type LucideIcon } from 'lucide-react';
@@ -58,7 +59,8 @@ interface FormsPreview {
  * L-H-8 (история, ОТМЕНЕНО Track 3-2): macos-Icon обёртка → lucide refs (§3.3).
  *
  * Доступ: /patient (hideSidebar:true, homeForRoles:['patient']).
- * Защищённые данные требуют Telegram Mini App identity (initData).
+ * Статусы заявок читаются через JWT-scoped patient API; предпросмотр форм
+ * отдельно продолжает использовать Telegram Mini App identity (initData).
  */
 const PatientPanel = () => {
   const { t: rawT } = useTranslation();
@@ -363,6 +365,8 @@ const PatientPanel = () => {
                   )}
                 </div>
               </Card>
+
+              <PublicBookingRequestsPanel />
             </div>
           )}
         </div>

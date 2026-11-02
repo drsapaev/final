@@ -36,6 +36,17 @@ export const adaptQueueEntry = (
   const queueNum = fullEntry.queue_position ?? fullEntry.number ?? 0;
   const queueTag = fullEntry.queue_tag ?? queue.queue_tag ?? queue.specialty ?? null;
   const queueName = fullEntry.queue_name ?? queue.specialist_name ?? queue.specialty ?? null;
+  // REG-FE-063 (registrar audit #3803, P1): real queue-entry identity for
+  // this row's ticket. An online_queue row IS the queue entry, so its id
+  // is the entry id; appointment/visit rows carry a ticket only through the
+  // read model's queue_entry_id passthrough — a record id is never a
+  // fabricated entry id.
+  const recordKind = fullEntry.record_kind ?? entry.record_kind ?? null;
+  const queueEntryIdentity = (fullEntry.queue_entry_id || entry.queue_entry_id || null)
+    ?? (recordKind === 'online_queue' ? entryId : null);
+  // Per-entry queue ownership from the read model. The surrounding
+  // specialty bucket can contain several doctors and is not an owner.
+  const dailyQueueId = fullEntry.daily_queue_id ?? entry.daily_queue_id ?? null;
   const timeFields = adaptTimeFields(entry, data);
   const queueTime = timeFields.queue_time ?? null;
   const canonicalStatus = fullEntry.canonical_status ?? fullEntry.queue_status ?? fullEntry.status ?? null;
@@ -64,12 +75,12 @@ export const adaptQueueEntry = (
     record_date: fullEntry.record_date ?? entry.record_date ?? null,
     visit_id: fullEntry.visit_id || entry.visit_id || null,
     appointment_id: fullEntry.appointment_id || entry.appointment_id || null,
-    queue_entry_id: fullEntry.queue_entry_id || entry.queue_entry_id || null,
+    queue_entry_id: queueEntryIdentity,
     // Per-entry queue ownership from the read model. The surrounding
     // specialty bucket can contain several doctors and is not an owner.
     queue_owner_kind: fullEntry.queue_owner_kind ?? entry.queue_owner_kind ?? null,
     queue_owner_id: fullEntry.queue_owner_id ?? entry.queue_owner_id ?? null,
-    daily_queue_id: fullEntry.daily_queue_id ?? entry.daily_queue_id ?? null,
+    daily_queue_id: dailyQueueId,
     patient_id: fullEntry.patient_id || entry.patient_id,
     patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name ?? entry.patient_fio ?? entry.patient_name ?? fallbackPatientLabel,
     patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year ?? entry.patient_birth_year ?? entry.birth_year ?? null,
@@ -104,6 +115,12 @@ export const adaptQueueEntry = (
     // Queue info
     queue_number: queueNum,
     queue_numbers: [{
+      // REG-FE-063 (#3803 follow-up): carry the ticket's queue-entry
+      // identity and the owning daily queue inside the element, so the
+      // all-departments merge can never collapse same-tag tickets that
+      // belong to different doctors/queues.
+      queue_entry_id: queueEntryIdentity,
+      daily_queue_id: dailyQueueId,
       number: queueNum,
       queue_tag: queueTag,
       queue_name: queueName,

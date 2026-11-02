@@ -1,9 +1,77 @@
-import { test, expect, type Page, type Response } from '@playwright/test';
+import { test as base, expect, type BrowserContext, type Page, type Response } from '@playwright/test';
 
 const REGISTRAR_USERNAME = process.env.QA_REGISTRAR_USERNAME || 'registrar@clinic.com';
 const REGISTRAR_QUEUE_PATH = '/registrar/queue';
 const QUEUE_SNAPSHOT_PATH = '/registrar/queues/today';
-const QUEUE_ROW_SELECTOR = '.qt-table-container tbody tr.mac-table-row';
+
+type RegistrarWorkerFixtures = {
+  registrarAuthState: {
+    baseURL: string;
+    storageState: Awaited<ReturnType<BrowserContext['storageState']>>;
+    sessionStorageEntries: Array<[string, string]>;
+  };
+};
+
+const test = base.extend<{}, RegistrarWorkerFixtures>({
+  registrarAuthState: [async ({ browser }, use, workerInfo) => {
+    const baseURL = workerInfo.project.use.baseURL;
+    expect(typeof baseURL, 'Queue system E2E requires a configured baseURL.').toBe('string');
+
+    const context = await browser.newContext({ baseURL: baseURL as string });
+    try {
+      const page = await context.newPage();
+      await page.goto('/login');
+      await page.fill('input[type="text"]', REGISTRAR_USERNAME);
+      await page.fill('input[type="password"]', requiredRegistrarPassword());
+      await page.click('button[type="submit"]');
+      await page.waitForLoadState('networkidle');
+      await expect(page, 'The synthetic Registrar login must leave the login screen.').not.toHaveURL(
+        /\/login(?:[?#].*)?$/
+      );
+
+      const storageState = await context.storageState();
+      const sessionStorageEntries = await page.evaluate(() => {
+        const entries: Array<[string, string]> = [];
+        for (let index = 0; index < window.sessionStorage.length; index += 1) {
+          const key = window.sessionStorage.key(index);
+          if (key === null) continue;
+          const value = window.sessionStorage.getItem(key);
+          if (value !== null) entries.push([key, value]);
+        }
+        return entries;
+      });
+      expect(
+        sessionStorageEntries.some(([key, value]) => key === 'auth_token' && value.length > 0),
+        'The normal Registrar login must keep its access token in sessionStorage.'
+      ).toBe(true);
+
+      await use({
+        baseURL: baseURL as string,
+        storageState,
+        sessionStorageEntries,
+      });
+    } finally {
+      await context.close();
+    }
+  }, { scope: 'worker' }],
+  context: async ({ browser, registrarAuthState }, provideContext) => {
+    const origin = new URL(registrarAuthState.baseURL).origin;
+    const context = await browser.newContext({
+      baseURL: registrarAuthState.baseURL,
+      storageState: registrarAuthState.storageState,
+    });
+    await context.addInitScript(({ expectedOrigin, entries }) => {
+      if (window.location.origin !== expectedOrigin) return;
+      for (const [key, value] of entries) window.sessionStorage.setItem(key, value);
+    }, { expectedOrigin: origin, entries: registrarAuthState.sessionStorageEntries });
+
+    try {
+      await provideContext(context);
+    } finally {
+      await context.close();
+    }
+  },
+});
 
 interface QueueEntrySnapshot {
   queue_number?: string | number | null;
@@ -277,8 +345,14 @@ async function expectVisibleQueueToMatch(
   expected: VisibleQueueSignature[],
   message: string
 ): Promise<void> {
+  const queueTable = page.getByRole('table').filter({
+    has: page.getByRole('columnheader', { name: '№', exact: true }),
+  });
+  await expect(queueTable, 'The visible queue must render its numbered table.').toHaveCount(1);
+  const queueRows = queueTable.getByRole('row').filter({ has: page.getByRole('cell') });
+
   await expect.poll(async () => {
-    const actual = await page.locator(QUEUE_ROW_SELECTOR).evaluateAll((rows) =>
+    const actual = await queueRows.evaluateAll((rows) =>
       rows.map((row) => {
         const number = row.querySelector('.qt-table-cell-number')?.textContent?.trim() ?? '';
         const patientCell = row.querySelector('.qt-table-cell-primary');
@@ -293,12 +367,27 @@ async function expectVisibleQueueToMatch(
       })
     );
 
-    return actual.length === expected.length && actual.every((row, index) =>
-      row.number === expected[index].number
-      && row.patient === expected[index].patient
-      && row.source === expected[index].source
-    );
-  }, { message, timeout: 15_000 }).toBe(true);
+    const comparableRows = Math.min(actual.length, expected.length);
+    return {
+      expectedRowCount: expected.length,
+      actualRowCount: actual.length,
+      queueNumberMismatchCount: actual
+        .slice(0, comparableRows)
+        .filter((row, index) => row.number !== expected[index].number).length,
+      patientLabelMismatchCount: actual
+        .slice(0, comparableRows)
+        .filter((row, index) => row.patient !== expected[index].patient).length,
+      sourceBadgeMismatchCount: actual
+        .slice(0, comparableRows)
+        .filter((row, index) => row.source !== expected[index].source).length,
+    };
+  }, { message, timeout: 15_000 }).toEqual({
+    expectedRowCount: expected.length,
+    actualRowCount: expected.length,
+    queueNumberMismatchCount: 0,
+    patientLabelMismatchCount: 0,
+    sourceBadgeMismatchCount: 0,
+  });
 }
 
 async function selectDoctorWithQueue(
@@ -331,11 +420,6 @@ test.describe('Queue System Tests', () => {
 
   test.beforeEach(async ({ page }) => {
     observeAvailableSpecialists(page);
-    await page.goto('/login');
-    await page.fill('input[type="text"]', REGISTRAR_USERNAME);
-    await page.fill('input[type="password"]', requiredRegistrarPassword());
-    await page.click('button[type="submit"]');
-    await page.waitForLoadState('networkidle');
   });
 
   test('should display queue management interface', async ({ page }) => {
