@@ -340,6 +340,41 @@ describe('initSentry scrubbing wiring (owner round-12 P1)', () => {
     expect(routeEvent.transaction).toBe('GET /api/v1/patients/{patient_id}');
   });
 
+  it('redacts route transactions whose segments look like record identifiers', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'enabled');
+    const sentry = await import('../sentry');
+    sentry.initSentry();
+
+    const options = initMock.mock.calls[0][0] as Record<string, unknown> & HookOptions;
+    const routeEvent = (transaction: string) => ({
+      type: 'transaction',
+      transaction,
+      transaction_info: { source: 'route' },
+    });
+
+    for (const transaction of [
+      'GET /patients/123456789',
+      '/appointments/bdebf761-90d7-4095-a651-d8602c6d8b61',
+      '/records/deadbeefcafe1234',
+      '/patients/1.2.3',
+      '/---',
+    ]) {
+      const scrubbed = options.beforeSendTransaction!(routeEvent(transaction)) as FakeEvent & Record<string, unknown>;
+      expect(scrubbed.transaction).toBe('[REDACTED TRANSACTION]');
+    }
+
+    for (const transaction of [
+      'GET /api/v1/patients/{patient_id}',
+      '/settings/profile',
+      '/locations/cafe',
+      '/queue/feedback',
+      '/suggestions/icd10',
+    ]) {
+      const scrubbed = options.beforeSendTransaction!(routeEvent(transaction)) as FakeEvent & Record<string, unknown>;
+      expect(scrubbed.transaction).toBe(transaction);
+    }
+  });
+
   it('scrubs child spans and drops breadcrumbs at their installed SDK hooks', async () => {
     vi.stubEnv('VITE_SENTRY_DSN', 'enabled');
     const sentry = await import('../sentry');

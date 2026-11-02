@@ -85,12 +85,18 @@ describe('Sentry SDK privacy callbacks (in-memory transport)', () => {
       }],
     } as Parameters<typeof Sentry.captureEvent>[0]);
 
+    Sentry.captureEvent({
+      type: 'transaction',
+      transaction: 'GET /patients/123456789',
+      transaction_info: { source: 'route' },
+    } as Parameters<typeof Sentry.captureEvent>[0]);
+
     await Sentry.flush(2_000);
     const serialized = JSON.stringify(sentEnvelopes);
 
     expect(sentEnvelopes.length).toBeGreaterThanOrEqual(2);
     expect(errorCallbackCalls).toBe(1);
-    expect(transactionCallbackCalls).toBe(1);
+    expect(transactionCallbackCalls).toBe(2);
     expect(spanCallbackCalls).toBe(1);
     expect(breadcrumbCallbackCalls).toBe(1);
     for (const marker of [
@@ -98,11 +104,12 @@ describe('Sentry SDK privacy callbacks (in-memory transport)', () => {
       'ERROR_EXTRA_CANARY', 'ERROR_CONTEXT_CANARY', 'ERROR_BREADCRUMB_CANARY',
       'ERROR_CRUMB_DATA_CANARY', 'TRACE_QUERY_CANARY', 'TRACE_REQUEST_CANARY',
       'TRACE_EMAIL_CANARY', 'TRACE_RESPONSE_CANARY', 'TRACE_SPAN_DESCRIPTION_CANARY',
-      'TRACE_SPAN_QUERY_CANARY',
+      'TRACE_SPAN_QUERY_CANARY', '123456789',
     ]) {
       expect(serialized).not.toContain(marker);
     }
     expect(serialized).toContain('ai_provider_failure');
     expect(serialized).toContain('http.response.status_code');
+    expect(serialized).toContain('[REDACTED TRANSACTION]');
   });
 });

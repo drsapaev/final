@@ -967,6 +967,57 @@ class TestRegisteredBeforeSendTransaction:
         assert scrubbed["transaction"] == "GET /api/v1/patients/{patient_id}"
         assert scrubbed["transaction_info"] == {"source": "route"}
 
+    def test_route_transaction_redacts_identifier_like_segments(
+        self, monkeypatch
+    ):
+        """Route names carrying concrete record ids must fail closed.
+
+        The structural route check accepts ``GET /patients/123456789`` with
+        ``source="route"``; the per-segment identifier guard redacts such
+        transactions, while static labels and ``{placeholder}`` templates
+        (including real digit-bearing routes like ``/suggestions/icd10``)
+        stay intact.
+        """
+        callback = _make_before_send(
+            monkeypatch, callback_name="before_send_transaction"
+        )
+
+        rejected = [
+            "GET /patients/123456789",
+            "/appointments/bdebf761-90d7-4095-a651-d8602c6d8b61",
+            "/records/deadbeefcafe1234",
+            "/patients/1.2.3",
+            "/---",
+        ]
+        for transaction in rejected:
+            scrubbed = callback(
+                {
+                    "type": "transaction",
+                    "transaction": transaction,
+                    "transaction_info": {"source": "route"},
+                },
+                {},
+            )
+            assert scrubbed["transaction"] == "[REDACTED TRANSACTION]", transaction
+
+        preserved = [
+            "GET /api/v1/patients/{patient_id}",
+            "/settings/profile",
+            "/locations/cafe",
+            "/queue/feedback",
+            "/suggestions/icd10",
+        ]
+        for transaction in preserved:
+            scrubbed = callback(
+                {
+                    "type": "transaction",
+                    "transaction": transaction,
+                    "transaction_info": {"source": "route"},
+                },
+                {},
+            )
+            assert scrubbed["transaction"] == transaction, transaction
+
     def test_registered_before_breadcrumb_discards_crumbs(self, monkeypatch):
         _make_before_send(monkeypatch)
         import sentry_sdk

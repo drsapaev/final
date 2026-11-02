@@ -682,16 +682,45 @@ def _safe_sdk(value: Any) -> dict[str, Any] | None:
     return safe or None
 
 
+def _route_segment_looks_like_identifier(segment: str) -> bool:
+    """True when a structurally valid path segment may encode a record id.
+
+    Covers the shapes that pass the structural route check while still
+    carrying a concrete identifier: numeric ids (``123456789``, ``1.2.3``),
+    UUIDs, and long hex tokens. Word-like segments such as ``icd10`` or
+    ``send-2fa-code`` stay allowed.
+    """
+    compact = re.sub(r"[._-]+", "", segment)
+    if not compact:
+        return True
+    if compact.isdigit():
+        return True
+    return len(compact) >= 8 and re.fullmatch(r"[0-9a-fA-F]+", compact) is not None
+
+
 def _safe_route_transaction(value: Any, source: Any) -> str | None:
-    """Retain a framework-marked route template, never a raw URL/path value."""
+    """Retain a framework-marked route template, never a raw URL/path value.
+
+    The structural check alone lets a concrete identifier through
+    (``GET /patients/123456789`` with ``source="route"``), so every segment
+    is additionally screened: the name is forwarded only when each segment
+    is a static label or an explicit ``{placeholder}``. Segments that look
+    like record identifiers fail closed to redaction.
+    """
     if source != "route" or not isinstance(value, str):
         return None
     segment = (
         r"(?:[A-Za-z0-9_.-]+|\{[A-Za-z_][A-Za-z0-9_]*(?::[A-Za-z_][A-Za-z0-9_]*)?\})"
     )
-    if re.fullmatch(rf"(?:[A-Z]+ )?/(?:{segment}(?:/{segment})*)?", value):
-        return value
-    return None
+    if not re.fullmatch(rf"(?:[A-Z]+ )?/(?:{segment}(?:/{segment})*)?", value):
+        return None
+    path = value.split(" ", 1)[1] if " " in value else value
+    for part in path.split("/"):
+        if not part or (part.startswith("{") and part.endswith("}")):
+            continue
+        if _route_segment_looks_like_identifier(part):
+            return None
+    return value
 
 
 def sanitize_sentry_payload(event: dict[str, Any]) -> dict[str, Any]:

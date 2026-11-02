@@ -460,12 +460,37 @@ function safeSdk(value: unknown): Record<string, unknown> | undefined {
   return Object.keys(safe).length ? safe : undefined;
 }
 
+/**
+ * True when a structurally valid path segment may encode a record id
+ * (numeric ids, UUIDs, long hex tokens). Word-like segments such as
+ * `icd10` or `send-2fa-code` stay allowed.
+ */
+function routeSegmentLooksLikeIdentifier(segment: string): boolean {
+  const compact = segment.replace(/[._-]+/g, '');
+  if (!compact) return true;
+  if (/^\d+$/.test(compact)) return true;
+  return compact.length >= 8 && /^[0-9a-fA-F]+$/.test(compact);
+}
+
+/**
+ * Retain a framework-marked route template, never a raw URL/path value.
+ * The structural check alone lets a concrete identifier through
+ * (`GET /patients/123456789` with source "route"), so every segment is
+ * additionally screened: the name is forwarded only when each segment is
+ * a static label or an explicit `{placeholder}`. Identifier-like segments
+ * fail closed to redaction.
+ */
 function safeRouteTransaction(value: unknown, source: unknown): string | undefined {
   if (source !== 'route' || typeof value !== 'string') return undefined;
   const segment = String.raw`(?:[A-Za-z0-9_.-]+|\{[A-Za-z_][A-Za-z0-9_]*(?::[A-Za-z_][A-Za-z0-9_]*)?\})`;
-  return new RegExp(`^(?:[A-Z]+ )?/(?:${segment}(?:/${segment})*)?$`).test(value)
-    ? value
-    : undefined;
+  if (!new RegExp(`^(?:[A-Z]+ )?/(?:${segment}(?:/${segment})*)?$`).test(value)) return undefined;
+  const path = value.includes(' ') ? value.slice(value.indexOf(' ') + 1) : value;
+  for (const part of path.split('/')) {
+    if (!part) continue;
+    if (part.startsWith('{') && part.endsWith('}')) continue;
+    if (routeSegmentLooksLikeIdentifier(part)) return undefined;
+  }
+  return value;
 }
 
 function safeSentrySpan(span: unknown): Record<string, unknown> | null {
