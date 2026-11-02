@@ -25,10 +25,27 @@ import type { Appointment } from '../../types/domain/clinic';
 import type { UsePaymentsReturn } from '../../hooks/usePayments';
 
 // ✅ УЛУЧШЕНИЕ: Статистика из API (shape moved verbatim from CashierPanel).
+// CSH-FE-036 (#3813 follow-up): BOTH financial semantics are exposed —
+// total/cash/card stay gross; refunded_amount + net_* carry the same
+// period net of refunds. pending_amount has been net since CSH-FE-028.
+//
+// P2 (PR 3830 review, comment 4439005298): the CSH-FE-036 fields are
+// OPTIONAL — during a rolling frontend/backend deploy the frontend may
+// talk to an older /cashier/stats that does not return them. The payload
+// is stored verbatim and zeros are never invented: an absent key stays
+// `undefined` so CashierStatsCard renders «—» instead of a fake 0.
 export interface CashierStatsSnapshot {
   total_amount: number;
   cash_amount: number;
   card_amount: number;
+  /** Refunds inside the gross set; present only on the post-CSH-FE-036 API. */
+  refunded_amount?: number;
+  /** Net receipts (total − refunds); present only on the post-CSH-FE-036 API. */
+  net_total_amount?: number;
+  /** Net cash; present only on the post-CSH-FE-036 API. */
+  net_cash_amount?: number;
+  /** Net card; present only on the post-CSH-FE-036 API. */
+  net_card_amount?: number;
   pending_count: number;
   pending_amount: number;
   paid_count: number;
@@ -36,6 +53,11 @@ export interface CashierStatsSnapshot {
   [k: string]: unknown;
 }
 
+// P2 (PR 3830 review, comment 4439005298): the CSH-FE-036 fields are
+// intentionally ABSENT from the empty snapshot — before the first
+// successful load (and after a failed one) their values are UNKNOWN, not
+// zero. The legacy gross counters keep the historical zero convention of
+// the whole card.
 const EMPTY_STATS: CashierStatsSnapshot = {
   total_amount: 0,
   cash_amount: 0,

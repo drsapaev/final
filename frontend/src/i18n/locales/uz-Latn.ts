@@ -745,6 +745,8 @@ const uzLatn = {
     tab_history: 'Tarix',
     tab_pending: 'Kutilmoqda',
     total_period: 'Davr bo\'yicha jami',
+    refunded_total: 'Qaytarilmalar',
+    net_total: 'Qaytarilmalarsiz jami',
   },
   cardio: {
     cancel_appointment_title: 'Отменить запись?',
