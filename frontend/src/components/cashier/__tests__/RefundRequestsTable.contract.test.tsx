@@ -16,13 +16,27 @@ const columnsSource = readSource('components/cashier/refundRequestsColumns.tsx')
 
 describe('RefundRequestsTable command contract', () => {
   it('uses the published refund request list filter query name', () => {
-    expect(hookSource).toContain('params.append(\'status_filter\', filter)');
+    expect(hookSource).toContain('params.status_filter = filter');
     expect(hookSource).not.toContain('params.append(\'status\', filter)');
   });
 
+  it('routes list and process commands through the shared api client (CSH-FE-011/012)', () => {
+    // canonical transport: shared axios instance with /api/v1 base URL,
+    // Bearer, CSRF on POST, 401 refresh and 429 cooldown
+    expect(hookSource).toContain('from \'../../api/client\'');
+    expect(hookSource).toContain('api.get(\'/force-majeure/refund-requests\'');
+    expect(hookSource).toContain('api.post(`/force-majeure/refund-requests/${requestId}/process`');
+
+    // no raw fetch() anywhere in the hook — the origin-relative URL without
+    // /api/v1 and the headerless POST were the CSH-FE-011/012 defects
+    expect(hookSource).not.toContain('fetch(');
+    expect(hookSource).not.toContain('tokenManager');
+    expect(hookSource).not.toContain('\'Authorization\'');
+  });
+
   it('uses the existing backend process command instead of invented action URLs', () => {
-    expect(hookSource).toContain('/force-majeure/refund-requests/${requestId}/process');
-    expect(hookSource).toContain('body: JSON.stringify({ action, ...extraPayload })');
+    expect(hookSource).toContain('api.post(`/force-majeure/refund-requests/${requestId}/process`');
+    expect(hookSource).toContain('{\n        action,\n        ...extraPayload,\n      }');
 
     expect(hookSource).not.toContain('/force-majeure/refund-requests/${requestId}/approve');
     expect(hookSource).not.toContain('/force-majeure/refund-requests/${requestId}/reject');
