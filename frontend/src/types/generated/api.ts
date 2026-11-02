@@ -21894,6 +21894,13 @@ export type paths = {
         /**
          * Get Cashier Stats
          * @description Получить агрегированную статистику платежей за период.
+         *
+         *     CSH-FE-036 (#3813 follow-up): контракт фиксирован — ОБЕ финансовые
+         *     величины. ``total_amount``/``cash_amount``/``card_amount`` — валовые
+         *     поступления (исходные суммы ``paid``/``completed`` без вычета возвратов;
+         *     значение существующих полей не меняется молча).
+         *     ``refunded_amount``/``net_*`` — поступления за вычетом возвратов.
+         *     ``pending_amount`` с CSH-FE-028 (#3814) считается за вычетом возвратов.
          */
         get: operations["get_cashier_stats_api_v1_cashier_stats_get"];
         put?: never;
@@ -26609,18 +26616,60 @@ export type components = {
         };
         /**
          * CashierStatsResponse
-         * @description Агрегированная статистика для кассира
+         * @description Агрегированная статистика для кассира.
+         *
+         *     CSH-FE-036 (#3813 follow-up, 2026-11-02) — контракт сумм зафиксирован:
+         *     ``total_amount``/``cash_amount``/``card_amount`` остаются ВАЛОВЫМИ
+         *     поступлениями (исходные суммы платежей ``paid``/``completed`` без вычета
+         *     возвратов; полностью возвращённые платежи покидают набор при переходе
+         *     статуса в ``refunded`` и в валовые суммы не входят). Значение существующих
+         *     полей НЕ меняется молча: интерфейс и отчётность продолжают читать те же
+         *     величины. Дополнительно экспонируются поступления за вычетом возвратов
+         *     (``refunded_amount`` + ``net_*``); ``pending_amount`` с CSH-FE-028
+         *     (#3814) также считается за вычетом возвратов.
          */
         CashierStatsResponse: {
-            /** Total Amount */
+            /**
+             * Total Amount
+             * @description Валовые поступления: исходные суммы paid/completed, БЕЗ вычета возвратов
+             */
             total_amount: string;
-            /** Cash Amount */
+            /**
+             * Cash Amount
+             * @description Валовые поступления наличными (gross, без вычета возвратов)
+             */
             cash_amount: string;
-            /** Card Amount */
+            /**
+             * Card Amount
+             * @description Валовые поступления картой (gross, без вычета возвратов)
+             */
             card_amount: string;
+            /**
+             * Refunded Amount
+             * @description Сумма возвратов по платежам, входящим в gross (частичные возвраты при статусе paid/completed)
+             */
+            refunded_amount: string;
+            /**
+             * Net Total Amount
+             * @description Поступления за вычетом возвратов: total_amount − refunded_amount
+             */
+            net_total_amount: string;
+            /**
+             * Net Cash Amount
+             * @description Наличные за вычетом возвратов
+             */
+            net_cash_amount: string;
+            /**
+             * Net Card Amount
+             * @description Карта за вычетом возвратов
+             */
+            net_card_amount: string;
             /** Pending Count */
             pending_count: number;
-            /** Pending Amount */
+            /**
+             * Pending Amount
+             * @description Ожидаемая задолженность; с CSH-FE-028 (#3814) считается за вычетом возвратов
+             */
             pending_amount: string;
             /** Paid Count */
             paid_count: number;

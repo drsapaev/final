@@ -755,6 +755,8 @@ const ru = {
     date_preset_aria: 'Быстрый выбор даты',
     date_range_preset_aria: 'Быстрый выбор диапазона дат',
     total_period: 'Всего за период',
+    refunded_total: 'Возвраты',
+    net_total: 'За вычетом возвратов',
     cancelled_count: 'Отменено',
     pending_count_caption: 'Ожидает оплаты ({count} заявок)',
     refresh_title: 'Обновить данные',

@@ -20,6 +20,7 @@ from app.api.v1.endpoints.cashier._helpers import (  # noqa: F401
     RefundRequest,
     RefundResponse,
     T,
+    _cashier_external_refunds_by_payment_id,
     _cashier_paid_amounts_by_visit_id,
     _cashier_payment_action_contract,
     _cashier_payment_available_amount,
@@ -42,6 +43,13 @@ async def get_cashier_stats(
 ):
     """
     Получить агрегированную статистику платежей за период.
+
+    CSH-FE-036 (#3813 follow-up): контракт фиксирован — ОБЕ финансовые
+    величины. ``total_amount``/``cash_amount``/``card_amount`` — валовые
+    поступления (исходные суммы ``paid``/``completed`` без вычета возвратов;
+    значение существующих полей не меняется молча).
+    ``refunded_amount``/``net_*`` — поступления за вычетом возвратов.
+    ``pending_amount`` с CSH-FE-028 (#3814) считается за вычетом возвратов.
     """
     try:
         query = db.query(Payment)
@@ -56,21 +64,71 @@ async def get_cashier_stats(
         total_amount = Decimal("0")
         cash_amount = Decimal("0")
         card_amount = Decimal("0")
+        refunded_amount = Decimal("0")
+        refunded_cash_amount = Decimal("0")
+        refunded_card_amount = Decimal("0")
         pending_amount = Decimal("0")
         paid_count = 0
         cancelled_count = 0
+        gross_payments: list[Payment] = []
 
 
         for p in payments:
             if p.status in ["paid", "completed"]:
                 total_amount += p.amount
                 paid_count += 1
+                gross_payments.append(p)
+                # CSH-FE-036: partial refunds keep the payment inside the
+                # gross set (status stays paid/completed, refunded_amount
+                # grows). A FULL refund flips the status to 'refunded' —
+                # such a payment has already left this set and never entered
+                # the gross sums, so it is not counted here either.
+                p_refunded = (
+                    Decimal(str(p.refunded_amount or 0))
+                    if getattr(p, "refunded_amount", None) is not None
+                    else Decimal("0")
+                )
+                refunded_amount += p_refunded
                 if hasattr(p, 'method') and p.method == "cash":
                     cash_amount += p.amount
+                    refunded_cash_amount += p_refunded
                 elif hasattr(p, 'method') and p.method == "card":
                     card_amount += p.amount
+                    refunded_card_amount += p_refunded
             elif p.status in ["cancelled", "refunded"]:
                 cancelled_count += 1
+
+        # CSH-FE-036 (#3830 review): reconcile the refund channels through
+        # the canonical invariant. Force-majeure legs return money WITHOUT
+        # touching Payment.refunded_amount: a deposit credit rows a
+        # DepositTransaction CREDIT (completed by construction — the patient
+        # balance already rose) and a bank claim is money-returned only at
+        # RefundRequest.status == 'completed' (pending/approved/processing
+        # have sent nothing yet). The channels are mutually exclusive per
+        # payment (payment_refund_claims) and disjoint from direct cashier
+        # refunds above, so nothing is counted twice.
+        external_refunds = _cashier_external_refunds_by_payment_id(
+            db, [p.id for p in gross_payments]
+        )
+        for p in gross_payments:
+            external = external_refunds.get(p.id)
+            if external is None:
+                continue
+            # Anomaly guard (parity with PaymentInvariantService.
+            # _net_settled_amount): a payment can never contribute negative
+            # net receipts, so an over-refunded payment is capped at its
+            # unrefunded remainder.
+            remaining = max(
+                Decimal(str(p.amount or 0))
+                - Decimal(str(getattr(p, "refunded_amount", None) or 0)),
+                Decimal("0"),
+            )
+            effective_external = min(Decimal(str(external)), remaining)
+            refunded_amount += effective_external
+            if hasattr(p, 'method') and p.method == "cash":
+                refunded_cash_amount += effective_external
+            elif hasattr(p, 'method') and p.method == "card":
+                refunded_card_amount += effective_external
 
 
         # Считаем pending из Visit
@@ -114,6 +172,10 @@ async def get_cashier_stats(
             total_amount=total_amount,
             cash_amount=cash_amount,
             card_amount=card_amount,
+            refunded_amount=refunded_amount,
+            net_total_amount=total_amount - refunded_amount,
+            net_cash_amount=cash_amount - refunded_cash_amount,
+            net_card_amount=card_amount - refunded_card_amount,
             pending_count=pending_count,
             pending_amount=pending_amount,
             paid_count=paid_count,

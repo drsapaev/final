@@ -746,6 +746,8 @@ const en = {
     tab_history: 'History',
     tab_pending: 'Pending',
     total_period: 'Total for period',
+    refunded_total: 'Refunds',
+    net_total: 'Net of refunds',
   },
   cardio: {
     cancel_appointment_title: 'Отменить запись?',

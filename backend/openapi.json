@@ -66385,7 +66385,7 @@
           "cashier"
         ],
         "summary": "Get Cashier Stats",
-        "description": "Получить агрегированную статистику платежей за период.",
+        "description": "Получить агрегированную статистику платежей за период.\n\nCSH-FE-036 (#3813 follow-up): контракт фиксирован — ОБЕ финансовые\nвеличины. ``total_amount``/``cash_amount``/``card_amount`` — валовые\nпоступления (исходные суммы ``paid``/``completed`` без вычета возвратов;\nзначение существующих полей не меняется молча).\n``refunded_amount``/``net_*`` — поступления за вычетом возвратов.\n``pending_amount`` с CSH-FE-028 (#3814) считается за вычетом возвратов.",
         "operationId": "get_cashier_stats_api_v1_cashier_stats_get",
         "security": [
           {
@@ -79214,17 +79214,44 @@
           "total_amount": {
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Total Amount"
+            "title": "Total Amount",
+            "description": "Валовые поступления: исходные суммы paid/completed, БЕЗ вычета возвратов"
           },
           "cash_amount": {
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Cash Amount"
+            "title": "Cash Amount",
+            "description": "Валовые поступления наличными (gross, без вычета возвратов)"
           },
           "card_amount": {
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Card Amount"
+            "title": "Card Amount",
+            "description": "Валовые поступления картой (gross, без вычета возвратов)"
+          },
+          "refunded_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Refunded Amount",
+            "description": "Сумма возвратов по платежам, входящим в gross (частичные возвраты при статусе paid/completed)"
+          },
+          "net_total_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Net Total Amount",
+            "description": "Поступления за вычетом возвратов: total_amount − refunded_amount"
+          },
+          "net_cash_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Net Cash Amount",
+            "description": "Наличные за вычетом возвратов"
+          },
+          "net_card_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Net Card Amount",
+            "description": "Карта за вычетом возвратов"
           },
           "pending_count": {
             "type": "integer",
@@ -79233,7 +79260,8 @@
           "pending_amount": {
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Pending Amount"
+            "title": "Pending Amount",
+            "description": "Ожидаемая задолженность; с CSH-FE-028 (#3814) считается за вычетом возвратов"
           },
           "paid_count": {
             "type": "integer",
@@ -79249,13 +79277,17 @@
           "total_amount",
           "cash_amount",
           "card_amount",
+          "refunded_amount",
+          "net_total_amount",
+          "net_cash_amount",
+          "net_card_amount",
           "pending_count",
           "pending_amount",
           "paid_count",
           "cancelled_count"
         ],
         "title": "CashierStatsResponse",
-        "description": "Агрегированная статистика для кассира"
+        "description": "Агрегированная статистика для кассира.\n\nCSH-FE-036 (#3813 follow-up, 2026-11-02) — контракт сумм зафиксирован:\n``total_amount``/``cash_amount``/``card_amount`` остаются ВАЛОВЫМИ\nпоступлениями (исходные суммы платежей ``paid``/``completed`` без вычета\nвозвратов; полностью возвращённые платежи покидают набор при переходе\nстатуса в ``refunded`` и в валовые суммы не входят). Значение существующих\nполей НЕ меняется молча: интерфейс и отчётность продолжают читать те же\nвеличины. Дополнительно экспонируются поступления за вычетом возвратов\n(``refunded_amount`` + ``net_*``); ``pending_amount`` с CSH-FE-028\n(#3814) также считается за вычетом возвратов."
       },
       "ChatFeedbackCreate": {
         "properties": {
