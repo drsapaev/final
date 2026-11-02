@@ -1,4 +1,19 @@
-## Current checkpoint — PR #3805 exact-head CI passed; awaiting user merge — 2026-10-30T23:10+05:00
+## Current checkpoint — T18.6 queue defaults and daily snapshot passed — 2026-11-02T11:05:59+05:00
+
+- Task ID: bd2f7564-bd3d-449d-8d85-5a9325722a80; Plan version: 1.0; Current task: T18 integrated synthetic acceptance.
+- Status: IN_PROGRESS. PR #3805 merged at bb010816b2e30e3b70cf14e73fb6e0626dee247f; evidence branch base is origin/main fb5fc995c80875b478929716515be8810523f6b7.
+- Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-defaults-evidence/final; branch codex/t18-defaults-evidence.
+- Runtime commit under test: dc39b0f0fd1217c8d5ac585c6aee9256e9defbc4; exact commit reported by canonical Preflight/Start; tracked source worktree clean.
+- T18 scenario 6: **PASS** on synthetic project clinic-aqs-t18-defaults-20261102-r5. Normal Admin password login, first TOTP setup, and subsequent password+TOTP login passed. Defaults were saved and independently read; a fresh desk-created queue consumed queue_start_hour=08:00 and start_number=47; the pre-existing daily queue retained all 11 checked snapshot fields; backend container ID stayed the same and restart count was 0.
+- Lifecycle: Preflight PASS (C: 18 GiB, WSL backing D: 28 GiB, WSL available memory 3215 MiB; no warnings); Start/build PASS; Session PASS. Teardown removed 5 containers, 3 volumes, and 1 network; independent inventory confirmed zero owned resources. A later WSL memory reading after Session was 2425 MiB.
+- Harness diagnostic: r4 did not pass the readback assertion because PowerShell indexed JSON PSCustomObject as a hashtable. The defect was in the ignored validation harness, reproduced locally and corrected. r4 remains a harness FAIL; r5 is the passing evidence. No application/runtime/test files changed.
+- Frontend provenance: launcher reported served_revision_verified=false; this API-focused case did not test frontend bytes. Do not count it as provenance evidence.
+- Tier-2/T18 remains PARTIAL. Full integrated T18 and docs/runbooks/STAGING_VALIDATION.md are incomplete; no deferral/waiver is claimed.
+- Allowed scope: the three T18 journals plus task-owned ignored harness/env/results; denied: application/runtime/tests, staging config, production, foreign Compose projects, global cleanup, merge/deploy.
+- PR: #3832 is open and Ready for review from branch codex/t18-defaults-evidence, based on fb5fc995c80875b478929716515be8810523f6b7; initial PR head was dfe5b56cd4b7a41abf1a12c8a28f800ee91142de. User retains merge authority.
+- Next exact action: commit/push this PR-reference checkpoint, verify checks on the new exact HEAD, then wait for the user merge. After merge, continue with one uncovered T18 case (next candidate: cabinet preview/apply/stale/audit/called-patient block); do not repeat scenario 6 or previously accepted T18 cases.
+
+## Historical checkpoint — PR #3805 exact-head CI passed before merge — 2026-10-30T23:10+05:00
 
 - Plan version: 1.0.
 - Current task: T18 integrated synthetic acceptance; PR #3805.

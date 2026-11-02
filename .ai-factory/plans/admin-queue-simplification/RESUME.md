@@ -1,4 +1,16 @@
-## Latest continuation — PR #3805 exact-head CI passed — 2026-10-30T23:10+05:00
+## Latest continuation — T18.6 defaults/snapshot synthetic acceptance — 2026-11-02T11:05:59+05:00
+
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 from branch codex/t18-defaults-evidence, based on fresh origin/main fb5fc995c80875b478929716515be8810523f6b7. PR #3805 is merged at bb010816b2e30e3b70cf14e73fb6e0626dee247f. Runtime evidence is anchored to exact clean commit dc39b0f0fd1217c8d5ac585c6aee9256e9defbc4.
+
+T18 scenario 6 passed in synthetic Compose r5: normal Admin password login and first-time TOTP enrollment/verification, second ordinary password+TOTP login, settings save and independent read, then a fresh command created a distinct daily queue with the saved 08:00 start and start number 47. The earlier queue remained unchanged across all 11 snapshot fields. Backend container identity remained constant and restart count stayed 0. Canonical Preflight/Start/Session passed; Session removed 5 containers, 3 volumes, 1 network; independent inventory found zero owned resources. No frontend byte attestation was attempted; launcher field served_revision_verified=false remains unverified.
+
+The earlier r4 attempt failed only in the harness: ConvertFrom-Json returns a PSCustomObject, but the harness used dictionary indexing for a dynamic start_numbers key. This was reproduced and fixed in task-owned scratch; r4 remains FAIL (harness), not PASS. Corrected r5 result is PASS. No runtime or tracked-test edits.
+
+Current state: T18/Tier-2 PARTIAL; full docs/runbooks/STAGING_VALIDATION.md remains incomplete; no deferral/waiver. Scratch env/harness are task-owned in the staging worktree and must be cleaned after checkpointing. User merges PRs; agent must not merge/deploy.
+
+PR #3832 is open and Ready for review; initial head dfe5b56cd4b7a41abf1a12c8a28f800ee91142de, based on fb5fc995c80875b478929716515be8810523f6b7. After this journal-only follow-up commit, recheck exact-head CI. User owns merge. Then resume one still-uncovered T18 scenario (candidate: cabinet preview/apply/stale/audit/called-patient block). Do not repeat scenario 6 or prior passing queue E2E/Admin route/RQ18/static-provenance checks.
+
+## Previous continuation — PR #3805 exact-head CI passed — 2026-10-30T23:10+05:00
 
 Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:\Users\DrSapaev\.codex\worktrees\aqs-t18-live-specs\final, branch codex/t18-queue-row-diagnostics. PR #3801 is merged at 22b21a8b7c3c0b9b56f4e388c35e329a4321f768. At CI verification PR #3805 was OPEN / Ready for review / mergeable at HEAD 8be11af929c1faa9e0d091427e055ab512540923, based on the same main commit. This journal-only update advances the PR head. User owns merge; do not merge or deploy. On resume, re-read the current PR head and exact-head checks before deciding the next step.
 
