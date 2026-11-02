@@ -5359,5 +5359,5 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Served frontend provenance: served_revision_verified=false; no frontend byte comparison was required or performed for this API-focused scenario. This does not close the separate T18 frontend-provenance gap.
 - Actual tracked paths: .ai-factory/plans/admin-queue-simplification/PROGRESS.md, EVIDENCE.md, RESUME.md; no runtime, API, tracked tests, migrations, staging configuration, production, or unrelated paths changed.
 - Remaining limitation: T18/Tier-2 remains PARTIAL. Full integrated T18 and docs/runbooks/STAGING_VALIDATION.md are incomplete; no deferral/waiver is claimed. Other scenario statuses remain as previously recorded; this entry closes only scenario 6.
-- PR: pending creation of a journal-only evidence follow-up. Merge commit: none; user retains merge authority.
-- Next exact action: review the three-file diff, run CRLF-aware git diff --check, commit and push, open the evidence PR, verify exact-head checks, then wait for user merge. Resume with one unverified T18 case; do not repeat scenario 6.
+- PR: https://github.com/drsapaev/final/pull/3832; opened Ready for review from base fb5fc995c80875b478929716515be8810523f6b7. Initial PR head was dfe5b56cd4b7a41abf1a12c8a28f800ee91142de; this journal-only follow-up advances the head. Merge commit: none; user retains merge authority.
+- Next exact action: verify required checks on the new exact PR head, wait for user merge, then resume with one unverified T18 case; do not repeat scenario 6.

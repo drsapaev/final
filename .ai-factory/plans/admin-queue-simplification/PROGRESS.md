@@ -1,4 +1,4 @@
-## Current checkpoint — T18.6 queue defaults and daily snapshot passed — 2026-11-02T11:03:49+05:00
+## Current checkpoint — T18.6 queue defaults and daily snapshot passed — 2026-11-02T11:05:59+05:00
 
 - Task ID: bd2f7564-bd3d-449d-8d85-5a9325722a80; Plan version: 1.0; Current task: T18 integrated synthetic acceptance.
 - Status: IN_PROGRESS. PR #3805 merged at bb010816b2e30e3b70cf14e73fb6e0626dee247f; evidence branch base is origin/main fb5fc995c80875b478929716515be8810523f6b7.
@@ -10,8 +10,8 @@
 - Frontend provenance: launcher reported served_revision_verified=false; this API-focused case did not test frontend bytes. Do not count it as provenance evidence.
 - Tier-2/T18 remains PARTIAL. Full integrated T18 and docs/runbooks/STAGING_VALIDATION.md are incomplete; no deferral/waiver is claimed.
 - Allowed scope: the three T18 journals plus task-owned ignored harness/env/results; denied: application/runtime/tests, staging config, production, foreign Compose projects, global cleanup, merge/deploy.
-- PR: documentation checkpoint to be opened after diff review; user retains merge authority.
-- Next exact action: finish journal review and git diff --check, commit/push the evidence-only change, open a focused PR and verify its exact-head checks. After user merge, continue with one uncovered T18 case (next candidate: cabinet preview/apply/stale/audit/called-patient block); do not repeat scenario 6 or previously accepted T18 cases.
+- PR: #3832 is open and Ready for review from branch codex/t18-defaults-evidence, based on fb5fc995c80875b478929716515be8810523f6b7; initial PR head was dfe5b56cd4b7a41abf1a12c8a28f800ee91142de. User retains merge authority.
+- Next exact action: commit/push this PR-reference checkpoint, verify checks on the new exact HEAD, then wait for the user merge. After merge, continue with one uncovered T18 case (next candidate: cabinet preview/apply/stale/audit/called-patient block); do not repeat scenario 6 or previously accepted T18 cases.
 
 ## Historical checkpoint — PR #3805 exact-head CI passed before merge — 2026-10-30T23:10+05:00
 

@@ -1,4 +1,4 @@
-## Latest continuation — T18.6 defaults/snapshot synthetic acceptance — 2026-11-02T11:03:49+05:00
+## Latest continuation — T18.6 defaults/snapshot synthetic acceptance — 2026-11-02T11:05:59+05:00
 
 Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 from branch codex/t18-defaults-evidence, based on fresh origin/main fb5fc995c80875b478929716515be8810523f6b7. PR #3805 is merged at bb010816b2e30e3b70cf14e73fb6e0626dee247f. Runtime evidence is anchored to exact clean commit dc39b0f0fd1217c8d5ac585c6aee9256e9defbc4.
 
@@ -8,7 +8,7 @@ The earlier r4 attempt failed only in the harness: ConvertFrom-Json returns a PS
 
 Current state: T18/Tier-2 PARTIAL; full docs/runbooks/STAGING_VALIDATION.md remains incomplete; no deferral/waiver. Scratch env/harness are task-owned in the staging worktree and must be cleaned after checkpointing. User merges PRs; agent must not merge/deploy.
 
-Next: complete the journal-only checkpoint from origin/main, open the evidence PR, wait for the user merge, then resume one still-uncovered T18 scenario (candidate: cabinet preview/apply/stale/audit/called-patient block). Do not repeat scenario 6 or prior passing queue E2E/Admin route/RQ18/static-provenance checks.
+PR #3832 is open and Ready for review; initial head dfe5b56cd4b7a41abf1a12c8a28f800ee91142de, based on fb5fc995c80875b478929716515be8810523f6b7. After this journal-only follow-up commit, recheck exact-head CI. User owns merge. Then resume one still-uncovered T18 scenario (candidate: cabinet preview/apply/stale/audit/called-patient block). Do not repeat scenario 6 or prior passing queue E2E/Admin route/RQ18/static-provenance checks.
 
 ## Previous continuation — PR #3805 exact-head CI passed — 2026-10-30T23:10+05:00
 
