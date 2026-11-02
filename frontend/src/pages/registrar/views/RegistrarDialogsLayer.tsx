@@ -11,7 +11,7 @@
  */
 import ErrorBoundary from '../../../components/common/ErrorBoundary';
 import AppointmentContextMenu from '../../../components/tables/AppointmentContextMenu';
-import CancelDialog from '../../../components/dialogs/CancelDialog';
+import CancelDialog, { type CancelCommandOutcome } from '../../../components/dialogs/CancelDialog';
 import PaymentDialog from '../../../components/dialogs/PaymentDialog';
 import PrintDialog from '../../../components/dialogs/PrintDialog';
 import PaymentManager from '../../../components/payment/PaymentManager';
@@ -19,7 +19,6 @@ import AppointmentWizardV2 from '../../../components/wizard/AppointmentWizardV2'
 import ForceMajeureModal from '../../../components/registrar/ForceMajeureModal';
 import logger from '../../../utils/logger';
 import notify from '../../../services/notify';
-import { getErrorMessage } from '../../../utils/errorHandler';
 import { printPanelTicketInBrowserAsync } from '../../../services/panelPrint';
 import type { Appointment } from '../../../types/domain/clinic';
 import type { RegistrarPaymentInput, RegistrarPaymentSummary } from '../../../api/registrarPayments';
@@ -148,27 +147,41 @@ const RegistrarDialogsLayer = ({
       isOpen={cancelDialog.open}
       onClose={() => setCancelDialog({ open: false, row: null, reason: '' })}
       appointment={cancelDialog.row}
-      onCancel={async (appointmentId, reason) => {
-        try {
-          const data = appointmentId === cancelDialog.row?.id
-            ? cancelDialog.row
-            : appointments.find((a) => a.id === appointmentId);
-          const result = await runRegistrarRecordAction(data as Record<string, unknown>, 'cancel', { reason });
-          if (!result) return;
-          if (!result.success) {
-            const successCount = Number(result.success_count || 0);
-            const failedCount = Number(result.failed_count || 0);
-            if (successCount === 0) {
-              throw new Error(result.results?.find((item: { success?: boolean; error?: string }) => !item.success)?.error || 'cancel_failed');
-            }
-            notify.warning('Cancelled ' + successCount + '; failed ' + failedCount);
+      onCancel={async (appointmentId, reason): Promise<CancelCommandOutcome> => {
+        // REG-FE-017 (#3803): колбэк возвращает типизированный результат
+        // команды; тосты и закрытие — ответственность диалога. Рефреш
+        // ворклиста — best-effort реконсиляция: его сбой не превращает
+        // реальный результат отмены в противоположный.
+        const data = appointmentId === cancelDialog.row?.id
+          ? cancelDialog.row
+          : appointments.find((a) => a.id === appointmentId);
+        const result = await runRegistrarRecordAction(data as Record<string, unknown>, 'cancel', { reason });
+        if (!result) return { outcome: 'no_op' };
+        if (!result.success) {
+          const successCount = Number(result.success_count || 0);
+          const failedCount = Number(result.failed_count || 0);
+          if (successCount === 0) {
+            return {
+              outcome: 'failed',
+              message: String(
+                result.results?.find((item: { success?: boolean; error?: string }) => !item.success)?.error
+                || 'cancel_failed',
+              ),
+            };
           }
-          await loadAppointments({ silent: true, source: 'cancel_complete' } as Record<string, unknown>);
-        } catch (error: unknown) {
-          logger.error('RegistrarPanel: cancellation failed:', error);
-          notify.error(getErrorMessage(error, 'Could not cancel record. Check connection and try again.'));
-          throw error;
+          try {
+            await loadAppointments({ silent: true, source: 'cancel_partial' } as Record<string, unknown>);
+          } catch (refreshError) {
+            logger.warn('RegistrarPanel: refresh after partial cancellation failed', refreshError);
+          }
+          return { outcome: 'partial_success', successCount, failedCount };
         }
+        try {
+          await loadAppointments({ silent: true, source: 'cancel_complete' } as Record<string, unknown>);
+        } catch (refreshError) {
+          logger.warn('RegistrarPanel: refresh after cancellation failed', refreshError);
+        }
+        return { outcome: 'all_success' };
       }} />
 
 

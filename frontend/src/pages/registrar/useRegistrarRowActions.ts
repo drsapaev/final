@@ -190,8 +190,11 @@ export const useRegistrarRowActions = ({
           intent: 'primary',
         });
         if (!inCabinetOk) break;
+        // REG-FE-014 (audit #3803): подтверждение принадлежит единственному
+        // владельцу — useRegistrarActions (тост только после фактического
+        // успеха команды). Меню больше не заявляет успех для отклонённой
+        // команды и не дублирует тост при реальном успехе.
         await updateAppointmentStatus(row.id, 'in_cabinet', '', row as Record<string, unknown>);
-        notify.success(tI18n('registrar.sent_to_cabinet'));
         break;
       }
       case 'call':
@@ -208,8 +211,9 @@ export const useRegistrarRowActions = ({
           intent: 'primary',
         });
         if (!completeOk) break;
+        // REG-FE-014 (audit #3803): см. in_cabinet выше — владелец тоста
+        // useRegistrarActions, не контекстное меню.
         await updateAppointmentStatus(row.id, 'done', '', row as Record<string, unknown>);
-        notify.success(tI18n('registrar.visit_completed'));
         break;
       }
       case 'payment':
