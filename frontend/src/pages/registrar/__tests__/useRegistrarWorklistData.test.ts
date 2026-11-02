@@ -494,11 +494,13 @@ describe('useRegistrarWorklistData — refresh lifecycle (REG-FE-007/020/021)', 
   });
 
   it('REG-FE-007: a 429 during a refresh keeps the loaded rows and marks them stale', async () => {
+    // Lazy factories: a rejected promise created before its consumer attaches
+    // a handler would surface as an unhandled rejection between act blocks.
     const callQueue = [
-      Promise.resolve({ data: { queues: [{ entries: [{ id: 'row-1' }] }] } }),
-      rateLimited(),
+      () => Promise.resolve({ data: { queues: [{ entries: [{ id: 'row-1' }] }] } }),
+      () => rateLimited(),
     ];
-    vi.mocked(api.get).mockImplementation(() => callQueue.shift() as never);
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift()!() as never);
     const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
