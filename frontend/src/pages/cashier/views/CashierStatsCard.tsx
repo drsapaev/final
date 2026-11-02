@@ -22,6 +22,17 @@ interface CashierStatsCardProps {
   tI18n: CashierTranslationFn;
 }
 
+/**
+ * CSH-FE-036 P2 (PR #3830 review, comment 4439005298): a MISSING stats
+ * field is not a zero. On a rolling frontend/backend deploy this frontend
+ * may be served by an older /cashier/stats without refunded_amount /
+ * net_* — formatUZS(undefined) would render a fake «0 сум» that
+ * misreports real receipts. An absent value renders as «—» (no data);
+ * a real zero reported by the current API still renders as «0 сум».
+ */
+const formatMoneyOrDash = (value: number | undefined | null): string =>
+  typeof value === 'number' && Number.isFinite(value) ? formatUZS(value) : '—';
+
 const CashierStatsCard = ({ isHistoryTab, stats, onRefresh, onExport, onHourlyStats, tI18n }: CashierStatsCardProps) => {
   const format = formatUZS;
 
@@ -62,10 +73,12 @@ const CashierStatsCard = ({ isHistoryTab, stats, onRefresh, onExport, onHourlySt
               </div>
               {/* CSH-FE-036 (PR 3813 follow-up): обе финансовые величины —
                   возвраты и поступления за вычетом возвратов — рядом с
-                  валовыми; смысл существующих плиток не меняется молча. */}
+                  валовыми; смысл существующих плиток не меняется молча.
+                  P2 (4439005298): отсутствующее поле ≠ ноль — старый API
+                  без net-полей получает «—», а не ложный «0 сум». */}
               <div className="cashier-text-center">
                 <div className="cashier-stat-num cashier-stat-danger">
-                  {format(stats.refunded_amount || 0)}
+                  {formatMoneyOrDash(stats.refunded_amount)}
                 </div>
                 <div className="cashier-stat-cap">
                   {tI18n('cashier.refunded_total')}
@@ -73,7 +86,7 @@ const CashierStatsCard = ({ isHistoryTab, stats, onRefresh, onExport, onHourlySt
               </div>
               <div className="cashier-text-center">
                 <div className="cashier-stat-num cashier-stat-green">
-                  {format(stats.net_total_amount || 0)}
+                  {formatMoneyOrDash(stats.net_total_amount)}
                 </div>
                 <div className="cashier-stat-cap">
                   {tI18n('cashier.net_total')}

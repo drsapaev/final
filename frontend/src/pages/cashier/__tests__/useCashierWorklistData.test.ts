@@ -87,6 +87,27 @@ describe('useCashierWorklistData (PR-UI-14-1)', () => {
     expect(result.current.historyLoading).toBe(false);
   });
 
+  it('does not invent zeros for CSH-FE-036 fields when the API predates them (P2 4439005298)', async () => {
+    const api = makeApi();
+    // Old /cashier/stats payload: gross counters only, no refunded/net keys.
+    api.getStats.mockResolvedValue({
+      success: true,
+      data: { total_amount: 100000, cash_amount: 60000, card_amount: 40000, pending_count: 2, pending_amount: 25000, paid_count: 3, cancelled_count: 0 },
+    });
+    api.getPendingPayments.mockResolvedValue({ success: true, data: [], pagination: { total: 0, page: 1, size: 20, pages: 1 } });
+    api.getPayments.mockResolvedValue({ success: true, data: [], pagination: { total: 0, page: 1, size: 20, pages: 1 } });
+
+    const { result } = renderWorklist(api);
+
+    await waitFor(() => expect(result.current.stats.total_amount).toBe(100000));
+    // The snapshot must preserve "field absent": a fake 0 here would render
+    // as «0 сум» in CashierStatsCard while the old API never reported it.
+    expect(result.current.stats.refunded_amount).toBeUndefined();
+    expect(result.current.stats.net_total_amount).toBeUndefined();
+    expect(result.current.stats.net_cash_amount).toBeUndefined();
+    expect(result.current.stats.net_card_amount).toBeUndefined();
+  });
+
   it('single date mode sends selectedDate as both bounds', async () => {
     const api = makeApi();
     api.getStats.mockResolvedValue({ success: false });
@@ -153,13 +174,16 @@ describe('useCashierWorklistData (PR-UI-14-1)', () => {
     const { result } = renderWorklist(api);
 
     await waitFor(() => {
-      // CSH-FE-036 (#3813 follow-up): the empty snapshot includes the
-      // net-of-refunds fields (refunded_amount + net_* stay gross-neutral).
+      // CSH-FE-036 P2 (review 4439005298): the empty snapshot keeps the
+      // LEGACY zeros (gross tiles unchanged), but the net-of-refunds fields
+      // stay ABSENT — their value is unknown, and the card renders «—»
+      // instead of inventing a zero.
       expect(result.current.stats).toEqual({
         total_amount: 0, cash_amount: 0, card_amount: 0,
-        refunded_amount: 0, net_total_amount: 0, net_cash_amount: 0, net_card_amount: 0,
         pending_count: 0, pending_amount: 0, paid_count: 0, cancelled_count: 0,
       });
+      expect(result.current.stats.refunded_amount).toBeUndefined();
+      expect(result.current.stats.net_total_amount).toBeUndefined();
     });
     await waitFor(() => {
       expect(result.current.appointments).toEqual([]);
