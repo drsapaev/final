@@ -5382,6 +5382,18 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR: [#3861](https://github.com/drsapaev/final/pull/3861), opened Ready for review from `codex/t18-cabinet-day`; initial PR HEAD `a55408c3668a011c6e950636d5f090f99cd5c53b`, base `235b4cbba6bc133e89c44a3ceeb087d227267f9d`. Exact-head checks were pending when this entry was written. Merge commit: none; user retains merge authority.
 - Next: verify applicable exact-head CI, then continue a distinct unverified T18 case after user-owned merge. Do not repeat scenario 6 or the unchanged cabinet PostgreSQL suite.
 
+## T18 scenario 1 — current-main backend contract validation — 2026-11-03T23:03+05:00
+
+- Commit under test: runtime source is current `origin/main` `235b4cbba6bc133e89c44a3ceeb087d227267f9d`; the open evidence-only PR #3861 was at HEAD `94efa74787fa1891afadaf54e70f4068447fd84e`, base `235b4cbba6bc133e89c44a3ceeb087d227267f9d`.
+- Environment: isolated Windows worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-cabinet-day\final`; Python 3.11.9; repository test fixture creates a temporary SQLite file DB and removes it after the pytest session.
+- Execution mode: `gate_known_root_cause` for protected queue/admin ownership behavior. Root `backend/app/services/queue_admin_directions_read_service.py`; scope included that service, `test_queue_admin_directions_read_model.py`, `test_multi_doctor_same_specialty_isolation.py`, and the three T18 journals. Gate result: `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; execution prompt read. Basis: user's ongoing authorization for bounded T18 validation. No gate/router change.
+- Allowed paths: existing ignored T18 prework checkpoint, `.gate_artifacts/`, and the T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`; source/tests were reference-only. Denied: source/test edits, production/shared DB, Compose/staging, real data, global cleanup, merge/deploy.
+- Validation: `scripts/run_python.ps1 -PythonArgs @('-m','py_compile',...)` — PASS. With `TESTING=1` and `DATABASE_URL=sqlite:///:memory:`, `scripts/run_backend_pytest.ps1 tests/integration/test_queue_admin_directions_read_model.py tests/integration/test_multi_doctor_same_specialty_isolation.py -q` — **24 passed, 6 warnings**. The test conftest's actual per-session DB is temporary SQLite; no PostgreSQL or shared database was contacted.
+- Result: related backend contracts for typed direction owners and same-specialty doctor queue behavior PASS. This does not prove the full Admin live workflow for creating a single direction with multiple same-specialty doctors; that part of T18 scenario 1 remains NOT_RUN.
+- Scope check: PASS. No runtime, tracked-test, API/schema/migration, staging or production change; no Compose project started. The gate's generated validation suggestion was only `py_compile`; running the two targeted tests was within the user's explicit T18 validation authorization and the same reviewed file scope.
+- PR: #3861; journal update pending commit/push at time of evidence capture. Merge commit: none; user owns merge. Tier-2 remains PARTIAL; no deferral claimed.
+- Next: push this journal-only evidence to the existing PR, update its body with the distinction between backend PASS and live Admin NOT_RUN, then verify exact-head checks. Do not repeat scenarios 6–9.
+
 ## T18 scenarios 8–9 — quota concurrency, replay, rollback and remaining-count contracts — 2026-11-03T22:47+05:00
 
 - Commit under test: `235b4cbba6bc133e89c44a3ceeb087d227267f9d`, equal to `origin/main` and the runtime base of the evidence-only PR #3861.
