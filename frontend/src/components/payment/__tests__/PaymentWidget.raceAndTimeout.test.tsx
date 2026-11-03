@@ -296,3 +296,208 @@ describe('PaymentWidget — CSH-FE-038 stale provider responses (real timers)', 
     expect(initCall![1]).toMatchObject({ provider: 'payme', currency: 'USD', visit_id: 1 });
   }, 10000);
 });
+
+/**
+ * #3854 review follow-up — the polling interval still allowed concurrent
+ * status GETs (`setInterval(async () => …)`), and no rule kept a late
+ * non-terminal response from overwriting a confirmed terminal one, or a
+ * response of a REPLACED payment session from landing on the new one.
+ *
+ * Fail-first proven on the pre-fix branch source (a3fbaa03b):
+ *  - reverse order: manual check resolves 'paid' while a poll GET hangs;
+ *    the late poll response ('processing') overwrote 'paid' and re-enabled
+ *    the pay button.
+ *  - single-flight: while a poll GET hung, the next 5s tick fired a second
+ *    concurrent GET.
+ *  - payment identity: a poll GET that settled after "Отмена" resurrected
+ *    'paid' for the cancelled session.
+ *  - provider reload failure: a currency switch whose GET rejected kept the
+ *    PREVIOUS currency's provider list rendered and payable.
+ */
+describe('PaymentWidget — #3854 review follow-up: single-flight, identity, no terminal rollback', () => {
+  const createDeferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((res) => { resolve = res; });
+    return { promise, resolve };
+  };
+
+  type Deferred<T> = ReturnType<typeof createDeferred<T>>;
+
+  const initHangingPollPayment = async (onSuccess?: () => void) => {
+    apiMocks.post.mockResolvedValueOnce({
+      data: {
+        success: true,
+        payment_id: 777,
+        payment_url: 'https://provider.example/pay/777',
+      },
+    });
+
+    const statusDeferreds: Deferred<{ data: { status: string } }>[] = [];
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === '/payments/providers') return Promise.resolve(providersResponse());
+      // Every payment-status GET hangs until the test resolves it manually.
+      const deferred = createDeferred<{ data: { status: string } }>();
+      statusDeferreds.push(deferred);
+      return deferred.promise;
+    });
+
+    renderWidget(<PaymentWidget visitId={1} amount={100} currency="UZS" onSuccess={onSuccess} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText(/pay_widg_pay_amount/));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(window.open).toHaveBeenCalledWith('https://provider.example/pay/777', '_blank');
+
+    // Redirect delay (10s) elapses → polling starts → the first tick fires
+    // after another POLLING_INTERVAL (5s) → the first status GET hangs.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000 + 5_000);
+    });
+    return statusDeferreds;
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it('single-flight: a 5s tick while the previous status GET hangs issues no second GET', async () => {
+    const statusDeferreds = await initHangingPollPayment();
+
+    expect(statusDeferreds.length).toBe(1);
+
+    // Two more ticks fire while GET #1 is still in flight — neither may
+    // start a concurrent request (attempt budget also stays unconsumed).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2 * 5_000);
+    });
+    expect(statusDeferreds.length).toBe(1);
+  }, 20000);
+
+  it('a late non-terminal poll response cannot roll back a confirmed paid status (responses in reverse order)', async () => {
+    const onSuccess = vi.fn();
+    const statusDeferreds = await initHangingPollPayment(onSuccess);
+
+    // The cashier presses "Проверить статус" manually while poll GET #1 hangs.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /pay_widg_check_status/ }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(statusDeferreds.length).toBe(2);
+
+    // The MANUAL response (the newer request) confirms 'paid' FIRST.
+    await act(async () => {
+      statusDeferreds[1].resolve({ data: { status: 'paid' } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText(/pay_widg_paid_success/)).toBeInTheDocument();
+    expect(onSuccess).toHaveBeenCalled();
+
+    // The delayed poll response ('processing') lands LAST, out of order —
+    // it must not roll the confirmed 'paid' back to a payable state.
+    await act(async () => {
+      statusDeferreds[0].resolve({ data: { status: 'processing' } });
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByText(/pay_widg_paid_success/)).toBeInTheDocument();
+    const payButton = screen.getByText(/pay_widg_pay_amount/).closest('button');
+    expect(payButton).not.toBeNull();
+    expect(payButton).toBeDisabled();
+  }, 20000);
+
+  it('a status response that settles after cancelling the payment session is discarded', async () => {
+    const onSuccess = vi.fn();
+    const statusDeferreds = await initHangingPollPayment(onSuccess);
+
+    // The cashier cancels while poll GET #1 is still in flight.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /pay_widg_cancel/ }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText(/pay_widg_select_method/)).toBeInTheDocument();
+
+    // The stale response arrives with 'paid' — it belongs to the cancelled
+    // session and must be discarded instead of marking the widget paid.
+    await act(async () => {
+      statusDeferreds[0].resolve({ data: { status: 'paid' } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByText(/pay_widg_select_method/)).toBeInTheDocument();
+    expect(screen.queryByText(/pay_widg_paid_success/)).toBeNull();
+    expect(onSuccess).not.toHaveBeenCalled();
+  }, 20000);
+});
+
+describe('PaymentWidget — #3854 review follow-up: provider reload failure must invalidate the stale list', () => {
+  it('a failed provider reload after a currency switch drops the previous currency list and surfaces the load error', async () => {
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === '/payments/providers') {
+        return Promise.resolve({
+          data: {
+            providers: [
+              { code: 'click', name: 'Click', is_active: true, supported_currencies: ['UZS'] },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: { status: 'processing' } });
+    });
+
+    const { rerender } = renderWidget(<PaymentWidget visitId={1} amount={100} currency="UZS" />);
+    await waitFor(() =>
+      expect(screen.getByText(/pay_widg_pay_amount/)).toBeInTheDocument(),
+    );
+
+    // Currency switch: the new provider GET fails.
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === '/payments/providers') {
+        return Promise.reject(new Error('providers endpoint down'));
+      }
+      return Promise.resolve({ data: { status: 'processing' } });
+    });
+    rerender(
+      <ThemeProvider>
+        <PaymentWidget visitId={1} amount={100} currency="KZT" />
+      </ThemeProvider>,
+    );
+
+    // The stale UZS list must not stay rendered as if it were payable for
+    // KZT: no provider picker, no pay button — and the failure surfaces as
+    // the load error, not as "no methods configured".
+    await waitFor(() =>
+      expect(screen.getByText(/providers endpoint down/)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/pay_widg_no_methods/)).toBeNull();
+    expect(screen.queryByText(/pay_widg_pay_amount/)).toBeNull();
+
+    // Recovery: a working provider endpoint + a supported currency restores
+    // the payable state (the reload is keyed by currency, so the cashier
+    // switches to another payable currency).
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === '/payments/providers') {
+        return Promise.resolve({
+          data: {
+            providers: [
+              { code: 'payme', name: 'Payme', is_active: true, supported_currencies: ['USD'] },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: { status: 'processing' } });
+    });
+    rerender(
+      <ThemeProvider>
+        <PaymentWidget visitId={1} amount={100} currency="USD" />
+      </ThemeProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByText(/pay_widg_pay_amount/)).toBeInTheDocument(),
+    );
+  }, 10000);
+});

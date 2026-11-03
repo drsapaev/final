@@ -14,7 +14,11 @@ describe('PaymentWidget backend payment status contract', () => {
     // CSH-FE-029: the polling path must read the payment from paymentDataRef
     // (currentPaymentData), never a stale closure over paymentData state.
     expect(source).toContain('const currentPaymentData = paymentDataRef.current;');
-    expect(source).toContain('apiClient.get(`/payments/${currentPaymentData.payment_id}`)');
+    // #3854 review follow-up: the GET is keyed by the identity-pinned
+    // paymentId (captured from paymentDataRef BEFORE the request) so a
+    // response of a replaced/cancelled session can be discarded.
+    expect(source).toContain('const paymentId = currentPaymentData.payment_id;');
+    expect(source).toContain('apiClient.get(`/payments/${paymentId}`)');
     expect(source).not.toContain('apiClient.get(`/payments/${paymentData.payment_id}`)');
     expect(source).not.toContain('apiClient.get(`/payments/${paymentData.payment_id}/status`)');
   });
