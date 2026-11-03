@@ -56,6 +56,17 @@ interface PaymentData {
   [key: string]: unknown;
 }
 
+// CSH-FE-037: statuses that end the payment lifecycle. The polling-budget
+// branch must never overwrite one of these observed by the very poll that
+// exhausted the attempt count.
+const TERMINAL_PAYMENT_STATUSES: readonly string[] = [
+  'paid',
+  'failed',
+  'cancelled',
+  'canceled',
+  'refunded',
+];
+
 const PaymentWidget = ({
   visitId,
   amount,
@@ -118,6 +129,12 @@ const PaymentWidget = ({
     tRef.current = t;
   });
 
+  // CSH-FE-038: a currency switch can overlap two provider requests; a late
+  // stale response (previous currency) must not overwrite the state resolved
+  // by the newer one. Every load takes the next sequence number and only the
+  // holder of the CURRENT number is allowed to commit state.
+  const providersRequestSeqRef = useRef(0);
+
   // HIGH #7 fix: auto-polling for online payment status.
   // Previously the cashier had to click "Проверить статус" manually.
   // Now we poll every 5 seconds for up to 5 minutes (60 attempts),
@@ -143,9 +160,16 @@ const PaymentWidget = ({
   };
 
   const loadProviders = useCallback(async () => {
+    const requestSeq = ++providersRequestSeqRef.current;
     try {
       setProvidersLoading(true);
       const response = await apiClient.get('/payments/providers');
+
+      // CSH-FE-038: a newer load (another currency) superseded this one —
+      // discard the stale response entirely.
+      if (requestSeq !== providersRequestSeqRef.current) {
+        return;
+      }
 
       if (response.data?.providers) {
         // Фильтруем активные провайдеры по валюте
@@ -165,13 +189,27 @@ const PaymentWidget = ({
               ? current
               : availableProviders[0].code
           );
+        } else {
+          // CSH-FE-038: an empty list must not keep a selection made for
+          // another currency — the leftover code could later be paired with
+          // a provider/currency combination the list never offered.
+          setSelectedProvider('');
         }
       }
     } catch (err) {
+      // CSH-FE-038: only the current request may surface errors; a stale
+      // rejection belongs to an abandoned currency load.
+      if (requestSeq !== providersRequestSeqRef.current) {
+        return;
+      }
       logger.error('Ошибка загрузки провайдеров:', err);
       setError(getErrorMessage(err, tRef.current('payment.pay_widg_load_providers_error')));
     } finally {
-      setProvidersLoading(false);
+      // CSH-FE-038: let the CURRENT request own the loading flag — a stale
+      // finally must not cancel the loading state of the newer in-flight load.
+      if (requestSeq === providersRequestSeqRef.current) {
+        setProvidersLoading(false);
+      }
     }
   }, [currency]);
 
@@ -224,8 +262,9 @@ const PaymentWidget = ({
     pollingRef.current = setInterval(async () => {
       attemptsRef.current += 1;
       setPollingAttempts(attemptsRef.current);
+      let observedStatus: string | null = null;
       try {
-        await checkPaymentStatus();
+        observedStatus = await checkPaymentStatus();
       } catch (err) {
         logger.error('Polling error:', err);
       }
@@ -235,14 +274,27 @@ const PaymentWidget = ({
         // observation limit, NOT provider failure — the payment may still
         // complete. Surface an explicit monitoring-timeout state with a
         // manual check instead of inventing a 'failed' payment status.
-        setPaymentStatus('status_check_timeout');
+        // CSH-FE-037: …but the poll that exhausts the budget may itself
+        // observe a TERMINAL status (paid/failed/…) — the timeout state
+        // must never overwrite it, or a paid visit renders as timed out.
+        const observedTerminal =
+          observedStatus !== null && TERMINAL_PAYMENT_STATUSES.includes(observedStatus);
+        if (!observedTerminal) {
+          setPaymentStatus('status_check_timeout');
+        }
       }
     }, POLLING_INTERVAL_MS);
   }, [clearPolling, t]);
 
   // Инициализация платежа
   const initializePayment = async () => {
-    if (!selectedProvider || !visitId || !amount) {
+    // CSH-FE-038: truthiness alone is not enough — the selected code must
+    // actually be offered by the CURRENT provider list, otherwise a stale
+    // selection could POST a provider/currency pair the list never offered.
+    const selectedProviderAvailable = providers.some(
+      (provider: PaymentProviderDto) => provider.code === selectedProvider
+    );
+    if (!selectedProvider || !selectedProviderAvailable || !visitId || !amount) {
       setError(t('payment.pay_widg_missing_data'));
       return;
     }
@@ -363,11 +415,14 @@ const PaymentWidget = ({
   };
 
   // Проверка статуса платежа
-  const checkPaymentStatus = async () => {
+  // CSH-FE-037: returns the observed payment status (or null when unknown /
+  // errored) so the polling-budget branch can tell whether the last
+  // observation was terminal before applying the monitoring-timeout state.
+  const checkPaymentStatus = async (): Promise<string | null> => {
     // CSH-FE-029: polling reads the CURRENT payment data from the ref —
     // the interval's closure cannot go stale.
     const currentPaymentData = paymentDataRef.current;
-    if (!currentPaymentData?.payment_id) return;
+    if (!currentPaymentData?.payment_id) return null;
 
     try {
       const response = await apiClient.get(`/payments/${currentPaymentData.payment_id}`);
@@ -384,10 +439,12 @@ const PaymentWidget = ({
             status: response.data.status
           });
         }
+        return nextStatus;
       }
     } catch (err) {
       logger.error('Ошибка проверки статуса:', err);
     }
+    return null;
   };
 
   // Отмена платежа
