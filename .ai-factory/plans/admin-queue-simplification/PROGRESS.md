@@ -7,13 +7,13 @@ Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`
 Branch: `codex/t18-cabinet-day`
 Base commit: `235b4cbba6bc133e89c44a3ceeb087d227267f9d` (`origin/main` at validation)
 Runtime commit: `235b4cbba6bc133e89c44a3ceeb087d227267f9d`
-Last updated: 2026-11-04T00:55:18+05:00
+Last updated: 2026-11-04T01:08:00+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T00–T17 | MERGED | See prior checkpoints | Recorded in prior entries | Existing plan journals |
 | T18 scenario 1 | VALIDATED | `codex/t18-cabinet-day`, PR #3861 open | — | 24 backend contract tests plus live synthetic Admin/TOTP setup; hidden profile and two same-specialty typed targets confirmed |
-| T18 scenario 2 | PARTIAL | Prior live slice on #3805; source reconciliation pending | — | Doctorless service/resource archive tested; resource-only onboarding and no-extra-doctor path not fully proven |
+| T18 scenario 2 | PARTIAL | Prior live slice on #3805; current-source harness audit recorded in #3861 | — | Doctorless service/resource archive tested; resource-only onboarding and no-extra-doctor path remain unproven; legacy RQ-17 spec targets a removed wizard |
 | T18 scenario 3 | PARTIAL | PR #3763 merged | `e2c4e0335bd1bd8bfc15db23e70436c82b53b39c` | Parent-conflict repair slice passed; broad incomplete-configuration/next-action coverage remains partial |
 | T18 scenario 4 | VALIDATED | PR #3805 merged | `e7cf5b47b1aa96e5df0b9baf9e9e567b8e3fecbf` | Live hidden/publish/hide/republish/permanent-address/resource lifecycle passed; relevant current-main paths unchanged |
 | T18 scenario 5 | PARTIAL | Current-main source; PR #3861 evidence update | — | Unit guards 11/11 and PostgreSQL direct-token/resource-token targets 3/3 PASS; live revalidation not run |
@@ -26,6 +26,7 @@ Last updated: 2026-11-04T00:55:18+05:00
 ## Current checkpoint
 
 - Completed: current-main synthetic Admin cabinet scenario (T18 scenario 7). Normal password + TOTP login succeeded; preview returned the clinic date and typed Doctor owner; stale apply returned 409 without write/audit; fresh preview/apply succeeded. Final database assertions confirmed the target assignment, unchanged owner default/queue identity, and exactly two expected audited changes.
+- Completed: read-only current-source review found the legacy `frontend/e2e/rq17-setup-directions-live.spec.ts` expects `setup-wizard-*` controls absent from the current `AdminSetupDirections` screen. This is test-harness drift, not a product failure. The spec was not run or edited; adapt/replace it before using it for scenario 2.
 - Completed: canonical Preflight → Start → Session. Session removed the owned project's 5 containers, 3 volumes and 1 network; independent inventory found zero owned resources and all dedicated ports free.
 - Reused existing PostgreSQL evidence: all 8 `test_queue_cabinet_reassignment_apply_pg.py` cases passed on a prior run. Current endpoint/service/repository/test blobs match the previously tested tree; no repeat was needed. This includes audit rollback and called/in-progress/active-execution blocks.
 - T18 scenarios 8–9: seven current-main PostgreSQL integration tests passed against one isolated disposable local PostgreSQL 17.11 instance; seven quota/status/API unit tests passed. PostgreSQL evidence covers token and GraphQL last-slot races, exact retry, lost-response replay, rollback and partial-batch conservation. Unit evidence covers public/QR availability and remaining-quota reporting. No runtime or tracked test files changed.
