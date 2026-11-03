@@ -26,6 +26,10 @@ export const useRegistrarDoctorWorklistFacts = ({
     selectedDoctorLabel,
     doctorStats: computeDoctorStats(appointments, date, doctors.map((doctor) => Number(doctor.id))),
     doctorCountLabel: date === todayStr ? tI18n('registrarPanel.today') : date,
+    // REG-FE-027 (registrar audit ledger): does the loaded sample belong to
+    // the CURRENT clinic day (same date resolution as loadAppointments)?
+    // The Welcome morning checklist is a today-only instrument.
+    sampleIsToday: date === todayStr,
   };
 }, [appointments, doctors, activeDoctorId, showCalendar, historyDate, urlDate, todayStr, tI18n]);
 

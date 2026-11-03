@@ -24,4 +24,36 @@ describe('per-doctor worklist presentation facts', () => {
     expect(result.current.doctorStats['7'].todayCount).toBe(1);
     expect(result.current.doctorStats['8'].todayCount).toBe(0);
   });
+
+  // REG-FE-027 (registrar audit ledger): the Welcome morning checklist is a
+  // TODAY-only instrument — the hook must expose whether the loaded sample's
+  // effective day (calendar historyDate → ?date → clinic today) is today.
+  it('flags whether the loaded sample is the current clinic day (sampleIsToday)', () => {
+    const base = {
+      appointments: [] as Appointment[],
+      doctors: [] as Doctor[],
+      activeDoctorId: null,
+      tI18n: (key: string) => key,
+    };
+    // Calendar history mode on a past day → NOT today.
+    const history = renderHook(() => useRegistrarDoctorWorklistFacts({
+      ...base, showCalendar: true, historyDate: '2026-09-20', urlDate: null, todayStr: '2026-09-25',
+    }));
+    expect(history.result.current.sampleIsToday).toBe(false);
+    // Calendar open on today → today.
+    const calendarToday = renderHook(() => useRegistrarDoctorWorklistFacts({
+      ...base, showCalendar: true, historyDate: '2026-09-25', urlDate: null, todayStr: '2026-09-25',
+    }));
+    expect(calendarToday.result.current.sampleIsToday).toBe(true);
+    // URL date on a past day (calendar closed) → NOT today.
+    const urlPast = renderHook(() => useRegistrarDoctorWorklistFacts({
+      ...base, showCalendar: false, historyDate: '', urlDate: '2026-09-20', todayStr: '2026-09-25',
+    }));
+    expect(urlPast.result.current.sampleIsToday).toBe(false);
+    // No date anywhere → clinic today.
+    const today = renderHook(() => useRegistrarDoctorWorklistFacts({
+      ...base, showCalendar: false, historyDate: '', urlDate: null, todayStr: '2026-09-25',
+    }));
+    expect(today.result.current.sampleIsToday).toBe(true);
+  });
 });

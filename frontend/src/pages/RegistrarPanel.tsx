@@ -16,10 +16,10 @@ import { useTranslation } from '../i18n/useTranslation';
 import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
 import { useRegistrarReschedule } from './registrar/useRegistrarReschedule';
 import { useRegistrarData } from './registrar/useRegistrarData';
-import { useRegistrarWorklistData } from './registrar/useRegistrarWorklistData';
+import { useRegistrarWorklistData, type RegistrarWorklistLoadOutcome } from './registrar/useRegistrarWorklistData';
 import {
   computeDepartmentStats,
-  computeRegistrarWorklistRows,
+  computeRegistrarWorklistRows, resolveRegistrarWorklistEmptyScopeKind,
   resolveRegistrarWorklistPresentationFacts,
   type QueueProfileItem,
 } from './registrar/registrarWorklistRows';
@@ -107,7 +107,7 @@ const RegistrarPanel = () => {
 
   // Dialog + wizard state machines (PR-UI-13-3). loadAppointmentsRef breaks
   // the wizard↔worklist wiring cycle with identical call-time semantics.
-  const loadAppointmentsRef = useRef<(options?: unknown) => Promise<void> | void>(() => {});
+  const loadAppointmentsRef = useRef<(options?: unknown) => Promise<RegistrarWorklistLoadOutcome | void> | void>(() => {});
 
   const {
     printDialog, setPrintDialog,
@@ -254,7 +254,7 @@ const RegistrarPanel = () => {
     () => computeDepartmentStats(appointments, todayStr, queueProfiles),
     [appointments, todayStr, queueProfiles],
   );
-  const { selectedDoctorLabel, doctorStats, doctorCountLabel } = useRegistrarDoctorWorklistFacts({
+  const { selectedDoctorLabel, doctorStats, doctorCountLabel, sampleIsToday } = useRegistrarDoctorWorklistFacts({
     appointments, doctors, activeDoctorId, showCalendar, historyDate,
     urlDate: searchParams.get('date'), todayStr, tI18n,
   });
@@ -392,7 +392,7 @@ const RegistrarPanel = () => {
                 paginationInfo={paginationInfo}
                 onRetry={loadAppointments} stale={worklistStale}
               />
-            )}
+            )} emptyScopeKind={resolveRegistrarWorklistEmptyScopeKind({ appointments, activeTab, activeDoctorId, queueProfiles })} loadedDateIsToday={sampleIsToday}
           />
         )}
 

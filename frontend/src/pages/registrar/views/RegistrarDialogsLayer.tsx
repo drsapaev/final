@@ -24,6 +24,7 @@ import type { Appointment } from '../../../types/domain/clinic';
 import type { RegistrarPaymentInput, RegistrarPaymentSummary } from '../../../api/registrarPayments';
 import RecordPreview from './RecordPreview';
 import RescheduleSlots from './RescheduleSlots';
+import type { RegistrarWorklistLoadOutcome } from '../useRegistrarWorklistData';
 import type {
   CancelDialogState,
   ContextMenuState,
@@ -71,7 +72,7 @@ interface RegistrarDialogsLayerProps {
   setIsProcessing: (value: boolean) => void;
   // data + actions
   appointments: Appointment[];
-  loadAppointments: (options?: unknown) => Promise<void> | void;
+  loadAppointments: (options?: unknown) => Promise<RegistrarWorklistLoadOutcome | void> | void;
   loadIntegratedData: () => Promise<void> | void;
   openRecordEditor: (row: unknown) => void;
   handleContextMenuAction: (action: string, row: Appointment) => void | Promise<void>;

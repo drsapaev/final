@@ -24,6 +24,7 @@ import notify from '../../../services/notify';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { rescheduleTomorrow, rescheduleVisit } from '../../../api/visits';
 import { getErrorMessage } from '../../../utils/errorHandler';
+import type { RegistrarWorklistLoadOutcome } from '../useRegistrarWorklistData';
 
 interface RescheduleSlotsDialogProps {
   isOpen: boolean;
@@ -36,7 +37,7 @@ interface RescheduleSlotsDialogProps {
   getRescheduleVisitIds: (appointmentRow: Record<string, unknown>) => unknown[];
   resolveRescheduleVisitId: (appointmentRow: Record<string, unknown>) => unknown;
   removeRescheduledAppointmentFromView: (appointmentRow: Record<string, unknown>, visitId: unknown) => void;
-  loadAppointments: (options?: unknown) => Promise<void> | void;
+  loadAppointments: (options?: unknown) => Promise<RegistrarWorklistLoadOutcome | void> | void;
   tI18n: (key: string, options?: Record<string, unknown>) => string;
 }
 

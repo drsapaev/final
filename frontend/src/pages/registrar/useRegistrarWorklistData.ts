@@ -45,6 +45,27 @@ import type { HttpApiError } from '../../types/errors';
 import type { Appointment } from '../../types/domain/clinic';
 import { adaptQueueEntry } from './registrarQueueAdapter';
 
+/**
+ * REG-FE-008 (registrar audit ledger): typed outcome of one loadAppointments
+ * call, so manual refresh callers can reward ONLY a verified result instead
+ * of toasting success for a request they never awaited.
+ *
+ * - 'loaded'        — fresh rows applied to the sample.
+ * - 'empty'         — authoritative empty day: still a SUCCESSFUL refresh.
+ * - 'failed'        — 429 / 401 / network / malformed-envelope failure (the
+ *                    reducer already drove the honest error/stale state).
+ * - 'token-missing' — no access token; the empty session state was applied.
+ * - 'superseded'    — a newer request owns the sample now (RQ-22 guard).
+ * - 'skipped'       — auto-refresh cooldown or in-flight guard said no.
+ */
+export type RegistrarWorklistLoadOutcome =
+  | 'loaded'
+  | 'empty'
+  | 'failed'
+  | 'token-missing'
+  | 'superseded'
+  | 'skipped';
+
 export interface WorklistPaginationInfo {
   total: number;
   hasMore: boolean;
@@ -196,7 +217,7 @@ export const useRegistrarWorklistData = ({
 
   // Улучшенная загрузка записей с поддержкой тихого режима
   // (port of RegistrarPanel.loadAppointments — verbatim control flow)
-  const loadAppointments = useCallback(async (rawOptions: unknown = {}) => {
+  const loadAppointments = useCallback(async (rawOptions: unknown = {}): Promise<RegistrarWorklistLoadOutcome> => {
     const options: Record<string, unknown> = (rawOptions && typeof rawOptions === 'object' ? rawOptions : {}) as Record<string, unknown>;
     const { silent = false } = options;
     const callSource = String(options.source || 'unknown');
@@ -210,12 +231,12 @@ export const useRegistrarWorklistData = ({
           });
           autoRefreshCooldownLoggedRef.current = true;
         }
-        return;
+        return 'skipped';
       }
 
       if (loadAppointmentsInFlightRef.current) {
         logger.info('⏭️ Автообновление пропущено: предыдущий запрос еще выполняется');
-        return;
+        return 'skipped';
       }
     }
 
@@ -237,7 +258,7 @@ export const useRegistrarWorklistData = ({
             dispatch({ type: 'LOAD_TOKEN_MISSING', silent: Boolean(silent) });
           });
         }
-        return;
+        return 'token-missing';
       }
 
       // Используем новый эндпоинт для получения очередей на указанную дату
@@ -250,7 +271,7 @@ export const useRegistrarWorklistData = ({
       // RQ-22 (S-19): a newer request has started while this one was in
       // flight — this response is stale and must not overwrite the sample.
       if (isSuperseded()) {
-        return;
+        return 'superseded';
       }
 
       // Axios successful response
@@ -307,7 +328,7 @@ export const useRegistrarWorklistData = ({
           logger.info('📋 Нет записей на сегодня - это нормальная ситуация в начале дня');
           // Устанавливаем пустой массив, не выбрасываем ошибку
           dispatch({ type: 'LOAD_EMPTY' });
-          return; // ✅ Выходим из функции, не загружаем демо-данные
+          return 'empty'; // ✅ Выходим из функции, не загружаем демо-данные
         }
       }
 
@@ -318,25 +339,30 @@ export const useRegistrarWorklistData = ({
         // RQ-22 (S-19): re-check after the enrichment await — a newer load
         // may have started (and even finished) while patients were enriched.
         if (isSuperseded()) {
-          return;
+          return 'superseded';
         }
 
         // ⭐ SSOT: Просто устанавливаем данные без local overrides
         // Removed: _locallyModified, localStorage overrides
+        // REG-FE-008: outcome resolved only AFTER the authoritative dispatch —
+        // a caller awaiting this promise cannot toast success for a sample
+        // that was never applied.
         startTransition(() => {
           dispatch({ type: 'LOAD_SUCCEEDED', rows: enriched as unknown as Appointment[] });
         });
         logger.info('✅ SSOT: Загружено', enriched.length, 'записей (без local overrides)');
+        return 'loaded';
       } else {
         // QW-03 fix: empty API response is a valid state, not a demo fallback.
         // Empty result is already handled earlier (line ~1370). This branch
         // is unreachable but kept as defensive code.
         if (isSuperseded()) {
-          return;
+          return 'superseded';
         }
         startTransition(() => {
           dispatch({ type: 'LOAD_SUCCEEDED', rows: [] });
         });
+        return 'empty';
       }
     } catch (error: unknown) {
       if ((error as HttpApiError)?.response?.status === 429) {
@@ -357,7 +383,7 @@ export const useRegistrarWorklistData = ({
             dispatch({ type: 'LOAD_FAILED', silent: Boolean(silent) });
           });
         }
-        return;
+        return 'failed';
       }
 
       // Handle axios errors
@@ -367,17 +393,18 @@ export const useRegistrarWorklistData = ({
         sessionStorage.removeItem('auth_token');  // PR-39 / P0-2;
         // QW-03 fix: show error state instead of demo data.
         if (isSuperseded()) {
-          return;
+          return 'superseded';
         }
         startTransition(() => {
           dispatch({ type: 'LOAD_FAILED', silent: Boolean(silent) });
         });
+        return 'failed';
       } else {
         // Other errors (network, 404, 500, etc.)
         logger.error('❌ Backend недоступен для загрузки записей:', getErrorMessage(error));
         logger.error('❌ Детали ошибки:', error);
         if (isSuperseded()) {
-          return;
+          return 'superseded';
         }
         startTransition(() => {
           dispatch({ type: 'LOAD_FAILED', silent: Boolean(silent) });
@@ -386,6 +413,7 @@ export const useRegistrarWorklistData = ({
         if (appointmentsCount === 0) {
           notify.error(tI18n('registrar.backend_unavailable'));
         }
+        return 'failed';
       }
     } finally {
       // REG-FE-020 (audit ledger 3803): in-flight guard принадлежит новейшему

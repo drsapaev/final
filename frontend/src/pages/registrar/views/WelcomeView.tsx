@@ -56,11 +56,30 @@ import { Button, Card, CardHeader, CardContent, Badge, Input } from '@/component
 import { AnimatedTransition } from '@/components/ui';
 import ModernStatistics from '@/components/statistics/ModernStatistics';
 import EnhancedAppointmentsTable from '@/components/tables/EnhancedAppointmentsTable';
-import { getLocalDateString, getYesterdayDateString } from '@/utils/dateUtils';
+import { getLocalDateString, getYesterdayDateString, parseRegistrarTimestamp, REGISTRAR_TIME_ZONE } from '@/utils/dateUtils';
 import logger from '@/utils/logger';
 import notify from '@/services/notify';
 import tokenManager from '@/utils/tokenManager';
-import { ArrowUpDown, Bell, Calendar, CheckCircle2, CreditCard, Eye, FileText, KeyRound, ListFilter, Lock, Plus, RotateCw, Search, Share, User } from 'lucide-react';
+import { ArrowUpDown, Bell, Calendar, CheckCircle2, CreditCard, Eye, FileText, KeyRound, ListFilter, Lock, Plus, RotateCw, Search, Share, User, AlertTriangle } from 'lucide-react';
+import type { RegistrarWorklistLoadOutcome } from '../useRegistrarWorklistData';
+
+// === REG-FE-032 (registrar audit ledger): clinic-timezone date labels ===
+// A date-only history value IS a Tashkent calendar day; rendering it through
+// the browser's local zone re-based UTC-midnight into the previous day for
+// UTC-negative operators. Both helpers pin the display zone to the clinic.
+export const formatClinicDayLong = (isoDay: string, locale: string): string => {
+  const parsed = parseRegistrarTimestamp(isoDay);
+  return parsed
+    ? parsed.toLocaleDateString(locale, {
+      day: 'numeric', month: 'long', year: 'numeric', timeZone: REGISTRAR_TIME_ZONE,
+    })
+    : isoDay;
+};
+
+export const formatClinicTodayLong = (locale: string, now: Date = new Date()): string =>
+  now.toLocaleDateString(locale, {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: REGISTRAR_TIME_ZONE,
+  });
 
 // === Domain types ===
 // WelcomeView is a registrar-facing dashboard. Most state lives in the
@@ -100,7 +119,9 @@ export interface WelcomeViewProps {
   showCalendar: boolean;
   tempDateInput: string;
   // Action: data load — accepts an options object per caller convention.
-  loadAppointments: (options?: unknown) => void | Promise<void>;
+  // REG-FE-008: the shared hook resolves a typed outcome so callers can
+  // reward only a verified refresh; void stays valid for stub/legacy callers.
+  loadAppointments: (options?: unknown) => void | Promise<RegistrarWorklistLoadOutcome | void>;
   // Action: wizard
   setShowWizard: (open: boolean) => void;
   setWizardEditMode: (edit: boolean) => void;
@@ -136,6 +157,14 @@ export interface WelcomeViewProps {
   downloadCSV: (...args: unknown[]) => void;
   // Memoized data-source badge component
   DataSourceIndicator: WelcomeViewDataSourceIndicator;
+  // REG-FE-028: same SSOT scope fact the worklist uses — filters narrowing a
+  // non-empty scope to zero rows must read as "no matches", not "empty queue".
+  emptyScopeKind?: 'queue-empty' | 'filtered-empty';
+  // REG-FE-027: the morning checklist is a TODAY instrument. The panel tells
+  // the view whether the loaded sample is the current clinic day (mirrors
+  // the hook's dateParam resolution). Absent → assume today (degraded
+  // fallback for out-of-panel consumers/tests).
+  loadedDateIsToday?: boolean;
   [key: string]: unknown;
 }
 
@@ -174,7 +203,55 @@ const WelcomeView = React.memo(({
   generateCSV,
   downloadCSV,
   DataSourceIndicator,
+  emptyScopeKind = 'queue-empty',
+  loadedDateIsToday = true,
 }: WelcomeViewProps) => {
+  // Locale resolution shared by every date label in the view.
+  const registrarLocale = language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-US' : 'uz-UZ';
+
+  // REG-FE-030 (registrar audit ledger): quick filters mutate ONLY the keys
+  // they own. The old setSearchParams({ status }) call replaced the WHOLE
+  // query and silently dropped date / dept / doctor_id / q scope.
+  const setStatusQuickFilter = (status: string) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      params.set('status', status);
+      return params;
+    });
+  };
+  // «Все записи» clears the narrowing (status + search) but keeps the
+  // date / department / doctor scope — "all records" must not silently
+  // move the day or the department.
+  const clearNarrowingFilters = () => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      params.delete('status');
+      params.delete('q');
+      return params;
+    });
+  };
+
+  // === Честная классификация пустых состояний (REG-FE-028/029) ===
+  // Те же контракты, что и в WorklistView: сбой первичной загрузки — видимое
+  // состояние ошибки с повтором; фильтр, сузивший непустой скоуп до нуля —
+  // «Ничего не найдено», а не «Очередь пуста».
+  const isSettledEmpty = !appointmentsLoading && filteredAppointments.length === 0;
+  // REG-FE-029: dataSource='error' без строк раньше не рендерил НИЧЕГО —
+  // пустой регион истории выглядел как «нет записей».
+  const isLoadError = isSettledEmpty && dataSource === 'error';
+  // REG-FE-028: emptyScopeKind — тот же SSOT-факт скоупа, что у worklist.
+  const isFilteredEmpty = isSettledEmpty && dataSource === 'api' && emptyScopeKind === 'filtered-empty';
+  const isEmptyQueue = isSettledEmpty && dataSource === 'api' && !isFilteredEmpty;
+
+  // PR-51: debug-лог только когда пустое состояние реально показано.
+  if (isEmptyQueue && import.meta.env.MODE === 'development') {
+    logger.debug('Empty state shown:', {
+      isNoToken: !tokenManager.getAccessToken(),
+      dataSource,
+      filteredLength: filteredAppointments.length,
+    });
+  }
+
   return (
     <AnimatedTransition type="fade" delay={100}>
       <Card variant="default" className="registrar-card-surface">
@@ -190,14 +267,10 @@ const WelcomeView = React.memo(({
           </AnimatedTransition>
           <AnimatedTransition type="fade" delay={300}>
             <div className="registrar-date-subtitle">
-              {new Date().toLocaleDateString(
-                // PR-51: fixed date locale — EN users now get en-US (was uz-UZ)
-                language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-US' : 'uz-UZ', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
+              {/* REG-FE-032: the hero "today" is the CLINIC's today
+                  (Asia/Tashkent), never the operator's browser zone — a
+                  UTC-negative remote operator used to see yesterday. */}
+              {formatClinicTodayLong(registrarLocale)}
             </div>
           </AnimatedTransition>
         </CardHeader>
@@ -206,27 +279,59 @@ const WelcomeView = React.memo(({
           {/* UX Audit Registrar #5: Morning checklist — список врачей с
               информацией о том, открыт ли приём. Раньше регистратору нужно
               было проверять каждого врача вручную через QueueView. */}
-          {(() => {
-            // Группируем записи по врачам и определяем статус приёма.
-            const doctorMap = new Map();
+          {/* REG-FE-027: сводка — инструмент СЕГОДНЯШНЕГО дня; на исторической
+              выборке (календарь/URL-дата) она не показывается. */}
+          {loadedDateIsToday && (() => {
+            // REG-FE-027 (registrar audit ledger): группы по каноническому
+            // владельцу очереди из read-model (queue_owner_kind /
+            // queue_owner_id), НЕ по legacy doctor_id/specialist_id — их на
+            // канонических строках нет, и раньше все записи сливались в одну
+            // карточку «Врач #undefined». Счётчик — отдельные ПАЦИЕНТЫ, когда
+            // каждая строка группы несёт patient_id; без полного
+            // patient-identity подпись честно меняется на «Записей».
+            const ownerGroups = new Map<string, {
+              key: string;
+              name: string;
+              patients: Set<string>;
+              rowCount: number;
+              hasAnonymousRows: boolean;
+            }>();
             for (const appt of appointments) {
-              const doctorId = appt.doctor_id || appt.specialist_id;
-              const doctorName = appt.doctor_name || appt.specialist_name || `Врач #${doctorId}`;
-              if (!doctorMap.has(doctorId)) {
-                doctorMap.set(doctorId, {
-                  id: doctorId,
-                  name: doctorName,
-                  patientCount: 0,
-                  hasQueue: false,
-                });
+              const ownerKind = typeof appt.queue_owner_kind === 'string' ? appt.queue_owner_kind : null;
+              const ownerId = appt.queue_owner_id;
+              let key: string;
+              let name: string;
+              if (ownerKind === 'doctor' && ownerId != null) {
+                key = `doctor:${ownerId}`;
+                const queueName = typeof appt.queue_name === 'string' ? appt.queue_name : '';
+                name = queueName || `Врач №${ownerId}`;
+              } else if (ownerKind && ownerId != null) {
+                // Очередь ресурса (кабинет/оборудование) — честное имя очереди.
+                key = `${ownerKind}:${ownerId}`;
+                const queueName = typeof appt.queue_name === 'string' ? appt.queue_name : '';
+                name = queueName || `Очередь №${ownerId}`;
+              } else {
+                // Запись без владельца очереди — не приписываем её врачу.
+                key = 'unowned';
+                name = 'Без привязки к врачу';
               }
-              const doc = doctorMap.get(doctorId);
-              doc.patientCount++;
-              if (appt.queue_entry_id || appt.queue_number) {
-                doc.hasQueue = true;
+              let group = ownerGroups.get(key);
+              if (!group) {
+                group = { key, name, patients: new Set(), rowCount: 0, hasAnonymousRows: false };
+                ownerGroups.set(key, group);
+              }
+              group.rowCount += 1;
+              const patientId = appt.patient_id;
+              if (patientId !== undefined && patientId !== null && patientId !== '') {
+                group.patients.add(`patient:${String(patientId)}`);
+              } else {
+                // Без patient_id дедупликация пациентов невозможна — строка
+                // считается отдельным неизвестным пациентом, группа помечается.
+                group.patients.add(`row:${String(appt.id)}`);
+                group.hasAnonymousRows = true;
               }
             }
-            const doctorsList = Array.from(doctorMap.values());
+            const doctorsList = Array.from(ownerGroups.values());
 
             if (doctorsList.length === 0) return null;
 
@@ -253,7 +358,7 @@ const WelcomeView = React.memo(({
                 }}>
                   {doctorsList.map((doc) => (
                     <div
-                      key={doc.id}
+                      key={doc.key}
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -275,7 +380,12 @@ const WelcomeView = React.memo(({
                         fontSize: 'var(--mac-font-size-xs)',
                         color: 'var(--mac-text-secondary)',
                       }}>
-                        Пациентов: {doc.patientCount}
+                        {/* REG-FE-027: подпись счётчика честная — «Пациентов»
+                            только при полном пациент-identity (дедупликация
+                            корректна); иначе считаем записи. */}
+                        {doc.hasAnonymousRows
+                          ? `Записей: ${doc.rowCount}`
+                          : `Пациентов: ${doc.patients.size}`}
                       </span>
                     </div>
                   ))}
@@ -379,7 +489,7 @@ const WelcomeView = React.memo(({
                     <Button
                     variant="outline"
                     size="default"
-                    onClick={() => setSearchParams({})}
+                    onClick={clearNarrowingFilters}
                     className="registrar-flex">
 
                       <Eye size={16} aria-hidden="true" />
@@ -395,7 +505,7 @@ const WelcomeView = React.memo(({
                         <button
                           type="button"
                           className="registrar-overflow-item"
-                          onClick={() => setSearchParams({ status: 'queued' })}
+                          onClick={() => setStatusQuickFilter('queued')}
                           role="menuitem">
                           <CheckCircle2 size={16} aria-hidden="true" />
                           Активная очередь
@@ -403,7 +513,7 @@ const WelcomeView = React.memo(({
                         <button
                           type="button"
                           className="registrar-overflow-item"
-                          onClick={() => setSearchParams({ status: 'paid_pending' })}
+                          onClick={() => setStatusQuickFilter('paid_pending')}
                           role="menuitem">
                           <CreditCard size={16} aria-hidden="true" />
                           Ожидают оплаты
@@ -419,7 +529,18 @@ const WelcomeView = React.memo(({
                         <button
                           type="button"
                           className="registrar-overflow-item"
-                          onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success(t('misc.data_updated'));}}
+                          onClick={() => {
+                            // REG-FE-008 (registrar audit ledger): тост успеха —
+                            // только после ПОДТВЕРЖДЁННОГО исхода загрузки; хук
+                            // возвращает типизированный результат: «пустой день»
+                            // — тоже успешное обновление, сбой — нет.
+                            void Promise.resolve(loadAppointments({ source: 'manual_refresh_button' }))
+                              .then((outcome) => {
+                                if (outcome === 'loaded' || outcome === 'empty') {
+                                  notify.success(t('misc.data_updated'));
+                                }
+                              });
+                          }}
                           role="menuitem">
                           <RotateCw size={16} aria-hidden="true" />
                           Обновить данные
@@ -516,10 +637,9 @@ const WelcomeView = React.memo(({
               {showCalendar &&
             <Badge variant="secondary" className="registrar-badge-date">
                   <Search size={16} aria-hidden="true" />
-                  {new Date(historyDate).toLocaleDateString(
-                    // PR-51: locale-aware date formatting (was hardcoded ru-RU)
-                    language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-US' : 'uz-UZ',
-                    { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {/* REG-FE-032: historyDate — ташкентский календарный день;
+              форматируем в зоне клиники, а не в зоне браузера. */}
+                  {formatClinicDayLong(historyDate, registrarLocale)}
                 </Badge>
             }
             </div>
@@ -527,22 +647,48 @@ const WelcomeView = React.memo(({
               {/* Индикатор источника данных */}
               {appointments.length > 0 && <DataSourceIndicator count={appointments.length} />}
 
-              {/* ✅ ДОБАВЛЕНО: Сообщение при пустой очереди */}
-              {(() => {
-              const token = tokenManager.getAccessToken();
-              const isNoToken = !token;
-              const isEmptyQueue = !appointmentsLoading && dataSource === 'api' && filteredAppointments.length === 0;
+              {/* REG-FE-029 (registrar audit ledger): первичный сбой загрузки —
+              видимое состояние ошибки с повтором, а не пустой регион истории.
+              Зеркалит контракт WorklistView (те же классы, без inline-стилей). */}
+              {isLoadError &&
+            <div className="registrar-empty-state">
+                  <div className="registrar-empty-icon-lg">
+                    <AlertTriangle size={24} aria-hidden="true" />
+                  </div>
+                  <h3 className="registrar-empty-heading registrar-empty-heading-text">
+                    {t('ds_error_message')}
+                  </h3>
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      // Повтор — тот же контракт загрузки, что и в worklist.
+                      void loadAppointments({ source: 'welcome_retry' });
+                    }}
+                    className="registrar-btn-cta">
+                    {t('ds_retry')}
+                  </Button>
+                </div>
+            }
 
-              // PR-51: removed logger.info('Empty state render check') — was
-              // running on EVERY render (even when table is full), logging
-              // PII-adjacent data at info level. Replaced with debug-level
-              // log that only fires when the empty state is actually shown.
-              if (isEmptyQueue && import.meta.env.MODE === 'development') {
-                logger.debug('Empty state shown:', { isNoToken, dataSource, filteredLength: filteredAppointments.length });
-              }
+              {/* REG-FE-028 (registrar audit ledger): фильтры/поиск ничего не
+              нашли — это «Ничего не найдено», а не «Очередь пуста»; CTA
+              «Создать первую запись» здесь не предлагается. */}
+              {isFilteredEmpty &&
+            <div className="registrar-empty-state">
+                  <div className="registrar-empty-icon-lg">
+                    <Search size={24} aria-hidden="true" />
+                  </div>
+                  <h3 className="registrar-empty-heading registrar-empty-heading-text">
+                    {t('rp_worklist_no_matches')}
+                  </h3>
+                  <p className="registrar-empty-desc-text registrar-empty-desc-fixed">
+                    {t('rp_empty_filter_desc')}
+                  </p>
+                </div>
+            }
 
-              return isEmptyQueue;
-            })() &&
+              {/* ✅ Сообщение при пустой очереди */}
+              {isEmptyQueue &&
             <div className="registrar-empty-state">
                     {/* QW-04: empty state 1 of 3 (session-expired / empty-queue). */}
               {/* Full unification deferred — migrate to MacOSEmptyState from */}
@@ -626,7 +772,10 @@ const WelcomeView = React.memo(({
               outerBorder={true}
               services={services}
               preferCanonicalQueueNumber
-              showCheckboxes={true} // UX Audit Registrar #13: включаем чекбоксы для bulk print
+              showCheckboxes={false} // REG-FE-031 (registrar audit ledger): нет
+                            // ни одного bulk-действия над выделением (то же
+                            // удаление dead-UI, что в worklist) — чекбоксы
+                            // выключены, пока реальная bulk-операция не появится.
               onRowClick={(row) => {
                 // REG-FE-013 (audit ledger 3803): безопасные факты вместо
                 // дампа строки — без ФИО/телефона пациента.
