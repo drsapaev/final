@@ -7,7 +7,7 @@ Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`
 Branch: `codex/t18-cabinet-day`
 Base commit: `235b4cbba6bc133e89c44a3ceeb087d227267f9d` (`origin/main` at validation)
 Runtime commit: `235b4cbba6bc133e89c44a3ceeb087d227267f9d`
-Last updated: 2026-11-03T23:48:00+05:00
+Last updated: 2026-11-03T23:52:00+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -25,6 +25,7 @@ Last updated: 2026-11-03T23:48:00+05:00
 - Reused existing PostgreSQL evidence: all 8 `test_queue_cabinet_reassignment_apply_pg.py` cases passed on a prior run. Current endpoint/service/repository/test blobs match the previously tested tree; no repeat was needed. This includes audit rollback and called/in-progress/active-execution blocks.
 - T18 scenarios 8–9: seven current-main PostgreSQL integration tests passed against one isolated disposable local PostgreSQL 17.11 instance; seven quota/status/API unit tests passed. PostgreSQL evidence covers token and GraphQL last-slot races, exact retry, lost-response replay, rollback and partial-batch conservation. Unit evidence covers public/QR availability and remaining-quota reporting. No runtime or tracked test files changed.
 - T18 scenario 1: `test_queue_admin_directions_read_model.py` plus `test_multi_doctor_same_specialty_isolation.py` passed 24/24 on temporary SQLite fixtures; 6 warnings. A subsequent live synthetic Admin flow passed: ordinary password login, initial TOTP enrollment and a separate password+TOTP login; two active synthetic cardiology doctors; one new hidden QueueProfile; backend read model returned both typed doctor targets and `effectiveAvailability=available`, while public setting and public availability remained false. The clinic-day read returned zero existing queues; no queue or patient admission was created. One initial attempt failed because the scratch harness generated a numeric profile key disallowed by the UI pattern; correcting the harness key produced the passing run. This was a harness failure, not a product defect.
+- Cleanup: after canonical teardown and zero-resource verification, the user removed the private synthetic `staging.env` file. Two non-secret task-owned harness scripts remain under ignored `.scratch`; no alternate deletion method was used.
 - Completed: scenario 8–9 journal evidence is committed and pushed to existing PR #3861 as `b730531a510d6f306f870ff469ca6e52d459e4c5`; its description now includes the current evidence and required labeled fields.
 - Confirmed: on PR HEAD `94efa74787fa1891afadaf54e70f4068447fd84e`, every applicable exact-head check passed; path-aware backend/frontend/integration/readiness jobs were skipped for the documentation-only changes.
 - Completed: scenario 1 related backend tests and journal evidence are committed/pushed to PR #3861 at `ec6bc5877d2fbb48de7f4832a667e00b6cc72505`; the PR description separates backend PASS from live Admin NOT_RUN.
