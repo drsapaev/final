@@ -100,6 +100,13 @@ export const useCashierActions = ({
   // Хранит {type, id} текущего action; пока не null — все action-кнопки disabled.
   const [processingAction, setProcessingAction] = useState<{ type?: string; id?: string | number } | null>(null);
 
+  // CSH-FE-008: single-flight guard for processPayment. CashPaymentModal now
+  // locks its own submit button, but processPayment is also reachable from
+  // other paths (hotkeys, future callers); a second in-flight call must not
+  // re-POST the non-idempotent /cashier/payments. A ref (not state) so the
+  // check is synchronous inside the same tick as the duplicate call.
+  const processPaymentInFlightRef = useRef(false);
+
   const { getDateParams, setPendingPage, bumpRefreshKey, triggerDataReload } = worklist;
   const {
     setPaymentSuccess, setPaymentError, clearPaymentFeedback,
@@ -176,6 +183,12 @@ export const useCashierActions = ({
   // ✅ УЛУЧШЕНИЕ: Функции для работы с оплатами через SSOT hook
   // Теперь appointment содержит сгруппированные данные пациента (все его неоплаченные визиты)
   const processPayment = async (appointment: unknown, paymentData: unknown) => {
+    // CSH-FE-008: swallow the duplicate in-flight call instead of re-POSTing.
+    if (processPaymentInFlightRef.current) {
+      logger.warn('[Cashier] processPayment ignored: another payment is already in flight');
+      return;
+    }
+    processPaymentInFlightRef.current = true;
     // CashPaymentModal declares `onProcessPayment?: (...args: unknown[]) => Promise<void>`
     // so the args arrive as `unknown`. Narrow to domain types for the body.
     const appt = appointment as Appointment;
@@ -213,6 +226,11 @@ export const useCashierActions = ({
       const message = getErrorMessage(error, tI18n('cashier.payment_process_failed'));
       setPaymentError(message);
       notify.error(message);
+    } finally {
+      // CSH-FE-008: always release the guard — both on success (the modal is
+      // closed anyway) and on failure (the modal stays open and the cashier
+      // must be able to retry the corrected amount).
+      processPaymentInFlightRef.current = false;
     }
   };
 
