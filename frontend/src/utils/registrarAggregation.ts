@@ -472,6 +472,12 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
     }
     patientGroups[patientKey].grouped_records.push({
       record_ref: recordRef,
+      // REG-FE-069 (audit ledger 3803): канонический id визита этой записи.
+      // record_ref.record_id — НЕ он: у online_queue это id записи очереди,
+      // у appointment — appointment_id. Потребители, матчащие запись против
+      // visit_ids строки (выбор целевого визита при переносе), обязаны
+      // использовать это поле, а не record_id.
+      visit_id: pickCanonicalVisitId(appointment),
       available_actions: Array.isArray(appointment.available_actions) ? [...appointment.available_actions] : [],
       can_mark_paid: Boolean(appointment.can_mark_paid),
       can_start_visit: Boolean(appointment.can_start_visit),
