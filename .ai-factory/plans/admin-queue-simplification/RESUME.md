@@ -8,7 +8,7 @@ The gate first stopped because reviewed scope required a known owner. Retry with
 
 PostgreSQL ran in one owned tmpfs-only container, loopback port 55541, cached image, no persistent mount. The exact container was stopped and auto-removed; its port is free and WSL had 3185 MiB available afterward. No production/shared DB or foreign Docker resources were touched.
 
-PR #3861 remains open/Ready for review at `f5742de4fb952d9dfa5cfc0f84973eea83a160fe`; it has not been merged. These journal updates must be diff-checked, committed and pushed to that existing PR, then its body and exact-head checks updated. User retains merge authority. Do not create a new PR cycle before user merge. After merge, reconcile previous evidence for T18 scenarios 1–5 and 10 and select only a distinct uncovered case. Tier-2 remains PARTIAL, no deferral is accepted, and full `docs/runbooks/STAGING_VALIDATION.md` is not complete.
+PR #3861 remains open/Ready for review with the scenario 8–9 journal commit pushed and the description updated; it has not been merged. The first body-triggered PR Review Quality Gate failed because required field labels were absent; the labels were added and checks are rerunning. Verify the latest exact-head checks, then wait for user-owned merge. Do not create a new PR cycle before user merge. After merge, reconcile previous evidence for T18 scenarios 1–5 and 10 and select only a distinct uncovered case. Tier-2 remains PARTIAL, no deferral is accepted, and full `docs/runbooks/STAGING_VALIDATION.md` is not complete.
 
 Scratch note `/.scratch/t18-cabinet-validation-prework-20261103.md` records the gate, path correction, startup retry and exact scope. Preserve it; do not retry passed scenarios 6–9 absent a source change.
 
