@@ -313,6 +313,15 @@ describe('PaymentWidget — CSH-FE-038 stale provider responses (real timers)', 
  *    'paid' for the cancelled session.
  *  - provider reload failure: a currency switch whose GET rejected kept the
  *    PREVIOUS currency's provider list rendered and payable.
+ *
+ * PR-3854 re-review follow-up (P2 restart race): stopping tracking does not
+ * cancel the session's already-sent status GET, and restarting tracking
+ * force-resets the single-flight guard — when the OLD GET then settled, its
+ * `finally` released the lock held by the NEW session's in-flight GET and
+ * its budget branch read the new session's attempt counter, so the next
+ * tick stacked a concurrent request (single-flight broken again after a
+ * stop → start cycle). Fixed with a polling-session epoch: only the current
+ * epoch may release the guard or run the budget branch.
  */
 describe('PaymentWidget — #3854 review follow-up: single-flight, identity, no terminal rollback', () => {
   const createDeferred = <T,>() => {
@@ -375,6 +384,45 @@ describe('PaymentWidget — #3854 review follow-up: single-flight, identity, no 
       await vi.advanceTimersByTimeAsync(2 * 5_000);
     });
     expect(statusDeferreds.length).toBe(1);
+  }, 20000);
+
+  it('restart race: a stopped session\'s late-settling GET cannot release the new session\'s single-flight lock (stop → start → old GET settles)', async () => {
+    const statusDeferreds = await initHangingPollPayment();
+
+    // GET #1 (session A) hangs. The cashier stops tracking: the interval is
+    // cleared, but GET #1 is already on the wire and cannot be cancelled.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /pay_widg_stop_tracking/ }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // …and starts tracking again right away. The new session (B) resets the
+    // single-flight guard; its first tick fires GET #2, which also hangs.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /pay_widg_start_tracking/ }));
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(statusDeferreds.length).toBe(2);
+
+    // The OLD session's GET #1 settles NOW, while the new session's GET #2
+    // is still in flight. Its late `finally` must not release the lock the
+    // new session holds, and its continuation must not consume the new
+    // session's attempt budget.
+    await act(async () => {
+      statusDeferreds[0].resolve({ data: { status: 'processing' } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // The new session's next tick must be SKIPPED while GET #2 hangs: no
+    // third concurrent status GET may go out, and the visible attempt
+    // counter must still show the new session's own attempt 1 — not a tick
+    // unlocked by the stale session's finally.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(statusDeferreds.length).toBe(2);
+    const trackingLabel = screen.getByText(/pay_widg_auto_check/);
+    expect(trackingLabel.textContent).toContain('"current":1');
   }, 20000);
 
   it('a late non-terminal poll response cannot roll back a confirmed paid status (responses in reverse order)', async () => {

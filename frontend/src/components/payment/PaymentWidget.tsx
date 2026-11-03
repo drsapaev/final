@@ -159,6 +159,17 @@ const PaymentWidget = ({
   // whose responses could then land OUT OF ORDER. While the guard is held,
   // ticks are skipped entirely (no request, no attempt consumed).
   const statusCheckInFlightRef = useRef(false);
+  // PR-3854 re-review follow-up (polling session epoch): stopping tracking
+  // does NOT cancel the session's already-sent status GET, and restarting
+  // tracking force-resets the single-flight guard — when the OLD GET then
+  // settled, its `finally` released the lock held by the NEW session's
+  // in-flight GET and its budget branch read the new session's attempt
+  // counter, so the next tick stacked a concurrent request (single-flight
+  // broken again after a stop → start cycle). Every polling session (and
+  // every stop) now takes a monotonically increasing epoch; only the
+  // CURRENT epoch may release the guard, consume the budget or clear the
+  // interval — a superseded session's continuation is fully inert.
+  const pollingSessionRef = useRef(0);
 
   // Иконки провайдеров — UX Audit #4 regression fix: brand colors в CSS-классах.
   const providerIcons = {
@@ -276,6 +287,10 @@ const PaymentWidget = ({
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
+    // PR-3854 re-review follow-up: invalidate the stopped session so its
+    // still-in-flight GET (if any) can neither release the single-flight
+    // lock nor run the budget branch against whatever session runs next.
+    pollingSessionRef.current += 1;
     attemptsRef.current = 0;
     setPollingAttempts(0);
   }, []);
@@ -285,9 +300,12 @@ const PaymentWidget = ({
     if (pollingRef.current) return;
     attemptsRef.current = 0;
     setPollingAttempts(0);
-    // PR-3854 review follow-up: a fresh polling session starts with a clean
-    // single-flight guard (a previous session's unsettled GET cannot block
-    // this one — its late response is handled by the identity check below).
+    // PR-3854 re-review follow-up: a fresh session takes the NEXT epoch and
+    // a clean single-flight guard. A previous session's unsettled GET can
+    // neither block this one (guard reset) nor release its lock later (the
+    // epoch check in its finally fails) — see pollingSessionRef above.
+    pollingSessionRef.current += 1;
+    const session = pollingSessionRef.current;
     statusCheckInFlightRef.current = false;
 
     pollingRef.current = setInterval(() => {
@@ -305,9 +323,19 @@ const PaymentWidget = ({
         } catch (err) {
           logger.error('Polling error:', err);
         } finally {
-          statusCheckInFlightRef.current = false;
+          // PR-3854 re-review follow-up (epoch guard): only the CURRENT
+          // session may release the single-flight lock — a stopped or
+          // superseded session's late-settling GET must not unlock the guard
+          // held by the new session's in-flight request.
+          if (pollingSessionRef.current === session) {
+            statusCheckInFlightRef.current = false;
+          }
         }
-        if (attemptsRef.current >= MAX_POLLING_ATTEMPTS) {
+        // PR-3854 re-review follow-up (epoch guard): the budget branch
+        // likewise belongs to the current session only — a superseded
+        // session's continuation must not consume the new session's attempt
+        // counter nor clear its interval via clearPolling().
+        if (pollingSessionRef.current === session && attemptsRef.current >= MAX_POLLING_ATTEMPTS) {
           clearPolling();
           // CSH-FE-031: five minutes of frontend polling is an
           // observation limit, NOT provider failure — the payment may still
