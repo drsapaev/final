@@ -10,7 +10,7 @@ No app/runtime/test/staging configuration changes. `served_revision_verified=fal
 
 Host policy rejected deletion of this run's five exact task-owned harness/env files and the separate DevBrain capture JSON before execution. All six remain under ignored `.scratch`; do not bypass this protection.
 
-Current next action: save the task memory checkpoint; commit and push the three T18 journals as one evidence-only PR; verify applicable CI on its exact HEAD. After user merge, refresh main in a fresh worktree and select one distinct uncovered T18 case. Do not repeat scenario 6, scenario 7, or the unchanged cabinet PG suite.
+Current next action: PR #3861 is open and Ready for review from `codex/t18-cabinet-day`; verify its exact HEAD and applicable CI, then wait for user-owned merge. After merge, refresh main in a fresh worktree and select one distinct uncovered T18 case. Do not repeat scenario 6, scenario 7, or the unchanged cabinet PG suite.
 
 
 ## Latest continuation — T18.6 defaults/snapshot synthetic acceptance — 2026-11-02T11:05:59+05:00

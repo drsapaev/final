@@ -5379,5 +5379,5 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: PASS for the current-day cabinet UI preview/stale/apply scenario, combined with source-identical existing PostgreSQL safety evidence. This does not complete T18 or the full staging runbook.
 - Actual tracked paths for this evidence update: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. No application, runtime, API, migration, tracked test, or staging configuration changed.
 - Remaining limitation: Tier-2/T18 remains PARTIAL; full integrated T18 and `docs/runbooks/STAGING_VALIDATION.md` are incomplete; no deferral/waiver is claimed.
-- PR: pending. User retains merge authority; no merge or deployment performed.
-- Next: commit/push the journal-only change, open one evidence-only PR, verify applicable exact-head CI, then continue a distinct unverified T18 case. Do not repeat scenario 6 or the unchanged cabinet PostgreSQL suite.
+- PR: [#3861](https://github.com/drsapaev/final/pull/3861), opened Ready for review from `codex/t18-cabinet-day`; initial PR HEAD `a55408c3668a011c6e950636d5f090f99cd5c53b`, base `235b4cbba6bc133e89c44a3ceeb087d227267f9d`. Exact-head checks were pending when this entry was written. Merge commit: none; user retains merge authority.
+- Next: verify applicable exact-head CI, then continue a distinct unverified T18 case after user-owned merge. Do not repeat scenario 6 or the unchanged cabinet PostgreSQL suite.
