@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { getDateOffset } from '@/utils/dateUtils';
 
 const { apiGet } = vi.hoisted(() => ({ apiGet: vi.fn() }));
 vi.mock('../../../api/client', () => ({ api: { get: apiGet } }));
@@ -42,7 +43,11 @@ describe('AppointmentModal exact service selection', () => {
     expect(dateInput).not.toBeNull();
     expect(timeInput).not.toBeNull();
     expect(reasonInput).not.toBeNull();
-    fireEvent.change(dateInput!, { target: { value: '2026-11-02' } });
+    // Date-rollover guard: validateForm() rejects PAST dates, so a pinned
+    // calendar day turns this suite into a deterministic time bomb the day
+    // after (main CI went red on 2026-11-03 over the hardcoded 2026-11-02).
+    // A Tashkent-aware dynamic day keeps the fixture future-dated forever.
+    fireEvent.change(dateInput!, { target: { value: getDateOffset(7) } });
     fireEvent.change(timeInput!, { target: { value: '10:00' } });
     fireEvent.change(reasonInput!, { target: { value: 'Плановый приём' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create appointment' }));
