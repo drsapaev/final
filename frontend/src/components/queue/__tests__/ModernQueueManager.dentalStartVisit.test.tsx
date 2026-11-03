@@ -134,4 +134,38 @@ describe('ModernQueueManager dentist start-visit flow', () => {
     await waitFor(() => expect(onStartVisit).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole('button', { name: 'dental.dental_panel_start_visit_for' })).toBeEnabled();
   });
+
+  // REG-FE-068: the doctor Select offers a '' placeholder option, so
+  // deselecting is a real user action — it must reach loadQueueSnapshot as
+  // an explicit clear transition (the hook then drops the queue snapshot and
+  // invalidates any in-flight request of the deselected doctor). Pre-fix,
+  // loadQueue returned early on an empty selection and the deselected
+  // doctor's queue stayed on screen.
+  it('REG-FE-068: deselecting the doctor issues a clear transition instead of keeping the last queue', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ThemeProvider>
+        <ModernQueueManager
+          mode="registrar"
+          doctors={[{ id: '7', full_name: 'Registrar test doctor', specialty: 'cardiology' }]}
+        />
+      </ThemeProvider>,
+    );
+
+    // Select the doctor first.
+    await user.click(screen.getByRole('button', { name: 'misc.mqm_select_doctor' }));
+    await user.click(screen.getByRole('option', { name: 'Registrar test doctor • cardiology' }));
+    await waitFor(() => {
+      expect(queueMocks.loadQueueSnapshot).toHaveBeenCalledWith(expect.objectContaining({ specialistId: '7' }));
+    });
+
+    // Deselect back to the placeholder option.
+    await user.click(screen.getByRole('button', { name: 'misc.mqm_select_doctor' }));
+    await user.click(screen.getByRole('option', { name: 'misc.mqm_select_doctor' }));
+
+    await waitFor(() => {
+      expect(queueMocks.loadQueueSnapshot).toHaveBeenCalledWith(expect.objectContaining({ specialistId: '' }));
+    });
+  });
 });

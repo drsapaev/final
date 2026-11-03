@@ -182,15 +182,28 @@ export const useQueueManager = (): UseQueueManagerReturn => {
 
   const loadQueueSnapshot = useCallback(
     async ({ specialistId, targetDate, doctor }: LoadQueueSnapshotArgs): Promise<QueueData | null> => {
-      if (!specialistId) {
-        return null;
-      }
-
       // REG-FE-035 (audit ledger 3803): эпоха запроса — последний выбранный
       // врач/дата владеет состоянием. Запоздалый ответ сменённого запроса
       // (успех, отказ или finally) не должен ни перезаписать более новый
       // снапшот, ни снять общий loading пока новый запрос в полёте.
+      // REG-FE-068 (audit ledger 3803): эпоха инкрементируется ДО раннего
+      // выхода — отмена выбора врача тоже переход жизненного цикла снапшота.
+      // Раньше выход без инкремента оставал активной эпоху запроса
+      // предыдущего врача: его запоздалый ответ проходил проверку эпохи и
+      // воскрешал очередь ОТМЕНЁННОГО врача после очистки выбора.
       const epoch = ++snapshotEpochRef.current;
+
+      if (!specialistId) {
+        // Отмена выбора: инкремент выше уже сместил любой запрос в полёте.
+        // Очищаем очередь и обнуляем статистику — UI не должен продолжать
+        // рендерить очередь врача, выбор которого снят. Loading снимаем
+        // здесь: finally сменённого запроса его больше не снимет.
+        setQueueData(null);
+        setStatistics({ total_entries: 0, waiting: 0, completed: 0 });
+        setLoading(false);
+        return null;
+      }
+
       setLoading(true);
       try {
         const payload = (await fetchQueuesToday(targetDate)) as QueuePayload;

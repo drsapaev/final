@@ -142,10 +142,10 @@ const ModernQueueManager = ({
 
   // Загрузка данных очереди
   const loadQueue = useCallback(async () => {
-    if (!effectiveDoctor) {
-      return;
-    }
-
+    // REG-FE-068: пустой выбор — валидный переход жизненного цикла: хук
+    // очистит снапшот и сместит эпоху (запоздалый ответ предыдущего врача
+    // не сможет воскресить его очередь). Раньше здесь был ранний return —
+    // очередь отменённого врача оставалась на экране.
     const doctor = doctors.find(
       (candidate) => String(candidate.id) === String(effectiveDoctor)
     );
@@ -164,9 +164,7 @@ const ModernQueueManager = ({
 
   // Автоматическая загрузка при изменении врача или даты
   useEffect(() => {
-    if (effectiveDoctor) {
-      loadQueue();
-    }
+    loadQueue();
   }, [effectiveDoctor, effectiveDate, loadQueue]);
 
   // Polling для автообновления (fallback для WebSocket)

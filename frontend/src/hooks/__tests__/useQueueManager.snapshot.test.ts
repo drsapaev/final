@@ -240,4 +240,77 @@ describe('useQueueManager snapshot lifecycle (REG-FE-035 / REG-FE-042)', () => {
     expect(result.current.queueData?.queue_id).toBe(2);
     expect(result.current.loading).toBe(false);
   });
+
+  // REG-FE-068: deselecting the doctor is a snapshot lifecycle transition —
+  // the epoch bump must happen BEFORE the no-specialist early return, the
+  // previous doctor's queue/statistics must be cleared, and a late response
+  // of the in-flight request must not resurrect the deselected queue.
+  it('REG-FE-068: deselecting the doctor invalidates an in-flight snapshot — the late response cannot resurrect it', async () => {
+    const lateA = deferred<{ data: { queues: unknown[] } }>();
+    mockTodayQueue([lateA.promise]);
+
+    const { result } = renderHook(() => useQueueManager());
+
+    // Doctor A (lab) is selected — the request hangs in flight.
+    let aPromise: Promise<unknown> | null = null;
+    await act(async () => {
+      aPromise = result.current.loadQueueSnapshot({ specialistId: LAB_SPECIALIST_ID, targetDate: '2026-11-03' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // The user deselects the doctor while A is still in flight.
+    let deselected: unknown = 'sentinel';
+    await act(async () => {
+      deselected = await result.current.loadQueueSnapshot({ specialistId: '', targetDate: '2026-11-03' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(deselected).toBeNull();
+    // The deselected state is explicit: no queue, zeroed stats, no spinner.
+    expect(result.current.queueData).toBeNull();
+    expect(result.current.statistics).toEqual({ total_entries: 0, waiting: 0, completed: 0 });
+    expect(result.current.loading).toBe(false);
+
+    // A's late response arrives after the deselection — it must NOT
+    // resurrect the deselected doctor's queue (pre-fix: the untouched epoch
+    // let it pass the staleness check and setQueueData(labQueue)).
+    await act(async () => {
+      lateA.resolve({ data: { queues: [labQueue] } });
+      await aPromise;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.queueData).toBeNull();
+    expect(result.current.statistics).toEqual({ total_entries: 0, waiting: 0, completed: 0 });
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('REG-FE-068: a deselection followed by a new selection keeps the new selection authoritative', async () => {
+    const lateA = deferred<{ data: { queues: unknown[] } }>();
+    const freshB = deferred<{ data: { queues: unknown[] } }>();
+    mockTodayQueue([lateA.promise, freshB.promise]);
+
+    const { result } = renderHook(() => useQueueManager());
+
+    let aPromise: Promise<unknown> | null = null;
+    await act(async () => {
+      aPromise = result.current.loadQueueSnapshot({ specialistId: LAB_SPECIALIST_ID, targetDate: '2026-11-03' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // Deselect, then immediately pick another doctor.
+    await act(async () => {
+      void result.current.loadQueueSnapshot({ specialistId: '', targetDate: '2026-11-03' });
+      void result.current.loadQueueSnapshot({ specialistId: CARDIO_DOCTOR_ID, targetDate: '2026-11-03' });
+      freshB.resolve({ data: { queues: [cardioQueue] } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.queueData?.queue_id).toBe(2);
+
+    await act(async () => {
+      lateA.resolve({ data: { queues: [labQueue] } });
+      await aPromise;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.queueData?.queue_id).toBe(2);
+    expect(result.current.loading).toBe(false);
+  });
 });
