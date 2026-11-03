@@ -1,4 +1,18 @@
-## Latest continuation — T18 scenario 7 cabinet acceptance — 2026-11-03
+## Latest continuation — T18 scenarios 8–9 quota/replay PostgreSQL acceptance — 2026-11-03T22:47+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`, branch `codex/t18-cabinet-day`, runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`.
+
+T18 scenarios 8–9 passed for the tested backend contracts. Seven explicit PostgreSQL 17.11 integration tests passed: concurrent token and GraphQL last-slot admission, exact token retry, QR lost-response replay, single and multi-join rollback, and partial-result replay/conservation. Seven SQLite-fixture unit tests passed for public/QR availability and queue-limits remaining-count reporting. The first unit invocation collected 0 due repo-root-prefixed paths; corrected backend-relative paths passed. No source or tracked-test code changed.
+
+The gate first stopped because reviewed scope required a known owner. Retry with `--known-root-cause backend/tests/integration/test_daily_queue_lock_parity_pg.py` returned `narrow_override` (`gate_misroute=true`, `override_used=true`, handoff required); generated prompt was read. The user's standing T18 validation authorization covered this exact evidence-only scope.
+
+PostgreSQL ran in one owned tmpfs-only container, loopback port 55541, cached image, no persistent mount. The exact container was stopped and auto-removed; its port is free and WSL had 3185 MiB available afterward. No production/shared DB or foreign Docker resources were touched.
+
+PR #3861 remains open/Ready for review at `f5742de4fb952d9dfa5cfc0f84973eea83a160fe`; it has not been merged. These journal updates must be diff-checked, committed and pushed to that existing PR, then its body and exact-head checks updated. User retains merge authority. Do not create a new PR cycle before user merge. After merge, reconcile previous evidence for T18 scenarios 1–5 and 10 and select only a distinct uncovered case. Tier-2 remains PARTIAL, no deferral is accepted, and full `docs/runbooks/STAGING_VALIDATION.md` is not complete.
+
+Scratch note `/.scratch/t18-cabinet-validation-prework-20261103.md` records the gate, path correction, startup retry and exact scope. Preserve it; do not retry passed scenarios 6–9 absent a source change.
+
+## Previous continuation — T18 scenario 7 cabinet acceptance — 2026-11-03
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`, branch `codex/t18-cabinet-day`, based on current `origin/main` and runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`.
 
