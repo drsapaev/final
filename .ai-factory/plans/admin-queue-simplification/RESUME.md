@@ -1,3 +1,18 @@
+## Latest continuation — T18 scenario 7 cabinet acceptance — 2026-11-03
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`, branch `codex/t18-cabinet-day`, based on current `origin/main` and runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`.
+
+T18 scenario 7 passed in synthetic project `clinic-aqs-t18-cabinet-20261103-1` (owner `codex-t18-cabinet-day`, ports 18131/18191/55531). Ordinary Admin password + TOTP passed. Current-day typed Doctor preview passed; stale apply returned HTTP 409 without a state or audit change; fresh preview/apply passed. Final assertions confirmed cabinet `T18-FINAL`, unchanged queue identity and owner default, and exactly two expected Admin audit records.
+
+Canonical Preflight → Start → Session passed. Session removed the owned 5 containers, 3 volumes and 1 network; independent inventory found zero owned resources and free ports. WSL available memory after teardown was 3239 MiB. Existing PostgreSQL evidence `test_queue_cabinet_reassignment_apply_pg.py` is 8/8 PASS and its source/test blobs match current main; reuse it for audit rollback and clinical-block assertions, do not rerun without a source change.
+
+No app/runtime/test/staging configuration changes. `served_revision_verified=false`; this is not frontend byte-provenance evidence. Tier-2 remains PARTIAL; full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete; no deferral is claimed. User owns merge; never merge/deploy.
+
+Host policy rejected deletion of this run's five exact task-owned harness/env files and the separate DevBrain capture JSON before execution. All six remain under ignored `.scratch`; do not bypass this protection.
+
+Current next action: save the task memory checkpoint; commit and push the three T18 journals as one evidence-only PR; verify applicable CI on its exact HEAD. After user merge, refresh main in a fresh worktree and select one distinct uncovered T18 case. Do not repeat scenario 6, scenario 7, or the unchanged cabinet PG suite.
+
+
 ## Latest continuation — T18.6 defaults/snapshot synthetic acceptance — 2026-11-02T11:05:59+05:00
 
 Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 from branch codex/t18-defaults-evidence, based on fresh origin/main fb5fc995c80875b478929716515be8810523f6b7. PR #3805 is merged at bb010816b2e30e3b70cf14e73fb6e0626dee247f. Runtime evidence is anchored to exact clean commit dc39b0f0fd1217c8d5ac585c6aee9256e9defbc4.
@@ -1566,3 +1581,4 @@ On the exact 0513 HEAD, the uncovered live T18 scenario-10 setup-context slice p
 Canonical Session teardown removed 5 containers, 3 volumes, 1 network and local project images; zero project resources remained. Independent inventory confirmed zero owned containers/volumes/networks and ports 18896/18897/15540 closed. Post-session Preflight passed. No runtime, tracked test, production, auth policy, patient-data or foreign-project changes occurred. Gate result was the previously authorized validation-only `narrow_override`, `gate_misroute=false`, `override_used=true`; generated prompt was read.
 
 Tier-2 remains PARTIAL: full integrated T18 and `docs/runbooks/STAGING_VALIDATION.md` are incomplete; no deferral is claimed. Do not repeat prior queue-system 6/6, Admin navigation/panel 3/3 + 2/2, RQ18 8/8, R5 static-file comparison 261/261, or this route-context browser scenario. The Docker project and ports were fully cleaned. The desktop policy rejected deletion of this run's generated harness files before execution, so they remain in the two task-owned ignored folders recorded in the checkpoint. Next: finish the three-journal checkpoint, commit/push it to existing PR #3805, update the PR body and verify exact-head CI. After user merge, proceed with a different unverified T18 item only.
+## Previous continuation — T18.6 defaults/snapshot synthetic acceptance — 2026-11-02T11:05:59+05:00
