@@ -99,8 +99,19 @@ const RescheduleSlotsDialog = ({
     const row = (rescheduleData ?? {}) as Record<string, unknown>;
     const records = Array.isArray(row.grouped_records) ? (row.grouped_records as Record<string, unknown>[]) : [];
     const record = records.find((rec) => {
+      // REG-FE-069 (audit ledger 3803): матчинг в каноническом пространстве
+      // визитов — grouped_records несут явный visit_id. record_ref.record_id
+      // НЕ является id визита у записей online_queue (это id записи очереди)
+      // и appointment (это appointment_id): сравнение по record_id почти
+      // всегда промахивалось для online_queue и могло совпасть с чужим
+      // appointment_id. Легаси-сравнение по record_id остаётся только для
+      // записей вида visit (там пространства совпадают) — обратно-совместимо
+      // с необогащёнными строками.
+      if (rec?.visit_id !== undefined && rec?.visit_id !== null) {
+        return String(rec.visit_id) === String(visitId);
+      }
       const ref = rec?.record_ref as Record<string, unknown> | undefined;
-      return ref && String(ref.record_id) === String(visitId);
+      return Boolean(ref && ref.record_kind === 'visit' && String(ref.record_id) === String(visitId));
     }) ?? {};
     const doctor = record.doctor_name || row.doctor_name || row.specialist_name || '';
     const services = Array.isArray(record.services) && record.services.length > 0

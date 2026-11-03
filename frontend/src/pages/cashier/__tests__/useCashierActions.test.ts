@@ -179,6 +179,43 @@ describe('useCashierActions (PR-UI-14-4)', () => {
     expect(deps.paymentModal.closeModal).not.toHaveBeenCalled();
   });
 
+  // CSH-FE-008: the payment POST is not idempotent server-side, so the action
+  // handler itself must be single-flight even when two callers race (the
+  // modal button guard is defense layer 1; this hook is layer 2).
+  it('processPayment is single-flight: a duplicate in-flight call does not re-POST (CSH-FE-008)', async () => {
+    const deps = makeDeps();
+    let resolveApi: (v: unknown) => void = () => {};
+    deps.paymentsApi.createPayment.mockImplementation(
+      () => new Promise((res) => { resolveApi = res; }),
+    );
+    const { result } = renderActions(deps);
+
+    const first = result.current.processPayment(
+      { visit_id: 77, can_create_direct_payment: true },
+      { amount: 150, method: 'cash', note: '' },
+    );
+    // Second call while the first POST is still in flight.
+    await result.current.processPayment(
+      { visit_id: 77, can_create_direct_payment: true },
+      { amount: 150, method: 'cash', note: '' },
+    );
+
+    expect(deps.paymentsApi.createPayment).toHaveBeenCalledTimes(1);
+    expect(deps.dialogs.setPaymentError).not.toHaveBeenCalled();
+    expect(notify.error).not.toHaveBeenCalled();
+
+    resolveApi({ success: true });
+    await first;
+
+    // Guard released after settle: a new call goes through again.
+    deps.paymentsApi.createPayment.mockResolvedValueOnce({ success: true });
+    await result.current.processPayment(
+      { visit_id: 77, can_create_direct_payment: true },
+      { amount: 150, method: 'cash', note: '' },
+    );
+    expect(deps.paymentsApi.createPayment).toHaveBeenCalledTimes(2);
+  });
+
   it('confirmPayment: missing id → error notify, no confirm dialog, no API call', async () => {
     const deps = makeDeps();
     const { result } = renderActions(deps);
