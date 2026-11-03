@@ -185,6 +185,65 @@ describe('aggregatePatientsForAllDepartments', () => {
     ]);
   });
 
+  // REG-FE-069: grouped_records must carry the CANONICAL visit id of each
+  // record. record_ref.record_id lives in a different id space for
+  // online_queue (queue-entry id) and appointment (appointment_id) records —
+  // consumers matching records against the row's visit_ids (the reschedule
+  // target-visit choice) need the explicit visit_id field.
+  it('stamps each grouped record with its canonical visit id, distinct from the record ref id (REG-FE-069)', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 900001,
+        record_kind: 'online_queue',
+        record_type: 'online_queue',
+        canonical_record_id: 900001,
+        visit_id: 555,
+        queue_entry_id: 900001,
+        available_actions: ['start_visit'],
+        can_start_visit: true,
+      }),
+      makeAppointment({
+        id: 3,
+        record_kind: 'visit',
+        canonical_record_id: 556,
+        visit_id: 556,
+        available_actions: ['mark_paid'],
+        can_mark_paid: true,
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].visit_ids).toEqual([555, 556]);
+    expect(result[0].grouped_records).toMatchObject([
+      // online_queue: record_ref.record_id is the queue-entry id (900001),
+      // the canonical visit id is 555 — both must be present, each in its
+      // own field.
+      { record_ref: { record_kind: 'online_queue', record_id: 900001 }, visit_id: 555 },
+      { record_ref: { record_kind: 'visit', record_id: 556 }, visit_id: 556 },
+    ]);
+  });
+
+  it('keeps visit_id null inside grouped records when the record carries no visit identity', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 900002,
+        record_kind: 'online_queue',
+        record_type: 'online_queue',
+        canonical_record_id: 900002,
+        visit_id: null,
+        appointment_id: null,
+        queue_entry_id: 900002,
+        available_actions: ['cancel'],
+        can_cancel: true,
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].grouped_records).toMatchObject([
+      { record_ref: { record_kind: 'online_queue', record_id: 900002 }, visit_id: null },
+    ]);
+  });
+
   it('does not synthesize visit or appointment ids from online queue row ids', () => {
     const result = aggregatePatientsForAllDepartments([
       makeAppointment({
