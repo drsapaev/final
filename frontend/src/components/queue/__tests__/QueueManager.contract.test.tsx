@@ -49,7 +49,11 @@ describe('Queue manager command contract', () => {
     expect(queueViewSource).toContain('selectedDoctor={searchParams.get(\'doctor\') || \'\'}');
 
     expect(managerSource).toContain('const [internalDoctor, setInternalDoctor] = useState(\'\')');
-    expect(managerSource).toContain('const effectiveDoctor = selectedDoctor !== undefined && selectedDoctor !== \'\' ? selectedDoctor : internalDoctor');
+    // #3856 review follow-up: controlled vs uncontrolled must be separated —
+    // a passed selectedDoctor (INCLUDING the empty string) is authoritative;
+    // only an absent prop (undefined) falls back to the internal choice.
+    expect(managerSource).toContain('const effectiveDoctor = selectedDoctor !== undefined ? String(selectedDoctor) : internalDoctor');
+    expect(managerSource).not.toContain('selectedDoctor !== undefined && selectedDoctor !== \'\'');
     expect(managerSource).toContain('if (!effectiveDoctor) {');
     expect(managerSource).not.toContain('setInternalDoctor(doctorOptions[0]');
     expect(managerSource).not.toContain('setInternalDoctor(specialists[0]');

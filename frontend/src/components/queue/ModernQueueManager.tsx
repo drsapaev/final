@@ -72,14 +72,28 @@ export interface ModernQueueManagerProps {
   [key: string]: unknown;
 }
 
+// #3856 review follow-up: stable default for the optional `doctors` prop.
+// A fresh `[]` literal per render changed the prop identity, which flowed
+// into the loadQueue useCallback deps and re-triggered the snapshot-load
+// effect on every render for consumers that omit the prop.
+const EMPTY_DOCTORS: ModernQueueManagerDoctor[] = [];
+
 const ModernQueueManager = ({
   mode,
   selectedDate = getLocalDateString(),
-  selectedDoctor = '',
+  // #3856 review follow-up: NO default for selectedDoctor — `undefined` now
+  // strictly means "uncontrolled mode" (internal UI state drives the
+  // selection), while any passed value (INCLUDING the empty string) means
+  // "controlled mode" where the prop is authoritative.
+  selectedDoctor,
   onQueueUpdate,
   onStartVisit,
   language = 'ru',
-  doctors = [],
+  // #3856 review follow-up: a stable module-level default — a fresh `[]`
+  // per render changed the `doctors` identity, which (through the
+  // loadQueue → effect chain) could re-trigger snapshot loads on every
+  // render for consumers that omit the prop.
+  doctors = EMPTY_DOCTORS,
   onDoctorChange,
   onDateChange
 }: ModernQueueManagerProps) => {
@@ -101,7 +115,12 @@ const ModernQueueManager = ({
 
   const [internalDoctor, setInternalDoctor] = useState('');
   const [internalDate, setInternalDate] = useState(getLocalDateString());
-  const effectiveDoctor = selectedDoctor !== undefined && selectedDoctor !== '' ? selectedDoctor : internalDoctor;
+  // #3856 review follow-up (controlled vs uncontrolled): when the parent
+  // passes `selectedDoctor`, the prop is authoritative INCLUDING the empty
+  // string — a parent-driven reset (7 → '') must clear the selection
+  // instead of falling back to the last internal UI choice. `undefined`
+  // (prop not passed) keeps the uncontrolled internal-state mode.
+  const effectiveDoctor = selectedDoctor !== undefined ? String(selectedDoctor) : internalDoctor;
   const effectiveDate = selectedDate !== undefined && selectedDate !== '' ? selectedDate : internalDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);

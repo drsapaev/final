@@ -265,9 +265,10 @@ describe('useQueueManager snapshot lifecycle (REG-FE-035 / REG-FE-042)', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(deselected).toBeNull();
-    // The deselected state is explicit: no queue, zeroed stats, no spinner.
+    // The deselected state is explicit: no queue, no statistics (null — not
+    // misleading zeroed cards; see the #3856 review follow-up), no spinner.
     expect(result.current.queueData).toBeNull();
-    expect(result.current.statistics).toEqual({ total_entries: 0, waiting: 0, completed: 0 });
+    expect(result.current.statistics).toBeNull();
     expect(result.current.loading).toBe(false);
 
     // A's late response arrives after the deselection — it must NOT
@@ -279,7 +280,7 @@ describe('useQueueManager snapshot lifecycle (REG-FE-035 / REG-FE-042)', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(result.current.queueData).toBeNull();
-    expect(result.current.statistics).toEqual({ total_entries: 0, waiting: 0, completed: 0 });
+    expect(result.current.statistics).toBeNull();
     expect(result.current.loading).toBe(false);
   });
 

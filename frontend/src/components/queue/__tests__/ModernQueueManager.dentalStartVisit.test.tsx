@@ -168,4 +168,73 @@ describe('ModernQueueManager dentist start-visit flow', () => {
       expect(queueMocks.loadQueueSnapshot).toHaveBeenCalledWith(expect.objectContaining({ specialistId: '' }));
     });
   });
+
+  // #3856 review follow-up (controlled vs uncontrolled): when the parent
+  // passes `selectedDoctor`, the prop is authoritative INCLUDING the empty
+  // string. Pre-fix, a parent-driven reset to '' fell back to the last
+  // internal UI choice, so the deselected doctor's queue stayed on screen.
+  it('a parent-driven reset of the controlled selection to "" clears the doctor instead of falling back to the internal choice', async () => {
+    const user = userEvent.setup();
+    const onDoctorChange = vi.fn();
+    const doctors = [{ id: '7', full_name: 'Registrar test doctor', specialty: 'cardiology' }];
+
+    // Controlled mode with the parent's initial empty selection (QueueView
+    // passes searchParams.get('doctor') || '').
+    const { rerender } = render(
+      <ThemeProvider>
+        <ModernQueueManager
+          mode="registrar"
+          selectedDoctor=""
+          doctors={doctors}
+          onDoctorChange={onDoctorChange}
+        />
+      </ThemeProvider>,
+    );
+
+    // The user picks a doctor through the UI — the internal state now holds
+    // '7' (the fallback source of the bug)…
+    await user.click(screen.getByRole('button', { name: 'misc.mqm_select_doctor' }));
+    await user.click(screen.getByRole('option', { name: 'Registrar test doctor • cardiology' }));
+    // …and the parent echoes the choice back through the controlled prop
+    // (exactly what QueueView does by writing the `doctor` URL param). In
+    // controlled mode only the echoed prop drives the snapshot load.
+    rerender(
+      <ThemeProvider>
+        <ModernQueueManager
+          mode="registrar"
+          selectedDoctor="7"
+          doctors={doctors}
+          onDoctorChange={onDoctorChange}
+        />
+      </ThemeProvider>,
+    );
+    await waitFor(() => {
+      expect(queueMocks.loadQueueSnapshot).toHaveBeenCalledWith(expect.objectContaining({ specialistId: '7' }));
+    });
+
+    // From here on only the RESET transition matters: clear the recorded
+    // mount/selection calls so an assertion on '' cannot be satisfied by
+    // the initial empty-selection load.
+    queueMocks.loadQueueSnapshot.mockClear();
+
+    // The parent resets the controlled selection to '' (e.g. a "clear
+    // filters" action or a URL param cleanup). The prop must win over the
+    // internal choice.
+    rerender(
+      <ThemeProvider>
+        <ModernQueueManager
+          mode="registrar"
+          selectedDoctor=""
+          doctors={doctors}
+          onDoctorChange={onDoctorChange}
+        />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(queueMocks.loadQueueSnapshot).toHaveBeenCalledWith(expect.objectContaining({ specialistId: '' }));
+    });
+    // The Select shows the placeholder again, not the stale doctor.
+    expect(screen.getByRole('button', { name: 'misc.mqm_select_doctor' })).toBeInTheDocument();
+  });
 });
