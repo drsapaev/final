@@ -14,6 +14,14 @@ describe('AppointmentModal exact service selection', () => {
   });
 
   it('includes the selected catalog service ID in the save callback', async () => {
+    // Time-bomb fix: the form rejects past dates, so the appointment date must
+    // always be computed relative to "now" instead of a hardcoded calendar day.
+    const tomorrow = new Date(Date.now() + 86_400_000);
+    const targetDate = [
+      tomorrow.getFullYear(),
+      String(tomorrow.getMonth() + 1).padStart(2, '0'),
+      String(tomorrow.getDate()).padStart(2, '0'),
+    ].join('-');
     const onSave = vi.fn().mockResolvedValue(undefined);
     const { container } = render(
       <ThemeProvider>
@@ -42,7 +50,7 @@ describe('AppointmentModal exact service selection', () => {
     expect(dateInput).not.toBeNull();
     expect(timeInput).not.toBeNull();
     expect(reasonInput).not.toBeNull();
-    fireEvent.change(dateInput!, { target: { value: '2026-11-02' } });
+    fireEvent.change(dateInput!, { target: { value: targetDate } });
     fireEvent.change(timeInput!, { target: { value: '10:00' } });
     fireEvent.change(reasonInput!, { target: { value: 'Плановый приём' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create appointment' }));
