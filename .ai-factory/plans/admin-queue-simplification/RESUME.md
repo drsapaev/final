@@ -1,3 +1,15 @@
+## Latest continuation — T18 scenario 5 PostgreSQL existing-token checks passed — 2026-11-04T00:40+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-cabinet-day\final`, branch `codex/t18-cabinet-day`, runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`. PR #3861 remains OPEN / Ready; user owns merge. The current journal-only evidence update is being added to that same PR; verify its resulting exact HEAD and checks before asking for merge.
+
+Three current-source PostgreSQL cases in `test_qr_token_path_owner_eligibility.py` passed **3/3, 0 skipped** (2 warnings). The module fixture reached Alembic head and its unique `rq09c_check_*` database was dropped. The cases cover an existing Doctor token after Department disablement, an available resource-owned legacy token shared by multiple profiles, and fail-closed behavior for an unavailable profile. Scenario 5 remains PARTIAL because its live Department off/on/manual-archive flow has not been rerun.
+
+Infrastructure lesson: a detached PostgreSQL container disappeared when the short WSL command ended. Keeping a WSL shell session alive preserved the exact `--rm` container, made Windows loopback port 15561 reachable, and allowed the focused tests to pass. Afterward the exact container and WSL keeper were stopped, no task-labeled containers/volumes remained, the fixture scratch DB was gone, and the port was closed. No app image was built and no persistent data volume was created.
+
+Gate: the plain mandatory queue-domain gate stopped because the reviewed scope required a known root. The scoped retry named the existing test module's `pg_engine` fixture and all three journals; result `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. The generated prompt was read. This validation is covered by the user's standing T18 authorization; no router/source/test changes.
+
+After committing and pushing this journal-only update to #3861, refresh the PR body with the PostgreSQL 3/3 PASS and verify exact-head CI. Do not start another PR cycle before user merge. After merge, refresh `origin/main` in a fresh worktree and continue the remaining scenario 2, 3, 5-live, and 10 gaps. Do not repeat scenarios 1 or 6–9, or these three PostgreSQL cases. Full T18, `docs/runbooks/STAGING_VALIDATION.md`, and served frontend byte provenance remain incomplete; Tier-2 is PARTIAL, with no deferral accepted.
+
 ## Latest continuation — T18 scenario 1 live Admin setup passed — 2026-11-03T23:52+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-cabinet-day\final`, branch `codex/t18-cabinet-day`. PR #3861 remains OPEN / Ready / CLEAN at pre-update HEAD `ef3fc2765e2e39aa262f8a244e6dec8805851f05`, base/runtime source `235b4cbba6bc133e89c44a3ceeb087d227267f9d`. User retains merge authority.
