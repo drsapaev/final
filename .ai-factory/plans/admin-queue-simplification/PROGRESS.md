@@ -7,7 +7,7 @@ Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`
 Branch: `codex/t18-cabinet-day`
 Base commit: `235b4cbba6bc133e89c44a3ceeb087d227267f9d` (`origin/main` at validation)
 Runtime commit: `235b4cbba6bc133e89c44a3ceeb087d227267f9d`
-Last updated: 2026-11-03T23:43:00+05:00
+Last updated: 2026-11-03T23:48:00+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -29,7 +29,8 @@ Last updated: 2026-11-03T23:43:00+05:00
 - Confirmed: on PR HEAD `94efa74787fa1891afadaf54e70f4068447fd84e`, every applicable exact-head check passed; path-aware backend/frontend/integration/readiness jobs were skipped for the documentation-only changes.
 - Completed: scenario 1 related backend tests and journal evidence are committed/pushed to PR #3861 at `ec6bc5877d2fbb48de7f4832a667e00b6cc72505`; the PR description separates backend PASS from live Admin NOT_RUN.
 - Confirmed: on exact PR HEAD `ec6bc5877d2fbb48de7f4832a667e00b6cc72505`, PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle, Python/TypeScript/Actions analysis, security, Gitleaks, GitGuardian, scratch guards, notifications and CodeQL passed. Path-aware build/test/readiness jobs were skipped for documentation-only changes.
-- Remaining: the new scenario 1 live evidence must be committed to PR #3861 and checked on its exact pushed HEAD; the PR then awaits user-owned merge. The full integrated T18 matrix and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete. Prior evidence for scenarios 2–5 and 10 is on separate commit-anchored slices and has not been reconciled against refreshed `main`.
+- Completed: live scenario 1 evidence was committed and pushed to PR #3861 at `315628d98e3112ee0ad047c8a2012ca0ee011111`; PR description now records the corrected live PASS and harness-only first failure. On that exact HEAD, applicable PR/quality/scope/lifecycle, security, Gitleaks, GitGuardian, scratch-guard and CodeQL checks passed. Backend/frontend/build/integration/readiness jobs were skipped for the documentation-only diff, not counted as passed.
+- Remaining: PR #3861 awaits user-owned merge. The full integrated T18 matrix and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete. Prior evidence for scenarios 2–5 and 10 is on separate commit-anchored slices and has not been reconciled against refreshed `main`.
 - Blocker: user-owned merge of #3861 is pending. Tier-2 remains PARTIAL; no deferral is accepted. `served_revision_verified=false` remains unresolved and this scenario does not attest frontend bytes.
-- Next exact action: commit and push the updated T18 journals to the existing PR #3861, refresh its description, and verify applicable checks on the exact new HEAD. Then wait for user-owned merge. After merge, confirm the merge commit, create a fresh isolated worktree from current `origin/main`, reconcile scenarios 2–5 and 10, and select only a distinct remaining T18 gap. Do not repeat scenarios 1 or 6–9. User retains merge authority; do not merge or deploy.
+- Next exact action: user merges PR #3861. Then confirm the merge commit, create a fresh isolated worktree from current `origin/main`, reconcile scenarios 2–5 and 10, and select only a distinct remaining T18 gap. Do not repeat scenarios 1 or 6–9. User retains merge authority; do not merge or deploy.
 - Checks to rerun after the next change: exact-head applicable CI. Do not repeat scenarios 6–9 or the cabinet PostgreSQL suite while their source blobs remain unchanged.

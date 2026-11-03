@@ -6,7 +6,7 @@ T18 scenario 1 now has a successful live synthetic Admin slice. Canonical Prefli
 
 The run used only the owned synthetic project `clinic-aqs-t18-multidoctor-20261103` (ports 18231/18291/55551). Served frontend provenance remains `served_revision_verified=false`. Host policy rejected removal of the exact task-owned ignored `.scratch/t18-admin-multidoctor-20261103/` files; do not attempt alternate deletion methods.
 
-The T18 journals are updated locally and need final diff review, normal-hook commit, push to the existing PR #3861, PR-body refresh, and exact-head check verification. Do not create a second PR cycle, merge, or deploy. Tier-2 remains PARTIAL without deferral; full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete. After the user merges #3861, refresh `origin/main`, reconcile scenarios 2–5 and 10 in a fresh worktree, and address only a distinct remaining gap.
+The journal update was committed and pushed to the existing PR #3861 as `315628d98e3112ee0ad047c8a2012ca0ee011111`; the PR body was refreshed. All applicable exact-head checks on that commit passed. Documentation-only path-aware backend/frontend/build/integration/readiness jobs were skipped, not counted as passed. Do not create a second PR cycle, merge, or deploy. Tier-2 remains PARTIAL without deferral; full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete. After the user merges #3861, refresh `origin/main`, reconcile scenarios 2–5 and 10 in a fresh worktree, and address only a distinct remaining gap.
 
 ## Latest continuation — T18 scenario 1 backend contract and exact-head CI — 2026-11-03T23:08+05:00
 
