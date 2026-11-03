@@ -67,7 +67,7 @@ const TERMINAL_PAYMENT_STATUSES: readonly string[] = [
   'refunded',
 ];
 
-// #3854 review follow-up: a CONFIRMED terminal status is authoritative —
+// PR-3854 review follow-up: a CONFIRMED terminal status is authoritative —
 // nothing may roll it back to a non-terminal observation arriving later.
 const isTerminalPaymentStatus = (status: string): boolean =>
   TERMINAL_PAYMENT_STATUSES.includes(status);
@@ -113,7 +113,7 @@ const PaymentWidget = ({
   const [loading, setLoading] = useState(false);
   const [providersLoading, setProvidersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // #3854 review follow-up: provider-LOAD failures get their own state so
+  // PR-3854 review follow-up: provider-LOAD failures get their own state so
   // they can be rendered in the empty-providers branch (the generic `error`
   // alert only exists in the main card, which is not rendered when the
   // list is empty).
@@ -154,7 +154,7 @@ const PaymentWidget = ({
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptsRef = useRef(0);
   const [pollingAttempts, setPollingAttempts] = useState(0);
-  // #3854 review follow-up (single-flight): `setInterval(async () => …)` let
+  // PR-3854 review follow-up (single-flight): `setInterval(async () => …)` let
   // a slow status GET overlap with the next 5s tick — two concurrent GETs
   // whose responses could then land OUT OF ORDER. While the guard is held,
   // ticks are skipped entirely (no request, no attempt consumed).
@@ -212,7 +212,7 @@ const PaymentWidget = ({
           setSelectedProvider('');
         }
       } else {
-        // #3854 review follow-up: a malformed payload (no providers array)
+        // PR-3854 review follow-up: a malformed payload (no providers array)
         // must not keep the previous currency's list rendered either.
         setProviders([]);
         setSelectedProvider('');
@@ -224,7 +224,7 @@ const PaymentWidget = ({
         return;
       }
       logger.error('Ошибка загрузки провайдеров:', err);
-      // #3854 review follow-up: a failed reload must INVALIDATE the list of
+      // PR-3854 review follow-up: a failed reload must INVALIDATE the list of
       // the previous currency — otherwise the widget keeps rendering (and
       // paying with) a provider/currency pair the new currency never
       // offered. Payment stays disabled until a reload succeeds.
@@ -285,13 +285,13 @@ const PaymentWidget = ({
     if (pollingRef.current) return;
     attemptsRef.current = 0;
     setPollingAttempts(0);
-    // #3854 review follow-up: a fresh polling session starts with a clean
+    // PR-3854 review follow-up: a fresh polling session starts with a clean
     // single-flight guard (a previous session's unsettled GET cannot block
     // this one — its late response is handled by the identity check below).
     statusCheckInFlightRef.current = false;
 
     pollingRef.current = setInterval(() => {
-      // #3854 review follow-up (single-flight): the previous status GET has
+      // PR-3854 review follow-up (single-flight): the previous status GET has
       // not settled yet — skip this tick instead of stacking a concurrent
       // request whose response may land after a newer observation.
       if (statusCheckInFlightRef.current) return;
@@ -316,7 +316,7 @@ const PaymentWidget = ({
           // CSH-FE-037: …but the poll that exhausts the budget may itself
           // observe a TERMINAL status (paid/failed/…) — the timeout state
           // must never overwrite it, or a paid visit renders as timed out.
-          // #3854 review follow-up: the same no-rollback rule applies when
+          // PR-3854 review follow-up: the same no-rollback rule applies when
           // ANOTHER observation (e.g. a manual status check that raced this
           // hanging poll) already confirmed a terminal status.
           const observedTerminal =
@@ -335,7 +335,7 @@ const PaymentWidget = ({
     // CSH-FE-038: truthiness alone is not enough — the selected code must
     // actually be offered by the CURRENT provider list, otherwise a stale
     // selection could POST a provider/currency pair the list never offered.
-    // #3854 review follow-up: list membership alone is still not enough —
+    // PR-3854 review follow-up: list membership alone is still not enough —
     // the selected provider must support the CURRENT currency AT POST
     // TIME, not the currency of the list snapshot (guards the render window
     // between a currency prop change and the provider reload effect).
@@ -474,7 +474,7 @@ const PaymentWidget = ({
     const currentPaymentData = paymentDataRef.current;
     if (!currentPaymentData?.payment_id) return null;
 
-    // #3854 review follow-up (payment identity): pin the payment this GET
+    // PR-3854 review follow-up (payment identity): pin the payment this GET
     // belongs to — a response that settles after the session was cancelled
     // or replaced must be discarded, not applied to the new session.
     const paymentId = currentPaymentData.payment_id;
@@ -490,7 +490,7 @@ const PaymentWidget = ({
       if (response.data?.status) {
         // Keep exact backend payment status; frontend must not collapse provider/status aliases.
         const nextStatus = String(response.data.status);
-        // #3854 review follow-up (no terminal rollback): a confirmed
+        // PR-3854 review follow-up (no terminal rollback): a confirmed
         // TERMINAL status is authoritative — a later-arriving non-terminal
         // observation (e.g. a slow poll that raced a manual 'paid' check)
         // must not resurrect a payable state for an already paid visit.
@@ -661,7 +661,7 @@ const PaymentWidget = ({
     return (
       <Card>
         <CardContent>
-          {/* #3854 review follow-up: an empty list after a FAILED reload is a
+          {/* PR-3854 review follow-up: an empty list after a FAILED reload is a
               load error, not "no methods configured" — surface the real
               reason; either way no payment can start from this state. */}
           {providersError ? (
