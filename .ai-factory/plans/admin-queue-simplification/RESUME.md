@@ -1,14 +1,16 @@
-## Latest continuation — T18 scenario 1 backend contract check — 2026-11-03T23:03+05:00
+## Latest continuation — T18 scenario 1 backend contract and exact-head CI — 2026-11-03T23:08+05:00
 
-Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`, branch `codex/t18-cabinet-day`, runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`. PR #3861 remains OPEN/Ready/CLEAN at HEAD `94efa74787fa1891afadaf54e70f4068447fd84e`, base `235b4cbba6bc133e89c44a3ceeb087d227267f9d`; user owns merge.
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`, branch `codex/t18-cabinet-day`, runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`. PR #3861 is OPEN/Ready/CLEAN at exact HEAD `ec6bc5877d2fbb48de7f4832a667e00b6cc72505`, base `235b4cbba6bc133e89c44a3ceeb087d227267f9d`; user owns merge.
 
 The two focused current-main modules `tests/integration/test_queue_admin_directions_read_model.py` and `tests/integration/test_multi_doctor_same_specialty_isolation.py` passed **24/24** with 6 warnings. `py_compile` also passed. `backend/tests/conftest.py` creates a temporary SQLite file database and unlinks it after the session; the test command set `TESTING=1` and `DATABASE_URL=sqlite:///:memory:` so it could not target a shared or production database. No PostgreSQL, staging, Compose, browser, or product-source test was run.
 
 Gate: mandatory queue-domain gate used `--known-root-cause backend/app/services/queue_admin_directions_read_service.py` with both focused test modules and the three T18 journals in scope. Result `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated prompt was read. Basis: the user's continuing authorization for bounded T18 validation; this slice made no source/test edits. The gate suggested only py_compile, so the focused tests were executed under the already-authorized validation-only override. No gate/router changes.
 
+Hosted checks on exact HEAD: PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle, Python/TypeScript/Actions analysis, security, Gitleaks, GitGuardian, scratch guards, notifications and CodeQL PASS. Path-aware backend/frontend/integration/readiness jobs were SKIPPED for the documentation-only changes, not counted as PASS. The first PR Review Quality Gate run failed because `Clean workspace` was unlabeled in the body; that field was added and the final gate passed.
+
 Status: related backend behavior is PASS, but T18 scenario 1 remains `IN_PROGRESS`: no live Admin setup evidence yet for one new direction containing multiple doctors of the same specialty. Related prior evidence for scenarios 2–5 and 10 is commit-anchored to separate acceptance slices; it is not full integrated T18. Tier-2 and `docs/runbooks/STAGING_VALIDATION.md` remain PARTIAL/incomplete, with no deferral accepted.
 
-Only the plan journals are intended to change in the current PR #3861; no new PR cycle, staging project, or code change is authorized by this checkpoint. Next: commit/push the three updated journals to #3861, update the PR description to distinguish the 24 local tests from live NOT_RUN, verify exact-head CI, then wait for user merge. After merge, refresh `origin/main`, reconcile prior evidence, and select only a distinct uncovered acceptance gap. Do not repeat scenarios 6–9.
+The only pushed change is journal evidence in PR #3861; no runtime/test code or staging project changed. Next: wait for user-owned merge. After confirmation, refresh `origin/main` in a fresh worktree, reconcile prior evidence for scenarios 2–5 and 10, and select only a distinct uncovered acceptance gap. Do not repeat scenarios 6–9.
 
 ## Latest continuation — T18 scenarios 8–9 quota/replay PostgreSQL acceptance — 2026-11-03T22:47+05:00
 
