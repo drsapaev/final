@@ -118,7 +118,12 @@ const resourceName = `Synthetic RQ-17 resource ${suffix}`;
 
 type QueueProfileRow = {
   key?: string;
+  name?: string;
+  title?: string;
+  title_ru?: string;
   queue_tags?: string[];
+  is_active?: boolean;
+  show_on_qr_page?: boolean;
 };
 
 type DoctorRow = {
@@ -154,9 +159,6 @@ type DirectionRow = {
 
 type DirectionFacts = {
   directions: DirectionRow[];
-  unattached?: {
-    resources?: Array<{ queue_tag: string }>;
-  };
 };
 
 function isGetResponseForPath(
@@ -181,6 +183,10 @@ function directionForKey(facts: DirectionFacts, key: string): DirectionRow {
   const direction = facts.directions.find((item) => item.profile.key === key);
   expect(direction, 'Admin read model should include the requested synthetic profile').toBeDefined();
   return direction!;
+}
+
+function queueProfileTitle(profile: QueueProfileRow): string {
+  return profile.title_ru?.trim() || profile.title?.trim() || profile.name?.trim() || profile.key || '';
 }
 
 function expectDirectionState(
@@ -369,14 +375,11 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   await expect(editorLinks.locator('a[href*="servicesTab=catalog"]')).toHaveCount(1);
   await expect(editorLinks.locator('a[href*="/admin/users"]')).toHaveCount(1);
 
-  const resourceTagsFromCurrentFacts = [
-    ...initialFacts.directions.flatMap((direction) =>
-      direction.booking_targets
-        .filter((target) => target.owner_type === 'resource')
-        .map((target) => target.queue_tag),
-    ),
-    ...(initialFacts.unattached?.resources || []).map((resource) => resource.queue_tag),
-  ];
+  const resourceRouteTags = initialFacts.directions.flatMap((direction) =>
+    direction.booking_targets
+      .filter((target) => target.owner_type === 'resource')
+      .map((target) => target.queue_tag.trim().toLowerCase()),
+  );
 
   const profilesResponsePromise = page.waitForResponse((response) =>
     isGetResponseForPath(response, '/queues/profiles')
@@ -385,7 +388,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   const profilesResponse = await profilesResponsePromise;
   expect(profilesResponse.ok(), 'existing QueueProfiles should be readable').toBeTruthy();
   const profilesPayload = await profilesResponse.json() as { profiles?: QueueProfileRow[] };
-  const existingProfileTags = (profilesPayload.profiles || []).flatMap((profile) => profile.queue_tags || []);
+  const existingProfiles = profilesPayload.profiles || [];
 
   // The resource axis is configured through a QueueProfile with no Doctor.
   await createHiddenQueueProfile(page, { key: profileKey, title: profileTitle, queueTag: resourceTag });
@@ -415,23 +418,38 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   const specialtyItems = (Array.isArray(specialtyPayload)
     ? specialtyPayload
     : specialtyPayload.items || []).filter((item) => Boolean(item?.code));
-  const usedCodes = new Set(
-    [
-      ...existingDoctors.map((doctor) => doctor.specialty),
-      ...existingProfileTags,
-      ...resourceTagsFromCurrentFacts,
-    ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean),
+  const usedDoctorSpecialties = new Set(
+    existingDoctors.map((doctor) => doctor.specialty.trim().toLowerCase()).filter(Boolean),
   );
-  const selectedSpecialtyIndex = specialtyItems.findIndex(
-    (specialty) => Boolean(specialty.code) && !usedCodes.has(specialty.code.trim().toLowerCase()),
-  );
+  const doctorRouteCandidate = specialtyItems.flatMap((specialty) => {
+    const specialtyCode = specialty.code.trim().toLowerCase();
+    if (!specialtyCode || usedDoctorSpecialties.has(specialtyCode) || resourceRouteTags.includes(specialtyCode)) {
+      return [];
+    }
+    const matchingProfiles = existingProfiles.filter((profile) =>
+      profile.is_active !== false
+      && profile.show_on_qr_page === false
+      && [profile.key, ...(profile.queue_tags || [])]
+        .some((tag) => tag?.trim().toLowerCase() === specialtyCode),
+    );
+    if (matchingProfiles.length !== 1) return [];
+    const profile = matchingProfiles[0];
+    const direction = initialFacts.directions.find((item) => item.profile.key === profile.key);
+    if (!direction
+      || direction.effective_availability !== 'available'
+      || direction.configuration_state === 'conflict'
+      || direction.booking_targets.length > 0) {
+      return [];
+    }
+    return [{ specialty, profile }];
+  })[0];
   expect(
-    selectedSpecialtyIndex,
-    'synthetic staging needs one unused canonical specialty to isolate the Doctor-owned direction',
-  ).toBeGreaterThanOrEqual(0);
-  const doctorSpecialty = specialtyItems[selectedSpecialtyIndex];
-  const doctorKey = 'rqdoc_' + suffix;
-  const doctorTitle = 'Synthetic RQ-17 Doctor direction ' + suffix;
+    doctorRouteCandidate,
+    'synthetic staging needs one hidden, unowned QueueProfile route for a canonical Doctor specialty',
+  ).toBeDefined();
+  const { specialty: doctorSpecialty, profile: doctorProfile } = doctorRouteCandidate!;
+  const doctorProfileTitle = queueProfileTitle(doctorProfile);
+  expect(doctorProfileTitle, 'selected QueueProfile should have a visible Admin label').not.toBe('');
   const doctorName = 'SYNTHETIC-RQ17 Doctor ' + suffix;
   const doctorUsername = 'synthetic_rq17_doc_' + suffix;
   const doctorEmail = 'synthetic.rq17.' + suffix + '@example.invalid';
@@ -447,6 +465,8 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   await specialtyTrigger.click();
   const specialtyOptions = page.getByRole('listbox').getByRole('option');
   await expect(specialtyOptions).toHaveCount(specialtyItems.length + 1);
+  const selectedSpecialtyIndex = specialtyItems.findIndex((item) => item.code === doctorSpecialty.code);
+  expect(selectedSpecialtyIndex).toBeGreaterThanOrEqual(0);
   await specialtyOptions.nth(selectedSpecialtyIndex + 1).click();
 
   const textInputs = userDialog.locator('input[type="text"]');
@@ -475,13 +495,6 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   await page.getByTestId('queue-setup-return-link').click();
   await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
 
-  // The Doctor axis requires an explicit service owner and a matching profile tag.
-  await createHiddenQueueProfile(page, {
-    key: doctorKey,
-    title: doctorTitle,
-    queueTag: doctorSpecialty.code,
-  });
-
   const createdDoctorsResponsePromise = page.waitForResponse((response) =>
     isGetResponseForPath(response, '/services/admin/doctors')
   );
@@ -498,7 +511,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
 
   await createCatalogService(page, {
     name: 'Synthetic RQ-17 Doctor service ' + suffix,
-    profileTitle: doctorTitle,
+    profileTitle: doctorProfileTitle,
     queueTag: doctorSpecialty.code,
     doctorSpecialty: doctorSpecialty.code,
     doctorId,
@@ -535,8 +548,8 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   // Before publication, both backend-resolved owners must remain hidden and
   // provide the explicit publish action instead of claiming QR readiness.
   let facts = await waitForAdminDirections(page);
-  expectDirectionState(directionForKey(facts, doctorKey), {
-    key: doctorKey,
+  expectDirectionState(directionForKey(facts, doctorProfile.key!), {
+    key: doctorProfile.key!,
     ownerType: 'doctor',
     ownerId: doctorId,
     queueTag: doctorSpecialty.code,
@@ -550,10 +563,10 @@ test('current setup screen resolves Doctor and QueueResource directions through 
     published: false,
   });
 
-  await publishQueueProfile(page, doctorKey, doctorTitle);
+  await publishQueueProfile(page, doctorProfile.key!, doctorProfileTitle);
   facts = await waitForAdminDirections(page);
-  expectDirectionState(directionForKey(facts, doctorKey), {
-    key: doctorKey,
+  expectDirectionState(directionForKey(facts, doctorProfile.key!), {
+    key: doctorProfile.key!,
     ownerType: 'doctor',
     ownerId: doctorId,
     queueTag: doctorSpecialty.code,
@@ -569,8 +582,8 @@ test('current setup screen resolves Doctor and QueueResource directions through 
 
   await publishQueueProfile(page, profileKey, profileTitle);
   facts = await waitForAdminDirections(page);
-  expectDirectionState(directionForKey(facts, doctorKey), {
-    key: doctorKey,
+  expectDirectionState(directionForKey(facts, doctorProfile.key!), {
+    key: doctorProfile.key!,
     ownerType: 'doctor',
     ownerId: doctorId,
     queueTag: doctorSpecialty.code,
@@ -592,7 +605,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
     specialists?: Array<{ specialty?: string }>;
   };
   const publicProfileKeys = (publicCatalog.specialists || []).map((specialist) => specialist.specialty);
-  expect(publicProfileKeys).toEqual(expect.arrayContaining([doctorKey, profileKey]));
+  expect(publicProfileKeys).toEqual(expect.arrayContaining([doctorProfile.key!, profileKey]));
 
   if (verifyServedFrontend) {
     const assetDirectory = process.env.T18_SERVED_ASSET_DIR;
