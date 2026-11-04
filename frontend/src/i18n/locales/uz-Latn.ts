@@ -678,6 +678,13 @@ const uzLatn = {
     empty_history_text: 'Tanlangan davr uchun to\'lov tarixi yo\'q.',
     empty_history_title: 'Tarix yo\'q',
     empty_pending_text: 'Kutilayotgan to\'lovlar yo\'q. Barcha to\'lovlar amalga oshirilgan.',
+    // CSH-FE-001: load-failure truthfulness banners (error/stale/retry)
+    load_error_title: 'Ma\'lumotlarni yuklashda xatolik',
+    load_error_text: 'Ulanishni tekshirib, qayta urinib ko\'ring.',
+    retry_load_btn: 'Qayta urinish',
+    stale_data_note: 'Oldingi yuklamadagi ma\'lumotlar ko\'rsatilgan — ular eskirgan bo\'lishi mumkin.',
+    stats_load_error_title: 'Statistikani yangilashda xatolik',
+    stats_stale_note: 'Ko\'rsatilgan ko\'rsatkichlar eskirgan yoki to\'liq bo\'lmasligi mumkin.',
     empty_pending_title: 'Hammasi tayyor',
     export_btn: 'Eksport',
     export_failed: 'Eksport qilib bo\'lmadi',
