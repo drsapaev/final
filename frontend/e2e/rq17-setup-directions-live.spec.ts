@@ -1,12 +1,12 @@
 /**
- * RQ-17 — T18 current Admin setup path for a resource-owned direction.
+ * RQ-17 — T18 current Admin setup paths for Doctor and QueueResource owners.
  *
- * This spec follows the current backend-facts screen and its existing editors.
- * It verifies the canonical Users editor link (there is no second doctor
- * onboarding form in setup), creates a hidden QueueProfile and a doctorless
- * service through their existing Admin screens, then creates and activates a
- * QueueResource through the setup screen's resource view. All rows live only
- * in the owned synthetic staging database and are removed with that project.
+ * This spec follows the backend-facts screen and existing Admin editors. It
+ * creates a canonical Doctor through User Management and a QueueResource
+ * through the setup screen, then proves both directions remain hidden until
+ * explicit publication and become ready/bookable in the public QR catalog.
+ * All rows live only in the owned synthetic staging database and are removed
+ * with that project.
  */
 import crypto from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -116,8 +116,231 @@ const profileTitle = `Synthetic RQ-17 direction ${suffix}`;
 const serviceName = `Synthetic RQ-17 service ${suffix}`;
 const resourceName = `Synthetic RQ-17 resource ${suffix}`;
 
-test('current setup screen supports resource-only setup without creating another doctor', async ({ page }) => {
-  test.setTimeout(240_000);
+type QueueProfileRow = {
+  key?: string;
+  queue_tags?: string[];
+};
+
+type DoctorRow = {
+  id: number;
+  specialty: string;
+};
+
+type SpecialtyRow = {
+  code: string;
+  title_ru?: string;
+  title_en?: string;
+  title_uz?: string;
+};
+
+type DirectionTarget = {
+  owner_type: 'doctor' | 'resource';
+  owner_id: number;
+  queue_tag: string;
+  label: string;
+  is_active: boolean;
+  eligible_for_new_booking: boolean;
+};
+
+type DirectionRow = {
+  profile: { key: string; show_on_qr_page: boolean };
+  resolved_mode: 'booking' | 'overview' | 'unresolved';
+  configuration_state: 'ready' | 'incomplete' | 'conflict' | 'unavailable';
+  effective_availability: 'available' | 'unavailable' | 'conflict';
+  public_availability: boolean;
+  booking_targets: DirectionTarget[];
+  allowed_next_actions: Array<{ kind: string; entity_key?: string | null }>;
+};
+
+type DirectionFacts = {
+  directions: DirectionRow[];
+  unattached?: {
+    resources?: Array<{ queue_tag: string }>;
+  };
+};
+
+function isGetResponseForPath(
+  response: import('@playwright/test').Response,
+  suffixPath: string,
+) {
+  return response.request().method() === 'GET'
+    && new URL(response.url()).pathname.endsWith(suffixPath);
+}
+
+async function waitForAdminDirections(page: Page): Promise<DirectionFacts> {
+  const responsePromise = page.waitForResponse((response) =>
+    isGetResponseForPath(response, '/queue/admin/directions')
+  );
+  await page.goto('/admin/setup-directions');
+  const response = await responsePromise;
+  expect(response.ok(), 'Admin directions facts should load from the backend').toBeTruthy();
+  return await response.json() as DirectionFacts;
+}
+
+function directionForKey(facts: DirectionFacts, key: string): DirectionRow {
+  const direction = facts.directions.find((item) => item.profile.key === key);
+  expect(direction, 'Admin read model should include the requested synthetic profile').toBeDefined();
+  return direction!;
+}
+
+function expectDirectionState(
+  direction: DirectionRow,
+  expected: {
+    key: string;
+    ownerType: DirectionTarget['owner_type'];
+    ownerId: number;
+    queueTag: string;
+    published: boolean;
+  },
+) {
+  expect(direction.profile).toMatchObject({
+    key: expected.key,
+    show_on_qr_page: expected.published,
+  });
+  expect(direction.resolved_mode).toBe('booking');
+  expect(direction.configuration_state).toBe(expected.published ? 'ready' : 'incomplete');
+  expect(direction.effective_availability).toBe('available');
+  expect(direction.public_availability).toBe(expected.published);
+  expect(direction.booking_targets).toHaveLength(1);
+  expect(direction.booking_targets[0]).toMatchObject({
+    owner_type: expected.ownerType,
+    owner_id: expected.ownerId,
+    queue_tag: expected.queueTag,
+    is_active: true,
+    eligible_for_new_booking: true,
+  });
+  const publishAction = direction.allowed_next_actions.some(
+    (action) => action.kind === 'publish_profile' && action.entity_key === expected.key,
+  );
+  expect(publishAction).toBe(!expected.published);
+}
+
+async function createHiddenQueueProfile(
+  page: Page,
+  input: { key: string; title: string; queueTag: string },
+) {
+  await page.goto('/admin/setup-directions');
+  const links = page.getByTestId('setup-editor-links');
+  await expect(links).toBeVisible();
+  await links.locator('a[href*="servicesTab=queue-profiles"]').click();
+  await expect(page).toHaveURL(/servicesTab=queue-profiles/);
+  await page.getByRole('button', { name: /Добавить|Add/i }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  const profileKeyInput = dialog.locator('#queue-profile-key');
+  await expect(profileKeyInput).toHaveAttribute('pattern', '[a-z_]+');
+  expect(input.key).toMatch(/^[a-z_]+$/);
+  await profileKeyInput.fill(input.key);
+  await dialog.locator('#queue-profile-title-en').fill(input.title);
+  await dialog.locator('#queue-profile-title-ru').fill(input.title);
+  await dialog.locator('#queue-profile-tags').fill(input.queueTag);
+
+  const createResponsePromise = page.waitForResponse((response) => {
+    const pathname = new URL(response.url()).pathname;
+    return response.request().method() === 'POST' && pathname.endsWith('/queues/profiles');
+  });
+  await dialog.getByRole('button', { name: /Создать вкладку очереди|Create queue tab/i }).click();
+  const createResponse = await createResponsePromise;
+  expect(createResponse.ok(), 'new QueueProfile should be created through the Admin editor').toBeTruthy();
+  expect(createResponse.request().postDataJSON()).toMatchObject({ show_on_qr_page: false });
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('row').filter({ hasText: input.title })).toHaveCount(1);
+}
+
+async function createCatalogService(
+  page: Page,
+  input: {
+    name: string;
+    profileTitle: string;
+    queueTag: string;
+    doctorSpecialty?: string;
+    doctorId?: number;
+  },
+) {
+  await page.getByRole('button', { name: /Добавить услугу|Add service/i }).first().click();
+  const serviceEditor = page.getByRole('heading', { name: /Добавление услуги|Add service/i }).locator('..');
+  const serviceForm = serviceEditor.locator('form').last();
+  await expect(serviceForm).toBeVisible();
+  await serviceForm.locator('input[type="text"]').first().fill(input.name);
+
+  const categorySelect = serviceForm.locator('.mac-select').first().getByRole('button');
+  await categorySelect.click();
+  const categoryOptions = page.getByRole('listbox').getByRole('option');
+  if (await categoryOptions.count() > 1) {
+    await categoryOptions.nth(1).click();
+  } else {
+    await expect(categoryOptions).toHaveCount(1);
+    await categoryOptions.first().click();
+  }
+
+  if (input.doctorId !== undefined && input.doctorSpecialty) {
+    const doctorSelects = serviceForm.locator('.mac-select');
+    await expect(doctorSelects).toHaveCount(3);
+    await doctorSelects.nth(2).getByRole('button').click();
+    const doctorOptions = page.getByRole('listbox').getByRole('option')
+      .filter({ hasText: new RegExp('\\(' + input.doctorSpecialty + '\\)', 'i') });
+    await expect(doctorOptions).toHaveCount(1);
+    await doctorOptions.click();
+  }
+
+  await serviceEditor.getByRole('button', { name: /Очередь|Queue/i }).click();
+  const queueTagSelect = serviceForm.locator('.mac-select').first().getByRole('button');
+  await queueTagSelect.click();
+  const tagOption = page.getByRole('listbox').getByRole('option').filter({ hasText: input.profileTitle });
+  await expect(tagOption).toHaveCount(1);
+  await tagOption.click();
+
+  await serviceEditor.getByRole('button', { name: /Опции|Options/i }).click();
+  const requiresDoctor = serviceForm.getByRole('checkbox', { name: /Требует врача|Doctor required/i });
+  if (input.doctorId === undefined) {
+    await expect(requiresDoctor).not.toBeChecked();
+  } else {
+    await requiresDoctor.click();
+    await expect(requiresDoctor).toBeChecked();
+  }
+
+  const createResponsePromise = page.waitForResponse((response) => {
+    const pathname = new URL(response.url()).pathname;
+    return response.request().method() === 'POST' && /\/services\/?$/.test(pathname);
+  });
+  await serviceForm.getByRole('button', { name: /Сохранить услугу|Сохранить|Save service|Save/i }).click();
+  const createResponse = await createResponsePromise;
+  expect(createResponse.ok(), 'synthetic queue service should be created through the Service Catalog').toBeTruthy();
+  expect(createResponse.request().postDataJSON()).toMatchObject({
+    queue_tag: input.queueTag,
+    doctor_id: input.doctorId ?? null,
+    requires_doctor: input.doctorId !== undefined,
+  });
+  await expect(page.getByText(input.name).first()).toBeVisible();
+}
+
+async function publishQueueProfile(page: Page, key: string, title: string) {
+  await page.goto('/admin/services?servicesTab=queue-profiles');
+  const row = page.getByRole('row').filter({ hasText: title });
+  await expect(row).toHaveCount(1);
+  await row.getByRole('button', { name: /для настройки QR-публикации|to manage QR publication/i }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  const qrVisibility = dialog.getByRole('checkbox', {
+    name: /Показывать профиль на QR-странице|Show profile on QR page/i,
+  });
+  await expect(qrVisibility).not.toBeChecked();
+  await qrVisibility.click();
+  await expect(qrVisibility).toBeChecked();
+
+  const updateResponsePromise = page.waitForResponse((response) => {
+    const pathname = new URL(response.url()).pathname;
+    return response.request().method() === 'PUT' && pathname.endsWith('/queues/profiles/' + key);
+  });
+  await dialog.getByRole('button', { name: /Сохранить вкладку очереди|Сохранить|Save/i }).click();
+  const updateResponse = await updateResponsePromise;
+  expect(updateResponse.ok(), 'explicit QR publication should be saved through the QueueProfile editor').toBeTruthy();
+  expect(updateResponse.request().postDataJSON()).toMatchObject({ show_on_qr_page: true });
+  await expect(dialog).toHaveCount(0);
+}
+
+test('current setup screen resolves Doctor and QueueResource directions through explicit QR publication', async ({ page }) => {
+  test.setTimeout(420_000);
   const verifyServedFrontend = process.env.T18_VERIFY_SERVED_FRONTEND === '1';
   const expectedOrigin = process.env.PLAYWRIGHT_BASE_URL
     ? new URL(process.env.PLAYWRIGHT_BASE_URL).origin
@@ -137,7 +360,7 @@ test('current setup screen supports resource-only setup without creating another
 
   await loginAdminWithRequiredTwoFactor(page);
 
-  await page.goto('/admin/setup-directions');
+  const initialFacts = await waitForAdminDirections(page);
   await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
   const editorLinks = page.getByTestId('setup-editor-links');
   await expect(editorLinks).toBeVisible();
@@ -146,83 +369,146 @@ test('current setup screen supports resource-only setup without creating another
   await expect(editorLinks.locator('a[href*="servicesTab=catalog"]')).toHaveCount(1);
   await expect(editorLinks.locator('a[href*="/admin/users"]')).toHaveCount(1);
 
-  // Create an unpublished profile through the canonical profile editor.
+  const resourceTagsFromCurrentFacts = [
+    ...initialFacts.directions.flatMap((direction) =>
+      direction.booking_targets
+        .filter((target) => target.owner_type === 'resource')
+        .map((target) => target.queue_tag),
+    ),
+    ...(initialFacts.unattached?.resources || []).map((resource) => resource.queue_tag),
+  ];
+
+  const profilesResponsePromise = page.waitForResponse((response) =>
+    isGetResponseForPath(response, '/queues/profiles')
+  );
   await editorLinks.locator('a[href*="servicesTab=queue-profiles"]').click();
-  await expect(page).toHaveURL(/servicesTab=queue-profiles/);
-  await page.getByRole('button', { name: /Добавить|Add/i }).click();
-  const profileDialog = page.getByRole('dialog');
-  await expect(profileDialog).toBeVisible();
-  const profileKeyInput = profileDialog.locator('#queue-profile-key');
-  await expect(profileKeyInput).toHaveAttribute('pattern', '[a-z_]+');
-  expect(profileKey).toMatch(/^[a-z_]+$/);
-  await profileKeyInput.fill(profileKey);
-  await profileDialog.locator('#queue-profile-title-en').fill(profileTitle);
-  await profileDialog.locator('#queue-profile-title-ru').fill(profileTitle);
-  await profileDialog.locator('#queue-profile-tags').fill(resourceTag);
-  await profileDialog.getByRole('button', { name: /Создать вкладку очереди|Create queue tab/i }).click();
-  await expect(profileDialog).toHaveCount(0);
-  await expect(page.getByText(profileTitle).first()).toBeVisible();
+  const profilesResponse = await profilesResponsePromise;
+  expect(profilesResponse.ok(), 'existing QueueProfiles should be readable').toBeTruthy();
+  const profilesPayload = await profilesResponse.json() as { profiles?: QueueProfileRow[] };
+  const existingProfileTags = (profilesPayload.profiles || []).flatMap((profile) => profile.queue_tags || []);
 
-  // Create a service with a real category and the new profile tag, leaving
-  // the optional doctor empty and requires_doctor at its false default.
+  // The resource axis is configured through a QueueProfile with no Doctor.
+  await createHiddenQueueProfile(page, { key: profileKey, title: profileTitle, queueTag: resourceTag });
+
+  const doctorsResponsePromise = page.waitForResponse((response) =>
+    isGetResponseForPath(response, '/services/admin/doctors')
+  );
+  await page.goto('/admin/services?servicesTab=catalog');
+  const doctorsResponse = await doctorsResponsePromise;
+  expect(doctorsResponse.ok(), 'existing Doctor owners should be readable').toBeTruthy();
+  const existingDoctors = await doctorsResponse.json() as DoctorRow[];
+  expect(Array.isArray(existingDoctors), 'Admin doctor picker should return a typed list').toBeTruthy();
+
+  // Start canonical Doctor onboarding from the existing setup screen link.
   await page.goto('/admin/setup-directions');
-  await expect(page.getByTestId('setup-editor-links')).toBeVisible();
-  await page.getByTestId('setup-editor-links').locator('a[href*="servicesTab=catalog"]').click();
-  await expect(page).toHaveURL(/servicesTab=catalog/);
-  const emptyServices = page.getByRole('region', { name: 'Услуги не найдены' });
-  await expect(emptyServices).toBeVisible();
-  await emptyServices.getByRole('button', { name: /Добавить услугу|Add service/i }).click();
-  const serviceEditor = page.getByRole('heading', { name: /Добавление услуги|Add service/i }).locator('..');
-  const serviceForm = serviceEditor.locator('form').last();
-  await expect(serviceForm).toBeVisible();
-  await serviceForm.locator('input[type="text"]').first().fill(serviceName);
+  const userLink = page.getByTestId('setup-editor-links').locator('a[href*="/admin/users"]');
+  await userLink.click();
+  await expect(page.getByTestId('queue-setup-return-link')).toBeVisible();
+  const addUserButton = page.getByRole('button', { name: /Добавить пользователя|Add user/i });
+  const specialtiesResponsePromise = page.waitForResponse((response) =>
+    isGetResponseForPath(response, '/admin/doctors/specialty-vocabulary')
+  );
+  await addUserButton.click();
+  const specialtiesResponse = await specialtiesResponsePromise;
+  expect(specialtiesResponse.ok(), 'canonical Doctor specialty vocabulary should load').toBeTruthy();
+  const specialtyPayload = await specialtiesResponse.json() as SpecialtyRow[] | { items?: SpecialtyRow[] };
+  const specialtyItems = (Array.isArray(specialtyPayload)
+    ? specialtyPayload
+    : specialtyPayload.items || []).filter((item) => Boolean(item?.code));
+  const usedCodes = new Set(
+    [
+      ...existingDoctors.map((doctor) => doctor.specialty),
+      ...existingProfileTags,
+      ...resourceTagsFromCurrentFacts,
+    ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean),
+  );
+  const selectedSpecialtyIndex = specialtyItems.findIndex(
+    (specialty) => Boolean(specialty.code) && !usedCodes.has(specialty.code.trim().toLowerCase()),
+  );
+  expect(
+    selectedSpecialtyIndex,
+    'synthetic staging needs one unused canonical specialty to isolate the Doctor-owned direction',
+  ).toBeGreaterThanOrEqual(0);
+  const doctorSpecialty = specialtyItems[selectedSpecialtyIndex];
+  const doctorKey = 'rqdoc_' + suffix;
+  const doctorTitle = 'Synthetic RQ-17 Doctor direction ' + suffix;
+  const doctorName = 'SYNTHETIC-RQ17 Doctor ' + suffix;
+  const doctorUsername = 'synthetic_rq17_doc_' + suffix;
+  const doctorEmail = 'synthetic.rq17.' + suffix + '@example.invalid';
 
-  const categorySelect = serviceForm.locator('.mac-select').first().getByRole('button');
-  await categorySelect.click();
-  const categoryOptions = page.getByRole('listbox').getByRole('option');
-  const categoryOptionCount = await categoryOptions.count();
-  const hasServiceCategory = categoryOptionCount > 1;
-  if (hasServiceCategory) {
-    await categoryOptions.nth(1).click();
-  } else {
-    await expect(categoryOptions).toHaveCount(1);
-    await expect(categoryOptions.first()).toHaveText(/Выберите категорию|Select category/i);
-    await categoryOptions.first().click();
-  }
+  const userDialog = page.getByRole('dialog');
+  await expect(userDialog).toBeVisible();
+  await userDialog.locator('.mac-select-trigger').first().click();
+  const doctorRole = page.getByRole('listbox').getByRole('option').filter({ hasText: /Врач|Doctor/i });
+  await expect(doctorRole).toHaveCount(1);
+  await doctorRole.click();
+  const specialtyTrigger = userDialog.locator('#user-modal-doctor-specialty');
+  await expect(specialtyTrigger).toBeVisible();
+  await specialtyTrigger.click();
+  const specialtyOptions = page.getByRole('listbox').getByRole('option');
+  await expect(specialtyOptions).toHaveCount(specialtyItems.length + 1);
+  await specialtyOptions.nth(selectedSpecialtyIndex + 1).click();
 
-  const queueTab = serviceEditor.getByRole('button', { name: /Очередь|Queue/i });
-  await expect(queueTab).toBeVisible();
-  await queueTab.click();
-  const queueTagSelect = serviceForm.locator('.mac-select').first().getByRole('button');
-  await queueTagSelect.click();
-  const resourceTagOption = page.getByRole('listbox').getByRole('option').filter({ hasText: profileTitle });
-  await expect(resourceTagOption).toHaveCount(1);
-  await resourceTagOption.click();
-
-  const optionsTab = serviceEditor.getByRole('button', { name: /Опции|Options/i });
-  await expect(optionsTab).toBeVisible();
-  await optionsTab.click();
-  await expect(serviceForm.getByRole('checkbox', { name: /Требует врача|Doctor required/i })).not.toBeChecked();
-  const serviceCreateResponsePromise = page.waitForResponse((response) => {
+  const textInputs = userDialog.locator('input[type="text"]');
+  await textInputs.nth(0).fill(doctorUsername);
+  await textInputs.nth(1).fill(doctorName);
+  await userDialog.locator('input[type="email"]').fill(doctorEmail);
+  const doctorPassword = 'Synthetic-' + crypto.randomBytes(24).toString('hex') + '!A1';
+  await userDialog.locator('input[type="password"]').nth(0).fill(doctorPassword);
+  await expect(userDialog.locator('input[type="password"]')).toHaveCount(2);
+  await userDialog.locator('input[type="password"]').nth(1).fill(doctorPassword);
+  const userCreateResponsePromise = page.waitForResponse((response) => {
     const pathname = new URL(response.url()).pathname;
-    return response.request().method() === 'POST' && /\/services\/?$/.test(pathname);
+    return response.request().method() === 'POST' && pathname.endsWith('/users/users');
   });
-  await serviceForm.getByRole('button', { name: /Сохранить услугу|Сохранить|Save service|Save/i }).click();
-  const serviceCreateResponse = await serviceCreateResponsePromise;
-  expect(serviceCreateResponse.ok(), 'doctorless synthetic service should be saved').toBeTruthy();
-  const servicePayload = serviceCreateResponse.request().postDataJSON() as Record<string, unknown>;
-  expect(servicePayload).toMatchObject({
-    queue_tag: resourceTag,
-    doctor_id: null,
-    requires_doctor: false,
+  await userDialog.getByRole('button', { name: 'Create user', exact: true }).click();
+  const userCreateResponse = await userCreateResponsePromise;
+  expect(userCreateResponse.ok(), 'Doctor should be created through normal User Management').toBeTruthy();
+  expect(userCreateResponse.request().postDataJSON()).toMatchObject({
+    username: doctorUsername,
+    email: doctorEmail,
+    full_name: doctorName,
+    role: 'Doctor',
+    doctor_profile: { specialty: doctorSpecialty.code },
   });
-  if (!hasServiceCategory) {
-    expect(servicePayload.category_id).toBeNull();
-  }
-  await expect(page.getByText(serviceName).first()).toBeVisible();
+  await expect(userDialog).toHaveCount(0);
+  await page.getByTestId('queue-setup-return-link').click();
+  await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
 
-  // The current setup screen owns the resource view; create a draft first,
-  // then activate it through the normal eligibility gate.
+  // The Doctor axis requires an explicit service owner and a matching profile tag.
+  await createHiddenQueueProfile(page, {
+    key: doctorKey,
+    title: doctorTitle,
+    queueTag: doctorSpecialty.code,
+  });
+
+  const createdDoctorsResponsePromise = page.waitForResponse((response) =>
+    isGetResponseForPath(response, '/services/admin/doctors')
+  );
+  await page.goto('/admin/services?servicesTab=catalog');
+  const createdDoctorsResponse = await createdDoctorsResponsePromise;
+  expect(createdDoctorsResponse.ok()).toBeTruthy();
+  const doctors = await createdDoctorsResponse.json() as DoctorRow[];
+  const createdDoctorMatches = doctors.filter((doctor) => doctor.specialty === doctorSpecialty.code);
+  expect(
+    createdDoctorMatches,
+    'the selected unused specialty should resolve to exactly the newly created Doctor',
+  ).toHaveLength(1);
+  const doctorId = createdDoctorMatches[0].id;
+
+  await createCatalogService(page, {
+    name: 'Synthetic RQ-17 Doctor service ' + suffix,
+    profileTitle: doctorTitle,
+    queueTag: doctorSpecialty.code,
+    doctorSpecialty: doctorSpecialty.code,
+    doctorId,
+  });
+  await createCatalogService(page, {
+    name: serviceName,
+    profileTitle,
+    queueTag: resourceTag,
+  });
+
   await page.goto('/admin/setup-directions');
   await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
   await page.getByTestId('setup-view-resources').click();
@@ -241,17 +527,72 @@ test('current setup screen supports resource-only setup without creating another
   await resourceRow.locator('[data-testid^="qr-resource-toggle-"]').click();
   await expect(resourceRow.getByTestId('qr-resource-badge-active')).toBeVisible({ timeout: 15_000 });
 
-  // The backend read model must resolve exactly one booking target, owned by
-  // the QueueResource. A doctor target would contradict this doctorless path.
-  await page.getByTestId('setup-view-checklist').click();
-  const directionRow = page.getByTestId(`setup-checklist-row-${resourceTag}`);
-  await expect(directionRow).toBeVisible({ timeout: 20_000 });
-  const targets = directionRow.getByTestId('setup-direction-targets');
-  await expect(targets).toBeVisible();
-  await expect(targets.locator('li')).toHaveCount(1);
-  await expect(targets).toContainText(resourceName);
-  await expect(targets).toContainText(/ресурс|resource/i);
-  await expect(targets).not.toContainText(/врач|doctor/i);
+  const resourceId = Number(
+    (await resourceRow.getAttribute('data-testid'))?.replace('qr-resource-row-', ''),
+  );
+  expect(Number.isInteger(resourceId) && resourceId > 0, 'QueueResource should have a persisted ID').toBeTruthy();
+
+  // Before publication, both backend-resolved owners must remain hidden and
+  // provide the explicit publish action instead of claiming QR readiness.
+  let facts = await waitForAdminDirections(page);
+  expectDirectionState(directionForKey(facts, doctorKey), {
+    key: doctorKey,
+    ownerType: 'doctor',
+    ownerId: doctorId,
+    queueTag: doctorSpecialty.code,
+    published: false,
+  });
+  expectDirectionState(directionForKey(facts, profileKey), {
+    key: profileKey,
+    ownerType: 'resource',
+    ownerId: resourceId,
+    queueTag: resourceTag,
+    published: false,
+  });
+
+  await publishQueueProfile(page, doctorKey, doctorTitle);
+  facts = await waitForAdminDirections(page);
+  expectDirectionState(directionForKey(facts, doctorKey), {
+    key: doctorKey,
+    ownerType: 'doctor',
+    ownerId: doctorId,
+    queueTag: doctorSpecialty.code,
+    published: true,
+  });
+  expectDirectionState(directionForKey(facts, profileKey), {
+    key: profileKey,
+    ownerType: 'resource',
+    ownerId: resourceId,
+    queueTag: resourceTag,
+    published: false,
+  });
+
+  await publishQueueProfile(page, profileKey, profileTitle);
+  facts = await waitForAdminDirections(page);
+  expectDirectionState(directionForKey(facts, doctorKey), {
+    key: doctorKey,
+    ownerType: 'doctor',
+    ownerId: doctorId,
+    queueTag: doctorSpecialty.code,
+    published: true,
+  });
+  expectDirectionState(directionForKey(facts, profileKey), {
+    key: profileKey,
+    ownerType: 'resource',
+    ownerId: resourceId,
+    queueTag: resourceTag,
+    published: true,
+  });
+
+  const publicCatalogResponse = await page.context().request.get(
+    new URL('/api/v1/queues/profiles/public', page.url()).toString(),
+  );
+  expect(publicCatalogResponse.ok(), 'public QR catalog should expose published profiles').toBeTruthy();
+  const publicCatalog = await publicCatalogResponse.json() as {
+    specialists?: Array<{ specialty?: string }>;
+  };
+  const publicProfileKeys = (publicCatalog.specialists || []).map((specialist) => specialist.specialty);
+  expect(publicProfileKeys).toEqual(expect.arrayContaining([doctorKey, profileKey]));
 
   if (verifyServedFrontend) {
     const assetDirectory = process.env.T18_SERVED_ASSET_DIR;
