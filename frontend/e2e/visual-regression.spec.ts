@@ -109,7 +109,12 @@ const sampleRefundRequest = {
   id: 4001,
   patient_id: 101,
   patient_name: 'Тестов Т. Т.',
-  amount: 50000,
+  // CSH-FE-050 (follow-up audit 2026-11-02): фикстура приведена к
+  // РЕАЛЬНОМУ ответу RefundRequestResponse — поле называется
+  // `refund_amount` (сериализатор force_majeure_api_service), `amount`
+  // бэкенд не отдаёт. До фикса таблица читала несуществующее поле и
+  // рендерила «—»; baseline обновлён под честную сумму (50 000 сум).
+  refund_amount: 50000,
   refund_type: 'card',
   reason: 'Дубликат оплаты',
   status: 'pending',
