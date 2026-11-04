@@ -1,11 +1,30 @@
 # Registrar + cashier frontend: follow-up source review and coverage gaps (2026-11-02)
 
-> Documentation-only Draft audit. Source-observed candidates; no executed reproduction, no claim of production impact. Do **not** merge as a code fix.
+> Documentation-only audit journal. Source-observed candidates; no executed reproduction, no claim of production impact, no resolution certification. Landing this document records findings only — do **not** treat it as a code fix; every fix belongs in a separate gated implementation PR.
+
+
+## Renumbering and reconciliation (2026-11-05)
+
+The 2026-11-03 re-review batch actualized both canonical ledgers (PR #3863, merged `40136e3ebf`) and **added different findings under five IDs this document had already used on 2026-11-02**: REG-FE-067/068/069 in the registrar ledger (per-queue element contract fail-closed; queue deselect epoch + controlled selection; reschedule visit-id space — all RESOLVED via #3855/#3856/#3857) and CSH-FE-037/038 in the cashier ledger (polling budget vs terminal status; stale provider responses across currency switches — both RESOLVED via #3854). The two numbering streams were produced independently within a day of each other.
+
+To keep the global audit ID space unambiguous, **this document's five findings are renumbered; their content is unchanged**:
+
+| Original ID in this document | New ID | This document's finding (short) | Canonical-ledger holder of the original ID |
+| --- | --- | --- | --- |
+| REG-FE-067 | **REG-FE-083** | Record preview discards the issued ticket `number` | per-queue element contract, RESOLVED via #3855 |
+| REG-FE-068 | **REG-FE-084** | Removing one service within a retained queue entry is a silent no-op edit | deselect epoch + controlled selection, RESOLVED via #3856 |
+| REG-FE-069 | **REG-FE-085** | Type-sensitive queue-entry IDs (`42` vs `"42"`) can cancel a retained entry | reschedule visit-id space, RESOLVED via #3857 |
+| CSH-FE-037 | **CSH-FE-050** | Refund table reads `amount`; backend responds `refund_amount` | polling budget vs terminal status, RESOLVED via #3854 |
+| CSH-FE-038 | **CSH-FE-051** | `cash` refund destination labeled 'На карту' | stale provider responses across currency switches, RESOLVED via #3854 |
+
+**Re-verification 2026-11-05 at `main 64a7c0b9ce`:** all five renumbered findings remain present in current code — `formatPreviewList` (`registrarHelpers.ts` L322–330) still never reads `number`; `refundRequestsContracts.ts` L21 still declares optional `amount` and `refundRequestsColumns.tsx` L156–158 still reads the `amount` column key with a `—` fallback; `getRefundTypeBadge` (`refundRequestsColumns.tsx` L46–51) still maps every value except `deposit` to `rrt_na_kartu`; `getRemovedQueueEntryIds` (`wizardUtils.ts` L463–474) still compares raw `Set<string | number>` membership; `buildEditDeltaTargetItems` (`wizardUtils.ts` L1930+) still emits no per-service removal instruction. None of the five was fixed by #3854–#3857 — those PRs fixed the same-numbered **ledger** findings listed in the right-hand column.
+
+The rest of this document's ID ranges continue both ledger sequences without collision: REG-FE-070–082 (registrar) and CSH-FE-039–049 (cashier) were still free in the canonical ledgers, and the QR-FE-001–007 series plus backend REG-XC-001 have no canonical-ledger counterparts.
 
 ## Baseline and scope
 
 - Repository: `drsapaev/final`; reviewed `main` at `ee7763e77e545db1479e257dbe4d3a388264cc03` (the commit matched `main` immediately before this audit branch).
-- Prior audit indices are [registrar Draft PR #3803](https://github.com/drsapaev/final/pull/3803) (`docs/audits/2026-10-29-registrar-frontend-review-ledger.md`) and [cashier Draft PR #3813](https://github.com/drsapaev/final/pull/3813) (`docs/audits/2026-11-01-cashier-frontend-review-ledger.md`). **Those remain the original historical ledgers.**
+- Prior audit indices are [registrar PR #3803](https://github.com/drsapaev/final/pull/3803) (`docs/audits/2026-10-29-registrar-frontend-review-ledger.md`) and [cashier PR #3813](https://github.com/drsapaev/final/pull/3813) (`docs/audits/2026-11-01-cashier-frontend-review-ledger.md`). **Those remain the original historical ledgers.**
 - Mode: `direct_execute` for a **new, single Markdown source-review checkpoint only**. Allowed edit: `docs/audits/2026-11-02-registrar-cashier-followup-source-review.md`. Source/test/backend reads are reference-only. No gate executable was run because no queue/payment/security/clinical application contract or code was changed. All later executable repairs require the mandatory gate and execution prompt under `AGENTS.md`.
 - Denied writes: `frontend/**`, `backend/**`, database/migrations, workflows, secrets, other branches/ledgers, live data, deployments. Stop condition: do not implement fixes or silently close prior findings inside this documentation PR.
 - Method: GitHub pinned file reads and cross-checks against the actual producer/backend DTO, not a browser run. Severity labels are **provisional** until synthetic fail-first tests demonstrate behavior.
@@ -17,25 +36,25 @@ The previous reviews **already inspected all five named registrar groups** and t
 | Area | Remaining incomplete depth or verification | Exact files / scope | Status after this pass |
 | --- | --- | --- | --- |
 | Registrar wizard | Full branch-by-branch review of registration/edit/multiservice execution, race/idempotency and date-dependent flow; original audit explicitly described a targeted scan of a 3331-line wizard and 2343-line utility | `frontend/src/components/wizard/AppointmentWizardV2.tsx`; `frontend/src/components/wizard/wizardUtils.ts`; remaining components/tests under `frontend/src/components/wizard/` | **Still incomplete**; not proven by running tests |
-| Registrar preview/identity display | Route-reachable preview dialogue and its value formatter, including canonical ticket facts | `frontend/src/pages/registrar/views/RecordPreview.tsx`; `frontend/src/pages/registrar/registrarHelpers.ts`; `frontend/src/pages/registrar/views/RegistrarDialogsLayer.tsx`; `frontend/src/pages/registrar/registrarQueueAdapter.ts` | **Focused source check done now**; new REG-FE-067 |
+| Registrar preview/identity display | Route-reachable preview dialogue and its value formatter, including canonical ticket facts | `frontend/src/pages/registrar/views/RecordPreview.tsx`; `frontend/src/pages/registrar/registrarHelpers.ts`; `frontend/src/pages/registrar/views/RegistrarDialogsLayer.tsx`; `frontend/src/pages/registrar/registrarQueueAdapter.ts` | **Focused source check done now**; new REG-FE-083 |
 | Registrar auxiliary selectors/price approvals | Establish actual mounted reachability before calling any behavior a registrar production defect | `frontend/src/components/registrar/IntegratedServiceSelector.tsx`, `IntegratedDoctorSelector.tsx`, `PriceOverrideApproval.tsx` | Previously scanned; **active consumer still unproven**; do not count dormant issues |
 | Registrar visual/a11y | Browser evidence for CSS, keyboard/focus/scrolling, accessibility and historic/doctor/resource switching | Registrar CSS, shared `ModernDialog`, `DataTable`, `EnhancedAppointmentsTable` and related Playwright/axe scenarios | Source review exists; **runtime/visual review incomplete** |
-| Cashier refund presentation | Complete backend DTO-to-table check, including returned sum and refund destination | `frontend/src/components/cashier/refundRequestsColumns.tsx`, `refundRequestsContracts.ts`, `useRefundRequests.ts`, `RefundRequestsTable.tsx` | **Focused contract check done now**; new CSH-FE-037/038 |
+| Cashier refund presentation | Complete backend DTO-to-table check, including returned sum and refund destination | `frontend/src/components/cashier/refundRequestsColumns.tsx`, `refundRequestsContracts.ts`, `useRefundRequests.ts`, `RefundRequestsTable.tsx` | **Focused contract check done now**; new CSH-FE-050/051 |
 | Cashier other presentation | Detailed edge-case review and test execution for filters/service badges/stats; compare cash vs refund vs zero vs missing field | `frontend/src/pages/cashier/views/CashierServiceBadges.tsx`, `CashierFiltersCard.tsx`, `CashierStatsCard.tsx`, `CashierPendingTable.tsx` | Targeted re-read now; remaining cross-component tests |
 | Cashier mutation, provider, session | Source read was bounded, but concurrent/uncertain-payment, delayed provider response, CSRF, RBAC, double submit and stale read A/B sequences were **not executed** | `frontend/src/components/payment/PaymentWidget.tsx`, `CashPaymentModal.tsx`, `frontend/src/hooks/usePayments.ts`, `frontend/src/api/client.ts`, `frontend/src/hooks/usePendingAwareSessionExpiry.ts` | Deep test/e2e coverage still required; see existing CSH-FE IDs before issuing new IDs |
 | Cashier print/export/visual | Source reviewed for defects but no full receipt/PDF reconciliation, CSV injection or actual browser/layout validation | `frontend/src/services/panelPrint.ts`, `frontend/src/utils/printWindow.ts`, `frontend/src/pages/cashier.css`, `frontend/src/components/cashier/RefundRequestsTable.css` | **Still needs** synthetic end-to-end, visual and physical print checks |
 
-**Distinction:** 'reviewed' means code was read; 'confirmed fixed' requires an executable regression and a merged fix PR. Old indices already include REG-FE-001–066 and CSH-FE-001–036 (including post-merge open questions); do not duplicate them in this new pass. Reconcile their statuses with current main separately.
+**Distinction:** 'reviewed' means code was read; 'confirmed fixed' requires an executable regression and a merged fix PR. Old indices already include REG-FE-001–066 and CSH-FE-001–036 (including post-merge open questions); do not duplicate them in this new pass. Reconcile their statuses with current main separately. (2026-11-05: the canonical ledgers have since grown to REG-FE-069 / CSH-FE-038 via the #3863 actualization — see the renumbering note above.)
 
 ## New indexed findings (not previously recorded under these IDs)
 
 | ID | Priority candidate | Surface | Source observation | Verification |
 | --- | --- | --- | --- | --- |
-| **REG-FE-067** | P2 | Registrar record preview | 'Очередь' formats objects by queue name/tag but discards their `number` | SOURCE-OBSERVED / REPRO-PENDING |
-| **CSH-FE-037** | **P1** | Cashier refund requests amount | Backend responds `refund_amount`; table column reads `amount`; no adapter maps between them | SOURCE-OBSERVED / REPRO-PENDING |
-| **CSH-FE-038** | P2 | Cashier refund destination | UI maps every type except `deposit` to 'На карту', including the legitimate `cash` refund enum | SOURCE-OBSERVED / REPRO-PENDING |
+| **REG-FE-083** | P2 | Registrar record preview | 'Очередь' formats objects by queue name/tag but discards their `number` | SOURCE-OBSERVED / REPRO-PENDING |
+| **CSH-FE-050** | **P1** | Cashier refund requests amount | Backend responds `refund_amount`; table column reads `amount`; no adapter maps between them | SOURCE-OBSERVED / REPRO-PENDING |
+| **CSH-FE-051** | P2 | Cashier refund destination | UI maps every type except `deposit` to 'На карту', including the legitimate `cash` refund enum | SOURCE-OBSERVED / REPRO-PENDING |
 
-### REG-FE-067 — Record preview shows queue label, not issued ticket (P2 candidate)
+### REG-FE-083 — Record preview shows queue label, not issued ticket (P2 candidate)
 
 **Producer/consumer proof:** The live `RegistrarDialogsLayer` mounts `RecordPreview` ([L136](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/frontend/src/pages/registrar/views/RegistrarDialogsLayer.tsx#L136)). `RecordPreview.tsx` [L58](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/frontend/src/pages/registrar/views/RecordPreview.tsx#L58) renders the queue field as `formatPreviewList(row.queue_numbers)`. The formatter in `registrarHelpers.ts` [L322–327](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/frontend/src/pages/registrar/registrarHelpers.ts#L322-L327) selects `name`, `service_name`, `code`, `queue_name` or `queue_tag` and **never reads `number`**. Meanwhile `registrarQueueAdapter.ts` [L117–127](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/frontend/src/pages/registrar/registrarQueueAdapter.ts#L117-L127) produces `queue_numbers` records with `number`, `queue_tag` and `queue_name`.
 
@@ -43,7 +62,7 @@ The previous reviews **already inspected all five named registrar groups** and t
 
 **Fail-first test / fix direction:** Mount `RecordPreview` with numbers 17 and 22 in distinct owner scopes; assert both issued numbers appear paired with the correct queue labels. A `null`/unallocated number should show a non-ticket placeholder and never invent a row ordinal. Prefer a dedicated ticket formatter reading the backend `queue_numbers` identity rather than changing generic `formatPreviewList` used for services. Keep server identity SSOT.
 
-### CSH-FE-037 — Refund amount column uses nonexistent response field (P1 candidate)
+### CSH-FE-050 — Refund amount column uses nonexistent response field (P1 candidate)
 
 **Server contract:** `RefundRequestResponse` in `backend/app/api/v1/endpoints/force_majeure.py` [L111–134](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/backend/app/api/v1/endpoints/force_majeure.py#L111-L134) declares `refund_amount: float` and does not declare `amount`. The domain serializer also explicitly returns `"refund_amount": float(req.refund_amount)` in `force_majeure_api_service.py` [L612](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/backend/app/services/force_majeure_api_service.py#L612).
 
@@ -53,7 +72,7 @@ The previous reviews **already inspected all five named registrar groups** and t
 
 **Fail-first test / fix direction:** Mock the **actual response DTO** containing `refund_amount:70000` and no `amount`, render `RefundRequestsTable` and assert `70 000` is visible in its amount cell. Include zero/invalid/missing cases, and ensure action states remain sourced from backend `available_actions`. Update the typed read model and column to `refund_amount`; do not synthesize totals client-side. Mandatory finance/API contract gate for the subsequent code PR.
 
-### CSH-FE-038 — Cash refund is labeled 'to card' (P2 candidate)
+### CSH-FE-051 — Cash refund is labeled 'to card' (P2 candidate)
 
 **Backend:** `RefundType` enum in `backend/app/models/refund_deposit.py` [L46–50](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/backend/app/models/refund_deposit.py#L46-L50) has `bank_transfer`, `deposit`, and `cash`. **Frontend:** `getRefundTypeBadge` in `refundRequestsColumns.tsx` [L46–52](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/frontend/src/components/cashier/refundRequestsColumns.tsx#L46-L52) renders `На депозит` for `deposit` and the translation key for `На карту` for **every other value**. Thus `cash` is displayed as `На карту`; unknown future enum values would also be misleadingly labeled as card payouts.
 
@@ -61,15 +80,15 @@ The previous reviews **already inspected all five named registrar groups** and t
 
 ## De-duplication and source-positive checks
 
-- CSH-FE-037 and -038 are **not** CSH-FE-011/012 (wrong refund API origin/CSRF), CSH-FE-014 (50-item pagination), CSH-FE-016 (whether completed means money transferred), nor CSH-FE-020 (receipt item totals). They concern the read-side refund list's displayed amount and type.
-- REG-FE-067 is **not** REG-FE-022/056/062/063 (canonical ticket issuance/binding/aggregation); this is exclusively the preview's final formatter for an already provided number.
+- CSH-FE-050 and -051 are **not** CSH-FE-011/012 (wrong refund API origin/CSRF), CSH-FE-014 (50-item pagination), CSH-FE-016 (whether completed means money transferred), nor CSH-FE-020 (receipt item totals). They concern the read-side refund list's displayed amount and type.
+- REG-FE-083 is **not** REG-FE-022/056/062/063 (canonical ticket issuance/binding/aggregation); this is exclusively the preview's final formatter for an already provided number.
 - Cashier `CashierServiceBadges.tsx`, `CashierFiltersCard.tsx`, `CashierStatsCard.tsx`, `refundRequestsColumns.tsx`, `refundRequestsContracts.ts`, `useRefundRequests.ts` and `RefundRequestsTable.tsx` were additionally read at current main. Lack of an executed test does not create additional findings by itself.
 - This source pass verified `getRefundTypeBadge` is presentation-only and `hasBackendRefundAction()` stays fail-closed on action permission. No evidence of successful or failed real transfers was collected.
 
 ## Next bounded review cycles
 
-1. **Cashier refund truth, first:** run a synthetic response DTO → `useRefundRequests` → `RefundRequestsTable` component test for CSH-FE-037/038; inspect user-readable refusal/error states. Create a separate gated implementation PR, not in this audit branch.
-2. **Registrar preview, second:** verify current active preview trigger and component test, ensure multi-queue numbers carry owner identifiers, then repair display only under REG-FE-067 in a separate implementation PR.
+1. **Cashier refund truth, first:** run a synthetic response DTO → `useRefundRequests` → `RefundRequestsTable` component test for CSH-FE-050/051; inspect user-readable refusal/error states. Create a separate gated implementation PR, not in this audit branch.
+2. **Registrar preview, second:** verify current active preview trigger and component test, ensure multi-queue numbers carry owner identifiers, then repair display only under REG-FE-083 in a separate implementation PR.
 3. **Registrar wizard deep pass:** trace the remaining wizard cart/price/doctor/time/confirm branches through `AppointmentWizardV2.tsx` and `wizardUtils.ts` in small slices; check against existing REG-FE issues before numbering anything new.
 4. **Cashier payment provider/print:** run bounded source + synthetic defer/retry tests for `PaymentWidget`, `CashPaymentModal`, `usePayments`, `panelPrint`, `printWindow` and page-specific CSS in an actual browser. Existing CSH-FE-001–035 already cover many relevant hypotheses.
 5. **Reachability boundary:** determine whether orphaned registrar selectors/price-approval components are actually mounted. Do not classify dormant code as a current registrar UX regression.
@@ -81,11 +100,11 @@ The previous reviews **already inspected all five named registrar groups** and t
 
 | ID | Provisional severity | Path | Symptom | Verification status |
 | --- | --- | --- | --- | --- |
-| **REG-FE-068** | **P1** | `wizardUtils.ts` + `AppointmentWizardV2.tsx` | Removing one of two services that share one queue entry is silently treated as no service delta, then reported as a successful edit | **SOURCE-OBSERVED / REPRO-PENDING** |
-| **REG-FE-069** | **P1** | `wizardUtils.ts` | Queue-entry ID equality is type-sensitive; `42` and `"42"` name the same entry but a still-kept entry is sent for cancellation | **SOURCE-OBSERVED / REPRO-PENDING** |
+| **REG-FE-084** | **P1** | `wizardUtils.ts` + `AppointmentWizardV2.tsx` | Removing one of two services that share one queue entry is silently treated as no service delta, then reported as a successful edit | **SOURCE-OBSERVED / REPRO-PENDING** |
+| **REG-FE-085** | **P1** | `wizardUtils.ts` | Queue-entry ID equality is type-sensitive; `42` and `"42"` name the same entry but a still-kept entry is sent for cancellation | **SOURCE-OBSERVED / REPRO-PENDING** |
 | **REG-FE-070** | P2 | `AppointmentWizardV2.tsx` | Manual service-list refresh announces success even when the fetch failed | **SOURCE-OBSERVED / REPRO-PENDING** |
 
-### REG-FE-068 — Removing a single service within a retained queue entry is not a persisted edit (P1 candidate)
+### REG-FE-084 — Removing a single service within a retained queue entry is not a persisted edit (P1 candidate)
 
 **Active route:** `CartStepV2.tsx` [L657–679](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/frontend/src/components/wizard/CartStepV2.tsx#L657-L679) offers the decrement-to-zero and remove buttons, calling the wizard's `removeFromCart`. The wizard [L1461–1469](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/frontend/src/components/wizard/AppointmentWizardV2.tsx#L1461-L1469) removes the entire cart item. `normalizeServicesFromInitialData` [L370–384, L488–499](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/frontend/src/utils/serviceCodeResolver.ts#L370-L499) can carry the same `original_queue_id` on two distinct service items from one queue.
 
@@ -95,7 +114,7 @@ The previous reviews **already inspected all five named registrar groups** and t
 
 **Fix boundary:** Backend SSOT must define the per-service removal/refund/visit transaction separately from cancelling the whole queue entry. Do not implement a client-side zero quantity, blind cancel, or optimistic success. Run mandatory `gate_known_root_cause` with full queue/visit/payment scope before implementation.
 
-### REG-FE-069 — Mixed `string | number` queue-entry IDs can cancel a retained record (P1 candidate)
+### REG-FE-085 — Mixed `string | number` queue-entry IDs can cancel a retained record (P1 candidate)
 
 **Proof in pure comparison:** The helper signature explicitly accepts `Array<string | number>` and cart items with `original_queue_id?: string | number` in [wizardUtils.ts L458–474](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/frontend/src/components/wizard/wizardUtils.ts#L458-L474). It inserts raw cart IDs into `Set<string | number>` and filters original IDs with `!currentQueueIds.has(id)`. Therefore `getRemovedQueueEntryIds([42], [{original_queue_id: "42"}])` returns `[42]` instead of `[]`. `cancelRemovedQueueEntries` [L490–522](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/frontend/src/components/wizard/wizardUtils.ts#L490-L522) then issues `POST /online-queue/entries/42/cancel` even though the entry remains in the cart. The wizard also repeats this raw-Set comparison inline in [L2544–2556, L2649–2655 and L2815–2829](https://github.com/drsapaev/final/blob/ee7763e77e545db1479e257dbe4d3a388264cc03/frontend/src/components/wizard/AppointmentWizardV2.tsx#L2544-L2829).
 
@@ -115,7 +134,7 @@ The `loadServices` helper [AppointmentWizardV2.tsx L922–948](https://github.co
 - Quote effect uses request-epoch guard and server quote token on create/edit/full update; this does **not** establish an executed live financial or queue contract test.
 - Existing backend edit-delta supports **quantity change** for a given service; it is not a general remove-one-service API.
 - Review did **not** perform Vitest, pytest, Playwright, browser smoke, PowerShell execution gate, staging or production changes. Findings retain `REPRO-PENDING`.
-- Reproduction and any code changes belong to independent, domain-gated implementation PRs, not this documentation Draft.
+- Reproduction and any code changes belong to independent, domain-gated implementation PRs, not this documentation audit.
 
 
 ## Focused auxiliary registrar selector review (2026-11-02, main `1595ce3dc907c64da57fd221de330646e4a9ed90`)
@@ -239,14 +258,14 @@ This is a **cross-contract finding in backend source** uncovered while reviewing
 - The row-action column does stop pointer propagation into row activation; report no new accidental row-action double command without a failing fixture.
 - Prior REG-FE-051 search/page false-empty, REG-FE-049 focus timer, REG-FE-059 context-menu viewport overflow, REG-FE-060 invalid CSS justification, REG-FE-031 selection mismatch already have original tracking.
 - This is source-level review only; **no** Vitest, axe, Playwright, browser visual screenshot, controlled staging, manual keyboard QA or production visit/payment action run in this PR. All severity P2/P3 is provisional. Do not claim a real patient was affected.
-- Code remediation should use a **separate** implementation PR, maintain backend SSOT for action/queue/payment; shared dialog/table changes require broad synthetic consumers tests and the repo mandatory gate if crossing API/security/clinical queue flows. This Draft remains a documentation-only checkpoint.
+- Code remediation should use a **separate** implementation PR, maintain backend SSOT for action/queue/payment; shared dialog/table changes require broad synthetic consumers tests and the repo mandatory gate if crossing API/security/clinical queue flows. This document remains a documentation-only checkpoint.
 
 
 ## Focused cashier payment dependencies review (2026-11-02 — main `9ba152ab8e394a4b1da23d921d49ceb35dfa5aed`)
 
 **Requested source:** `frontend/src/components/payment/PaymentWidget.tsx` (612 LOC), `CashPaymentModal.tsx` (273 LOC), `frontend/src/hooks/usePayments.ts` (474 LOC). Active consumers confirmed in `frontend/src/pages/cashier/views/CashierDialogsLayer.tsx` and `useCashierActions.ts`, and cashier route `CashierPanel.tsx`. Cross-read `cashierPaymentContracts.ts`, `CashierPendingTable.tsx`, `frontend/src/components/ui/macos/Dialog.tsx`, `backend/app/api/v1/endpoints/cashier/_payments.py`, `_helpers.py`, `backend/app/services/payment_invariant_service.py`, `payment_init_service.py`, `backend/app/api/v1/endpoints/payments.py`, and existing source/handler tests `PaymentWidget.contract.test.tsx`, `usePayments.contract.test.tsx`, `useCashierActions.test.ts`. Read repo `AGENTS.md`, SSOT skill and Vercel React best practices skill. **Source-only, no payments executed, no local/unit/DB/Playwright tests run.**
 
-**Main/ledger drift:** The prior cashier audit #3813 and registrar audit #3803 were **merged** to main at `9ba152ab` (both earlier Drafts closed); their issue IDs remain historical and may not have been fixed. This docs-only Draft #3833 is separate and still opens on original `ee7763e7` base; all implementation steps must first rebase/sync safely with the latest main and verify whether a previous fix supersedes the candidate.
+**Main/ledger drift:** The prior cashier audit #3813 and registrar audit #3803 were **merged** to main at `9ba152ab` (both earlier Drafts closed); their issue IDs remain historical and may not have been fixed. This docs-only PR #3833 is separate and originally opened on the `ee7763e7` base (2026-11-05: branch synced with `main 64a7c0b9ce` via update-branch; the five renumbered findings re-verified as still open — see the renumbering note); all implementation steps must still re-verify against the latest main and check whether a previous fix supersedes the candidate.
 
 **Previously numbered, no duplicate:** CSH-FE-007 (cash modal defaults to total instead of balance), -008 (no cash modal in-flight guard), -009 (blank/zero cash tender bypasses validation), -010 (localhost/DEV auto-confirm **online** before provider settlement), -029 (poll interval closes over stale `paymentData=null`), -030 (unstable provider-load effect due to translation callback), -031 (timeout turns unconfirmed online payment into failed), -035 (unvalidated 200 GET envelope), -019–021 (receipt semantics), -024 (refund validation), and -002 (stale requests). These are **not** new findings. This pass isolates different root causes.
 
@@ -301,7 +320,7 @@ This is a **cross-contract finding in backend source** uncovered while reviewing
 3. **Online lifecycle:** CSH-FE-041 cancellation semantics and CSH-FE-042 delayed timer with fake timers + provider-status response races, explicitly retaining CSH-FE-029/030/031 tracking.
 4. Verify existing CSH-FE-007–010, 029–031 and 035 using dedicated fail-first tests instead of claiming fixes from source inspection.
 
-**No live payment, fixture transaction, test run, migration, app source edit, staging or deployment occurred.** This is a docs-only extension of Draft #3833 (mode `direct_execute` restricted to its single Markdown file); payment/DB source is reference-only. Source fixes require mandatory `ai/langgraph/scripts/run_agent_gate.ps1` with full financial scope and the generated execution prompt read before edits. Stop if payment provenance policy remains unresolved.
+**No live payment, fixture transaction, test run, migration, app source edit, staging or deployment occurred.** This is a docs-only extension of PR #3833 (mode `direct_execute` restricted to its single Markdown file); payment/DB source is reference-only. Source fixes require mandatory `ai/langgraph/scripts/run_agent_gate.ps1` with full financial scope and the generated execution prompt read before edits. Stop if payment provenance policy remains unresolved.
 
 
 ## Focused ticket/receipt print pipeline review (2026-11-02; pinned `main 9ba152ab8e394a4b1da23d921d49ceb35dfa5aed`)
@@ -467,7 +486,7 @@ For legacy token flow, [QueueJoin L894–900](https://github.com/drsapaev/final/
 - **Strong positive:** `api/queueDirections.ts` consumes idempotent admin public-address provision and the canonical anonymous start response, rather than inventing a second queue join endpoint. QR TTL helper classifies valid/expired/unspecified from server expiry. The follow-up issues above concern *live rendering* and *legacy* transport, not the canonical resolver's correctness.
 - **Previously registered, not refiled:** REG-FE-035 (old doctor/day snapshot overwrites new in `useQueueManager`) and REG-FE-042 (missing queue projected as empty), in merged #3803.
 - **Not exhaustively inspected:** every line of 3430-line QueueJoin; all ~900 lines of QueueJoin.css; each line of `AdminSetupDirections`, all queue-table CSS, doctor-specific operational action handlers, production WebSocket delivery and complete end-to-end multilingual visual QA. The focused audit covered security/session/QR/response seams and call sites, not a full directory-wide certification.
-- **No tests executed:** only source and test fixtures read via GitHub; no Playwright, Vitest, pytest, frontend browser, database, real patient, live queue or active QR scanning occurred. Severity is provisional; all findings remain SOURCE-OBSERVED / REPRO-PENDING. For any app-source repair that crosses public-join identity, server queue fairness, PHI, auth or routing, first run the mandatory repository gate `ai/langgraph/scripts/run_agent_gate.ps1`, inspect the generated execution prompt and open a **separate implementation PR**. This cumulative Draft is docs-only and must not be merged as though its review findings were fixes.
+- **No tests executed:** only source and test fixtures read via GitHub; no Playwright, Vitest, pytest, frontend browser, database, real patient, live queue or active QR scanning occurred. Severity is provisional; all findings remain SOURCE-OBSERVED / REPRO-PENDING. For any app-source repair that crosses public-join identity, server queue fairness, PHI, auth or routing, first run the mandatory repository gate `ai/langgraph/scripts/run_agent_gate.ps1`, inspect the generated execution prompt and open a **separate implementation PR**. This cumulative audit document is docs-only; its merge records findings and must not be read as though the review findings were fixes.
 
 
 ## Follow-up QR queue component inventory and one narrow finding (2026-11-02)
@@ -498,5 +517,5 @@ An old `QRTokenManager` or `OnlineQueueManager` from archived design documents i
 
 - Checked: prior audit indices, current repository `AGENTS.md`, project SSOT skill, canonical producer/consumer source and recent main commit via connected GitHub. Cross-checked the exact `refund_amount` name in both Pydantic and serializer; checked the actual `RecordPreview` consumer and `RefundType` enum.
 - NOT run: local worktree state/PowerShell gate; Vitest/pytest/Playwright/axe; `git diff --check`; production or staging; CI for this newly created PR. Source review is **not a runtime test**.
-- Rollback: revert this single Markdown commit or close the audit Draft. No data or application behavior changed.
+- Rollback: revert the merged documentation commit. No data or application behavior changed.
 - Stop: do not mark findings resolved or deploy until synthetic failing tests, mandatory domain gate for source fixes, independent review and successful required CI.
