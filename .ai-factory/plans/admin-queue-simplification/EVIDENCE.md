@@ -5882,3 +5882,16 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Gate: `run_agent_gate.ps1` from `ai/langgraph` with known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` and four scoped Markdown paths returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. This was a documentation synchronization, not an application or staging change.
 - Validation: automatic Git merge completed without conflicts; merged tree retained all latest branch checkpoint entries and added the incoming audit document; `git diff --cached --check` PASS; normal merge commit hooks completed (file-specific checks reported no applicable files). No app tests, staging, runtime, production, merge, or deployment were run.
 - Remaining: updated journal commit, push, exact-head CI, and PR description refresh are pending. Tier-2 remains PARTIAL; the complete staging runbook and exact served-frontend revision attestation remain incomplete.
+
+## PR #3873 synchronized exact-head checkpoint — 2026-11-04T23:30+05:00
+
+- Commit under review: `ef6aa5e698f1d6fcb57371f81496ce9c94f21b54`; base/current `origin/main`: `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- Environment: GitHub PR #3873, repository `drsapaev/final`; journal worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-combined-validation\final`.
+- Execution mode: continuation of the existing documentation-only PR synchronization; no new staging cycle.
+- Allowed and actual tracked paths: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `RESUME.md`, and `EVIDENCE.md`. Runtime, tests, staging, production, merge and deployment were not changed.
+- Main sync: commit `5cf78a3a97bc9d7f559d8296fd69d2b32231d20d`, second parent `106597d67ece48ee9380ded5725ba421aed8cbc0`; clean merge retained latest T18 journal history and the incoming audit document.
+- Exact-head checks: Unified CI, PR Required Gate, PR Review Quality Gate, lifecycle recommendation, security scans, Gitleaks, CodeQL, GitGuardian, scratch guards, and language analysis passed. An earlier PR Review Quality Gate attempt failed because the PR description lacked required labels; the description was corrected and subsequent exact-head quality-gate runs passed.
+- Scope-aware NOT_RUN/SKIPPED: frontend build/unit/lint/E2E, backend, integration, Docker, staging and production readiness, load, and DAST were skipped because this PR changes only documentation. These skips are not PASS.
+- Result: PR #3873 is OPEN, Ready for review, mergeable, at `ef6aa5e698f1d6fcb57371f81496ce9c94f21b54`. `gh pr checks 3873` showed no checks in progress and no current failure.
+- Limitations: no tests or staging were run in this checkpoint. Tier-2 remains PARTIAL; full `docs/runbooks/STAGING_VALIDATION.md` and exact served-frontend revision attestation remain incomplete (`served_revision_verified=false`).
+- Next: user-owned merge of #3873, then fresh-main worktree and reconciliation of T18 gaps without repeating completed scenarios. Merge commit: none.

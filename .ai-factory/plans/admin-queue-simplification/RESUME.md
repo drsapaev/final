@@ -1,12 +1,12 @@
-## Current resume — sync PR #3873 with main — 2026-11-04T23:07+05:00
+## Current resume — PR #3873 exact-head checks passed — 2026-11-04T23:30+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. PR #3865 is merged at `64a7c0b9ce422bbdac73d919158eb525669d9229`; its final reviewed code HEAD was `290d8f6d960c6207f4118783a1d48775c99ef41e`. The two P2 findings in the supplied older review were fixed and resolved before merge.
 
-PR #3873 was OPEN and Ready for review at remote HEAD `ce0f2d9db64b10689d1ec37a6e03ff790db96043`; its applicable checks passed, while path-aware app/build/test/integration/Docker/staging/readiness/load/DAST jobs were SKIPPED for docs-only scope, not PASS. The branch has now merged origin/main `106597d67ece48ee9380ded5725ba421aed8cbc0` as local merge commit `5cf78a3a97bc9d7f559d8296fd69d2b32231d20d`. The merge retained the newest T18 checkpoint/evidence and added the independent audit document. Push and exact-head CI are pending.
+PR #3873 is OPEN, Ready for review and mergeable at exact HEAD `ef6aa5e698f1d6fcb57371f81496ce9c94f21b54`, based on `106597d67ece48ee9380ded5725ba421aed8cbc0`. It contains only three T18 journal files. The branch includes clean main-sync merge `5cf78a3a97bc9d7f559d8296fd69d2b32231d20d`; it was pushed. Unified CI, PR Required Gate, PR Review Quality Gate, lifecycle, security, Gitleaks, CodeQL, GitGuardian, scratch guards and language analysis passed on exact HEAD. Product-path checks (frontend/backend/build/tests/integration/Docker/staging/readiness/load/DAST) were SKIPPED for the documentation-only diff, not PASS. An earlier quality-gate failure caused by missing PR-body labels was corrected; subsequent exact-head runs passed.
 
 The combined synthetic run on exact runtime source `64a7c0b9` passed T18 scenarios 3, 5-live, and 10 with ordinary Admin password + TOTP and owned teardown. Earlier scenario evidence remains in `EVIDENCE.md`. Full T18 is not claimed complete: full `STAGING_VALIDATION.md` remains incomplete and exact current served-frontend provenance remains NOT_RUN (`served_revision_verified=false`). Tier-2 remains PARTIAL, with no deferral.
 
-No code, tests, or staging resources changed in this checkpoint. Tier-2 remains PARTIAL; full `STAGING_VALIDATION.md` and exact served frontend revision attestation remain incomplete. Next: commit the updated checkpoint, push the synchronized branch, confirm exact-head checks, and update the PR description. Do not merge or deploy; the user retains that authority.
+No code, tests, or staging resources changed in this checkpoint. Tier-2 remains PARTIAL; full `STAGING_VALIDATION.md` and exact served frontend revision attestation remain incomplete. Next: user-owned merge of #3873. After merge, refresh `origin/main` in a fresh worktree, reconcile T18 evidence without repeating accepted scenarios, and continue the next distinct gap. Do not deploy or claim full Tier-2.
 ---
 ## Latest continuation — T18 scenario 5 PostgreSQL existing-token checks passed — 2026-11-04T00:40+05:00
 
