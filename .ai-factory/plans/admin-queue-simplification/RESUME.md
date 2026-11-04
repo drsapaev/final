@@ -1,3 +1,12 @@
+## Current resume — T18 combined synthetic acceptance — 2026-11-04T21:51:38+05:00
+
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final, branch codex/t18-combined-validation. Current source and origin/main are both 64a7c0b9ce422bbdac73d919158eb525669d9229. PR #3865 is merged at this commit.
+
+Targeted T18 scenarios 3, 5-live and 10 passed in one canonical synthetic Start to Session run. Normal Admin password plus TOTP passed. Session teardown removed its own project resources and local images; post-session Preflight passed after a transient port 18987 signal cleared. Full T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete; served_revision_verified is still false; Tier-2 remains PARTIAL with no deferral.
+
+The current journal update is limited to PROGRESS.md, EVIDENCE.md, and RESUME.md. Review the diff and run git diff --check, commit and push one journal-only PR, verify exact-head checks, then wait for user-owned merge. Do not merge/deploy, repeat completed scenarios, rerun scenario 2 or its prior static-byte comparison, or claim full system validation. Do not delete shared Docker/WSL data or inspect secrets. Task-owned synthetic env and runner files are in .scratch/t18-combined-20261104 and should be removed only through the normal approved local cleanup path after evidence is durable.
+
+---
 ## Latest continuation — T18 scenario 5 PostgreSQL existing-token checks passed — 2026-11-04T00:40+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-cabinet-day\final`, branch `codex/t18-cabinet-day`, runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`. PR #3861 remains OPEN / Ready; user owns merge. The current journal-only evidence update is being added to that same PR; verify its resulting exact HEAD and checks before asking for merge.

@@ -5834,3 +5834,16 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: no application/E2E source changed in this checkpoint; only evidence journals were modified. No merge/deployment.
 - Remaining limitation: a task-owned `.scratch` containing synthetic credentials remains in the validation worktree because host policy rejected deletion. Do not bypass the block. Owned Compose resources are absent.
 - Next: commit/push this journal update, set PR body SHA to the resulting exact HEAD, and wait for exact-head CI and the new PR Review Quality Gate.
+
+## T18 combined scenarios 3, 5, and 10 — synthetic acceptance — 2026-11-04T21:51:38+05:00
+
+- Commit: 64a7c0b9ce422bbdac73d919158eb525669d9229; branch codex/t18-combined-validation; fresh from origin/main.
+- Environment: Ubuntu-24.04 / WSL; project clinic-aqs-t18-combined-20261104; owner codex-t18-combined-validation; ports 18986/18987/15586; synthetic Admin and configuration rows only.
+- Execution: mandatory gate stopped on missing known root; one retry with PROGRESS.md returned narrow_override, gate_misroute=false, override_used=true, handoff_required=true; generated prompt read. Validation-only scope.
+- Validation: canonical Preflight PASS; Start PASS and runtime readiness PASS; one Session PASS. Normal Admin password and TOTP PASS. Scenario 3 incomplete state/actions to resource target, explicit publication, ready/public PASS. Scenario 5 Department off/on and manual archive persistence PASS. Scenario 10 all four legacy Admin URLs PASS; linked synthetic profile DELETE returned 409 and profile remained.
+- Teardown: Session removed 5 containers, 3 volumes, 1 network and Compose-local images; remaining owned containers/volumes/networks 0. First post-Session Preflight briefly reported WINDOWS_PORT_OWNER on 18987; read-only follow-up found no durable listener and no process was stopped. Next canonical Preflight PASS with no warnings, ports free.
+- Runtime facts: Docker 29.1.3; Compose 2.40.3; boot ID 47a7033b-e93f-4183-82dd-dd2185707986; C: free 16 GiB; WSL backing D: free 28 GiB; WSL memory after Session 3218 MiB.
+- Scope: only PROGRESS.md, EVIDENCE.md, RESUME.md tracked changes; no app/runtime/test/API/auth/database/migration/staging-config/production edits. No foreign project or global cleanup.
+- Limitation: launcher served_revision_verified=false; no exact served-frontend attestation. Full T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Tier-2 remains PARTIAL with no deferral.
+- Relevant result: .scratch/t18-combined-20261104/validation-result.json records the source revision, aggregate statuses, and timestamps only.
+- PR: journal-only PR pending. Merge/deploy: not performed.
