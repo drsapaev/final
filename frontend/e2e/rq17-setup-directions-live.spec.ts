@@ -122,6 +122,7 @@ type QueueProfileRow = {
   title?: string;
   title_ru?: string;
   queue_tags?: string[];
+  department_key?: string;
   is_active?: boolean;
   show_on_qr_page?: boolean;
 };
@@ -187,6 +188,26 @@ function directionForKey(facts: DirectionFacts, key: string): DirectionRow {
 
 function queueProfileTitle(profile: QueueProfileRow): string {
   return profile.title_ru?.trim() || profile.title?.trim() || profile.name?.trim() || profile.key || '';
+}
+
+function serviceQueueTagOptions(profiles: QueueProfileRow[]) {
+  const options: Array<{ value: string; profileKey: string; departmentKey: string | null }> = [];
+  const seenTags = new Set<string>();
+  for (const profile of profiles) {
+    if (!profile || profile.is_active === false || !profile.key) continue;
+    const tags = (profile.queue_tags || []).map((tag) => String(tag ?? '').trim()).filter(Boolean);
+    const candidates = tags.length ? tags : [profile.key.trim()];
+    for (const value of candidates) {
+      if (!value || seenTags.has(value)) continue;
+      seenTags.add(value);
+      options.push({
+        value,
+        profileKey: profile.key,
+        departmentKey: profile.department_key ? String(profile.department_key) : null,
+      });
+    }
+  }
+  return options;
 }
 
 function expectDirectionState(
@@ -316,13 +337,13 @@ async function createCatalogService(
   await serviceEditor.getByRole('button', { name: /Очередь|Queue/i }).click();
   const queueTagSelect = serviceForm.locator('.mac-select').first().getByRole('button');
   await queueTagSelect.click();
-  const activeProfiles = input.queueProfiles.filter((profile) => profile.is_active !== false);
-  const selectedProfileIndex = activeProfiles.findIndex((profile) => profile.key === input.profileKey
-    && (profile.queue_tags?.[0] || profile.key) === input.queueTag);
-  expect(selectedProfileIndex, 'the chosen QueueProfile must map to the requested service queue tag').toBeGreaterThanOrEqual(0);
+  const options = serviceQueueTagOptions(input.queueProfiles);
+  const selectedOptionIndex = options.findIndex((option) => option.profileKey === input.profileKey
+    && option.value === input.queueTag);
+  expect(selectedOptionIndex, 'the chosen QueueProfile must map to the requested service queue tag').toBeGreaterThanOrEqual(0);
   const queueTagOptions = page.getByRole('listbox').getByRole('option');
-  await expect(queueTagOptions).toHaveCount(activeProfiles.length + 1);
-  await queueTagOptions.nth(selectedProfileIndex + 1).click();
+  await expect(queueTagOptions).toHaveCount(options.length + 1);
+  await queueTagOptions.nth(selectedOptionIndex + 1).click();
 
   await serviceEditor.getByRole('button', { name: /Опции|Options/i }).click();
   const requiresDoctor = serviceForm.getByRole('checkbox', { name: /Требует врача|Doctor required/i });
@@ -464,8 +485,12 @@ test('current setup screen resolves Doctor and QueueResource directions through 
     if (matchingProfiles.length !== 1) return [];
     const profile = matchingProfiles[0];
     if (typeof profile.show_on_qr_page !== 'boolean') return [];
-    const queueTag = profile.queue_tags?.[0] || profile.key || '';
-    if (!queueTag || resourceRouteTags.includes(queueTag.trim().toLowerCase())) return [];
+    const matchingQueueOption = serviceQueueTagOptions(existingProfiles).find((option) =>
+      option.profileKey === profile.key
+      && (!option.departmentKey || option.departmentKey.trim().toLowerCase() === specialtyCode)
+      && !resourceRouteTags.includes(option.value.trim().toLowerCase()),
+    );
+    if (!matchingQueueOption) return [];
     const direction = initialFacts.directions.find((item) => item.profile.key === profile.key);
     if (!direction
       || direction.effective_availability !== 'available'
@@ -473,7 +498,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
       || direction.booking_targets.length > 0) {
       return [];
     }
-    return [{ specialty, profile, queueTag }];
+    return [{ specialty, profile, queueTag: matchingQueueOption.value }];
   })[0];
   const routeReadiness = doctorRouteCandidate ? [] : specialtyItems.map((specialty) => {
       const code = specialty.code.trim().toLowerCase();
@@ -484,7 +509,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
           const direction = initialFacts.directions.find((item) => item.profile.key === profile.key);
           return {
             key: profile.key,
-            serviceQueueTag: profile.queue_tags?.[0] || profile.key,
+            serviceQueueTags: serviceQueueTagOptions([profile]).map((option) => option.value),
             active: profile.is_active !== false,
             published: profile.show_on_qr_page,
             state: direction?.configuration_state,
