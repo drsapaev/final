@@ -301,7 +301,7 @@ async function createCatalogService(
   page: Page,
   input: {
     name: string;
-    profileKey: string;
+    queueTagOptionProfileKey: string;
     queueProfiles: QueueProfileRow[];
     queueTag: string;
     doctorSpecialty?: string;
@@ -338,7 +338,7 @@ async function createCatalogService(
   const queueTagSelect = serviceForm.locator('.mac-select').first().getByRole('button');
   await queueTagSelect.click();
   const options = serviceQueueTagOptions(input.queueProfiles);
-  const selectedOptionIndex = options.findIndex((option) => option.profileKey === input.profileKey
+  const selectedOptionIndex = options.findIndex((option) => option.profileKey === input.queueTagOptionProfileKey
     && option.value === input.queueTag);
   expect(selectedOptionIndex, 'the chosen QueueProfile must map to the requested service queue tag').toBeGreaterThanOrEqual(0);
   const queueTagOptions = page.getByRole('listbox').getByRole('option');
@@ -485,8 +485,11 @@ test('current setup screen resolves Doctor and QueueResource directions through 
     if (matchingProfiles.length !== 1) return [];
     const profile = matchingProfiles[0];
     if (typeof profile.show_on_qr_page !== 'boolean') return [];
+    const exactProfileTag = [profile.key, ...(profile.queue_tags || [])]
+      .find((tag) => tag?.trim().toLowerCase() === specialtyCode);
+    if (!exactProfileTag) return [];
     const matchingQueueOption = serviceQueueTagOptions(existingProfiles).find((option) =>
-      option.profileKey === profile.key
+      option.value.trim().toLowerCase() === specialtyCode
       && (!option.departmentKey || option.departmentKey.trim().toLowerCase() === specialtyCode)
       && !resourceRouteTags.includes(option.value.trim().toLowerCase()),
     );
@@ -498,7 +501,12 @@ test('current setup screen resolves Doctor and QueueResource directions through 
       || direction.booking_targets.length > 0) {
       return [];
     }
-    return [{ specialty, profile, queueTag: matchingQueueOption.value }];
+    return [{
+      specialty,
+      profile,
+      queueTag: matchingQueueOption.value,
+      queueTagOptionProfileKey: matchingQueueOption.profileKey,
+    }];
   })[0];
   const routeReadiness = doctorRouteCandidate ? [] : specialtyItems.map((specialty) => {
       const code = specialty.code.trim().toLowerCase();
@@ -510,6 +518,10 @@ test('current setup screen resolves Doctor and QueueResource directions through 
           return {
             key: profile.key,
             serviceQueueTags: serviceQueueTagOptions([profile]).map((option) => option.value),
+            availableTagOwners: serviceQueueTagOptions(existingProfiles)
+              .filter((option) => [profile.key, ...(profile.queue_tags || [])]
+                .some((tag) => tag?.trim().toLowerCase() === option.value.trim().toLowerCase()))
+              .map((option) => `${option.value}:${option.profileKey}`),
             active: profile.is_active !== false,
             published: profile.show_on_qr_page,
             state: direction?.configuration_state,
@@ -528,7 +540,12 @@ test('current setup screen resolves Doctor and QueueResource directions through 
     doctorRouteCandidate,
     `synthetic staging needs one available QueueProfile route for a canonical Doctor specialty; route candidates: ${JSON.stringify(routeReadiness)}`,
   ).toBeDefined();
-  const { specialty: doctorSpecialty, profile: doctorProfile, queueTag: doctorQueueTag } = doctorRouteCandidate!;
+  const {
+    specialty: doctorSpecialty,
+    profile: doctorProfile,
+    queueTag: doctorQueueTag,
+    queueTagOptionProfileKey: doctorQueueTagOptionProfileKey,
+  } = doctorRouteCandidate!;
   const doctorProfileTitle = queueProfileTitle(doctorProfile);
   expect(doctorProfileTitle, 'selected QueueProfile should have a visible Admin label').not.toBe('');
   const doctorName = 'SYNTHETIC-RQ17 Doctor ' + suffix;
@@ -601,7 +618,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
 
   await createCatalogService(page, {
     name: 'Synthetic RQ-17 Doctor service ' + suffix,
-    profileKey: doctorProfile.key!,
+    queueTagOptionProfileKey: doctorQueueTagOptionProfileKey,
     queueProfiles: catalogQueueProfiles,
     queueTag: doctorQueueTag,
     doctorSpecialty: doctorSpecialty.code,
@@ -609,7 +626,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   });
   await createCatalogService(page, {
     name: serviceName,
-    profileKey,
+    queueTagOptionProfileKey: profileKey,
     queueProfiles: catalogQueueProfiles,
     queueTag: resourceTag,
   });
