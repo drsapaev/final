@@ -5,15 +5,16 @@ Current task: T18 integrated synthetic acceptance
 Current status: IN_PROGRESS
 Current PR: [#3861](https://github.com/drsapaev/final/pull/3861), journal-only; user retains merge authority.
 PR head before this repair: `3ff4ddfe1bd84283e29d4faabe090fd3aaa9741a`; base / origin/main: `235b4cbba6bc133e89c44a3ceeb087d227267f9d`.
-Last updated: 2026-11-04T07:51:50+05:00
+Last updated: 2026-11-04T08:00:52+05:00
 
 ## Latest checkpoint
 
 - Review P1 confirmed: the PR diff had replaced the historical T00–T18 ledger with a short current checkpoint. This repair restores the prior origin/main history from blob e145041a4013752240120e6e0429c2c2f766c9ba below and keeps the current status above it.
 - T18/Tier-2 remains PARTIAL. No deferral is claimed. Scenarios 2, 3, 5 live behavior and 10, the full `STAGING_VALIDATION.md` checklist, and served-frontend byte provenance remain incomplete.
-- PR #3861 stays open pending the history repair, exact-head checks, and user-owned merge. No staging or runtime work is part of this journal fix.
 - Completed: restored the full `origin/main` journal, including its first historical checkpoint; the exact-source comparison and whitespace check pass. Only the two T18 journals are changed in this repair.
-- Next exact action: commit and push the history repair to PR #3861, update its description, wait for applicable checks, then wait for user merge before any new staging cycle.
+- Completed: commit `347f9417ed365df0983ea99c7a61496e06f9a91c` is pushed to PR #3861. The P1 review thread is resolved. On that exact head, Unified CI, PR Required Gate, the corrected PR Review Quality Gate, lifecycle, security, Gitleaks, CodeQL, and workflow guards passed; path-aware product checks were skipped for the journal-only diff.
+- Current PR state: OPEN, Ready for review, mergeable; user retains merge authority. No staging or runtime work is part of this journal fix.
+- Next exact action: after this checkpoint-only journal update is pushed, verify its exact-head checks and wait for user-owned merge. After merge, continue the remaining T18 scenarios in a fresh worktree; do not repeat validated scenarios.
 
 ## Current detailed checkpoint carried by PR #3861
 

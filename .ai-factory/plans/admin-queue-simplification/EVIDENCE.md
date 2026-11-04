@@ -5482,3 +5482,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: P1 restoration applied locally; PR remains open pending exact-head checks and the user-owned merge.
 - Remaining limitation: T18/Tier-2 remains PARTIAL; outstanding scenarios and full staging validation remain as recorded in the current checkpoint.
 - Next exact action: commit/push to #3861, update the PR description, and check applicable exact-head gates. Do not start staging before the user-owned merge.
+
+## PR #3861 — P1 repair and exact-head checks — 2026-11-04T08:00+05:00
+
+- Repair commit: `347f9417ed365df0983ea99c7a61496e06f9a91c`, pushed to the existing journal-only PR #3861.
+- History validation: the restored archive exactly matches base blob `e145041a4013752240120e6e0429c2c2f766c9ba`; `PROGRESS.md` has 65 additions and no deletions relative to `origin/main`. `git diff --check`, the exact-source comparison, and commit hooks passed.
+- Exact-head checks at `347f9417`: Unified CI and PR Required Gate PASS; corrected PR Review Quality Gate and lifecycle PASS; security, Gitleaks, CodeQL, GitGuardian, scratch guards and workflow guards PASS. Path-aware backend/frontend/integration/staging checks were skipped for the documentation-only scope, not counted as PASS.
+- Review: the P1 history thread was resolved after confirming the full source archive and green applicable checks.
+- PR state: OPEN / Ready for review / mergeable; user retains merge authority. T18/Tier-2 remains PARTIAL; no deferral is claimed.
+- This record itself is a journal-only checkpoint update; validate applicable exact-head checks after its push. No tests, staging, runtime, merge, or deployment were performed for this slice.
+- Next exact action: verify gates on the resulting PR head, then wait for user-owned merge. After merge, resume only outstanding T18 work in a fresh isolated worktree.
