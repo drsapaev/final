@@ -5467,3 +5467,18 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Validation: source search/read and `git diff --check` PASS. No tests or staging were run.
 - Result: scenario 2 remains `PARTIAL`; resource-only onboarding and the no-extra-doctor path still need a current-screen synthetic Admin/2FA run. Tier-2 remains `PARTIAL`, with no deferral claimed.
 - Next: after user-owned merge of #3861, use a fresh `origin/main` worktree. Adapt/replace the obsolete spec, then include scenario 2 in the combined synthetic cycle for scenarios 2/3/5-live/10, full `STAGING_VALIDATION.md`, and served-frontend byte provenance. Do not rerun validated scenarios or the three passing PostgreSQL tests.
+
+
+
+## PR #3861 — restore PROGRESS history — 2026-11-04T07:52:56+05:00
+
+- Commit under test before repair: `3ff4ddfe1bd84283e29d4faabe090fd3aaa9741a`; base: `235b4cbba6bc133e89c44a3ceeb087d227267f9d`.
+- Execution mode: `narrow_override` after the canonical known-root-cause gate. Result: `gate_misroute=false`, `override_used=true`, `handoff_required=true`; the generated execution prompt was read. An initial argument-format mistake returned usage only; the corrected launcher call produced this result.
+- Allowed paths: `PROGRESS.md`, `EVIDENCE.md`, and this task's ignored pre-work note. Denied: runtime, API, migrations, tracked tests, staging/Compose, production, merge, deployment, unrelated files.
+- Original failure: `origin/main...HEAD` showed 39 insertions and 2,072 deletions in `PROGRESS.md`, replacing the T00–T18 ledger with a short checkpoint.
+- Restoration: current status and the PR checkpoint are above the complete `origin/main` file, restored from blob `e145041a4013752240120e6e0429c2c2f766c9ba`, including its first historical checkpoint. Historical content was not discarded.
+- Actual tracked paths for this slice: `PROGRESS.md`, `EVIDENCE.md` only. No app, test, migration, staging, production, merge, or deployment changes.
+- Validation: exact archived text compared with the normalized `origin/main` blob; all historical content including the first checkpoint matched. `git -c core.whitespace=cr-at-eol diff --check` passed. Diff against `origin/main` retains the historical journal with no bulk deletions. No tests or staging run because this is a documentation-only history repair.
+- Result: P1 restoration applied locally; PR remains open pending exact-head checks and the user-owned merge.
+- Remaining limitation: T18/Tier-2 remains PARTIAL; outstanding scenarios and full staging validation remain as recorded in the current checkpoint.
+- Next exact action: commit/push to #3861, update the PR description, and check applicable exact-head gates. Do not start staging before the user-owned merge.
