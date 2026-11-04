@@ -5956,3 +5956,14 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: provenance PASS; scoped diagnostic Session PASS; console classification PARTIAL (9/11 reproduced and source-family classified; 2/11 not reproduced; exact call sites unresolved); full T18/Tier-2 PARTIAL. No deferral accepted.
 - Remaining limitation: full `docs/runbooks/STAGING_VALIDATION.md` not complete; launcher provenance flag still false; two console events unattributed. No need to repeat passed cross-cutting functional assertions absent a source change.
 - PR: #3873 OPEN, Ready for review, mergeable at last live check; user owns merge. Merge commit: none.
+
+## PR #3873 exact-head journal update — 2026-11-05T02:41:06+05:00
+
+- Commit under review: `d4d587421b92f5b122d921691030b4f41775294c`; base/current `origin/main`: `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- PR state: #3873 OPEN, Ready for review, mergeable; exact head verified from GitHub after push. PR body refreshed with the provenance match, partial console classification, remaining limitations, and updated cleanup note.
+- Changed paths: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` only. `git diff --check` PASS before commit. Commit hooks passed: large-file/conflict/private-key checks, Gitleaks, whitespace/end-of-file checks; language and application hooks were skipped as no relevant files were present.
+- Exact-head CI: 17 success, 22 skipped, 0 failures, 0 in progress. PASS: PR Required Gate, PR Review Quality Gate, lifecycle recommendation, security scan, Gitleaks, CodeQL, GitGuardian, CI Scope, Windows/Ubuntu scratch guards, and Python/TypeScript/Actions analysis. Path-aware frontend/backend/unit/E2E/integration/Docker/readiness/load/DAST checks were SKIPPED for documentation-only scope, not PASS.
+- Result: journal checkpoint and PR metadata are current at the exact pushed HEAD. No application tests or staging were rerun in this docs-only follow-up.
+- Scope check: no application/runtime, tests, API, auth, database/migrations, staging configuration, production, foreign project, merge, or deployment changes.
+- Remaining limitation: full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete; Tier-2 remains PARTIAL with no deferral. User owns merge.
+- PR: [#3873](https://github.com/drsapaev/final/pull/3873). Merge commit: none.
