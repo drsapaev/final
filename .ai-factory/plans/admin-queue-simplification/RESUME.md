@@ -1,6 +1,6 @@
-## Current resume — PR #3873 final journal checkpoint — 2026-11-04T22:10:51+05:00
+## Current resume — PR #3873 final journal checkpoint — 2026-11-04T22:14:36+05:00
 
-Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final, branch codex/t18-combined-validation. Source under validation and base are 64a7c0b9ce422bbdac73d919158eb525669d9229; PR #3865 is merged at this commit. Journal-only PR #3873 is open. Prior journal head 41f0ac3b71e7ef93a266f082c81ecb0ed422e4f7 passed applicable CI, security, quality, lifecycle, Gitleaks, and workflow guards; path-aware product/staging jobs were skipped.
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final, branch codex/t18-combined-validation. Source under validation and base are 64a7c0b9ce422bbdac73d919158eb525669d9229; PR #3865 is merged at this commit. Journal-only PR #3873 is open. Head 86910e96f42b35b01ecf016d290a15101a890db0 passed Unified CI, PR Review Quality Gate, lifecycle, security, Gitleaks, and workflow guards; product/staging jobs were SKIPPED. Verify checks again after this final checkpoint update is pushed.
 
 Targeted T18 scenarios 3, 5-live and 10 passed in one canonical synthetic Start to Session run. Normal Admin password plus TOTP passed. Session teardown removed its own project resources and local images; post-session Preflight passed after a transient port 18987 signal cleared. Full T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete; served_revision_verified is still false; Tier-2 remains PARTIAL with no deferral.
 
