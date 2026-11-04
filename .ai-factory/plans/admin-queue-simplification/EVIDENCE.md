@@ -5492,3 +5492,237 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR state: OPEN / Ready for review / mergeable; user retains merge authority. T18/Tier-2 remains PARTIAL; no deferral is claimed.
 - This record itself is a journal-only checkpoint update; validate applicable exact-head checks after its push. No tests, staging, runtime, merge, or deployment were performed for this slice.
 - Next exact action: verify gates on the resulting PR head, then wait for user-owned merge. After merge, resume only outstanding T18 work in a fresh isolated worktree.
+
+## T18 scenario 2 — RQ-17 current-screen adaptation — 2026-11-04T09:49+05:00 pre-edit checkpoint
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6` (`origin/main`, clean fresh worktree `codex/t18-rq17-current-screen`).
+- Environment: current Windows/WSL host state has not yet passed this cycle's canonical Preflight; no Compose services have been started.
+- Execution mode: `narrow_override` after the required known-root-cause gate invocation. Exact launcher from `ai/langgraph`: `run_agent_gate.ps1 'Adapt the legacy RQ-17 Admin setup E2E to the current backend-facts screen and validate the resource-only/no-extra-doctor path with ordinary Admin 2FA in the owned synthetic staging project; update only T18 progress and evidence. Do not change application/runtime/auth/DB/production or use foreign Compose resources.' --known-root-cause frontend/e2e/rq17-setup-directions-live.spec.ts --scope frontend/e2e/rq17-setup-directions-live.spec.ts --scope frontend/src/components/admin/AdminSetupDirections.tsx --scope frontend/src/components/admin/QueueResourceManager.tsx --scope frontend/src/components/admin/QueueProfilesManager.tsx --scope frontend/src/components/admin/ServiceCatalog.tsx --scope frontend/src/components/security/TwoFactorSetupWizard.tsx --scope frontend/e2e/rq18-permanent-qr-live.spec.ts --scope .ai-factory/plans/admin-queue-simplification/PROGRESS.md --scope .ai-factory/plans/admin-queue-simplification/EVIDENCE.md --scope ops/scripts/wsl_staging.ps1 --scope ops/compose.staging.yml --scope docs/runbooks/AGENT_SESSION_WORKTREES.md --scope docs/runbooks/WSL_STAGING_SESSION.md --format json`.
+- Gate result: `result=narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. The generated execution prompt was read. Basis: the user has authorized continued T18 work and multiple owned synthetic validation cycles; the override is limited to the reviewed E2E/journal paths and this task-owned synthetic project. Gate validation targets include frontend build and Compose config where available.
+- Canonical anchors/reference-only: `AGENTS.md`, current `AdminSetupDirections.tsx`, `QueueResourceManager.tsx`, `QueueProfilesManager.tsx`, `ServiceCatalog.tsx`, `TwoFactorSetupWizard.tsx`, RQ-18 TOTP implementation, `AGENT_SESSION_WORKTREES.md`, `WSL_STAGING_SESSION.md`, `STAGING_VALIDATION.md`, and `ops/compose.staging.yml`.
+- First-touch/allowed tracked paths: `frontend/e2e/rq17-setup-directions-live.spec.ts`, `PROGRESS.md`, and `EVIDENCE.md`. Allowed ignored operational paths: only `.scratch/t18-rq17-current-screen/` for one reusable synthetic env, harness, and results.
+- Denied paths/actions: application/runtime/API/auth/database/migration and staging-config edits; production and live data; foreign Compose resources or global cleanup; merge and deployment. User retains merge authority.
+- Original failure: RQ-17 references removed `setup-wizard-*` controls; current setup page exposes backend facts, universal editor links, and a separate QueueResource view. The spec also writes screenshots and generated identity data under `output/playwright`, outside the intended task scratch area.
+- Validation targets: focused ESLint; Playwright collection without starting a webServer; `npm.cmd run build`; canonical synthetic `Preflight → Start → Session` with ordinary Admin 2FA, the resource-only/no-extra-doctor scenario, and automatic owned-project teardown. Record served-byte provenance separately; launcher metadata alone is not an attestation.
+- First stop conditions: any need to edit product/auth/DB behavior; 2FA bypass or unavailable normal enrollment; unsafe/foreign resource ownership; failed storage/port/identity prerequisite; or unclear test target. In that case, keep dependent live checks `NOT_RUN` and do not start Compose.
+- Actual changed paths at checkpoint: `PROGRESS.md` and `EVIDENCE.md` only. No test edit, build, staging, or runtime change has occurred yet.
+- Result: execution scope recorded; no implementation or runtime validation claimed.
+
+## T18 scenario 2 — RQ-17 adaptation and first owned staging attempt — 2026-11-04T10:20+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; worktree `codex/t18-rq17-current-screen` based directly on `origin/main`.
+- Actual changed tracked paths: `frontend/e2e/rq17-setup-directions-live.spec.ts`, `PROGRESS.md`, and `EVIDENCE.md`. Runtime, API, auth, database, migration, and Compose configuration were not changed.
+- Implementation: replaced removed wizard selectors with current setup-screen editor links; the single RQ-17 flow performs ordinary Admin password login and normal TOTP enrollment/verification, creates a hidden synthetic QueueProfile and doctorless service, creates/activates a QueueResource, and verifies the backend read model resolves one resource-owned target and no doctor target. Removed screenshots and generated identity dumps under shared `output/playwright`.
+- Local validation: `npm.cmd ci --no-audit --no-fund` PASS (900 packages; dependency deprecation notices); `npx.cmd eslint e2e/rq17-setup-directions-live.spec.ts` PASS; `npx.cmd playwright test e2e/rq17-setup-directions-live.spec.ts --project=chromium --list` PASS (1 test listed); `npm.cmd run build` PASS (existing Rollup/esbuild CSS annotation/style warnings only); scratch runner/config syntax PASS.
+- Gate: the current known-root-cause gate returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; prompt read, as recorded in the pre-edit checkpoint. This override stays limited to the reviewed E2E/journal paths and owned synthetic staging.
+- Canonical environment: first Preflight attempt returned `PUBLIC_ORIGIN_REQUIRED` because `STAGING_PUBLIC_HOST` was omitted; no Compose services were created. Read the guard source, added `STAGING_PUBLIC_HOST=127.0.0.1`, then Preflight PASS. It selected project `clinic-aqs-t18-rq17-20261104`, ports 18737/18738/55737; D: 28 GiB free, C: 16 GiB free, WSL root/Docker storage 912 GiB free, WSL available memory 3208 MiB, no warnings. Runtime readiness was `NOT_RUN` at Preflight.
+- Canonical Start: PASS; backend/frontend/worker images built; health readiness PASS; D: 28 GiB free; WSL available memory 3176 MiB; launcher reported `served_revision_verified=false` and `teardown=PENDING_SESSION`.
+- Canonical Session: FAIL before the test case ran. Temporary Playwright config had no named `chromium` project while the runner requested `--project chromium`; exact child error: `Project(s) "chromium" not found. Available projects: ""`. Result: RQ-17 test `NOT_RUN`, not product PASS/FAIL. Launcher reported `STAGING_TEARDOWN=PASS`; no test rows are credited.
+- Served frontend provenance: `NOT_RUN`; launcher aggregate remained `served_revision_verified=false`. No independent static-byte comparison was done in this attempt.
+- Scope/cleanup: only the task-owned project was started and its automatic teardown passed. No foreign Docker project, production, runtime code, or live data was touched. One task-owned ignored synthetic env is retained for reuse; no per-run credential files were created.
+- Next: add project `chromium` to the ignored Playwright config, verify `--list` locally, then repeat Preflight → Start → Session. Do not claim the browser test passed until it actually executes.
+
+## T18 scenario 2 — RQ-17 Admin 2FA and profile-form harness failure — 2026-11-04T10:20+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; only the task-owned RQ-17 E2E/journal paths are modified.
+- Environment: same isolated Compose project `clinic-aqs-t18-rq17-20261104`; second canonical Start PASS; exact ports 18737/18738/55737; served revision aggregate false.
+- Canonical Session result: **FAIL, teardown PASS**. The updated Playwright config now launched one Chromium test. Password login and initial TOTP enrollment/verification completed through the normal Admin flow. The test then failed at native QueueProfile key validation before the create request.
+- Original failure: generated key `rq17_<letters>` violated the existing form pattern `[a-z_]+`; browser showed native “Please match the requested format.” This is test-data/harness failure, not an application defect. No QueueProfile/service/resource was created.
+- Validation artifact: task-owned screenshot in `.scratch/t18-rq17-current-screen/results/` shows the invalid field and browser validation message; no patient data or authentication secret is present. It is retained only for this repair cycle.
+- Correction: changed generated identifiers to letters/underscores only (`rq_<letters>`, `rqres<letters>`) and added assertions for the form pattern and generated key. This correction has not yet been rerun in the browser.
+- Scope: no runtime/API/auth/database/Compose/production changes. Session teardown verified by launcher; no foreign project was touched.
+- Remaining: focused lint and collection after the correction, then one new canonical Preflight → Start → Session. The earlier TOTP enrollment proves the flow reached Admin normally but does not complete T18 scenario 2. Served-byte provenance remains NOT_RUN; `served_revision_verified=false` is not a pass.
+
+## T18 scenario 2 — corrected harness local validation — 2026-11-04T10:23+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; worktree `codex/t18-rq17-current-screen`.
+- Execution mode: continuation of the existing T18 `narrow_override`; no scope expansion. Allowed tracked paths remain the RQ-17 E2E spec and the T18 `PROGRESS.md`/`EVIDENCE.md`; allowed ignored paths remain `.scratch/t18-rq17-current-screen/` only. Runtime, API, auth, DB, migrations, Compose configuration, production, foreign projects, merge, and deployment remain denied.
+- Validation after correcting synthetic identifiers to satisfy the existing `[a-z_]+` form constraint: `npx.cmd eslint e2e/rq17-setup-directions-live.spec.ts` — PASS; `npx.cmd playwright test --config ..\.scratch\t18-rq17-current-screen\playwright.config.mjs --project chromium --list` — PASS, exactly one test listed under `[chromium]`; `git diff --check` — PASS. No browser test ran in this local step.
+- Result: test-data correction is syntactically valid and collected by the scratch Playwright project. This is not a browser PASS and does not establish scenario 2.
+- Next: canonical Preflight for the already-owned synthetic project, followed by Start and Session only if all guards pass; the Session performs automatic teardown. `served_revision_verified` is not yet established.
+
+## T18 scenario 2 — duplicate empty-state action in browser harness — 2026-11-04T10:25+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; same task-owned isolated project `clinic-aqs-t18-rq17-20261104` and loopback ports 18737/18738/55737.
+- Canonical lifecycle: Preflight PASS; Start PASS with health readiness PASS; Session executed one Chromium test and ended FAIL with automatic `STAGING_TEARDOWN=PASS`.
+- Actual browser progress: normal Admin password login and first-time TOTP enrollment/verification succeeded; the test created the hidden synthetic profile, navigated to the Service Catalog, then stopped before creating a service because the broad “Add service” locator matched both the toolbar action and the accessible empty-state action. This is a Playwright strict-mode ambiguity, not an application runtime failure. Subsequent service/resource assertions did not run. Session teardown removed the synthetic stack/database.
+- Correction: the test now scopes the add action to the accessible `region` whose label comes from the Service Catalog empty-state title, then clicks its Add Service button. This targets the empty catalog's intended action and avoids the duplicate toolbar control. The correction has not yet been revalidated in a browser.
+- Scope: only the task-owned E2E test and T18 journals are changed. No product/runtime/auth/API/DB/migration/Compose/production changes; no foreign project touched. Existing ignored screenshot/video/trace contain only synthetic page content and are retained within this task's `.scratch` pending completion.
+- Next: rerun targeted lint and collection, then another canonical Preflight → Start → Session on the same project; stop if the next failure indicates product behavior rather than a test selector/data issue. `served_revision_verified` remains false/unverified.
+
+## T18 scenario 2 — synthetic catalog has no categories — 2026-11-04T10:33+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; owned project `clinic-aqs-t18-rq17-20261104`.
+- Canonical lifecycle: Preflight PASS; Start PASS with health readiness PASS; Session executed the Chromium test then reported FAIL, with `STAGING_TEARDOWN=PASS`.
+- Browser evidence: the Admin flow completed password + normal TOTP, created the hidden profile and opened the service form. The current synthetic database reports `0 Категорий`; opening the category picker shows only its placeholder, so the test's assumption that option index 1 exists is invalid. No service was submitted. The synthetic profile/database were removed with the owned Compose project.
+- Contract check: `ServiceForm` sends `category_id: null` when left blank, and backend `ServiceCreate.category_id` is optional. The queue tag is the identity under test, so service-category assignment is not necessary for the resource-only/no-doctor acceptance. This is a harness fixture mismatch, not a demonstrated product failure.
+- Planned test adaptation within the existing approved path: if a real category option exists, select one; if the only option is the placeholder, leave the optional field blank and assert the saved payload has `category_id: null`. Continue to assert the new queue tag, `doctor_id: null`, and `requires_doctor: false`.
+- Scope/cleanup: only the E2E file and T18 journals; runtime/API/auth/DB/migration/Compose/production untouched; automatic teardown passed. `served_revision_verified` remains false/unverified.
+- Next: make the test data-dependent only for optional category selection, run focused lint/collection, then repeat the same owned Preflight → Start → Session. Stop if service creation with `category_id=null` is rejected.
+
+## T18 scenario 2 — category-aware harness collection — 2026-11-04T10:34+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; same RQ-17 E2E scope and task-owned ignored scratch directory.
+- Change: test now selects a real category only when the synthetic catalog provides one; if the picker contains only its placeholder, it leaves the optional category unset and checks that the service request uses `category_id: null` while still asserting the queue tag and `doctor_id: null`.
+- Validation: focused ESLint PASS; scratch Playwright `--list` PASS (one test collected); `git diff --check` PASS. No browser execution in this entry.
+- Result: harness handles the observed zero-category synthetic seed without adding direct database/API setup or changing application behavior. Browser outcome remains NOT_RUN for this correction.
+- Next: canonical Preflight → Start → Session on the same owned project; stop if the backend rejects the optional category or any unrelated product behavior is required.
+
+## T18 scenario 2 — custom category listbox dismissal — 2026-11-04T10:45+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; same owned project and ports 18737/18738/55737.
+- Canonical lifecycle: Preflight PASS; Start PASS with readiness PASS; Session reached the category form and timed out after 240 seconds, then automatic teardown PASS.
+- Browser evidence: normal Admin password/TOTP succeeded, hidden synthetic profile was created, and the service form opened. The listbox contains only the placeholder `Выберите категорию`; Escape did not dismiss this custom Select popup, so clicking the Queue tab was blocked. No service request was submitted. This is a test harness interaction issue; no product defect is established. Teardown discarded the synthetic data.
+- Correction planned: when no real category exists, click the existing placeholder option to close the listbox while keeping the category unset; this uses the normal UI and preserves the backend-supported `category_id: null` behavior.
+- Scope/cleanup: only the owned E2E and plan journals; automatic teardown PASS; no runtime, API, auth, database, migration, staging config, production, or foreign resources changed. Served frontend provenance remains unverified.
+- Next: apply placeholder click, run focused lint/collection and `git diff --check`, then retry the same isolated scenario.
+
+## T18 scenario 2 — queue option is labeled by profile title — 2026-11-04T10:59+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; same synthetic project `clinic-aqs-t18-rq17-20261104`.
+- Canonical lifecycle: Preflight PASS; Start PASS with readiness PASS; Session failed on a test expectation and ended with automatic teardown PASS.
+- Browser progress: ordinary Admin login and TOTP succeeded; hidden synthetic QueueProfile was created; ServiceCatalog form saved the doctorless service with `category_id=null`, `queue_tag` set to the new profile tag, `doctor_id=null`, and `requires_doctor=false`. The test then searched the queue dropdown by tag, but the UI intentionally labels this option with `QueueProfile.title_ru` while using the tag only as its value. The expected option was present under the profile title; no product failure is established.
+- Fix: locate the service queue option by the synthetic profile title, then retain the API request assertion that the submitted `queue_tag` equals the profile tag.
+- Cleanup/scope: Session auto-teardown PASS; synthetic service/profile data was discarded with the project. No application/runtime/API/auth/DB/migration/Compose/production code changed; no foreign project touched. Served frontend provenance remains unverified.
+- Next: adjust the E2E label locator, validate lint/collection, then retry the same one-test owned staging flow.
+
+## T18 scenario 2 — options tab is also outside the form — 2026-11-04T11:08+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; owned synthetic project unchanged.
+- Canonical lifecycle: Preflight PASS; Start PASS with readiness PASS; Session ended FAIL on a 240-second locator timeout and automatic teardown PASS.
+- Browser progress: Admin/TOTP, hidden profile creation, doctorless service configuration with null category, and service queue selection all succeeded in the form. The test then timed out looking for the `Опции` tab inside the form element; current `ServiceForm` renders tabs outside the `<form>`, just like the Queue tab. No service POST for this attempt occurred because the test stopped before Save; teardown discarded the synthetic profile.
+- Fix: target the Options tab on the same ServiceForm card, and use bounded visibility expectations for the tab before clicking. No product behavior change is indicated.
+- Scope/cleanup: task-owned E2E and plan journals only; automatic teardown PASS; no runtime/API/auth/DB/migration/Compose/production changes or foreign resources. Served frontend provenance remains unverified.
+- Next: correct the test locator, rerun focused checks, then one same-project canonical Preflight → Start → Session.
+
+## T18 scenario 2 — Docker-image byte provenance pre-edit checkpoint — 2026-11-04T11:35+05:00
+
+- Goal: finish the already-authorized resource-only RQ-17 Admin scenario with an independent byte comparison between the three static assets actually received by Chromium and the files in the same owned frontend container that served them.
+- Worktree/base: `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq17-current-screen\final`, branch `codex/t18-rq17-current-screen`, HEAD and `origin/main` `bfc33837cd3028f1989b2462a998b16505a62fd6` (merged PR #3861).
+- Execution mode: continuation of the approved validation-only `narrow_override`. The earlier gate reported `gate_misroute=true`, `override_used=true`, `handoff_required=true`, and its execution prompt was read. No new gate is required for this same test/harness/journal scope; the runtime and operational configuration scope is unchanged.
+- Confirmed root cause: the previous comparison tried to use Windows Node 24 `frontend/dist` as the byte baseline for a staging image built with Node 20.19.6; the filenames differ, so that attempt did not compare bytes and proves no provenance. New method: store the exact same-origin browser response bodies in task-owned scratch and, during the still-running canonical Session, use Compose `cp` from the same owned frontend service to compare SHA-256 values against `/usr/share/nginx/html/assets/...`.
+- Canonical anchors read: repository `AGENTS.md`; `docs/runbooks/AGENT_SESSION_WORKTREES.md`; `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`; `ops/compose.staging.yml`; `frontend/Dockerfile.staging`; `ops/scripts/wsl_staging.ps1`; current RQ-17 E2E and current T18 checkpoint.
+- First-touch/allowed files: `frontend/e2e/rq17-setup-directions-live.spec.ts`, task-owned ignored `.scratch/t18-rq17-current-screen/validate-rq17.ps1`, and `PROGRESS.md` / `EVIDENCE.md` for checkpoint and results.
+- Reference-only files: launcher, Compose definition, Dockerfile, application/runtime, API, backend auth/DB code. Denied: Compose/Dockerfile/config changes, runtime/application changes, production, foreign projects, global Docker cleanup, merge and deployment.
+- Validation target: focused ESLint, Playwright collection, CRLF-aware `git diff --check`, then exactly one canonical Preflight → Start → Session on the existing task-owned synthetic project. The Session runs the resource-only UI test with ordinary Admin password/TOTP, writes the three captured browser assets to ignored task scratch, compares each to the same frontend container, and auto-tears down the owned project.
+- First stop condition: lease/ownership/port/preflight mismatch, missing asset, Compose copy failure, any SHA mismatch, or Session failure. Record the exact result, rely on canonical owned teardown, and do not claim provenance on an incomplete comparison.
+
+## T18 scenario 2 — same-container provenance runner prepared — 2026-11-04T11:37+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; branch `codex/t18-rq17-current-screen`.
+- Allowed changes: RQ-17 E2E asset capture, task-owned ignored validation runner, and T18 progress/evidence journals. No application/runtime/backend/API/auth/DB/migration/Compose/Dockerfile/production changes.
+- Local validation: focused ESLint PASS; Playwright collection PASS (1 Chromium test, 0 executed); PowerShell parser PASS; `git -c core.whitespace=cr-at-eol diff --check` PASS.
+- Canonical Preflight: PASS; exact worktree and env revision `bfc33837cd3028f1989b2462a998b16505a62fd6`; project `clinic-aqs-t18-rq17-20261104`; C: 16 GiB free; WSL backing disk D: 28 GiB free; Ubuntu available memory 3228 MiB; ports 18737/18738/55737 available; no warnings; runtime readiness correctly NOT_RUN at Preflight.
+- Runner safety: validates the fixed project and owner, expected loopback origin and worktree revision before test execution. Synthetic credential values are loaded in process and are never printed. Asset manifest contains only same-origin asset paths, filenames and SHA-256 values.
+- Remaining validation: canonical Start then a single Session. During that Session, after the UI test passes, each browser-captured asset will be copied from `frontend:/usr/share/nginx/html/assets/...` in the same running owned project and compared byte-for-byte by SHA-256. Session automatic teardown remains mandatory.
+- Stop conditions remain: project/owner/revision/port mismatch, failed canonical lifecycle, missing expected asset, copy error or hash mismatch. On any such result, do not report served-byte provenance.
+
+## T18 scenario 2 — browser PASS, WSL copy path harness failure — 2026-11-04T11:44+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; own project `clinic-aqs-t18-rq17-20261104`, owner `codex-t18-rq17-current-screen`.
+- Local checks before Session: focused ESLint, one-test Playwright collection, PowerShell parser, and CRLF-aware diff check PASS.
+- Canonical Preflight PASS; Start PASS with runtime readiness PASS. Host C: free 16 GiB, WSL backing disk D: free 28 GiB, Ubuntu memory 3228 MiB before build and 3207 MiB after build; no warnings.
+- Browser result: 1 Chromium test PASS in 16.9s. Normal synthetic Admin login/TOTP, hidden QueueProfile, doctorless Service, active QueueResource and typed backend resource target all passed.
+- Post-browser byte attestation: FAIL before copying any container asset. Windows PowerShell passed backslash paths to WSL with separators removed (`C:Users...`), causing `wslpath` to reject the path. No hash comparison ran, so provenance remains NOT_RUN.
+- Teardown: canonical Session reported `STAGING_TEARDOWN=PASS`; no foreign project or production resource was touched.
+- Diagnostic: read-only `wslpath -a C:/Users/.../ops/compose.staging.yml` returned `/mnt/c/Users/.../ops/compose.staging.yml`, and `test -f` on that WSL path PASS. Harness correction: normalize full Windows paths to forward slashes before invoking `wslpath`.
+- Next: focused PowerShell syntax and WSL path checks, then one canonical Preflight → Start → Session. Do not claim byte provenance unless all three same-container hashes match the Chromium-captured bytes.
+
+## T18 scenario 2 — WSL path normalization validated — 2026-11-04T11:46+05:00
+
+- Harness change: the task-owned runner now calls `GetFullPath()` and converts Windows separators to `/` before passing a path to Ubuntu's `wslpath`.
+- Validation: PowerShell parser PASS; normalized WSL access checks PASS for the Compose file, task-private staging env, and browser-served asset directory. `git -c core.whitespace=cr-at-eol diff --check` PASS.
+- No staging services were started during this diagnostic. Existing failed Session had already reported owned-project teardown PASS.
+- Corrected-runner canonical Preflight PASS: project and commit match; host C: free 16 GiB, WSL backing disk D: free 28 GiB, Ubuntu available memory 3188 MiB; ports 18737/18738/55737 free; no warnings; runtime readiness NOT_RUN as expected.
+- Next: canonical Start → Session using the corrected runner. The browser flow and the three asset hash comparisons must pass in the same Session; otherwise provenance remains NOT_RUN.
+
+## T18 scenario 2 — ServiceForm tab scope correction — 2026-11-04T11:09+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; allowed paths unchanged.
+- Change: Queue and Options tabs are both located through the ServiceForm card anchored by the Add Service heading; form data controls and the Save button remain scoped to its `<form>`.
+- Validation: `npx.cmd eslint e2e/rq17-setup-directions-live.spec.ts` PASS; scratch Playwright collection PASS (one `[chromium]` test); `git diff --check` PASS. No live browser run for this correction yet.
+- Next: same project's canonical Preflight → Start → Session. If successful, assert the submitted service request and final typed target, then record teardown and provenance.
+
+## T18 scenario 2 — image copy succeeded; PowerShell hash command unavailable — 2026-11-04T11:51+05:00
+
+- Canonical Preflight PASS; Start PASS with runtime readiness PASS; same owned project, source/env revision, and ports as the prior attempt. C: free 16 GiB; WSL backing disk D: free 28 GiB; Ubuntu memory 3188 MiB before build and 3210 MiB after build; no warnings.
+- Browser: resource-only Admin/TOTP test PASS (1/1, 16.9s). Compose copied the entry JS from the running `frontend` service to task-owned scratch successfully.
+- Session then failed because its Windows PowerShell environment does not provide `Get-FileHash`; the remaining asset copies and comparison did not run. Canonical automatic teardown reported PASS. No static-byte provenance is claimed yet.
+- Read-only check on the retained browser and container copies: Node SHA-256 matched the manifest and both copies exactly (`index-CgOZFmEj.js`, SHA-256 `2dd2637aa5d53b0f89f299ef1d8d0f1ba079c2e44267e679867ce02c896e26e0`). This confirms only that single copied file for this run, not all three assets in one successful Session.
+- Pre-edit checkpoint: replace `Get-FileHash` with a Node `crypto` helper in the task-owned runner; validate it against the saved browser/container copies and syntax-check. Then one final canonical Preflight → Start → Session for all three assets; automatic teardown required.
+
+## T18 scenario 2 — Node hash helper validated locally — 2026-11-04T11:53+05:00
+
+- The task-owned runner now computes SHA-256 through Node's built-in `crypto`, avoiding unavailable Windows PowerShell cmdlets. It still checks the browser hash against the manifest and the copied-container hash against the browser bytes.
+- Validation: PowerShell parser PASS; `Get-FileHash` absence guard PASS; Node hash helper matched both retained entry-JS copies to the browser manifest hash; CRLF-aware `git diff --check` PASS.
+- No staging services were started during this local validation. Next: one canonical Preflight → Start → Session for the three same-container asset comparisons and automatic teardown.
+
+## T18 scenario 2 — Node inline command quoting failure — 2026-11-04T11:57+05:00
+
+- Canonical Preflight PASS and Start PASS with readiness PASS; project and commit remained exact; host C: 16 GiB free, WSL backing disk D: 28 GiB free, Ubuntu memory 3208 MiB before and 3251 MiB after build; no warnings.
+- Browser: current resource-only Admin/TOTP scenario PASS (1/1, 15.8s). Compose copied the entry JS from the same running owned frontend service to task scratch.
+- Session failed before hashing because Windows PowerShell 5.1 altered quoting in `node.exe -e`; Node parsed the JavaScript incorrectly. No hash comparison completed. Canonical Session teardown reported PASS.
+- Root cause is limited to command argument quoting in the validation harness; no application defect or byte mismatch is established. The saved entry-JS browser/container copies and manifest remain available, and the previous independent Node check for that asset passed.
+- Pre-edit checkpoint: move the hash code into a task-owned `.cjs` helper and call Node with only file-path arguments; validate from Windows PowerShell 5.1 against the saved copies before another staging cycle. Scope remains `.scratch` plus the existing test/journals; no Compose/runtime change.
+
+## T18 scenario 2 — standalone hash helper validated under Windows PowerShell — 2026-11-04T11:59+05:00
+
+- Added ignored task-owned `hash-asset.cjs`; the runner now passes only normalized file paths to Node, avoiding inline JavaScript quoting.
+- Validation: Node syntax check PASS; PowerShell parser PASS for both runner and offline smoke script; actual `powershell.exe` (Windows PowerShell 5.1) invoked the helper on the retained browser/container entry-JS files and matched both to the manifest SHA-256; CRLF-aware `git diff --check` PASS.
+- No staging services were started during this validation. Next: one canonical Preflight → Start → Session for all three same-container static asset comparisons and automatic teardown.
+
+## T18 scenario 2 — current setup path and served asset provenance PASS — 2026-11-04T12:04+05:00
+
+- Commit/source tree under test: `bfc33837cd3028f1989b2462a998b16505a62fd6` (merged #3861). The only tracked local changes were the RQ-17 E2E spec and T18 journals; no frontend runtime/build source was modified. Synthetic env pinned `VERCEL_GIT_COMMIT_SHA` to the same commit.
+- Environment: Ubuntu-24.04; own synthetic project `clinic-aqs-t18-rq17-20261104`, owner `codex-t18-rq17-current-screen`; ports backend/frontend/PostgreSQL 18737/18738/55737. Credentials stayed in the private task env and process memory; none were logged or committed.
+- Canonical lifecycle: Preflight PASS; Start PASS and runtime readiness PASS; Session PASS; post-Session Preflight PASS. No warnings. C: free 16 GiB, WSL backing D: free 28 GiB. Ubuntu memory was 3204 MiB at Preflight, 3244 MiB after build, 2439 MiB after Session, and 3195 MiB at post-Session Preflight. Session teardown removed 5 containers, 3 volumes and 1 network; remaining counts were zero; local images were removed. Post-Session Preflight confirms owned ports are free.
+- Browser result: normal Admin password login and required TOTP enrollment/verification PASS. Current `/admin/setup-directions` UI created a hidden QueueProfile, doctorless service (`category_id=null`, `doctor_id=null`, `requires_doctor=false`), and QueueResource; the read model returned exactly one typed QueueResource target and no Doctor target. Playwright: 1 passed, 0 failed, 0 skipped (15.4 seconds).
+- Served frontend static-byte provenance: the same-origin Chromium response bodies for entry JavaScript, entry CSS, and the loaded AdminSetupDirections chunk were saved to owned scratch. `docker compose cp` copied each exact path from the same running `frontend` service at `/usr/share/nginx/html`; all captured-browser, container-copy and manifest SHA-256 values matched:
+  - `/assets/index-CgOZFmEj.js` — `2dd2637aa5d53b0f89f299ef1d8d0f1ba079c2e44267e679867ce02c896e26e0`
+  - `/assets/index-C3gpOeJv.css` — `cffe2954fac5d65a9be86a142fce9bc426723323d17bc1a6cae4f68fcd64a90a`
+  - `/assets/AdminSetupDirections-CqawWBjB.js` — `71011ac1251506014050fd29ea66a3a7e8e41343c2c60b087fd349bc7dcd5753`
+- Launcher provenance field remained `served_revision_verified=false`; it was not changed. The independent result above establishes that the three assets received by Chromium are byte-identical to the files in the frontend container built from this worktree/source pin. This does not claim that every asset, role, route or item in the full `STAGING_VALIDATION.md` was checked.
+- Scope: only RQ-17 E2E and `PROGRESS.md` / `EVIDENCE.md` tracked files; task-owned ignored runner, config, private synthetic env and result files in `.scratch/t18-rq17-current-screen/`. No runtime, API, auth policy, database, migrations, Compose/Dockerfile, production, foreign project, merge or deployment changes.
+- Gate: earlier task gate returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; its execution prompt was read. This continued same authorized test/evidence scope; no gate/router or source scope was expanded.
+- Result: T18 scenario 2 and three-file same-container static-byte comparison PASS. T18/Tier-2 remains PARTIAL; scenarios 3, 5 live Department off/on/manual archive, 10, and the complete staging runbook remain uncompleted.
+- Next: finalize local evidence and scoped checks, remove only this task's temporary secret-bearing/output scratch after evidence is secured, then prepare the bounded T18 PR and verify exact-head CI. Do not merge or deploy.
+
+## T18 scenario 2 — local scratch cleanup blocked — 2026-11-04T12:11+05:00
+
+- Canonical Session teardown and post-Session Preflight had already confirmed the owned Compose project is gone and its ports are free.
+- Cleanup scope was limited to this task's exact ignored directory `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-rq17-current-screen\final\.scratch\t18-rq17-current-screen` and its private synthetic env file. The directory contains task-owned runner/config/evidence copies and Playwright outputs; no other task path was targeted.
+- Local execution policy blocked both the exact directory cleanup and an exact-file removal attempt before either command executed. No scratch file was deleted. The private env and generated browser outputs therefore remain local and ignored; values were not read or printed. No alternate deletion path was attempted.
+- Impact: no staging stack or Docker resources remain. Do not start another cycle in this worktree until the remaining task-owned scratch is removed by an allowed local action. Repository work can continue because `.scratch` is ignored and none of its contents are included in the tracked diff.
+
+## T18 scenario 2 — served static-byte provenance pre-edit checkpoint — 2026-11-04T11:10+05:00
+
+- Goal: independently compare the HTML entry and exact served entry JS, stylesheet, and AdminSetupDirections route chunk with the local `frontend/dist` bytes generated from this worktree's runtime source.
+- Allowed tracked edit remains `frontend/e2e/rq17-setup-directions-live.spec.ts`; allowed ignored edit remains `.scratch/t18-rq17-current-screen/validate-rq17.ps1`. Plan journals may record evidence. No app/runtime/auth/API/DB/migration/Compose/production changes.
+- Method: on the staging-only runner flag, capture same-origin responses for the Vite entry JS/CSS and the Admin setup route chunk, compare SHA-256 of decoded response bytes against corresponding local `dist/assets` files, and print only asset paths and hashes. Ordinary CI does not set the flag.
+- Validation target: local frontend production build, focused ESLint/collection/diff check, then a single canonical Preflight → Start → Session combining the already-passing resource-only scenario with static-byte comparison and automatic teardown.
+- Stop condition: required static asset missing or hash mismatch; preserve the concrete comparison result and do not claim provenance.
+
+## T18 scenario 2 — byte-check harness local validation — 2026-11-04T11:20+05:00
+
+- Local build: `npm.cmd run build` PASS from the frontend worktree at source commit `bfc33837cd3028f1989b2462a998b16505a62fd6`; existing Rollup/esbuild CSS annotation/style warnings only. The Vite output includes the index entry JS/CSS and `AdminSetupDirections` chunk.
+- The staging-only E2E flag now captures same-origin responses for the entry JS, entry CSS, and loaded AdminSetupDirections chunk and checks each SHA-256 against `frontend/dist`. The ordinary CI path leaves this check disabled. The task-owned runner enables the flag.
+- Initial lint caught a `no-console` violation in the new harness; the console output was removed. Final focused ESLint PASS, Playwright collection PASS (one test), and `git diff --check` PASS.
+- No browser provenance result yet. Next: canonical Preflight → Start → Session on the same owned project, then use the test's byte comparison and record the exact successful result plus teardown.
+
+## T18 scenario 2 — initial served-byte comparison harness mismatch — 2026-11-04T11:25+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; owned project/ports unchanged.
+- Canonical lifecycle: Preflight PASS; Start PASS with readiness PASS; Session completed the UI scenario, then the new local-byte comparison failed before it could compare hashes; automatic teardown PASS.
+- Exact failure: the staging response referenced `/assets/index-CgOZFmEj.js`, which was absent from the local `frontend/dist` generated with default Windows build variables. `ops/compose.staging.yml` builds with `STAGING_PUBLIC_BASE_URL`, `STAGING_PUBLIC_WS_URL`, `STAGING_PUBLIC_WS_HOST`, `VITE_SENTRY_ENV=staging`, and `VERCEL_GIT_COMMIT_SHA`; the local baseline had not mirrored those build args. This is a comparison-fixture mismatch; no hash mismatch was observed and no provenance is claimed.
+- Correction planned: rebuild the local static baseline with the exact non-secret frontend build args from the task-owned synthetic env and the same `bfc33837` revision; rerun local checks and the exact-byte comparison once in the same isolated project.
+- Scope/cleanup: no app/runtime/auth/API/DB/migration/Compose/production changes; Session removed the owned project, containers, volumes, and network. No foreign project touched. The launcher continues to report `served_revision_verified=false`.
+- Next: build exact-args local baseline, then one canonical Preflight → Start → Session. Stop if the same asset is present locally but SHA-256 differs.
+
+## T18 scenario 2 — tab control is outside the form element — 2026-11-04T10:54+05:00
+
+- Commit under test: `bfc33837cd3028f1989b2462a998b16505a62fd6`; same owned Compose project `clinic-aqs-t18-rq17-20261104`.
+- Canonical lifecycle: Preflight PASS; Start PASS with readiness PASS; Session timed out at 240 seconds and reported automatic teardown PASS.
+- Browser evidence: normal Admin password/TOTP and profile creation succeeded. The test selected the category placeholder; the popup closed. It then searched for the `Очередь` tab inside the `<form>`, but current `ServiceForm` renders tabs as siblings above the form. No service POST occurred. This is a test locator scope error, not an app defect.
+- Fix: scope the tab controls to the ServiceForm card anchored by its “Добавление услуги” heading; continue scoping actual form fields and Save to the `<form>`.
+- Scope/cleanup: owned Session teardown PASS; no runtime/API/auth/DB/migration/Compose/production changes and no foreign resources touched. Served frontend provenance remains unverified.
+- Next: update this E2E locator, run focused checks, then retry the single scenario through canonical Preflight → Start → Session.

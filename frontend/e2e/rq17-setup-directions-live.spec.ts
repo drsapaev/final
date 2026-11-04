@@ -1,254 +1,286 @@
 /**
- * RQ-17 — S-14 e2e: собранный путь настройки направления (REAL_API).
+ * RQ-17 — T18 current Admin setup path for a resource-owned direction.
  *
- * Brief `RQ17_SETUP_PATH_BRIEF.md` §5: «Admin browser + REAL_API. "Новый
- * врач/ресурс" читается буквально — e2e покрывает ОБЕ оси D-01».
- *
- * Ось doctor-owned: мастер S-14 ведёт врача в /admin/users (canonical
- * onboarding, атомарное User+Doctor) — «нет второго onboarding» фиксируется
- * тем, что внутри мастера НЕТ формы создания врача, только переход.
- * Ось resource-owned: полный путь НАЧИНАЕТСЯ С ЧИСТОГО SETUP SCREEN (S-14
- * «from empty form», round-3 owner-ревью P1): мастер ведёт в профиль с
- * новым тегом и doctorless-услугу через ссылки существующих экранов, тег
- * выбирается в селекторе оси после создания/возврата, затем draft
- * QueueResource и активация через gate §3.1; checklist пересчитывает
- * статусы из API.
- *
- * Негативные комбинации инварианта §3.1 (12 пинов) покрываются
- * интеграционными пинами контракта
- * (backend/tests/integration/test_rq17_owner_invariant.py), не e2e.
- *
- * Запуск: реальный стек (vite dev + backend + БД с админом);
- * креды — QA_ADMIN_USERNAME / QA_ADMIN_PASSWORD (прецедент
- * admin-navigation.spec.ts).
+ * This spec follows the current backend-facts screen and its existing editors.
+ * It verifies the canonical Users editor link (there is no second doctor
+ * onboarding form in setup), creates a hidden QueueProfile and a doctorless
+ * service through their existing Admin screens, then creates and activates a
+ * QueueResource through the setup screen's resource view. All rows live only
+ * in the owned synthetic staging database and are removed with that project.
  */
-import { test, expect } from '@playwright/test';
-import fs from 'node:fs';
+import crypto from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { test, expect, type Page } from '@playwright/test';
 
 const ADMIN_USERNAME = process.env.QA_ADMIN_USERNAME || 'admin';
-const artifactsDir = path.join(process.cwd(), '..', 'output', 'playwright');
 
 function requiredAdminPassword() {
   const password = process.env.QA_ADMIN_PASSWORD;
   if (!password) {
-    throw new Error('Set QA_ADMIN_PASSWORD to run RQ-17 S-14 e2e tests.');
+    throw new Error('Set QA_ADMIN_PASSWORD for the synthetic RQ-17 Admin flow.');
   }
   return password;
 }
 
-const suffix = process.env.QA_SUFFIX || String(Date.now()).slice(-6);
-const resourceTag = `rq17res${suffix}`;
-const profileKey = `rq17_res_${suffix}`;
-const profileTitle = `RQ-17 ресурс ${suffix}`;
-const serviceName = `RQ-17 услуга ${suffix}`;
-
-if (!fs.existsSync(artifactsDir)) {
-  fs.mkdirSync(artifactsDir, { recursive: true });
+function base32Decode(secret: string): Buffer {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const character of secret.replace(/=+$/, '').toUpperCase()) {
+    const value = alphabet.indexOf(character);
+    if (value < 0) throw new Error('The synthetic Admin 2FA setup returned an invalid TOTP secret.');
+    bits += value.toString(2).padStart(5, '0');
+  }
+  const bytes: number[] = [];
+  for (let index = 0; index + 8 <= bits.length; index += 8) {
+    bytes.push(Number.parseInt(bits.slice(index, index + 8), 2));
+  }
+  return Buffer.from(bytes);
 }
 
-test.describe.configure({ mode: 'serial' });
+function totpCode(secret: string, atMs = Date.now()): string {
+  const counter = Math.floor(atMs / 1000 / 30);
+  const message = Buffer.alloc(8);
+  message.writeBigUInt64BE(BigInt(counter));
+  const digest = crypto.createHmac('sha1', base32Decode(secret)).update(message).digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const binary = ((digest[offset] & 0x7f) << 24)
+    | (digest[offset + 1] << 16)
+    | (digest[offset + 2] << 8)
+    | digest[offset + 3];
+  return String(binary % 1_000_000).padStart(6, '0');
+}
 
-test.beforeEach(async ({ page }) => {
+async function loginAdminWithRequiredTwoFactor(page: Page) {
   await page.goto('/login');
-  await page.fill('input[name="username"]', ADMIN_USERNAME);
-  await page.fill('input[name="password"]', requiredAdminPassword());
-  await page.click('button:has-text("Войти")');
-  await page.waitForLoadState('networkidle');
-});
+  await page.locator('input[name="username"]').fill(ADMIN_USERNAME);
+  await page.locator('input[name="password"]').fill(requiredAdminPassword());
 
-test('S-14 doctor-owned: мастер ведёт в существующие экраны, без второго onboarding', async ({ page }) => {
-  await page.goto('/admin/setup-directions');
-  await page.waitForLoadState('networkidle');
-
-  // экран-вход открылся, чек-лист отрисован (статусы из API)
-  await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
-  await expect(page.getByTestId('setup-checklist')).toBeVisible();
-
-  // мастер S-14 с пустой формы
-  await page.getByTestId('setup-wizard-open').click();
-  await expect(page.getByTestId('setup-wizard')).toBeVisible();
-
-  // «нет второго onboarding»: внутри мастера НЕТ формы создания врача —
-  // только переход в /admin/users (canonical onboarding)
-  await expect(page.getByTestId('setup-wizard-step-executor')).toHaveText(/.+/);
-  const doctorInputs = page
-    .getByTestId('setup-wizard-step-executor')
-    .locator('input');
-  await expect(doctorInputs).toHaveCount(0);
-
-  // doctor-шаг ведёт в /admin/users
-  await page.getByTestId('setup-wizard-axis-doctor').click();
-  await page.getByRole('link', { name: /Пользователи|Users/i }).first().click();
-  await expect(page).toHaveURL(/\/admin\/users$/);
-
-  // возврат в путь: шаг «услуги» ведёт в каталог услуг
-  await page.goto('/admin/setup-directions');
-  await page.getByTestId('setup-wizard-open').click();
-  await page.getByTestId('setup-wizard-axis-doctor').click();
-  await page.getByRole('link', { name: /Услуги|Services/i }).first().click();
-  await expect(page).toHaveURL(/\/admin\/services/);
-
-  // шаг «отображение» ведёт в профили очередей
-  await page.goto('/admin/setup-directions');
-  await page.getByTestId('setup-wizard-open').click();
-  await page.getByTestId('setup-wizard-axis-doctor').click();
-  await page.getByTestId('setup-wizard-services-next').click();
-  await page.getByRole('link', { name: /профил|profiles/i }).first().click();
-  await expect(page).toHaveURL(/\/admin\/services/);
-
-  // шаг «проверка»: возврат на чек-лист, статусы пересчитаны
-  await page.goto('/admin/setup-directions');
-  await page.getByTestId('setup-wizard-open').click();
-  await page.getByTestId('setup-wizard-axis-doctor').click();
-  await page.getByTestId('setup-wizard-services-next').click();
-  await page.getByTestId('setup-wizard-display-next').click();
-  await page.getByTestId('setup-wizard-verify-open').click();
-  await expect(page.getByTestId('setup-checklist')).toBeVisible();
-
-  // шаг «QR»: точка расширения зашита, выдача QR — после RQ-18
-  await page.getByTestId('setup-wizard-open').click();
-  await page.getByTestId('setup-wizard-axis-doctor').click();
-  await page.getByTestId('setup-wizard-services-next').click();
-  await page.getByTestId('setup-wizard-display-next').click();
-  await page.getByTestId('setup-wizard-verify-open').click();
-  await expect(page.getByTestId('setup-wizard-step-qr')).toBeVisible();
-
-  await page.screenshot({
-    path: path.join(artifactsDir, 'rq17-s14-doctor-owned.png'),
-    fullPage: true,
+  const loginResponsePromise = page.waitForResponse((response) => {
+    const pathname = new URL(response.url()).pathname;
+    return response.request().method() === 'POST' && pathname.endsWith('/authentication/login');
   });
-});
+  await page.getByRole('button', { name: /Войти|Sign in|Log in/i }).click();
+  const loginResponse = await loginResponsePromise;
+  expect(loginResponse.ok(), 'synthetic Admin password login should succeed').toBeTruthy();
+  const loginData = await loginResponse.json() as Record<string, unknown>;
 
-test('S-14 resource-owned: с чистого setup screen — wizard ведёт профиль/услугу, тег выбирается после создания, draft → активация через gate', async ({ page }) => {
-  test.setTimeout(180_000);
+  if (loginData.requires_2fa_setup === true) {
+    const setupWizard = page.locator('.twofactor-setup-auth');
+    await expect(setupWizard).toBeVisible();
 
-  // 0) старт СТРОГО с экрана-входа: новое направление начинается «с пустой
-  //    формы» — resource-ось доступна БЕЗ существующего тега (round-3 P1:
-  //    прежняя версия скрывала это, создавая профиль/услугу вне мастера)
+    const setupResponsePromise = page.waitForResponse((response) => {
+      const pathname = new URL(response.url()).pathname;
+      return response.request().method() === 'POST' && pathname.endsWith('/2fa/setup');
+    });
+    await setupWizard.getByRole('button', { name: /Далее|Next/i }).click();
+    const setupResponse = await setupResponsePromise;
+    expect(setupResponse.ok(), 'normal Admin TOTP enrollment should succeed').toBeTruthy();
+    const setupData = await setupResponse.json() as { secret_key?: unknown };
+    const secret = typeof setupData.secret_key === 'string' ? setupData.secret_key : '';
+    expect(secret.length, '2FA enrollment must return a TOTP secret').toBeGreaterThan(0);
+
+    await setupWizard.getByRole('button', { name: /Далее|Next/i }).click();
+    await setupWizard.getByLabel('2FA verification code').fill(totpCode(secret));
+    await setupWizard.getByRole('button', { name: /Подтвердить|Confirm/i }).click();
+    await expect(setupWizard.getByRole('button', { name: /Готово|Завершить|Finish|Done/i })).toBeVisible();
+    await setupWizard.getByRole('button', { name: /Готово|Завершить|Finish|Done/i }).click();
+    await expect(setupWizard).toHaveCount(0);
+    return;
+  }
+
+  if (loginData.requires_2fa === true) {
+    const secret = process.env.QA_ADMIN_TOTP_SECRET;
+    if (!secret) {
+      throw new Error('Admin already has 2FA; set QA_ADMIN_TOTP_SECRET for this synthetic staging run.');
+    }
+    const verifyPanel = page.locator('.twofactor-verify-auth');
+    await expect(verifyPanel).toBeVisible();
+    await verifyPanel.getByLabel('Authenticator code').fill(totpCode(secret));
+    await verifyPanel.getByRole('button', { name: /Проверить|Подтвердить|Verify|Confirm/i }).click();
+    await expect(verifyPanel).toHaveCount(0);
+    return;
+  }
+
+  throw new Error('Admin login did not require 2FA; refusing to continue without the normal Admin security flow.');
+}
+
+const letters = 'abcdefghij';
+const suffix = (process.env.QA_SUFFIX || String(Date.now()).slice(-6))
+  .toLowerCase()
+  .replace(/\d/g, (digit) => letters[Number(digit)] || 'k')
+  .replace(/[^a-z]/g, 'k');
+const resourceTag = `rqres${suffix}`;
+const profileKey = `rq_${suffix}`;
+const profileTitle = `Synthetic RQ-17 direction ${suffix}`;
+const serviceName = `Synthetic RQ-17 service ${suffix}`;
+const resourceName = `Synthetic RQ-17 resource ${suffix}`;
+
+test('current setup screen supports resource-only setup without creating another doctor', async ({ page }) => {
+  test.setTimeout(240_000);
+  const verifyServedFrontend = process.env.T18_VERIFY_SERVED_FRONTEND === '1';
+  const expectedOrigin = process.env.PLAYWRIGHT_BASE_URL
+    ? new URL(process.env.PLAYWRIGHT_BASE_URL).origin
+    : null;
+  if (verifyServedFrontend && !expectedOrigin) {
+    throw new Error('T18 served frontend verification requires PLAYWRIGHT_BASE_URL.');
+  }
+  const servedAssets = new Map<string, Promise<Buffer>>();
+  if (verifyServedFrontend && expectedOrigin) {
+    page.on('response', (response) => {
+      const assetUrl = new URL(response.url());
+      if (assetUrl.origin !== expectedOrigin || response.status() !== 200) return;
+      if (!/^\/assets\/(?:index-[^/]+\.(?:js|css)|AdminSetupDirections-[^/]+\.js)$/.test(assetUrl.pathname)) return;
+      servedAssets.set(assetUrl.pathname, response.body());
+    });
+  }
+
+  await loginAdminWithRequiredTwoFactor(page);
+
   await page.goto('/admin/setup-directions');
-  await page.waitForLoadState('networkidle');
   await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
-  await page.getByTestId('setup-wizard-open').click();
-  await expect(page.getByTestId('setup-wizard')).toBeVisible();
-  // deferred start: кнопка resource-оси активна и без выбранного тега
-  await expect(page.getByTestId('setup-wizard-axis-resource')).not.toBeDisabled();
-  await page.getByTestId('setup-wizard-axis-resource').click();
-  await expect(page.getByTestId('setup-wizard-step-services')).toBeVisible();
+  const editorLinks = page.getByTestId('setup-editor-links');
+  await expect(editorLinks).toBeVisible();
+  await expect(page.locator('[data-testid^="setup-wizard-"]')).toHaveCount(0);
+  await expect(editorLinks.locator('a[href*="servicesTab=queue-profiles"]')).toHaveCount(1);
+  await expect(editorLinks.locator('a[href*="servicesTab=catalog"]')).toHaveCount(1);
+  await expect(editorLinks.locator('a[href*="/admin/users"]')).toHaveCount(1);
 
-  // 1) шаг «отображение» (через мастер) → QueueProfilesManager: профиль
-  //    с НОВЫМ тегом (queue_tags вводится списком; это существующий экран,
-  //    не поверхность пути RQ-17)
-  await page.getByTestId('setup-wizard-services-next').click();
-  await page.getByRole('link', { name: /профил|profiles/i }).first().click();
-  await expect(page).toHaveURL(/\/admin\/services/);
-  await page.getByRole('button', { name: /Добавить|Создать/i }).first().click();
-  const modal = page.locator('.admin-qp-modal');
-  await expect(modal).toBeVisible();
-  await modal.locator('input').first().fill(profileKey);
-  await modal.locator('input').nth(1).fill(profileTitle);
-  await modal.locator('input').nth(2).fill(profileTitle);
-  await modal.locator('input').nth(3).fill(resourceTag);
-  await modal.getByRole('button', { name: /Сохранить|Создать/i }).first().click();
-  await expect(page.getByText(profileTitle).first()).toBeVisible({ timeout: 15000 });
+  // Create an unpublished profile through the canonical profile editor.
+  await editorLinks.locator('a[href*="servicesTab=queue-profiles"]').click();
+  await expect(page).toHaveURL(/servicesTab=queue-profiles/);
+  await page.getByRole('button', { name: /Добавить|Add/i }).click();
+  const profileDialog = page.getByRole('dialog');
+  await expect(profileDialog).toBeVisible();
+  const profileKeyInput = profileDialog.locator('#queue-profile-key');
+  await expect(profileKeyInput).toHaveAttribute('pattern', '[a-z_]+');
+  expect(profileKey).toMatch(/^[a-z_]+$/);
+  await profileKeyInput.fill(profileKey);
+  await profileDialog.locator('#queue-profile-title-en').fill(profileTitle);
+  await profileDialog.locator('#queue-profile-title-ru').fill(profileTitle);
+  await profileDialog.locator('#queue-profile-tags').fill(resourceTag);
+  await profileDialog.getByRole('button', { name: /Создать вкладку очереди|Create queue tab/i }).click();
+  await expect(profileDialog).toHaveCount(0);
+  await expect(page.getByText(profileTitle).first()).toBeVisible();
 
-  // 2) возврат в путь: тег создан — выбирается в селекторе resource-оси
-  //    («выбор созданного тега после возврата»), шаг «услуги» → ServiceCatalog
+  // Create a service with a real category and the new profile tag, leaving
+  // the optional doctor empty and requires_doctor at its false default.
   await page.goto('/admin/setup-directions');
-  await page.waitForLoadState('networkidle');
-  await page.getByTestId('setup-wizard-open').click();
-  await page.getByTestId('setup-wizard-tag-select').click();
-  await page.getByRole('option', { name: resourceTag }).first().click();
-  await page.getByTestId('setup-wizard-axis-resource').click();
-  await page.getByRole('link', { name: /Услуги|Services/i }).first().click();
-  await expect(page).toHaveURL(/\/admin\/services/);
+  await expect(page.getByTestId('setup-editor-links')).toBeVisible();
+  await page.getByTestId('setup-editor-links').locator('a[href*="servicesTab=catalog"]').click();
+  await expect(page).toHaveURL(/servicesTab=catalog/);
+  const emptyServices = page.getByRole('region', { name: 'Услуги не найдены' });
+  await expect(emptyServices).toBeVisible();
+  await emptyServices.getByRole('button', { name: /Добавить услугу|Add service/i }).click();
+  const serviceEditor = page.getByRole('heading', { name: /Добавление услуги|Add service/i }).locator('..');
+  const serviceForm = serviceEditor.locator('form').last();
+  await expect(serviceForm).toBeVisible();
+  await serviceForm.locator('input[type="text"]').first().fill(serviceName);
 
-  // 3) doctorless-услуга нового тега (ServiceCatalog; ADM-06-прецедент)
-  await page.getByRole('heading', { name: 'Справочник услуг' }).waitFor();
-  await page.getByRole('button', { name: 'Добавить услугу' }).click();
-  const form = page.locator('form').last();
-  await form.locator('input[type="text"]').first().fill(serviceName);
-  await form.getByPlaceholder('K01').fill(`T${suffix.slice(-2)}`);
-  await form.locator('select').first().selectOption('7');
-  await form.locator('input[type="number"]').first().fill('15000');
-  await form.locator('input[type="number"]').nth(1).fill('20');
-  // requires_doctor остаётся дефолтным (doctorless — нижняя нога gate §3.1)
-  await page.getByRole('button', { name: 'Очередь' }).click();
-  await form.locator('select').last().selectOption(resourceTag);
-  await form.getByRole('button', { name: 'Сохранить' }).click();
-  await expect(page.getByText('Услуга создана')).toBeVisible({ timeout: 15000 });
+  const categorySelect = serviceForm.locator('.mac-select').first().getByRole('button');
+  await categorySelect.click();
+  const categoryOptions = page.getByRole('listbox').getByRole('option');
+  const categoryOptionCount = await categoryOptions.count();
+  const hasServiceCategory = categoryOptionCount > 1;
+  if (hasServiceCategory) {
+    await categoryOptions.nth(1).click();
+  } else {
+    await expect(categoryOptions).toHaveCount(1);
+    await expect(categoryOptions.first()).toHaveText(/Выберите категорию|Select category/i);
+    await categoryOptions.first().click();
+  }
 
-  // 4) экран-вход: мастер ведёт на проверку — тег в чек-листе, статусы
-  //    пересчитаны из API ((б) готово, оси ещё нет — ресурс не создан)
+  const queueTab = serviceEditor.getByRole('button', { name: /Очередь|Queue/i });
+  await expect(queueTab).toBeVisible();
+  await queueTab.click();
+  const queueTagSelect = serviceForm.locator('.mac-select').first().getByRole('button');
+  await queueTagSelect.click();
+  const resourceTagOption = page.getByRole('listbox').getByRole('option').filter({ hasText: profileTitle });
+  await expect(resourceTagOption).toHaveCount(1);
+  await resourceTagOption.click();
+
+  const optionsTab = serviceEditor.getByRole('button', { name: /Опции|Options/i });
+  await expect(optionsTab).toBeVisible();
+  await optionsTab.click();
+  await expect(serviceForm.getByRole('checkbox', { name: /Требует врача|Doctor required/i })).not.toBeChecked();
+  const serviceCreateResponsePromise = page.waitForResponse((response) => {
+    const pathname = new URL(response.url()).pathname;
+    return response.request().method() === 'POST' && /\/services\/?$/.test(pathname);
+  });
+  await serviceForm.getByRole('button', { name: /Сохранить услугу|Сохранить|Save service|Save/i }).click();
+  const serviceCreateResponse = await serviceCreateResponsePromise;
+  expect(serviceCreateResponse.ok(), 'doctorless synthetic service should be saved').toBeTruthy();
+  const servicePayload = serviceCreateResponse.request().postDataJSON() as Record<string, unknown>;
+  expect(servicePayload).toMatchObject({
+    queue_tag: resourceTag,
+    doctor_id: null,
+    requires_doctor: false,
+  });
+  if (!hasServiceCategory) {
+    expect(servicePayload.category_id).toBeNull();
+  }
+  await expect(page.getByText(serviceName).first()).toBeVisible();
+
+  // The current setup screen owns the resource view; create a draft first,
+  // then activate it through the normal eligibility gate.
   await page.goto('/admin/setup-directions');
-  await page.waitForLoadState('networkidle');
-  await page.getByTestId('setup-wizard-open').click();
-  await page.getByTestId('setup-wizard-tag-select').click();
-  await page.getByRole('option', { name: resourceTag }).first().click();
-  await page.getByTestId('setup-wizard-axis-resource').click();
-  await page.getByTestId('setup-wizard-services-next').click();
-  await page.getByTestId('setup-wizard-display-next').click();
-  await page.getByTestId('setup-wizard-verify-open').click();
-  const row = page.getByTestId(`setup-checklist-row-${resourceTag}`);
-  await expect(row).toBeVisible({ timeout: 15000 });
-
-  // 5) QueueResource-менеджер: draft-ресурс (draft-by-default)
+  await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
   await page.getByTestId('setup-view-resources').click();
   await page.getByTestId('qr-resource-create-toggle').click();
-  // «ноль технических ключей»: тег — выбор из существующих значений
-  const createForm = page.getByTestId('qr-resource-create-form');
-  await expect(createForm).toBeVisible();
-  const tagSelect = page.getByTestId('qr-resource-tag-select');
-  await tagSelect.click();
-  await page.getByRole('option', { name: resourceTag }).first().click();
-  await page.getByTestId('qr-resource-display-name-input').fill(`Ресурс ${resourceTag}`);
-  // active НЕ включаем — draft (S-14: услуги/профиль → draft → активация)
+  await expect(page.getByTestId('qr-resource-create-form')).toBeVisible();
+  await page.getByTestId('qr-resource-tag-select').click();
+  const resourceTagChoice = page.getByRole('listbox').getByRole('option').filter({ hasText: resourceTag });
+  await expect(resourceTagChoice).toHaveCount(1);
+  await resourceTagChoice.click();
+  await page.getByTestId('qr-resource-display-name-input').fill(resourceName);
   await page.getByTestId('qr-resource-submit').click();
-  await expect(page.getByTestId('qr-resource-error')).toHaveCount(0);
-  await expect(page.locator('[data-testid^="qr-resource-row-"]').first()).toBeVisible({ timeout: 15000 });
-  await expect(page.getByTestId('qr-resource-badge-draft').first()).toBeVisible();
 
-  // 6) активация через gate §3.1 (doctorless-услуга тега существует)
-  const draftRow = page.locator('[data-testid^="qr-resource-row-"]').first();
-  await draftRow.locator('[data-testid^="qr-resource-toggle-"]').click();
-  await expect(page.getByTestId('qr-resource-badge-active').first()).toBeVisible({ timeout: 15000 });
+  const resourceRow = page.locator('[data-testid^="qr-resource-row-"]').filter({ hasText: resourceName });
+  await expect(resourceRow).toHaveCount(1, { timeout: 15_000 });
+  await expect(resourceRow.getByTestId('qr-resource-badge-draft')).toBeVisible();
+  await resourceRow.locator('[data-testid^="qr-resource-toggle-"]').click();
+  await expect(resourceRow.getByTestId('qr-resource-badge-active')).toBeVisible({ timeout: 15_000 });
 
-  // 7) чек-лист: ось resource, (а) готово
+  // The backend read model must resolve exactly one booking target, owned by
+  // the QueueResource. A doctor target would contradict this doctorless path.
   await page.getByTestId('setup-view-checklist').click();
-  await expect(row.getByTestId('setup-row-axis-resource')).toBeVisible({ timeout: 15000 });
+  const directionRow = page.getByTestId(`setup-checklist-row-${resourceTag}`);
+  await expect(directionRow).toBeVisible({ timeout: 20_000 });
+  const targets = directionRow.getByTestId('setup-direction-targets');
+  await expect(targets).toBeVisible();
+  await expect(targets.locator('li')).toHaveCount(1);
+  await expect(targets).toContainText(resourceName);
+  await expect(targets).toContainText(/ресурс|resource/i);
+  await expect(targets).not.toContainText(/врач|doctor/i);
 
-  await page.screenshot({
-    path: path.join(artifactsDir, 'rq17-s14-resource-owned.png'),
-    fullPage: true,
-  });
+  if (verifyServedFrontend) {
+    const assetDirectory = process.env.T18_SERVED_ASSET_DIR;
+    expect(assetDirectory, 'staging runner must provide an owned asset evidence directory').toBeTruthy();
+    const requiredAssetPatterns = [
+      /\/assets\/index-[^/]+\.js$/,
+      /\/assets\/index-[^/]+\.css$/,
+      /\/assets\/AdminSetupDirections-[^/]+\.js$/,
+    ];
+    const requiredAssets = requiredAssetPatterns.map((pattern) =>
+      Array.from(servedAssets.entries()).find(([assetPath]) => pattern.test(assetPath))
+    );
+    expect(requiredAssets.every(Boolean), 'entry JS, entry CSS, and AdminSetupDirections chunk must be served').toBeTruthy();
 
-  fs.writeFileSync(
-    path.join(artifactsDir, 'rq17-s14-ids.json'),
-    JSON.stringify({ suffix, resourceTag, profileKey, serviceName }, null, 2),
-    'utf8',
-  );
-});
-
-test('S-14 text pin: ноль технических ключей в формах пути', async ({ page }) => {
-  await page.goto('/admin/setup-directions');
-  await page.waitForLoadState('networkidle');
-
-  // мастер: ноль свободного ввода — всё выбор/ссылки/кнопки
-  await page.getByTestId('setup-wizard-open').click();
-  await expect(page.getByTestId('setup-wizard').locator('input')).toHaveCount(0);
-
-  // менеджер QueueResource: тег — селектор из существующих значений,
-  // среди текстовых полей формы нет поля queue_tag
-  await page.getByTestId('setup-wizard-close').click();
-  await page.getByTestId('setup-view-resources').click();
-  await page.getByTestId('qr-resource-create-toggle').click();
-  await expect(page.getByTestId('qr-resource-tag-select')).toBeVisible();
-  const tagInputs = page
-    .getByTestId('qr-resource-create-form')
-    .locator('input')
-    .filter({ hasNot: page.locator('[data-testid="qr-resource-display-name-input"], [data-testid="qr-resource-code-input"]') });
-  const tagInputCount = await tagInputs.evaluateAll((nodes) =>
-    nodes.filter((node) => /тег|queue_tag/i.test(node.getAttribute('name') || '')).length,
-  );
-  expect(tagInputCount).toBe(0);
+    await mkdir(assetDirectory!, { recursive: true });
+    const assetManifest = [] as Array<{ path: string; file: string; sha256: string }>;
+    for (const asset of requiredAssets) {
+      if (!asset) continue;
+      const [assetPath, servedBodyPromise] = asset;
+      const servedBody = await servedBodyPromise;
+      const servedHash = crypto.createHash('sha256').update(servedBody).digest('hex');
+      const file = path.basename(assetPath);
+      await writeFile(path.join(assetDirectory!, file), servedBody);
+      assetManifest.push({ path: assetPath, file, sha256: servedHash });
+    }
+    await writeFile(
+      path.join(assetDirectory!, 'manifest.json'),
+      JSON.stringify({ assets: assetManifest }, null, 2),
+      'utf8',
+    );
+  }
 });
