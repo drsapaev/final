@@ -1,4 +1,16 @@
-## Current resume — T18 scenario matrix reconciled — 2026-11-04T23:48+05:00
+## Current resume — T18 cross-cutting Admin setup validation — 2026-11-05T00:45:37+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. PR #3865 is merged at `64a7c0b9ce422bbdac73d919158eb525669d9229`; its final reviewed code HEAD was `290d8f6d960c6207f4118783a1d48775c99ef41e`.
+
+The corrected T18 cross-cutting browser run passed on worktree HEAD `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`: normal Admin password+TOTP; keyboard/form behavior; empty-state links; error/retry; five locales; viewports 375/768/1280/1920; content appearance 1,190/944 ms. Browser page errors were 0. The first attempt timed out because the temporary harness omitted `sessionStorage` when creating a fresh context; this was corrected in memory and is recorded as harness-only.
+
+Important limitations: 11 browser console errors were counted but not classified; `served_revision_verified=false`; the full staging runbook is incomplete. Tier-2 remains PARTIAL, without deferral. The canonical Session teardown passed and removed its project resources. The host command policy rejected deletion of the task-owned synthetic env file; the user has been asked to remove only `.scratch/t18-crosscut-20261105/staging.env`. Do not use another deletion method.
+
+PR #3873 is still user-merge-owned. The journal-only checkpoint is committed locally with normal hooks; push it to the existing PR, refresh the PR body, and verify exact-head checks. Do not merge or deploy. After user merge, refresh `origin/main` in a fresh worktree, classify the 11 console errors safely if feasible without another broad staging cycle, complete served asset provenance, and then update the outstanding T18 matrix. Do not repeat passing UI checks without a source change.
+
+---
+
+## Previous resume — T18 scenario matrix reconciled — 2026-11-04T23:48+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. PR #3865 is merged at `64a7c0b9ce422bbdac73d919158eb525669d9229`; its final reviewed code HEAD was `290d8f6d960c6207f4118783a1d48775c99ef41e`. The two P2 findings in the supplied older review were fixed and resolved before merge.
 

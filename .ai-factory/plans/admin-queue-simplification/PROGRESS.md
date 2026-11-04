@@ -1,17 +1,28 @@
 # Progress — T18 integrated synthetic acceptance
 
 Plan version: 1.0
-Current task: T18 integrated synthetic acceptance; reconcile the current evidence matrix in PR #3873
-Current status: PR_OPEN; core scenarios 1–10 reconciled to evidence; cross-cutting T18 acceptance remains incomplete
+Current task: T18 integrated synthetic acceptance; cross-cutting Admin setup checks in existing PR #3873
+Current status: IN_PROGRESS; targeted cross-cutting browser assertions passed; journal commit created; push and exact-head checks pending
 Merged PRs: #3861 at bfc33837cd3028f1989b2462a998b16505a62fd6; #3865 at 64a7c0b9ce422bbdac73d919158eb525669d9229
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final
 Branch: codex/t18-combined-validation
 Base commit: origin/main 106597d67ece48ee9380ded5725ba421aed8cbc0
-Current commit: PR #3873 branch `codex/t18-combined-validation` (resolve current SHA and checks from GitHub); sync merge 5cf78a3a97bc9d7f559d8296fd69d2b32231d20d into origin/main 106597d67ece48ee9380ded5725ba421aed8cbc0; runtime source under validation 64a7c0b9ce422bbdac73d919158eb525669d9229
-Last updated: 2026-11-04T23:46+05:00
+Current commit: local journal commit on PR #3873 branch `codex/t18-combined-validation`; runtime source exercised at `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`; sync merge 5cf78a3a97bc9d7f559d8296fd69d2b32231d20d into origin/main 106597d67ece48ee9380ded5725ba421aed8cbc0
+Last updated: 2026-11-05T00:48:49+05:00
 Tier-2: PARTIAL; no deferral accepted. User retains merge and deployment authority.
 
-## Current checkpoint
+## Current checkpoint — cross-cutting Admin setup browser validation
+
+- Completed: canonical synthetic Preflight → Start → Session on worktree HEAD `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`. The corrected Chromium harness passed normal Admin password + TOTP enrollment, keyboard trap/Escape/focus return, invalid form key rejection, hidden QueueProfile creation, empty-state editor links, error/retry, five language headings, and responsive checks at 375/768/1280/1920 px. First/repeat content appearance measured 1,190/944 ms; page errors 0.
+- Harness-only first attempt: Admin 2FA and form keyboard checks passed, then the screen row timed out. Source inspection confirmed auth tokens are in `sessionStorage`, which Playwright `storageState` omits. The harness now copies synthetic session storage in memory to a fresh context; no token was written to disk or output. The first attempt is recorded as a harness failure, not a product failure.
+- Diagnostics: the passing browser result counted 11 console errors without classifying their messages; this remains an explicit limitation. The launcher reports `served_revision_verified=false`; the build input pin matched HEAD, but this is not served-asset provenance evidence.
+- Cleanup: canonical Session returned PASS and removed 5 containers, 3 volumes, 1 network and local Compose images; remaining project containers/volumes/networks were all 0. Dedicated ports were free. Post-Session WSL available memory was 2,142 MiB. The task-owned env contains synthetic credentials and must be removed; the host command policy rejected the removal attempt, and no alternate method was used.
+- Changed but not verified: the three T18 journal files are committed locally; push and exact-head checks are pending.
+- Remaining: classify the 11 console errors without exposing raw messages; verify served frontend revision provenance; complete the full `docs/runbooks/STAGING_VALIDATION.md`. Do not repeat the passing checks unless source changes or the console-error diagnostic shows a functional failure.
+- Blocker: PR #3873 remains user-merge-owned; no merge or deployment is authorized by this checkpoint.
+- Next exact action: push the journal commit to the same PR, refresh its body, and verify exact-head checks. Then wait for user-owned merge.
+
+## Previous checkpoint — T18 core scenario matrix reconciled
 
 - Completed: one canonical synthetic Start to Session run on exact source commit 64a7c0b9ce422bbdac73d919158eb525669d9229. Normal synthetic Admin password plus TOTP PASS. Scenario 3 incomplete configuration to ownership action to resource target to explicit publish to ready/public PASS. Scenario 5 Department off/on with manual profile archive persistence PASS. Scenario 10 all four legacy Admin URLs PASS; linked synthetic QueueProfile DELETE returned 409 and the profile remained present.
 - Cleanup: Session teardown PASS; removed 5 containers, 3 volumes, 1 network and Compose-local images; remaining owned containers, volumes and networks 0. First post-Session Preflight detected a transient local listener on port 18987; no process was stopped. A follow-up canonical Preflight passed with no warnings and all ports available.
