@@ -1,9 +1,9 @@
 # Registrar frontend — cumulative code-review ledger
 
-> **Status:** CUMULATIVE AUDIT JOURNAL — actualized 2026-11-03 against `main` `235b4cbba`: 31/69 findings RESOLVED / FIXED-VERIFIED via merged fix PRs (#3809, #3821, #3825, #3826, #3827, #3828, #3829 for the first 8; the 2026-11-03 registrar batch fixes REG-FE-007/020/021 via #3847, 009/064/065 via #3849, 013 via #3844, 014/015/017 via #3843, 034 via #3845, 035/042 via #3846, 050/051/052/053/055/057/061 via #3848; the 2026-11-03 re-review batch adds and fixes REG-FE-067 via #3855, 068 via #3856, 069 via #3857); 38 remain REPRO-PENDING. Documentation-only historical audit log; not a release or approval report.
+> **Status:** CUMULATIVE AUDIT JOURNAL — actualized 2026-11-04 against `main` `dac307b1b`: 38/69 findings RESOLVED / FIXED-VERIFIED via merged fix PRs (#3809, #3821, #3825, #3826, #3827, #3828, #3829 for the first 8; the 2026-11-03 registrar batch fixes REG-FE-007/020/021 via #3847, 009/064/065 via #3849, 013 via #3844, 014/015/017 via #3843, 034 via #3845, 035/042 via #3846, 050/051/052/053/055/057/061 via #3848; the 2026-11-03 re-review batch adds and fixes REG-FE-067 via #3855, 068 via #3856, 069 via #3857; the 2026-11-04 Welcome honest-states batch fixes REG-FE-008 via #3851 together with 027/028/029/030/031/032, including the review #5767519793 follow-up that binds the morning checklist to the VERIFIED sample day); 31 remain REPRO-PENDING. Documentation-only historical audit log; not a release or approval report.
 > **Started:** 2026-10-29 (Asia/Tashkent). **Repository:** `drsapaev/final`.
 > **Baseline:** `main` at `9ef2c9376ada9a7c3049ad595d9f2fb5bd6b64b1` (original).
-> **Actualized:** `main` at `235b4cbba6bc133e89c44a3ceeb087d227267f9d` (2026-11-03, post re-review batch #3853–#3858; registrar findings REG-FE-067–069 added from that review and marked fixed); each RESOLVED finding re-verified by inspecting the corresponding merged PR diff at its merge SHA. Prior actualization anchors: `dcdfb4566` (2026-11-03, post the 20-finding registrar fix batch #3843–#3849), `1595ce3dc` (2026-11-02, post #3804).
+> **Actualized:** `main` at `dac307b1b` (2026-11-04, post the #3851 Welcome honest-states merge: REG-FE-008/027–032 fixed and marked, review #5767519793 P2/P3 follow-up included); each RESOLVED finding re-verified by inspecting the corresponding merged PR diff at its merge SHA. Prior actualization anchors: `235b4cbba` (2026-11-03, post re-review batch #3853–#3858), `dcdfb4566` (2026-11-03, post the 20-finding registrar fix batch #3843–#3849), `1595ce3dc` (2026-11-02, post #3804).
 > **Review type:** source inspection via GitHub file reads. **No runtime or automated tests were executed for these findings.**
 > **Purpose:** retain every actionable review finding with source evidence, reproduce/verify it, and agree on a safe remediation sequence **after** the review inventory is complete.
 
@@ -34,7 +34,7 @@
 | REG-FE-005 | P2 | URL date and worklist | Changing `?date` while mounted does not directly reload when calendar is closed; worklist heading still says today | SOURCE-OBSERVED / REPRO-PENDING | Batch D: date lifecycle |
 | REG-FE-006 | P2 | Welcome actions | `in_cabinet`/`complete` commands lack confirmations present in the main table | SOURCE-OBSERVED / REPRO-PENDING | Batch A: action consistency |
 | REG-FE-007 | P2 | Rate-limit handling | HTTP 429 returns without failure/stale state; tests explicitly pin a `loading=false`/`dataSource=loading` quirk | RESOLVED / FIXED-VERIFIED — PR #3847 (merged c494cabc3, main-CI green)  Batch D: fetch state |
-| REG-FE-008 | P2 | Refresh feedback | Welcome manual refresh announces success synchronously, before fetch outcome | SOURCE-OBSERVED / REPRO-PENDING | Batch D: fetch feedback |
+| REG-FE-008 | P2 | Refresh feedback | Welcome manual refresh announces success synchronously, before fetch outcome | RESOLVED / FIXED-VERIFIED — PR #3851 (merged `dac307b1b`, main-CI green) — `loadAppointments` resolves a typed `RegistrarWorklistLoadOutcome`; the toast fires only for verified `loaded`/`empty` | Batch D: fetch feedback |
 | REG-FE-009 | P2 | Reschedule presentation | Optimistic deletion compares IDs from different record namespaces, potentially hiding an unrelated row | RESOLVED / FIXED-VERIFIED — PR #3849 (merged dcdfb4566, main-CI green)  Batch E: reschedule UI |
 | REG-FE-010 | P2 | Existing patient selected in create mode | Form changes to existing patient profile are not sent to patient update API on create path | SOURCE-OBSERVED / REPRO-PENDING | Batch F: patient identity/profile UX |
 | REG-FE-011 | P2 | Partial patient save before edit | `updatePatient` can commit changes before later queue/edit-delta failure | SOURCE-OBSERVED / REPRO-PENDING | Batch G: patient/visit atomicity |
@@ -53,12 +53,12 @@
 | REG-FE-024 | P2 | Aggregated action visibility | Context menu ignores grouped_records.available_actions and hides backend-permitted non-payment actions | SOURCE-OBSERVED / REPRO-PENDING | Batch Q: action exposure/wiring |
 | REG-FE-025 | P2 | Force majeure target identity | Row action selects specialist_id from legacy doctor fields, not backend queue-owner scope, for mass queue transfer/cancel | CONFIRMED / RESOLVED — PR #3809 (merged a770ce337, main-CI green) | Batch R: force-majeure owner boundary |
 | REG-FE-026 | P3 | Context-menu reschedule visibility | Menu checks missing can_reschedule/reschedule signal on canonical registrar queue rows while inline reschedule remains accessible | SOURCE-OBSERVED / REPRO-PENDING | Batch Q: action exposure/wiring |
-| REG-FE-027 | P2 | Welcome morning doctor summary | Doctor groups use absent legacy IDs and count rows, not distinct patients | SOURCE-OBSERVED / REPRO-PENDING | Batch S: Welcome summary |
-| REG-FE-028 | P2 | Welcome filtered-empty presentation | No-match filtered results are presented as an empty queue and offer first-record CTA | SOURCE-OBSERVED / REPRO-PENDING | Batch S: Welcome empty states |
-| REG-FE-029 | P2 | Welcome primary load error | With zero rows/dataSource=error there is no error message or retry UI | SOURCE-OBSERVED / REPRO-PENDING | Batch S: Welcome error state |
-| REG-FE-030 | P2 | Welcome query scope loss | Quick filter replaces all URL params and drops active date/department/doctor/search scope | SOURCE-OBSERVED / REPRO-PENDING | Batch T: URL filters |
-| REG-FE-031 | P3 | Welcome orphaned selection | Selection checkboxes enabled with no bulk-action consumer | SOURCE-OBSERVED / REPRO-PENDING | Batch U: selection UX |
-| REG-FE-032 | P3 | Welcome calendar date timezone | History date-only string parsed as UTC and displayed in browser local timezone | SOURCE-OBSERVED / REPRO-PENDING | Batch U: clinic date |
+| REG-FE-027 | P2 | Welcome morning doctor summary | Doctor groups use absent legacy IDs and count rows, not distinct patients | RESOLVED / FIXED-VERIFIED — PR #3851 (merged `dac307b1b`, main-CI green) — groups by canonical `queue_owner_kind`/`queue_owner_id`, distinct patients with honest «Записей» fallback, today-only gating bound to the verified sample day (review #5767519793 P2) | Batch S: Welcome summary |
+| REG-FE-028 | P2 | Welcome filtered-empty presentation | No-match filtered results are presented as an empty queue and offer first-record CTA | RESOLVED / FIXED-VERIFIED — PR #3851 (merged `dac307b1b`, main-CI green) — Welcome consumes the same SSOT scope fact (`resolveRegistrarWorklistEmptyScopeKind`) as the worklist; no-matches renders without the create CTA | Batch S: Welcome empty states |
+| REG-FE-029 | P2 | Welcome primary load error | With zero rows/dataSource=error there is no error message or retry UI | RESOLVED / FIXED-VERIFIED — PR #3851 (merged `dac307b1b`, main-CI green) — explicit error + retry state mirroring the worklist contract | Batch S: Welcome error state |
+| REG-FE-030 | P2 | Welcome query scope loss | Quick filter replaces all URL params and drops active date/department/doctor/search scope | RESOLVED / FIXED-VERIFIED — PR #3851 (merged `dac307b1b`, main-CI green) — functional `URLSearchParams` updates mutate only the status key; «Все записи» clears status+search, scope keys survive | Batch T: URL filters |
+| REG-FE-031 | P3 | Welcome orphaned selection | Selection checkboxes enabled with no bulk-action consumer | RESOLVED / FIXED-VERIFIED — PR #3851 (merged `dac307b1b`, main-CI green) — `showCheckboxes` off until a bulk consumer exists (same dead-UI removal as the worklist) | Batch U: selection UX |
+| REG-FE-032 | P3 | Welcome calendar date timezone | History date-only string parsed as UTC and displayed in browser local timezone | RESOLVED / FIXED-VERIFIED — PR #3851 (merged `dac307b1b`, main-CI green) — history badge and hero «today» render in clinic time (Asia/Tashkent) via `formatClinicDayLong`/`formatClinicTodayLong`; suite TZ override restored in `afterAll` (review #5767519793 P3) | Batch U: clinic date |
 | REG-FE-033 | P3 | Default tabpanel label | All-departments tabpanel has no labelledby; corresponding control is not a real tab | SOURCE-OBSERVED / REPRO-PENDING | Batch U: accessibility |
 | REG-FE-034 | P2 | Queue API response validation | Canonical queue response lacking queues is silently parsed as empty legacy response; null payload mapper also returns empty queues | RESOLVED / FIXED-VERIFIED — PR #3845 (merged fc2c8a13e, main-CI green)  Batch V: API contract fail-closed |
 | REG-FE-035 | P2 | Queue-manager async identity | Older doctor/date queue snapshot can overwrite more recent selection because hook has no request epoch guard | RESOLVED / FIXED-VERIFIED — PR #3846 (merged 842080d68, main-CI green)  Batch W: queue snapshot lifecycle |
@@ -200,6 +200,8 @@
 **Fail-first test:** stub a pending/rejected/429 fetch, click Refresh, assert no success toast before a verified successful response; assert an appropriate failure or rate-limit indication. Test a successful refresh separately.
 
 **Fix direction:** expose a reliable fetch-result outcome from the hook (rather than assuming any awaited void return means success), then show success only for a current, successful request. Preserve last-known data on failure.
+
+**Resolution (2026-11-04):** RESOLVED / FIXED-VERIFIED — PR **#3851** (merged `dac307b1b`, main-CI green): `loadAppointments` resolves a typed `RegistrarWorklistLoadOutcome` (`loaded`/`empty`/`failed`/`token-missing`/`superseded`/`skipped`); the «Обновить данные» toast fires only for `loaded`/`empty` — a valid empty day still counts as a successful refresh, 429/network failures do not. Review #5767519793 follow-up (P2) additionally binds the checklist's `sampleIsToday` to the VERIFIED sample day (`loadedDate` in `worklistDataReducer`), so a «history → today» switch no longer presents the old sample as today's while the request is in flight or after a failed refresh (RQ-22 kept-rows case).
 
 ### REG-FE-009 — Reschedule optimistic removal mixes ID namespaces (P2 candidate)
 
@@ -448,6 +450,8 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 
 **Fail-first test:** render synthetic rows from two doctor-owned queues, a resource-owned queue, an unknown owner, and one patient with two records. Assert owner groups are not collapsed and counts use distinct patients or are accurately labelled as record counts. **Repair:** use canonical owner-aware backend presentation facts (or a typed read-model summary), never infer doctor from queue bucket; clarify scope/date and unknown-owner treatment.
 
+**Resolution (2026-11-04):** RESOLVED / FIXED-VERIFIED — PR **#3851** (merged `dac307b1b`, main-CI green): the morning checklist groups by the canonical queue owner (`queue_owner_kind`/`queue_owner_id` — doctor/resource/unowned buckets with numbered fallbacks), counts DISTINCT patients via `patient_id` and honestly labels «Записей» when identity is incomplete; the checklist is a today-only instrument gated by `sampleIsToday`, which after review #5767519793 (P2) is bound to the verified sample day rather than the selected date. Suite: `WelcomeView.honestStates.test.tsx` 20/20 (12 RED on pre-fix source).
+
 ### REG-FE-028 — Welcome filtered-no-match screen falsely says queue is empty (P2 candidate)
 
 **Code:** [WelcomeView.tsx L530–L561](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L530-L561) marks empty when `!appointmentsLoading && dataSource==='api' && filteredAppointments.length===0`; [L591–L615](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L591-L615) shows "Сегодня пока нет записей"/"Создать первую запись". The parent supplies both raw `appointments` and filtered rows ([RegistrarPanel.tsx L350–L395](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/RegistrarPanel.tsx#L350-L395)); main [WorklistView.tsx L213–L269](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WorklistView.tsx#L213-L269) correctly differentiates "nothing matched" vs "no entries". Existing [registrarWorklistRows.test.ts L328–L397](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/__tests__/registrarWorklistRows.test.ts#L328-L397) tests the scope fact, but it is not wired into Welcome.
@@ -455,6 +459,8 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 **Risk:** a failed search or narrow status filter can imply there are no patients and invite an unnecessary new registration. Distinct view surface from already fixed Worklist empty-state behavior.
 
 **Fail-first test:** `appointments.length>0`, `filteredAppointments=[]`, `dataSource='api'`, valid auth; assert "Ничего не найдено" and no first-record text. For a genuinely empty response, assert proper empty queue CTA. **Repair:** share the backend-derived scope classification/view-model facts with Welcome, not duplicated heuristics.
+
+**Resolution (2026-11-04):** RESOLVED / FIXED-VERIFIED — PR **#3851** (merged `dac307b1b`, main-CI green): Welcome consumes the SAME SSOT scope fact (`resolveRegistrarWorklistEmptyScopeKind`) as the worklist — a filter narrowing a non-empty scope to zero rows renders the no-matches state without the create CTA; a genuinely empty scope keeps the honest empty-queue CTA.
 
 ### REG-FE-029 — Primary queue load failure is invisible in Welcome's empty history (P2 candidate)
 
@@ -464,6 +470,8 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 
 **Fail-first test:** render Welcome with zero entries, `dataSource='error'`, `appointmentsLoading=false`, assert visible failure text and retry invoking `loadAppointments`; also cover a previously loaded stale sample. **Repair:** use shared Worklist-style error/stale state and a retry control.
 
+**Resolution (2026-11-04):** RESOLVED / FIXED-VERIFIED — PR **#3851** (merged `dac307b1b`, main-CI green): a primary load failure renders an explicit error + retry state mirroring the worklist contract instead of a blank history region; the stale-rows case keeps the table visible with the retry affordance.
+
 ### REG-FE-030 — Welcome quick-filter changes discard unrelated URL scope (P2 candidate)
 
 **Code:** [WelcomeView.tsx L389–L411](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L389-L411) uses `setSearchParams({status:'queued'})` and `setSearchParams({status:'paid_pending'})`, replacing the entire query rather than changing just `status`; the "Все записи" action [L379–L387](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L379-L387) similarly clears all query keys. [useRegistrarNavigation.ts L50–L63, L93–L112](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/useRegistrarNavigation.ts#L50-L112) explicitly syncs department/doctor from query keys and carefully preserves unrelated params in its `clearStatusFilter`.
@@ -471,6 +479,8 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 **Risk:** clicking a status quick filter wipes `date`, `dept`, `doctor_id`, `q`, possibly changing which patients are shown. The status **value** mismatch is already REG-FE-004; this finding concerns the destructive URL update only.
 
 **Fail-first test:** at `/registrar/welcome?date=2026-10-28&dept=lab&q=synthetic`, click each quick filter; verify these keys remain while `status` changes. Decide/document whether "Все записи" means clear status/search or deliberately clear all scope. **Repair:** use functional updates to `URLSearchParams` and mutate only intended keys.
+
+**Resolution (2026-11-04):** RESOLVED / FIXED-VERIFIED — PR **#3851** (merged `dac307b1b`, main-CI green): quick filters use functional `setSearchParams` updates that mutate only the `status` key; «Все записи» clears the status+search narrowing while `date`/`dept`/`doctor_id` scope keys survive — documented as "clear narrowing, keep scope".
 
 ### REG-FE-031 — Welcome selection checkboxes have no bulk-action consumer (P3 candidate)
 
@@ -480,6 +490,8 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 
 **Fail-first test:** render Welcome table, select two rows, verify either a valid bulk-print command exists and uses selection, or selection controls are absent pending product approval. **Repair:** disable orphaned checkboxes unless an authorized bulk operation is truly implemented.
 
+**Resolution (2026-11-04):** RESOLVED / FIXED-VERIFIED — PR **#3851** (merged `dac307b1b`, main-CI green): `showCheckboxes` is off until an authorized bulk consumer exists — the same dead-UI removal the worklist already applied. The deeper selection-identity concerns noted in the 2026-11-03 deepening (typed identity, page-scoped select-all) remain a precondition for any future bulk action.
+
 ### REG-FE-032 — Welcome history date can shift to the previous day outside clinic timezone (P3 candidate)
 
 **Code:** [WelcomeView.tsx L516–L523](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L516-L523) uses `new Date(historyDate).toLocaleDateString(...)` without an explicit timezone. ISO date-only strings are parsed as UTC midnight, then displayed in the browser's local timezone, showing the previous calendar date in UTC-negative zones. Its hero subtitle [L191–L201](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WelcomeView.tsx#L191-L201) also uses browser-local today; [dateUtils.ts L168–L180](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/utils/dateUtils.ts#L168-L180) and [WorklistView.tsx L148–L153](https://github.com/drsapaev/final/blob/22b21a8b7c3c0b9b56f4e388c35e329a4321f768/frontend/src/pages/registrar/views/WorklistView.tsx#L148-L153) honor the clinic's Asia/Tashkent time.
@@ -487,6 +499,8 @@ There remains an older [batch endpoint + fallback branch in AppointmentWizardV2.
 **Risk:** remote operator at UTC−5 can see 29 October on a history badge for 30 October while the backend targets 30 October. Display-only, not evidence of wrong queue date.
 
 **Fail-first test:** run synthetic date display under `TZ=America/New_York` with `historyDate='2026-10-30'` and assert 30 October is shown; test clinic-midnight rollover. **Repair:** use shared Tashkent-aware date formatter; keep locale independent of timezone.
+
+**Resolution (2026-11-04):** RESOLVED / FIXED-VERIFIED — PR **#3851** (merged `dac307b1b`, main-CI green): the history badge and the hero «today» render via the new pure helpers `formatClinicDayLong`/`formatClinicTodayLong` in clinic time (Asia/Tashkent), locale-independent of timezone; the suite pins the UTC−5 red-check precondition and — per review #5767519793 (P3) — restores `process.env.TZ` in `afterAll` so a shared worker never inherits the zone.
 
 ### REG-FE-033 — Default all-departments tabpanel has no accessible tab label (P3 candidate)
 

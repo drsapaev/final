@@ -45,6 +45,27 @@ import type { HttpApiError } from '../../types/errors';
 import type { Appointment } from '../../types/domain/clinic';
 import { adaptQueueEntry } from './registrarQueueAdapter';
 
+/**
+ * REG-FE-008 (registrar audit ledger): typed outcome of one loadAppointments
+ * call, so manual refresh callers can reward ONLY a verified result instead
+ * of toasting success for a request they never awaited.
+ *
+ * - 'loaded'        — fresh rows applied to the sample.
+ * - 'empty'         — authoritative empty day: still a SUCCESSFUL refresh.
+ * - 'failed'        — 429 / 401 / network / malformed-envelope failure (the
+ *                    reducer already drove the honest error/stale state).
+ * - 'token-missing' — no access token; the empty session state was applied.
+ * - 'superseded'    — a newer request owns the sample now (RQ-22 guard).
+ * - 'skipped'       — auto-refresh cooldown or in-flight guard said no.
+ */
+export type RegistrarWorklistLoadOutcome =
+  | 'loaded'
+  | 'empty'
+  | 'failed'
+  | 'token-missing'
+  | 'superseded'
+  | 'skipped';
+
 export interface WorklistPaginationInfo {
   total: number;
   hasMore: boolean;
@@ -59,13 +80,21 @@ export interface WorklistDataState {
   /** RQ-22 (F-18): true when the displayed rows are previously loaded data
    *  kept after a failed refresh. Staleness must be explicit, never silent. */
   stale: boolean;
+  /** PR #3851 review (P2): target_date of the last VERIFIED sample — the
+   *  clinic day whose rows are actually in `appointments`. null until the
+   *  first successful load, and after a deliberate wipe (token-missing) or
+   *  a primary failure. The SELECTED date (calendar/URL) is a different
+   *  concept: on a date switch the selection changes instantly while the
+   *  sample still belongs to the previous day (and a failed refresh keeps
+   *  it there, RQ-22) — today- instruments must key off THIS value. */
+  loadedDate: string | null;
 }
 
 export type WorklistDataAction =
   | { type: 'LOAD_STARTED'; silent: boolean }
   | { type: 'LOAD_TOKEN_MISSING'; silent: boolean }
-  | { type: 'LOAD_EMPTY' }
-  | { type: 'LOAD_SUCCEEDED'; rows: Appointment[] }
+  | { type: 'LOAD_EMPTY'; date: string }
+  | { type: 'LOAD_SUCCEEDED'; rows: Appointment[]; date: string }
   | { type: 'LOAD_FAILED'; silent: boolean }
   | { type: 'LOAD_FINALLY'; silent: boolean }
   | { type: 'PAGINATION_REPLACED'; pagination: WorklistPaginationInfo }
@@ -78,6 +107,7 @@ export const initialWorklistDataState: WorklistDataState = {
   appointmentsLoading: false,
   paginationInfo: { total: 0, hasMore: false, loadingMore: false },
   stale: false,
+  loadedDate: null,
 };
 
 /**
@@ -96,21 +126,26 @@ export const worklistDataReducer = (
     case 'LOAD_TOKEN_MISSING':
       // Original (startTransition): if (!silent) setDataSource('api'); setAppointments([]);
       // RQ-22: a deliberate auth-data wipe is not staleness — flag resets.
+      // PR #3851 review (P2): the wiped sample is no longer a verified day.
       return {
         ...state,
         dataSource: action.silent ? state.dataSource : 'api',
         appointments: [],
         stale: false,
+        loadedDate: null,
       };
     case 'LOAD_EMPTY':
       // Original (NOT in startTransition): setAppointments([]); setDataSource('api');
       // setAppointmentsLoading(false);
       // RQ-22: an authoritative empty answer is fresh data, not staleness.
-      return { ...state, appointments: [], dataSource: 'api', appointmentsLoading: false, stale: false };
+      // PR #3851 review (P2): an empty day is still a VERIFIED day — its
+      // target_date becomes the loaded sample's date.
+      return { ...state, appointments: [], dataSource: 'api', appointmentsLoading: false, stale: false, loadedDate: action.date };
     case 'LOAD_SUCCEEDED':
       // Original (startTransition): setAppointments(enriched); setDataSource('api');
       // RQ-22: a successful response refreshes the sample — staleness clears.
-      return { ...state, appointments: action.rows, dataSource: 'api', stale: false };
+      // PR #3851 review (P2): the sample now verifiably belongs to action.date.
+      return { ...state, appointments: action.rows, dataSource: 'api', stale: false, loadedDate: action.date };
     case 'LOAD_FAILED': {
       // Original (startTransition): if (!silent) setDataSource('error'); setAppointments([]);
       // RQ-22 (F-18): a failed refresh must NOT wipe previously loaded rows
@@ -121,13 +156,18 @@ export const worklistDataReducer = (
       // (original contract) but still mark the displayed data stale.
       const hasRows = state.appointments.length > 0;
       if (!hasRows) {
+        // PR #3851 review (P2): nothing was ever verified — no loaded day.
         return {
           ...state,
           dataSource: action.silent ? state.dataSource : 'error',
           appointments: [],
           stale: false,
+          loadedDate: null,
         };
       }
+      // PR #3851 review (P2): kept rows still belong to the day they were
+      // loaded for — loadedDate stays (sampleIsToday must not flip to
+      // the newly SELECTED day whose load just failed).
       return {
         ...state,
         dataSource: 'api',
@@ -174,7 +214,7 @@ export const useRegistrarWorklistData = ({
 }) => {
   const [state, dispatch] = useReducer(worklistDataReducer, initialWorklistDataState);
 
-  const { appointments, dataSource, appointmentsLoading, paginationInfo, stale } = state;
+  const { appointments, dataSource, appointmentsLoading, paginationInfo, stale, loadedDate } = state;
   const appointmentsCount = appointments.length;
 
   // In-flight / cooldown / freshness guards (ports of panel refs).
@@ -196,7 +236,7 @@ export const useRegistrarWorklistData = ({
 
   // Улучшенная загрузка записей с поддержкой тихого режима
   // (port of RegistrarPanel.loadAppointments — verbatim control flow)
-  const loadAppointments = useCallback(async (rawOptions: unknown = {}) => {
+  const loadAppointments = useCallback(async (rawOptions: unknown = {}): Promise<RegistrarWorklistLoadOutcome> => {
     const options: Record<string, unknown> = (rawOptions && typeof rawOptions === 'object' ? rawOptions : {}) as Record<string, unknown>;
     const { silent = false } = options;
     const callSource = String(options.source || 'unknown');
@@ -210,12 +250,12 @@ export const useRegistrarWorklistData = ({
           });
           autoRefreshCooldownLoggedRef.current = true;
         }
-        return;
+        return 'skipped';
       }
 
       if (loadAppointmentsInFlightRef.current) {
         logger.info('⏭️ Автообновление пропущено: предыдущий запрос еще выполняется');
-        return;
+        return 'skipped';
       }
     }
 
@@ -237,7 +277,7 @@ export const useRegistrarWorklistData = ({
             dispatch({ type: 'LOAD_TOKEN_MISSING', silent: Boolean(silent) });
           });
         }
-        return;
+        return 'token-missing';
       }
 
       // Используем новый эндпоинт для получения очередей на указанную дату
@@ -250,7 +290,7 @@ export const useRegistrarWorklistData = ({
       // RQ-22 (S-19): a newer request has started while this one was in
       // flight — this response is stale and must not overwrite the sample.
       if (isSuperseded()) {
-        return;
+        return 'superseded';
       }
 
       // Axios successful response
@@ -320,8 +360,8 @@ export const useRegistrarWorklistData = ({
         if (appointmentsData.length === 0) {
           logger.info('📋 Нет записей на сегодня - это нормальная ситуация в начале дня');
           // Устанавливаем пустой массив, не выбрасываем ошибку
-          dispatch({ type: 'LOAD_EMPTY' });
-          return; // ✅ Выходим из функции, не загружаем демо-данные
+          dispatch({ type: 'LOAD_EMPTY', date: dateParam });
+          return 'empty'; // ✅ Выходим из функции, не загружаем демо-данные
         }
       }
 
@@ -332,25 +372,30 @@ export const useRegistrarWorklistData = ({
         // RQ-22 (S-19): re-check after the enrichment await — a newer load
         // may have started (and even finished) while patients were enriched.
         if (isSuperseded()) {
-          return;
+          return 'superseded';
         }
 
         // ⭐ SSOT: Просто устанавливаем данные без local overrides
         // Removed: _locallyModified, localStorage overrides
+        // REG-FE-008: outcome resolved only AFTER the authoritative dispatch —
+        // a caller awaiting this promise cannot toast success for a sample
+        // that was never applied.
         startTransition(() => {
-          dispatch({ type: 'LOAD_SUCCEEDED', rows: enriched as unknown as Appointment[] });
+          dispatch({ type: 'LOAD_SUCCEEDED', rows: enriched as unknown as Appointment[], date: dateParam });
         });
         logger.info('✅ SSOT: Загружено', enriched.length, 'записей (без local overrides)');
+        return 'loaded';
       } else {
         // QW-03 fix: empty API response is a valid state, not a demo fallback.
         // Empty result is already handled earlier (line ~1370). This branch
         // is unreachable but kept as defensive code.
         if (isSuperseded()) {
-          return;
+          return 'superseded';
         }
         startTransition(() => {
-          dispatch({ type: 'LOAD_SUCCEEDED', rows: [] });
+          dispatch({ type: 'LOAD_SUCCEEDED', rows: [], date: dateParam });
         });
+        return 'empty';
       }
     } catch (error: unknown) {
       if ((error as HttpApiError)?.response?.status === 429) {
@@ -371,7 +416,7 @@ export const useRegistrarWorklistData = ({
             dispatch({ type: 'LOAD_FAILED', silent: Boolean(silent) });
           });
         }
-        return;
+        return 'failed';
       }
 
       // Handle axios errors
@@ -381,17 +426,18 @@ export const useRegistrarWorklistData = ({
         sessionStorage.removeItem('auth_token');  // PR-39 / P0-2;
         // QW-03 fix: show error state instead of demo data.
         if (isSuperseded()) {
-          return;
+          return 'superseded';
         }
         startTransition(() => {
           dispatch({ type: 'LOAD_FAILED', silent: Boolean(silent) });
         });
+        return 'failed';
       } else {
         // Other errors (network, 404, 500, etc.)
         logger.error('❌ Backend недоступен для загрузки записей:', getErrorMessage(error));
         logger.error('❌ Детали ошибки:', error);
         if (isSuperseded()) {
-          return;
+          return 'superseded';
         }
         startTransition(() => {
           dispatch({ type: 'LOAD_FAILED', silent: Boolean(silent) });
@@ -400,6 +446,7 @@ export const useRegistrarWorklistData = ({
         if (appointmentsCount === 0) {
           notify.error(tI18n('registrar.backend_unavailable'));
         }
+        return 'failed';
       }
     } finally {
       // REG-FE-020 (audit ledger 3803): in-flight guard принадлежит новейшему
@@ -568,6 +615,7 @@ export const useRegistrarWorklistData = ({
     appointmentsLoading,
     paginationInfo,
     stale,
+    loadedDate,
     loadAppointments,
     loadMoreAppointments,
   };

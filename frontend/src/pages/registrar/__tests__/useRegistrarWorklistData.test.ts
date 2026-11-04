@@ -43,13 +43,14 @@ const withState = (patch: Partial<WorklistDataState>): WorklistDataState => ({
 const rows = [{ id: 1 }, { id: 2 }] as unknown as WorklistDataState['appointments'];
 
 describe('worklistDataReducer (PR-UI-13-1)', () => {
-  it('initial state: empty appointments, dataSource loading, not loading, zeroed pagination, not stale', () => {
+  it('initial state: empty appointments, dataSource loading, not loading, zeroed pagination, not stale, no verified day', () => {
     expect(initialWorklistDataState).toEqual({
       appointments: [],
       dataSource: 'loading',
       appointmentsLoading: false,
       paginationInfo: { total: 0, hasMore: false, loadingMore: false },
       stale: false,
+      loadedDate: null,
     });
   });
 
@@ -86,28 +87,38 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
 
   describe('LOAD_EMPTY', () => {
     it('clears appointments, sets api, forces loading=false (original quirk: unconditional)', () => {
-      const state = withState({ appointments: rows, dataSource: 'loading', appointmentsLoading: true });
-      const next = worklistDataReducer(state, { type: 'LOAD_EMPTY' });
+      const state = withState({ appointments: rows, dataSource: 'loading', appointmentsLoading: true, loadedDate: '2026-09-20' });
+      const next = worklistDataReducer(state, { type: 'LOAD_EMPTY', date: '2026-09-25' });
       expect(next).toEqual({
         appointments: [],
         dataSource: 'api',
         appointmentsLoading: false,
         paginationInfo: state.paginationInfo,
         stale: false,
+        loadedDate: '2026-09-25',
       });
     });
 
     it('RQ-22: a successful EMPTY response clears a previously set stale flag', () => {
       const state = withState({ stale: true });
-      const next = worklistDataReducer(state, { type: 'LOAD_EMPTY' });
+      const next = worklistDataReducer(state, { type: 'LOAD_EMPTY', date: '2026-09-25' });
       expect(next.stale).toBe(false);
+    });
+
+    // PR #3851 review (P2): an authoritative empty day is still a VERIFIED
+    // day — its target_date becomes loadedDate (an empty today flips
+    // sampleIsToday to true honestly).
+    it('PR #3851 review (P2): records the empty day as the verified sample date', () => {
+      const state = withState({ loadedDate: '2026-09-20' });
+      const next = worklistDataReducer(state, { type: 'LOAD_EMPTY', date: '2026-09-25' });
+      expect(next.loadedDate).toBe('2026-09-25');
     });
   });
 
   describe('LOAD_SUCCEEDED', () => {
     it('sets rows and dataSource=api', () => {
       const state = withState({ appointments: [], dataSource: 'loading', appointmentsLoading: true });
-      const next = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows });
+      const next = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows, date: '2026-09-25' });
       expect(next.appointments).toBe(rows);
       expect(next.dataSource).toBe('api');
       // NOTE: loading is cleared by LOAD_FINALLY, not here — mirrors original.
@@ -116,8 +127,16 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
 
     it('RQ-22: a successful response clears the stale flag', () => {
       const state = withState({ stale: true, appointments: rows, dataSource: 'api' });
-      const next = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows: [] });
+      const next = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows: [], date: '2026-09-25' });
       expect(next.stale).toBe(false);
+    });
+
+    // PR #3851 review (P2): the verified sample's date is the action's
+    // target_date — NOT the currently selected calendar/URL date.
+    it('PR #3851 review (P2): binds loadedDate to the response day, not the selection', () => {
+      const state = withState({ appointments: [], loadedDate: null });
+      const next = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows, date: '2026-09-24' });
+      expect(next.loadedDate).toBe('2026-09-24');
     });
   });
 
@@ -149,6 +168,24 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
       expect(next.dataSource).toBe('error');
       expect(next.appointments).toEqual([]);
       expect(next.stale).toBe(false);
+    });
+
+    // PR #3851 review (P2): a primary failure verifies NOTHING — no loaded
+    // day (sampleIsToday must be false, not an assumed today).
+    it('PR #3851 review (P2): primary failure resets loadedDate to null', () => {
+      const state = withState({ appointments: [], dataSource: 'loading', loadedDate: null });
+      const next = worklistDataReducer(state, { type: 'LOAD_FAILED', silent: false });
+      expect(next.loadedDate).toBeNull();
+    });
+
+    // PR #3851 review (P2): a failed refresh keeps the rows AND their day —
+    // loadedDate must not flip to the newly selected day whose load failed.
+    it('PR #3851 review (P2): refresh failure with rows keeps the previously verified day', () => {
+      const state = withState({ appointments: rows, dataSource: 'api', loadedDate: '2026-09-24' });
+      const next = worklistDataReducer(state, { type: 'LOAD_FAILED', silent: false });
+      expect(next.appointments).toBe(rows);
+      expect(next.stale).toBe(true);
+      expect(next.loadedDate).toBe('2026-09-24');
     });
 
     it('stale flag does not double-apply on a repeated failure', () => {
@@ -218,7 +255,7 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
       type: 'PAGINATION_REPLACED',
       pagination: { total: 2, hasMore: false, loadingMore: false },
     });
-    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows });
+    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows, date: '2026-09-25' });
     state = worklistDataReducer(state, { type: 'LOAD_FINALLY', silent: false });
     expect(state).toEqual({
       appointments: rows,
@@ -226,6 +263,7 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
       appointmentsLoading: false,
       paginationInfo: { total: 2, hasMore: false, loadingMore: false },
       stale: false,
+      loadedDate: '2026-09-25',
     });
   });
 
@@ -233,7 +271,7 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
     const settled = withState({ appointments: rows, dataSource: 'api', appointmentsLoading: false });
     let state = settled;
     state = worklistDataReducer(state, { type: 'LOAD_STARTED', silent: true });
-    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows });
+    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows, date: '2026-09-25' });
     state = worklistDataReducer(state, { type: 'LOAD_FINALLY', silent: true });
     expect(state.appointments).toBe(rows);
     expect(state.dataSource).toBe('api');
@@ -252,7 +290,7 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
     state = worklistDataReducer(state, { type: 'LOAD_FINALLY', silent: false });
     // A later retry succeeds: fresh rows replace the stale ones, flag clears.
     const fresh = [{ id: 3 }] as unknown as WorklistDataState['appointments'];
-    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows: fresh });
+    state = worklistDataReducer(state, { type: 'LOAD_SUCCEEDED', rows: fresh, date: '2026-09-25' });
     state = worklistDataReducer(state, { type: 'LOAD_FINALLY', silent: false });
     expect(state.appointments).toBe(fresh);
     expect(state.stale).toBe(false);
@@ -727,5 +765,141 @@ describe('useRegistrarWorklistData — refresh lifecycle (REG-FE-007/020/021)', 
       await vi.advanceTimersByTimeAsync(61_000);
     });
     expect(vi.mocked(api.get).mock.calls.length).toBeGreaterThan(baselineCalls);
+  });
+});
+
+/**
+ * PR #3851 review (P2): loadedDate — the clinic day of the VERIFIED sample —
+ * must gate today-only instruments (the Welcome morning checklist via
+ * useRegistrarDoctorWorklistFacts.sampleIsToday). The SELECTED date flips
+ * instantly on a calendar switch; the sample must NOT be presented as the
+ * new day until that day's request actually succeeds.
+ */
+describe('useRegistrarWorklistData — PR #3851 review (P2): loadedDate binds to the verified sample', () => {
+  const HIST = '2026-09-24';
+  const TODAY = '2026-09-25';
+  const histRows = [{ id: 'hist-1' }];
+  const todayRows = [{ id: 'today-1' }];
+
+  // IMPORTANT: the deps object must keep STABLE member identities across
+  // re-renders (mirrors the panel, where every dep is useCallback-stable).
+  // Building it inline in the render callback would mint a fresh
+  // enrichAppointmentsWithPatientData/searchParams on every state update →
+  // new loadAppointments identity → calendar-date-change effect refires →
+  // new load → re-render → … an infinite reload loop. Only `historyDate`
+  // is swapped per rerender (the property under test).
+  const stableDeps = {
+    searchParams: new URLSearchParams(),
+    activeTab: null,
+    showCalendar: true,
+    showWizard: false,
+    anyDialogOpenRef: { current: false },
+    enrichAppointmentsWithPatientData: async (rows: Record<string, unknown>[]) => rows,
+    loadIntegratedData: () => undefined,
+    tI18n: (key: string) => key,
+  };
+  const depsFor = (historyDate: string) => ({ ...stableDeps, historyDate });
+
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
+  it('history → today with a DELAYED today-load: loadedDate stays the history day until the response lands', async () => {
+    const todayRequest = deferred<{ data: { queues: unknown[] } }>();
+    // Any HIST request resolves instantly; the TODAY request hangs until resolved.
+    vi.mocked(api.get).mockImplementation((_url: unknown, config: unknown) => {
+      const targetDate = (config as { params?: { target_date?: string } }).params?.target_date;
+      if (targetDate === TODAY) return todayRequest.promise;
+      return Promise.resolve({ data: { queues: [{ entries: histRows }] } });
+    });
+
+    const { result, rerender } = renderHook(
+      ({ historyDate }: { historyDate: string }) => useRegistrarWorklistData(depsFor(historyDate)),
+      { initialProps: { historyDate: HIST } },
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    // History day verified.
+    expect(result.current.loadedDate).toBe(HIST);
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['hist-1']);
+
+    // The calendar flips to today: the selection changes instantly, but the
+    // today-load hangs — the sample (and its verified day) must NOT flip.
+    rerender({ historyDate: TODAY });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['hist-1']);
+    expect(result.current.loadedDate).toBe(HIST); // ← the P2 regression pin
+
+    // The today response lands: the sample AND its day flip together.
+    await act(async () => {
+      todayRequest.resolve({ data: { queues: [{ entries: todayRows }] } } as never);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['today-1']);
+    expect(result.current.loadedDate).toBe(TODAY);
+  });
+
+  it('history → today with a FAILED today-load: rows stay, loadedDate stays the history day (stale sample, honest flag)', async () => {
+    const todayRequest = deferred<{ data: { queues: unknown[] } }>();
+    vi.mocked(api.get).mockImplementation((_url: unknown, config: unknown) => {
+      const targetDate = (config as { params?: { target_date?: string } }).params?.target_date;
+      if (targetDate === TODAY) return todayRequest.promise;
+      return Promise.resolve({ data: { queues: [{ entries: histRows }] } });
+    });
+
+    const { result, rerender } = renderHook(
+      ({ historyDate }: { historyDate: string }) => useRegistrarWorklistData(depsFor(historyDate)),
+      { initialProps: { historyDate: HIST } },
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.loadedDate).toBe(HIST);
+
+    // The calendar flips to today and the today-load FAILS: RQ-22 keeps the
+    // history rows on screen with stale=true — the verified day must stay
+    // the HISTORY day, so sampleIsToday cannot present them as today's.
+    rerender({ historyDate: TODAY });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await act(async () => {
+      todayRequest.reject(new Error('network down'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['hist-1']);
+    expect(result.current.stale).toBe(true);
+    expect(result.current.loadedDate).toBe(HIST); // ← the P2 regression pin
+    expect(result.current.dataSource).toBe('api');
+  });
+
+  it('an authoritative EMPTY today verifies the today day (empty ≠ unverified)', async () => {
+    vi.mocked(api.get).mockImplementation((_url: unknown, config: unknown) => {
+      const targetDate = (config as { params?: { target_date?: string } }).params?.target_date;
+      return Promise.resolve({ data: { queues: targetDate === TODAY ? [] : [{ entries: histRows }] } });
+    });
+
+    const { result, rerender } = renderHook(
+      ({ historyDate }: { historyDate: string }) => useRegistrarWorklistData(depsFor(historyDate)),
+      { initialProps: { historyDate: HIST } },
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.loadedDate).toBe(HIST);
+
+    rerender({ historyDate: TODAY });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments).toEqual([]);
+    expect(result.current.loadedDate).toBe(TODAY);
+    expect(result.current.stale).toBe(false);
   });
 });

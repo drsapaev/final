@@ -36,6 +36,7 @@ import {
   getRegistrarActionForStatus,
 } from './registrarHelpers';
 import type { RegistrarRecordLike } from './registrarHelpers';
+import type { RegistrarWorklistLoadOutcome } from './useRegistrarWorklistData';
 import type { RegistrarPaymentInput, RegistrarPaymentSummary } from '../../api/registrarPayments';
 
 /**
@@ -66,7 +67,7 @@ export const classifyRegistrarBatchResult = (result: RegistrarBatchResult): Regi
 
 export const useRegistrarActions = ({ appointments, loadAppointments }: {
   appointments: unknown[];
-  loadAppointments: (opts?: Record<string, unknown>) => Promise<void> | void;
+  loadAppointments: (opts?: Record<string, unknown>) => Promise<RegistrarWorklistLoadOutcome | void> | void;
 }) => {
   const runRegistrarRecordAction = useCallback(async (record: Record<string, unknown>, action: string, payload: Record<string, unknown> = {}) => {
     const records = getRegistrarRecordRefs(record);
