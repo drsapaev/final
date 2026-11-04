@@ -1,10 +1,10 @@
-## Current resume — T18 combined synthetic acceptance — 2026-11-04T21:51:38+05:00
+## Current resume — PR #3873 exact-head checks — 2026-11-04T22:06:37+05:00
 
-Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final, branch codex/t18-combined-validation. Current source and origin/main are both 64a7c0b9ce422bbdac73d919158eb525669d9229. PR #3865 is merged at this commit.
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final, branch codex/t18-combined-validation. Source under validation and base are 64a7c0b9ce422bbdac73d919158eb525669d9229; PR #3865 is merged at this commit. Journal-only PR #3873 is open at HEAD 80110ee1ef959c786d0e0b8186cce3f4985a929f.
 
 Targeted T18 scenarios 3, 5-live and 10 passed in one canonical synthetic Start to Session run. Normal Admin password plus TOTP passed. Session teardown removed its own project resources and local images; post-session Preflight passed after a transient port 18987 signal cleared. Full T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete; served_revision_verified is still false; Tier-2 remains PARTIAL with no deferral.
 
-The current journal update is limited to PROGRESS.md, EVIDENCE.md, and RESUME.md. Review the diff and run git diff --check, commit and push one journal-only PR, verify exact-head checks, then wait for user-owned merge. Do not merge/deploy, repeat completed scenarios, rerun scenario 2 or its prior static-byte comparison, or claim full system validation. Do not delete shared Docker/WSL data or inspect secrets. Task-owned synthetic env and runner files are in .scratch/t18-combined-20261104 and should be removed only through the normal approved local cleanup path after evidence is durable.
+The journal-only change is limited to PROGRESS.md, EVIDENCE.md, and RESUME.md. Local PR-body quality gate, diff check, standard commit hooks, and gitleaks passed. Task-owned staging scratch/env files were removed after the result was recorded. Verify exact-head checks on PR #3873; if green, report it for user-owned merge. Do not merge/deploy, repeat completed scenarios, rerun scenario 2 or its prior static-byte comparison, or claim full system validation. Tier-2 remains PARTIAL; served_revision_verified=false.
 
 ---
 ## Latest continuation — T18 scenario 5 PostgreSQL existing-token checks passed — 2026-11-04T00:40+05:00

@@ -5845,5 +5845,5 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Runtime facts: Docker 29.1.3; Compose 2.40.3; boot ID 47a7033b-e93f-4183-82dd-dd2185707986; C: free 16 GiB; WSL backing D: free 28 GiB; WSL memory after Session 3218 MiB.
 - Scope: only PROGRESS.md, EVIDENCE.md, RESUME.md tracked changes; no app/runtime/test/API/auth/database/migration/staging-config/production edits. No foreign project or global cleanup.
 - Limitation: launcher served_revision_verified=false; no exact served-frontend attestation. Full T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Tier-2 remains PARTIAL with no deferral.
-- Relevant result: .scratch/t18-combined-20261104/validation-result.json records the source revision, aggregate statuses, and timestamps only.
-- PR: journal-only PR pending. Merge/deploy: not performed.
+- Relevant result: aggregate statuses and timestamps were copied into this evidence entry; task-owned scratch, harness, PR-body draft, and synthetic env were removed after the PR opened.
+- PR: #3873 open at HEAD `80110ee1ef959c786d0e0b8186cce3f4985a929f`; exact-head Unified CI, Security, Gitleaks, Lifecycle Recommendation, and Agent Workflow Guards were in progress at 2026-11-04T22:06+05:00; PR Review Quality Gate had passed. Merge/deploy: not performed.
