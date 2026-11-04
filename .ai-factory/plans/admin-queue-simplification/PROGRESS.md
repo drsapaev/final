@@ -1,3 +1,69 @@
+# Progress — T18 integrated synthetic acceptance
+
+Plan version: 1.0
+Current task: T18 integrated synthetic acceptance
+Current status: IN_PROGRESS
+Current PR: [#3861](https://github.com/drsapaev/final/pull/3861), journal-only; user retains merge authority.
+PR head before this repair: `3ff4ddfe1bd84283e29d4faabe090fd3aaa9741a`; base / origin/main: `235b4cbba6bc133e89c44a3ceeb087d227267f9d`.
+Last updated: 2026-11-04T08:00:52+05:00
+
+## Latest checkpoint
+
+- Review P1 confirmed: the PR diff had replaced the historical T00–T18 ledger with a short current checkpoint. This repair restores the prior origin/main history from blob e145041a4013752240120e6e0429c2c2f766c9ba below and keeps the current status above it.
+- T18/Tier-2 remains PARTIAL. No deferral is claimed. Scenarios 2, 3, 5 live behavior and 10, the full `STAGING_VALIDATION.md` checklist, and served-frontend byte provenance remain incomplete.
+- Completed: restored the full `origin/main` journal, including its first historical checkpoint; the exact-source comparison and whitespace check pass. Only the two T18 journals are changed in this repair.
+- Completed: commit `347f9417ed365df0983ea99c7a61496e06f9a91c` is pushed to PR #3861. The P1 review thread is resolved. On that exact head, Unified CI, PR Required Gate, the corrected PR Review Quality Gate, lifecycle, security, Gitleaks, CodeQL, and workflow guards passed; path-aware product checks were skipped for the journal-only diff.
+- Current PR state: OPEN, Ready for review, mergeable; user retains merge authority. No staging or runtime work is part of this journal fix.
+- Next exact action: after this checkpoint-only journal update is pushed, verify its exact-head checks and wait for user-owned merge. After merge, continue the remaining T18 scenarios in a fresh worktree; do not repeat validated scenarios.
+
+## Current detailed checkpoint carried by PR #3861
+
+
+Plan version: 1.0
+Current task: T18 integrated synthetic acceptance
+Current status: IN_PROGRESS
+Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`
+Branch: `codex/t18-cabinet-day`
+Base commit: `235b4cbba6bc133e89c44a3ceeb087d227267f9d` (`origin/main` at validation)
+Runtime commit: `235b4cbba6bc133e89c44a3ceeb087d227267f9d`
+Last updated: 2026-11-04T01:08:00+05:00
+
+| Task | Status | Branch / PR | Merge commit | Evidence |
+|------|--------|-------------|--------------|----------|
+| T00–T17 | MERGED | See prior checkpoints | Recorded in prior entries | Existing plan journals |
+| T18 scenario 1 | VALIDATED | `codex/t18-cabinet-day`, PR #3861 open | — | 24 backend contract tests plus live synthetic Admin/TOTP setup; hidden profile and two same-specialty typed targets confirmed |
+| T18 scenario 2 | PARTIAL | Prior live slice on #3805; current-source harness audit recorded in #3861 | — | Doctorless service/resource archive tested; resource-only onboarding and no-extra-doctor path remain unproven; legacy RQ-17 spec targets a removed wizard |
+| T18 scenario 3 | PARTIAL | PR #3763 merged | `e2c4e0335bd1bd8bfc15db23e70436c82b53b39c` | Parent-conflict repair slice passed; broad incomplete-configuration/next-action coverage remains partial |
+| T18 scenario 4 | VALIDATED | PR #3805 merged | `e7cf5b47b1aa96e5df0b9baf9e9e567b8e3fecbf` | Live hidden/publish/hide/republish/permanent-address/resource lifecycle passed; relevant current-main paths unchanged |
+| T18 scenario 5 | PARTIAL | Current-main source; PR #3861 evidence update | — | Unit guards 11/11 and PostgreSQL direct-token/resource-token targets 3/3 PASS; live revalidation not run |
+| T18 scenario 6 | VALIDATED | PR #3832, merged | `ee7763e77e545db1479e257dbe4d3a388264cc03` | Defaults and daily snapshot; exact runtime evidence in prior entry |
+| T18 scenario 7 | VALIDATED | `codex/t18-cabinet-day`, [PR #3861](https://github.com/drsapaev/final/pull/3861) open, Ready for review | — | Current-day cabinet preview, stale rejection, apply and strict audit; existing PG evidence reused by unchanged code blobs |
+| T18 scenario 8 | VALIDATED | `codex/t18-cabinet-day`, PR #3861 open | — | Current-main PostgreSQL token/GraphQL last-slot races plus availability, QR and queue-limits remaining-quota tests |
+| T18 scenario 9 | VALIDATED | `codex/t18-cabinet-day`, PR #3861 open | — | Current-main exact retry, lost-response replay, no double count, rollback, partial success/replay and partial rollback |
+| T18 scenario 10 | PARTIAL | PR #3805 merged | `e7cf5b47b1aa96e5df0b9baf9e9e567b8e3fecbf` | Setup-context return/history/reload slice passed; all legacy URLs, special profile key and explicit 409 guard not all proven |
+
+## Current checkpoint
+
+- Completed: current-main synthetic Admin cabinet scenario (T18 scenario 7). Normal password + TOTP login succeeded; preview returned the clinic date and typed Doctor owner; stale apply returned 409 without write/audit; fresh preview/apply succeeded. Final database assertions confirmed the target assignment, unchanged owner default/queue identity, and exactly two expected audited changes.
+- Completed: read-only current-source review found the legacy `frontend/e2e/rq17-setup-directions-live.spec.ts` expects `setup-wizard-*` controls absent from the current `AdminSetupDirections` screen. This is test-harness drift, not a product failure. The spec was not run or edited; adapt/replace it before using it for scenario 2.
+- Completed: canonical Preflight → Start → Session. Session removed the owned project's 5 containers, 3 volumes and 1 network; independent inventory found zero owned resources and all dedicated ports free.
+- Reused existing PostgreSQL evidence: all 8 `test_queue_cabinet_reassignment_apply_pg.py` cases passed on a prior run. Current endpoint/service/repository/test blobs match the previously tested tree; no repeat was needed. This includes audit rollback and called/in-progress/active-execution blocks.
+- T18 scenarios 8–9: seven current-main PostgreSQL integration tests passed against one isolated disposable local PostgreSQL 17.11 instance; seven quota/status/API unit tests passed. PostgreSQL evidence covers token and GraphQL last-slot races, exact retry, lost-response replay, rollback and partial-batch conservation. Unit evidence covers public/QR availability and remaining-quota reporting. No runtime or tracked test files changed.
+- T18 scenario 5 current-main unit guard tests: `test_queue_token_parent_recheck.py` and `test_qr_available_specialists.py` passed 11/11 (2 warnings). The three targeted PostgreSQL old-token/resource-token cases subsequently passed 3/3 (2 warnings); the fixture reached Alembic head, and its unique scratch database was dropped after the tests. Scenario 5 remains PARTIAL because its live Department off/on/manual-archive flow has not been rerun.
+- T18 scenario 1: `test_queue_admin_directions_read_model.py` plus `test_multi_doctor_same_specialty_isolation.py` passed 24/24 on temporary SQLite fixtures; 6 warnings. A subsequent live synthetic Admin flow passed: ordinary password login, initial TOTP enrollment and a separate password+TOTP login; two active synthetic cardiology doctors; one new hidden QueueProfile; backend read model returned both typed doctor targets and `effectiveAvailability=available`, while public setting and public availability remained false. The clinic-day read returned zero existing queues; no queue or patient admission was created. One initial attempt failed because the scratch harness generated a numeric profile key disallowed by the UI pattern; correcting the harness key produced the passing run. This was a harness failure, not a product defect.
+- Cleanup: canonical staging teardown was previously verified. The user removed the private synthetic `staging.env` and four remaining task-owned scratch files. For the latest PostgreSQL run, the test-created scratch database was absent after fixture teardown; the exact `--rm` container used tmpfs-only database storage and was stopped, no owned containers or volumes remain, the WSL keeper session was closed, and port 15561 is closed. No persistent PostgreSQL volume was created.
+- Completed: scenario 8–9 journal evidence is committed and pushed to existing PR #3861 as `b730531a510d6f306f870ff469ca6e52d459e4c5`; its description now includes the current evidence and required labeled fields.
+- Confirmed: on PR HEAD `94efa74787fa1891afadaf54e70f4068447fd84e`, every applicable exact-head check passed; path-aware backend/frontend/integration/readiness jobs were skipped for the documentation-only changes.
+- Completed: scenario 1 related backend tests and journal evidence are committed/pushed to PR #3861 at `ec6bc5877d2fbb48de7f4832a667e00b6cc72505`; the PR description separates backend PASS from live Admin NOT_RUN.
+- Confirmed: on exact PR HEAD `ec6bc5877d2fbb48de7f4832a667e00b6cc72505`, PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle, Python/TypeScript/Actions analysis, security, Gitleaks, GitGuardian, scratch guards, notifications and CodeQL passed. Path-aware build/test/readiness jobs were skipped for documentation-only changes.
+- Completed: live scenario 1 evidence was committed and pushed to PR #3861 at `315628d98e3112ee0ad047c8a2012ca0ee011111`; PR description now records the corrected live PASS and harness-only first failure. On that exact HEAD, applicable PR/quality/scope/lifecycle, security, Gitleaks, GitGuardian, scratch-guard and CodeQL checks passed. Backend/frontend/build/integration/readiness jobs were skipped for the documentation-only diff, not counted as passed.
+- Confirmed: before this checkpoint correction, PR #3861 was OPEN / Ready for review, CLEAN and MERGEABLE at exact HEAD 89b54f131e37cd63145d307d79bf9add20abbb8d; base and origin/main were 235b4cbba6bc133e89c44a3ceeb087d227267f9d. Applicable checks on that head passed: PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle recommendation, CodeQL, security, Gitleaks, GitGuardian, notifications, and Linux/Windows scratch guards. Backend/frontend/build/integration/staging and readiness jobs were SKIPPED for documentation-only changes; they are not counted as PASS. This is a historical snapshot of the preceding commit; later HEAD and check states are authoritative from GitHub.
+- Remaining: PR #3861 awaits user-owned merge. T18 scenarios 2, 3, 5 live behavior and 10 remain partial; scenario 4 is accepted from source-reconciled live evidence. Full integrated T18, `docs/runbooks/STAGING_VALIDATION.md`, and served frontend byte provenance remain incomplete.
+- Blocker: user-owned merge of #3861 is pending. Tier-2 remains PARTIAL; no deferral is accepted. `served_revision_verified=false` remains unresolved and this scenario does not attest frontend bytes.
+- Next exact action: wait for user-owned merge of PR #3861. After merge, verify the merge commit, refresh origin/main, and continue in a fresh isolated worktree with one combined synthetic cycle for scenario 2, scenario 3, scenario 5 live Department off/on/manual archive, and scenario 10. Include the remaining full STAGING_VALIDATION.md checks and served-frontend byte provenance; do not repeat already validated scenarios or the three passing PostgreSQL tests. Do not merge or deploy.
+- Checks to rerun after the next change: exact-head applicable CI. Do not repeat scenarios 6–9 or the cabinet PostgreSQL suite while their source blobs remain unchanged.
+## Restored historical checkpoints from origin/main — blob `e145041a4013752240120e6e0429c2c2f766c9ba`
+
 ## Current checkpoint — T18.6 queue defaults and daily snapshot passed — 2026-11-02T11:05:59+05:00
 
 - Task ID: bd2f7564-bd3d-449d-8d85-5a9325722a80; Plan version: 1.0; Current task: T18 integrated synthetic acceptance.

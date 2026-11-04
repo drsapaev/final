@@ -298,10 +298,24 @@ export const useRegistrarWorklistData = ({
       // ⭐ SSOT: flatMap all entries without any deduplication or aggregation
       let appointmentsData: Record<string, unknown>[] = [];
       const queuesList = rawQueues as Record<string, unknown>[];
-      appointmentsData = queuesList.flatMap((queue) =>
-      (Array.isArray(queue.entries) ? queue.entries : [] as unknown[]).
-      map((entry: Record<string, unknown>) => adaptQueueEntry(entry, queue, data, dateParam, tI18n('registrarPanel.rp_unknown_patient'))).
-      filter((entry: Record<string, unknown> | null) => entry !== null) // Remove entries without ID
+      // REG-FE-067 (audit ledger 3803): per-queue contract validation — the
+      // REG-FE-034 envelope check extends to each element of queues: a queue
+      // that is not an object, or whose `entries` is not an array, is a
+      // contract violation and must fail closed (LOAD_FAILED → error/stale).
+      // The old `Array.isArray(queue.entries) ? queue.entries : []` coerced
+      // such a body into a valid-looking EMPTY day (LOAD_EMPTY) or silently
+      // dropped one queue's patients while rendering the rest.
+      const validatedQueues = queuesList.map((queue) => {
+        if (queue === null || typeof queue !== 'object' || !Array.isArray(queue.entries)) {
+          logger.warn('⚠️ Некорректный элемент очереди: entries не является массивом (contract violation)');
+          throw new Error(tI18n('registrarPanel.rp_err_invalid_data'));
+        }
+        return { queue, entries: queue.entries as Record<string, unknown>[] };
+      });
+      appointmentsData = validatedQueues.flatMap(({ queue, entries }) =>
+        entries.
+        map((entry: Record<string, unknown>) => adaptQueueEntry(entry, queue, data, dateParam, tI18n('registrarPanel.rp_unknown_patient'))).
+        filter((entry: Record<string, unknown> | null) => entry !== null) // Remove entries without ID
       );
 
       logger.info(`📊 SSOT: Loaded ${appointmentsData.length} entries (no dedup, no aggregation)`);

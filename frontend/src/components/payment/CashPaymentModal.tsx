@@ -1,6 +1,6 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { CheckCircle, XCircle, Info, AlertTriangle } from 'lucide-react';
 import {
   Button,
@@ -17,6 +17,7 @@ import {
 } from '../ui/macos';
 import notify from '../../services/notify';
 import { formatUZS } from '../../utils/formatCurrency';
+import { generateCashierClientRequestId } from '../../pages/cashier/cashierPaymentContracts';
 // UX Audit #4 regression fix: inline-стили → CSS-классы (после PR #1910 regression).
 import './CashPaymentModal.css';
 import React from "react";
@@ -67,6 +68,24 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymen
         note: ''
     });
 
+    // CSH-FE-008: single-flight submit guard. POST /cashier/payments is not
+    // idempotent server-side, so every extra in-flight submit is a potential
+    // double charge. The ref is checked synchronously — a `submitting` state
+    // alone would lose the race against a rapid second click/Enter, because
+    // the re-render (and the resulting disabled button) only happens after
+    // the current tick, while `onProcessPayment` is already firing again.
+    const [submitting, setSubmitting] = useState(false);
+    const submittingRef = useRef(false);
+
+    // Issue 3859 (CSH-FE-008 remainder): server-side idempotency key.
+    // Generated ONCE per modal session (per mount) and reused for every
+    // submit inside the session — a retry after a lost response must send
+    // the SAME key so the server replays the original payment response
+    // instead of charging twice. A deliberate new attempt (modal reopened =
+    // remount) gets a fresh key. Ref, not state: the key must never reset
+    // on re-render and must not trigger one.
+    const clientRequestIdRef = useRef(generateCashierClientRequestId());
+
     // Update amount when appointment changes
     useEffect(() => {
         const newAmount = appointment?.remaining_amount ??
@@ -100,7 +119,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymen
         return numericReceived < numericAmount;
     }, [paymentData.method, numericReceived, numericAmount]);
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!paymentData.amount || Number(paymentData.amount) <= 0) {
             notify.warning(t('payment.invalid_amount'));
@@ -110,13 +129,34 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymen
             notify.warning(t('payment.insufficient_amount'));
             return;
         }
-        // Pass change due up to parent for receipt printing (HIGH #9 fix).
-        onProcessPayment?.(appointment, {
-            ...paymentData,
-            amount: Number(paymentData.amount),
-            change_due: changeDue,
-            received_amount: paymentData.method === 'cash' ? numericReceived : numericAmount,
-        });
+        // CSH-FE-008: swallow the duplicate submit instead of re-firing the
+        // payment call. Validation failures above must NOT engage the guard —
+        // the cashier has to be able to fix the amount and submit again.
+        if (submittingRef.current) return;
+        submittingRef.current = true;
+        setSubmitting(true);
+        try {
+            // Pass change due up to parent for receipt printing (HIGH #9 fix).
+            // CSH-FE-008: await the parent handler so the modal stays locked
+            // for the whole server round-trip and unlocks exactly once after
+            // it settles (success closes the modal, failure keeps it open for
+            // an in-place retry).
+            await onProcessPayment?.(appointment, {
+                ...paymentData,
+                amount: Number(paymentData.amount),
+                change_due: changeDue,
+                received_amount: paymentData.method === 'cash' ? numericReceived : numericAmount,
+                client_request_id: clientRequestIdRef.current,
+            });
+        } catch {
+            // The parent owns error surfacing (notify + paymentError state);
+            // the modal owns only the submit lock, released in finally.
+            // Swallowing here keeps a rejecting handler from becoming an
+            // unhandled rejection out of the form event.
+        } finally {
+            submittingRef.current = false;
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -288,7 +328,9 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymen
                 <Button type="button" variant="outline" onClick={onClose}>
                     {t('payment.pay_cash_cancel')}
                 </Button>
-                <Button type="submit" variant="primary" form="cash-payment-form">
+                {/* CSH-FE-008: `loading` disables the button, sets aria-busy
+                    and shows the spinner for the whole server round-trip. */}
+                <Button type="submit" variant="primary" form="cash-payment-form" loading={submitting}>
                     <CheckCircle size={16} className="cpm-submit-icon" aria-hidden="true" />
                     {t('payment.pay_cash_submit')}
                 </Button>

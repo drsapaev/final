@@ -155,7 +155,7 @@ from .patient_relationship import (  # M4-P1-3: context roles
     PatientRelationship,
     RelationshipType,  # noqa: F401
 )
-from .payment import Payment
+from .payment import Payment, PaymentClientRequest
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from .payment_webhook import PaymentProvider, PaymentTransaction, PaymentWebhook
 from .print_config import PrinterConfig, PrintJob, PrintTemplate
@@ -239,6 +239,7 @@ __all__ = [
     "ServiceCatalog",
     "ServiceAuditLog",
     "Payment",
+    "PaymentClientRequest",
     "PaymentWebhook",
     "PaymentProvider",
     "PaymentTransaction",

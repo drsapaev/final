@@ -5,10 +5,15 @@
  *
  * Pins the externally observable load semantics that previously lived inline
  * in CashierPanel effects:
- *  - stats load: success sets snapshot; failure resets to empty snapshot
- *  - pending load: success maps data + pagination; failure clears rows
- *  - history load: success maps data + pagination (or falls back to
- *    totalPages=1 / totalItems=data.length); failure clears rows
+ *  - stats load: success sets snapshot; initial failure keeps the legacy
+ *    empty snapshot + sets statsError; a refresh failure keeps the previous
+ *    snapshot (CSH-FE-001 — zeros are never presented as server-confirmed)
+ *  - pending/history loads: success maps data + pagination (or falls back
+ *    to totalPages=1 / totalItems=data.length); failure keeps the previous
+ *    rows and exposes the section error (CSH-FE-001 — a failed read is not
+ *    a confirmed empty)
+ *  - out-of-order responses are dropped: only the latest request per
+ *    section may write rows/metadata/loading (CSH-FE-002 epoch guard)
  *  - status='all' is NOT sent to the API; specific statuses are passed through
  *  - debounced search is passed through as `search`
  *  - date mode 'single' sends selectedDate for both bounds; 'range' sends from/to
@@ -165,10 +170,10 @@ describe('useCashierWorklistData (PR-UI-14-1)', () => {
     expect(api.getPayments).toHaveBeenCalledWith(expect.objectContaining({ status: undefined }));
   });
 
-  it('stats failure resets snapshot to empty; pending/history failures clear rows', async () => {
+  it('initial failure keeps empty rows + exposes section errors — never a confirmed empty (CSH-FE-001)', async () => {
     const api = makeApi();
     api.getStats.mockRejectedValue(new Error('boom'));
-    api.getPendingPayments.mockResolvedValue({ success: false, data: [], error: 'backend', pagination: { total: 0, page: 1, size: 20, pages: 1 } });
+    api.getPendingPayments.mockResolvedValue({ success: false, data: [], error: 'backend down', pagination: { total: 0, page: 1, size: 20, pages: 1 } });
     api.getPayments.mockRejectedValue(new Error('boom'));
 
     const { result } = renderWorklist(api);
@@ -188,8 +193,15 @@ describe('useCashierWorklistData (PR-UI-14-1)', () => {
     await waitFor(() => {
       expect(result.current.appointments).toEqual([]);
       expect(result.current.payments).toEqual([]);
+      expect(result.current.pendingLoading).toBe(false);
       expect(result.current.historyLoading).toBe(false);
     });
+    // CSH-FE-001: a failed read is NOT a confirmed empty — the hook must
+    // expose the failure so the views render error/retry instead of the
+    // genuine «no pending payments» / «empty history» empty states.
+    expect(result.current.pendingError).toBe('backend down');
+    expect(result.current.historyError).toBe('boom');
+    expect(result.current.statsError).toBe('boom');
   });
 
   it('history result without pagination falls back to totalPages=1 and data length', async () => {
@@ -269,5 +281,170 @@ describe('useCashierWorklistData (PR-UI-14-1)', () => {
       expect(result.current.currentPage).toBe(1);
       expect(result.current.pendingPage).toBe(1);
     });
+  });
+});
+
+// CSH-FE-002 (out-of-order reads) + CSH-FE-001 (failure truthfulness).
+// Fail-first proven on the pre-fix source: every effect wrote its result
+// unconditionally after `await`, so a slow response for a superseded
+// date/search/page overwrote the newer one, and any failure cleared the
+// rows to [] — presented by the views as a server-confirmed empty list.
+describe('useCashierWorklistData — CSH-FE-001/002 read integrity', () => {
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
+  const okPending = (ids: number[]) => ({
+    success: true,
+    data: ids.map((id) => ({ id })),
+    pagination: { total: ids.length, page: 1, size: 20, pages: 1 },
+  });
+  const okHistory = (ids: string[]) => ({
+    success: true,
+    data: ids.map((id) => ({ id })),
+    pagination: { total: ids.length, page: 1, size: 20, pages: 1 },
+  });
+  const okStats = (total: number) => ({
+    success: true,
+    data: { total_amount: total, cash_amount: 0, card_amount: total, pending_count: 0, pending_amount: 0, paid_count: 1, cancelled_count: 0 },
+  });
+  const emptyPagination = { total: 0, page: 1, size: 20, pages: 1 };
+
+  it('drops a late pending response for a superseded date (CSH-FE-002)', async () => {
+    const api = makeApi();
+    api.getStats.mockResolvedValue({ success: false });
+    const a = deferred<unknown>();
+    const b = deferred<unknown>();
+    api.getPendingPayments.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
+    api.getPayments.mockResolvedValue({ success: true, data: [], pagination: emptyPagination });
+
+    const { result, rerender } = renderWorklist(api);
+
+    // Date A -> B: B's request must own the pending section from now on.
+    rerender({ ...DEFAULT_PROPS, selectedDate: '2026-09-15' });
+
+    await act(async () => { b.resolve(okPending([21])); });
+    await waitFor(() => expect(result.current.appointments).toEqual([{ id: 21 }]));
+    expect(result.current.pendingLoading).toBe(false);
+
+    // The OLD date's response lands after the new one — it must be dropped.
+    await act(async () => { a.resolve(okPending([11])); });
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.appointments).toEqual([{ id: 21 }]);
+    expect(result.current.pendingLoading).toBe(false);
+  });
+
+  it('drops a late history response for a superseded date (CSH-FE-002)', async () => {
+    const api = makeApi();
+    api.getStats.mockResolvedValue({ success: false });
+    api.getPendingPayments.mockResolvedValue({ success: true, data: [], pagination: emptyPagination });
+    const a = deferred<unknown>();
+    const b = deferred<unknown>();
+    api.getPayments.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
+
+    const { result, rerender } = renderWorklist(api);
+
+    rerender({ ...DEFAULT_PROPS, selectedDate: '2026-09-15' });
+
+    await act(async () => { b.resolve(okHistory(['pB'])); });
+    await waitFor(() => expect(result.current.payments).toEqual([{ id: 'pB' }]));
+
+    await act(async () => { a.resolve(okHistory(['pA'])); });
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.payments).toEqual([{ id: 'pB' }]);
+    expect(result.current.historyLoading).toBe(false);
+  });
+
+  it('drops a late stats response for a superseded date (CSH-FE-002)', async () => {
+    const api = makeApi();
+    const a = deferred<unknown>();
+    const b = deferred<unknown>();
+    api.getStats.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
+    api.getPendingPayments.mockResolvedValue({ success: true, data: [], pagination: emptyPagination });
+    api.getPayments.mockResolvedValue({ success: true, data: [], pagination: emptyPagination });
+
+    const { result, rerender } = renderWorklist(api);
+
+    rerender({ ...DEFAULT_PROPS, selectedDate: '2026-09-15' });
+
+    await act(async () => { b.resolve(okStats(200)); });
+    await waitFor(() => expect(result.current.stats.total_amount).toBe(200));
+
+    await act(async () => { a.resolve(okStats(100)); });
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.stats.total_amount).toBe(200);
+  });
+
+  it('keeps previously loaded rows and raises the section error when a refresh fails (CSH-FE-001)', async () => {
+    const api = makeApi();
+    api.getStats.mockResolvedValue({ success: false });
+    api.getPendingPayments
+      .mockResolvedValueOnce(okPending([1, 2]))
+      .mockResolvedValueOnce({ success: false, data: [], error: 'backend down' });
+    api.getPayments
+      .mockResolvedValueOnce(okHistory(['p1']))
+      .mockRejectedValueOnce(new Error('boom'));
+
+    const { result } = renderWorklist(api);
+    await waitFor(() => {
+      expect(result.current.appointments).toHaveLength(2);
+      expect(result.current.payments).toEqual([{ id: 'p1' }]);
+    });
+
+    act(() => { result.current.bumpRefreshKey(); });
+
+    await waitFor(() => {
+      expect(result.current.pendingError).toBe('backend down');
+      expect(result.current.historyError).toBe('boom');
+      expect(result.current.pendingLoading).toBe(false);
+      expect(result.current.historyLoading).toBe(false);
+    });
+    // The previously loaded rows must survive the failed refresh —
+    // clearing them would present a server outage as «no pending payments».
+    expect(result.current.appointments).toHaveLength(2);
+    expect(result.current.payments).toEqual([{ id: 'p1' }]);
+  });
+
+  it('a superseded request failure does not raise an error or clear the newer result (CSH-FE-002)', async () => {
+    const api = makeApi();
+    api.getStats.mockResolvedValue({ success: false });
+    const a = deferred<unknown>();
+    api.getPendingPayments.mockReturnValueOnce(a.promise).mockResolvedValueOnce(okPending([31]));
+    api.getPayments.mockResolvedValue({ success: true, data: [], pagination: emptyPagination });
+
+    const { result, rerender } = renderWorklist(api);
+
+    rerender({ ...DEFAULT_PROPS, selectedDate: '2026-09-15' });
+
+    await waitFor(() => expect(result.current.appointments).toEqual([{ id: 31 }]));
+
+    await act(async () => { a.reject(new Error('late network failure')); });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.appointments).toEqual([{ id: 31 }]);
+    expect(result.current.pendingError).toBeNull();
+    expect(result.current.pendingLoading).toBe(false);
+  });
+
+  it('a response landing after unmount is a no-op (epoch invalidation on cleanup)', async () => {
+    const api = makeApi();
+    api.getStats.mockResolvedValue({ success: false });
+    const a = deferred<unknown>();
+    api.getPendingPayments.mockReturnValueOnce(a.promise);
+    api.getPayments.mockResolvedValue({ success: true, data: [], pagination: emptyPagination });
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { unmount } = renderWorklist(api);
+
+    unmount();
+
+    await act(async () => { a.resolve(okPending([1])); });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 });

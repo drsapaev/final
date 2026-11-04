@@ -434,6 +434,78 @@ describe('useRegistrarWorklistData — REG-FE-034 malformed 200 envelopes fail c
     expect(result.current.stale).toBe(true);
     expect(result.current.dataSource).toBe('api');
   });
+
+  // REG-FE-067: the per-queue contract validation. The old
+  // `Array.isArray(queue.entries) ? queue.entries : []` coerced a broken
+  // queue element into "no entries" — a single malformed queue rendered as
+  // a valid EMPTY day (LOAD_EMPTY) or silently dropped that queue's rows
+  // while the healthy queues still rendered.
+  it.each([
+    { queues: [{ entries: null }] },
+    { queues: [{ entries: 'not-an-array' }] },
+    { queues: [{ entries: { 0: 'object-not-array' } }] },
+    { queues: [42] },
+  ])('a primary 200 body with a malformed queue element %j is a load error, not a valid empty queue (REG-FE-067)', async (body) => {
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: body }) as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.dataSource).toBe('error');
+    expect(result.current.appointments).toEqual([]);
+  });
+
+  it('a queue element without entries but valid entries elsewhere must not silently drop patients (REG-FE-067)', async () => {
+    // One healthy queue with a real row + one broken queue (entries: null):
+    // the old code rendered ONLY the healthy queue's row and pretended the
+    // broken queue had no patients — silent partial data loss.
+    const body = {
+      queues: [
+        { entries: [{ id: 'row-1' }] },
+        { entries: null },
+      ],
+    };
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: body }) as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.dataSource).toBe('error');
+    expect(result.current.appointments).toEqual([]);
+  });
+
+  it('a queue with an empty entries array remains a valid empty queue (REG-FE-067)', async () => {
+    vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: { queues: [{ entries: [] }] } }) as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.dataSource).toBe('api');
+    expect(result.current.appointments).toEqual([]);
+    expect(result.current.stale).toBe(false);
+  });
+
+  it('a malformed queue element during a refresh keeps the loaded rows and marks them stale (REG-FE-067)', async () => {
+    const loaded = [{ id: 'row-1' }];
+    const callQueue = [
+      Promise.resolve({ data: { queues: [{ entries: loaded }] } }),
+      Promise.resolve({ data: { queues: [{ entries: null }] } }),
+    ];
+    vi.mocked(api.get).mockImplementation(() => callQueue.shift() as never);
+    const { result } = renderHook(() => useRegistrarWorklistData(hookDeps()));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+
+    await act(async () => {
+      result.current.loadAppointments({ silent: false, source: 'reg_fe_067_refresh' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.appointments.map((a) => a.id)).toEqual(['row-1']);
+    expect(result.current.stale).toBe(true);
+    expect(result.current.dataSource).toBe('api');
+  });
 });
 
 /**

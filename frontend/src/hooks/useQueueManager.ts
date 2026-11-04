@@ -182,15 +182,36 @@ export const useQueueManager = (): UseQueueManagerReturn => {
 
   const loadQueueSnapshot = useCallback(
     async ({ specialistId, targetDate, doctor }: LoadQueueSnapshotArgs): Promise<QueueData | null> => {
-      if (!specialistId) {
-        return null;
-      }
-
       // REG-FE-035 (audit ledger 3803): эпоха запроса — последний выбранный
       // врач/дата владеет состоянием. Запоздалый ответ сменённого запроса
       // (успех, отказ или finally) не должен ни перезаписать более новый
       // снапшот, ни снять общий loading пока новый запрос в полёте.
+      // REG-FE-068 (audit ledger 3803): эпоха инкрементируется ДО раннего
+      // выхода — отмена выбора врача тоже переход жизненного цикла снапшота.
+      // Раньше выход без инкремента оставал активной эпоху запроса
+      // предыдущего врача: его запоздалый ответ проходил проверку эпохи и
+      // воскрешал очередь ОТМЕНЁННОГО врача после очистки выбора.
       const epoch = ++snapshotEpochRef.current;
+
+      if (!specialistId) {
+        // Отмена выбора: инкремент выше уже сместил любой запрос в полёте.
+        // Очищаем очередь и сбрасываем статистику в null — UI не должен
+        // продолжать рендерить очередь врача, выбор которого снят.
+        // Loading снимаем здесь: finally сменённого запроса его больше не
+        // снимет.
+        // PR-3856 review follow-up: statistics = null (а НЕ {0,0,0}) —
+        // «врач не выбран» не значит «пустая очередь»; нулевые карточки
+        // статистики вводили в заблуждение и меняли визуальные эталоны
+        // спец-панелей (dermatology/dentistry), плюс новый объект на каждый
+        // вызов при пустом выборе мог зациклить перерендеры у потребителей
+        // без memoized doctors. null = то же состояние, что и до первого
+        // выбора — рендер идентичен baseline.
+        setQueueData(null);
+        setStatistics(null);
+        setLoading(false);
+        return null;
+      }
+
       setLoading(true);
       try {
         const payload = (await fetchQueuesToday(targetDate)) as QueuePayload;

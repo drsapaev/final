@@ -7,6 +7,7 @@ import logging  # noqa: F401
 from datetime import UTC, date, datetime  # noqa: F401
 from decimal import Decimal  # noqa: F401
 from typing import Any, Generic, TypeVar  # noqa: F401
+from uuid import UUID  # noqa: F401
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
 from fastapi.responses import Response  # noqa: F401
@@ -197,6 +198,14 @@ class CreatePaymentRequest(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Сумма платежа")
     method: str = Field(default="cash", description="Метод оплаты (cash, card)")
     note: str | None = Field(None, description="Примечание")
+    client_request_id: UUID | None = Field(
+        None,
+        description=(
+            "Ключ идемпотентности (UUID), генерируется клиентом один раз "
+            "на платёжный intent; повторный запрос с тем же ключом получает "
+            "сохранённый ответ исходной операции вместо второго платежа"
+        ),
+    )
 
 
 class PaymentResponse(BaseModel):
@@ -221,6 +230,14 @@ class CreateGroupedPaymentRequest(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Total payment amount to allocate")
     method: str = Field(default="cash", description="Payment method (cash, card)")
     note: str | None = Field(None, description="Payment note")
+    client_request_id: UUID | None = Field(
+        None,
+        description=(
+            "Ключ идемпотентности (UUID), генерируется клиентом один раз "
+            "на платёжный intent; повторный запрос с тем же ключом получает "
+            "сохранённый ответ исходной аллокации вместо повторного списания"
+        ),
+    )
 
 
 class GroupedPaymentAllocationItem(BaseModel):
