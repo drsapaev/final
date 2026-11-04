@@ -63,8 +63,13 @@ export function mapQueueDataDto(dto: QueueDtoLike): QueueData {
 }
 
 export function mapQueuePayloadDto(dto: QueueDtoLike): QueuePayload {
-  if (dto == null || typeof dto !== 'object') {
-    return { queues: [] };
+  // REG-FE-034 (registrar audit ledger 3803): контракт канонического
+  // ответа /registrar/queues/today — объект с МАССИВОМ queues. Всё
+  // остальное (null, чужой конверт, отсутствие/не-массив queues) — ошибка
+  // контракта, а не «пустая очередь»: замалчивание превращает регрессию
+  // API/прокси в пустой клинический список.
+  if (dto == null || typeof dto !== 'object' || !Array.isArray((dto as QueuePayload).queues)) {
+    throw new Error('Invalid queue payload: expected an object with a queues array');
   }
   return { ...(dto as QueuePayload) };
 }

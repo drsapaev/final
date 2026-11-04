@@ -21972,6 +21972,12 @@ export type paths = {
         /**
          * Create Payment
          * @description Создать новый платеж.
+         *
+         *     Idempotency (issue 3859): a request carrying ``client_request_id`` is
+         *     deduplicated server-side — a repeat with the same key replays the
+         *     stored response of the original payment (200) instead of creating a
+         *     second payment row. Keys are optional, so key-less callers keep the
+         *     legacy behavior.
          */
         post: operations["create_payment_api_v1_cashier_payments_post"];
         delete?: never;
@@ -21996,6 +22002,12 @@ export type paths = {
          *     Allocation is backend-owned: visits must belong to one patient, amount is
          *     allocated oldest visit first by remaining backend-calculated debt, and
          *     overpay is rejected instead of being assigned to an arbitrary visit.
+         *
+         *     Idempotency (issue 3859): a request carrying ``client_request_id`` is
+         *     deduplicated server-side — a repeat with the same key replays the
+         *     stored response of the original allocation (200) instead of
+         *     allocating a second time. Keys are optional, so key-less callers keep
+         *     the legacy behavior.
          */
         post: operations["create_grouped_payment_api_v1_cashier_payments_grouped_post"];
         delete?: never;
@@ -27099,6 +27111,11 @@ export type components = {
              * @description Payment note
              */
             note?: string | null;
+            /**
+             * Client Request Id
+             * @description Ключ идемпотентности (UUID), генерируется клиентом один раз на платёжный intent; повторный запрос с тем же ключом получает сохранённый ответ исходной аллокации вместо повторного списания
+             */
+            client_request_id?: string | null;
         };
         /**
          * CreatePaymentRequest
@@ -27136,6 +27153,11 @@ export type components = {
              * @description Примечание
              */
             note?: string | null;
+            /**
+             * Client Request Id
+             * @description Ключ идемпотентности (UUID), генерируется клиентом один раз на платёжный intent; повторный запрос с тем же ключом получает сохранённый ответ исходной операции вместо второго платежа
+             */
+            client_request_id?: string | null;
         };
         /** DataTransferRequest */
         DataTransferRequest: {

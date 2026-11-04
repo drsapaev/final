@@ -1930,11 +1930,9 @@ const AppointmentWizardV2 = ({
       // В режиме EDIT MODE с QR-пациентом (patient_id = null)
       if (editMode && !patientId && wizardData.patient.phone) {
         logger.log('🔍 Edit mode: patient_id is null, searching for existing patient by phone...');
-        logger.log('📞 Patient data:', {
-          fio: wizardData.patient.fio,
-          phone: normalizedPhone,
-          birth_date: wizardData.patient.birth_date
-        });
+        // REG-FE-013 (audit ledger 3803): значения пациента (ФИО/телефон/
+        // дата рождения) не логируются — только факт поиска.
+        logger.log('📞 Patient data: <redacted — resolving by phone>');
 
         // Ищем пациента по телефону
         // UX Audit Stage 3 (Wizard issue 5.1 + 5.3):
@@ -2035,7 +2033,8 @@ const AppointmentWizardV2 = ({
         } else {
           // ✅ НОВОЕ: Если в режиме редактирования по QR пациент по телефону не найден,
           // создаем НОВОГО пациента с данными из формы, чтобы не блокировать завершение мастера.
-          logger.warn(`⚠️ Пациент с телефоном ${wizardData.patient.phone} не найден. Создаем нового пациента (editMode + QR).`);
+          // REG-FE-013: телефон не интерполируется в сообщение лога.
+          logger.warn('⚠️ Пациент с привязанным телефоном не найден. Создаем нового пациента (editMode + QR).');
 
           const patientData: Record<string, unknown> = {
             full_name: wizardData.patient.fio.trim(),

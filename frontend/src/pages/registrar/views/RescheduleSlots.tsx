@@ -24,6 +24,7 @@ import notify from '../../../services/notify';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { rescheduleTomorrow, rescheduleVisit } from '../../../api/visits';
 import { getErrorMessage } from '../../../utils/errorHandler';
+import type { RegistrarWorklistLoadOutcome } from '../useRegistrarWorklistData';
 
 interface RescheduleSlotsDialogProps {
   isOpen: boolean;
@@ -36,7 +37,7 @@ interface RescheduleSlotsDialogProps {
   getRescheduleVisitIds: (appointmentRow: Record<string, unknown>) => unknown[];
   resolveRescheduleVisitId: (appointmentRow: Record<string, unknown>) => unknown;
   removeRescheduledAppointmentFromView: (appointmentRow: Record<string, unknown>, visitId: unknown) => void;
-  loadAppointments: (options?: unknown) => Promise<void> | void;
+  loadAppointments: (options?: unknown) => Promise<RegistrarWorklistLoadOutcome | void> | void;
   tI18n: (key: string, options?: Record<string, unknown>) => string;
 }
 
@@ -91,6 +92,46 @@ const RescheduleSlotsDialog = ({
     return resolveRescheduleVisitId(rescheduleData as Record<string, unknown>);
   };
 
+  // REG-FE-064 (audit ledger 3803): опция выбора визита информативна —
+  // врач, услуги и исходные дата/время конкретного визита из данных строки
+  // (grouped_records с REG-FE-064-обогащением), с fallback на общие поля
+  // строки. Числовой id больше не единственная информация.
+  const describeVisitOption = (visitId: unknown): string => {
+    const row = (rescheduleData ?? {}) as Record<string, unknown>;
+    const records = Array.isArray(row.grouped_records) ? (row.grouped_records as Record<string, unknown>[]) : [];
+    const record = records.find((rec) => {
+      // REG-FE-069 (audit ledger 3803): матчинг в каноническом пространстве
+      // визитов — grouped_records несут явный visit_id. record_ref.record_id
+      // НЕ является id визита у записей online_queue (это id записи очереди)
+      // и appointment (это appointment_id): сравнение по record_id почти
+      // всегда промахивалось для online_queue и могло совпасть с чужим
+      // appointment_id. Легаси-сравнение по record_id остаётся только для
+      // записей вида visit (там пространства совпадают) — обратно-совместимо
+      // с необогащёнными строками.
+      if (rec?.visit_id !== undefined && rec?.visit_id !== null) {
+        return String(rec.visit_id) === String(visitId);
+      }
+      const ref = rec?.record_ref as Record<string, unknown> | undefined;
+      return Boolean(ref && ref.record_kind === 'visit' && String(ref.record_id) === String(visitId));
+    }) ?? {};
+    const doctor = record.doctor_name || row.doctor_name || row.specialist_name || '';
+    const services = Array.isArray(record.services) && record.services.length > 0
+      ? record.services
+      : (Array.isArray(row.services) ? row.services : []);
+    const serviceNames = (services as unknown[])
+      .map((svc) => (typeof svc === 'string' ? svc : ((svc as Record<string, unknown>)?.name ?? (svc as Record<string, unknown>)?.code ?? '')))
+      .filter(Boolean)
+      .join(', ');
+    const date = record.record_date || row.record_date || row.date || '';
+    const time = record.appointment_time || row.appointment_time || row.time || '';
+    const parts = [doctor, serviceNames, [date, time].filter(Boolean).join(' ')]
+      .map((part) => String(part).trim())
+      .filter(Boolean);
+    return parts.length > 0
+      ? `${tI18n('registrar.reschedule_visit_option', { id: String(visitId) })} — ${parts.join(' · ')}`
+      : tI18n('registrar.reschedule_visit_option', { id: String(visitId) });
+  };
+
   return (
     <ModernDialog
       isOpen={isOpen}
@@ -132,11 +173,15 @@ const RescheduleSlotsDialog = ({
                 }
                 return;
               }
+              // REG-FE-065 (audit ledger 3803): закрытие и сброс формы —
+              // только ПОСЛЕ успешного ответа сервера. Раньше диалог
+              // закрывался до await: при отказе API введённые параметры
+              // терялись без возможности повторить на месте.
+              await rescheduleTomorrow(targetVisitId as string | number);
+              notify.success(tI18n('registrar.visit_postponed'));
               onClose();
               resetForm();
               logger.info(`Перенос визита ${targetVisitId} на завтра`);
-              await rescheduleTomorrow(targetVisitId as string | number);
-              notify.success(tI18n('registrar.visit_postponed'));
               removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
               loadAppointments({ source: 'reschedule_tomorrow' });
             } catch (e: unknown) {
@@ -208,11 +253,13 @@ const RescheduleSlotsDialog = ({
                 }
                 return;
               }
+              // REG-FE-065: см. tomorrow-обработчик — close/reset только
+              // после подтверждения сервером.
+              await rescheduleVisit(targetVisitId as string | number, dateStr, timeStr || undefined);
+              notify.success(tI18n('registrar.visit_postponed_date') + ` ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
               onClose();
               resetForm();
               logger.info(`Перенос визита ${targetVisitId} на ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
-              await rescheduleVisit(targetVisitId as string | number, dateStr, timeStr || undefined);
-              notify.success(tI18n('registrar.visit_postponed_date') + ` ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
               removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
               loadAppointments({ source: 'reschedule_date' });
             } catch (e: unknown) {
@@ -260,7 +307,7 @@ const RescheduleSlotsDialog = ({
               <option value="">{tI18n('registrar.reschedule_select_visit_placeholder')}</option>
               {candidateVisitIds.map((visitId: unknown) => (
                 <option key={String(visitId)} value={String(visitId)}>
-                  {tI18n('registrar.reschedule_visit_option', { id: String(visitId) })}
+                  {describeVisitOption(visitId)}
                 </option>
               ))}
             </select>

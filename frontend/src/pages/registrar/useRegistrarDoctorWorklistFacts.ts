@@ -5,7 +5,7 @@ import { computeDoctorStats } from './registrarWorklistRows';
 /** Presentation facts for per-doctor tabs; the backend owns queue identity. */
 export const useRegistrarDoctorWorklistFacts = ({
   appointments, doctors, activeDoctorId, showCalendar, historyDate,
-  urlDate, todayStr, tI18n,
+  urlDate, todayStr, loadedDate, tI18n,
 }: {
   appointments: Appointment[];
   doctors: Doctor[];
@@ -14,6 +14,13 @@ export const useRegistrarDoctorWorklistFacts = ({
   historyDate: string;
   urlDate: string | null;
   todayStr: string;
+  /** PR #3851 review (P2): the clinic day of the VERIFIED sample from
+   *  useRegistrarWorklistData (target_date of the last successful load).
+   *  NOT the selected date: on a date switch the selection changes
+   *  instantly while the sample still belongs to the previous day, and a
+   *  failed refresh (RQ-22) keeps those rows on screen — today-only
+   *  instruments must not present them as the current clinic day. */
+  loadedDate: string | null;
   tI18n: (key: string, options?: Record<string, unknown>) => string;
 }) => useMemo(() => {
   const date = showCalendar && historyDate ? historyDate : urlDate || todayStr;
@@ -26,7 +33,15 @@ export const useRegistrarDoctorWorklistFacts = ({
     selectedDoctorLabel,
     doctorStats: computeDoctorStats(appointments, date, doctors.map((doctor) => Number(doctor.id))),
     doctorCountLabel: date === todayStr ? tI18n('registrarPanel.today') : date,
+    // REG-FE-027 (registrar audit ledger) + PR #3851 review (P2): does the
+    // VERIFIED sample belong to the current clinic day? Bound to
+    // `loadedDate` (the target_date of the last SUCCESSFUL load), never to
+    // the selected date: on a «history → today» switch the old sample is
+    // kept while the request is in flight, and a failed load keeps it with
+    // stale=true — the Welcome morning checklist must not render those
+    // rows as today's. null (nothing verified yet) → honest false.
+    sampleIsToday: loadedDate != null && loadedDate === todayStr,
   };
-}, [appointments, doctors, activeDoctorId, showCalendar, historyDate, urlDate, todayStr, tI18n]);
+}, [appointments, doctors, activeDoctorId, showCalendar, historyDate, urlDate, todayStr, loadedDate, tI18n]);
 
 export default useRegistrarDoctorWorklistFacts;

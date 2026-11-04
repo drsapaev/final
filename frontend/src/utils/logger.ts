@@ -15,6 +15,7 @@
 const PHI_FIELDS: readonly string[] = [
   // Идентификаторы пациента
   'patient_id', 'patientId', 'patient_name', 'patientName',
+  'patient', 'fio', 'patient_fio', 'patientFio',
   'full_name', 'fullName', 'firstName', 'lastName', 'middleName',
   'first_name', 'last_name', 'middle_name',
   'name', 'surname', 'patronymic',
@@ -44,6 +45,29 @@ const PHI_FIELDS: readonly string[] = [
 const isDevelopment: boolean = import.meta.env.MODE === 'development';
 
 const ENABLE_SANITIZATION: boolean = import.meta.env.VITE_ENABLE_PHI_SANITIZATION !== 'false';
+
+/**
+ * REG-FE-013 (registrar audit ledger 3803): шаблон «похоже на телефонный
+ * номер» — 9–15 цифр с разделителями (пробелы/дефисы/скобки), необязательный
+ * ведущий «+». Применяется к ПРИМИТИВНЫМ строкам лога, которые никогда не
+ * проходят ключевой скраббер объектов.
+ */
+const PHONE_LIKE_RE = /\+?\d[\d\s().-]{7,}\d/g;
+
+/**
+ * Маскировка телефонных литералов в примитивных строках лога:
+ * сохраняются только последние 4 цифры («phone tail only», AGENTS.md).
+ * Короткие цифровые последовательности (id, суммы) и даты не затрагиваются.
+ */
+export function maskPhoneLiterals(text: string): string {
+  return text.replace(PHONE_LIKE_RE, (match) => {
+    const digits = match.replace(/\D/g, '');
+    if (digits.length < 9 || digits.length > 15) {
+      return match;
+    }
+    return `+****${digits.slice(-4)}`;
+  });
+}
 
 /**
  * Санитизация объекта — замена PHI на [REDACTED].
@@ -154,7 +178,15 @@ function formatArgs(args: unknown[]): unknown[] {
 
   try {
     return args.map((arg) => {
-      // Пропускаем примитивы как есть
+      // REG-FE-013: примитивные строки проходят маскировку телефонных
+      // литералов — интерполированный в сообщение телефон не минует
+      // приватность-скраббер (ключевой скраббер работает только по ключам
+      // объектов).
+      if (typeof arg === 'string') {
+        return ENABLE_SANITIZATION ? maskPhoneLiterals(arg) : arg;
+      }
+
+      // Пропускаем остальные примитивы как есть
       if (arg === null || arg === undefined || typeof arg !== 'object') {
         return arg;
       }

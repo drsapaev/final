@@ -21,6 +21,7 @@
  * single silent retry (P-004 fix: no artificial 1500ms wait).
  */
 import { useCallback, useReducer, useState } from 'react';
+import type { RegistrarWorklistLoadOutcome } from './useRegistrarWorklistData';
 import logger from '../../utils/logger';
 import notify from '../../services/notify';
 import type { Appointment } from '../../types/domain/clinic';
@@ -82,7 +83,7 @@ export const useRegistrarWizard = ({
    * which is exactly the closure the original inline onComplete captured
    * (React events fire against the latest committed render).
    */
-  loadAppointmentsRef: { current: (options?: unknown) => Promise<void> | void };
+  loadAppointmentsRef: { current: (options?: unknown) => Promise<RegistrarWorklistLoadOutcome | void> | void };
   loadIntegratedData: () => Promise<void> | void;
   tI18n: (key: string, options?: Record<string, unknown>) => string;
 }) => {

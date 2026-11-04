@@ -36,11 +36,38 @@ import {
   getRegistrarActionForStatus,
 } from './registrarHelpers';
 import type { RegistrarRecordLike } from './registrarHelpers';
+import type { RegistrarWorklistLoadOutcome } from './useRegistrarWorklistData';
 import type { RegistrarPaymentInput, RegistrarPaymentSummary } from '../../api/registrarPayments';
+
+/**
+ * REG-FE-015 (audit 3803): серверный /registrar/records/actions батч
+ * исполняется по-записи и не атомарен — success_count>0 при failed_count>0
+ * означает, что часть записей УЖЕ изменена. Результат батча классифицируется
+ * до какого-либо пользовательского сообщения.
+ */
+type RegistrarBatchResult = {
+  success?: boolean;
+  success_count?: number;
+  failed_count?: number;
+  results?: { success?: boolean; error?: string }[];
+};
+
+type RegistrarBatchOutcome =
+  | { kind: 'all_success' }
+  | { kind: 'partial'; successCount: number; failedCount: number }
+  | { kind: 'failed' };
+
+export const classifyRegistrarBatchResult = (result: RegistrarBatchResult): RegistrarBatchOutcome => {
+  const successCount = Number(result?.success_count ?? 0);
+  const failedCount = Number(result?.failed_count ?? 0);
+  if (result?.success && failedCount === 0) return { kind: 'all_success' };
+  if (successCount > 0 && failedCount > 0) return { kind: 'partial', successCount, failedCount };
+  return { kind: 'failed' };
+};
 
 export const useRegistrarActions = ({ appointments, loadAppointments }: {
   appointments: unknown[];
-  loadAppointments: (opts?: Record<string, unknown>) => Promise<void> | void;
+  loadAppointments: (opts?: Record<string, unknown>) => Promise<RegistrarWorklistLoadOutcome | void> | void;
 }) => {
   const runRegistrarRecordAction = useCallback(async (record: Record<string, unknown>, action: string, payload: Record<string, unknown> = {}) => {
     const records = getRegistrarRecordRefs(record);
@@ -65,10 +92,20 @@ export const useRegistrarActions = ({ appointments, loadAppointments }: {
 
   const handleStartVisit = useCallback(async (appointment: Record<string, unknown>) => {
     try {
-      const result = await runRegistrarRecordAction(appointment, 'start_visit');
+      const result = await runRegistrarRecordAction(appointment, 'start_visit') as RegistrarBatchResult | null;
       if (!result) return null;
-      if (!result.success) {
-        throw new Error(result.results?.find((item: Record<string, unknown>) => !item.success)?.error || 'start_visit_failed');
+      const batch = classifyRegistrarBatchResult(result);
+      if (batch.kind === 'failed') {
+        throw new Error(result.results?.find((item: { success?: boolean }) => !item.success)?.error || 'start_visit_failed');
+      }
+      if (batch.kind === 'partial') {
+        // REG-FE-015: часть записей уже изменена сервером — выравниваем
+        // ворклист по каноническому read-model и честно сообщаем частичный
+        // результат. Сбой обновления не превращает частичный успех в ошибку.
+        await Promise.resolve(loadAppointments({ source: 'start_visit_partial' }))
+          .catch(() => logger.warn('RegistrarPanel: refresh after partial start_visit failed'));
+        notify.warning(`Команда выполнена частично: успешно ${batch.successCount}, отклонено ${batch.failedCount}`);
+        return result;
       }
 
       logger.info('RegistrarPanel: start_visit completed through backend command contract', result);
@@ -107,10 +144,19 @@ export const useRegistrarActions = ({ appointments, loadAppointments }: {
         return null;
       }
 
-      const result = await runRegistrarRecordAction(record, requiredBackendAction, { reason });
+      const result = await runRegistrarRecordAction(record, requiredBackendAction, { reason }) as RegistrarBatchResult | null;
       if (!result) return null;
-      if (!result.success) {
-        throw new Error(result.results?.find((item: Record<string, unknown>) => !item.success)?.error || 'status_update_failed');
+      const batch = classifyRegistrarBatchResult(result);
+      if (batch.kind === 'failed') {
+        throw new Error(result.results?.find((item: { success?: boolean }) => !item.success)?.error || 'status_update_failed');
+      }
+      if (batch.kind === 'partial') {
+        // REG-FE-015: см. handleStartVisit — частичный батч требует
+        // реконсиляции списка и правдивого сообщения, а не только ошибки.
+        await Promise.resolve(loadAppointments({ source: 'status_update_partial' }))
+          .catch(() => logger.warn('RegistrarPanel: refresh after partial status update failed'));
+        notify.warning(`Статус обновлён частично: успешно ${batch.successCount}, отклонено ${batch.failedCount}`);
+        return result;
       }
 
       await loadAppointments({ source: 'status_update' });

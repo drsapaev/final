@@ -100,3 +100,62 @@ describe('useRegistrarReschedule — REG-FE-041 grouped reschedule (fail-first)'
     expect(hook.result.current.resolveRescheduleVisitId({})).toBeNull();
   });
 });
+
+// REG-FE-009 (registrar audit ledger 3803) — type-scoped removal identity.
+// The old removal unioned ids from DIFFERENT namespaces (row id, visit id,
+// appointment id, queue-entry id) into one string set and dropped ANY row
+// matching ANY of them. A visit id of row A could therefore hide an
+// unrelated row B whose ROW id happened to equal that visit id.
+describe('useRegistrarReschedule — REG-FE-009 type-scoped removal identity', () => {
+  it('a visit id of the rescheduled row never removes an unrelated row with that value as its ROW id', () => {
+    const ctx = makeHook();
+    ctx.seed([
+      { id: 10, visit_id: 20, patient_fio: 'A' },
+      { id: 20, visit_id: 21, patient_fio: 'B' },
+    ]);
+    ctx.hook.result.current.removeRescheduledAppointmentFromView(
+      { id: 10, visit_id: 20 },
+      20,
+    );
+    const survivors = ctx.state().map((r) => r.id);
+    expect(survivors).toEqual([20]); // B stays; only A (the rescheduled record) is removed
+  });
+
+  it('an appointment id of the rescheduled row never removes an unrelated row with that value as its visit id', () => {
+    const ctx = makeHook();
+    ctx.seed([
+      { id: 1, visit_id: 2, appointment_id: 7 },
+      { id: 3, visit_id: 7, appointment_id: 9 },
+    ]);
+    ctx.hook.result.current.removeRescheduledAppointmentFromView(
+      { id: 1, visit_id: 2, appointment_id: 7 },
+      2,
+    );
+    expect(ctx.state().map((r) => r.id)).toEqual([3]);
+  });
+
+  it('the rescheduled record itself is still removed (same row id / same visit id)', () => {
+    const ctx = makeHook();
+    ctx.seed([
+      { id: 10, visit_id: 20 },
+      { id: 11, visit_id: 22 },
+    ]);
+    ctx.hook.result.current.removeRescheduledAppointmentFromView({ id: 10, visit_id: 20 }, 20);
+    expect(ctx.state().map((r) => r.id)).toEqual([11]);
+  });
+
+  it('an aggregate row is removed when it IS the rescheduled record (matched by its own id)', () => {
+    const ctx = makeHook();
+    ctx.seed([
+      { id: 10, visit_id: 20 },
+      { id: 99, visit_ids: [20], aggregated_ids: [10] },
+    ]);
+    ctx.hook.result.current.removeRescheduledAppointmentFromView(
+      { id: 10, visit_id: 20, aggregated_ids: [10] },
+      20,
+    );
+    // The rescheduled row (10) and the aggregate that presented it (99,
+    // by its own aggregated membership) both disappear; nothing else does.
+    expect(ctx.state().map((r) => r.id)).toEqual([]);
+  });
+});

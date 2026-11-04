@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import logger from '../../utils/logger';
+import { getErrorMessage } from '../../utils/type-guards';
 import type { Appointment } from '../../types/domain/clinic';
 import type { UsePaymentsReturn } from '../../hooks/usePayments';
 
@@ -133,8 +134,25 @@ export const useCashierWorklistData = ({
   const [pendingLoading, setPendingLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // CSH-FE-001/002: per-section failure truthfulness + stale-response
+  // guards. Each effect owns a local `active` flag (the React-docs
+  // "ignore stale results" pattern): the cleanup flips it on every dep
+  // change and on unmount, so any response landing after its request was
+  // superseded (date/search/page/refresh change or unmount) is dropped
+  // BEFORE touching state.
+  //
+  // CSH-FE-001: a failed read is NOT a confirmed empty. The last error per
+  // section is exposed (null = the last load succeeded, possibly empty);
+  // rows/snapshots from the last successful load are KEPT so the views can
+  // render a stale-data banner instead of a fake «no pending payments» /
+  // «empty history» state. Backend stays the SSOT; nothing is invented.
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [pendingError, setPendingError] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
   // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка статистики (только при изменении дат)
   useEffect(() => {
+    let active = true; // CSH-FE-002: drop responses of superseded/unmounted loads
     const loadStats = async () => {
       const { date_from, date_to } = getDateParams();
       logger.log('Loading stats with params:', { date_from, date_to });
@@ -144,20 +162,30 @@ export const useCashierWorklistData = ({
           date_from: date_from || undefined,
           date_to: date_to || undefined
         });
+        if (!active) return; // superseded/unmounted
         if ((statsResult as { success?: boolean }).success && (statsResult as { data?: Record<string, unknown> }).data) {
           setStats((statsResult as { data?: Record<string, unknown> }).data as CashierStatsSnapshot);
+          setStatsError(null);
+        } else {
+          // CSH-FE-001: keep the previous snapshot (its values stay unknown,
+          // not server-confirmed zeros) and surface the failure.
+          const message = (statsResult as { error?: unknown }).error;
+          setStatsError(typeof message === 'string' && message ? message : '');
         }
       } catch (error: unknown) {
+        if (!active) return;
         logger.error('Error loading stats:', error);
-        setStats(EMPTY_STATS);
+        setStatsError(getErrorMessage(error));
       }
     };
 
     loadStats();
+    return () => { active = false; };
   }, [getDateParams, refreshKey, getStats]);
 
   // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка pending payments (только при изменении pendingPage)
   useEffect(() => {
+    let active = true; // CSH-FE-002: drop responses of superseded/unmounted loads
     const loadPending = async () => {
       const { date_from, date_to } = getDateParams();
       logger.info('Loading pending payments:', { date_from, date_to, page: pendingPage });
@@ -172,9 +200,12 @@ export const useCashierWorklistData = ({
           size: itemsPerPage
         });
 
+        if (!active) return; // superseded/unmounted
+
         if (pendingResult.success) {
           const appointmentsData = Array.isArray(pendingResult.data) ? pendingResult.data : [];
           setAppointments(appointmentsData as Appointment[]);
+          setPendingError(null);
 
           if (pendingResult.pagination) {
             setPendingTotalPages(pendingResult.pagination.pages);
@@ -182,20 +213,25 @@ export const useCashierWorklistData = ({
           }
         } else {
           logger.warn('Error loading pending payments:', pendingResult.error);
-          setAppointments([]);
+          // CSH-FE-001: keep the previously loaded rows — clearing them
+          // would present a server outage as «no pending payments».
+          setPendingError(typeof pendingResult.error === 'string' ? pendingResult.error : '');
         }
       } catch (error: unknown) {
+        if (!active) return;
         logger.error('Error loading pending payments:', error);
-        setAppointments([]);
+        setPendingError(getErrorMessage(error));
       }
       setPendingLoading(false);
     };
 
     loadPending();
+    return () => { active = false; };
   }, [pendingPage, search, getDateParams, refreshKey, getPendingPayments]);
 
   // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка истории платежей (только при изменении currentPage)
   useEffect(() => {
+    let active = true; // CSH-FE-002: drop responses of superseded/unmounted loads
     const loadHistory = async () => {
       const { date_from, date_to } = getDateParams();
       logger.info('Loading payment history:', { date_from, date_to, page: currentPage, status });
@@ -211,9 +247,12 @@ export const useCashierWorklistData = ({
           size: itemsPerPage
         });
 
+        if (!active) return; // superseded/unmounted
+
         if (paymentsResult.success) {
           const paymentsData = Array.isArray(paymentsResult.data) ? paymentsResult.data : [];
           setPayments(paymentsData as Record<string, unknown>[]);
+          setHistoryError(null);
 
           if (paymentsResult.pagination) {
             setTotalPages(paymentsResult.pagination.pages);
@@ -224,17 +263,20 @@ export const useCashierWorklistData = ({
           }
         } else {
           logger.warn('Error loading payment history:', paymentsResult.error);
-          setPayments([]);
-          setTotalPages(1);
+          // CSH-FE-001: keep the previously loaded rows and pagination —
+          // clearing them would present a server outage as «empty history».
+          setHistoryError(typeof paymentsResult.error === 'string' ? paymentsResult.error : '');
         }
       } catch (error: unknown) {
+        if (!active) return;
         logger.error('Error loading payment history:', error);
-        setPayments([]);
+        setHistoryError(getErrorMessage(error));
       }
       setHistoryLoading(false);
     };
 
     loadHistory();
+    return () => { active = false; };
   }, [currentPage, search, status, getDateParams, refreshKey, getPayments]);
 
   // Reset page when date or search changes
@@ -262,6 +304,12 @@ export const useCashierWorklistData = ({
     payments,
     appointments,
     stats,
+    // CSH-FE-001: per-section read failures (null = last load succeeded;
+    // a string — possibly empty — means the last load FAILED and the rows/
+    // snapshot above are the kept previous sample, not fresh data)
+    statsError,
+    pendingError,
+    historyError,
     // loading flags
     pendingLoading,
     historyLoading,

@@ -26,7 +26,7 @@ import {
   User,
   CreditCard,
   XCircle,
-  AlertCircle } from 'lucide-react';
+  AlertCircle, Stethoscope, Activity, HelpCircle } from 'lucide-react';
 import { Checkbox, Tooltip } from '../ui/macos';
 import type { DataTableColumn } from '../ui/DataTable';
 import { QueueActionButtons } from '../queue/QueueManagementCard';
@@ -213,10 +213,51 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
         icon: Calendar,
         text: t('misc.eat_status_plan'),
         emoji: '📅'
+      },
+
+      // REG-FE-052 (audit ledger 3803): канонические статусы очереди из
+      // backend/app/services/queue_status.py (in_service, diagnostics,
+      // incomplete, rescheduled) — раньше ЛЮБОЙ неизвестный статус
+      // молча рисовался как «Запланирован».
+      in_service: {
+        color: 'var(--mac-accent-blue, rgb(0 122 255))',
+        bg: withOpacity('var(--mac-accent-blue, rgb(0 122 255))', 0.12),
+        icon: Stethoscope,
+        text: t('misc.eat_status_in_cabinet'),
+        emoji: '🩺'
+      },
+      diagnostics: {
+        color: 'var(--mac-accent-purple, rgb(175 82 222))',
+        bg: withOpacity('var(--mac-accent-purple, rgb(175 82 222))', 0.12),
+        icon: Activity,
+        text: t('misc.eat_status_diagnostics'),
+        emoji: '🔬'
+      },
+      incomplete: {
+        color: 'var(--mac-warning, rgb(255 149 0))',
+        bg: withOpacity('var(--mac-warning, rgb(255 149 0))', 0.12),
+        icon: AlertCircle,
+        text: t('misc.eat_status_incomplete'),
+        emoji: '⚠️'
+      },
+      rescheduled: {
+        color: 'var(--mac-text-secondary, rgb(142 142 147))',
+        bg: withOpacity('var(--mac-text-secondary, rgb(142 142 147))', 0.12),
+        icon: CalendarClock,
+        text: t('misc.eat_status_rescheduled'),
+        emoji: '🔁'
       }
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.scheduled;
+    // REG-FE-052: неизвестный статус больше НЕ изобретает «Запланирован» —
+    // показываем честный серый бейдж с исходным значением статуса.
+    const config = statusConfig[status as keyof typeof statusConfig] || {
+      color: 'var(--mac-text-secondary, rgb(142 142 147))',
+      bg: withOpacity('var(--mac-text-secondary, rgb(142 142 147))', 0.12),
+      icon: HelpCircle,
+      text: String(status || '—'),
+      emoji: '❔'
+    };
 
     return (
       <div
@@ -558,10 +599,18 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
             // different queue's status just because the number is equal.
             const sameNumber = row.queue_numbers.filter((q: QueueNumberInfo) =>
               String(q.number) === String(row.queue_number));
+            // REG-FE-057 (audit ledger 3803): идентичность очереди — сначала
+            // канонический daily_queue_id (сильнейший факт владельца), затем
+            // queue_tag; номер талона локален для очереди и не является
+            // глобальным идентификатором.
+            const selectedDailyQueueId = (row as { daily_queue_id?: unknown }).daily_queue_id;
             const selectedTag = typeof row.queue_tag === 'string' ? row.queue_tag.trim() : '';
-            const sameQueue = selectedTag
-              ? sameNumber.filter((q: QueueNumberInfo) => q.queue_tag === selectedTag)
-              : sameNumber;
+            const sameQueue = typeof selectedDailyQueueId === 'number' && selectedDailyQueueId > 0
+              ? sameNumber.filter((q: QueueNumberInfo & { daily_queue_id?: unknown }) =>
+                  q.daily_queue_id === selectedDailyQueueId)
+              : selectedTag
+                ? sameNumber.filter((q: QueueNumberInfo) => q.queue_tag === selectedTag)
+                : sameNumber;
             const distinctStatuses = [...new Set(sameQueue.map((q: QueueNumberInfo) => q.status).filter(Boolean))];
             queueStatus = distinctStatuses.length === 1 ? distinctStatuses[0] : undefined;
           } else {
@@ -640,7 +689,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
                 marginLeft: 'var(--mac-spacing-1)',
                 padding: '2px 6px',
                 backgroundColor: 'color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 85%)',
-                color: 'var(--mac-accent-blue, #007aff)',
+                color: 'var(--mac-accent-blue, rgb(0 122 255))',
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-semibold)',
@@ -720,7 +769,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
                 marginLeft: 'var(--mac-spacing-1)',
                 padding: '2px 6px',
                 backgroundColor: 'color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 85%)',
-                color: 'var(--mac-accent-blue, #007aff)',
+                color: 'var(--mac-accent-blue, rgb(0 122 255))',
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-semibold)',

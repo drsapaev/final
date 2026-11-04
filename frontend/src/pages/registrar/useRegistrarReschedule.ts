@@ -64,53 +64,48 @@ export const useRegistrarReschedule = ({ setAppointments }: {
       : [];
     if (groupVisitIds.length > 1) return;
 
-    const idsToRemove = new Set<string>();
-    [
-      appointmentRow.id,
-      appointmentRow.visit_id,
-      appointmentRow.visitId,
-      appointmentRow.appointment_id,
-      appointmentRow.queue_entry_id,
-      visitId,
-    ].forEach((id: unknown) => {
-      if (id !== undefined && id !== null) {
-        idsToRemove.add(String(id));
-      }
-    });
+    // REG-FE-009 (audit ledger 3803): сравнение ТИПО-СКОПЛЕННЫХ канонических
+    // ссылок, а не «голых» идентификаторов из разных таблиц. Прежний union
+    // (row id + visit id + appointment id + queue-entry id в одном множестве)
+    // удалял постороннюю строку, чей row id совпал с visit id переносимой
+    // записи. Каждое пространство имён сравнивается только с самим собой;
+    // aggregate-строка удаляется по собственному членству (aggregated_ids),
+    // а не по чужому совпадению.
+    const eq = (a: unknown, b: unknown): boolean =>
+      a !== undefined && a !== null && b !== undefined && b !== null && String(a) === String(b);
 
-    [
-      appointmentRow.visit_ids,
-      appointmentRow.appointment_ids,
-      appointmentRow.queue_entry_ids,
-    ].forEach((ids: unknown) => {
-      if (Array.isArray(ids)) {
-        ids.forEach((id: unknown) => {
-          if (id !== undefined && id !== null) {
-            idsToRemove.add(String(id));
-          }
-        });
-      }
-    });
+    const targetVisitId = visitId ?? appointmentRow.visit_id ?? appointmentRow.visitId ?? null;
+    const rowVisitId = appointmentRow.visit_id ?? appointmentRow.visitId ?? null;
+    const rowAppointmentId = appointmentRow.appointment_id ?? null;
+    const rowQueueEntryId = appointmentRow.queue_entry_id ?? null;
+    const rowId = appointmentRow.id ?? null;
+    const rowVisitIds = Array.isArray(appointmentRow.visit_ids) ? (appointmentRow.visit_ids as unknown[]) : [];
+    const rowAppointmentIds = Array.isArray(appointmentRow.appointment_ids) ? (appointmentRow.appointment_ids as unknown[]) : [];
+    const rowQueueEntryIds = Array.isArray(appointmentRow.queue_entry_ids) ? (appointmentRow.queue_entry_ids as unknown[]) : [];
+    const rowAggregatedIds = Array.isArray(appointmentRow.aggregated_ids) ? (appointmentRow.aggregated_ids as unknown[]) : [];
 
-    if (Array.isArray(appointmentRow.aggregated_ids)) {
-      (appointmentRow.aggregated_ids as unknown[]).forEach((id: unknown) => {
-        if (id !== undefined && id !== null) {
-          idsToRemove.add(String(id));
-        }
-      });
-    }
+    const rowIdMatches = (id: unknown) =>
+      eq(id, rowId) || rowAggregatedIds.some((aggId) => eq(id, aggId));
+    const visitIdMatches = (id: unknown) =>
+      eq(id, targetVisitId) || eq(id, rowVisitId) ||
+      rowVisitIds.some((v) => eq(id, v));
+    const appointmentIdMatches = (id: unknown) =>
+      eq(id, rowAppointmentId) || rowAppointmentIds.some((a) => eq(id, a));
+    const queueEntryIdMatches = (id: unknown) =>
+      eq(id, rowQueueEntryId) || rowQueueEntryIds.some((q) => eq(id, q));
 
     setAppointments((prev: Record<string, unknown>[]) => prev.filter((apt: Record<string, unknown>) => {
-      const candidateIds = [
-        apt.id,
-        apt.visit_id,
-        apt.visitId,
-        apt.appointment_id,
-        apt.queue_entry_id,
-      ];
-      return !candidateIds.some((id: unknown) =>
-        id !== undefined && id !== null && idsToRemove.has(String(id))
-      );
+      const sameRow = rowIdMatches(apt.id);
+      const sameVisit = visitIdMatches(apt.visit_id) || visitIdMatches(apt.visitId);
+      const sameAppointment = appointmentIdMatches(apt.appointment_id);
+      const sameQueueEntry = queueEntryIdMatches(apt.queue_entry_id);
+      // Aggregate rows presenting the moved record: their OWN id is a member
+      // of the rescheduled row's aggregated membership.
+      const aggregatePresentsMovedRecord =
+        Array.isArray(apt.aggregated_ids) &&
+        (apt.aggregated_ids as unknown[]).some((aggId) => rowIdMatches(aggId));
+      const removed = sameRow || sameVisit || sameAppointment || sameQueueEntry || aggregatePresentsMovedRecord;
+      return !removed;
     }));
   }, [setAppointments]);
 

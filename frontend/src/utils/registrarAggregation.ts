@@ -472,6 +472,12 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
     }
     patientGroups[patientKey].grouped_records.push({
       record_ref: recordRef,
+      // REG-FE-069 (audit ledger 3803): канонический id визита этой записи.
+      // record_ref.record_id — НЕ он: у online_queue это id записи очереди,
+      // у appointment — appointment_id. Потребители, матчащие запись против
+      // visit_ids строки (выбор целевого визита при переносе), обязаны
+      // использовать это поле, а не record_id.
+      visit_id: pickCanonicalVisitId(appointment),
       available_actions: Array.isArray(appointment.available_actions) ? [...appointment.available_actions] : [],
       can_mark_paid: Boolean(appointment.can_mark_paid),
       can_start_visit: Boolean(appointment.can_start_visit),
@@ -483,6 +489,13 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
       payment_status: normalizedPayment,
       payment_type: appointment.payment_type || null,
       cost: appointmentCost,
+      // REG-FE-064 (audit ledger 3803): per-record факты для честного
+      // выбора визита при переносе групповой записи — врач, услуги и
+      // исходные дата/время конкретного визита, а не только его числовой id.
+      doctor_name: appointment.doctor_name || appointment.specialist_name || null,
+      services: Array.isArray(appointment.services) ? [...appointment.services] : [],
+      record_date: appointment.record_date ?? appointment.date ?? null,
+      appointment_time: appointment.appointment_time ?? appointment.time ?? null,
     });
 
     if (Array.isArray(appointment.services)) {

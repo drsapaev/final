@@ -549,7 +549,7 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    assert revision == "0089_merge_booking_refund_heads"
+    assert revision == "0090_payment_client_request"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",

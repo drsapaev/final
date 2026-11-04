@@ -23,6 +23,18 @@ const renderTicket = (row: Record<string, unknown>, otherRows: Record<string, un
   render(<div>{result.current.renderQueueNumbers(row as unknown as Appointment)}</div>);
 };
 
+const renderStatusBadge = (status: string) => {
+  const { result } = renderHook(() => useAppointmentsTableRenderers({
+    t,
+    services: {},
+    data: [] as unknown as AppointmentRow[],
+    preferCanonicalQueueNumber: true,
+  }));
+  render(<div>{result.current.renderStatus(status)}</div>);
+};
+
+const getBadge = () => document.querySelector('.status-badge') as HTMLElement;
+
 describe('REG-FE-056: registrar ticket column', () => {
   it('keeps the actual backend ticket number on a historical date instead of the row index', () => {
     const oldDate = '2020-01-20';
@@ -151,4 +163,67 @@ describe('REG-FE-056: registrar ticket column', () => {
     expect(screen.getByTitle('№7')).toHaveAttribute('data-queue-status', 'called');
   });
 
+});
+
+// REG-FE-052 / REG-FE-057 (registrar audit ledger 3803) — truthful status
+// vocabulary and queue-identity badge resolution.
+describe('REG-FE-052: canonical queue statuses are never mislabeled as scheduled', () => {
+  it.each(['in_service', 'diagnostics', 'incomplete', 'rescheduled'])(
+    'renders the canonical status %s with its own palette, not the scheduled badge',
+    (status) => {
+      renderStatusBadge(status);
+      // The scheduled badge carries the localized 'planned' text; a truthful
+      // badge must not reuse it for a different lifecycle stage.
+      const badge = getBadge();
+      expect(badge.textContent).not.toContain('eat_status_scheduled');
+      expect(badge.textContent).not.toContain('eat_status_plan');
+    },
+  );
+
+  it('an unknown future status shows its raw value instead of inventing scheduled', () => {
+    renderStatusBadge('some_future_status');
+    expect(getBadge().textContent).toContain('some_future_status');
+  });
+});
+
+describe('REG-FE-057: badge status resolves by queue identity, not by number alone', () => {
+  it('two queues with the same ticket number resolve the status of the daily queue that owns the row', () => {
+    renderTicket(
+      {
+        id: 601,
+        date: getLocalDateString(),
+        appointment_date: getLocalDateString(),
+        queue_number: 1,
+        daily_queue_id: 77,
+        queue_numbers: [
+          { number: 1, queue_tag: 'cardiology', status: 'served', daily_queue_id: 12 },
+          { number: 1, queue_tag: 'lab', status: 'waiting', daily_queue_id: 77 },
+        ],
+      },
+      [],
+    );
+    // The row belongs to daily queue 77 (lab): the badge must take lab's
+    // status, never borrow cardiology's same-number status.
+    const badge = document.querySelector('[data-queue-status]') as HTMLElement;
+    expect(badge.getAttribute('data-queue-status')).toBe('waiting');
+  });
+
+  it('falls back to queue_tag matching when the daily queue id is absent', () => {
+    renderTicket(
+      {
+        id: 602,
+        date: getLocalDateString(),
+        appointment_date: getLocalDateString(),
+        queue_number: 1,
+        queue_tag: 'lab',
+        queue_numbers: [
+          { number: 1, queue_tag: 'cardiology', status: 'served' },
+          { number: 1, queue_tag: 'lab', status: 'waiting' },
+        ],
+      },
+      [],
+    );
+    const badge = document.querySelector('[data-queue-status]') as HTMLElement;
+    expect(badge.getAttribute('data-queue-status')).toBe('waiting');
+  });
 });

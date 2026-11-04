@@ -8,10 +8,35 @@ const readPaymentWidget = () =>
   fs.readFileSync(path.join(ROOT, 'PaymentWidget.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('PaymentWidget backend payment status contract', () => {
-  it('polls the canonical backend payment status route', () => {
+  it('polls the canonical backend payment status route via the current payment data ref (CSH-FE-029)', () => {
     const source = readPaymentWidget();
 
-    expect(source).toContain('apiClient.get(`/payments/${paymentData.payment_id}`)');
+    // CSH-FE-029: the polling path must read the payment from paymentDataRef
+    // (currentPaymentData), never a stale closure over paymentData state.
+    expect(source).toContain('const currentPaymentData = paymentDataRef.current;');
+    // #3854 review follow-up: the GET is keyed by the identity-pinned
+    // paymentId (captured from paymentDataRef BEFORE the request) so a
+    // response of a replaced/cancelled session can be discarded.
+    expect(source).toContain('const paymentId = currentPaymentData.payment_id;');
+    expect(source).toContain('apiClient.get(`/payments/${paymentId}`)');
+    expect(source).not.toContain('apiClient.get(`/payments/${paymentData.payment_id}`)');
     expect(source).not.toContain('apiClient.get(`/payments/${paymentData.payment_id}/status`)');
+  });
+
+  it('keeps provider loading on a stable dependency surface (CSH-FE-030)', () => {
+    const source = readPaymentWidget();
+
+    // t is unstable per render — it must NOT be a loadProviders dependency.
+    expect(source).toContain('}, [currency]);');
+    expect(source).not.toContain('}, [currency, t]);');
+    // manual provider selection must survive reloads
+    expect(source).toContain('setSelectedProvider((current) =>');
+  });
+
+  it('treats the polling limit as a monitoring timeout, not a payment failure (CSH-FE-031)', () => {
+    const source = readPaymentWidget();
+
+    expect(source).toContain('case \'status_check_timeout\':');
+    expect(source).not.toContain('setPaymentStatus(\'failed\');\n      }\n    }, POLLING_INTERVAL_MS);');
   });
 });

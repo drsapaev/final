@@ -11,11 +11,22 @@ import { useTranslation } from '../../i18n/useTranslation';
 import type { Appointment } from '../../types/domain/clinic';
 import { getErrorMessage } from '../../utils/type-guards';
 
+/**
+ * REG-FE-017 (audit 3803): результат команды отмены — типизированный
+ * факт, а не «промис разрешился». resolve без отмены (null-результат
+ * команды) и частичный батч больше не считаются полным успехом.
+ */
+export type CancelCommandOutcome =
+  | { outcome: 'all_success' }
+  | { outcome: 'partial_success'; successCount: number; failedCount: number }
+  | { outcome: 'no_op'; message?: string }
+  | { outcome: 'failed'; message?: string };
+
 interface CancelDialogProps {
   isOpen: boolean;
   onClose: () => void;
   appointment: Appointment | null;
-  onCancel: (appointmentId: unknown, reason: string) => Promise<void>;
+  onCancel: (appointmentId: unknown, reason: string) => Promise<CancelCommandOutcome | void> | CancelCommandOutcome | void;
 }
 
 const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogProps) => {
@@ -63,14 +74,42 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
 
     try {
       if (onCancel && appointment) {
-        await onCancel(appointment.id, reason.trim());
+        const result = await onCancel(appointment.id, reason.trim());
+        // REG-FE-017 (ledger PR 3803): успех подтверждается только явным
+        // результатом команды. no_op/failed/partial держат диалог открытым;
+        // легаси-void-контракт не считается доказательством отмены.
+        if (result && typeof result === 'object' && 'outcome' in result) {
+          if (result.outcome === 'all_success') {
+            toast.success(t('misc.cd_zapis_uspeshno_otmenena'));
+            onClose();
+            return;
+          }
+          if (result.outcome === 'partial_success') {
+            setError(
+              `Отменено записей: ${result.successCount}; не отменено: ${result.failedCount}. ` +
+              'Список обновлён — проверьте оставшиеся записи.',
+            );
+            return;
+          }
+          if (result.outcome === 'no_op') {
+            // Конкретную причину уже показал общий action-hook.
+            setError(result.message || t('misc.cd_oshibka_pri_otmene_zapisi'));
+            return;
+          }
+          const failedMessage = result.message || t('misc.cd_oshibka_pri_otmene_zapisi');
+          setError(failedMessage);
+          toast.error(`${t('misc.cd_oshibka_pri_otmene_zapisi')}: ${failedMessage}`);
+          return;
+        }
+        // Легаси-контракт (void): явного подтверждения успеха нет — не заявляем его.
+        setError(t('misc.cd_oshibka_pri_otmene_zapisi'));
+        return;
       }
-
-      toast.success(t('misc.cd_zapis_uspeshno_otmenena'));
-      onClose();
+      setError(t('misc.cd_oshibka_pri_otmene_zapisi'));
     } catch (error) {
       logger.error('Cancel error:', error);
       toast.error(t('misc.cd_oshibka_pri_otmene_zapisi') + getErrorMessage(error));
+      setError(getErrorMessage(error));
     } finally {
       setIsProcessing(false);
     }
