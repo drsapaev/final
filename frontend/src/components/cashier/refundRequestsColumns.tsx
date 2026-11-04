@@ -153,7 +153,10 @@ export const buildRefundRequestColumns = (
       )
     },
     {
-      key: 'amount',
+      // CSH-FE-050: колонка читает реальное поле ответа `refund_amount`
+      // (RefundRequestResponse не отдаёт `amount` — раньше каждая легитимная
+      // сумма возврата рендерилась как «—»).
+      key: 'refund_amount',
       title: t('payment.col_amount'),
       render: (amount: unknown) => <span className="refund-cell-amount">{formatRefundAmount(amount)}</span>
     },

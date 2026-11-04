@@ -563,23 +563,10 @@ const QueueJoin = () => {
       ? preExecRefusalMessage || t('misc.qj_preexec_not_executed')
       : t('misc.qj_preexec_refusal');
 
-  const draftGet = useCallback(
-    (key: string): string | null =>
-      directionMode
-        ? window.sessionStorage.getItem(key)
-        : window.localStorage.getItem(key),
-    [directionMode],
-  );
-  const draftSet = useCallback(
-    (key: string, value: string): void => {
-      if (directionMode) {
-        window.sessionStorage.setItem(key, value);
-      } else {
-        window.localStorage.setItem(key, value);
-      }
-    },
-    [directionMode],
-  );
+  // QR-FE-001 (follow-up audit 2026-11-02): draftGet/draftSet удалены
+  // вместе с PHI-черновиками — на анонимных поверхностях (постоянный код
+  // направления и общий legacy QR-токен) больше НЕТ чтения/записи полей
+  // пациента; остаётся только очистка обоих хранилищ.
   const draftRemove = useCallback((key: string): void => {
     // Belt & suspenders: clear BOTH stores — no PHI may linger either way.
     window.sessionStorage.removeItem(key);
@@ -712,20 +699,17 @@ const QueueJoin = () => {
       // Stale draft from another code/key — the load effect owns this commit.
       return;
     }
-    // RQ-18 follow-up round-5 (P1-1): in direction mode NOTHING about the
-    // typed patient is persisted any more — the shared permanent code is
-    // the wrong place for PHI on an anonymous device (the round-4
-    // phone-tail challenge verified nothing for families sharing one
-    // number). The legacy per-token flow keeps its own draft.
-    if (directionMode) {
-      return;
-    }
-    if (!formData.patientName && !formData.phone && !formData.telegramId) {
-      draftRemove(formStorageKey);
-      return;
-    }
-    draftSet(formStorageKey, JSON.stringify(formData));
-  }, [formData, formStorageKey, formDraftHydrated, directionMode, draftSet, draftRemove]);
+    // RQ-18 follow-up round-5 (P1-1) + QR-FE-001 (follow-up audit
+    // 2026-11-02): NOTHING about the typed patient is persisted on ANY
+    // anonymous shared surface. Round-5 removed the direction draft; the
+    // legacy QR token is equally shared — it is printed for a whole
+    // doctor-day or the entire clinic (backend qr_queue/_tokens.py), so
+    // the per-token draft restored the previous patient's name, phone
+    // and Telegram id to WHOEVER reopened the same token URL on a shared
+    // device. The only storage action left is clearing a possible stale
+    // draft from an older build (draftRemove sweeps both stores).
+    draftRemove(formStorageKey);
+  }, [formData, formStorageKey, formDraftHydrated, draftRemove]);
 
   useEffect(() => {
     // RQ-18 follow-up round-2 (P1): switching directions discards the
@@ -753,35 +737,18 @@ const QueueJoin = () => {
       setFormData({ patientName: '', phone: '', telegramId: '' });
     }
     formDataOwnerRef.current = formStorageKey;
-    const saved = draftGet(formStorageKey);
-    let restored: QueueJoinDraftData | null = null;
-    // RQ-18 follow-up round-5 (P1-1): in direction mode there is no draft
-    // to hydrate — no PHI is stored under the shared permanent code, so a
-    // reload (or the next person at the device) always finds an EMPTY
-    // form. Nothing to verify, nothing to leak.
-    if (!directionMode) {
-      try {
-        const parsed = saved ? safeJsonParse(saved) : null;
-        if (parsed && typeof parsed === 'object') {
-          const record = parsed as Record<string, unknown>;
-          restored = {
-            patientName: String(record.patientName ?? ''),
-            phone: String(record.phone ?? ''),
-            telegramId: String(record.telegramId ?? ''),
-          };
-        }
-      } catch {
-        draftRemove(formStorageKey);
-        restored = null;
-      }
-    } else if (saved) {
-      // A stale direction-mode draft from an OLDER build must not linger.
-      draftRemove(formStorageKey);
-    }
+    // RQ-18 follow-up round-5 (P1-1) + QR-FE-001 (follow-up audit
+    // 2026-11-02): no PHI rehydration on ANY anonymous surface. Direction
+    // mode never stored a draft (round-5); the legacy per-token draft is
+    // no longer written either — a reload (or the NEXT person at the same
+    // shared device) always finds an EMPTY form. Stale drafts from older
+    // builds are cleared unconditionally: draftRemove sweeps both stores,
+    // so no read is needed to decide.
+    draftRemove(formStorageKey);
     setPendingDraft(null);
-    setFormData(restored ?? { patientName: '', phone: '', telegramId: '' });
+    setFormData({ patientName: '', phone: '', telegramId: '' });
     setFormDraftHydrated(true);
-  }, [formStorageKey, directionMode, draftGet, draftRemove]);
+  }, [formStorageKey, draftRemove]);
 
   // RQ-18 follow-up round-4 (P1-2): the URL must carry the SAME canonical
   // lowercase code the backend resolves by. A non-canonical variant is
@@ -2389,7 +2356,18 @@ const QueueJoin = () => {
     };
 
     // RQ-10 (S-08): 0 успешных записей не называется успехом.
-    const successCount = successEntries.length;
+    // QR-FE-002 (follow-up audit 2026-11-02): канонический одиночный DTO
+    // (complete_join_session для врача-специфичного QR) — это
+    // { success: true, queue_number: N, ... } БЕЗ массива entries.
+    // Прежний счётчик смотрел ТОЛЬКО на entries.length и честно выданный
+    // талон рендерил как «не удалось присоединиться» с красной иконкой.
+    // Бизнес-исход определяется по success + top-level талону, а не по
+    // длине списка; multi-форма (entries) и частичный результат не меняются.
+    const singleShapeSuccessCount =
+      hasEntriesShape || result?.success !== true || result?.queue_number == null
+        ? 0
+        : 1;
+    const successCount = successEntries.length + singleShapeSuccessCount;
     const successTitle =
       successCount === 0
         ? t('misc.qj_join_failed')
