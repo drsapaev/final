@@ -119,8 +119,6 @@ const MacOSTab = ({
     transition: 'all var(--mac-duration-normal) var(--mac-ease)',
     display: 'flex',
     alignItems: 'center',
-    outline: 'none !important',
-    outlineOffset: '0',
     position: 'relative',
     whiteSpace: 'nowrap',
     minHeight: '40px',
@@ -170,6 +168,15 @@ const MacOSTab = ({
           div, which fails axe aria-required-parent (a tab must be contained
           by a tablist; flagged on cashier/admin-users/admin-family
           surfaces). */}
+      <style>{`
+        .mac-tab-button {
+          outline: none;
+        }
+        .mac-tab-button:focus-visible {
+          outline: 2px solid color-mix(in srgb, var(--mac-accent-blue-500), transparent 60%);
+          outline-offset: -2px;
+        }
+      `}</style>
       <div style={{ display: 'flex', gap: currentVariant.gap || currentSize.gap }} role="tablist">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
