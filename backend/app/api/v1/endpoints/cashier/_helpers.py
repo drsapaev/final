@@ -11,7 +11,7 @@ from uuid import UUID  # noqa: F401
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
 from fastapi.responses import Response  # noqa: F401
-from pydantic import BaseModel, ConfigDict, Field  # noqa: F401
+from pydantic import BaseModel, ConfigDict, Field, field_validator  # noqa: F401
 from sqlalchemy import or_  # noqa: F401
 from sqlalchemy.exc import IntegrityError  # noqa: F401  # H-4: catch double-payment race
 from sqlalchemy.orm import Session, joinedload  # noqa: F401
@@ -190,6 +190,39 @@ class PaginatedResponse(BaseModel, Generic[T]):
     pages: int
 
 
+
+# CSH-FE-039 (P1, follow-up audit 2026-11-02): прямая кассовая команда
+# платежа закрывает его НЕМЕДЛЕННО (PaymentInvariantService создаёт
+# Payment(status='paid', paid_at=now) без подтверждения провайдером).
+# Через неё разрешены ТОЛЬКО методы с ручным документальным подтверждением
+# кассира (cash — наличные, card — ручной терминал). Провайдерские методы
+# (click/payme/kaspi) обязаны идти через payment_init_service
+# (pending → провайдер → webhook → paid): кассир не может «провести» их
+# одним POST без доказательства списания провайдером.
+CASHIER_IMMEDIATE_PAID_METHODS = frozenset({"cash", "card"})
+CASHIER_HOSTED_PROVIDER_METHODS = frozenset({"click", "payme", "kaspi"})
+
+
+def _validate_immediate_paid_method(value: str) -> str:
+    """Нормализует и проверяет метод прямой кассовой оплаты (CSH-FE-039).
+
+    Возвращает каноническое значение метода; для провайдерских/неизвестных
+    методов бросает ValueError (pydantic переводит его в 422).
+    """
+    normalized = str(value or "").strip().lower()
+    if normalized in CASHIER_IMMEDIATE_PAID_METHODS:
+        return normalized
+    if normalized in CASHIER_HOSTED_PROVIDER_METHODS:
+        raise ValueError(
+            f"Метод «{normalized}» — провайдерская оплата: прямая кассовая "
+            "команда не подтверждает списание провайдером и не может "
+            "провести её как paid. Инициируйте оплату через провайдера "
+            "(pending → webhook → paid)."
+        )
+    raise ValueError(
+        f"Неизвестный метод оплаты: {value!r}. Разрешены: cash, card."
+    )
+
 class CreatePaymentRequest(BaseModel):
     """Запрос на создание платежа"""
     visit_id: int | None = Field(None, description="ID визита")
@@ -206,6 +239,13 @@ class CreatePaymentRequest(BaseModel):
             "сохранённый ответ исходной операции вместо второго платежа"
         ),
     )
+
+    # CSH-FE-039: немедленный paid допустим только для методов с ручным
+    # подтверждением кассира; провайдерские методы требуют провайдер-флоу.
+    @field_validator("method")
+    @classmethod
+    def _method_is_manually_receipted(cls, value: str) -> str:
+        return _validate_immediate_paid_method(value)
 
 
 class PaymentResponse(BaseModel):
@@ -238,6 +278,13 @@ class CreateGroupedPaymentRequest(BaseModel):
             "сохранённый ответ исходной аллокации вместо повторного списания"
         ),
     )
+
+    # CSH-FE-039: сгруппированный путь делит тот же немедленный paid-контракт
+    # — те же ограничения провенанса метода, что и у одиночного платежа.
+    @field_validator("method")
+    @classmethod
+    def _method_is_manually_receipted(cls, value: str) -> str:
+        return _validate_immediate_paid_method(value)
 
 
 class GroupedPaymentAllocationItem(BaseModel):

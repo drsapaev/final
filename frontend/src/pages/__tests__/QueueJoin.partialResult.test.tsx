@@ -175,6 +175,96 @@ describe('QueueJoin partial result (RQ-10, S-08)', () => {
     expect(screen.queryByText(/Вы зарегистрированы в очередях!/i)).not.toBeInTheDocument();
   });
 
+  it('QR-FE-002: успешный одиночный join (success:true + queue_number, БЕЗ entries) — это выданный талон, а не провал', async () => {
+    // Канонический ответ complete_join_session для врача-специфичного QR:
+    // { success, queue_number, queue_length, estimated_wait_time,
+    //   specialist_name, department } — массива entries НЕТ.
+    // Прежний successCount смотрел только на entries.length и рендерил
+    // «Не удалось присоединиться» с красной иконкой на честный талон.
+    queueApiMocks.completeQueueJoinSession.mockResolvedValue({
+      success: true,
+      queue_number: 7,
+      queue_length: 3,
+      estimated_wait_time: 15,
+      specialist_name: 'Иванов Иван Иванович',
+      department: 'cardiology',
+    });
+
+    renderQueueJoin('doctor-specific-token');
+    // Врач-специфичный QR (не клиник-вид): шаг выбора специалистов
+    // пропускается — переопределяем сессионный мок с is_clinic_wide: false.
+    queueApiMocks.startQueueJoinSession.mockResolvedValue({
+      session_token: 'session-token',
+      queue_info: {
+        is_clinic_wide: false,
+        queue_active: true,
+        allowed: true,
+        status: 'available',
+        message: 'Запись доступна',
+        queue_length: 2,
+        department_name: 'Кардиология',
+        specialist_name: 'Иванов Иван Иванович',
+        target_date: '2026-02-21',
+      },
+    });
+    // Врач-специфичный QR: шаг выбора специалистов пропускается.
+    fireEvent.click(await screen.findByRole('button', { name: /продолжить/i }));
+    fireEvent.change(await screen.findByLabelText(/фио/i), {
+      target: { value: 'Тест Пациент' },
+    });
+    fireEvent.change(screen.getByLabelText(/номер телефона/i), {
+      target: { value: '+998 (90) 123-45-67' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Присоединиться/i }));
+    });
+
+    // Успешный заголовок и выданный номер — не провал.
+    expect(await screen.findByText(/Вы в очереди!/i)).toBeInTheDocument();
+    expect(screen.getByText(/№7/)).toBeInTheDocument();
+    expect(screen.queryByText(/Не удалось присоединиться/i)).not.toBeInTheDocument();
+    // Честные метрики одиночного талона из top-level полей ответа.
+    expect(screen.getByText(/Иванов Иван Иванович/i)).toBeInTheDocument();
+  });
+
+  it('QR-FE-002 (контрапункт): multi-ответ без entries не считается талоном', async () => {
+    // success:true, но НИ queue_number, НИ entries — счётчик успеха не
+    // выдумывает бизнес-исход из одного флага: 0 успешных остаётся провалом.
+    queueApiMocks.completeQueueJoinSession.mockResolvedValue({
+      success: true,
+      message: 'нет выданных талонов',
+    });
+
+    renderQueueJoin('doctor-specific-no-number');
+    queueApiMocks.startQueueJoinSession.mockResolvedValue({
+      session_token: 'session-token',
+      queue_info: {
+        is_clinic_wide: false,
+        queue_active: true,
+        allowed: true,
+        status: 'available',
+        message: 'Запись доступна',
+        queue_length: 2,
+        department_name: 'Кардиология',
+        specialist_name: 'Кардиолог',
+        target_date: '2026-02-21',
+      },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /продолжить/i }));
+    fireEvent.change(await screen.findByLabelText(/фио/i), {
+      target: { value: 'Тест Пациент' },
+    });
+    fireEvent.change(screen.getByLabelText(/номер телефона/i), {
+      target: { value: '+998 (90) 123-45-67' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Присоединиться/i }));
+    });
+
+    expect(await screen.findByText(/Не удалось присоединиться/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Вы в очереди!/i)).not.toBeInTheDocument();
+  });
+
   it('потеря ответа после успешного сохранения: повтор дает честный совет вместо вводящего «сессия не найдена»', async () => {
     queueApiMocks.completeQueueJoinSession
       .mockRejectedValueOnce(NETWORK_ERROR)

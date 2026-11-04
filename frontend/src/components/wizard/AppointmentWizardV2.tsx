@@ -213,6 +213,8 @@ import {
   buildEditOriginalServiceIdentity,
   buildEditDeltaTargetItems,
   describeUnroutableEditDeltaRows,
+  detectRemovedServicesWithinRetainedEntries,
+  describeRemovedWithinRetainedRows,
   resolveEditRecordDate,
   isEditDeltaNewItem,
   resolveCartServiceReferences,
@@ -2216,6 +2218,23 @@ const AppointmentWizardV2 = ({
       const originalQueueIds = editOriginalIdentity.queueIds; // ✅ available throughout handleComplete
       const entryUpdatedAtMap = editOriginalIdentity.entryUpdatedAtMap;
 
+      // REG-FE-084 (follow-up audit 2026-11-02): удаление ОДНОЙ услуги из
+      // СОХРАНЯЕМОЙ записи не поддерживается backend edit-контрактом (нет
+      // per-service remove-команды) — прежний путь молча терял правку и
+      // рапортовал успех. Громкий отказ ДО сабмита; детектор — wizardUtils.
+      if (editMode) {
+        const removed = detectRemovedServicesWithinRetainedEntries(
+          editOriginalIdentity, wizardData.cart.items);
+        if (removed.length > 0) {
+          const refusal = describeRemovedWithinRetainedRows(removed);
+          logger.warn('[AppointmentWizardV2] REG-FE-084: blocking submit', removed);
+          setErrors((prev) => ({ ...prev, quote: refusal }));
+          setCurrentStep(STEP_CART);
+          toast.error(refusal, { style: TOAST_ERROR_STYLE });
+          return; // НЕ сабмитим, НЕ рапортуем успех
+        }
+      }
+
       if (hasQueueEntries) {
         // ✅ Устанавливаем source по умолчанию для записей типа visit
         const effectiveSource = initialSourceKind || (
@@ -2539,14 +2558,15 @@ const AppointmentWizardV2 = ({
                 } else {
                   // Нет изменений в данных, просто завершаем
                   // ✅ НОВОЕ: Обработка удаленных записей очереди
-                  // Находим записи, которых больше нет в корзине
-                  const currentQueueIds = new Set(
-                    wizardData.cart.items.
-                    map((item) => item.original_queue_id).
-                    filter((id) => id)
+                  // Находим записи, которых больше нет в корзине.
+                  // REG-FE-085: единая нормализованная идентичность записи
+                  // (String) — как в cancelRemovedQueueEntries; инлайн-Set
+                  // со смешанными типами (42 vs "42") ошибочно отменял
+                  // СОХРАНЯЕМУЮ запись.
+                  const removedQueueIds = getRemovedQueueEntryIds(
+                    Array.from(originalQueueIds),
+                    wizardData.cart.items
                   );
-
-                  const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
                   if (removedQueueIds.length > 0) {
                     logger.log(`🗑️ Найдены удаленные записи очереди: ${removedQueueIds.join(', ')}. Отменяем их...`);
@@ -2645,13 +2665,12 @@ const AppointmentWizardV2 = ({
           logger.log('✅ Данные пациента успешно обновлены');
 
           // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
-          const currentQueueIds = new Set(
-            wizardData.cart.items.
-              map((item) => item.original_queue_id).
-              filter((id) => id)
+          // REG-FE-085: нормализованная идентичность записи (см. getRemovedQueueEntryIds)
+          // вместо сырого Set<string|number> сравнения.
+          const removedQueueIds = getRemovedQueueEntryIds(
+            Array.from(originalQueueIds),
+            wizardData.cart.items
           );
-
-          const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
           // Codex R14 PR 3121 (P1): отмены выполняются ДО success-тоста и
           // onComplete — неудача (QueueEntryCancelError) уходит в общий
@@ -2811,13 +2830,12 @@ const AppointmentWizardV2 = ({
       // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
 
       // Обработка удалённых записей очереди (cart path)
-      const currentQueueIds = new Set(
-        wizardData.cart.items.
-          map((item) => item.original_queue_id).
-          filter((id) => id)
+      // REG-FE-085: нормализованная идентичность записи (см. getRemovedQueueEntryIds)
+      // вместо сырого Set<string|number> сравнения.
+      const removedQueueIds = getRemovedQueueEntryIds(
+        Array.from(originalQueueIds),
+        wizardData.cart.items
       );
-
-      const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
       // Codex R14 PR 3121 (P1): отмены выполняются ДО success-тоста и
       // onComplete — неудача (QueueEntryCancelError) уходит в общий catch
