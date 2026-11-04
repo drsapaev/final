@@ -221,6 +221,29 @@ function expectDirectionState(
   expect(publishAction).toBe(!expected.published);
 }
 
+function expectDoctorDirectionState(
+  direction: DirectionRow,
+  expected: { key: string; ownerId: number; queueTag: string },
+  published: boolean,
+) {
+  expect(direction.profile).toMatchObject({ key: expected.key, show_on_qr_page: published });
+  expect(direction.resolved_mode).toBe('booking');
+  expect(direction.effective_availability).toBe('available');
+  expect(direction.booking_targets).toContainEqual(expect.objectContaining({
+    owner_type: 'doctor',
+    owner_id: expected.ownerId,
+    queue_tag: expected.queueTag,
+    is_active: true,
+    eligible_for_new_booking: true,
+  }));
+  expect(direction.public_availability).toBe(published);
+  expect(direction.configuration_state).toBe(published ? 'ready' : 'incomplete');
+  const publishAction = direction.allowed_next_actions.some(
+    (action) => action.kind === 'publish_profile' && action.entity_key === expected.key,
+  );
+  expect(publishAction).toBe(!published);
+}
+
 async function createHiddenQueueProfile(
   page: Page,
   input: { key: string; title: string; queueTag: string },
@@ -433,7 +456,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
     }
     const matchingProfiles = existingProfiles.filter((profile) =>
       profile.is_active !== false
-      && profile.show_on_qr_page === false
+      && typeof profile.show_on_qr_page === 'boolean'
       && (profile.queue_tags?.[0] || profile.key)?.trim().toLowerCase() === specialtyCode,
     );
     if (matchingProfiles.length !== 1) return [];
@@ -447,9 +470,31 @@ test('current setup screen resolves Doctor and QueueResource directions through 
     }
     return [{ specialty, profile }];
   })[0];
+  const routeReadiness = doctorRouteCandidate ? [] : specialtyItems.map((specialty) => {
+      const code = specialty.code.trim().toLowerCase();
+      const profiles = existingProfiles
+        .filter((profile) => (profile.queue_tags?.[0] || profile.key)?.trim().toLowerCase() === code)
+        .map((profile) => {
+          const direction = initialFacts.directions.find((item) => item.profile.key === profile.key);
+          return {
+            key: profile.key,
+            active: profile.is_active !== false,
+            published: profile.show_on_qr_page,
+            state: direction?.configuration_state,
+            availability: direction?.effective_availability,
+            existingTargets: direction?.booking_targets.map((target) => `${target.owner_type}:${target.queue_tag}`) || [],
+          };
+        });
+      return {
+        code,
+        doctorAlreadyExists: usedDoctorSpecialties.has(code),
+        resourceAlreadyUsesTag: resourceRouteTags.includes(code),
+        profiles,
+      };
+    }).filter((item) => !item.doctorAlreadyExists && !item.resourceAlreadyUsesTag).slice(0, 20);
   expect(
     doctorRouteCandidate,
-    'synthetic staging needs one hidden, unowned QueueProfile route for a canonical Doctor specialty',
+    `synthetic staging needs one available QueueProfile route for a canonical Doctor specialty; route candidates: ${JSON.stringify(routeReadiness)}`,
   ).toBeDefined();
   const { specialty: doctorSpecialty, profile: doctorProfile } = doctorRouteCandidate!;
   const doctorProfileTitle = queueProfileTitle(doctorProfile);
@@ -560,16 +605,15 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   );
   expect(Number.isInteger(resourceId) && resourceId > 0, 'QueueResource should have a persisted ID').toBeTruthy();
 
-  // Before publication, both backend-resolved owners must remain hidden and
-  // provide the explicit publish action instead of claiming QR readiness.
+  // Before any test-controlled publication, the Doctor direction must resolve
+  // to its Doctor target and the new resource profile must remain hidden.
   let facts = await waitForAdminDirections(page);
-  expectDirectionState(directionForKey(facts, doctorProfile.key!), {
+  const doctorPublishedBeforeSetup = doctorProfile.show_on_qr_page === true;
+  expectDoctorDirectionState(directionForKey(facts, doctorProfile.key!), {
     key: doctorProfile.key!,
-    ownerType: 'doctor',
     ownerId: doctorId,
     queueTag: doctorSpecialty.code,
-    published: false,
-  });
+  }, doctorPublishedBeforeSetup);
   expectDirectionState(directionForKey(facts, profileKey), {
     key: profileKey,
     ownerType: 'resource',
@@ -578,15 +622,15 @@ test('current setup screen resolves Doctor and QueueResource directions through 
     published: false,
   });
 
-  await publishQueueProfile(page, doctorProfile.key!, doctorProfileTitle);
-  facts = await waitForAdminDirections(page);
-  expectDirectionState(directionForKey(facts, doctorProfile.key!), {
+  if (!doctorPublishedBeforeSetup) {
+    await publishQueueProfile(page, doctorProfile.key!, doctorProfileTitle);
+    facts = await waitForAdminDirections(page);
+  }
+  expectDoctorDirectionState(directionForKey(facts, doctorProfile.key!), {
     key: doctorProfile.key!,
-    ownerType: 'doctor',
     ownerId: doctorId,
     queueTag: doctorSpecialty.code,
-    published: true,
-  });
+  }, true);
   expectDirectionState(directionForKey(facts, profileKey), {
     key: profileKey,
     ownerType: 'resource',
@@ -597,13 +641,11 @@ test('current setup screen resolves Doctor and QueueResource directions through 
 
   await publishQueueProfile(page, profileKey, profileTitle);
   facts = await waitForAdminDirections(page);
-  expectDirectionState(directionForKey(facts, doctorProfile.key!), {
+  expectDoctorDirectionState(directionForKey(facts, doctorProfile.key!), {
     key: doctorProfile.key!,
-    ownerType: 'doctor',
     ownerId: doctorId,
     queueTag: doctorSpecialty.code,
-    published: true,
-  });
+  }, true);
   expectDirectionState(directionForKey(facts, profileKey), {
     key: profileKey,
     ownerType: 'resource',
