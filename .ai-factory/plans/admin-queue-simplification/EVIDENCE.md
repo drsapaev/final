@@ -5726,3 +5726,17 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Fix: scope the tab controls to the ServiceForm card anchored by its “Добавление услуги” heading; continue scoping actual form fields and Save to the `<form>`.
 - Scope/cleanup: owned Session teardown PASS; no runtime/API/auth/DB/migration/Compose/production changes and no foreign resources touched. Served frontend provenance remains unverified.
 - Next: update this E2E locator, run focused checks, then retry the single scenario through canonical Preflight → Start → Session.
+
+## T18 scenario 2 — RQ-17 current-screen PR opened — 2026-11-04T12:21+05:00
+
+- Commit under review: `7af1d9809d754619d2db17648515ecc4d7bf3012`; base and merge commit for #3861: `bfc33837cd3028f1989b2462a998b16505a62fd6`.
+- Branch / PR: `codex/t18-rq17-current-screen`, [Draft PR #3865](https://github.com/drsapaev/final/pull/3865). Exact PR HEAD verified on GitHub; mergeable at creation. No merge or deployment.
+- Actual tracked paths: `frontend/e2e/rq17-setup-directions-live.spec.ts`, `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `.ai-factory/plans/admin-queue-simplification/EVIDENCE.md`.
+- Original issue: the old RQ-17 E2E used removed `setup-wizard-*` controls. Rewritten test follows the current backend-facts setup screen and existing Admin editors; this is test-harness drift, not a confirmed product defect.
+- Local validation on the final spec: focused ESLint PASS; Playwright `--list` PASS (one scenario collected by five configured projects; listing only, not execution); CRLF-aware `git diff --check` PASS.
+- Synthetic validation already recorded above: one Chromium current-screen resource-only Admin/TOTP scenario PASS; three same-container browser-served asset byte comparisons PASS; canonical teardown and post-Session Preflight PASS. Full frontend Tier-1 suite was not run locally for this slice.
+- Commit hooks: PASS, including large-file, whitespace, conflict, private-key, Gitleaks and standard repository checks.
+- GitHub checks: pending on exact PR HEAD at checkpoint creation; skipped jobs remain SKIPPED, not PASS. Recheck before closing this PR cycle.
+- Result: this RQ-17 slice is validated and submitted for review. Overall T18/Tier-2 remains PARTIAL; no deferral is claimed. Remaining work includes scenario 3, scenario 5 live Department off/on/manual archive, scenario 10, full `docs/runbooks/STAGING_VALIDATION.md`, and canonical `served_revision_verified` attestation.
+- Cleanup limitation: the owned synthetic Compose stack was removed and ports verified free, but local policy prevented deleting only this task's ignored scratch directory and private synthetic env. The exact path is recorded in `PROGRESS.md`; no values were logged or committed. Do not rerun staging from this worktree until cleanup is permitted.
+- Next exact action: wait for exact-head CI on #3865; repair red checks in this PR. After the PR cycle closes under user merge authority, continue T18 from a fresh worktree without repeating completed scenario 2 or its asset comparison.

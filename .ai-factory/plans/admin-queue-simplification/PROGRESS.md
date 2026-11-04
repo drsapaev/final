@@ -2,13 +2,13 @@
 
 Plan version: 1.0
 Current task: T18 scenario 2 — adapt RQ-17 to the current Admin setup screen and validate resource-only setup
-Current status: IN_PROGRESS
+Current status: PR_OPEN
 Merged PR: [#3861](https://github.com/drsapaev/final/pull/3861), merge commit `bfc33837cd3028f1989b2462a998b16505a62fd6`.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq17-current-screen/final`
 Branch: `codex/t18-rq17-current-screen`
 Base commit: `bfc33837cd3028f1989b2462a998b16505a62fd6` (`origin/main`)
-Current commit: `bfc33837cd3028f1989b2462a998b16505a62fd6`
-Last updated: 2026-11-04T12:11:30+05:00
+Current commit: `7af1d9809d754619d2db17648515ecc4d7bf3012`
+Last updated: 2026-11-04T12:21:08+05:00
 
 ## Current checkpoint
 
@@ -18,19 +18,20 @@ Last updated: 2026-11-04T12:11:30+05:00
 - Served-byte provenance: **PASS for three assets**. Browser-captured entry JS, entry CSS and AdminSetupDirections JS each matched the same running frontend container file byte-for-byte. Exact SHA-256 evidence is in `EVIDENCE.md`. The launcher field `served_revision_verified` still says false and was not changed.
 - Teardown: **PASS**; 5 containers, 3 volumes, 1 network removed; remaining counts zero; local images removed. Post-Session Preflight PASS, project ports free. Ubuntu memory was 2439 MiB after Session and recovered to 3195 MiB at post-Session Preflight; host C: free 16 GiB and WSL disk D: free 28 GiB.
 - Scratch cleanup: local policy blocked both removal of the exact task-owned scratch directory and removal of the exact private env file before execution; no deletion occurred. The ignored task folder still contains synthetic credentials and browser artifacts. Do not use this worktree for another staging run until that scratch is removed by an allowed local action.
-- Current exact action: review the three-file tracked diff, run final scope/diff checks, commit and push the bounded T18 E2E/evidence change, open a Draft PR and verify exact-head checks. Do not merge or deploy.
+- Current exact action: monitor exact-head checks on Draft [PR #3865](https://github.com/drsapaev/final/pull/3865), currently pending; fix any red check within this scope. User retains merge authority. Do not deploy.
 - The launcher still reports `served_revision_verified=false`; the independently verified three-file comparison is a separate evidence result, not a change to the launcher marker.
 - T18 remains PARTIAL; scenario 2 and its three-file byte comparison are complete, while scenario 3, scenario 5 live state and scenario 10/full staging runbook remain.
 
-- Completed: verified PR #3861 is merged at `bfc33837cd3028f1989b2462a998b16505a62fd6`; the fresh worktree is clean and exactly at `origin/main`.
+- Completed: verified PR #3861 is merged at `bfc33837cd3028f1989b2462a998b16505a62fd6`; the fresh worktree was clean and exactly at `origin/main` before this slice.
 - Confirmed source drift: legacy `frontend/e2e/rq17-setup-directions-live.spec.ts` depends on deleted `setup-wizard-*` controls. Current `AdminSetupDirections` is the backend-facts screen with editor links and a separate QueueResource view. This is test-harness drift, not a confirmed application defect.
 - Pre-edit gate: mandatory launcher returned `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; the execution prompt was read. The override is limited to the reviewed E2E/journal paths and one owned synthetic project under the user's standing T18 authorization. No application/runtime/auth/database/production changes are allowed.
 - Allowed tracked paths: `frontend/e2e/rq17-setup-directions-live.spec.ts`, this `PROGRESS.md`, and `EVIDENCE.md`. Allowed ignored operational paths: this task's `.scratch/t18-rq17-current-screen/` env, harness and results. Denied: application/runtime/API/auth/DB/migrations, staging configuration, production, foreign Compose projects, global cleanup, merge and deployment.
 - Reference-only source/runbooks: current Admin setup, QueueResource and QueueProfile managers, Service Catalog, TwoFactor setup, RQ-18 TOTP helper, `AGENTS.md`, `AGENT_SESSION_WORKTREES.md`, `WSL_STAGING_SESSION.md`, and `STAGING_VALIDATION.md`.
 - Changed and verified: staging-only test mode writes browser response bytes and a safe manifest to task-owned scratch. The ignored runner validates project/revision/origin, then uses `docker compose cp` during the Session to compare three files served by the owned frontend container. All three matched; launcher marker remains `false`.
-- Remaining: package this RQ-17 scenario/evidence as a bounded PR and check exact-head CI. T18 remains PARTIAL; do not repeat scenarios 1, 2, 4, or 6–9, the three-asset byte check, or passing PostgreSQL suites. Continue next with scenario 3 or the live Department state flow after this PR cycle closes.
+- Completed: committed the RQ-17 scenario and journals as `7af1d9809d754619d2db17648515ecc4d7bf3012`, pushed the branch, and opened Draft PR #3865. Focused ESLint, Playwright collection, diff checks, and normal commit hooks passed. At the latest check, applicable GitHub workflows were pending.
+- Remaining: complete exact-head CI for #3865, then continue T18 scenario 3 or the live Department state flow in a fresh worktree after this PR cycle closes. T18 remains PARTIAL; do not repeat scenarios 1, 2, 4, or 6–9, the three-asset byte check, or passing PostgreSQL suites.
 - Stop conditions: any required product/auth/DB change, inability to use normal Admin 2FA, unsafe/foreign Compose ownership, launcher reserve/preflight failure, or a test result that depends on runtime behavior beyond the approved T18 outcome.
-- Current checkpoint supersedes the historical next action below: close this bounded PR cycle, then continue remaining T18 checks from a fresh worktree; no production/main-tree/foreign-project changes.
+- Current checkpoint supersedes the historical next action below: close PR #3865 under user-owned merge authority, then continue remaining T18 checks from a fresh worktree; no production/main-tree/foreign-project changes.
 
 ## Historical checkpoint — PR #3861 before user-owned merge
 
