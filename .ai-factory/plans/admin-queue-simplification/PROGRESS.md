@@ -7,8 +7,8 @@ Merged PR: [#3861](https://github.com/drsapaev/final/pull/3861), merge commit `b
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq17-current-screen/final`
 Branch: `codex/t18-rq17-current-screen`
 Base commit: `bfc33837cd3028f1989b2462a998b16505a62fd6` (`origin/main`)
-Current commit: `7af1d9809d754619d2db17648515ecc4d7bf3012`
-Last updated: 2026-11-04T12:27:59+05:00
+Current commit: `d79763ee4056c31c54057e4678648c3d4392afab`
+Last updated: 2026-11-04T12:56:51+05:00
 
 ## Current checkpoint
 
@@ -18,7 +18,8 @@ Last updated: 2026-11-04T12:27:59+05:00
 - Served-byte provenance: **PASS for three assets**. Browser-captured entry JS, entry CSS and AdminSetupDirections JS each matched the same running frontend container file byte-for-byte. Exact SHA-256 evidence is in `EVIDENCE.md`. The launcher field `served_revision_verified` still says false and was not changed.
 - Teardown: **PASS**; 5 containers, 3 volumes, 1 network removed; remaining counts zero; local images removed. Post-Session Preflight PASS, project ports free. Ubuntu memory was 2439 MiB after Session and recovered to 3195 MiB at post-Session Preflight; host C: free 16 GiB and WSL disk D: free 28 GiB.
 - Scratch cleanup: local policy blocked both removal of the exact task-owned scratch directory and removal of the exact private env file before execution; no deletion occurred. The ignored task folder still contains synthetic credentials and browser artifacts. Do not use this worktree for another staging run until that scratch is removed by an allowed local action.
-- Current exact action: monitor checks on Draft [PR #3865](https://github.com/drsapaev/final/pull/3865). The corrected PR Review Quality Gate, frontend lint/build, security, lifecycle and scratch guards pass; frontend unit and E2E checks remain pending at the latest poll. Fix any red check within this scope. User retains merge authority. Do not deploy.
+- Exact-head checks: GitHub Actions run `41792553945` completed on `d79763ee4056c31c54057e4678648c3d4392afab`. Frontend unit, Frontend e2e, frontend lint/build, PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle, CodeQL, security, Gitleaks, GitGuardian, notifications, and Windows/Ubuntu scratch guards passed. Backend, integration, Docker, staging/production readiness, k6, DAST, parity, metadata, and path-aware context-boundary jobs were skipped, not passed.
+- Current exact action: update the stale PR description/checkpoint, then make [PR #3865](https://github.com/drsapaev/final/pull/3865) Ready for review after the documentation-only commit's applicable checks pass. PR is currently OPEN / Draft / mergeable; merge remains user-owned. Do not deploy.
 - The launcher still reports `served_revision_verified=false`; the independently verified three-file comparison is a separate evidence result, not a change to the launcher marker.
 - T18 remains PARTIAL; scenario 2 and its three-file byte comparison are complete, while scenario 3, scenario 5 live state and scenario 10/full staging runbook remain.
 
@@ -28,8 +29,8 @@ Last updated: 2026-11-04T12:27:59+05:00
 - Allowed tracked paths: `frontend/e2e/rq17-setup-directions-live.spec.ts`, this `PROGRESS.md`, and `EVIDENCE.md`. Allowed ignored operational paths: this task's `.scratch/t18-rq17-current-screen/` env, harness and results. Denied: application/runtime/API/auth/DB/migrations, staging configuration, production, foreign Compose projects, global cleanup, merge and deployment.
 - Reference-only source/runbooks: current Admin setup, QueueResource and QueueProfile managers, Service Catalog, TwoFactor setup, RQ-18 TOTP helper, `AGENTS.md`, `AGENT_SESSION_WORKTREES.md`, `WSL_STAGING_SESSION.md`, and `STAGING_VALIDATION.md`.
 - Changed and verified: staging-only test mode writes browser response bytes and a safe manifest to task-owned scratch. The ignored runner validates project/revision/origin, then uses `docker compose cp` during the Session to compare three files served by the owned frontend container. All three matched; launcher marker remains `false`.
-- Completed: committed the RQ-17 scenario and journals as `7af1d9809d754619d2db17648515ecc4d7bf3012`, pushed the branch, and opened Draft PR #3865. Focused ESLint, Playwright collection, diff checks, and normal commit hooks passed. At the latest check, applicable GitHub workflows were pending.
-- Remaining: complete exact-head CI for #3865, then continue T18 scenario 3 or the live Department state flow in a fresh worktree after this PR cycle closes. T18 remains PARTIAL; do not repeat scenarios 1, 2, 4, or 6–9, the three-asset byte check, or passing PostgreSQL suites.
+- Completed: committed the RQ-17 scenario as `7af1d9809d754619d2db17648515ecc4d7bf3012`, pushed the branch, and opened Draft PR #3865. Focused ESLint, Playwright collection, diff checks, and normal commit hooks passed. The exact-head GitHub checks subsequently completed as recorded above.
+- Remaining: correct the stale PR description, validate and push this journal checkpoint, and finish #3865's review-ready state. After user-owned merge, continue T18 scenario 3 or the live Department state flow in a fresh worktree. T18 remains PARTIAL; do not repeat scenarios 1, 2, 4, or 6–9, the three-asset byte check, or passing PostgreSQL suites.
 - Stop conditions: any required product/auth/DB change, inability to use normal Admin 2FA, unsafe/foreign Compose ownership, launcher reserve/preflight failure, or a test result that depends on runtime behavior beyond the approved T18 outcome.
 - Current checkpoint supersedes the historical next action below: close PR #3865 under user-owned merge authority, then continue remaining T18 checks from a fresh worktree; no production/main-tree/foreign-project changes.
 
