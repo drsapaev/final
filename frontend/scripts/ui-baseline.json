@@ -1,8 +1,8 @@
 {
   "version": 1,
   "description": "UI_AUDIT_PLAN.md Phase 0 baseline. Ratchet: values may only improve (decrease). To move the baseline intentionally run: node scripts/ui-baseline.mjs --write-baseline and justify the change in the PR description.",
-  "generatedAt": "2026-10-23T05:47:04.240Z",
-  "gitCommit": "429e256fc",
+  "generatedAt": "2026-11-04T18:34:17.911Z",
+  "gitCommit": "106597d6",
   "metrics": {
     "tokenSourceFiles": [
       {
@@ -215,15 +215,15 @@
       "--warning-border",
       "--warning-text"
     ],
-    "varUsagesTotal": 12889,
-    "varUsagesNoFallback": 11228,
+    "varUsagesTotal": 12977,
+    "varUsagesNoFallback": 11229,
     "cssHexOutsideTokens": 743,
-    "tsxHex": 381,
+    "tsxHex": 379,
     "tsxHexFiles": 64,
     "inlineStyles": 2240,
     "inlineStyleFiles": 206,
     "cssImportant": 309,
-    "tsxImportant": 47,
+    "tsxImportant": 46,
     "modalFilesOutsideKit": [
       "src/components/ResponsiveModal.tsx",
       "src/components/admin/AppointmentModal.tsx",
