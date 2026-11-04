@@ -13,7 +13,7 @@
 
 import { CheckCircle, Loader2, MoreVertical, Receipt, Undo2, XCircle } from 'lucide-react';
 
-import { Badge, Button, Skeleton } from '../../../components/ui/macos';
+import { AppError, Badge, Button, Skeleton } from '../../../components/ui/macos';
 import { formatUZS } from '../../../utils/formatCurrency';
 import {
   getPaymentStatusMeta,
@@ -26,6 +26,12 @@ import type { CashierSortField, CashierSortDir } from '../cashierPaymentRows';
 
 interface CashierHistoryTableProps {
   historyLoading: boolean;
+  /** CSH-FE-001: last history-read failure (null = last load succeeded).
+   * A failed read must never render as a server-confirmed empty history. */
+  historyError?: string | null;
+  /** CSH-FE-001: retry action for the error/stale banners (panel passes
+   * triggerDataReload). */
+  onRetryLoad?: () => void;
   filteredPayments: CashierPaymentRow[];
   sortField: CashierSortField;
   sortDir: CashierSortDir;
@@ -46,6 +52,8 @@ interface CashierHistoryTableProps {
 
 const CashierHistoryTable = ({
   historyLoading,
+  historyError,
+  onRetryLoad,
   filteredPayments,
   sortField,
   sortDir,
@@ -62,6 +70,17 @@ const CashierHistoryTable = ({
   tI18n,
 }: CashierHistoryTableProps) => {
   const format = formatUZS;
+
+  // CSH-FE-001: a failed read is not a confirmed empty. With rows kept from
+  // the last successful load the banner is a stale-data warning above them;
+  // with no rows at all it replaces the «genuine empty» state entirely.
+  const loadFailed = historyError !== null && historyError !== undefined;
+  const hasRows = filteredPayments.length > 0;
+  const retryAction = onRetryLoad ? (
+    <Button size="small" variant="outline" onClick={onRetryLoad}>
+      {tI18n('cashier.retry_load_btn')}
+    </Button>
+  ) : undefined;
 
   return (
     <div className="cashier-section-gap">
@@ -92,6 +111,27 @@ const CashierHistoryTable = ({
         </table>
       </div>
       ) :
+      (loadFailed && !hasRows) ?
+      (/* CSH-FE-001: failed initial load — error + retry, never the
+          «empty history» state over a dead request. */
+      <AppError
+        title={tI18n('cashier.load_error_title')}
+        description={historyError || tI18n('cashier.load_error_text')}
+        action={retryAction}
+      />
+      ) :
+      <>
+      {loadFailed && hasRows &&
+      (/* CSH-FE-001: failed refresh — kept rows stay visible under a
+          stale-data warning with retry. */
+      <AppError
+        severity="warning"
+        title={tI18n('cashier.load_error_title')}
+        description={[historyError, tI18n('cashier.stale_data_note')].filter(Boolean).join(' ')}
+        action={retryAction}
+        style={{ marginBottom: 'var(--mac-spacing-4)' }}
+      />
+      )}
 
       <div className="cashier-table-scroll">
             <table className="cashier-table">
@@ -245,6 +285,7 @@ const CashierHistoryTable = ({
               </div>
         }
           </div>
+      </>
       }
       </div>
   );

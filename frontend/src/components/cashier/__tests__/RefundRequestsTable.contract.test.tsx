@@ -13,6 +13,7 @@ const readSource = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8'
 const contractsSource = readSource('components/cashier/refundRequestsContracts.ts');
 const hookSource = readSource('components/cashier/useRefundRequests.ts');
 const columnsSource = readSource('components/cashier/refundRequestsColumns.tsx');
+const tableSource = readSource('components/cashier/RefundRequestsTable.tsx');
 
 describe('RefundRequestsTable command contract', () => {
   it('uses the published refund request list filter query name', () => {
@@ -62,5 +63,13 @@ describe('RefundRequestsTable command contract', () => {
 
     expect(renderActionsBlock).not.toContain('request.status === \'pending\'');
     expect(renderActionsBlock).not.toContain('request.status === \'approved\'');
+  });
+
+  it('renders the genuine empty state only after a successful load (CSH-FE-017)', () => {
+    // A failed initial fetch renders the AppError surface; the «no refund
+    // requests» empty state on top of it presented a server error as a
+    // confirmed empty list. The empty state must be error-exclusive.
+    expect(tableSource).toContain('!loading && !error && requests.length === 0');
+    expect(tableSource).not.toContain('!loading && requests.length === 0');
   });
 });

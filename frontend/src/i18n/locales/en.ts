@@ -679,6 +679,13 @@ const en = {
     empty_history_text: 'No payment history for the selected period.',
     empty_history_title: 'No history',
     empty_pending_text: 'No pending payments. All payments are processed.',
+    // CSH-FE-001: load-failure truthfulness banners (error/stale/retry)
+    load_error_title: 'Failed to load data',
+    load_error_text: 'Check your connection and try again.',
+    retry_load_btn: 'Retry',
+    stale_data_note: 'Showing data from the previous load — it may be out of date.',
+    stats_load_error_title: 'Failed to refresh statistics',
+    stats_stale_note: 'The figures shown may be outdated or incomplete.',
     empty_pending_title: 'All done',
     export_btn: 'Export',
     export_failed: 'Failed to export',
