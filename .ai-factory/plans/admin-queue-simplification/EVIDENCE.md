@@ -5847,3 +5847,10 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Limitation: launcher served_revision_verified=false; no exact served-frontend attestation. Full T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Tier-2 remains PARTIAL with no deferral.
 - Relevant result: aggregate statuses and timestamps were copied into this evidence entry; task-owned scratch, harness, PR-body draft, and synthetic env were removed after the PR opened.
 - PR: #3873 open at HEAD `80110ee1ef959c786d0e0b8186cce3f4985a929f`; exact-head Unified CI, Security, Gitleaks, Lifecycle Recommendation, and Agent Workflow Guards were in progress at 2026-11-04T22:06+05:00; PR Review Quality Gate had passed. Merge/deploy: not performed.
+
+## T18 journal PR checkpoint — 2026-11-04T22:10:51+05:00
+
+- PR: #3873 remains open and mergeable. Prior head `41f0ac3b71e7ef93a266f082c81ecb0ed422e4f7` had Unified CI, PR Review Quality Gate, Lifecycle Recommendation, Security, Gitleaks, and Agent Workflow Guards PASS.
+- Scope-aware skips: frontend unit/build/lint/E2E, backend, integration, Docker, staging readiness, production readiness, load, and DAST jobs were SKIPPED for the docs-only diff; these are not reported as PASS.
+- Validation: local PR-body quality gate, `git diff --check`, standard commit hooks, and Gitleaks passed. A final journal checkpoint is being pushed; verify its exact-head checks before merge.
+- Tier-2 remains PARTIAL; `served_revision_verified=false`; full T18 and the complete `STAGING_VALIDATION.md` checklist remain incomplete. Merge/deploy: user-owned; not performed.
