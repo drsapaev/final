@@ -5781,3 +5781,15 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: T18/Tier-2 remains PARTIAL; scenarios 3, 5 live Department state, 10, full `STAGING_VALIDATION.md`, and canonical `served_revision_verified` attestation remain. The task-owned ignored scratch still blocks using this worktree for another staging run.
 - PR: [#3865](https://github.com/drsapaev/final/pull/3865), Ready for review. No merge or deployment.
 - Next exact action: wait for the user-owned merge, verify the resulting `origin/main` commit, then continue remaining T18 work in a fresh isolated worktree without repeating completed scenarios.
+
+## PR #3865 — branch synchronized with main — 2026-11-04T13:44:04+05:00
+
+- Previous PR HEAD: `50b86c511c9bd33ba6cec3f580746ac7cfb34198`; then-current base was `bfc33837cd3028f1989b2462a998b16505a62fd6`.
+- New main: `0df792342a6fd07fa1b9b206d3e91900a51630f4`, merge commit PR #3864 (`fix(payments): server-side idempotency for cashier payment creation`). Its 16 changed files are unrelated to this queue-test PR.
+- Execution mode: safe feature-branch synchronization within the current PR cycle. The task worktree was clean before sync; main and PR branch refs were checked against GitHub before mutation. Production `C:\final`, other worktrees, and the PR head on GitHub were not changed by this local merge.
+- Scope: merge the exact `origin/main` commit into `codex/t18-rq17-current-screen`; then update only `PROGRESS.md` and `EVIDENCE.md` to record the base change. No runtime or test source edits.
+- Actual synchronization: `git merge --no-edit origin/main` completed with no conflicts and created merge commit `41b39493c9e831ad709bb8526e244ff3c7f8337a`.
+- Scope check: `git diff --name-only origin/main...HEAD` still contains only `.ai-factory/plans/admin-queue-simplification/EVIDENCE.md`, `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, and `frontend/e2e/rq17-setup-directions-live.spec.ts`; the payment changes are part of the updated base and are not in the PR diff.
+- Validation so far: repository status clean before the local merge; no-conflict merge result; path diff against new base inspected. Exact-head CI for the post-sync branch is pending; do not count the prior `50b86c5` checks as checks for the new head.
+- PR state before synchronization: #3865 OPEN / Ready for review / mergeable, with exact-head Unified CI PASS on `50b86c5`. No merge or deployment.
+- Remaining: commit the current progress/evidence update, push the sync using normal fast-forward from remote PR HEAD `50b86c5`, and wait for applicable checks on the resulting exact HEAD. Preserve Ready status and user-owned merge authority.
