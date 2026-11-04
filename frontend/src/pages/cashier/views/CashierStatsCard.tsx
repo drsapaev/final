@@ -61,7 +61,7 @@ const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport
               {tI18n('cashier.retry_load_btn')}
             </Button>
           }
-          style={{ marginBottom: 'var(--mac-spacing-4)' }}
+          className="cashier-mb-4"
         />
         )}
         <div className="cashier-stats-grid">

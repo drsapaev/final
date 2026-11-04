@@ -115,7 +115,7 @@ const CashierPendingTable = ({
         title={tI18n('cashier.load_error_title')}
         description={[pendingError, tI18n('cashier.stale_data_note')].filter(Boolean).join(' ')}
         action={retryAction}
-        style={{ marginBottom: 'var(--mac-spacing-4)' }}
+        className="cashier-mb-4"
       />
       )}
       {appointments.length > 0 ?
