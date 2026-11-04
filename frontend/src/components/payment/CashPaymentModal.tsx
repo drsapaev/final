@@ -17,6 +17,7 @@ import {
 } from '../ui/macos';
 import notify from '../../services/notify';
 import { formatUZS } from '../../utils/formatCurrency';
+import { generateCashierClientRequestId } from '../../pages/cashier/cashierPaymentContracts';
 // UX Audit #4 regression fix: inline-стили → CSS-классы (после PR #1910 regression).
 import './CashPaymentModal.css';
 import React from "react";
@@ -75,6 +76,15 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymen
     // the current tick, while `onProcessPayment` is already firing again.
     const [submitting, setSubmitting] = useState(false);
     const submittingRef = useRef(false);
+
+    // Issue 3859 (CSH-FE-008 remainder): server-side idempotency key.
+    // Generated ONCE per modal session (per mount) and reused for every
+    // submit inside the session — a retry after a lost response must send
+    // the SAME key so the server replays the original payment response
+    // instead of charging twice. A deliberate new attempt (modal reopened =
+    // remount) gets a fresh key. Ref, not state: the key must never reset
+    // on re-render and must not trigger one.
+    const clientRequestIdRef = useRef(generateCashierClientRequestId());
 
     // Update amount when appointment changes
     useEffect(() => {
@@ -136,6 +146,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymen
                 amount: Number(paymentData.amount),
                 change_due: changeDue,
                 received_amount: paymentData.method === 'cash' ? numericReceived : numericAmount,
+                client_request_id: clientRequestIdRef.current,
             });
         } catch {
             // The parent owns error surfacing (notify + paymentError state);
