@@ -1,3 +1,68 @@
+## Latest continuation — T18 scenario 5 PostgreSQL existing-token checks passed — 2026-11-04T00:40+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-cabinet-day\final`, branch `codex/t18-cabinet-day`, runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`. PR #3861 remains OPEN / Ready; user owns merge. The current journal-only evidence update is being added to that same PR; verify its resulting exact HEAD and checks before asking for merge.
+
+Three current-source PostgreSQL cases in `test_qr_token_path_owner_eligibility.py` passed **3/3, 0 skipped** (2 warnings). The module fixture reached Alembic head and its unique `rq09c_check_*` database was dropped. The cases cover an existing Doctor token after Department disablement, an available resource-owned legacy token shared by multiple profiles, and fail-closed behavior for an unavailable profile. Scenario 5 remains PARTIAL because its live Department off/on/manual-archive flow has not been rerun.
+
+Infrastructure lesson: a detached PostgreSQL container disappeared when the short WSL command ended. Keeping a WSL shell session alive preserved the exact `--rm` container, made Windows loopback port 15561 reachable, and allowed the focused tests to pass. Afterward the exact container and WSL keeper were stopped, no task-labeled containers/volumes remained, the fixture scratch DB was gone, and the port was closed. No app image was built and no persistent data volume was created.
+
+Gate: the plain mandatory queue-domain gate stopped because the reviewed scope required a known root. The scoped retry named the existing test module's `pg_engine` fixture and all three journals; result `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. The generated prompt was read. This validation is covered by the user's standing T18 authorization; no router/source/test changes.
+
+After committing and pushing this journal-only update to #3861, refresh the PR body with the PostgreSQL 3/3 PASS and verify exact-head CI. Do not start another PR cycle before user merge. After merge, refresh `origin/main` in a fresh worktree and continue the remaining scenario 2, 3, 5-live, and 10 gaps. Do not repeat scenarios 1 or 6–9, or these three PostgreSQL cases. Full T18, `docs/runbooks/STAGING_VALIDATION.md`, and served frontend byte provenance remain incomplete; Tier-2 is PARTIAL, with no deferral accepted.
+
+## Latest continuation — T18 scenario 1 live Admin setup passed — 2026-11-03T23:52+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-cabinet-day\final`, branch `codex/t18-cabinet-day`. PR #3861 remains OPEN / Ready / CLEAN at pre-update HEAD `ef3fc2765e2e39aa262f8a244e6dec8805851f05`, base/runtime source `235b4cbba6bc133e89c44a3ceeb087d227267f9d`. User retains merge authority.
+
+T18 scenario 1 now has a successful live synthetic Admin slice. Canonical Preflight → Start → Session → post-session Preflight passed. Normal Admin password + TOTP enrollment/login passed; two active synthetic cardiology doctors (IDs 4 and 5) were created, then one hidden QueueProfile was created through the Admin UI. The backend read model returned both typed doctor targets and available effective status while QR publication remained false. The clinic-day queue count was zero; no queue or patient admission was created. The first attempt failed only because a scratch-generated profile key contained digits forbidden by the form pattern; correcting the harness produced PASS. Teardown removed 5 containers, 3 volumes, 1 network and local images; zero owned resources remained.
+
+The run used only the owned synthetic project `clinic-aqs-t18-multidoctor-20261103` (ports 18231/18291/55551). Served frontend provenance remains `served_revision_verified=false`. After canonical teardown and zero-resource verification, the user removed the private synthetic `staging.env`; two non-secret harness scripts remain in ignored `.scratch`. Do not attempt alternate deletion methods.
+
+The journal update was committed and pushed to the existing PR #3861 as `315628d98e3112ee0ad047c8a2012ca0ee011111`; the PR body was refreshed. All applicable exact-head checks on that commit passed. Documentation-only path-aware backend/frontend/build/integration/readiness jobs were skipped, not counted as passed. Do not create a second PR cycle, merge, or deploy. Tier-2 remains PARTIAL without deferral; full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete. After the user merges #3861, refresh `origin/main`, reconcile scenarios 2–5 and 10 in a fresh worktree, and address only a distinct remaining gap.
+
+## Latest continuation — T18 scenario 1 backend contract and exact-head CI — 2026-11-03T23:08+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`, branch `codex/t18-cabinet-day`, runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`. PR #3861 is OPEN/Ready/CLEAN at exact HEAD `ec6bc5877d2fbb48de7f4832a667e00b6cc72505`, base `235b4cbba6bc133e89c44a3ceeb087d227267f9d`; user owns merge.
+
+The two focused current-main modules `tests/integration/test_queue_admin_directions_read_model.py` and `tests/integration/test_multi_doctor_same_specialty_isolation.py` passed **24/24** with 6 warnings. `py_compile` also passed. `backend/tests/conftest.py` creates a temporary SQLite file database and unlinks it after the session; the test command set `TESTING=1` and `DATABASE_URL=sqlite:///:memory:` so it could not target a shared or production database. No PostgreSQL, staging, Compose, browser, or product-source test was run.
+
+Gate: mandatory queue-domain gate used `--known-root-cause backend/app/services/queue_admin_directions_read_service.py` with both focused test modules and the three T18 journals in scope. Result `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated prompt was read. Basis: the user's continuing authorization for bounded T18 validation; this slice made no source/test edits. The gate suggested only py_compile, so the focused tests were executed under the already-authorized validation-only override. No gate/router changes.
+
+Hosted checks on exact HEAD: PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle, Python/TypeScript/Actions analysis, security, Gitleaks, GitGuardian, scratch guards, notifications and CodeQL PASS. Path-aware backend/frontend/integration/readiness jobs were SKIPPED for the documentation-only changes, not counted as PASS. The first PR Review Quality Gate run failed because `Clean workspace` was unlabeled in the body; that field was added and the final gate passed.
+
+Status: related backend behavior is PASS, but T18 scenario 1 remains `IN_PROGRESS`: no live Admin setup evidence yet for one new direction containing multiple doctors of the same specialty. Related prior evidence for scenarios 2–5 and 10 is commit-anchored to separate acceptance slices; it is not full integrated T18. Tier-2 and `docs/runbooks/STAGING_VALIDATION.md` remain PARTIAL/incomplete, with no deferral accepted.
+
+The only pushed change is journal evidence in PR #3861; no runtime/test code or staging project changed. Next: wait for user-owned merge. After confirmation, refresh `origin/main` in a fresh worktree, reconcile prior evidence for scenarios 2–5 and 10, and select only a distinct uncovered acceptance gap. Do not repeat scenarios 6–9.
+
+## Latest continuation — T18 scenarios 8–9 quota/replay PostgreSQL acceptance — 2026-11-03T22:47+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`, branch `codex/t18-cabinet-day`, runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`.
+
+T18 scenarios 8–9 passed for the tested backend contracts. Seven explicit PostgreSQL 17.11 integration tests passed: concurrent token and GraphQL last-slot admission, exact token retry, QR lost-response replay, single and multi-join rollback, and partial-result replay/conservation. Seven SQLite-fixture unit tests passed for public/QR availability and queue-limits remaining-count reporting. The first unit invocation collected 0 due repo-root-prefixed paths; corrected backend-relative paths passed. No source or tracked-test code changed.
+
+The gate first stopped because reviewed scope required a known owner. Retry with `--known-root-cause backend/tests/integration/test_daily_queue_lock_parity_pg.py` returned `narrow_override` (`gate_misroute=true`, `override_used=true`, handoff required); generated prompt was read. The user's standing T18 validation authorization covered this exact evidence-only scope.
+
+PostgreSQL ran in one owned tmpfs-only container, loopback port 55541, cached image, no persistent mount. The exact container was stopped and auto-removed; its port is free and WSL had 3185 MiB available afterward. No production/shared DB or foreign Docker resources were touched.
+
+PR #3861 remains open/Ready for review with the scenario 8–9 journal commit pushed and the description updated; it has not been merged. The first body-triggered PR Review Quality Gate failed because required field labels were absent; the labels were added and checks are rerunning. Verify the latest exact-head checks, then wait for user-owned merge. Do not create a new PR cycle before user merge. After merge, reconcile previous evidence for T18 scenarios 1–5 and 10 and select only a distinct uncovered case. Tier-2 remains PARTIAL, no deferral is accepted, and full `docs/runbooks/STAGING_VALIDATION.md` is not complete.
+
+Scratch note `/.scratch/t18-cabinet-validation-prework-20261103.md` records the gate, path correction, startup retry and exact scope. Preserve it; do not retry passed scenarios 6–9 absent a source change.
+
+## Previous continuation — T18 scenario 7 cabinet acceptance — 2026-11-03
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-cabinet-day/final`, branch `codex/t18-cabinet-day`, based on current `origin/main` and runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`.
+
+T18 scenario 7 passed in synthetic project `clinic-aqs-t18-cabinet-20261103-1` (owner `codex-t18-cabinet-day`, ports 18131/18191/55531). Ordinary Admin password + TOTP passed. Current-day typed Doctor preview passed; stale apply returned HTTP 409 without a state or audit change; fresh preview/apply passed. Final assertions confirmed cabinet `T18-FINAL`, unchanged queue identity and owner default, and exactly two expected Admin audit records.
+
+Canonical Preflight → Start → Session passed. Session removed the owned 5 containers, 3 volumes and 1 network; independent inventory found zero owned resources and free ports. WSL available memory after teardown was 3239 MiB. Existing PostgreSQL evidence `test_queue_cabinet_reassignment_apply_pg.py` is 8/8 PASS and its source/test blobs match current main; reuse it for audit rollback and clinical-block assertions, do not rerun without a source change.
+
+No app/runtime/test/staging configuration changes. `served_revision_verified=false`; this is not frontend byte-provenance evidence. Tier-2 remains PARTIAL; full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete; no deferral is claimed. User owns merge; never merge/deploy.
+
+Host policy rejected deletion of this run's five exact task-owned harness/env files and the separate DevBrain capture JSON before execution. All six remain under ignored `.scratch`; do not bypass this protection.
+
+Current next action: PR #3861 is open and Ready for review from `codex/t18-cabinet-day`; verify its exact HEAD and applicable CI, then wait for user-owned merge. After merge, refresh main in a fresh worktree and select one distinct uncovered T18 case. Do not repeat scenario 6, scenario 7, or the unchanged cabinet PG suite.
+
+
 ## Latest continuation — T18.6 defaults/snapshot synthetic acceptance — 2026-11-02T11:05:59+05:00
 
 Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 from branch codex/t18-defaults-evidence, based on fresh origin/main fb5fc995c80875b478929716515be8810523f6b7. PR #3805 is merged at bb010816b2e30e3b70cf14e73fb6e0626dee247f. Runtime evidence is anchored to exact clean commit dc39b0f0fd1217c8d5ac585c6aee9256e9defbc4.
@@ -1566,3 +1631,11 @@ On the exact 0513 HEAD, the uncovered live T18 scenario-10 setup-context slice p
 Canonical Session teardown removed 5 containers, 3 volumes, 1 network and local project images; zero project resources remained. Independent inventory confirmed zero owned containers/volumes/networks and ports 18896/18897/15540 closed. Post-session Preflight passed. No runtime, tracked test, production, auth policy, patient-data or foreign-project changes occurred. Gate result was the previously authorized validation-only `narrow_override`, `gate_misroute=false`, `override_used=true`; generated prompt was read.
 
 Tier-2 remains PARTIAL: full integrated T18 and `docs/runbooks/STAGING_VALIDATION.md` are incomplete; no deferral is claimed. Do not repeat prior queue-system 6/6, Admin navigation/panel 3/3 + 2/2, RQ18 8/8, R5 static-file comparison 261/261, or this route-context browser scenario. The Docker project and ports were fully cleaned. The desktop policy rejected deletion of this run's generated harness files before execution, so they remain in the two task-owned ignored folders recorded in the checkpoint. Next: finish the three-journal checkpoint, commit/push it to existing PR #3805, update the PR body and verify exact-head CI. After user merge, proceed with a different unverified T18 item only.
+
+## Latest continuation — T18 scenario 5 unit PASS; PostgreSQL fixture NOT_RUN — 2026-11-04T00:24+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-cabinet-day\final`, branch `codex/t18-cabinet-day`. PR #3861 remains OPEN / Ready / CLEAN at `f83ee906852c4ec9dc8068cbff25f012587cd070`; exact-head applicable checks pass, while product jobs are path-skipped for the docs-only diff. User retains merge authority.
+
+On runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`, current-source SQLite unit tests `test_queue_token_parent_recheck.py` and `test_qr_available_specialists.py` passed 11/11 (2 warnings). Three PostgreSQL cases for disabled-parent direct tokens and resource-owned legacy-token positive/negative behavior remain NOT_RUN: a private tmpfs-only PostgreSQL container was reachable, but the attempt logged `alembic_version` missing and produced no target-test result before it was stopped. The exact Alembic failure remains undiagnosed. The exact owned containers were removed and port 15561 is closed. User removed the private staging env and four remaining scratch files.
+
+Tier-2 remains PARTIAL; no deferral is claimed. The remaining evidence gaps are scenario 2 resource-only onboarding, scenario 3 broad incomplete-configuration actions, scenario 5 current-source PostgreSQL/live behavior, scenario 10 all legacy URLs/profile key/409 guard, full `STAGING_VALIDATION.md`, and byte-level frontend provenance. Do not repeat scenarios 1 or 6–9. Next: after user merge of #3861, refresh `origin/main` in a fresh worktree and combine the remaining scenario 2/5/10 checks into one isolated synthetic validation cycle. Do not merge or deploy.
