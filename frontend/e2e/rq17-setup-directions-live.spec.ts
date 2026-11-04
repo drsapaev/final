@@ -451,16 +451,21 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   );
   const doctorRouteCandidate = specialtyItems.flatMap((specialty) => {
     const specialtyCode = specialty.code.trim().toLowerCase();
-    if (!specialtyCode || usedDoctorSpecialties.has(specialtyCode) || resourceRouteTags.includes(specialtyCode)) {
+    if (!specialtyCode || usedDoctorSpecialties.has(specialtyCode)) {
       return [];
     }
-    const matchingProfiles = existingProfiles.filter((profile) =>
-      profile.is_active !== false
-      && typeof profile.show_on_qr_page === 'boolean'
-      && (profile.queue_tags?.[0] || profile.key)?.trim().toLowerCase() === specialtyCode,
-    );
+    const activeProfiles = existingProfiles.filter((profile) => profile.is_active !== false);
+    const keyMatches = activeProfiles.filter((profile) => profile.key?.trim().toLowerCase() === specialtyCode);
+    const matchingProfiles = keyMatches.length > 0
+      ? keyMatches
+      : activeProfiles.filter((profile) =>
+        (profile.queue_tags || []).some((tag) => tag.trim().toLowerCase() === specialtyCode),
+      );
     if (matchingProfiles.length !== 1) return [];
     const profile = matchingProfiles[0];
+    if (typeof profile.show_on_qr_page !== 'boolean') return [];
+    const queueTag = profile.queue_tags?.[0] || profile.key || '';
+    if (!queueTag || resourceRouteTags.includes(queueTag.trim().toLowerCase())) return [];
     const direction = initialFacts.directions.find((item) => item.profile.key === profile.key);
     if (!direction
       || direction.effective_availability !== 'available'
@@ -468,16 +473,18 @@ test('current setup screen resolves Doctor and QueueResource directions through 
       || direction.booking_targets.length > 0) {
       return [];
     }
-    return [{ specialty, profile }];
+    return [{ specialty, profile, queueTag }];
   })[0];
   const routeReadiness = doctorRouteCandidate ? [] : specialtyItems.map((specialty) => {
       const code = specialty.code.trim().toLowerCase();
       const profiles = existingProfiles
-        .filter((profile) => (profile.queue_tags?.[0] || profile.key)?.trim().toLowerCase() === code)
+        .filter((profile) => profile.key?.trim().toLowerCase() === code
+          || (profile.queue_tags || []).some((tag) => tag.trim().toLowerCase() === code))
         .map((profile) => {
           const direction = initialFacts.directions.find((item) => item.profile.key === profile.key);
           return {
             key: profile.key,
+            serviceQueueTag: profile.queue_tags?.[0] || profile.key,
             active: profile.is_active !== false,
             published: profile.show_on_qr_page,
             state: direction?.configuration_state,
@@ -496,7 +503,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
     doctorRouteCandidate,
     `synthetic staging needs one available QueueProfile route for a canonical Doctor specialty; route candidates: ${JSON.stringify(routeReadiness)}`,
   ).toBeDefined();
-  const { specialty: doctorSpecialty, profile: doctorProfile } = doctorRouteCandidate!;
+  const { specialty: doctorSpecialty, profile: doctorProfile, queueTag: doctorQueueTag } = doctorRouteCandidate!;
   const doctorProfileTitle = queueProfileTitle(doctorProfile);
   expect(doctorProfileTitle, 'selected QueueProfile should have a visible Admin label').not.toBe('');
   const doctorName = 'SYNTHETIC-RQ17 Doctor ' + suffix;
@@ -571,7 +578,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
     name: 'Synthetic RQ-17 Doctor service ' + suffix,
     profileKey: doctorProfile.key!,
     queueProfiles: catalogQueueProfiles,
-    queueTag: doctorSpecialty.code,
+    queueTag: doctorQueueTag,
     doctorSpecialty: doctorSpecialty.code,
     doctorId,
   });
@@ -612,7 +619,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   expectDoctorDirectionState(directionForKey(facts, doctorProfile.key!), {
     key: doctorProfile.key!,
     ownerId: doctorId,
-    queueTag: doctorSpecialty.code,
+    queueTag: doctorQueueTag,
   }, doctorPublishedBeforeSetup);
   expectDirectionState(directionForKey(facts, profileKey), {
     key: profileKey,
@@ -629,7 +636,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   expectDoctorDirectionState(directionForKey(facts, doctorProfile.key!), {
     key: doctorProfile.key!,
     ownerId: doctorId,
-    queueTag: doctorSpecialty.code,
+    queueTag: doctorQueueTag,
   }, true);
   expectDirectionState(directionForKey(facts, profileKey), {
     key: profileKey,
@@ -644,7 +651,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   expectDoctorDirectionState(directionForKey(facts, doctorProfile.key!), {
     key: doctorProfile.key!,
     ownerId: doctorId,
-    queueTag: doctorSpecialty.code,
+    queueTag: doctorQueueTag,
   }, true);
   expectDirectionState(directionForKey(facts, profileKey), {
     key: profileKey,
