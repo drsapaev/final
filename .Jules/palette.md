@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-11-04 - MacOSTab keyboard focus states
+**Learning:** The MacOSTab component had inline styles that enforced `outline: 'none !important'`, entirely disabling focus rings for keyboard users and violating accessibility guidelines.
+**Action:** Removed `!important` overrides and added `:focus-visible` states using `<style>` injection with the standard `color-mix` outline token, restoring keyboard navigation visibility while preserving mouse interaction styling.
