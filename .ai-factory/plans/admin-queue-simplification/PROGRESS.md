@@ -8,7 +8,7 @@ Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq17-current-screen/final`
 Branch: `codex/t18-rq17-current-screen`
 Base commit: `bfc33837cd3028f1989b2462a998b16505a62fd6` (`origin/main`)
 Current commit: `7af1d9809d754619d2db17648515ecc4d7bf3012`
-Last updated: 2026-11-04T12:21:08+05:00
+Last updated: 2026-11-04T12:27:59+05:00
 
 ## Current checkpoint
 
@@ -18,7 +18,7 @@ Last updated: 2026-11-04T12:21:08+05:00
 - Served-byte provenance: **PASS for three assets**. Browser-captured entry JS, entry CSS and AdminSetupDirections JS each matched the same running frontend container file byte-for-byte. Exact SHA-256 evidence is in `EVIDENCE.md`. The launcher field `served_revision_verified` still says false and was not changed.
 - Teardown: **PASS**; 5 containers, 3 volumes, 1 network removed; remaining counts zero; local images removed. Post-Session Preflight PASS, project ports free. Ubuntu memory was 2439 MiB after Session and recovered to 3195 MiB at post-Session Preflight; host C: free 16 GiB and WSL disk D: free 28 GiB.
 - Scratch cleanup: local policy blocked both removal of the exact task-owned scratch directory and removal of the exact private env file before execution; no deletion occurred. The ignored task folder still contains synthetic credentials and browser artifacts. Do not use this worktree for another staging run until that scratch is removed by an allowed local action.
-- Current exact action: monitor exact-head checks on Draft [PR #3865](https://github.com/drsapaev/final/pull/3865), currently pending; fix any red check within this scope. User retains merge authority. Do not deploy.
+- Current exact action: monitor checks on Draft [PR #3865](https://github.com/drsapaev/final/pull/3865). The corrected PR Review Quality Gate, frontend lint/build, security, lifecycle and scratch guards pass; frontend unit and E2E checks remain pending at the latest poll. Fix any red check within this scope. User retains merge authority. Do not deploy.
 - The launcher still reports `served_revision_verified=false`; the independently verified three-file comparison is a separate evidence result, not a change to the launcher marker.
 - T18 remains PARTIAL; scenario 2 and its three-file byte comparison are complete, while scenario 3, scenario 5 live state and scenario 10/full staging runbook remain.
 

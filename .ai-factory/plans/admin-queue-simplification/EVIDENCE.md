@@ -5740,3 +5740,12 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: this RQ-17 slice is validated and submitted for review. Overall T18/Tier-2 remains PARTIAL; no deferral is claimed. Remaining work includes scenario 3, scenario 5 live Department off/on/manual archive, scenario 10, full `docs/runbooks/STAGING_VALIDATION.md`, and canonical `served_revision_verified` attestation.
 - Cleanup limitation: the owned synthetic Compose stack was removed and ports verified free, but local policy prevented deleting only this task's ignored scratch directory and private synthetic env. The exact path is recorded in `PROGRESS.md`; no values were logged or committed. Do not rerun staging from this worktree until cleanup is permitted.
 - Next exact action: wait for exact-head CI on #3865; repair red checks in this PR. After the PR cycle closes under user merge authority, continue T18 from a fresh worktree without repeating completed scenario 2 or its asset comparison.
+
+## PR #3865 — PR body quality gate corrected — 2026-11-04T12:27+05:00
+
+- PR HEAD at the first gate failure and body correction: `fc302ca4c51c040afe77df5c23a5450b92696158`.
+- Original result: PR Review Quality Gate failed because the `Validation` section lacked the required `Targeted tests or smoke run`, `Result`, and `Not checked` fields. The failure was in PR metadata only; no source or test failure was reported.
+- Correction: added those three fields with the actual focused checks, staging result, and explicit remaining NOT_CHECKED items. PR description updated; no tracked files other than the existing T18 journals were affected.
+- Local validation: `scripts/run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py','--body-env','PR_BODY')` PASS; 19 validator tests and both sample bodies PASS; current PR body PASS.
+- GitHub after the correction: PR Review Quality Gate PASS; frontend lint/build, CodeQL, security, Gitleaks, GitGuardian, scratch guards, CI Scope, and lifecycle checks PASS. Frontend unit and E2E checks were still pending at the latest poll; path-aware skipped jobs remain SKIPPED, not PASS.
+- Next: wait for final frontend unit/E2E results on the current exact PR HEAD. If green, report the Draft PR and remaining Tier-2 limits; no merge or deployment.
