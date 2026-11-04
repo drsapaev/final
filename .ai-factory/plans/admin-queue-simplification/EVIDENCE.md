@@ -5861,3 +5861,14 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Unified CI, PR Review Quality Gate, Lifecycle Recommendation, Security, Gitleaks, and Agent Workflow Guards: PASS.
 - Unified CI path-aware frontend/backend/integration/Docker/staging/production/load/DAST jobs: SKIPPED for docs-only scope; not PASS.
 - A final checkpoint update is being added to PROGRESS.md / EVIDENCE.md / RESUME.md. Recheck the resulting exact PR head before reporting it ready for user-owned merge.
+
+## T18 PR #3873 exact-head status rechecked — 2026-11-04T22:36+05:00
+
+- Environment: GitHub `drsapaev/final`; local evidence worktree `aqs-t18-combined-validation`.
+- PR state: #3873 OPEN, Ready for review, mergeable; exact HEAD `c00f84920d572c24a4ea413199700a4d7a1fc462`; base and current `origin/main` `64a7c0b9ce422bbdac73d919158eb525669d9229`.
+- Applicable checks: PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle recommendation, security scan, Gitleaks, CodeQL, GitGuardian, Windows/Ubuntu scratch guards, and Python/TypeScript/Actions analysis PASS.
+- Path-aware checks: frontend build/unit/lint/E2E, backend, integration, Docker, staging/production readiness, load, DAST, and other product checks SKIPPED for the journal-only diff; none are counted as PASS.
+- PR #3865 reconciliation: the supplied review referred to older HEAD `4aa1857eee`. GitHub confirms #3865 merged with final code HEAD `290d8f6d960c6207f4118783a1d48775c99ef41e` at merge commit `64a7c0b9ce422bbdac73d919158eb525669d9229`; both reported P2 findings were fixed and resolved before merge. No follow-up source change is needed.
+- Scope: read-only status verification; no code, tests, staging resources, review threads, merge, or deployment changed.
+- Remaining limitation: T18/Tier-2 remains PARTIAL; full `docs/runbooks/STAGING_VALIDATION.md` is incomplete and exact current served-frontend provenance remains NOT_RUN (`served_revision_verified=false`). No deferral is claimed.
+- Next: user-owned merge of #3873. After merge, refresh `origin/main` and reconcile T18 scenario evidence without repeating completed checks.

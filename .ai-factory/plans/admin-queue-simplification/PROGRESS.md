@@ -2,23 +2,23 @@
 
 Plan version: 1.0
 Current task: T18 scenarios 3, 5, and 10 — combined synthetic validation after PR #3865
-Current status: PR_OPEN; latest checkpoint recheck pending
+Current status: PR_OPEN; exact-head status verified
 Merged PRs: #3861 at bfc33837cd3028f1989b2462a998b16505a62fd6; #3865 at 64a7c0b9ce422bbdac73d919158eb525669d9229
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final
 Branch: codex/t18-combined-validation
 Base commit: origin/main 64a7c0b9ce422bbdac73d919158eb525669d9229
 Current commit: source under validation 64a7c0b9ce422bbdac73d919158eb525669d9229; journal PR #3873
-Last updated: 2026-11-04T22:14:36+05:00
+Last updated: 2026-11-04T22:36:28+05:00
 Tier-2: PARTIAL; no deferral accepted. User retains merge and deployment authority.
 
 ## Current checkpoint
 
 - Completed: one canonical synthetic Start to Session run on exact source commit 64a7c0b9ce422bbdac73d919158eb525669d9229. Normal synthetic Admin password plus TOTP PASS. Scenario 3 incomplete configuration to ownership action to resource target to explicit publish to ready/public PASS. Scenario 5 Department off/on with manual profile archive persistence PASS. Scenario 10 all four legacy Admin URLs PASS; linked synthetic QueueProfile DELETE returned 409 and the profile remained present.
 - Cleanup: Session teardown PASS; removed 5 containers, 3 volumes, 1 network and Compose-local images; remaining owned containers, volumes and networks 0. First post-Session Preflight detected a transient local listener on port 18987; no process was stopped. A follow-up canonical Preflight passed with no warnings and all ports available.
-- Changed but not verified: the newest checkpoint commit needs exact-head CI. On prior PR head 86910e96f42b35b01ecf016d290a15101a890db0, Unified CI, PR Review Quality Gate, Lifecycle Recommendation, Security, Gitleaks, and Agent Workflow Guards passed; path-aware frontend/backend/E2E/staging jobs were skipped for docs-only scope. Local body gate, diff checks, hooks, and gitleaks passed.
+- Verified: exact PR HEAD `c00f84920d572c24a4ea413199700a4d7a1fc462`, base `64a7c0b9ce422bbdac73d919158eb525669d9229`; PR #3873 is OPEN, Ready for review, and mergeable. PR Required Gate, PR Review Quality Gate, CI Scope, Lifecycle Recommendation, Security, Gitleaks, CodeQL, GitGuardian, scratch guards, and language analysis checks PASS. Path-aware frontend/backend/integration/Docker/staging/production/load/DAST jobs are SKIPPED for the docs-only diff, not PASS.
 - Remaining: full docs/runbooks/STAGING_VALIDATION.md checklist is incomplete; exact current served frontend revision attestation remains NOT_RUN because launcher served_revision_verified=false. Prior asset comparisons remain separately anchored to earlier commits.
 - Blocker: none for this bounded slice. Overall T18/Tier-2 remains PARTIAL by user direction.
-- Next exact action: verify checks on the latest pushed checkpoint commit in PR #3873 and confirm it remains mergeable; if green, report it for user-owned merge. Do not deploy or claim Tier-2 complete.
+- Next exact action: user-owned merge of PR #3873. After merge, refresh `origin/main` and reconcile the final T18 matrix before selecting any remaining validation. Do not deploy or claim full Tier-2; the runbook remains incomplete and `served_revision_verified=false`.
 
 ## Historical checkpoint — T18 scenario 2 before PR #3865 merge
 

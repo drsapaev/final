@@ -1,11 +1,12 @@
-## Current resume — PR #3873 final journal checkpoint — 2026-11-04T22:14:36+05:00
+## Current resume — PR #3873 exact-head verification — 2026-11-04T22:36+05:00
 
-Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final, branch codex/t18-combined-validation. Source under validation and base are 64a7c0b9ce422bbdac73d919158eb525669d9229; PR #3865 is merged at this commit. Journal-only PR #3873 is open. Head 86910e96f42b35b01ecf016d290a15101a890db0 passed Unified CI, PR Review Quality Gate, lifecycle, security, Gitleaks, and workflow guards; product/staging jobs were SKIPPED. Verify checks again after this final checkpoint update is pushed.
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. PR #3865 is merged at `64a7c0b9ce422bbdac73d919158eb525669d9229`; its final reviewed code HEAD was `290d8f6d960c6207f4118783a1d48775c99ef41e`. The two P2 findings in the supplied older review were fixed and resolved before merge.
 
-Targeted T18 scenarios 3, 5-live and 10 passed in one canonical synthetic Start to Session run. Normal Admin password plus TOTP passed. Session teardown removed its own project resources and local images; post-session Preflight passed after a transient port 18987 signal cleared. Full T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete; served_revision_verified is still false; Tier-2 remains PARTIAL with no deferral.
+PR #3873 is OPEN, Ready for review, and mergeable at HEAD `c00f84920d572c24a4ea413199700a4d7a1fc462`, based on `64a7c0b9ce422bbdac73d919158eb525669d9229`. Current applicable checks PASS: PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle, security, Gitleaks, CodeQL, GitGuardian, scratch guards, and language analysis. Path-aware app/build/test/integration/Docker/staging/readiness/load/DAST jobs are SKIPPED for the docs-only diff, not PASS.
 
-The journal-only change is limited to PROGRESS.md, EVIDENCE.md, and RESUME.md. Local PR-body quality gate, diff check, standard commit hooks, and gitleaks passed. Task-owned staging scratch/env files were removed after the result was recorded. Verify exact-head checks after the latest checkpoint push; if green, report PR #3873 for user-owned merge. Do not merge/deploy, repeat completed scenarios, rerun scenario 2 or its prior static-byte comparison, or claim full system validation. Tier-2 remains PARTIAL; served_revision_verified=false.
+The combined synthetic run on exact runtime source `64a7c0b9` passed T18 scenarios 3, 5-live, and 10 with ordinary Admin password + TOTP and owned teardown. Earlier scenario evidence remains in `EVIDENCE.md`. Full T18 is not claimed complete: full `STAGING_VALIDATION.md` remains incomplete and exact current served-frontend provenance remains NOT_RUN (`served_revision_verified=false`). Tier-2 remains PARTIAL, with no deferral.
 
+No code, tests, or staging resources changed in this checkpoint. Do not merge or deploy. Next: wait for the user-owned merge of #3873; then refresh `origin/main` and reconcile the full T18 plan/evidence matrix before any further validation.
 ---
 ## Latest continuation — T18 scenario 5 PostgreSQL existing-token checks passed — 2026-11-04T00:40+05:00
 
