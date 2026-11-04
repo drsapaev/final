@@ -720,6 +720,13 @@ const uzCyrl = {
     pagination_info: 'Страница {current} из {total} (Всего: {total_items})',
     empty_pending_title: 'Все платежи обработаны',
     empty_pending_text: 'Новых записей, ожидающих оплаты, нет.',
+    // CSH-FE-001: load-failure truthfulness banners (error/stale/retry)
+    load_error_title: 'Маълумотларни юклашда хатолик',
+    load_error_text: 'Уланишни текшириб, қайта уриниб кўринг.',
+    retry_load_btn: 'Қайта уриниш',
+    stale_data_note: 'Олдинги юкламадаги маълумотлар кўрсатилган — улар эскирган бўлиши мумкин.',
+    stats_load_error_title: 'Статистикани янгилашда хатолик',
+    stats_stale_note: 'Кўрсатилган кўрсаткичлар эскирган ёки тўлиқ бўлмаслиги мумкин.',
     open_history_btn: 'Открыть историю платежей',
     payment_history_date_aria: 'Дата и время платежа в истории',
     confirm_payment_aria: 'Подтвердить платёж',

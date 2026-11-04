@@ -16,7 +16,7 @@
  * POST /force-majeure/refund-requests/{id}/process.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
@@ -31,8 +31,16 @@ export const useRefundRequests = (t: RefundTranslationFn, onRefresh?: () => void
   const [processingId, setProcessingId] = useState<string | number | null>(null);
   const [filter, setFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected' | 'completed'
 
+  // CSH-FE-015: request epoch — only the latest load may write
+  // requests/loading/error. The effect cleanup bumps the counter, so a
+  // response landing after its request was superseded (filter change or
+  // unmount) is dropped BEFORE touching state; a late rejection of a
+  // superseded request must not raise a misleading error banner either.
+  const loadEpochRef = useRef(0);
+
   // Load refund requests
   const loadRequests = useCallback(async () => {
+    const myEpoch = ++loadEpochRef.current;
     setLoading(true);
     setError(null);
 
@@ -43,18 +51,29 @@ export const useRefundRequests = (t: RefundTranslationFn, onRefresh?: () => void
       }
 
       const response = await api.get('/force-majeure/refund-requests', { params });
+      if (loadEpochRef.current !== myEpoch) return; // superseded/unmounted
+
       const data = response.data as RefundRequest[] | { requests?: RefundRequest[] };
       setRequests(Array.isArray(data) ? data : data.requests || []);
     } catch (err) {
+      if (loadEpochRef.current !== myEpoch) return;
       logger.error('[RefundRequestsTable] Error loading requests:', err);
+      // CSH-FE-001 convention: keep the previously loaded list — a failed
+      // read is not a confirmed empty list.
       setError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (loadEpochRef.current === myEpoch) {
+        setLoading(false);
+      }
     }
   }, [filter]);
 
   useEffect(() => {
     loadRequests();
+    // Capture the ref OBJECT (not .current) for the cleanup: bumping the
+    // epoch invalidates any in-flight load on supersede/unmount.
+    const epochRef = loadEpochRef;
+    return () => { epochRef.current += 1; };
   }, [loadRequests]);
 
   const processRefundRequest = async (

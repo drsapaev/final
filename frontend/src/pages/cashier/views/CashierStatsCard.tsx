@@ -7,7 +7,7 @@
  * tabs (Nielsen #8 — aesthetic and minimalist design + IA separation).
  */
 
-import { Card, Button } from '../../../components/ui/macos';
+import { AppError, Card, Button } from '../../../components/ui/macos';
 import { formatUZS } from '../../../utils/formatCurrency';
 import type { CashierStatsSnapshot } from '../useCashierWorklistData';
 import type { CashierTranslationFn } from '../cashierPaymentContracts';
@@ -16,6 +16,10 @@ interface CashierStatsCardProps {
   /** Metrics switch shape by tab (history shows the full grid). */
   isHistoryTab: boolean;
   stats: CashierStatsSnapshot;
+  /** CSH-FE-001: last stats-read failure (null = last load succeeded).
+   * The previous snapshot stays visible under a warning banner — its
+   * values are stale/unknown, not server-confirmed zeros. */
+  statsError?: string | null;
   onRefresh: () => void;
   onExport: () => void;
   onHourlyStats: () => void;
@@ -33,7 +37,7 @@ interface CashierStatsCardProps {
 const formatMoneyOrDash = (value: number | undefined | null): string =>
   typeof value === 'number' && Number.isFinite(value) ? formatUZS(value) : '—';
 
-const CashierStatsCard = ({ isHistoryTab, stats, onRefresh, onExport, onHourlyStats, tI18n }: CashierStatsCardProps) => {
+const CashierStatsCard = ({ isHistoryTab, stats, statsError, onRefresh, onExport, onHourlyStats, tI18n }: CashierStatsCardProps) => {
   const format = formatUZS;
 
   return (
@@ -44,6 +48,22 @@ const CashierStatsCard = ({ isHistoryTab, stats, onRefresh, onExport, onHourlySt
           Nielsen #8 (эстетический и минималистичный дизайн) + IA-разделение.
           Скрытые плитки (visibility:hidden) удалены — визуальный шум устранён. */}
       <Card variant="outlined" className="cashier-stats-card">
+        {statsError !== null && statsError !== undefined &&
+        (/* CSH-FE-001: failed stats read — the tiles below stay from the
+            previous load (or the legacy zeros before the first success) and
+            must not read as freshly confirmed numbers. */
+        <AppError
+          severity="warning"
+          title={tI18n('cashier.stats_load_error_title')}
+          description={[statsError, tI18n('cashier.stats_stale_note')].filter(Boolean).join(' ')}
+          action={
+            <Button size="small" variant="outline" onClick={onRefresh}>
+              {tI18n('cashier.retry_load_btn')}
+            </Button>
+          }
+          className="cashier-mb-4"
+        />
+        )}
         <div className="cashier-stats-grid">
           {isHistoryTab ?
           <>

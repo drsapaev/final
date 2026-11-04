@@ -20,7 +20,7 @@
  *  - successful process reloads the list and calls onRefresh
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 
 const apiMocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -145,5 +145,78 @@ describe('useRefundRequests (PR-UI-14-6, CSH-FE-011/012 shared client)', () => {
     expect(notifyMocks.error.mock.calls[0][0]).toContain('Недостаточно прав');
     // the list is NOT reloaded after a failed command and onRefresh is not fired
     expect(apiMocks.get).toHaveBeenCalledTimes(1);
+  });
+});
+
+// CSH-FE-015: concurrent refund-list requests have no freshness guard.
+// Fail-first proven on the pre-fix source: loadRequests wrote
+// requests/loading/error unconditionally after `await`, so a slow response
+// for a superseded status filter overwrote the newer list (and a late
+// rejection of the superseded request raised a misleading error banner).
+describe('useRefundRequests — CSH-FE-015 freshness guard', () => {
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
+  it('drops a late response for a superseded status filter', async () => {
+    const a = deferred<unknown>();
+    const b = deferred<unknown>();
+    apiMocks.get.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
+
+    const { result } = renderHook(() => useRefundRequests(t));
+    await waitFor(() => expect(apiMocks.get).toHaveBeenCalledTimes(1));
+
+    act(() => { result.current.setFilter('pending'); });
+    await waitFor(() => expect(apiMocks.get).toHaveBeenCalledTimes(2));
+
+    await act(async () => { b.resolve({ data: [{ id: 9, status: 'pending' }] }); });
+    await waitFor(() => expect(result.current.requests).toEqual([{ id: 9, status: 'pending' }]));
+    expect(result.current.loading).toBe(false);
+
+    // The OLD filter's response lands after the new one — it must be dropped.
+    await act(async () => { a.resolve({ data: [{ id: 1, status: 'pending' }, { id: 2, status: 'approved' }] }); });
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.requests).toEqual([{ id: 9, status: 'pending' }]);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('a superseded request failure does not raise an error or clear the newer list', async () => {
+    const a = deferred<unknown>();
+    apiMocks.get.mockReturnValueOnce(a.promise).mockResolvedValueOnce({ data: [{ id: 5, status: 'approved' }] });
+
+    const { result } = renderHook(() => useRefundRequests(t));
+    await waitFor(() => expect(apiMocks.get).toHaveBeenCalledTimes(1));
+
+    act(() => { result.current.setFilter('approved'); });
+    await waitFor(() => expect(result.current.requests).toEqual([{ id: 5, status: 'approved' }]));
+
+    await act(async () => { a.reject(axiosLikeError(500, 'late failure')); });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.requests).toEqual([{ id: 5, status: 'approved' }]);
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('keeps the previously loaded list when a filter switch fails (stale rows + error, not a fake empty)', async () => {
+    apiMocks.get
+      .mockResolvedValueOnce({ data: [{ id: 1, status: 'pending' }] })
+      .mockRejectedValueOnce(axiosLikeError(503, 'unavailable'));
+
+    const { result } = renderHook(() => useRefundRequests(t));
+    await waitFor(() => expect(result.current.requests).toEqual([{ id: 1, status: 'pending' }]));
+
+    act(() => { result.current.setFilter('approved'); });
+
+    await waitFor(() => {
+      expect(result.current.error).toContain('unavailable');
+      expect(result.current.loading).toBe(false);
+    });
+    // CSH-FE-001 convention on the refund section too: a failed read keeps
+    // the previous sample instead of presenting a confirmed empty list.
+    expect(result.current.requests).toEqual([{ id: 1, status: 'pending' }]);
   });
 });

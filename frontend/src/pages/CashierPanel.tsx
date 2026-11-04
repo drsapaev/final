@@ -99,6 +99,7 @@ const CashierPanel = () => {
   // refresh lifecycle) moved verbatim to ./cashier/useCashierWorklistData.
   const {
     payments, appointments, stats,
+    statsError, pendingError, historyError,
     pendingLoading, historyLoading,
     currentPage, setCurrentPage, totalPages, totalItems,
     pendingPage, setPendingPage, pendingTotalPages, pendingTotalItems,
@@ -201,6 +202,7 @@ const CashierPanel = () => {
           <CashierStatsCard
             isHistoryTab={activeTab === 'history'}
             stats={stats}
+            statsError={statsError}
             onRefresh={handleRefresh}
             onExport={exportToCSV}
             onHourlyStats={loadHourlyStats}
@@ -258,6 +260,8 @@ const CashierPanel = () => {
                 <CashierPendingTable
                   appointments={appointments}
                   pendingLoading={pendingLoading}
+                  pendingError={pendingError}
+                  onRetryLoad={triggerDataReload}
                   pendingPage={pendingPage}
                   onPendingPageChange={setPendingPage}
                   pendingTotalPages={pendingTotalPages}
@@ -274,6 +278,8 @@ const CashierPanel = () => {
               {activeTab === 'history' &&
                 <CashierHistoryTable
                   historyLoading={historyLoading}
+                  historyError={historyError}
+                  onRetryLoad={triggerDataReload}
                   filteredPayments={filteredPayments}
                   sortField={sortField}
                   sortDir={sortDir}

@@ -679,6 +679,13 @@ const kk = {
     empty_history_text: 'Таңдалған кезең үшін төлем тарихы жоқ.',
     empty_history_title: 'Тарих жоқ',
     empty_pending_text: 'Күтудегі төлемдер жоқ. Барлық төлемдер өңделген.',
+    // CSH-FE-001: load-failure truthfulness banners (error/stale/retry)
+    load_error_title: 'Деректерді жүктеу кезінде қате кетті',
+    load_error_text: 'Байланысты тексеріп, қайта байқап көріңіз.',
+    retry_load_btn: 'Қайта байқап көру',
+    stale_data_note: 'Алдыңғы жүктеменің деректері көрсетілген — олар ескірген болуы мүмкін.',
+    stats_load_error_title: 'Статистиканы жаңарту кезінде қате кетті',
+    stats_stale_note: 'Көрсетілген көрсеткіштер ескірген немесе толық болмауы мүмкін.',
     empty_pending_title: 'Бәрі дайын',
     export_btn: 'Экспорт',
     export_failed: 'Экспорт сәтсіз',
