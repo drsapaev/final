@@ -75,6 +75,20 @@ class Payment(Base):
     receipt_no: Mapped[str | None] = mapped_column(String(64), nullable=True)
     note: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
+    # Идемпотентность кассовых платежей (issue 3859, CSH-FE-008 remainder):
+    # клиентский ключ запроса. Не имеет UNIQUE-констрейнта, потому что
+    # grouped-аллокация создаёт НЕСКОЛЬКО строк платежа под одним ключом;
+    # дедупликационным якорем служит таблица payment_client_requests.
+    client_request_id: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        index=True,
+        comment=(
+            "Ключ идемпотентности клиента (UUID): все строки одной "
+            "групповой аллокации несут один и тот же ключ"
+        ),
+    )
+
     # Онлайн-платежи
     provider: Mapped[str | None] = mapped_column(
         String(32), nullable=True, index=True
@@ -140,3 +154,52 @@ class Payment(Base):
     #     back_populates="payment",
     #     cascade="all, delete-orphan"
     # )
+
+
+class PaymentClientRequest(Base):
+    """Дедупликационный якорь кассовых платежей (issue 3859).
+
+    Одна строка на клиентский ``client_request_id`` (UUID, генерируется
+    фронтендом один раз на жизненный цикл модального окна оплаты).
+    УНИКАЛЬНЫЙ индекс — это серверный гарантий того, что повторный запрос
+    с тем же ключом (потеря ответа в сети, повторное нажатие) не создаст
+    второй платёж: повтор получает сохранённый снимок ответа исходной
+    операции (``response_payload``), а не новую строку в ``payments``.
+
+    Почему отдельная таблица, а не UNIQUE-колонка ``payments``:
+    grouped-аллокация создаёт N строк платежа под одним ключом, что
+    не выразить уникальностью на ``payments``; кроме того, снимок ответа
+    (включая allocations) невосстановим из строк платежа после того,
+    как долг визита изменился последующими платежами.
+    """
+
+    __tablename__ = "payment_client_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    client_request_id: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        unique=True,
+        comment="Клиентский ключ идемпотентности — UNIQUE: один якорь на intent",
+    )
+    endpoint: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        comment="single | grouped — эндпоинт, создавший якорь",
+    )
+    response_payload: Mapped[dict] = mapped_column(
+        JSON,
+        nullable=False,
+        comment="Снимок ответа исходной операции для реплея (JSON)",
+    )
+    created_by: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Кассир, создавший платёж (ID пользователя)",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+    )

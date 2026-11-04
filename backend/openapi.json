@@ -66804,7 +66804,7 @@
           "cashier"
         ],
         "summary": "Create Payment",
-        "description": "Создать новый платеж.",
+        "description": "Создать новый платеж.\n\nIdempotency (issue 3859): a request carrying ``client_request_id`` is\ndeduplicated server-side — a repeat with the same key replays the\nstored response of the original payment (200) instead of creating a\nsecond payment row. Keys are optional, so key-less callers keep the\nlegacy behavior.",
         "operationId": "create_payment_api_v1_cashier_payments_post",
         "security": [
           {
@@ -66851,7 +66851,7 @@
           "cashier"
         ],
         "summary": "Create Grouped Payment",
-        "description": "Create cashier payments for a grouped pending-payment row.\n\nAllocation is backend-owned: visits must belong to one patient, amount is\nallocated oldest visit first by remaining backend-calculated debt, and\noverpay is rejected instead of being assigned to an arbitrary visit.",
+        "description": "Create cashier payments for a grouped pending-payment row.\n\nAllocation is backend-owned: visits must belong to one patient, amount is\nallocated oldest visit first by remaining backend-calculated debt, and\noverpay is rejected instead of being assigned to an arbitrary visit.\n\nIdempotency (issue 3859): a request carrying ``client_request_id`` is\ndeduplicated server-side — a repeat with the same key replays the\nstored response of the original allocation (200) instead of\nallocating a second time. Keys are optional, so key-less callers keep\nthe legacy behavior.",
         "operationId": "create_grouped_payment_api_v1_cashier_payments_grouped_post",
         "requestBody": {
           "content": {
@@ -80342,6 +80342,19 @@
             ],
             "title": "Note",
             "description": "Payment note"
+          },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id",
+            "description": "Ключ идемпотентности (UUID), генерируется клиентом один раз на платёжный intent; повторный запрос с тем же ключом получает сохранённый ответ исходной аллокации вместо повторного списания"
           }
         },
         "type": "object",
@@ -80421,6 +80434,19 @@
             ],
             "title": "Note",
             "description": "Примечание"
+          },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id",
+            "description": "Ключ идемпотентности (UUID), генерируется клиентом один раз на платёжный intent; повторный запрос с тем же ключом получает сохранённый ответ исходной операции вместо второго платежа"
           }
         },
         "type": "object",

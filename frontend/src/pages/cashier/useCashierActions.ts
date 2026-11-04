@@ -208,7 +208,14 @@ export const useCashierActions = ({
           visit_id: visitId,
           amount: pData.amount,
           method: pData.method,
-          note: pData.note || tI18n('cashier.payment_note_default')
+          note: pData.note || tI18n('cashier.payment_note_default'),
+          // Issue 3859: forward the modal's idempotency key (one UUID per
+          // modal session) so a network-loss retry replays the original
+          // payment server-side instead of double-charging. Conditional
+          // spread keeps the legacy body shape for key-less callers.
+          ...(('client_request_id' in pData && pData.client_request_id)
+            ? { client_request_id: pData.client_request_id }
+            : {}),
         });
 
         if (!(result as { success?: boolean }).success) {
