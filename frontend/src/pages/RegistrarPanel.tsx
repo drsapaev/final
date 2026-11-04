@@ -193,7 +193,7 @@ const RegistrarPanel = () => {
     setAppointments,
     dataSource,
     appointmentsLoading,
-    paginationInfo, stale: worklistStale,
+    paginationInfo, stale: worklistStale, loadedDate,
     loadAppointments,
     loadMoreAppointments,
   } = useRegistrarWorklistData({
@@ -256,7 +256,7 @@ const RegistrarPanel = () => {
   );
   const { selectedDoctorLabel, doctorStats, doctorCountLabel, sampleIsToday } = useRegistrarDoctorWorklistFacts({
     appointments, doctors, activeDoctorId, showCalendar, historyDate,
-    urlDate: searchParams.get('date'), todayStr, tI18n,
+    urlDate: searchParams.get('date'), todayStr, loadedDate, tI18n,
   });
   const currentWorklistLabel = selectedDoctorLabel || resolveRegistrarTabLabel(activeTab, queueProfiles, (key) => tI18n('registrarPanel.' + key));
   // View-model rows (PR-UI-13-2: pure functions in registrarWorklistRows.ts;

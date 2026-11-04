@@ -25,10 +25,14 @@
 
 // REG-FE-032 red-check precondition: render date-only values from a
 // UTC-negative operator zone — the pre-fix code showed the PREVIOUS day.
+// PR #3851 review (P3): the override is process-global — capture the
+// original zone and restore it in afterAll so a reused worker/process
+// (vitest without per-file isolation) never inherits America/New_York.
+const originalProcessTz = process.env.TZ;
 process.env.TZ = 'America/New_York';
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/components/ui/macos', () => ({
   Button: (props: Record<string, unknown>) => <button {...props} />,
@@ -74,6 +78,16 @@ import WelcomeView, { formatClinicDayLong, formatClinicTodayLong } from '../Welc
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+});
+
+// PR #3851 review (P3): TZ is a process-wide knob — undo the suite-wide
+// override so sibling suites in a shared worker keep their own zone.
+afterAll(() => {
+  if (originalProcessTz === undefined) {
+    delete process.env.TZ;
+  } else {
+    process.env.TZ = originalProcessTz;
+  }
 });
 
 const makeProps = (overrides: Record<string, unknown> = {}) => ({
