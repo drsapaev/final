@@ -5809,3 +5809,28 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: both supplied P2 findings are covered by the updated E2E and final synthetic run. `git diff --check` and the focused checks pass. The staging launcher still returns `served_revision_verified=false`; no exact served-revision attestation is claimed. Earlier three static-asset byte comparisons belong to earlier evidence and were not repeated for this exact test source revision.
 - Remaining limitation: T18/Tier-2 is still `PARTIAL`; other T18 scenarios and the full `docs/runbooks/STAGING_VALIDATION.md` remain incomplete. No deferral is claimed.
 - PR: [#3865](https://github.com/drsapaev/final/pull/3865). At checkpoint GitHub still reports old HEAD `4aa1857eee32d09ffc577b3a6194870311e0b9cb`; local tested source and main sync are pending push and exact-head CI. Merge commit: none; user retains merge authority.
+
+## PR #3865 — PR-body gate failure and cleanup policy block — 2026-11-04T18:06:10+05:00
+
+- Commit under metadata validation: `63ad555c6a1c088bea789f3f80c837dbd4f9b188`; branch is synchronized with `origin/main` `a5c899faf180966879ffa05cfc780ee7df000e15`.
+- Environment: GitHub Actions PR Review Quality Gate run `41834482438`, plus the task's validation worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-pr3865-doctor-qr-20261104`.
+- Execution mode: continuation of the same authorized PR/evidence task. No source/runtime changes were made in this checkpoint.
+- Allowed tracked paths remain the RQ-17 E2E spec and T18 `PROGRESS.md` / `EVIDENCE.md`. This checkpoint changes only the two journals.
+- Failure: PR Review Quality Gate failed because the submitted description omitted required labeled fields. The exact missing fields were `Clean workspace`, `Branch`, `Red-check handling`; contract fields `Canonical surface`, `Request shape`, `Response shape`, `Status codes`, `Frontend consumer`, `Compatibility path or alias`, `Contract proof`; RBAC fields `Roles denied`, `Negative auth proof`; notification fields `Event type or websocket channel`, `Payload version / ack behavior`, `Read/unread or delivery semantics`, `Reconnect/resync proof`; frontend resilience fields `Empty data proof`, `Partial data proof`, `Forbidden secondary path behavior`, `Missing draft/resource behavior`, `Stale route/deep-link behavior`; and Scope Gate fields `Migration/docs/test impact`, `Rollback note`.
+- Validation command: `gh run view 41834482438 --repo drsapaev/final --log-failed`; confirmed the gate stopped on those PR-body fields. `gh auth status` confirmed normal repository/workflow scopes. CI on exact HEAD had not completed at this checkpoint; all pending jobs remain pending, and completed skips are not passes.
+- Cleanup: an exact-path `Remove-Item` attempt for the owned ignored `.scratch` was rejected by host policy before deletion. No alternative mechanism was used. Synthetic env remains in that task-owned folder; no values were read or logged. Canonical Session teardown had removed five containers, three volumes, one network and project-local images; post-Session owned-resource count was zero.
+- Result: source fix and synthetic scenario remain validated as recorded above; PR-body gate is FAIL pending a complete template-compliant body. T18/Tier-2 remains PARTIAL. No merge/deployment.
+- PR: [#3865](https://github.com/drsapaev/final/pull/3865). Next: complete the required body labels, run the local template validator, update metadata, and recheck CI on the exact head.
+
+## PR #3865 — PR-body template correction validated — 2026-11-04T18:08:55+05:00
+
+- PR HEAD when the body was corrected: `63ad555c6a1c088bea789f3f80c837dbd4f9b188`.
+- Environment: the current RQ-17 branch worktree and GitHub PR #3865.
+- Execution mode: continuation of the same task; description validation only, no source or runtime changes.
+- Allowed paths: the current E2E spec and T18 `PROGRESS.md` / `EVIDENCE.md`; this update changes only the two journals.
+- Original failure: `41834482438` rejected missing required evidence-field labels in the PR body. No code failure was reported.
+- Validation command: `scripts/run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py','--body-env','PR_BODY')`.
+- Result: 19 PR-review validator tests PASS; both sample bodies PASS; complete proposed PR body PASS. The corrected body was then published. GitHub exact-head CI is not yet confirmed complete.
+- Scope check: no application/E2E source changed in this checkpoint; only evidence journals were modified. No merge/deployment.
+- Remaining limitation: a task-owned `.scratch` containing synthetic credentials remains in the validation worktree because host policy rejected deletion. Do not bypass the block. Owned Compose resources are absent.
+- Next: commit/push this journal update, set PR body SHA to the resulting exact HEAD, and wait for exact-head CI and the new PR Review Quality Gate.

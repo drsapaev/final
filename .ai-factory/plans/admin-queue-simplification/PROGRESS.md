@@ -2176,3 +2176,16 @@ Last updated: 2026-10-29T15:42:19+05:00
 - Scope: only the RQ-17 E2E spec and the two T18 journals are allowed/tracked. No runtime, backend, auth policy, database, migration, Compose/Dockerfile, production, deployment, or foreign staging changes. Do not merge; merge remains user-controlled.
 - Tier-2 remains `PARTIAL`: the launcher still reports `served_revision_verified=false`; this final scenario does not attest the served frontend SHA. Full `STAGING_VALIDATION.md` and the other remaining T18 scenarios are outstanding.
 - Next exact action: commit the journal update with normal hooks, push the fast-forward PR branch, verify hosted CI on the new exact HEAD, then reply to/resolve the two fixed P2 threads and refresh the PR description with precise limits. Do not mark Tier-2 complete or merge.
+
+## PR #3865 — PR-body gate and task scratch cleanup limitation — 2026-11-04T18:06:10+05:00
+
+- The first refreshed PR description on HEAD `63ad555c6a1c088bea789f3f80c837dbd4f9b188` triggered PR Review Quality Gate failure because the template requires explicit labeled fields for cyclic evidence, contract, RBAC, notification/realtime, frontend resilience, and scope. The run did not report a source/test failure. Correct the description against `scripts/check_pr_review_template.py` before treating the PR metadata gate as complete.
+- GitHub PR state: OPEN / Ready for review / mergeable; exact HEAD `63ad555c6a1c088bea789f3f80c837dbd4f9b188`; other CI jobs were still running at the last check. Do not claim exact-head CI success yet.
+- Attempted to remove only the task-owned ignored scratch folder in validation worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-pr3865-doctor-qr-20261104\.scratch`. Host policy rejected the deletion. It contains the task's private synthetic env and temporary harness/log files; do not copy, print, or bypass the policy. The owned Compose project was already torn down and verified absent. No other scratch path or worktree was touched.
+- Continue independent PR work: correct and locally validate every required body field, record the failed metadata gate and cleanup block in `EVIDENCE.md`, commit/push the journal correction, update PR body to the resulting exact HEAD, then wait for checks. Leave the temporary validation worktree in place until its task-owned scratch can be removed through an allowed path.
+
+## PR #3865 — body fields corrected locally — 2026-11-04T18:08:55+05:00
+
+- Rewrote the PR description to include every required labeled field. Local `run_pr_review_gate_checks.py --body-env PR_BODY` passed its 19 tests, sample-body validations, and the exact proposed PR body.
+- The corrected body has been published on GitHub. It accurately records that current exact-head CI is pending and that `served_revision_verified` remains false.
+- This local change is journal-only; next commit and push it, update the body to the resulting exact commit, and check the resulting exact-head CI and metadata gate.
