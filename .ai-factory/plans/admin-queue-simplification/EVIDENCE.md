@@ -5872,3 +5872,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope: read-only status verification; no code, tests, staging resources, review threads, merge, or deployment changed.
 - Remaining limitation: T18/Tier-2 remains PARTIAL; full `docs/runbooks/STAGING_VALIDATION.md` is incomplete and exact current served-frontend provenance remains NOT_RUN (`served_revision_verified=false`). No deferral is claimed.
 - Next: user-owned merge of #3873. After merge, refresh `origin/main` and reconcile T18 scenario evidence without repeating completed checks.
+
+## PR #3873 main synchronization — 2026-11-04T23:07:41+05:00
+
+- Task: synchronize the existing journal-only PR branch with fresh `origin/main`; no new PR cycle.
+- Before sync: PR branch HEAD `ce0f2d9db64b10689d1ec37a6e03ff790db96043`, base `64a7c0b9ce422bbdac73d919158eb525669d9229`; remote PR was OPEN, Ready for review, and mergeable.
+- Incoming main: `106597d67ece48ee9380ded5725ba421aed8cbc0`, documentation-only audit commit. It added `docs/audits/2026-11-02-registrar-cashier-followup-source-review.md`; it also rewrote the top of `PROGRESS.md`/`RESUME.md` to an older T18 scenario-2 checkpoint and removed four newer PR #3873 entries from `EVIDENCE.md`.
+- Resolution: clean merge retained the branch's latest combined T18 checkpoint and evidence history and included the new audit document. Merge commit `5cf78a3a97bc9d7f559d8296fd69d2b32231d20d` has parents `ce0f2d9db64b10689d1ec37a6e03ff790db96043` and `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- Gate: `run_agent_gate.ps1` from `ai/langgraph` with known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` and four scoped Markdown paths returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. This was a documentation synchronization, not an application or staging change.
+- Validation: automatic Git merge completed without conflicts; merged tree retained all latest branch checkpoint entries and added the incoming audit document; `git diff --cached --check` PASS; normal merge commit hooks completed (file-specific checks reported no applicable files). No app tests, staging, runtime, production, merge, or deployment were run.
+- Remaining: updated journal commit, push, exact-head CI, and PR description refresh are pending. Tier-2 remains PARTIAL; the complete staging runbook and exact served-frontend revision attestation remain incomplete.

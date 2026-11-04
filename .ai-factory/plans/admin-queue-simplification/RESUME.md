@@ -1,12 +1,12 @@
-## Current resume — PR #3873 exact-head verification — 2026-11-04T22:36+05:00
+## Current resume — sync PR #3873 with main — 2026-11-04T23:07+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. PR #3865 is merged at `64a7c0b9ce422bbdac73d919158eb525669d9229`; its final reviewed code HEAD was `290d8f6d960c6207f4118783a1d48775c99ef41e`. The two P2 findings in the supplied older review were fixed and resolved before merge.
 
-PR #3873 is OPEN, Ready for review, and mergeable at HEAD `c00f84920d572c24a4ea413199700a4d7a1fc462`, based on `64a7c0b9ce422bbdac73d919158eb525669d9229`. Current applicable checks PASS: PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle, security, Gitleaks, CodeQL, GitGuardian, scratch guards, and language analysis. Path-aware app/build/test/integration/Docker/staging/readiness/load/DAST jobs are SKIPPED for the docs-only diff, not PASS.
+PR #3873 was OPEN and Ready for review at remote HEAD `ce0f2d9db64b10689d1ec37a6e03ff790db96043`; its applicable checks passed, while path-aware app/build/test/integration/Docker/staging/readiness/load/DAST jobs were SKIPPED for docs-only scope, not PASS. The branch has now merged origin/main `106597d67ece48ee9380ded5725ba421aed8cbc0` as local merge commit `5cf78a3a97bc9d7f559d8296fd69d2b32231d20d`. The merge retained the newest T18 checkpoint/evidence and added the independent audit document. Push and exact-head CI are pending.
 
 The combined synthetic run on exact runtime source `64a7c0b9` passed T18 scenarios 3, 5-live, and 10 with ordinary Admin password + TOTP and owned teardown. Earlier scenario evidence remains in `EVIDENCE.md`. Full T18 is not claimed complete: full `STAGING_VALIDATION.md` remains incomplete and exact current served-frontend provenance remains NOT_RUN (`served_revision_verified=false`). Tier-2 remains PARTIAL, with no deferral.
 
-No code, tests, or staging resources changed in this checkpoint. Do not merge or deploy. Next: wait for the user-owned merge of #3873; then refresh `origin/main` and reconcile the full T18 plan/evidence matrix before any further validation.
+No code, tests, or staging resources changed in this checkpoint. Tier-2 remains PARTIAL; full `STAGING_VALIDATION.md` and exact served frontend revision attestation remain incomplete. Next: commit the updated checkpoint, push the synchronized branch, confirm exact-head checks, and update the PR description. Do not merge or deploy; the user retains that authority.
 ---
 ## Latest continuation — T18 scenario 5 PostgreSQL existing-token checks passed — 2026-11-04T00:40+05:00
 

@@ -1,24 +1,25 @@
 # Progress — T18 integrated synthetic acceptance
 
 Plan version: 1.0
-Current task: T18 scenarios 3, 5, and 10 — combined synthetic validation after PR #3865
-Current status: PR_OPEN; exact-head status verified
+Current task: T18 integrated synthetic acceptance; synchronize PR #3873 with current main
+Current status: IN_PROGRESS; main merged locally, exact-head CI pending
 Merged PRs: #3861 at bfc33837cd3028f1989b2462a998b16505a62fd6; #3865 at 64a7c0b9ce422bbdac73d919158eb525669d9229
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final
 Branch: codex/t18-combined-validation
-Base commit: origin/main 64a7c0b9ce422bbdac73d919158eb525669d9229
-Current commit: source under validation 64a7c0b9ce422bbdac73d919158eb525669d9229; journal PR #3873
-Last updated: 2026-11-04T22:36:28+05:00
+Base commit: origin/main 106597d67ece48ee9380ded5725ba421aed8cbc0
+Current commit: runtime source under validation 64a7c0b9ce422bbdac73d919158eb525669d9229; local sync merge 5cf78a3a97bc9d7f559d8296fd69d2b32231d20d (first parent PR head ce0f2d9db64b10689d1ec37a6e03ff790db96043, second parent origin/main)
+Last updated: 2026-11-04T23:07:41+05:00
 Tier-2: PARTIAL; no deferral accepted. User retains merge and deployment authority.
 
 ## Current checkpoint
 
 - Completed: one canonical synthetic Start to Session run on exact source commit 64a7c0b9ce422bbdac73d919158eb525669d9229. Normal synthetic Admin password plus TOTP PASS. Scenario 3 incomplete configuration to ownership action to resource target to explicit publish to ready/public PASS. Scenario 5 Department off/on with manual profile archive persistence PASS. Scenario 10 all four legacy Admin URLs PASS; linked synthetic QueueProfile DELETE returned 409 and the profile remained present.
 - Cleanup: Session teardown PASS; removed 5 containers, 3 volumes, 1 network and Compose-local images; remaining owned containers, volumes and networks 0. First post-Session Preflight detected a transient local listener on port 18987; no process was stopped. A follow-up canonical Preflight passed with no warnings and all ports available.
-- Verified: exact PR HEAD `c00f84920d572c24a4ea413199700a4d7a1fc462`, base `64a7c0b9ce422bbdac73d919158eb525669d9229`; PR #3873 is OPEN, Ready for review, and mergeable. PR Required Gate, PR Review Quality Gate, CI Scope, Lifecycle Recommendation, Security, Gitleaks, CodeQL, GitGuardian, scratch guards, and language analysis checks PASS. Path-aware frontend/backend/integration/Docker/staging/production/load/DAST jobs are SKIPPED for the docs-only diff, not PASS.
+- Verified before sync: remote PR #3873 was OPEN, Ready for review, and mergeable at `ce0f2d9db64b10689d1ec37a6e03ff790db96043`, based on `64a7c0b9ce422bbdac73d919158eb525669d9229`. Applicable checks at that head passed; path-aware frontend/backend/integration/Docker/staging/production/load/DAST jobs were SKIPPED for the docs-only diff, not PASS.
+- Main synchronization: merged `origin/main` `106597d67ece48ee9380ded5725ba421aed8cbc0` into the PR branch as `5cf78a3a97bc9d7f559d8296fd69d2b32231d20d`. Merge was clean. The incoming commit added `docs/audits/2026-11-02-registrar-cashier-followup-source-review.md`; its journal changes pointed back to an older T18 scenario-2 checkpoint, so the newer combined T18 checkpoint and evidence history on this branch were retained. New exact-head checks are pending push.
 - Remaining: full docs/runbooks/STAGING_VALIDATION.md checklist is incomplete; exact current served frontend revision attestation remains NOT_RUN because launcher served_revision_verified=false. Prior asset comparisons remain separately anchored to earlier commits.
 - Blocker: none for this bounded slice. Overall T18/Tier-2 remains PARTIAL by user direction.
-- Next exact action: user-owned merge of PR #3873. After merge, refresh `origin/main` and reconcile the final T18 matrix before selecting any remaining validation. Do not deploy or claim full Tier-2; the runbook remains incomplete and `served_revision_verified=false`.
+- Next exact action: update this journal checkpoint, push the synchronized branch, verify exact-head checks, and refresh the PR description. Merge remains user-owned. Do not deploy or claim full Tier-2; the runbook remains incomplete and `served_revision_verified=false`.
 
 ## Historical checkpoint — T18 scenario 2 before PR #3865 merge
 
