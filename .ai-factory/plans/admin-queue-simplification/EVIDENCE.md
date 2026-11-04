@@ -5765,3 +5765,19 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR: [#3865](https://github.com/drsapaev/final/pull/3865).
 - Merge commit: none; user retains merge authority.
 - Next exact action: correct the stale PR description and this journal, rerun applicable CI after the documentation-only update, then mark the PR Ready for review if checks remain green. Continue the next T18 cycle only after user-owned merge and a fresh `origin/main` worktree.
+
+## T18 scenario 2 — PR ready; final exact-head checks recorded — 2026-11-04T13:22:34+05:00
+
+- Commit under test: `48feabb18db7e2a32568f4a776bf424fa2290b87`; base `bfc33837cd3028f1989b2462a998b16505a62fd6`.
+- Environment: GitHub Actions and the local Windows worktree `aqs-t18-rq17-current-screen`; PR #3865 is OPEN, Ready for review, mergeable, and has no submitted review decision.
+- Execution mode: continuation of the same T18 evidence scope and approved `narrow_override`; no staging run or application/runtime change was performed.
+- Allowed paths: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `.ai-factory/plans/admin-queue-simplification/EVIDENCE.md`; PR-body changes were limited to accurately reporting check outcomes.
+- Actual tracked paths: the two plan journals. No application, API, auth, database, migration, staging configuration, production, or E2E source was changed in this checkpoint.
+- Original failure: after correcting the body summary, a PR Review Quality Gate run failed because its parser requires the literal field label `Not checked:`; the phrase `Not checked locally:` did not satisfy it. Restoring the required label fixed the failure. The local command `scripts/run_python.ps1 -PythonArgs @('scripts/run_pr_review_gate_checks.py','--body-env','PR_BODY')` passed all 19 validator tests, sample bodies, and the fetched current PR body.
+- Validation command: `gh pr checks 3865`; PR metadata was verified using `gh pr view 3865 --json state,isDraft,mergedAt,headRefOid,baseRefOid,mergeable,mergeStateStatus,reviewDecision`.
+- Result: Unified CI `41796496003` PASS on exact HEAD `48feabb18db7e2a32568f4a776bf424fa2290b87`: Frontend unit, configured Frontend e2e, lint, build, PR Required Gate, CI Scope, CodeQL, security, Gitleaks, GitGuardian, notifications, and Windows/Ubuntu scratch guards passed. PR Review Quality Gate `41798863043` and lifecycle `41798863128` passed after the required label was restored and the PR was marked Ready. Backend, integration, Docker, staging/production readiness, k6, DAST, parity, metadata, and context-boundary jobs were skipped, not passed.
+- E2E scope: the configured CI Frontend e2e job passed in 16m59s but does not execute the changed live RQ-17 spec; that spec's one-scenario Admin/TOTP behavior was previously validated in the owned synthetic staging Session. No new staging result is claimed here.
+- Scope check: only evidence/progress journals and PR metadata changed. `git diff --check` passed before commit; normal repository commit hooks passed. Worktree was clean at `48feabb` before this final status update.
+- Remaining limitation: T18/Tier-2 remains PARTIAL; scenarios 3, 5 live Department state, 10, full `STAGING_VALIDATION.md`, and canonical `served_revision_verified` attestation remain. The task-owned ignored scratch still blocks using this worktree for another staging run.
+- PR: [#3865](https://github.com/drsapaev/final/pull/3865), Ready for review. No merge or deployment.
+- Next exact action: wait for the user-owned merge, verify the resulting `origin/main` commit, then continue remaining T18 work in a fresh isolated worktree without repeating completed scenarios.
