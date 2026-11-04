@@ -5921,3 +5921,14 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Cleanup: Session teardown PASS; removed 5 containers, 3 volumes, 1 network, and local Compose images; remaining owned containers/volumes/networks 0. Dedicated host ports were free. Post-session WSL available memory was 2,142 MiB. The host command policy rejected deletion of the exact task-owned secret env file after teardown; no alternate deletion method was used. User cleanup request is pending.
 - Scope check: only three durable plan journals are included in the PR. Scratch harness/env are not tracked. No foreign Docker resources or shared caches were pruned.
 - PR: [#3873](https://github.com/drsapaev/final/pull/3873), OPEN / Ready for review at pre-update HEAD above; user owns merge. Merge commit: none.
+
+## PR #3873 exact-head follow-up — 2026-11-05T00:56:33+05:00
+
+- Commit and PR HEAD: `9ea9311a10db03285be23ab99bcb7ce0ff02741a`; base/current `origin/main`: `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- PR state: OPEN, Ready for review, mergeable; user retains merge authority. PR description now records exact HEAD, targeted smoke evidence, limitations, and required review-gate fields.
+- Result: PR Review Quality Gate run `41901375079` PASS; Lifecycle Recommendation `41901375032` PASS; Unified CI `41900690688` PASS; Gitleaks `41900690697` PASS; Security `41900690681` PASS; Agent Workflow Guards `41900690657` PASS.
+- Scope interpretation: path-aware frontend/backend/integration/Docker/readiness/load/DAST jobs were SKIPPED for the docs-only journal diff, not PASS. The prior synthetic browser Session evidence remains tied to runtime input commit `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`, not the journal commit.
+- No application, test, staging, production, merge, or deployment changes were made in this follow-up. The PR diff remains limited to the three T18 journals.
+- Tier-2 remains PARTIAL: the 11 browser console errors are NOT_CLASSIFIED; exact served asset revision attestation remains NOT_RUN (`served_revision_verified=false`); full `docs/runbooks/STAGING_VALIDATION.md` remains incomplete. No deferral was accepted.
+- Cleanup: owned Compose resources remain torn down; the task-owned synthetic env file still exists under ignored `.scratch` because host deletion policy blocked removal. User was asked to remove that exact file; no alternate deletion method was used.
+- Next: user-owned merge of #3873, then fresh-main worktree and continuation of only the remaining T18 gaps. Merge commit: none.

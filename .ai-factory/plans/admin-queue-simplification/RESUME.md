@@ -1,4 +1,4 @@
-## Current resume — T18 cross-cutting Admin setup validation — 2026-11-05T00:45:37+05:00
+## Current resume — T18 cross-cutting Admin setup validation — 2026-11-05T00:56:33+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. PR #3865 is merged at `64a7c0b9ce422bbdac73d919158eb525669d9229`; its final reviewed code HEAD was `290d8f6d960c6207f4118783a1d48775c99ef41e`.
 
@@ -6,7 +6,7 @@ The corrected T18 cross-cutting browser run passed on worktree HEAD `88cd7da19ca
 
 Important limitations: 11 browser console errors were counted but not classified; `served_revision_verified=false`; the full staging runbook is incomplete. Tier-2 remains PARTIAL, without deferral. The canonical Session teardown passed and removed its project resources. The host command policy rejected deletion of the task-owned synthetic env file; the user has been asked to remove only `.scratch/t18-crosscut-20261105/staging.env`. Do not use another deletion method.
 
-PR #3873 is still user-merge-owned. The journal-only checkpoint is committed locally with normal hooks; push it to the existing PR, refresh the PR body, and verify exact-head checks. Do not merge or deploy. After user merge, refresh `origin/main` in a fresh worktree, classify the 11 console errors safely if feasible without another broad staging cycle, complete served asset provenance, and then update the outstanding T18 matrix. Do not repeat passing UI checks without a source change.
+PR #3873 is OPEN, Ready for review, mergeable, and user-merge-owned at exact HEAD `9ea9311a10db03285be23ab99bcb7ce0ff02741a` against base `106597d67ece48ee9380ded5725ba421aed8cbc0`. The journal-only commit is pushed. The corrected PR description passed PR Review Quality Gate run `41901375079`; Lifecycle Recommendation `41901375032` passed; Unified CI `41900690688`, Gitleaks `41900690697`, Security `41900690681`, and Agent Workflow Guards `41900690657` passed. Product-path jobs skipped for docs-only scope are not PASS. Do not merge or deploy. After user merge, refresh `origin/main` in a fresh worktree, classify the 11 console errors safely if feasible without another broad staging cycle, complete served asset provenance, and then update the outstanding T18 matrix. Do not repeat passing UI checks without a source change.
 
 ---
 

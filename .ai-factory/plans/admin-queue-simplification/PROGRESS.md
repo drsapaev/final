@@ -2,13 +2,13 @@
 
 Plan version: 1.0
 Current task: T18 integrated synthetic acceptance; cross-cutting Admin setup checks in existing PR #3873
-Current status: IN_PROGRESS; targeted cross-cutting browser assertions passed; journal commit created; push and exact-head checks pending
+Current status: IN_PROGRESS; targeted cross-cutting browser assertions passed; journal commit pushed; exact-head CI and PR description gates PASS; user-owned merge pending
 Merged PRs: #3861 at bfc33837cd3028f1989b2462a998b16505a62fd6; #3865 at 64a7c0b9ce422bbdac73d919158eb525669d9229
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final
 Branch: codex/t18-combined-validation
 Base commit: origin/main 106597d67ece48ee9380ded5725ba421aed8cbc0
-Current commit: local journal commit on PR #3873 branch `codex/t18-combined-validation`; runtime source exercised at `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`; sync merge 5cf78a3a97bc9d7f559d8296fd69d2b32231d20d into origin/main 106597d67ece48ee9380ded5725ba421aed8cbc0
-Last updated: 2026-11-05T00:48:49+05:00
+Current commit: `9ea9311a10db03285be23ab99bcb7ce0ff02741a` on PR #3873 branch `codex/t18-combined-validation`; runtime source exercised at `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`; sync merge 5cf78a3a97bc9d7f559d8296fd69d2b32231d20d into origin/main 106597d67ece48ee9380ded5725ba421aed8cbc0
+Last updated: 2026-11-05T00:56:33+05:00
 Tier-2: PARTIAL; no deferral accepted. User retains merge and deployment authority.
 
 ## Current checkpoint — cross-cutting Admin setup browser validation
@@ -17,10 +17,10 @@ Tier-2: PARTIAL; no deferral accepted. User retains merge and deployment authori
 - Harness-only first attempt: Admin 2FA and form keyboard checks passed, then the screen row timed out. Source inspection confirmed auth tokens are in `sessionStorage`, which Playwright `storageState` omits. The harness now copies synthetic session storage in memory to a fresh context; no token was written to disk or output. The first attempt is recorded as a harness failure, not a product failure.
 - Diagnostics: the passing browser result counted 11 console errors without classifying their messages; this remains an explicit limitation. The launcher reports `served_revision_verified=false`; the build input pin matched HEAD, but this is not served-asset provenance evidence.
 - Cleanup: canonical Session returned PASS and removed 5 containers, 3 volumes, 1 network and local Compose images; remaining project containers/volumes/networks were all 0. Dedicated ports were free. Post-Session WSL available memory was 2,142 MiB. The task-owned env contains synthetic credentials and must be removed; the host command policy rejected the removal attempt, and no alternate method was used.
-- Changed but not verified: the three T18 journal files are committed locally; push and exact-head checks are pending.
+- Changed but not verified: none in tracked files; all three journal files are pushed. PR #3873 body now records exact HEAD and the validation limits.
 - Remaining: classify the 11 console errors without exposing raw messages; verify served frontend revision provenance; complete the full `docs/runbooks/STAGING_VALIDATION.md`. Do not repeat the passing checks unless source changes or the console-error diagnostic shows a functional failure.
-- Blocker: PR #3873 remains user-merge-owned; no merge or deployment is authorized by this checkpoint.
-- Next exact action: push the journal commit to the same PR, refresh its body, and verify exact-head checks. Then wait for user-owned merge.
+- Blocker: no technical blocker for this docs-only PR; user-owned merge is pending. Tier-2 remains PARTIAL.
+- Next exact action: user merges PR #3873. Then refresh `origin/main` in a fresh worktree and continue only the unverified T18 items.
 
 ## Previous checkpoint — T18 core scenario matrix reconciled
 
