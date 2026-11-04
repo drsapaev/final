@@ -5932,3 +5932,12 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Tier-2 remains PARTIAL: the 11 browser console errors are NOT_CLASSIFIED; exact served asset revision attestation remains NOT_RUN (`served_revision_verified=false`); full `docs/runbooks/STAGING_VALIDATION.md` remains incomplete. No deferral was accepted.
 - Cleanup: owned Compose resources remain torn down; the task-owned synthetic env file still exists under ignored `.scratch` because host deletion policy blocked removal. User was asked to remove that exact file; no alternate deletion method was used.
 - Next: user-owned merge of #3873, then fresh-main worktree and continuation of only the remaining T18 gaps. Merge commit: none.
+
+## PR #3873 exact-head gate reconciliation — 2026-11-05T01:04:11+05:00
+
+- Commit under review: `f9bd1012f98f8fd6eaa12f8216e1b9c1b2e4110d`; base: `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- Current PR review body was corrected to retain the required `Result` field. An intermediate body version failed PR Review Quality Gate run `41902253143` because that label was omitted; no source or test failure was reported. The corrected body passed PR Review Quality Gate run `41902595406`.
+- Exact-head checks: Unified CI `41902208886` PASS; Gitleaks `41902208887` PASS; Security `41902208817` PASS; Agent Workflow Guards `41902208835` PASS; Lifecycle Recommendation `41902595472` PASS; PR Review Quality Gate `41902595406` PASS.
+- Scope: documentation journals and PR metadata only; application/runtime, tests, staging, production, merge, and deployment unchanged. Product-path jobs skipped for docs-only scope remain SKIPPED, not PASS.
+- State at verification: PR #3873 OPEN, Ready for review, mergeable; user retains merge authority. Tier-2 remains PARTIAL; no deferral accepted.
+- Next: user-owned merge, then refresh main in a fresh worktree and continue only remaining T18 checks. Merge commit: none.
