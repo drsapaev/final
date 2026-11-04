@@ -2,25 +2,28 @@
 
 Plan version: 1.0
 Current task: T18 integrated synthetic acceptance; cross-cutting Admin setup checks in existing PR #3873
-Current status: IN_PROGRESS; targeted cross-cutting browser assertions passed; journal commit pushed; exact-head checks PASS; user-owned merge pending
+Current status: IN_PROGRESS; served-asset provenance verified; console errors partially source-classified; journal update and exact-head checks pending; user owns merge
 Merged PRs: #3861 at bfc33837cd3028f1989b2462a998b16505a62fd6; #3865 at 64a7c0b9ce422bbdac73d919158eb525669d9229
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final
 Branch: codex/t18-combined-validation
 Base commit: origin/main 106597d67ece48ee9380ded5725ba421aed8cbc0
-Current commit: latest journal commit on PR #3873 branch `codex/t18-combined-validation`; resolve the live tip from GitHub before merge. Runtime source exercised at `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`; sync merge 5cf78a3a97bc9d7f559d8296fd69d2b32231d20d into origin/main 106597d67ece48ee9380ded5725ba421aed8cbc0
-Last updated: 2026-11-05T01:04:11+05:00
+Current commit: `cbd8c64241c7a80f02b4728e63d2d132a55d708c`; journal commit pending
+Runtime source exercised: `cbd8c64241c7a80f02b4728e63d2d132a55d708c`; its frontend tree `475364c91518ceda62af758219334fe3bc3ec5cd` matches the previously tested frontend tree at `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`.
+Last updated: 2026-11-05T02:34:40+05:00
 Tier-2: PARTIAL; no deferral accepted. User retains merge and deployment authority.
 
-## Current checkpoint — cross-cutting Admin setup browser validation
+## Current checkpoint — T18 console diagnostics and served frontend provenance
 
-- Completed: canonical synthetic Preflight → Start → Session on worktree HEAD `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`. The corrected Chromium harness passed normal Admin password + TOTP enrollment, keyboard trap/Escape/focus return, invalid form key rejection, hidden QueueProfile creation, empty-state editor links, error/retry, five language headings, and responsive checks at 375/768/1280/1920 px. First/repeat content appearance measured 1,190/944 ms; page errors 0.
-- Harness-only first attempt: Admin 2FA and form keyboard checks passed, then the screen row timed out. Source inspection confirmed auth tokens are in `sessionStorage`, which Playwright `storageState` omits. The harness now copies synthetic session storage in memory to a fresh context; no token was written to disk or output. The first attempt is recorded as a harness failure, not a product failure.
-- Diagnostics: the passing browser result counted 11 console errors without classifying their messages; this remains an explicit limitation. The launcher reports `served_revision_verified=false`; the build input pin matched HEAD, but this is not served-asset provenance evidence.
-- Cleanup: canonical Session returned PASS and removed 5 containers, 3 volumes, 1 network and local Compose images; remaining project containers/volumes/networks were all 0. Dedicated ports were free. Post-Session WSL available memory was 2,142 MiB. The task-owned env contains synthetic credentials and must be removed; the host command policy rejected the removal attempt, and no alternate method was used.
-- Changed but not verified: none in tracked files; all three journal files are pushed. The PR body was corrected to preserve the required `Result` field; final Quality Gate passed on exact HEAD.
-- Remaining: classify the 11 console errors without exposing raw messages; verify served frontend revision provenance; complete the full `docs/runbooks/STAGING_VALIDATION.md`. Do not repeat the passing checks unless source changes or the console-error diagnostic shows a functional failure.
-- Blocker: no technical blocker for this docs-only PR; user-owned merge is pending. Tier-2 remains PARTIAL.
-- Next exact action: user merges PR #3873. Then refresh `origin/main` in a fresh worktree and continue only the unverified T18 items.
+- Completed earlier cross-cutting checks: normal Admin password + TOTP; keyboard trap/Escape/focus return; invalid form-key rejection; hidden QueueProfile creation; empty-state editor links; synthetic 503 retry; five language headings; viewports 375/768/1280/1920; cold/repeated content 1,190/944 ms; page errors 0.
+- New canonical diagnostic Session on exact worktree HEAD `cbd8c64241c7a80f02b4728e63d2d132a55d708c`: Admin password + TOTP PASS; read-only visits to setup-directions, queue-profiles tab, and user management; RU/EN/KK/uz-Latn/uz-Cyrl navigation completed.
+- Console diagnostics: the earlier full cross-cutting run counted 11 errors. The narrower diagnostic run reproduced 9: 8 originated from the same-origin minified app bundle `/assets/index-BVFGuh9T.js` (line 1), and 1 from a same-origin non-bundle source. Raw messages were not retained. Two events from the broader flow were not reproduced in this narrow run and remain unattributed. Request failures 0; HTTP 4xx/5xx responses 0; uncaught page errors 0. This is source-family classification, not identification of the exact application call sites.
+- Served frontend provenance: PASS independently of the launcher's `served_revision_verified=false` field. The browser received `/sw.js` with build SHA `cbd8c64241c7a80f02b4728e63d2d132a55d708c`; all 37 fetched JS/CSS response bodies matched SHA-256 of the corresponding files in the same owned Nginx container.
+- Startup diagnosis: one early attempt used a malformed temporary env file whose lines were concatenated, leaving the PostgreSQL password empty. Safe log classification confirmed `password_missing`; no kernel OOM was observed. The env was corrected, and the final canonical Start/Session passed. A separate diagnostic harness attempt exited nonzero; its Session teardown passed, and the subsequent instrumented run completed.
+- Cleanup: successful canonical Session removed 5 containers, 3 volumes, 1 network and local Compose images; remaining resources were 0. The three diagnostic projects were task-owned. The latest post-Session WSL available memory was 1,903 MiB; no OOM was reported. Two ignored synthetic env files remain because local command policy rejected their deletion; no alternate removal method was used.
+- Changed but not verified: this evidence update changes only `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`; commit, push, PR body refresh, and exact-head checks are pending.
+- Remaining: two console events from the original 11 were not reproduced; the exact source call sites for the 8 minified-bundle events are not mapped. The full `docs/runbooks/STAGING_VALIDATION.md` and overall T18 remain incomplete. No deferral is accepted.
+- Blocker: no technical blocker for this journal-only update. PR #3873 is OPEN, Ready for review, mergeable, and user-merge-owned.
+- Next exact action: finish the three journal updates, commit and push them to the same PR, refresh its description, verify exact-head gates, then wait for user-owned merge. After merge, refresh `origin/main` in a fresh worktree and continue only the remaining T18 acceptance gaps.
 
 ## Previous checkpoint — T18 core scenario matrix reconciled
 
