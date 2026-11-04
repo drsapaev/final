@@ -257,7 +257,8 @@ async function createCatalogService(
   page: Page,
   input: {
     name: string;
-    profileTitle: string;
+    profileKey: string;
+    queueProfiles: QueueProfileRow[];
     queueTag: string;
     doctorSpecialty?: string;
     doctorId?: number;
@@ -292,9 +293,13 @@ async function createCatalogService(
   await serviceEditor.getByRole('button', { name: /Очередь|Queue/i }).click();
   const queueTagSelect = serviceForm.locator('.mac-select').first().getByRole('button');
   await queueTagSelect.click();
-  const tagOption = page.getByRole('listbox').getByRole('option').filter({ hasText: input.profileTitle });
-  await expect(tagOption).toHaveCount(1);
-  await tagOption.click();
+  const activeProfiles = input.queueProfiles.filter((profile) => profile.is_active !== false);
+  const selectedProfileIndex = activeProfiles.findIndex((profile) => profile.key === input.profileKey
+    && (profile.queue_tags?.[0] || profile.key) === input.queueTag);
+  expect(selectedProfileIndex, 'the chosen QueueProfile must map to the requested service queue tag').toBeGreaterThanOrEqual(0);
+  const queueTagOptions = page.getByRole('listbox').getByRole('option');
+  await expect(queueTagOptions).toHaveCount(activeProfiles.length + 1);
+  await queueTagOptions.nth(selectedProfileIndex + 1).click();
 
   await serviceEditor.getByRole('button', { name: /Опции|Options/i }).click();
   const requiresDoctor = serviceForm.getByRole('checkbox', { name: /Требует врача|Doctor required/i });
@@ -429,8 +434,7 @@ test('current setup screen resolves Doctor and QueueResource directions through 
     const matchingProfiles = existingProfiles.filter((profile) =>
       profile.is_active !== false
       && profile.show_on_qr_page === false
-      && [profile.key, ...(profile.queue_tags || [])]
-        .some((tag) => tag?.trim().toLowerCase() === specialtyCode),
+      && (profile.queue_tags?.[0] || profile.key)?.trim().toLowerCase() === specialtyCode,
     );
     if (matchingProfiles.length !== 1) return [];
     const profile = matchingProfiles[0];
@@ -498,10 +502,19 @@ test('current setup screen resolves Doctor and QueueResource directions through 
   const createdDoctorsResponsePromise = page.waitForResponse((response) =>
     isGetResponseForPath(response, '/services/admin/doctors')
   );
+  const catalogProfilesResponsePromise = page.waitForResponse((response) =>
+    isGetResponseForPath(response, '/queues/profiles')
+  );
   await page.goto('/admin/services?servicesTab=catalog');
-  const createdDoctorsResponse = await createdDoctorsResponsePromise;
+  const [createdDoctorsResponse, catalogProfilesResponse] = await Promise.all([
+    createdDoctorsResponsePromise,
+    catalogProfilesResponsePromise,
+  ]);
   expect(createdDoctorsResponse.ok()).toBeTruthy();
+  expect(catalogProfilesResponse.ok(), 'Service Catalog should load the current QueueProfile list').toBeTruthy();
   const doctors = await createdDoctorsResponse.json() as DoctorRow[];
+  const catalogProfilePayload = await catalogProfilesResponse.json() as { profiles?: QueueProfileRow[] };
+  const catalogQueueProfiles = catalogProfilePayload.profiles || [];
   const createdDoctorMatches = doctors.filter((doctor) => doctor.specialty === doctorSpecialty.code);
   expect(
     createdDoctorMatches,
@@ -511,14 +524,16 @@ test('current setup screen resolves Doctor and QueueResource directions through 
 
   await createCatalogService(page, {
     name: 'Synthetic RQ-17 Doctor service ' + suffix,
-    profileTitle: doctorProfileTitle,
+    profileKey: doctorProfile.key!,
+    queueProfiles: catalogQueueProfiles,
     queueTag: doctorSpecialty.code,
     doctorSpecialty: doctorSpecialty.code,
     doctorId,
   });
   await createCatalogService(page, {
     name: serviceName,
-    profileTitle,
+    profileKey,
+    queueProfiles: catalogQueueProfiles,
     queueTag: resourceTag,
   });
 
