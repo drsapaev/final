@@ -21,6 +21,20 @@ To keep the global audit ID space unambiguous, **this document's five findings a
 
 The rest of this document's ID ranges continue both ledger sequences without collision: REG-FE-070–082 (registrar) and CSH-FE-039–049 (cashier) were still free in the canonical ledgers, and the QR-FE-001–007 series plus backend REG-XC-001 have no canonical-ledger counterparts.
 
+## Fix round 2026-11-05 (PR #3876) — seven P1 findings closed
+
+Owner-directed fix round for the seven **P1** findings of this journal, in the priority order set by the owner (CSH-FE-039 first, then CSH-FE-050, REG-FE-084/085, QR-FE-001/002, REG-XC-001). Implementation branch `fix/p1-followup-csh039-csh050-reg084-085-qr001-002-regxc001`, single fix commit + this status update.
+
+- **CSH-FE-039 — RESOLVED.** Backend: `CreatePaymentRequest`/`CreateGroupedPaymentRequest` now validate `method` at the DTO boundary (`cashier/_helpers.py`): manually receipted `cash`/`card` pass (canonicalized), hosted provider methods (`click`/`payme`/`kaspi`) and unknown strings are rejected with 422 pointing to the provider flow. Frontend: `CashPaymentModal` offers only cash/card. The immediate-paid command can no longer settle a provider-labelled payment without provider proof; provider payments keep the `payment_init_service` pending → webhook → paid path. 21 DTO validator tests.
+- **CSH-FE-050 — RESOLVED.** `RefundRequest` read model and the amount column now read `refund_amount` (the field `RefundRequestResponse` actually returns); the former `amount` read rendered «—» for every legitimate refund sum. Component tests mount the table on the exact backend DTO (70 000 visible; missing → honest «—»; legacy `amount`-only string does NOT fabricate a sum; string sums; multi-row distinctness).
+- **REG-FE-084 — RESOLVED (honest refusal).** The backend edit-delta contract has no per-service remove command inside a retained queue entry, so the fix is a loud pre-submit refusal, not a client-side workaround: `buildEditOriginalServiceIdentity` now also collects the original (queue, service) pairs from `service_details`, and `detectRemovedServicesWithinRetainedEntries` blocks the submit (cart step + explicit error naming the services and the exit: cancel the whole entry) before ANY save path (edit-delta / batch / cart / patient-update). Whole-entry cancellation semantics are unchanged and explicitly tested. Detector unit tests cover: removal within retained entry, unchanged quantities, whole-entry removal, mixed-type ids, same service in two entries, legacy rows without queue identity, create mode.
+- **REG-FE-085 — RESOLVED.** Queue-entry identity is String-normalized in `getRemovedQueueEntryIds` (wizardUtils) and in all three inline comparison sites of `AppointmentWizardV2` (batch / patient-update / cart paths, now reusing the helper). `getRemovedQueueEntryIds([42], [{original_queue_id: "42"}])` returns `[]`; genuinely removed entries are still cancelled; `"042"` vs `42` stays distinct. Mixed-type regression tests added to `wizardCancelRemovedEntries.test.ts`.
+- **QR-FE-001 — RESOLVED.** The legacy per-token PHI draft is gone: no write, no restore (persist effect only sweeps; hydrate effect always starts an EMPTY form and clears stale drafts from both stores — `draftGet`/`draftSet` removed). The same privacy reasoning as the direction-mode round-5 fix now covers the shared legacy QR token. The old accessibility test that ASSERTED PHI restoration is inverted to assert an empty form for the next same-token visitor.
+- **QR-FE-002 — RESOLVED.** `successCount` no longer depends only on `entries.length`: the canonical single-doctor DTO (`success:true` + top-level `queue_number`, no `entries`) counts as one issued ticket — green success header, big №N, truthful footer metrics from the top-level fields. Multi/partial presentations unchanged; `success:true` without either shape still renders as failure (no fabrication from the flag alone). Both behaviors component-tested against the canonical DTO shapes.
+- **REG-XC-001 — RESOLVED.** `approve_price_override` (`registrar_wizard/_cart.py`) now reassigns a NEW dict to `visit.doctor_price_override` on every approval — SQLAlchemy dirty tracking fires on first AND second approvals. Red-first proof on an isolated SQLite engine: pre-fix source failed exactly with the audit symptom (`'202' not in stored JSON` while the override row said `approved` and the endpoint returned 2xx); post-fix both approvals persist and a FRESH session reads them back. First-approval and approved_at-contract regressions included.
+
+Red-first evidence per finding was captured on pre-fix source before applying the fixes (see the PR body's Cyclic Execution Evidence). All other findings of this journal (REG-FE-070–083, CSH-FE-040–049/051, QR-FE-003–007) remain open REPRO-PENDING candidates; the canonical ledger counters are unaffected (this journal stays separate from the registrar/cashier ledgers).
+
 ## Baseline and scope
 
 - Repository: `drsapaev/final`; reviewed `main` at `ee7763e77e545db1479e257dbe4d3a388264cc03` (the commit matched `main` immediately before this audit branch).
@@ -51,7 +65,7 @@ The previous reviews **already inspected all five named registrar groups** and t
 | ID | Priority candidate | Surface | Source observation | Verification |
 | --- | --- | --- | --- | --- |
 | **REG-FE-083** | P2 | Registrar record preview | 'Очередь' formats objects by queue name/tag but discards their `number` | SOURCE-OBSERVED / REPRO-PENDING |
-| **CSH-FE-050** | **P1** | Cashier refund requests amount | Backend responds `refund_amount`; table column reads `amount`; no adapter maps between them | SOURCE-OBSERVED / REPRO-PENDING |
+| **CSH-FE-050** | **P1** | Cashier refund requests amount | Backend responds `refund_amount`; table column reads `amount`; no adapter maps between them | **RESOLVED via #3876** (2026-11-05): typed read model + column read `refund_amount`; component tests against the exact DTO |
 | **CSH-FE-051** | P2 | Cashier refund destination | UI maps every type except `deposit` to 'На карту', including the legitimate `cash` refund enum | SOURCE-OBSERVED / REPRO-PENDING |
 
 ### REG-FE-083 — Record preview shows queue label, not issued ticket (P2 candidate)
@@ -100,8 +114,8 @@ The previous reviews **already inspected all five named registrar groups** and t
 
 | ID | Provisional severity | Path | Symptom | Verification status |
 | --- | --- | --- | --- | --- |
-| **REG-FE-084** | **P1** | `wizardUtils.ts` + `AppointmentWizardV2.tsx` | Removing one of two services that share one queue entry is silently treated as no service delta, then reported as a successful edit | **SOURCE-OBSERVED / REPRO-PENDING** |
-| **REG-FE-085** | **P1** | `wizardUtils.ts` | Queue-entry ID equality is type-sensitive; `42` and `"42"` name the same entry but a still-kept entry is sent for cancellation | **SOURCE-OBSERVED / REPRO-PENDING** |
+| **REG-FE-084** | **P1** | `wizardUtils.ts` + `AppointmentWizardV2.tsx` | Removing one of two services that share one queue entry is silently treated as no service delta, then reported as a successful edit | **RESOLVED via #3876** (2026-11-05): `detectRemovedServicesWithinRetainedEntries` blocks the submit with an explicit unsupported-operation error before any save path; whole-entry cancellation unchanged |
+| **REG-FE-085** | **P1** | `wizardUtils.ts` | Queue-entry ID equality is type-sensitive; `42` and `"42"` name the same entry but a still-kept entry is sent for cancellation | **RESOLVED via #3876** (2026-11-05): String-normalized identity in `getRemovedQueueEntryIds` + all three inline wizard sites; mixed-type regression tests |
 | **REG-FE-070** | P2 | `AppointmentWizardV2.tsx` | Manual service-list refresh announces success even when the fetch failed | **SOURCE-OBSERVED / REPRO-PENDING** |
 
 ### REG-FE-084 — Removing a single service within a retained queue entry is not a persisted edit (P1 candidate)
@@ -155,7 +169,7 @@ Exact-identifier code search on current `main` returned each component's **own d
 | **REG-FE-072** | P2 conditional | Doctor selector presents per-specialty static limits as actual doctor's queue number range | **DORMANT / SOURCE-OBSERVED / REPRO-PENDING** |
 | **REG-FE-073** | P2 conditional | Price override list has no request-epoch guard for concurrent filter changes | **DORMANT / SOURCE-OBSERVED / REPRO-PENDING** |
 | **REG-FE-074** | P2 conditional | An optional queue-settings network failure rejects `Promise.all` and hides otherwise successfully loaded doctor roster | **DORMANT / SOURCE-OBSERVED / REPRO-PENDING** |
-| **REG-XC-001** | **P1 candidate, backend cross-contract** | Second price approval on an existing nonempty `Visit.doctor_price_override` uses in-place JSON mutation without SQLAlchemy dirty tracking | **BACKEND SOURCE-OBSERVED / DB-REPRO-PENDING**; API endpoint exists even if UI is dormant |
+| **REG-XC-001** | **P1 candidate, backend cross-contract** | Second price approval on an existing nonempty `Visit.doctor_price_override` uses in-place JSON mutation without SQLAlchemy dirty tracking | **RESOLVED via #3876** (2026-11-05): new-dict reassignment marks the attribute dirty on every approval; red-first proven on an isolated SQLite engine with a fresh session (`'202' not in stored JSON` on pre-fix source) |
 
 #### REG-FE-071 — `specialty` filter ignored
 
@@ -271,7 +285,7 @@ This is a **cross-contract finding in backend source** uncovered while reviewing
 
 | ID | Severity candidate | New source observation | State |
 | --- | --- | --- | --- |
-| **CSH-FE-039** | **P1** | CashPaymentModal offers `click`/`payme`, but routes them through the direct cashier endpoint that sets `status='paid'` without provider verification | **SOURCE-OBSERVED / DB+CONTRACT-REPRO-PENDING** |
+| **CSH-FE-039** | **P1** | CashPaymentModal offers `click`/`payme`, but routes them through the direct cashier endpoint that sets `status='paid'` without provider verification | **RESOLVED via #3876** (2026-11-05): backend DTO validation — immediate-paid command accepts only manually receipted `cash`/`card` (422 for click/payme/kaspi/unknown); modal offers cash/card only; provider flow stays pending → webhook → paid |
 | **CSH-FE-040** | P2 | Cash tender `received_amount` and `change_due` calculated in modal are dropped before the backend payment command | **SOURCE-OBSERVED / REPRO-PENDING** |
 | **CSH-FE-041** | P2 | Online `cancelPayment` only clears UI state and closes modal; no provider cancellation nor explicit 'tracking stopped; payment may settle' confirmation | **SOURCE-OBSERVED / REPRO-PENDING** |
 | **CSH-FE-042** | P2 | Untracked 10-second delayed poll starter can activate after PaymentWidget is unmounted/closed | **SOURCE-OBSERVED / FAKE-TIMER-REPRO-PENDING** |
@@ -433,8 +447,8 @@ In [`panelPrint.ts` L948–968](https://github.com/drsapaev/final/blob/9ba152ab8
 
 | ID | Provisional priority | Observation | Evidence |
 | --- | --- | --- | --- |
-| **QR-FE-001** | **P1 privacy candidate** | **Legacy shared QR token** auto-persists full patient name, phone, Telegram ID to browser localStorage and restores it for the next same-token visitor after an abandoned form | **SOURCE-OBSERVED / SHARED-DEVICE-REPRO-PENDING** |
-| **QR-FE-002** | **P1 workflow/truthfulness candidate** | A **successful single-doctor join** (`success:true,queue_number:N` but no `entries`) renders a failed success header and red failure icon because `successCount` depends only on `entries.length` | **SOURCE-CONTRACT-MISMATCH / COMPONENT-REPRO-PENDING** |
+| **QR-FE-001** | **P1 privacy candidate** | **Legacy shared QR token** auto-persists full patient name, phone, Telegram ID to browser localStorage and restores it for the next same-token visitor after an abandoned form | **RESOLVED via #3876** (2026-11-05): no PHI draft persistence/restoration on ANY anonymous surface; stale drafts swept from both stores; the old restoration test inverted |
+| **QR-FE-002** | **P1 workflow/truthfulness candidate** | A **successful single-doctor join** (`success:true,queue_number:N` but no `entries`) renders a failed success header and red failure icon because `successCount` depends only on `entries.length` | **RESOLVED via #3876** (2026-11-05): success derived from `success` + top-level ticket when the single DTO shape arrives; multi/partial presentations unchanged; component tests on the canonical DTO |
 | **QR-FE-003** | P2 conditional | If server QR image missing, staff SVG QR hardcodes `https://med-queue.uz/` instead of server `qr_url`/deployment origin; download button refuses fallback even though SVG visible | **SOURCE-OBSERVED / MOCKED-IMAGE-REPRO-PENDING** |
 | **QR-FE-004** | P2 conditional | QR expiry state memoized once when dialog opens, not refreshed at `expires_at`; open dialog and PNG caption can keep saying valid after expiry | **SOURCE-OBSERVED / FAKE-CLOCK-REPRO-PENDING** |
 | **QR-FE-005** | P2 conditional | Legacy token flow reloads a **new** join session even if an old complete attempt returned UNKNOWN, overwriting the prior session identity and losing the same-session replay path | **SOURCE-OBSERVED / LOST-RESPONSE-RELOAD-REPRO-PENDING** |
