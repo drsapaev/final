@@ -6737,6 +6737,7 @@ const uzLatn = {
     pay_widg_processing: 'Qayta ishlanmoqda...',
     pay_widg_pay_amount: 'Toʻlash {amount}',
     pay_widg_cancel: 'Bekor qilish',
+    pay_widg_cancel_hint: 'Oynani yopish to‘lovni bekor qilmaydi — to‘lov provayder tasdiqlaguncha faol bo‘lib qoladi',
 
     // ─── CashPaymentModal.stories.jsx (pay_story_) ─────────────────────
     pay_story_docs_description: 'Modal for processing cash/card payments. Features: quick cash denominations (50k/100k/200k/500k UZS), "{noChangeBtn}" button, change-due calculation, insufficient funds validation.',
@@ -9419,6 +9420,8 @@ const uzLatn = {
     rrt_kogda_poyavyatsya_novye_zapr: 'Когда появятся новые запросы на возврат, они будут показаны здесь.',
     rrt_na_depozit: 'На депозит',
     rrt_na_kartu: 'На карту',
+    rrt_nalichnymi: 'Naqd pul',
+    rrt_unknown: 'Noma’lum',
     rrt_obrabotka: 'Обработка',
     // ServiceChecklist.jsx (sc_)
     sc_konsultatsiya_kardiologa: 'Консультация кардиолога',

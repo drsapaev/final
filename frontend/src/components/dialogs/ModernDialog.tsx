@@ -2,6 +2,15 @@ import React, { useEffect, useRef, type CSSProperties, type ReactNode } from 're
 import { X } from 'lucide-react';
 import './ModernDialog.css';
 import { useTranslation } from '../../i18n/useTranslation';
+import logger from '../../utils/logger';
+
+// REG-FE-077 (follow-up audit 2026-11-02): стек открытых диалогов —
+// единственный владелец блокировки скролла body и клавиатурного
+// перехвата. Прежде каждый экземпляр вешал свой глобальный keydown и
+// безусловно очищал body.style.overflow при закрытии: два вложенных
+// диалога — закрытие внутреннего разблокировало скролл за внешним,
+// а Escape закрывал оба сразу.
+const dialogStack: HTMLElement[] = [];
 
 interface DialogAction {
   label?: string;
@@ -21,6 +30,13 @@ interface ModernDialogProps {
   title?: ReactNode;
   children?: ReactNode;
   customHeader?: ReactNode;
+  /**
+   * REG-FE-075 (follow-up audit 2026-11-02): доступное имя диалога для
+   * случаев, когда заголовок — НЕ строка (customHeader-композиция без
+   * текстового `title`). Без него role="dialog" оставался безымянным для
+   * скринридеров.
+   */
+  ariaLabel?: string;
   actions?: ReactNode | DialogAction[];
   maxWidth?: string;
   maxHeight?: string;
@@ -39,6 +55,7 @@ const ModernDialog = ({
   title,
   children,
   customHeader,
+  ariaLabel,
   actions,
   maxWidth = '28rem',
   maxHeight = 'calc(100dvh - 2rem)',
@@ -54,24 +71,74 @@ const ModernDialog = ({
   // (все стили перенесены в CSS с macos tokens + [data-theme="dark"] selectors).
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Фокус-ловушка и управление клавишами
+  // REG-FE-076 (follow-up audit 2026-11-02): ловушка фокуса считает только
+  // РЕАЛЬНО доступных кандидатов — прежде селектор включал disabled-кнопки
+  // и скрытые элементы: «последний tabbable» мог оказаться недостижимым, и
+  // Tab с последней живой кнопки выпадал из диалога (реальный кейс
+  // CancelDialog: действие disabled, а предшествующая кнопка — последняя
+  // «tabbable» по старому подсчёту).
+  const FOCUSABLE_SELECTOR =
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  const isFocusableCandidate = (el: Element): el is HTMLElement => {
+    const html = el as HTMLElement;
+    if ('disabled' in html && (html as { disabled?: boolean }).disabled) return false;
+    if (el.getAttribute('aria-hidden') === 'true') return false;
+    // jsdom не реализует checkVisibility — там считаем видимым;
+    // в реальном браузере скрытые кандидаты отфильтровываются.
+    if (typeof html.checkVisibility === 'function') {
+      return html.checkVisibility();
+    }
+    return true;
+  };
+  const getFocusableCandidates = (): HTMLElement[] =>
+    Array.from(dialogRef.current?.querySelectorAll(FOCUSABLE_SELECTOR) ?? []).filter(
+      isFocusableCandidate,
+    );
+
+  // Фокус-ловушка, стек диалогов и возврат фокуса
   useEffect(() => {
     if (!isOpen) return;
 
+    // REG-FE-080 (follow-up audit 2026-11-02): запоминаем триггер — после
+    // закрытия клавиатурный пользователь возвращается на место, а не
+    // «проваливается» в body.
+    const previouslyFocused = (document.activeElement as HTMLElement | null) ?? null;
+
+    // REG-FE-077 (follow-up audit 2026-11-02): владелец стека. Скролл body
+    // блокирует только ПЕРВЫЙ открытый диалог и возвращает только
+    // ПОСЛЕДНИЙ закрытый — прежде каждый экземпляр очищал overflow,
+    // разблокируя скролл за ещё открытым внешним диалогом. Клавиатуру
+    // (Escape/Tab) обрабатывает только ВЕРХНИЙ диалог — внутренние
+    // экземпляры больше не соревнуются глобальными слушателями.
+    const stackEntry: HTMLElement = dialogRef.current ?? document.createElement('div');
+    dialogStack.push(stackEntry);
+    if (dialogStack.length === 1) {
+      document.body.style.overflow = 'hidden';
+    }
+    if (process.env.NODE_ENV !== 'production'
+      && customHeader && typeof title !== 'string' && !ariaLabel) {
+      // REG-FE-075: композиция без доступного имени — заметно в разработке.
+      logger.warn(
+        '[ModernDialog] customHeader без строкового title/ariaLabel: '
+          + 'у диалога нет доступного имени (REG-FE-075).',
+      );
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      // REG-FE-077: не верхний диалог клавиатуру не перехватывает.
+      if (dialogStack[dialogStack.length - 1] !== stackEntry) return;
+
       if (e.key === 'Escape' && closeOnEscape) {
         e.preventDefault();
         onClose?.();
       }
 
       if (e.key === 'Tab') {
-        const focusableElements = dialogRef.current?.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
+        const focusableElements = getFocusableCandidates();
 
-        if (focusableElements && focusableElements.length > 0) {
-          const firstElement = focusableElements[0] as HTMLElement;
-          const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+        if (focusableElements.length > 0) {
+          const firstElement = focusableElements[0];
+          const lastElement = focusableElements[focusableElements.length - 1];
 
           if (e.shiftKey && document.activeElement === firstElement) {
             e.preventDefault();
@@ -86,24 +153,40 @@ const ModernDialog = ({
 
     document.addEventListener('keydown', handleKeyDown);
 
-    // Фокус на первый элемент
-    setTimeout(() => {
-      const firstFocusable = dialogRef.current?.querySelector(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
+    // Фокус на первый доступный элемент (REG-FE-076: тоже отфильтрованный)
+    const focusTimer = setTimeout(() => {
+      const firstFocusable = getFocusableCandidates()[0];
       if (firstFocusable) {
-        (firstFocusable as HTMLElement).focus();
+        firstFocusable.focus();
       }
     }, 100);
 
-    // Блокируем скролл body
-    document.body.style.overflow = 'hidden';
-
     return () => {
+      clearTimeout(focusTimer);
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
+      // REG-FE-077: снять только СВОЮ регистрацию; скролл возвращает
+      // последний закрытый.
+      const stackIndex = dialogStack.lastIndexOf(stackEntry);
+      if (stackIndex !== -1) {
+        dialogStack.splice(stackIndex, 1);
+      }
+      if (dialogStack.length === 0) {
+        document.body.style.overflow = '';
+      }
+      // REG-FE-080: вернуть фокус триггеру, если он ещё в документе и
+      // фокус сейчас внутри закрывающегося диалога (или потерян в body).
+      const currentActive = document.activeElement as HTMLElement | null;
+      if (
+        previouslyFocused
+        && previouslyFocused.isConnected
+        && (!currentActive
+          || currentActive === document.body
+          || dialogRef.current?.contains(currentActive))
+      ) {
+        previouslyFocused.focus();
+      }
     };
-  }, [isOpen, closeOnEscape, onClose]);
+  }, [isOpen, closeOnEscape, onClose, customHeader, title, ariaLabel]);
 
   if (!isOpen) return null;
 
@@ -115,11 +198,16 @@ const ModernDialog = ({
     ...dialogStyle
   };
 
-  const dialogLabelProps = customHeader && title ? {
-    'aria-label': typeof title === 'string' ? title : undefined
-  } : {
-    'aria-labelledby': title ? 'dialog-title' : undefined
-  };
+  // REG-FE-075 (follow-up audit 2026-11-02): у диалога ВСЕГДА есть
+  // доступное имя, когда его можно вывести: строковый title (напрямую или
+  // через customHeader-композицию) либо явный ariaLabel. Прежняя логика
+  // давала имя только паре customHeader+строковый-title; композиция без
+  // title оставалась безымянной для скринридеров.
+  const dialogLabelProps = customHeader
+    ? { 'aria-label': typeof title === 'string' ? title : ariaLabel }
+    : title
+      ? { 'aria-labelledby': 'dialog-title' }
+      : { 'aria-label': ariaLabel };
 
   return (
     <div

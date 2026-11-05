@@ -1320,16 +1320,23 @@ def approve_price_override(
             # Обновляем цену в визите
             visit = db.query(Visit).filter(Visit.id == override.visit_id).first()
             if visit:
-                # Обновляем doctor_price_override в JSON поле
-                if not visit.doctor_price_override:
-                    visit.doctor_price_override = {}
-
-                visit.doctor_price_override[str(override.service_id)] = {
+                # Обновляем doctor_price_override в JSON поле.
+                # REG-XC-001 (follow-up audit 2026-11-02): колонка — обычный
+                # mapped_column(JSON) БЕЗ MutableDict, поэтому SQLAlchemy не
+                # отслеживает in-place мутации словаря. Первое согласование
+                # (None → {}) маркировало атрибут dirty, но ВТОРОЕ на
+                # непустом словаре проходило без присваивания/flag_modified —
+                # одобрение возвращало 2xx, а JSON визита не сохранялся.
+                # Каноническая правка: собрать НОВЫЙ словарь и присвоить его
+                # атрибуту — dirty-трекинг срабатывает на каждом согласовании.
+                updated_override = dict(visit.doctor_price_override or {})
+                updated_override[str(override.service_id)] = {
                     "original_price": float(override.original_price),
                     "new_price": float(override.new_price),
                     "override_id": override.id,
                     "approved_at": override.approved_at.isoformat(),
                 }
+                visit.doctor_price_override = updated_override
 
             message = "Изменение цены одобрено"
 

@@ -32,11 +32,17 @@ import React from "react";
  * and uses consistent Russian aria-labels (HIGH #8).
  */
 // i18n: payment method labels are translated at call time via getPaymentMethodOptions(t).
+// CSH-FE-039 (follow-up audit 2026-11-02): this modal feeds the DIRECT
+// cashier payment command, which settles immediately (status='paid')
+// with no provider verification. Only manually receipted methods may
+// take that path — cash (наличные) and card (ручной терминал с чеком).
+// Click/PayMe are hosted provider methods: they must be initiated via
+// the online PaymentWidget (pending → provider → webhook → paid) and
+// must never be offered as one-click "paid" entries here. The backend
+// enforces the same boundary on the DTO (cashier/_helpers.py).
 const getPaymentMethodOptions = (t: (key: string) => string) => [
   { value: 'cash', label: t('payment.pay_cash_method_cash') },
   { value: 'card', label: t('payment.pay_cash_method_card') },
-  { value: 'click', label: t('payment.pay_cash_method_click') },
-  { value: 'payme', label: t('payment.pay_cash_method_payme') },
 ];
 
 // UX Audit #1.2: Quick cash denominations (UZS banknotes) + "exact amount" button.
