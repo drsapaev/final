@@ -152,12 +152,11 @@
 - **Suggested fix:** use a controlled maintenance workflow with verified source backup, isolated target, compatibility check and explicit swap/promotion; use transactional restore semantics where supported. Do not invoke on a live clinic database in a test or to collect review evidence.
 
 
-### BR-021 — P2 — Retention cleanup double-unlinks archives and can abandon the count limit
+### BR-021 — Withdrawn as P2; P3 log-only duplicate unlink (corrected after negative-path review)
 
-- **Source:** `backend/app/services/backup_service.py:356–385`. `_cleanup_old_backups()` obtains a sorted list, unlinks expired files in the first loop, then iterates `backups[self.max_backups:]` from the **original unfiltered list**, calling `unlink()` again. A broad `except Exception` logs and terminates cleanup.
-- **Failure precondition:** an expired archive also occurs beyond the `max_backups` cutoff. `FileNotFoundError` from the second unlink aborts the remainder of the count-limit pass, leaving some nonexpired excess archives. The independent `backend/tests/unit/test_backup_atomic_and_retention.py:23–39` tests age-based cleanup without simultaneously exercising max-count enforcement.
-- **Fail-first test:** create synthetic age-controlled backup files: more than `max_backups` total, at least one expired file in the second-loop slice and at least one younger excess file after it. Assert all expired files and all extra survivors are handled and no stale-reference unlink aborts the pass.
-- **Suggested fix:** recompute the surviving list after age-based deletion and apply max-count retention only to extant files; handle disappeared files idempotently and instrument a failure to enforce retention. Avoid deletion of an active backup by requiring unique, committed backup ownership.
+- **Source:** `backend/app/services/backup_service.py:356–385`. The cleanup sorts archives by descending `mtime`, unlinks expired archives, then loops over `backups[self.max_backups:]` from the original snapshot. A previously removed expired file can be unlinked again, raising `FileNotFoundError` and producing an error log.
+- **Correction (2026-11-05):** the original claim that this leaves **younger excess archives** and violates `MAX_BACKUPS` was **not supported**. With stable file mtimes, all expired entries are a suffix of the sorted list, so younger count-excess entries are processed **before** the repeated unlink raises. An isolated three-file synthetic reproduction confirmed the duplicate exception **and** that the configured count limit was still satisfied. Withdraw BR-021 as a retention-safety/P2 defect; at most treat it as a P3 idempotence/logging cleanup, unless new independent evidence of retention violations appears.
+- **Optional regression:** create two fresh and one expired synthetic archive with `max_backups=1`; assert one file survives and avoid misleading `Error cleaning up backups` log by applying a filtered survivor list. Do not prioritize ahead of data-integrity P1 work.
 
 ### BR-022 — P2 — Interrupted compression leaves a partial published-looking `.db.gz` artifact
 
@@ -191,11 +190,24 @@
 8. **DR leftover state and gzip archive safety:** BR-015–017. Preserve backup artifacts, enforce per-run database and temporary-file ownership, and report failed test DB removal.
 9. **Service backup concurrency and format correctness:** BR-018–019. Protect other writers' temp files and verify PostgreSQL archives using PostgreSQL tools.
 10. **Admin restore safety:** BR-020. Require isolated synthetic full-restore proof and explicit clinical maintenance/rollback policy before repairing live-restore behavior.
-11. **Retention and archive visibility:** BR-021–022. Test age and count limits together; isolate partial compressed artifacts until final publication.
+11. **Archive visibility:** BR-022 needs atomic compression/cleanup; BR-021 is withdrawn as P2 after an isolated counterexample check (only optional P3 logging/idempotence hygiene).
+
+## Isolated negative-path reproductions (2026-11-05)
+
+- **Evidence type:** controlled Python 3.13 source-**excerpt** harness, with PostgreSQL subprocesses replaced by mocks, using only synthetic files in `tempfile.TemporaryDirectory`. The harness transcribed the relevant function bodies from inspected GitHub source; it did **not** import the full repository, launch PostgreSQL, use secrets, or execute a real `DROP DATABASE`. It is **not** CI, a product-level regression suite, or proof of a corrected implementation.
+- **BR-012:** with synthetic source/target name `source_clinic`, `drop_and_create_drill_db()` reaches construction of `DROP DATABASE` despite the source identity collision.
+- **BR-013:** `pg_restore` stub returns `returncode=1`, stderr `pg_restore: connection interrupted` (no `ERROR:` token); `restore_backup()` still reaches completion.
+- **BR-016:** with two synthetic adjacent `synthetic.dump` and `synthetic.dump.gz` files, gzip extraction overwrites the original `.dump` bytes.
+- **BR-017:** with `DRILL_DB_DROP_ON_START=0` and failed stubbed `CREATE DATABASE`, cleanup still issues a `DROP DATABASE` for that same target.
+- **BR-018:** the exact `for stray in backup_dir.glob("*.tmp"): stray.unlink()` cleanup pattern deletes a synthetic other-writer file.
+- **BR-008:** `fail()` signals `SystemExit`; the update supervisor's `except Exception` does not catch it, so rollback is skipped.
+- **BR-021 correction:** the duplicate unlink raises `FileNotFoundError`, but the synthetic sorted case still satisfies the archive count limit; prior priority/consequence overstated.
+- **Output:** 7/7 **behavior scenarios observed** (six vulnerability behaviors + one corrective falsification). The harness passes only because it asserts the **current undesirable behavior**, not because a fix is present. Future real repository tests must assert the opposite (fail-first before fix, green after).
+- **Limitations:** no exact repo code was executed as an installed module, no actual database changes, no true process concurrency, no genuine archive/restore E2E and no production exposure or impact verified. Reproduce in an isolated worktree and disposable PostgreSQL before shipping a source fix.
 
 ## Verification and rollback
 
 - **Performed:** read exact GitHub `main` sources and runbooks; checked scopes, existing explicit restore guard, encrypted backup alternative, backend DR drill including cleanup/gzip, scheduled and Admin backup writers, service verification/restore, age/count retention and partial-compression unit-test coverage, and the synthetic GitHub Actions workflow; consulted repo security/testing skills. Existing source hashes for these paths were unchanged at review time; original base was `503cc1e`.
-- **Not performed:** local `git status`, gate execution, `git diff --check`, pytest, PostgreSQL commands, archive creation, real restore, E2E smoke, CI, protected source changes, production actions.
+- **Not performed:** local repository `git status`, gate execution, `git diff --check`, pytest, real PostgreSQL commands, real archive creation/restore, E2E smoke, source fixes, production actions. The separately described excerpt/mocks run is not a substitute for these.
 - **Stop condition:** no source repair, rollout, restore, or merge until safe isolation and mandatory gate evidence are available.
 - **Rollback for this document only:** close its Draft PR or revert this one docs-only commit; no deployed behavior changes.
