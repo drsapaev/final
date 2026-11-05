@@ -58,7 +58,15 @@ def _wait_for_backend_ready(*, timeout_seconds: int = 120, interval_seconds: int
             last_error = str(exc)
         time.sleep(interval_seconds)
 
-    fail(
+    # BR-008 (backup/restore source review, PR #3882): the historical
+    # fail() raised SystemExit — a BaseException the rollback
+    # supervisor's ``except Exception`` does not catch — so a readiness
+    # timeout AFTER deploy/migration skipped the automatic rollback
+    # entirely. Signal the ordinary lifecycle exception instead; the
+    # supervisor rolls back and reports the failure with a nonzero exit.
+    # KeyboardInterrupt/SystemExit from other sources keep their
+    # pass-through semantics.
+    raise LifecycleError(
         "Backend did not become ready after deploy within "
         f"{timeout_seconds}s. Last error: {last_error or 'unknown'}"
     )

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -54,6 +55,10 @@ log = logging.getLogger("dr_drill")
 BACKUP_DIR = Path(os.getenv("BACKUP_DIR", "backups"))
 DRILL_DB_NAME = os.getenv("DRILL_DB_NAME", "clinic_dr_drill")
 DRILL_DB_DROP_ON_START = os.getenv("DRILL_DB_DROP_ON_START", "1") == "1"
+
+# BR-012: the drill target must be a simple SQL identifier — it is
+# interpolated into quoted DROP/CREATE statements from an env var.
+_DRILL_DB_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _exit(code: int, msg: str) -> None:
@@ -125,66 +130,142 @@ def ensure_pg_tools() -> None:
         _exit(2, "psql not found. Install postgresql-client.")
 
 
-def drop_and_create_drill_db(user: str, password: str, host: str, port: int) -> None:
+def _require_safe_drill_target(source_db_name: str) -> str:
+    """BR-012: validate the drill target BEFORE any destructive command.
+
+    The drill runs its psql/pg_restore with the SOURCE credentials, so a
+    ``DRILL_DB_NAME`` equal to the source database turns ``DROP
+    DATABASE`` into a source-database deletion. Fail closed on the
+    identity collision and on any name that is not a simple SQL
+    identifier (the historical code interpolated raw env text into
+    quoted SQL)."""
+    candidate = (DRILL_DB_NAME or "").strip()
+    if not _DRILL_DB_NAME_RE.fullmatch(candidate):
+        _exit(
+            2,
+            "DRILL_DB_NAME must be a simple SQL identifier (letters, digits, "
+            f"underscore; no quotes/dashes/dots): {candidate!r}",
+        )
+    if candidate.casefold() == (source_db_name or "").strip().casefold():
+        _exit(
+            2,
+            f"Refusing DR drill: DRILL_DB_NAME ({candidate!r}) matches the "
+            f"source database ({source_db_name!r}). Point DRILL_DB_NAME at a "
+            "separate scratch database.",
+        )
+    return candidate
+
+
+def drop_and_create_drill_db(user: str, password: str, host: str, port: int) -> bool:
+    """Provision the drill target; True only after CREATE succeeds.
+
+    BR-013: both psql calls ran with ``check=False`` and ignored the
+    exit status — a failed DROP/CREATE silently continued into the
+    restore. Every status is now enforced. BR-017: the run owns the
+    target only once CREATE has succeeded; the finally-cleanup never
+    drops a database this run did not create.
+    """
     env = os.environ.copy()
     env["PGPASSWORD"] = password
 
     if DRILL_DB_DROP_ON_START:
         log.info("Dropping drill DB '%s' if exists...", DRILL_DB_NAME)
-        _run(
-            ["psql", "-h", host, "-p", str(port), "-U", user, "-d", "postgres", "-c", f"DROP DATABASE IF EXISTS \"{DRILL_DB_NAME}\";"],
+        result = _run(
+            ["psql", "-h", host, "-p", str(port), "-U", user, "-d", "postgres", "-c", f'DROP DATABASE IF EXISTS "{DRILL_DB_NAME}";'],
             env=env,
             check=False,
         )
+        if result.returncode != 0:
+            _exit(
+                1,
+                "DROP DATABASE for drill target failed "
+                f"(rc={result.returncode}): {(result.stderr or '')[:300]}",
+            )
 
     log.info("Creating fresh drill DB '%s'...", DRILL_DB_NAME)
-    _run(
-        ["psql", "-h", host, "-p", str(port), "-U", user, "-d", "postgres", "-c", f"CREATE DATABASE \"{DRILL_DB_NAME}\";"],
+    result = _run(
+        ["psql", "-h", host, "-p", str(port), "-U", user, "-d", "postgres", "-c", f'CREATE DATABASE "{DRILL_DB_NAME}";'],
         env=env,
         check=False,
     )
+    if result.returncode != 0:
+        _exit(
+            1,
+            "CREATE DATABASE for drill target failed "
+            f"(rc={result.returncode}): {(result.stderr or '')[:300]}",
+        )
+    return True
 
 
 def restore_backup(backup_path: Path, user: str, password: str, host: str, port: int) -> None:
     env = os.environ.copy()
     env["PGPASSWORD"] = password
 
-    # Decompress if gzipped
     actual_path = backup_path
-    if backup_path.suffix == ".gz":
-        log.info("Decompressing %s...", backup_path.name)
-        actual_path = backup_path.with_suffix("")  # strip .gz
-        with gzip_open(backup_path, "rb") as src, open(actual_path, "wb") as dst:
-            shutil.copyfileobj(src, dst)
+    extracted_tmp: Path | None = None
+    try:
+        # Decompress if gzipped
+        if backup_path.suffix == ".gz":
+            log.info("Decompressing %s...", backup_path.name)
+            # BR-016: the historical code wrote ``backup_path.with_suffix("")``
+            # INSIDE the backup directory — a same-stem archive next to the
+            # .gz was truncated and replaced, and a malformed stream left
+            # plaintext bytes behind with no cleanup. Extract into a
+            # privately created 0600 temp artifact outside the backup
+            # directory; the finally below guarantees removal.
+            fd, tmp_name = tempfile.mkstemp(
+                prefix=f"dr_drill_{backup_path.stem}.", suffix=".dump"
+            )
+            os.close(fd)
+            extracted_tmp = Path(tmp_name)
+            extracted_tmp.chmod(0o600)
+            with gzip_open(backup_path, "rb") as src, open(extracted_tmp, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            actual_path = extracted_tmp
 
-    log.info("Restoring %s → %s...", actual_path.name, DRILL_DB_NAME)
-    result = _run(
-        [
-            "pg_restore",
-            "-h", host,
-            "-p", str(port),
-            "-U", user,
-            "-d", DRILL_DB_NAME,
-            "--no-owner",
-            "--no-privileges",
-            "--clean",
-            "--if-exists",
-            "--verbose",
-            str(actual_path),
-        ],
-        env=env,
-        check=False,
-    )
+        log.info("Restoring %s → %s...", actual_path.name, DRILL_DB_NAME)
+        result = _run(
+            [
+                "pg_restore",
+                "-h", host,
+                "-p", str(port),
+                "-U", user,
+                "-d", DRILL_DB_NAME,
+                "--no-owner",
+                "--no-privileges",
+                "--clean",
+                "--if-exists",
+                # BR-013: stop at the first error instead of continuing
+                # through a partially restored schema.
+                "--exit-on-error",
+                "--verbose",
+                str(actual_path),
+            ],
+            env=env,
+            check=False,
+        )
 
-    # pg_restore exits non-zero on warnings (e.g. 'relation already exists' on --clean).
-    # We treat stderr as the source of truth: only fail if there are ERROR lines.
-    error_lines = [ln for ln in result.stderr.splitlines() if "ERROR:" in ln.upper()]
-    if error_lines:
-        for ln in error_lines[:20]:
-            log.error("pg_restore: %s", ln)
-        _exit(1, f"pg_restore had {len(error_lines)} ERROR lines")
+        # BR-013: the process exit status is authoritative. The historical
+        # code ignored ``returncode`` and failed only on stderr lines
+        # containing 'ERROR:' — a nonzero pg_restore with a differently
+        # shaped diagnostic certified a stale database.
+        if result.returncode != 0:
+            for ln in (result.stderr or "").splitlines()[:20]:
+                log.error("pg_restore: %s", ln)
+            _exit(1, f"pg_restore failed with exit code {result.returncode}")
 
-    log.info("Restore completed.")
+        # Defense in depth: pg_restore diagnostics that look like errors
+        # still fail the drill even when the process exited 0.
+        error_lines = [ln for ln in result.stderr.splitlines() if "ERROR:" in ln.upper()]
+        if error_lines:
+            for ln in error_lines[:20]:
+                log.error("pg_restore: %s", ln)
+            _exit(1, f"pg_restore had {len(error_lines)} ERROR lines")
+
+        log.info("Restore completed.")
+    finally:
+        if extracted_tmp is not None:
+            extracted_tmp.unlink(missing_ok=True)
 
 
 def gzip_open(path: Path, mode: str):
@@ -234,17 +315,38 @@ def smoke_test_drill_db(user: str, password: str, host: str, port: int) -> None:
     log.info("✅ Smoke test passed.")
 
 
-def cleanup_drill_db(user: str, password: str, host: str, port: int) -> None:
-    """Drop the drill DB (best-effort)."""
+def cleanup_drill_db(
+    user: str,
+    password: str,
+    host: str,
+    port: int,
+    *,
+    drill_db_created: bool,
+) -> None:
+    """Drop the drill DB (best-effort) — but ONLY what this run created.
+
+    BR-017: the historical finally-cleanup dropped ``DRILL_DB_NAME``
+    unconditionally, so with ``DRILL_DB_DROP_ON_START=0`` and a failed
+    CREATE the run could delete a PREEXISTING database it never owned.
+    ``DRILL_KEEP_DB=1`` stays the explicit retain opt-out.
+    """
     if os.getenv("DRILL_KEEP_DB", "0") == "1":
         log.info("DRILL_KEEP_DB=1 — leaving drill DB '%s' in place for inspection.", DRILL_DB_NAME)
+        return
+
+    if not drill_db_created:
+        log.info(
+            "Drill DB '%s' was not created by this run — skipping cleanup "
+            "(BR-017: never drop a database this run does not own).",
+            DRILL_DB_NAME,
+        )
         return
 
     env = os.environ.copy()
     env["PGPASSWORD"] = password
     log.info("Cleaning up drill DB '%s'...", DRILL_DB_NAME)
     _run(
-        ["psql", "-h", host, "-p", str(port), "-U", user, "-d", "postgres", "-c", f"DROP DATABASE IF EXISTS \"{DRILL_DB_NAME}\";"],
+        ["psql", "-h", host, "-p", str(port), "-U", user, "-d", "postgres", "-c", f'DROP DATABASE IF EXISTS "{DRILL_DB_NAME}";'],
         env=env,
         check=False,
     )
@@ -261,10 +363,16 @@ def main() -> None:
 
     ensure_pg_tools()
     backup_path = find_latest_backup()
-    user, password, host, port, _source_db = parse_source_db_url()
+    user, password, host, port, source_db = parse_source_db_url()
+
+    # BR-012: identity + identifier validation happens BEFORE any psql,
+    # DROP, CREATE or pg_restore command is issued.
+    global DRILL_DB_NAME
+    DRILL_DB_NAME = _require_safe_drill_target(source_db)
+    drill_db_created = False
 
     try:
-        drop_and_create_drill_db(user, password, host, port)
+        drill_db_created = drop_and_create_drill_db(user, password, host, port)
         restore_backup(backup_path, user, password, host, port)
         smoke_test_drill_db(user, password, host, port)
         _exit(0, "DR drill PASSED — backup is restorable.")
@@ -273,7 +381,7 @@ def main() -> None:
         log.error("stderr: %s", e.stderr[:500] if e.stderr else "")
         _exit(1, f"DR drill FAILED: {e}")
     finally:
-        cleanup_drill_db(user, password, host, port)
+        cleanup_drill_db(user, password, host, port, drill_db_created=drill_db_created)
 
 
 if __name__ == "__main__":

@@ -206,7 +206,13 @@ class BackupService:
             backup_filename = f"backup_{safe_type or 'manual'}_{timestamp}.db"
             # Atomic write: pg_dump targets .tmp; final name appears only
             # after success - a failed dump no longer leaves zero-byte files.
-            backup_path = self.backup_dir / (backup_filename + ".tmp")
+            # BR-018 (backup/restore source review, PR #3882): the staging
+            # path is tracked so the failure handler below removes ONLY this
+            # operation's temp file — the historical glob("*.tmp") unlink
+            # loop deleted OTHER concurrent writers' live staging archives
+            # (scheduled job vs Admin-initiated backup share the directory).
+            staging_path = self.backup_dir / (backup_filename + ".tmp")
+            backup_path = staging_path
 
             # Create backup based on database type
             if db_url.startswith("sqlite"):
@@ -328,12 +334,14 @@ class BackupService:
             return backup_info
 
         except Exception as e:
-            # remove .tmp leftovers from a failed dump
-            for stray in self.backup_dir.glob("*.tmp"):
-                try:
-                    stray.unlink()
-                except OSError:
-                    pass
+            # BR-018: remove ONLY this operation's staging file. The
+            # historical cleanup globbed every ``*.tmp`` in the backup
+            # directory — a failed writer deleted OTHER concurrent
+            # writers' live staging archives (cross-run corruption).
+            try:
+                staging_path.unlink(missing_ok=True)
+            except OSError:
+                pass
             logger.error(f"❌ Backup failed: {e}")
             raise
 
