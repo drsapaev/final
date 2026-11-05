@@ -6,6 +6,7 @@ Database Backup Service
 import logging
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import uuid
@@ -211,16 +212,33 @@ class BackupService:
             # Post-merge review of #3887 (P1 #2): the timestamp has second
             # precision only — two same-type runs started within one second
             # derived the SAME .tmp path and the SAME final name, so one run
-            # could delete or replace the other's archive mid-flight. A
-            # random per-run suffix makes every run's paths exclusive.
-            run_suffix = uuid.uuid4().hex[:8]
-            backup_filename = (
-                f"backup_{safe_type or 'manual'}_{timestamp}.{run_suffix}.db"
-            )
+            # could delete or replace the other's archive mid-flight.
+            # Post-merge review of #3888 (P2): 32 random bits alone are not
+            # a uniqueness guarantee either — the temp path is now RESERVED
+            # exclusively (O_CREAT|O_EXCL): a same-id competitor cannot even
+            # create the file, and this run rerolls a fresh id on collision.
+            base_name = f"backup_{safe_type or 'manual'}_{timestamp}"
+            backup_path = None
+            for _attempt in range(8):
+                run_suffix = uuid.uuid4().hex[:8]
+                candidate = self.backup_dir / f"{base_name}.{run_suffix}.db.tmp"
+                try:
+                    # Exclusive reservation: create-and-close an empty file
+                    # only this run may own; the dumpers truncate it next.
+                    os.close(os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+                except FileExistsError:
+                    continue
+                backup_path = candidate
+                break
+            if backup_path is None:
+                raise RuntimeError(
+                    f"Could not reserve a unique backup temp path in "
+                    f"{self.backup_dir} after 8 attempts"
+                )
+            backup_filename = backup_path.name[: -len(".tmp")]
             # Atomic write: pg_dump targets the run-private .tmp; the final
             # name appears only after success - a failed dump no longer
             # leaves zero-byte files.
-            backup_path = self.backup_dir / (backup_filename + ".tmp")
             operation_tmp = backup_path
 
             # Create backup based on database type
@@ -281,18 +299,20 @@ class BackupService:
             else:
                 raise ValueError(f"Unsupported database type: {db_url}")
 
-            # Dump succeeded - atomically publish the final name. Both the
-            # source and the destination carry this run's random suffix, so
-            # the rename can only ever touch this run's own files: two
-            # concurrent runs publish distinct archives and never overwrite
-            # each other (#3887 post-merge review, P1 #2).
-            final_path = self.backup_dir / backup_filename
-            if not backup_path.exists():
-                raise FileNotFoundError(
-                    "pg_dump reported success but the temp archive is missing: "
+            # Dump succeeded. The O_EXCL reservation pre-created the temp
+            # file, so "pg_dump said ok but wrote nothing" now manifests as a
+            # zero-byte reserved file — fail loud instead of publishing it
+            # (no zero-byte artifacts under final names, Sentry-P0 rule).
+            if backup_path.stat().st_size == 0:
+                raise RuntimeError(
+                    "pg_dump reported success but produced an empty archive: "
                     f"{backup_path}"
                 )
-            os.replace(backup_path, final_path)
+            # Atomically + exclusively publish the final name (#3888 P2):
+            # os.link fails with FileExistsError if the name is already
+            # taken and this run re-stamps an extra unique suffix — a
+            # completed archive is never overwritten.
+            final_path = self._publish_backup(backup_path, backup_filename)
             backup_path = final_path
 
             # Get backup size
@@ -363,21 +383,73 @@ class BackupService:
             logger.error(f"❌ Backup failed: {e}")
             raise
 
+    def _publish_backup(self, tmp_path: Path, final_name: str) -> Path:
+        """Atomically and exclusively publish a completed artifact.
+
+        Post-merge review of #3888 (P2): publication must never overwrite a
+        completed archive. ``os.link`` fails with FileExistsError when the
+        name is already taken — this run then re-stamps an extra unique
+        suffix. ``os.replace`` would silently destroy the earlier archive.
+        The final name appears only with full content or not at all
+        (atomic, same-directory hard link).
+        """
+        final_path = self.backup_dir / final_name
+        for _attempt in range(8):
+            try:
+                os.link(tmp_path, final_path)
+            except FileExistsError:
+                final = Path(final_name)
+                final_path = self.backup_dir / (
+                    f"{final.stem}.{secrets.token_hex(3)}{final.suffix}"
+                )
+                continue
+            except OSError as link_err:
+                # Filesystems without hard links (FAT, some network
+                # shares): fall back to the atomic-but-non-exclusive
+                # rename; log loudly so the reduced guarantee is visible.
+                logger.warning(
+                    "os.link publish unsupported (%s); falling back to "
+                    "os.replace for %s",
+                    link_err,
+                    final_path.name,
+                )
+                os.replace(tmp_path, final_path)
+                return final_path
+            tmp_path.unlink(missing_ok=True)
+            return final_path
+        raise RuntimeError(
+            f"Could not publish backup {final_name!r}: final-name collision "
+            "persisted after 8 attempts"
+        )
+
     def _compress_backup(self, backup_path: Path) -> Path | None:
-        """Compress backup file"""
+        """Compress backup file.
+
+        Post-merge review of #3888 (P1): compression must stream into a
+        run-private ``.gz.tmp`` and publish atomically. Writing directly
+        under the final ``.db.gz`` name let list/retention observe a
+        partial archive mid-compression (a restorable-by-name corrupt
+        backup) — same family as the .db publish fix.
+        """
+        import gzip
+
+        final_gz_name = backup_path.name + ".gz"
+        gz_tmp = self.backup_dir / (final_gz_name + ".tmp")
         try:
-            import gzip
-
-            compressed_path = backup_path.with_suffix(backup_path.suffix + ".gz")
-
             with open(backup_path, "rb") as f_in:
-                with gzip.open(compressed_path, "wb") as f_out:
+                with gzip.open(gz_tmp, "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
-
-            return compressed_path
         except Exception as e:
             logger.warning(f"Compression failed: {e}")
+            try:
+                gz_tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
             return None
+
+        # Atomic + exclusive publish: no partial archive ever appears
+        # under the final name, no completed archive is clobbered.
+        return self._publish_backup(gz_tmp, final_gz_name)
 
     def _cleanup_old_backups(self):
         """Remove old backups based on retention policy"""

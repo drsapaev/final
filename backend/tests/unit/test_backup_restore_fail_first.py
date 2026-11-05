@@ -32,6 +32,14 @@ Coverage:
           within one second must get unique temp files, exclusive final
           names and failure isolation; retention must never sweep another
           writer's in-flight ``*.tmp``.
+- PMR-3 (post-merge review of #3888, P1)  gzip compression must stream into
+          a run-private ``.gz.tmp`` and publish atomically — a partial
+          archive must never be visible under the final ``.db.gz`` name,
+          and a failed compression must leave nothing behind.
+- PMR-4 (post-merge review of #3888, P2)  the per-run id must be reserved
+          exclusively (``O_CREAT|O_EXCL`` with reroll): forced identical
+          run ids must never share a temp path, and publication must never
+          clobber an already-completed archive.
 """
 
 from __future__ import annotations
@@ -39,6 +47,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
@@ -547,13 +556,213 @@ def test_retention_never_sweeps_in_flight_tmp(tmp_path):
     inflight.write_bytes(b"OTHER-WRITER-IN-FLIGHT")
     now = time.time()
     os.utime(inflight, (now, now))  # newest artifact in the directory
+    inflight_gz = tmp_path / "backup_manual_20261106_120000.1a2b3c4d.db.gz.tmp"
+    inflight_gz.write_bytes(b"OTHER-WRITER-GZ-IN-FLIGHT")
+    os.utime(inflight_gz, (now, now))
 
     svc._cleanup_old_backups()
 
     assert inflight.exists(), "retention swept another writer's in-flight temp file"
     assert inflight.read_bytes() == b"OTHER-WRITER-IN-FLIGHT"
+    assert inflight_gz.exists(), "retention swept another writer's in-flight gz temp file"
+    assert inflight_gz.read_bytes() == b"OTHER-WRITER-GZ-IN-FLIGHT"
     remaining = sorted(p.name for p in tmp_path.glob("backup_*.db"))
     assert len(remaining) == 2, (
         f"the in-flight tmp displaced published archives from the keep-window: {remaining}"
     )
+
+
+# ---------------------------------------------------------------------------
+# PMR-3 — post-merge review of #3888 (P1): incomplete gzip archives must
+# never be visible under the final ``.db.gz`` name.
+# ---------------------------------------------------------------------------
+
+
+def test_gzip_compression_never_exposes_partial_archive(tmp_path, monkeypatch):
+    """PMR-3: while gzip compression is running, the final ``.db.gz`` name
+    must not exist — list/retention must never observe a partial archive.
+    Compression streams into a single run-private ``.gz.tmp`` and the
+    published archive decompresses to the complete dump."""
+    svc = _concurrent_svc(tmp_path, monkeypatch)
+    monkeypatch.setenv("BACKUP_COMPRESS", "true")
+
+    payload = b"SYNTHETIC-DUMP-FOR-GZIP" * 64
+
+    def fake_pg_dump(cmd, env=None, capture_output=True, text=True, check=False, **kwargs):
+        assert "pg_dump" in str(cmd[0]), f"unexpected subprocess call: {cmd}"
+        Path(cmd[list(cmd).index("-f") + 1]).write_bytes(payload)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(backup_service_module.subprocess, "run", fake_pg_dump)
+
+    real_copyfileobj = backup_service_module.shutil.copyfileobj
+    snapshot: dict[str, list[str]] = {}
+
+    def spy_copyfileobj(f_in, f_out, *args, **kwargs):
+        # Called mid-compression: the final .db.gz must not exist yet.
+        snapshot["final_gz"] = [p.name for p in tmp_path.glob("backup_*.db.gz")]
+        snapshot["gz_tmp"] = [p.name for p in tmp_path.glob("backup_*.gz.tmp")]
+        return real_copyfileobj(f_in, f_out, *args, **kwargs)
+
+    monkeypatch.setattr(backup_service_module.shutil, "copyfileobj", spy_copyfileobj)
+
+    info = svc.create_backup("manual")
+
+    assert info["compressed"] is True
+    assert info["filename"].endswith(".db.gz")
+    assert snapshot["final_gz"] == [], (
+        "partial .db.gz was visible under its final name mid-compression: "
+        f"{snapshot['final_gz']}"
+    )
+    assert len(snapshot["gz_tmp"]) == 1, (
+        f"compression did not stream into a single run-private .gz.tmp: {snapshot['gz_tmp']}"
+    )
+    import gzip as gzip_mod
+
+    assert gzip_mod.decompress((tmp_path / info["filename"]).read_bytes()) == payload, (
+        "published archive is not the complete dump"
+    )
+    assert list(tmp_path.glob("backup_*.gz.tmp")) == [], "gz temp leftover after success"
+
+
+def test_failed_compression_leaves_no_partial_gz(tmp_path, monkeypatch):
+    """PMR-3: a compression failure mid-stream must leave neither a partial
+    archive under the final ``.db.gz`` name nor a ``.gz.tmp`` leftover; the
+    uncompressed ``.db`` remains the published artifact."""
+    svc = _concurrent_svc(tmp_path, monkeypatch)
+    monkeypatch.setenv("BACKUP_COMPRESS", "true")
+
+    payload = b"SYNTHETIC-DUMP-FOR-GZIP-FAIL" * 32
+
+    def fake_pg_dump(cmd, env=None, capture_output=True, text=True, check=False, **kwargs):
+        assert "pg_dump" in str(cmd[0]), f"unexpected subprocess call: {cmd}"
+        Path(cmd[list(cmd).index("-f") + 1]).write_bytes(payload)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(backup_service_module.subprocess, "run", fake_pg_dump)
+
+    def boom(*args, **kwargs):
+        raise OSError("synthetic: disk full mid-compression")
+
+    monkeypatch.setattr(backup_service_module.shutil, "copyfileobj", boom)
+
+    info = svc.create_backup("manual")
+
+    assert info["compressed"] is False, "failed compression must fall back to the .db"
+    assert info["filename"].endswith(".db") and not info["filename"].endswith(".gz")
+    assert (tmp_path / info["filename"]).read_bytes() == payload, (
+        "uncompressed fallback archive is missing or corrupted"
+    )
+    assert list(tmp_path.glob("backup_*.gz.tmp")) == [], "partial .gz.tmp leftover"
+    assert list(tmp_path.glob("backup_*.db.gz")) == [], "partial .db.gz under final name"
+
+
+# ---------------------------------------------------------------------------
+# PMR-4 — post-merge review of #3888 (P2): the per-run id must be reserved
+# exclusively; forced identical ids must not share paths or clobber finals.
+# ---------------------------------------------------------------------------
+
+
+class _ScriptedUuidModule:
+    """uuid-module stand-in handing out a fixed id sequence (only uuid4 is
+    used by backup_service). Thread-safe so concurrent runs can share it."""
+
+    def __init__(self, values: list[str]):
+        self._values = values
+        self._lock = threading.Lock()
+        self._next = 0
+
+    def uuid4(self) -> uuid.UUID:
+        with self._lock:
+            value = self._values[min(self._next, len(self._values) - 1)]
+            self._next += 1
+        return uuid.UUID(value)
+
+
+def test_forced_runid_collision_reserves_unique_temp_paths(tmp_path, monkeypatch):
+    """PMR-4: with FORCED identical run ids handed to two concurrent runs,
+    exclusive temp creation (O_CREAT|O_EXCL) must make the loser reroll a
+    fresh id — the runs never share one temp path and both archives
+    publish intact under distinct final names."""
+    svc = _concurrent_svc(tmp_path, monkeypatch)
+
+    same_id = "00000000-0000-0000-0000-000000000000"  # hex[:8] == "00000000"
+    other_id = "11111111-1111-1111-1111-111111111111"  # hex[:8] == "11111111"
+    monkeypatch.setattr(
+        backup_service_module, "uuid", _ScriptedUuidModule([same_id, same_id, other_id, other_id])
+    )
+
+    dump_barrier = threading.Barrier(2)
+    seq_lock = threading.Lock()
+    targets: list[Path] = []
+
+    def fake_pg_dump(cmd, env=None, capture_output=True, text=True, check=False, **kwargs):
+        assert "pg_dump" in str(cmd[0]), f"unexpected subprocess call: {cmd}"
+        target = Path(cmd[list(cmd).index("-f") + 1])
+        with seq_lock:
+            seq = len(targets)
+            targets.append(target)
+        try:
+            dump_barrier.wait(timeout=10)
+        except threading.BrokenBarrierError:
+            pass  # the other run already failed — let this one proceed
+        target.write_bytes(f"SYNTHETIC-DUMP-{seq}".encode())
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(backup_service_module.subprocess, "run", fake_pg_dump)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(svc.create_backup, "manual") for _ in range(2)]
+        infos = [f.result(timeout=30) for f in futures]
+
+    assert len({str(t) for t in targets}) == 2, (
+        f"forced same-id runs shared one temp path: {targets}"
+    )
+    filenames = [info["filename"] for info in infos]
+    assert len(set(filenames)) == 2, f"runs published colliding final names: {filenames}"
+    finals = sorted(tmp_path.glob("backup_manual_20261106_120000*.db"))
+    assert {p.read_bytes() for p in finals} == {b"SYNTHETIC-DUMP-0", b"SYNTHETIC-DUMP-1"}, (
+        "a forced-id collision corrupted or lost an archive"
+    )
+    assert list(tmp_path.glob("*.tmp")) == [], "temp leftovers after forced-id runs"
+
+
+def test_publish_never_clobbers_archive_under_forced_runid(tmp_path, monkeypatch):
+    """PMR-4: even when an archive already exists under the same identity
+    (sequential run reusing a forced identical run id), publication must
+    never overwrite it — the new archive is published under an additional
+    unique suffix and the earlier archive stays byte-intact."""
+    svc = _concurrent_svc(tmp_path, monkeypatch)
+
+    forced = "00000000-0000-0000-0000-000000000000"
+    monkeypatch.setattr(backup_service_module, "uuid", _ScriptedUuidModule([forced]))
+
+    calls = {"n": 0}
+
+    def fake_pg_dump(cmd, env=None, capture_output=True, text=True, check=False, **kwargs):
+        assert "pg_dump" in str(cmd[0]), f"unexpected subprocess call: {cmd}"
+        calls["n"] += 1
+        Path(cmd[list(cmd).index("-f") + 1]).write_bytes(f"SYNTHETIC-DUMP-{calls['n']}".encode())
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(backup_service_module.subprocess, "run", fake_pg_dump)
+
+    first = svc.create_backup("manual")
+    second = svc.create_backup("manual")  # same forced run id, later in time
+
+    first_path = tmp_path / first["filename"]
+    second_path = tmp_path / second["filename"]
+
+    assert first_path.exists() and second_path.exists(), "an archive was lost"
+    assert first["filename"] != second["filename"], (
+        f"second run silently reused the first run's final name: {second['filename']}"
+    )
+    assert first_path.read_bytes() == b"SYNTHETIC-DUMP-1", (
+        "the second run overwrote the first run's completed archive"
+    )
+    assert second_path.read_bytes() == b"SYNTHETIC-DUMP-2"
+    assert second["filename"].startswith(first["filename"][:-3]), (
+        f"rerolled name lost the original stem: {second['filename']}"
+    )
+    assert list(tmp_path.glob("*.tmp")) == [], "temp leftovers after forced-id runs"
 
