@@ -228,9 +228,20 @@ class BackupService:
                     # Second-pass review of #3888 (P1): owner-only from the
                     # first byte — os.open's default 0777&~umask produced
                     # group/world-readable (0755/0644) dumps.
+                    # Review 5791968648 (P1): harden with os.chmod — NOT
+                    # os.fchmod, which is Unix-only before Python 3.13 and
+                    # raised AttributeError (leaking the open descriptor
+                    # and the temp file) on the Windows 3.11/3.12 runtimes
+                    # the deployment runbook supports. os.chmod exists on
+                    # every supported platform; on POSIX it re-asserts
+                    # owner-only regardless of umask, on Windows it maps
+                    # to the read-only attribute (the NTFS ACLs of the
+                    # service account remain the real Windows guarantee).
                     fd = os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-                    os.fchmod(fd, 0o600)  # umask-proof owner-only
-                    os.close(fd)
+                    try:
+                        os.chmod(candidate, 0o600)  # umask-proof owner-only
+                    finally:
+                        os.close(fd)  # descriptor closed on EVERY path
                 except FileExistsError:
                     continue
                 backup_path = candidate
@@ -394,13 +405,19 @@ class BackupService:
         Post-merge review of #3888 (P2): publication must never overwrite a
         completed archive. ``os.link`` fails with FileExistsError when the
         name is already taken — this run then re-stamps an extra unique
-        suffix. Second-pass review of #3888 (P1): on filesystems without
-        hard links the fallback must ALSO be no-replace — an exclusive
-        create of the final name plus a streamed, fsynced copy with
-        rollback. ``os.replace`` is never used on this safety-critical
-        path: it silently destroys an already-completed archive when the
+        suffix. ``os.replace`` is never used on this safety-critical path:
+        it silently destroys an already-completed archive when the
         candidate name is taken. The final name appears only with full
         content or not at all.
+
+        Review 5791968648 (P1): a filesystem WITHOUT hard-link support has
+        no atomic no-clobber publish primitive at all. The previous
+        exclusive-create fallback staged the final name and streamed bytes
+        into it, so list/restore/retention observed a truncated archive
+        mid-copy — publication therefore FAILS CLOSED there: this method
+        raises, the completed archive stays untouched and the caller's
+        run-private temp is left for its own cleanup. Run BACKUP_DIR on a
+        filesystem with hard-link support (ext4/xfs/NTFS).
         """
         final_path = self.backup_dir / final_name
         for _attempt in range(8):
@@ -410,23 +427,19 @@ class BackupService:
                 final_path = self.backup_dir / self._collision_name(final_name)
                 continue
             except OSError as link_err:
-                # Filesystems without hard links (FAT, some network
-                # shares): fall back to the genuinely no-replace publish
-                # (exclusive create + copy + fsync + rollback). NEVER
-                # os.replace here — a repeated candidate name would
-                # replace an already-completed archive.
-                logger.warning(
-                    "os.link publish unsupported (%s); using no-replace "
-                    "exclusive-create fallback for %s",
-                    link_err,
-                    final_path.name,
-                )
-                published = self._publish_without_hardlink(tmp_path, final_path)
-                if published is not None:
-                    return published
-                # Name was claimed inside the race window — re-stamp.
-                final_path = self.backup_dir / self._collision_name(final_name)
-                continue
+                # Fail closed (review 5791968648, P1): without hard links
+                # there is no atomic no-clobber publish. A staged final
+                # name exposes a truncated archive to list/restore/
+                # retention mid-copy, and replace-style fallbacks can
+                # destroy a completed archive — refuse instead.
+                raise RuntimeError(
+                    f"Could not publish backup {final_name!r}: filesystem "
+                    f"does not support atomic exclusive publication "
+                    f"(hard links unavailable: {link_err}); refusing to "
+                    "publish a partial or clobberable archive — point "
+                    "BACKUP_DIR at a filesystem with hard-link support "
+                    "(ext4/xfs/NTFS)"
+                ) from link_err
             tmp_path.unlink(missing_ok=True)
             return final_path
         raise RuntimeError(
@@ -449,45 +462,6 @@ class BackupService:
             return f"{final_name[: -len('.db.gz')]}.{secrets.token_hex(3)}.db.gz"
         final = Path(final_name)
         return f"{final.stem}.{secrets.token_hex(3)}{final.suffix}"
-
-    def _publish_without_hardlink(self, tmp_path: Path, final_path: Path) -> Path | None:
-        """No-replace publish for filesystems without hard links.
-
-        Second-pass review of #3888 (P1): reserves the final name
-        exclusively (``O_CREAT|O_EXCL``, owner-only), streams the bytes
-        over, fsyncs and rolls the reservation back on any failure, so a
-        partial artifact never survives under the final name. Returns
-        ``None`` when the name was claimed by a concurrent writer (the
-        caller re-stamps and retries) — it NEVER replaces an existing
-        file.
-        """
-        try:
-            fd = os.open(final_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        except FileExistsError:
-            return None
-        except OSError as open_err:
-            raise RuntimeError(
-                f"Could not publish backup {final_path.name!r}: no no-replace "
-                f"publish available (link failed, exclusive create failed: "
-                f"{open_err}); refusing to overwrite existing archives"
-            ) from open_err
-        try:
-            with os.fdopen(fd, "wb") as f_out:
-                with open(tmp_path, "rb") as f_in:
-                    shutil.copyfileobj(f_in, f_out)
-                f_out.flush()
-                os.fsync(f_out.fileno())
-            os.chmod(final_path, 0o600)
-        except BaseException:
-            # Roll the reservation back: no partial file under the final
-            # name — the next attempt (or run) must find the name free.
-            try:
-                os.unlink(final_path)
-            except OSError:
-                pass
-            raise
-        tmp_path.unlink(missing_ok=True)
-        return final_path
 
     def _compress_backup(self, backup_path: Path) -> Path | None:
         """Compress backup file.
@@ -520,8 +494,11 @@ class BackupService:
             except FileExistsError:
                 logger.error("Refusing to reuse existing gz temp: %s", temp_gz.name)
                 return None
-            os.fchmod(fd, 0o600)
             with os.fdopen(fd, "wb") as raw_out:
+                # Review 5791968648 (P1): os.chmod — NOT the Unix-only
+                # pre-3.13 os.fchmod — INSIDE the fdopen with-block, so
+                # the descriptor closes on every path.
+                os.chmod(temp_gz, 0o600)
                 with open(backup_path, "rb") as f_in, gzip.open(raw_out, "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
             if temp_gz.stat().st_size == 0:

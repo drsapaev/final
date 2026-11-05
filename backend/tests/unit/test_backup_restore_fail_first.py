@@ -40,9 +40,10 @@ Coverage:
           exclusively (``O_CREAT|O_EXCL`` with reroll): forced identical
           run ids must never share a temp path, and publication must never
           clobber an already-completed archive.
-- PMR-5 (second-pass review of #3888, P1)  on filesystems without hard
-          links the publish fallback must still be no-replace: a repeated
-          candidate name must never overwrite a completed archive.
+- PMR-5 (second-pass review of #3888, P1; revised by review 5791968648)
+          on filesystems without hard links there is NO atomic no-clobber
+          publish primitive — publication must FAIL CLOSED: no partial or
+          truncated final name may ever appear, nothing overwritten.
 - PMR-6 (second-pass review of #3888, P1)  dumps, temp artifacts and
           published archives must be owner-only (0600) regardless of umask.
 - PMR-7 (second-pass review of #3888, P2)  DR-drill discovery must select
@@ -52,6 +53,11 @@ Coverage:
           ``.db.gz`` publication must keep the published-format suffix
           (token BEFORE the compound ``.db.gz``) so the archive stays
           visible to ``list_backups()`` and retention enumeration.
+- PMR-9 (review 5791968648, P1)  backup creation must not depend on
+          ``os.fchmod`` (Unix-only before Python 3.13): with fchmod absent
+          the run must still succeed with owner-only archives, closed
+          descriptors and no temp leaks; the source must stay free of
+          Windows-unsupported permission calls.
 """
 
 from __future__ import annotations
@@ -780,18 +786,23 @@ def test_publish_never_clobbers_archive_under_forced_runid(tmp_path, monkeypatch
 
 
 # ---------------------------------------------------------------------------
-# PMR-5 — second-pass review of #3888 (P1): the hardlink-less publish
-# fallback must be no-replace; os.replace must never touch this path.
+# PMR-5 — second-pass review of #3888 (P1), revised by review 5791968648:
+# a hardlink-less filesystem has NO atomic no-clobber publish primitive,
+# so publication must FAIL CLOSED (no partial final name, no overwrite).
 # ---------------------------------------------------------------------------
 
 
-def test_publish_without_hardlink_support_never_overwrites(tmp_path, monkeypatch):
-    """PMR-5: when ``os.link`` is unsupported (FAT, some network shares),
-    the fallback publish must still be no-replace. A candidate name that
-    collides with an already-completed archive must NOT replace it — the
-    pre-fix fallback used ``os.replace`` and destroyed the earlier file."""
+def test_publish_fails_closed_when_hardlinks_unsupported(tmp_path, monkeypatch):
+    """PMR-5, revised per review 5791968648: on a filesystem without hard
+    links there is no atomic no-clobber publish primitive. The previous
+    exclusive-create fallback staged the FINAL name (``O_CREAT|O_EXCL``)
+    and streamed bytes into it, so a concurrent list/restore/retention
+    scan observed a truncated ``backup_*.db`` (8192 of 2000000 bytes in
+    the review's isolated reproduction). Publication must FAIL CLOSED:
+    raise, never stage the final name, never overwrite the completed
+    archive, and leave the run-private candidate for the caller's own
+    cleanup."""
     import errno
-    import os as os_mod
 
     svc = BackupService.__new__(BackupService)
     svc.backup_dir = tmp_path
@@ -810,20 +821,24 @@ def test_publish_without_hardlink_support_never_overwrites(tmp_path, monkeypatch
 
     monkeypatch.setattr(backup_service_module.os, "link", no_hardlinks)
 
-    published = svc._publish_backup(candidate, final.name)
+    with pytest.raises(RuntimeError, match="hard link"):
+        svc._publish_backup(candidate, final.name)
 
-    assert final.exists() and final.read_bytes() == b"OLD-COMPLETED-ARCHIVE", (
-        "the hardlink-less fallback overwrote an already-completed archive"
+    assert final.read_bytes() == b"OLD-COMPLETED-ARCHIVE", (
+        "a failed publish overwrote the already-completed archive"
     )
-    assert published != final, "fallback claimed the already-taken final name"
-    assert published.name.endswith(".db"), (
-        f"rerolled name lost the published-format suffix: {published.name}"
+    visible_finals = [
+        p.name
+        for p in tmp_path.glob("backup_*.db*")
+        if not p.name.endswith(".tmp")
+    ]
+    assert visible_finals == [final.name], (
+        f"a partial/truncated final archive became visible to "
+        f"list/restore/retention during the failed publish: {visible_finals}"
     )
-    assert published.read_bytes() == b"NEW-ARCHIVE-BYTES", (
-        "the new archive was lost or corrupted by the fallback publish"
+    assert candidate.exists(), (
+        "run-private candidate must be left for the caller's own cleanup"
     )
-    assert not os_mod.path.exists(str(candidate)), "candidate temp survived publish"
-    assert list(tmp_path.glob("*.tmp")) == [], "temp leftovers after fallback publish"
 
 
 # ---------------------------------------------------------------------------
@@ -969,5 +984,74 @@ def test_gzip_collision_publish_stays_discoverable(tmp_path):
     )
     assert not candidate.exists() or candidate == published, (
         "the publication candidate temp survived as a leftover"
+    )
+
+
+# ---------------------------------------------------------------------------
+# PMR-9 — review 5791968648 (P1): backup creation must not depend on
+# os.fchmod (Unix-only before Python 3.13; the deployment runbook supports
+# Windows hosts on Python 3.11/3.12).
+# ---------------------------------------------------------------------------
+
+
+def test_backup_permissions_survive_absent_fchmod(tmp_path, monkeypatch):
+    """PMR-9: with ``os.fchmod`` ABSENT (AttributeError — the Windows
+    3.11/3.12 behavior, officially 'Added support on Windows' only in
+    3.13) the whole backup run — the .db reservation AND the gzip
+    reservation — must still succeed, keep owner-only permissions and
+    leave no descriptor/temp leak. The pre-fix code died with
+    AttributeError before pg_dump even started and leaked both."""
+
+    def fchmod_absent(*args, **kwargs):
+        raise AttributeError(
+            "module 'os' has no attribute 'fchmod' (Windows Python 3.11/3.12)"
+        )
+
+    # Booby-trap: any os.fchmod call on the backup path now fails the run.
+    monkeypatch.setattr(
+        backup_service_module.os, "fchmod", fchmod_absent, raising=False
+    )
+
+    svc = _concurrent_svc(tmp_path, monkeypatch)
+    monkeypatch.setenv("BACKUP_COMPRESS", "true")
+
+    payload = b"SYNTHETIC-DUMP-WINDOWS-SAFE" * 16
+
+    def fake_pg_dump(cmd, env=None, capture_output=True, text=True, check=False, **kwargs):
+        assert "pg_dump" in str(cmd[0]), f"unexpected subprocess call: {cmd}"
+        Path(cmd[list(cmd).index("-f") + 1]).write_bytes(payload)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(backup_service_module.subprocess, "run", fake_pg_dump)
+
+    info = svc.create_backup("manual")
+
+    assert info["filename"].endswith(".db.gz"), (
+        f"backup run failed under absent os.fchmod: {info}"
+    )
+    artifact = tmp_path / info["filename"]
+    assert artifact.stat().st_size > 0, "published archive is empty"
+    mode = artifact.stat().st_mode & 0o777
+    assert mode == 0o600, (
+        f"archive mode {oct(mode)}: owner-only must not depend on os.fchmod"
+    )
+    assert list(tmp_path.glob("*.tmp")) == [], (
+        "temp leak under absent os.fchmod (descriptor was not closed)"
+    )
+
+
+def test_backup_source_has_no_windows_unsupported_permission_calls():
+    """PMR-9: source-scan regression — backup_service.py must stay free of
+    call-style ``fchmod(``/``lchmod(``: these are Unix-only before Python
+    3.13 and raise AttributeError on the Windows 3.11/3.12 runtimes the
+    deployment runbook supports (docs/runbooks/DEPLOYMENT_NEW_CLINIC.md).
+    Reintroducing one fails CI even on a Linux runner."""
+    source = Path(backup_service_module.__file__).read_text(encoding="utf-8")
+    forbidden = ("fchmod(", "lchmod(")
+    hits = [tok for tok in forbidden if tok in source]
+    assert not hits, (
+        f"backup_service.py contains Windows-unsupported permission calls "
+        f"{hits}: os.fchmod/os.lchmod raise AttributeError on Windows "
+        "Python < 3.13 — use os.open(mode=0o600) + os.chmod instead"
     )
 
