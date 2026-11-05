@@ -2888,6 +2888,8 @@ const kk = {
         failed: 'Тұрақты QR жасау мүмкін болмады',
         sr_qr: 'Бағыттың тұрақты мекенжайының QR-коды',
         dedupe_note: 'Бұл бағыттың тұрақты QR-ы «{tag}» жолында көрсетілген — мекенжай бүт профильге тиесілі, жекелеген тегке емес.',
+        // QR-FE-007 (follow-up audit 2026-11-02): SVG-fallback туралы хабарлама — файл .svg деп аталады, қолжетімді емес PNG.
+        svg_fallback_notice: 'Бұл ортада PNG қолжетімді емес: файл SVG (.svg) ретінде сақталды.',
         },
     qrm_title: 'QueueResource тізілімі',
     qrm_subtitle: 'Тегтердің ресурс иелері. Жасау — draft; белсендіру §3.1 инвариант gate арқылы. code/queue_tag жасалғаннан кейін өзгермейді (§3.2).',
@@ -9422,6 +9424,9 @@ const kk = {
     rrt_na_kartu: 'На карту',
     rrt_nalichnymi: 'Қолма-қол',
     rrt_unknown: 'Белгісіз',
+    // CSH-FE-049 (follow-up audit 2026-11-02): толық себебін ашуға арналған
+    // фокустанатын түйме (пернетақта қолжетімділігі).
+    rrt_reason_expand: 'Толық көрсету',
     rrt_obrabotka: 'Обработка',
     // ServiceChecklist.jsx (sc_)
     sc_konsultatsiya_kardiologa: 'Консультация кардиолога',
@@ -11092,6 +11097,8 @@ const kk = {
     rp_field_department: 'Отделение',
     rp_field_services: 'Услуги',
     rp_field_queue: 'Очередь',
+    // REG-FE-083 (follow-up audit 2026-11-02): нөмір берілмеген жазба үшін адал толтырғыш.
+    rp_queue_no_ticket: 'нөмір берілмеді',
     rp_field_status: 'Статус',
     rp_field_payment: 'Оплата',
     rp_field_amount: 'Сумма',
