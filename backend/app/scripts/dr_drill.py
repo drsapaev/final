@@ -110,12 +110,18 @@ def parse_source_db_url() -> tuple[str, str, str, int, str]:
         _exit(2, f"DR drill requires PostgreSQL source. Got: {url[:50]}...")
 
     parsed = urllib.parse.urlparse(url.replace("postgresql://", "http://").replace("postgresql+psycopg://", "http://"))
+    # Post-merge review of #3887 (P1): urlparse keeps the path
+    # percent-encoded. `clinic%5Fdr%5Fdrill` IS `clinic_dr_drill` to
+    # PostgreSQL, so the BR-012 collision guard must compare the DECODED
+    # name — otherwise an encoded DSN bypasses the guard and the drill
+    # issues DROP DATABASE against the working database.
+    source_db = urllib.parse.unquote(parsed.path.lstrip("/"))
     return (
         parsed.username or "postgres",
         parsed.password or "",
         parsed.hostname or "localhost",
         parsed.port or 5432,
-        parsed.path.lstrip("/"),
+        source_db,
     )
 
 

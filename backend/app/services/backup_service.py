@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -207,9 +208,18 @@ class BackupService:
             # the pg component validator above).
             _m = _re.fullmatch(r"[a-z0-9_]{0,40}", safe_type)
             safe_type = _m.group(0) if _m else "manual"
-            backup_filename = f"backup_{safe_type or 'manual'}_{timestamp}.db"
-            # Atomic write: pg_dump targets .tmp; final name appears only
-            # after success - a failed dump no longer leaves zero-byte files.
+            # Post-merge review of #3887 (P1 #2): the timestamp has second
+            # precision only — two same-type runs started within one second
+            # derived the SAME .tmp path and the SAME final name, so one run
+            # could delete or replace the other's archive mid-flight. A
+            # random per-run suffix makes every run's paths exclusive.
+            run_suffix = uuid.uuid4().hex[:8]
+            backup_filename = (
+                f"backup_{safe_type or 'manual'}_{timestamp}.{run_suffix}.db"
+            )
+            # Atomic write: pg_dump targets the run-private .tmp; the final
+            # name appears only after success - a failed dump no longer
+            # leaves zero-byte files.
             backup_path = self.backup_dir / (backup_filename + ".tmp")
             operation_tmp = backup_path
 
@@ -271,8 +281,17 @@ class BackupService:
             else:
                 raise ValueError(f"Unsupported database type: {db_url}")
 
-            # Dump succeeded - atomically publish the final name.
+            # Dump succeeded - atomically publish the final name. Both the
+            # source and the destination carry this run's random suffix, so
+            # the rename can only ever touch this run's own files: two
+            # concurrent runs publish distinct archives and never overwrite
+            # each other (#3887 post-merge review, P1 #2).
             final_path = self.backup_dir / backup_filename
+            if not backup_path.exists():
+                raise FileNotFoundError(
+                    "pg_dump reported success but the temp archive is missing: "
+                    f"{backup_path}"
+                )
             os.replace(backup_path, final_path)
             backup_path = final_path
 
@@ -363,8 +382,19 @@ class BackupService:
     def _cleanup_old_backups(self):
         """Remove old backups based on retention policy"""
         try:
+            # Post-merge review of #3887 (P1 #2): retention must consider
+            # only PUBLISHED archives. The old ``backup_*.db*`` pattern also
+            # matched ``*.db.tmp`` artifacts of runs that were still dumping,
+            # so an over-limit directory swept another writer's in-flight
+            # temp file — and the tmp counted toward the keep-window,
+            # displacing published archives. .tmp files belong to their
+            # writers and are never touched here.
             backups = sorted(
-                self.backup_dir.glob("backup_*.db*"),
+                [
+                    p
+                    for pattern in ("backup_*.db", "backup_*.db.gz")
+                    for p in self.backup_dir.glob(pattern)
+                ],
                 key=lambda p: p.stat().st_mtime,
                 reverse=True
             )
@@ -399,8 +429,14 @@ class BackupService:
         """List all available backups"""
         backups = []
 
+        # Same P1 #2 family as retention: never present another writer's
+        # in-flight ``*.tmp`` as a restorable backup.
         for backup_path in sorted(
-            self.backup_dir.glob("backup_*.db*"),
+            [
+                p
+                for pattern in ("backup_*.db", "backup_*.db.gz")
+                for p in self.backup_dir.glob(pattern)
+            ],
             key=lambda p: p.stat().st_mtime,
             reverse=True
         ):

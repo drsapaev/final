@@ -6,9 +6,10 @@ module: no real ``DROP DATABASE``, ``CREATE DATABASE``, ``pg_restore`` or
 ``psql`` is ever executed, no real database is contacted, and no real backup
 material is used — only synthetic files in pytest temporary directories.
 
-Against the reviewed source these tests are EXPECTED TO FAIL for the intended
-reason (the current implementation exhibits the finding). After the narrow
-fail-closed fixes land in separate gated fix PRs, each test must turn green.
+The BR-008/012/013/016/017/018 fixes landed in Pull Request #3887 (merged
+2026-11-05). The post-merge review of #3887 found two remaining P1 defects;
+their fail-first regressions live at the bottom of this module in the same
+mocked-subprocess style.
 
 Coverage:
 - BR-012  dr_drill must refuse a target DB name equal to the source DB name
@@ -24,12 +25,22 @@ Coverage:
           Exception`` and rollback is skipped).
 - BR-018  BackupService failure cleanup must remove only its own temp file,
           never another writer's in-flight ``*.tmp``.
+- PMR-1 (post-merge review of #3887, P1 #1)  the BR-012 collision guard must
+          compare the percent-DECODED source DB name, so an encoded DSN
+          (``clinic%5Fdr%5Fdrill`` == ``clinic_dr_drill``) cannot bypass it.
+- PMR-2 (post-merge review of #3887, P1 #2)  two same-type backups started
+          within one second must get unique temp files, exclusive final
+          names and failure isolation; retention must never sweep another
+          writer's in-flight ``*.tmp``.
 """
 
 from __future__ import annotations
 
 import subprocess
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -299,3 +310,250 @@ def test_failed_backup_cleanup_preserves_other_writers_temp(tmp_path, monkeypatc
     assert other.read_bytes() == b"OTHER-WRITER-IN-FLIGHT", (
         "cleanup corrupted another writer's in-flight temp file"
     )
+
+
+# ---------------------------------------------------------------------------
+# PMR-1 — post-merge review of #3887 (P1 #1): the BR-012 guard must compare
+# the percent-DECODED source DB name.
+# ---------------------------------------------------------------------------
+
+
+def test_parse_source_db_url_decodes_percent_encoding(monkeypatch):
+    """PMR-1: ``clinic%5Fdr%5Fdrill`` in DATABASE_URL IS ``clinic_dr_drill``
+    to PostgreSQL — ``parse_source_db_url`` must return the decoded name or
+    the BR-012 collision guard compares apples to oranges."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(
+        settings,
+        "DATABASE_URL",
+        "postgresql://drill_user:drill_pass@drill_host.invalid:5432/clinic%5Fdr%5Fdrill",
+    )
+
+    user, password, host, port, source_db = dr_drill.parse_source_db_url()
+
+    assert source_db == "clinic_dr_drill", (
+        "source DB name must be percent-decoded before the BR-012 comparison"
+    )
+    assert (user, password, host, port) == (
+        "drill_user",
+        "drill_pass",
+        "drill_host.invalid",
+        5432,
+    )
+
+
+def test_dr_drill_refuses_target_db_equal_to_percent_encoded_source_db(
+    tmp_path, monkeypatch
+):
+    """PMR-1 end-to-end: DRILL_DB_NAME equal to the DECODED source DB name
+    must abort the drill before any ``DROP DATABASE``, even when DATABASE_URL
+    percent-encodes the name (``%5F`` for ``_``). Pre-fix, the raw string
+    comparison ``'clinic_dr_drill' == 'clinic%5Fdr%5Fdrill'`` misses the
+    collision and the drill drops the working database."""
+    from app.core.config import settings
+
+    backup = tmp_path / "synthetic.dump"
+    backup.write_bytes(b"SYNTHETIC-ARCHIVE")
+
+    issued: list[list[str]] = []
+
+    def fake_run(cmd, env=None, check=True):
+        issued.append([str(part) for part in cmd])
+        # smoke queries return plausible row counts
+        return _ok(cmd, stdout="3\n")
+
+    monkeypatch.setattr(dr_drill, "_run", fake_run)
+    monkeypatch.setattr(dr_drill, "find_latest_backup", lambda: backup)
+    monkeypatch.setattr(dr_drill, "ensure_pg_tools", lambda: None)
+    monkeypatch.setattr(dr_drill, "DRILL_DB_NAME", "clinic_dr_drill")
+    monkeypatch.setattr(dr_drill, "DRILL_DB_DROP_ON_START", True)
+    # NOTE: no _drill_env() here — the REAL parse_source_db_url must run
+    # against an encoded DSN.
+    monkeypatch.setattr(
+        settings,
+        "DATABASE_URL",
+        "postgresql://drill_user:drill_pass@drill_host.invalid:5432/clinic%5Fdr%5Fdrill",
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        dr_drill.main()
+
+    assert excinfo.value.code != 0, (
+        "percent-encoded source DB name bypassed the BR-012 collision guard"
+    )
+    joined = [" ".join(cmd) for cmd in issued]
+    assert not any("DROP DATABASE" in cmd for cmd in joined), (
+        "drill issued a DROP DATABASE against the working database although "
+        f"the decoded names collide (commands: {joined})"
+    )
+
+
+# ---------------------------------------------------------------------------
+# PMR-2 — post-merge review of #3887 (P1 #2): parallel same-type backups must
+# not corrupt each other (shared second-precision temp path, non-exclusive
+# publication, retention sweeping in-flight temp files).
+# ---------------------------------------------------------------------------
+
+
+class _FrozenDatetime(datetime):
+    """Clock pinned to one second so two concurrent runs derive the exact
+    stem from the reviewed P1 scenario (same type, same second)."""
+
+    @classmethod
+    def now(cls, tz=None):  # noqa: ARG003 — mirrors datetime.now signature
+        return cls(2026, 11, 6, 12, 0, 0, tzinfo=UTC)
+
+
+def _concurrent_svc(tmp_path: Path, monkeypatch) -> BackupService:
+    """BackupService wired for PG-path concurrency tests: synthetic dump
+    tool, no offsite upload, no gzip, frozen clock."""
+    svc = BackupService.__new__(BackupService)
+    svc.backup_dir = tmp_path
+    svc.retention_days = 7
+    svc.max_backups = 10
+    svc.db = None
+
+    monkeypatch.setattr(
+        backup_service_module,
+        "_get_database_url",
+        lambda: "postgresql://drill_user:drill_pass@localhost:5432/clinicdb_src",
+    )
+    monkeypatch.setattr(
+        backup_service_module, "_resolve_pg_tool", lambda name: f"synthetic_{name}"
+    )
+    monkeypatch.setattr(
+        backup_service_module.r2_uploader, "r2_configured", lambda: False
+    )
+    monkeypatch.setattr(backup_service_module, "datetime", _FrozenDatetime)
+    monkeypatch.setenv("BACKUP_COMPRESS", "false")
+    return svc
+
+
+def test_concurrent_same_type_backups_get_unique_files(tmp_path, monkeypatch):
+    """PMR-2: two same-type backups started within the same second must (a)
+    dump into distinct temp paths, (b) both publish intact archives under
+    distinct final names, (c) leave no temp leftovers."""
+    svc = _concurrent_svc(tmp_path, monkeypatch)
+
+    dump_barrier = threading.Barrier(2)
+    seq_lock = threading.Lock()
+    targets: list[Path] = []
+
+    def fake_pg_dump(cmd, env=None, capture_output=True, text=True, check=False, **kwargs):
+        assert "pg_dump" in str(cmd[0]), f"unexpected subprocess call: {cmd}"
+        target = Path(cmd[list(cmd).index("-f") + 1])
+        with seq_lock:
+            seq = len(targets)
+            targets.append(target)
+        # Force a true overlap of the two in-flight dumps (same second is
+        # already guaranteed by the frozen clock).
+        try:
+            dump_barrier.wait(timeout=10)
+        except threading.BrokenBarrierError:
+            pass  # the other run already failed — let this one proceed
+        target.write_bytes(f"SYNTHETIC-DUMP-{seq}".encode())
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(backup_service_module.subprocess, "run", fake_pg_dump)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(svc.create_backup, "manual") for _ in range(2)]
+        infos = [f.result(timeout=30) for f in futures]
+
+    assert len({str(t) for t in targets}) == 2, (
+        f"concurrent runs shared one temp path: {targets}"
+    )
+    filenames = [info["filename"] for info in infos]
+    assert len(set(filenames)) == 2, (
+        f"runs published the same final archive name: {filenames}"
+    )
+    for name in filenames:
+        assert name.startswith("backup_manual_20261106_120000"), (
+            f"unexpected archive stem: {name}"
+        )
+        assert (tmp_path / name).exists(), f"published archive missing: {name}"
+    finals = sorted(tmp_path.glob("backup_manual_20261106_120000*.db"))
+    assert {p.read_bytes() for p in finals} == {b"SYNTHETIC-DUMP-0", b"SYNTHETIC-DUMP-1"}, (
+        "a concurrent run corrupted or replaced another run's archive content"
+    )
+    assert list(tmp_path.glob("*.tmp")) == [], "temp leftovers after successful runs"
+
+
+def test_failing_concurrent_backup_spares_the_in_flight_run(tmp_path, monkeypatch):
+    """PMR-2: a run that fails mid-dump must neither delete nor overwrite the
+    temp artifact of another run that is still in flight."""
+    svc = _concurrent_svc(tmp_path, monkeypatch)
+
+    inflight_started = threading.Event()
+    release_inflight = threading.Event()
+    calls = {"n": 0}
+
+    def fake_pg_dump(cmd, env=None, capture_output=True, text=True, check=False, **kwargs):
+        assert "pg_dump" in str(cmd[0]), f"unexpected subprocess call: {cmd}"
+        target = Path(cmd[list(cmd).index("-f") + 1])
+        calls["n"] += 1
+        if calls["n"] == 1:
+            # Run A: writes its full archive, then stalls mid-run so run B
+            # can fail-and-clean inside the overlap window.
+            target.write_bytes(b"SYNTHETIC-DUMP-A")
+            inflight_started.set()
+            assert release_inflight.wait(timeout=10), "run A stalled forever"
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        # Run B: starts while A is in flight, writes a partial archive, fails.
+        target.write_bytes(b"PARTIAL-SYNTHETIC-DUMP-B")
+        return subprocess.CompletedProcess(cmd, 1, "", "pg_dump: synthetic failure")
+
+    monkeypatch.setattr(backup_service_module.subprocess, "run", fake_pg_dump)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future_a = pool.submit(svc.create_backup, "manual")
+        assert inflight_started.wait(timeout=10), "run A never reached its dump"
+
+        with pytest.raises(Exception):  # noqa: B017 — create_backup raises bare Exception on dump failure
+            svc.create_backup("manual")  # run B, synchronous, while A is in flight
+
+        release_inflight.set()
+        info_a = future_a.result(timeout=10)
+
+    published = tmp_path / info_a["filename"]
+    assert published.exists(), "the in-flight run's archive was never published"
+    assert published.read_bytes() == b"SYNTHETIC-DUMP-A", (
+        "the failing run deleted or corrupted the in-flight run's artifact"
+    )
+    assert list(tmp_path.glob("*.tmp")) == [], "temp leftovers after both runs ended"
+
+
+def test_retention_never_sweeps_in_flight_tmp(tmp_path):
+    """PMR-2 family: retention cleanup must neither count nor delete another
+    writer's in-flight ``.tmp`` artifact, even when the directory is over the
+    max-backups limit (the tmp must not displace published archives from the
+    keep-window either)."""
+    import os
+    import time
+
+    svc = BackupService.__new__(BackupService)
+    svc.backup_dir = tmp_path
+    svc.retention_days = 7
+    svc.max_backups = 2
+
+    base = time.time() - 1000
+    for i in range(3):
+        p = tmp_path / f"backup_manual_2026010{i + 1}_000000.db"
+        p.write_bytes(b"x" * 8)
+        stamp = base + i * 100
+        os.utime(p, (stamp, stamp))
+    inflight = tmp_path / "backup_manual_20261106_120000.9f3ab12c.db.tmp"
+    inflight.write_bytes(b"OTHER-WRITER-IN-FLIGHT")
+    now = time.time()
+    os.utime(inflight, (now, now))  # newest artifact in the directory
+
+    svc._cleanup_old_backups()
+
+    assert inflight.exists(), "retention swept another writer's in-flight temp file"
+    assert inflight.read_bytes() == b"OTHER-WRITER-IN-FLIGHT"
+    remaining = sorted(p.name for p in tmp_path.glob("backup_*.db"))
+    assert len(remaining) == 2, (
+        f"the in-flight tmp displaced published archives from the keep-window: {remaining}"
+    )
+
