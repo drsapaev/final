@@ -40,6 +40,18 @@ Coverage:
           exclusively (``O_CREAT|O_EXCL`` with reroll): forced identical
           run ids must never share a temp path, and publication must never
           clobber an already-completed archive.
+- PMR-5 (second-pass review of #3888, P1)  on filesystems without hard
+          links the publish fallback must still be no-replace: a repeated
+          candidate name must never overwrite a completed archive.
+- PMR-6 (second-pass review of #3888, P1)  dumps, temp artifacts and
+          published archives must be owner-only (0600) regardless of umask.
+- PMR-7 (second-pass review of #3888, P2)  DR-drill discovery must select
+          only PUBLISHED archives — in-flight ``.db.tmp``/``.db.gz.tmp``
+          artifacts are newer and must never be picked for restore.
+- PMR-8 (second-pass review of #3888, P2)  a FileExistsError during
+          ``.db.gz`` publication must keep the published-format suffix
+          (token BEFORE the compound ``.db.gz``) so the archive stays
+          visible to ``list_backups()`` and retention enumeration.
 """
 
 from __future__ import annotations
@@ -765,4 +777,197 @@ def test_publish_never_clobbers_archive_under_forced_runid(tmp_path, monkeypatch
         f"rerolled name lost the original stem: {second['filename']}"
     )
     assert list(tmp_path.glob("*.tmp")) == [], "temp leftovers after forced-id runs"
+
+
+# ---------------------------------------------------------------------------
+# PMR-5 — second-pass review of #3888 (P1): the hardlink-less publish
+# fallback must be no-replace; os.replace must never touch this path.
+# ---------------------------------------------------------------------------
+
+
+def test_publish_without_hardlink_support_never_overwrites(tmp_path, monkeypatch):
+    """PMR-5: when ``os.link`` is unsupported (FAT, some network shares),
+    the fallback publish must still be no-replace. A candidate name that
+    collides with an already-completed archive must NOT replace it — the
+    pre-fix fallback used ``os.replace`` and destroyed the earlier file."""
+    import errno
+    import os as os_mod
+
+    svc = BackupService.__new__(BackupService)
+    svc.backup_dir = tmp_path
+    svc.retention_days = 7
+    svc.max_backups = 10
+    svc.db = None
+
+    final = tmp_path / "backup_manual_20260101_010101.aaaabbbb.db"
+    final.write_bytes(b"OLD-COMPLETED-ARCHIVE")
+
+    candidate = tmp_path / "backup_manual_20260101_010101.aaaabbbb.db.tmp"
+    candidate.write_bytes(b"NEW-ARCHIVE-BYTES")
+
+    def no_hardlinks(src, dst):
+        raise OSError(errno.EOPNOTSUPP, "synthetic: hard links not supported")
+
+    monkeypatch.setattr(backup_service_module.os, "link", no_hardlinks)
+
+    published = svc._publish_backup(candidate, final.name)
+
+    assert final.exists() and final.read_bytes() == b"OLD-COMPLETED-ARCHIVE", (
+        "the hardlink-less fallback overwrote an already-completed archive"
+    )
+    assert published != final, "fallback claimed the already-taken final name"
+    assert published.name.endswith(".db"), (
+        f"rerolled name lost the published-format suffix: {published.name}"
+    )
+    assert published.read_bytes() == b"NEW-ARCHIVE-BYTES", (
+        "the new archive was lost or corrupted by the fallback publish"
+    )
+    assert not os_mod.path.exists(str(candidate)), "candidate temp survived publish"
+    assert list(tmp_path.glob("*.tmp")) == [], "temp leftovers after fallback publish"
+
+
+# ---------------------------------------------------------------------------
+# PMR-6 — second-pass review of #3888 (P1): archive file permissions.
+# ---------------------------------------------------------------------------
+
+
+def test_backup_artifacts_are_owner_only(tmp_path, monkeypatch):
+    """PMR-6: dumps, run-private temp artifacts and published archives must
+    be owner-only (0600) regardless of umask — with umask 022 the pre-fix
+    code produced world-readable 0644 backups containing the full database."""
+    import os as os_mod
+
+    svc = _concurrent_svc(tmp_path, monkeypatch)
+
+    payload = b"SYNTHETIC-DUMP-PERMISSIONS" * 16
+
+    def fake_pg_dump(cmd, env=None, capture_output=True, text=True, check=False, **kwargs):
+        assert "pg_dump" in str(cmd[0]), f"unexpected subprocess call: {cmd}"
+        Path(cmd[list(cmd).index("-f") + 1]).write_bytes(payload)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(backup_service_module.subprocess, "run", fake_pg_dump)
+
+    old_umask = os_mod.umask(0o022)  # deterministic world-readable baseline
+    try:
+        monkeypatch.setenv("BACKUP_COMPRESS", "false")
+        plain = svc.create_backup("manual")
+        monkeypatch.setenv("BACKUP_COMPRESS", "true")
+        gz = svc.create_backup("manual")
+    finally:
+        os_mod.umask(old_umask)
+
+    plain_path = tmp_path / plain["filename"]
+    gz_path = tmp_path / gz["filename"]
+    assert plain_path.exists() and gz_path.exists(), "an artifact went missing"
+    for artifact, label in ((plain_path, "uncompressed"), (gz_path, "gzip")):
+        mode = artifact.stat().st_mode & 0o777
+        assert mode == 0o600, (
+            f"{label} archive is group/world-readable (mode {oct(mode)}): "
+            "backup artifacts must be owner-only 0600"
+        )
+
+
+# ---------------------------------------------------------------------------
+# PMR-7 — second-pass review of #3888 (P2): DR-drill discovery must ignore
+# in-flight temp artifacts.
+# ---------------------------------------------------------------------------
+
+
+def test_dr_drill_discovery_ignores_in_flight_tmp_artifacts(tmp_path, monkeypatch):
+    """PMR-7: ``find_latest_backup`` must select only PUBLISHED archives.
+    In-flight ``.db.tmp``/``.db.gz.tmp`` artifacts are typically NEWER than
+    the last completed backup; the pre-fix ``glob('backup_*')`` picked the
+    partial file and the drill restored garbage / failed spuriously."""
+    import gzip as gzip_mod
+    import os as os_mod
+    import time as time_mod
+
+    monkeypatch.delenv("BACKUP_FILE", raising=False)
+    monkeypatch.setattr(dr_drill, "BACKUP_DIR", tmp_path)
+
+    completed = tmp_path / "backup_manual_20260101_000000.aaaabbbb.db.gz"
+    completed.write_bytes(gzip_mod.compress(b"COMPLETED-SYNTHETIC-DUMP"))
+    inflight_gz = tmp_path / "backup_manual_20260101_000001.ccccdddd.db.gz.tmp"
+    inflight_gz.write_bytes(b"PARTIAL-NOT-A-GZIP")
+    inflight_db = tmp_path / "backup_manual_20260101_000002.eeeeffff.db.tmp"
+    inflight_db.write_bytes(b"PARTIAL-DUMP-IN-FLIGHT")
+
+    old = time_mod.time() - 500
+    os_mod.utime(completed, (old, old))
+    now = time_mod.time()
+    os_mod.utime(inflight_gz, (now, now))
+    os_mod.utime(inflight_db, (now, now))
+
+    latest = dr_drill.find_latest_backup()
+
+    assert latest == completed, (
+        f"drill selected an in-flight temp artifact: {latest.name}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# PMR-8 — second-pass review of #3888 (P2): a gzip publication collision
+# must keep the published-format suffix and stay discoverable.
+# ---------------------------------------------------------------------------
+
+
+def test_gzip_collision_publish_stays_discoverable(tmp_path):
+    """PMR-8: forcing FileExistsError during ``.db.gz`` publication must
+    insert the collision token BEFORE the compound ``.db.gz`` suffix — the
+    pre-fix branch produced ``...db.<token>.gz``, a file that the
+    ``backup_*.db`` / ``backup_*.db.gz`` allowlists of ``list_backups()``
+    and retention can never discover (review-confirmed with Path.glob)."""
+    import os as os_mod
+    import time as time_mod
+
+    svc = BackupService.__new__(BackupService)
+    svc.backup_dir = tmp_path
+    svc.retention_days = 7
+    svc.max_backups = 1
+    svc.db = None
+
+    final_name = "backup_manual_20261106_120000.abc12345.db.gz"
+    existing = tmp_path / final_name
+    existing.write_bytes(b"EXISTING-COMPLETED-ARCHIVE")
+    # Legacy-form file published by the pre-fix collision branch: invisible
+    # to the allowlist globs; discovery must tolerate it too.
+    legacy = tmp_path / "backup_manual_20261101_000000.abc12345.db.deadbeef.gz"
+    legacy.write_bytes(b"LEGACY-FORM-ARCHIVE")
+
+    candidate = tmp_path / (final_name + ".tmp")
+    candidate.write_bytes(b"NEW-ARCHIVE-BYTES")
+
+    base = time_mod.time() - 100
+    os_mod.utime(existing, (base - 300, base - 300))
+    os_mod.utime(legacy, (base - 200, base - 200))
+    os_mod.utime(candidate, (base, base))
+
+    published = svc._publish_backup(candidate, final_name)
+
+    assert published != existing, "collision publish claimed the taken name"
+    assert existing.read_bytes() == b"EXISTING-COMPLETED-ARCHIVE", (
+        "collision publish clobbered the completed archive"
+    )
+    assert published.name.endswith(".db.gz"), (
+        f"collision name fell outside the published-format allowlist: {published.name}"
+    )
+    assert published.read_bytes() == b"NEW-ARCHIVE-BYTES"
+
+    listed = {entry["filename"] for entry in svc.list_backups()}
+    expected = {final_name, published.name, legacy.name}
+    assert expected <= listed, (
+        f"published archives missing from list_backups(): "
+        f"missing={sorted(expected - listed)} listed={sorted(listed)}"
+    )
+
+    svc._cleanup_old_backups()  # max_backups=1: keep only the newest
+
+    assert published.exists(), "retention dropped the newest published archive"
+    assert not existing.exists() and not legacy.exists(), (
+        "retention kept more than max_backups archives"
+    )
+    assert not candidate.exists() or candidate == published, (
+        "the publication candidate temp survived as a leftover"
+    )
 

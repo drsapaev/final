@@ -91,8 +91,21 @@ def find_latest_backup() -> Path:
     if not BACKUP_DIR.exists():
         _exit(2, f"Backup directory does not exist: {BACKUP_DIR.absolute()}")
 
+    # Second-pass review of #3888 (P2): discovery must consider only
+    # PUBLISHED archives. The old ``backup_*`` pattern also matched
+    # in-flight ``.db.tmp`` / ``.db.gz.tmp`` artifacts, which are typically
+    # NEWER than the last completed backup — the drill then restored a
+    # partial file and reported a spurious DR failure. Same allowlist as
+    # BackupService.list_backups(): plain and gzip archives plus the
+    # legacy collision form ``...db.<token>.gz`` (deduped — the gzip
+    # patterns overlap).
     candidates = sorted(
-        [p for p in BACKUP_DIR.glob("backup_*") if p.is_file()],
+        {
+            p
+            for pattern in ("backup_*.db", "backup_*.db.gz", "backup_*.db.*.gz")
+            for p in BACKUP_DIR.glob(pattern)
+            if p.is_file()
+        },
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )

@@ -225,7 +225,12 @@ class BackupService:
                 try:
                     # Exclusive reservation: create-and-close an empty file
                     # only this run may own; the dumpers truncate it next.
-                    os.close(os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+                    # Second-pass review of #3888 (P1): owner-only from the
+                    # first byte — os.open's default 0777&~umask produced
+                    # group/world-readable (0755/0644) dumps.
+                    fd = os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                    os.fchmod(fd, 0o600)  # umask-proof owner-only
+                    os.close(fd)
                 except FileExistsError:
                     continue
                 backup_path = candidate
@@ -389,38 +394,100 @@ class BackupService:
         Post-merge review of #3888 (P2): publication must never overwrite a
         completed archive. ``os.link`` fails with FileExistsError when the
         name is already taken — this run then re-stamps an extra unique
-        suffix. ``os.replace`` would silently destroy the earlier archive.
-        The final name appears only with full content or not at all
-        (atomic, same-directory hard link).
+        suffix. Second-pass review of #3888 (P1): on filesystems without
+        hard links the fallback must ALSO be no-replace — an exclusive
+        create of the final name plus a streamed, fsynced copy with
+        rollback. ``os.replace`` is never used on this safety-critical
+        path: it silently destroys an already-completed archive when the
+        candidate name is taken. The final name appears only with full
+        content or not at all.
         """
         final_path = self.backup_dir / final_name
         for _attempt in range(8):
             try:
                 os.link(tmp_path, final_path)
             except FileExistsError:
-                final = Path(final_name)
-                final_path = self.backup_dir / (
-                    f"{final.stem}.{secrets.token_hex(3)}{final.suffix}"
-                )
+                final_path = self.backup_dir / self._collision_name(final_name)
                 continue
             except OSError as link_err:
                 # Filesystems without hard links (FAT, some network
-                # shares): fall back to the atomic-but-non-exclusive
-                # rename; log loudly so the reduced guarantee is visible.
+                # shares): fall back to the genuinely no-replace publish
+                # (exclusive create + copy + fsync + rollback). NEVER
+                # os.replace here — a repeated candidate name would
+                # replace an already-completed archive.
                 logger.warning(
-                    "os.link publish unsupported (%s); falling back to "
-                    "os.replace for %s",
+                    "os.link publish unsupported (%s); using no-replace "
+                    "exclusive-create fallback for %s",
                     link_err,
                     final_path.name,
                 )
-                os.replace(tmp_path, final_path)
-                return final_path
+                published = self._publish_without_hardlink(tmp_path, final_path)
+                if published is not None:
+                    return published
+                # Name was claimed inside the race window — re-stamp.
+                final_path = self.backup_dir / self._collision_name(final_name)
+                continue
             tmp_path.unlink(missing_ok=True)
             return final_path
         raise RuntimeError(
             f"Could not publish backup {final_name!r}: final-name collision "
             "persisted after 8 attempts"
         )
+
+    @staticmethod
+    def _collision_name(final_name: str) -> str:
+        """Fresh token that keeps the published-format suffix.
+
+        Second-pass review of #3888 (P2): ``Path('x.abc12345.db.gz').stem``
+        is ``x.abc12345.db``, so ``f"{stem}.{token}{suffix}"`` produced
+        ``x.abc12345.db.<token>.gz`` — a name the list/retention allowlist
+        (``backup_*.db``, ``backup_*.db.gz``) can never discover. The
+        token goes BEFORE the compound ``.db.gz`` suffix instead, so every
+        generated name still ends in the published format.
+        """
+        if final_name.endswith(".db.gz"):
+            return f"{final_name[: -len('.db.gz')]}.{secrets.token_hex(3)}.db.gz"
+        final = Path(final_name)
+        return f"{final.stem}.{secrets.token_hex(3)}{final.suffix}"
+
+    def _publish_without_hardlink(self, tmp_path: Path, final_path: Path) -> Path | None:
+        """No-replace publish for filesystems without hard links.
+
+        Second-pass review of #3888 (P1): reserves the final name
+        exclusively (``O_CREAT|O_EXCL``, owner-only), streams the bytes
+        over, fsyncs and rolls the reservation back on any failure, so a
+        partial artifact never survives under the final name. Returns
+        ``None`` when the name was claimed by a concurrent writer (the
+        caller re-stamps and retries) — it NEVER replaces an existing
+        file.
+        """
+        try:
+            fd = os.open(final_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            return None
+        except OSError as open_err:
+            raise RuntimeError(
+                f"Could not publish backup {final_path.name!r}: no no-replace "
+                f"publish available (link failed, exclusive create failed: "
+                f"{open_err}); refusing to overwrite existing archives"
+            ) from open_err
+        try:
+            with os.fdopen(fd, "wb") as f_out:
+                with open(tmp_path, "rb") as f_in:
+                    shutil.copyfileobj(f_in, f_out)
+                f_out.flush()
+                os.fsync(f_out.fileno())
+            os.chmod(final_path, 0o600)
+        except BaseException:
+            # Roll the reservation back: no partial file under the final
+            # name — the next attempt (or run) must find the name free.
+            try:
+                os.unlink(final_path)
+            except OSError:
+                pass
+            raise
+        tmp_path.unlink(missing_ok=True)
+        return final_path
 
     def _compress_backup(self, backup_path: Path) -> Path | None:
         """Compress backup file.
@@ -443,8 +510,19 @@ class BackupService:
 
         temp_gz: Path | None = self.backup_dir / (compressed_path.name + ".tmp")
         try:
-            with open(backup_path, "rb") as f_in:
-                with gzip.open(temp_gz, "wb") as f_out:
+            # Second-pass review of #3888 (P1): owner-only from the first
+            # byte — gzip.open created the temp with 0666&~umask. The path
+            # embeds this run's own uuid-suffixed source name, so an
+            # existing file is a stale crash leftover, never a live
+            # writer: refuse to touch it and keep the uncompressed .db.
+            try:
+                fd = os.open(temp_gz, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            except FileExistsError:
+                logger.error("Refusing to reuse existing gz temp: %s", temp_gz.name)
+                return None
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "wb") as raw_out:
+                with open(backup_path, "rb") as f_in, gzip.open(raw_out, "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
             if temp_gz.stat().st_size == 0:
                 raise OSError("compressed output is empty")
@@ -478,11 +556,15 @@ class BackupService:
             # displacing published archives. .tmp files belong to their
             # writers and are never touched here.
             backups = sorted(
-                [
+                {
                     p
-                    for pattern in ("backup_*.db", "backup_*.db.gz")
+                    for pattern in (
+                        "backup_*.db",
+                        "backup_*.db.gz",
+                        "backup_*.db.*.gz",
+                    )
                     for p in self.backup_dir.glob(pattern)
-                ],
+                },
                 key=lambda p: p.stat().st_mtime,
                 reverse=True
             )
@@ -525,12 +607,22 @@ class BackupService:
 
         # Same P1 #2 family as retention: never present another writer's
         # in-flight ``*.tmp`` as a restorable backup.
+        # Second-pass review of #3888 (P2): every published generated name
+        # must be discoverable — collision re-stamps keep the compound
+        # ``.db.gz`` suffix, and the legacy ``...db.<token>.gz`` form is
+        # tolerated. Dedupe: ``backup_*.db.gz`` and ``backup_*.db.*.gz``
+        # overlap; a duplicated path would be swept twice by retention
+        # (the BR-021 double-unlink failure mode).
         for backup_path in sorted(
-            [
+            {
                 p
-                for pattern in ("backup_*.db", "backup_*.db.gz")
+                for pattern in (
+                    "backup_*.db",
+                    "backup_*.db.gz",
+                    "backup_*.db.*.gz",
+                )
                 for p in self.backup_dir.glob(pattern)
-            ],
+            },
             key=lambda p: p.stat().st_mtime,
             reverse=True
         ):

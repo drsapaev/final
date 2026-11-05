@@ -22,10 +22,11 @@ retention/R2 guarantees этому .dump НЕ приписываются):
     ops/vps/scripts/backup_db.py (pg_dump -F c → *.dump в BACKUP_DIR) не
     выполняет retention-cleanup и не вызывает r2_uploader; BackupService
     (BACKUP_RETENTION_DAYS=30 / MAX_BACKUPS=100) чистит только
-    backup_*.db и backup_*.db.gz (in-flight *.tmp не трогает; glob этот
-    .dump не покрывает — подстроки .db в имени нет) и загружает в R2
-    только собственные create_backup()-артефакты
-    (backup_<type>_<ts>.<runid>.db[.gz])
+    backup_*.db, backup_*.db.gz и backup_*.db.*.gz (legacy-форма коллизии
+    ...db.<token>.gz; in-flight *.tmp не трогает; glob этот .dump не
+    покрывает — подстроки .db в имени нет) и загружает в R2 только
+    собственные create_backup()-артефакты
+    (backup_<type>_<ts>.<runid>[.<token>].db[.gz]; права артефактов 0600)
   - r2_uploader выполняет только PutObject + HeadObject с sha256-верификацией;
     Delete/List-операций в коде uploader'а НЕТ — это факт о коде, а не
     доказательство неспособности R2-токена к Delete/List
