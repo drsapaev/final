@@ -5834,3 +5834,151 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scope check: no application/E2E source changed in this checkpoint; only evidence journals were modified. No merge/deployment.
 - Remaining limitation: a task-owned `.scratch` containing synthetic credentials remains in the validation worktree because host policy rejected deletion. Do not bypass the block. Owned Compose resources are absent.
 - Next: commit/push this journal update, set PR body SHA to the resulting exact HEAD, and wait for exact-head CI and the new PR Review Quality Gate.
+
+## T18 combined scenarios 3, 5, and 10 — synthetic acceptance — 2026-11-04T21:51:38+05:00
+
+- Commit: 64a7c0b9ce422bbdac73d919158eb525669d9229; branch codex/t18-combined-validation; fresh from origin/main.
+- Environment: Ubuntu-24.04 / WSL; project clinic-aqs-t18-combined-20261104; owner codex-t18-combined-validation; ports 18986/18987/15586; synthetic Admin and configuration rows only.
+- Execution: mandatory gate stopped on missing known root; one retry with PROGRESS.md returned narrow_override, gate_misroute=false, override_used=true, handoff_required=true; generated prompt read. Validation-only scope.
+- Validation: canonical Preflight PASS; Start PASS and runtime readiness PASS; one Session PASS. Normal Admin password and TOTP PASS. Scenario 3 incomplete state/actions to resource target, explicit publication, ready/public PASS. Scenario 5 Department off/on and manual archive persistence PASS. Scenario 10 all four legacy Admin URLs PASS; linked synthetic profile DELETE returned 409 and profile remained.
+- Teardown: Session removed 5 containers, 3 volumes, 1 network and Compose-local images; remaining owned containers/volumes/networks 0. First post-Session Preflight briefly reported WINDOWS_PORT_OWNER on 18987; read-only follow-up found no durable listener and no process was stopped. Next canonical Preflight PASS with no warnings, ports free.
+- Runtime facts: Docker 29.1.3; Compose 2.40.3; boot ID 47a7033b-e93f-4183-82dd-dd2185707986; C: free 16 GiB; WSL backing D: free 28 GiB; WSL memory after Session 3218 MiB.
+- Scope: only PROGRESS.md, EVIDENCE.md, RESUME.md tracked changes; no app/runtime/test/API/auth/database/migration/staging-config/production edits. No foreign project or global cleanup.
+- Limitation: launcher served_revision_verified=false; no exact served-frontend attestation. Full T18 and docs/runbooks/STAGING_VALIDATION.md remain incomplete. Tier-2 remains PARTIAL with no deferral.
+- Relevant result: aggregate statuses and timestamps were copied into this evidence entry; task-owned scratch, harness, PR-body draft, and synthetic env were removed after the PR opened.
+- PR: #3873 open at HEAD `80110ee1ef959c786d0e0b8186cce3f4985a929f`; exact-head Unified CI, Security, Gitleaks, Lifecycle Recommendation, and Agent Workflow Guards were in progress at 2026-11-04T22:06+05:00; PR Review Quality Gate had passed. Merge/deploy: not performed.
+
+## T18 journal PR checkpoint — 2026-11-04T22:10:51+05:00
+
+- PR: #3873 remains open and mergeable. Prior head `41f0ac3b71e7ef93a266f082c81ecb0ed422e4f7` had Unified CI, PR Review Quality Gate, Lifecycle Recommendation, Security, Gitleaks, and Agent Workflow Guards PASS.
+- Scope-aware skips: frontend unit/build/lint/E2E, backend, integration, Docker, staging readiness, production readiness, load, and DAST jobs were SKIPPED for the docs-only diff; these are not reported as PASS.
+- Validation: local PR-body quality gate, `git diff --check`, standard commit hooks, and Gitleaks passed. A final journal checkpoint is being pushed; verify its exact-head checks before merge.
+- Tier-2 remains PARTIAL; `served_revision_verified=false`; full T18 and the complete `STAGING_VALIDATION.md` checklist remain incomplete. Merge/deploy: user-owned; not performed.
+
+## T18 PR #3873 exact-head status — 2026-11-04T22:14:36+05:00
+
+- Confirmed PR head `86910e96f42b35b01ecf016d290a15101a890db0`, open, ready for review, and mergeable.
+- Unified CI, PR Review Quality Gate, Lifecycle Recommendation, Security, Gitleaks, and Agent Workflow Guards: PASS.
+- Unified CI path-aware frontend/backend/integration/Docker/staging/production/load/DAST jobs: SKIPPED for docs-only scope; not PASS.
+- A final checkpoint update is being added to PROGRESS.md / EVIDENCE.md / RESUME.md. Recheck the resulting exact PR head before reporting it ready for user-owned merge.
+
+## T18 PR #3873 exact-head status rechecked — 2026-11-04T22:36+05:00
+
+- Environment: GitHub `drsapaev/final`; local evidence worktree `aqs-t18-combined-validation`.
+- PR state: #3873 OPEN, Ready for review, mergeable; exact HEAD `c00f84920d572c24a4ea413199700a4d7a1fc462`; base and current `origin/main` `64a7c0b9ce422bbdac73d919158eb525669d9229`.
+- Applicable checks: PR Required Gate, PR Review Quality Gate, CI Scope, lifecycle recommendation, security scan, Gitleaks, CodeQL, GitGuardian, Windows/Ubuntu scratch guards, and Python/TypeScript/Actions analysis PASS.
+- Path-aware checks: frontend build/unit/lint/E2E, backend, integration, Docker, staging/production readiness, load, DAST, and other product checks SKIPPED for the journal-only diff; none are counted as PASS.
+- PR #3865 reconciliation: the supplied review referred to older HEAD `4aa1857eee`. GitHub confirms #3865 merged with final code HEAD `290d8f6d960c6207f4118783a1d48775c99ef41e` at merge commit `64a7c0b9ce422bbdac73d919158eb525669d9229`; both reported P2 findings were fixed and resolved before merge. No follow-up source change is needed.
+- Scope: read-only status verification; no code, tests, staging resources, review threads, merge, or deployment changed.
+- Remaining limitation: T18/Tier-2 remains PARTIAL; full `docs/runbooks/STAGING_VALIDATION.md` is incomplete and exact current served-frontend provenance remains NOT_RUN (`served_revision_verified=false`). No deferral is claimed.
+- Next: user-owned merge of #3873. After merge, refresh `origin/main` and reconcile T18 scenario evidence without repeating completed checks.
+
+## PR #3873 main synchronization — 2026-11-04T23:07:41+05:00
+
+- Task: synchronize the existing journal-only PR branch with fresh `origin/main`; no new PR cycle.
+- Before sync: PR branch HEAD `ce0f2d9db64b10689d1ec37a6e03ff790db96043`, base `64a7c0b9ce422bbdac73d919158eb525669d9229`; remote PR was OPEN, Ready for review, and mergeable.
+- Incoming main: `106597d67ece48ee9380ded5725ba421aed8cbc0`, documentation-only audit commit. It added `docs/audits/2026-11-02-registrar-cashier-followup-source-review.md`; it also rewrote the top of `PROGRESS.md`/`RESUME.md` to an older T18 scenario-2 checkpoint and removed four newer PR #3873 entries from `EVIDENCE.md`.
+- Resolution: clean merge retained the branch's latest combined T18 checkpoint and evidence history and included the new audit document. Merge commit `5cf78a3a97bc9d7f559d8296fd69d2b32231d20d` has parents `ce0f2d9db64b10689d1ec37a6e03ff790db96043` and `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- Gate: `run_agent_gate.ps1` from `ai/langgraph` with known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` and four scoped Markdown paths returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. This was a documentation synchronization, not an application or staging change.
+- Validation: automatic Git merge completed without conflicts; merged tree retained all latest branch checkpoint entries and added the incoming audit document; `git diff --cached --check` PASS; normal merge commit hooks completed (file-specific checks reported no applicable files). No app tests, staging, runtime, production, merge, or deployment were run.
+- Remaining: updated journal commit, push, exact-head CI, and PR description refresh are pending. Tier-2 remains PARTIAL; the complete staging runbook and exact served-frontend revision attestation remain incomplete.
+
+## PR #3873 synchronized exact-head checkpoint — 2026-11-04T23:30+05:00
+
+- Commit under review: `ef6aa5e698f1d6fcb57371f81496ce9c94f21b54`; base/current `origin/main`: `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- Environment: GitHub PR #3873, repository `drsapaev/final`; journal worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-combined-validation\final`.
+- Execution mode: continuation of the existing documentation-only PR synchronization; no new staging cycle.
+- Allowed and actual tracked paths: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `RESUME.md`, and `EVIDENCE.md`. Runtime, tests, staging, production, merge and deployment were not changed.
+- Main sync: commit `5cf78a3a97bc9d7f559d8296fd69d2b32231d20d`, second parent `106597d67ece48ee9380ded5725ba421aed8cbc0`; clean merge retained latest T18 journal history and the incoming audit document.
+- Exact-head checks: Unified CI, PR Required Gate, PR Review Quality Gate, lifecycle recommendation, security scans, Gitleaks, CodeQL, GitGuardian, scratch guards, and language analysis passed. An earlier PR Review Quality Gate attempt failed because the PR description lacked required labels; the description was corrected and subsequent exact-head quality-gate runs passed.
+- Scope-aware NOT_RUN/SKIPPED: frontend build/unit/lint/E2E, backend, integration, Docker, staging and production readiness, load, and DAST were skipped because this PR changes only documentation. These skips are not PASS.
+- Result: PR #3873 is OPEN, Ready for review, mergeable, at `ef6aa5e698f1d6fcb57371f81496ce9c94f21b54`. `gh pr checks 3873` showed no checks in progress and no current failure.
+- Limitations: no tests or staging were run in this checkpoint. Tier-2 remains PARTIAL; full `docs/runbooks/STAGING_VALIDATION.md` and exact served-frontend revision attestation remain incomplete (`served_revision_verified=false`).
+- Next: user-owned merge of #3873, then fresh-main worktree and reconciliation of T18 gaps without repeating completed scenarios. Merge commit: none.
+
+## T18 scenario matrix reconciliation in existing PR #3873 — 2026-11-04T23:48+05:00
+
+> Historical correction, 2026-11-05: the statement below that all ten scenarios were VALIDATED and that the `specialists` context was outside the checklist was incorrect. T18.10 is PARTIAL; see the later PR #3873 review-correction entry. The individual passing observations and original timestamps are retained.
+
+- Evidence baseline: PR #3873 parent HEAD `ebf6e1831c89bc81a14ea5ed7ebcb07e7fe65268`, base `106597d67ece48ee9380ded5725ba421aed8cbc0`; latest combined synthetic runtime commit `64a7c0b9ce422bbdac73d919158eb525669d9229`.
+- Source of status facts: GitHub merge metadata for #3861 (`bfc33837cd3028f1989b2462a998b16505a62fd6`), #3865 (`64a7c0b9ce422bbdac73d919158eb525669d9229`), #3805 (`e7cf5b47b1aa96e5df0b9baf9e9e567b8e3fecbf`), and #3832 (`ee7763e77e545db1479e257dbe4d3a388264cc03`); this journal's exact synthetic run record at runtime commit `64a7c0b9`; prior scenario-specific evidence preserved in this file.
+- Reconciliation: scenario 1 is supported by #3861; scenario 2 by the merged #3865 Doctor-owned and doctorless resource-routing UI flow; scenario 3 by the incomplete-direction → resource target → explicit publish → ready/public synthetic flow plus #3763 parent repair; scenario 4 by #3805; scenario 5 by live Department off/on/manual-archive plus 11 unit guards and 3 PostgreSQL token cases; scenario 6 by #3832; scenarios 7–9 by #3861; scenario 10 by the four legacy Admin URL checks and profile-delete 409 guard in the combined run.
+- Scope and uncertainty: the status table now marks the ten named core scenarios VALIDATED. This is not full T18 completion. The special profile-key deep link was not separately tested; keyboard/error/empty-state behavior, supported languages, viewports 375/768/1280/1920, cold/repeated-navigation latency, the complete `docs/runbooks/STAGING_VALIDATION.md` checklist, and exact served-frontend revision provenance remain incomplete or NOT_RUN.
+- Gate: canonical launcher from `ai/langgraph`, known root `PROGRESS.md`, scope limited to `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`; result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`. The generated execution prompt was read. No router or runtime changes.
+- Actual tracked scope: three existing T18 journal files only. No application/runtime, tests, staging, production, merge, or deployment changes in this reconciliation.
+- Validation: merge metadata and recorded evidence were cross-checked; `git diff --check` passed on the matrix edit. The new journal checkpoint must be pushed and exact-head checks revalidated in the same open PR #3873. The preceding head's applicable CI passed; product jobs were skipped for docs-only scope, not PASS.
+- Next: finish this same PR cycle, verify its exact HEAD and applicable checks, then wait for user-owned merge. Tier-2 remains PARTIAL with no accepted deferral.
+
+## T18 cross-cutting Admin setup browser validation — 2026-11-05T00:45:37+05:00
+
+- Commit under test: `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`; PR #3873, branch `codex/t18-combined-validation`; base/current `origin/main` `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- Environment: Windows host, Ubuntu-24.04 WSL, synthetic Compose project `clinic-aqs-t18-crosscut-20261105`; dedicated ports 18986/18987/15586. No production host, DB, or patient data used.
+- Execution mode: existing validation-only `gate_known_root_cause` / approved narrow override; the canonical execution prompt was read before staging. No router/gate changes.
+- Allowed and actual tracked paths: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Task-owned ignored scratch also held the synthetic env and temporary browser harness. No runtime, tracked test, API, auth policy, DB/migration, staging config, production, or foreign project was changed.
+- Original harness failure: first canonical Session passed Admin password + TOTP and keyboard/form checks, then timed out waiting for the setup direction row. Source inspection confirmed the harness had copied Playwright `storageState` without copying auth tokens held in `sessionStorage`. The corrected temporary harness copied session storage in memory only; it wrote or printed no tokens. This is a harness failure, not an application failure.
+- Validation command: `ops/scripts/wsl_staging.ps1 -Action Preflight -EnvFile .scratch/t18-crosscut-20261105/staging.env`; then `-Action Start` with the same env; then `-Action Session -NoBuild -CommandArgs powershell.exe -NoProfile -File .scratch/t18-crosscut-20261105/run-crosscut-session.ps1 -EnvFile .scratch/t18-crosscut-20261105/staging.env -Harness .scratch/t18-crosscut-20261105/validate-crosscut.cjs`. Playwright 1.63.0 Chromium. No credentials are recorded here.
+- Result, corrected run: Preflight PASS; Start/readiness PASS; Session PASS. Admin password + TOTP PASS; dialog keyboard trap, Escape/focus return, invalid key validation, and hidden profile creation PASS; empty-state editor links PASS; synthetic 503 then retry PASS; RU/EN/KK/uz-Latn/uz-Cyrl headings PASS; viewport checks 375/768/1280/1920 PASS. First/repeat content appearance: 1,190/944 ms. Browser page errors: 0.
+- Diagnostic limitation: the browser counted 11 console errors; this harness recorded only the count, so their causes are NOT_CLASSIFIED. No raw console text was saved. The explicit functional assertions passed, but this diagnostic remains open and should be classified before full T18 closure.
+- Provenance and scope limits: build input revision pin matched the worktree HEAD, but canonical launcher output remained `served_revision_verified=false`; exact served-frontend provenance is NOT_RUN. Full `docs/runbooks/STAGING_VALIDATION.md`, remaining legacy specs, and overall T18 are not complete. Tier-2 remains PARTIAL; no deferral is claimed.
+- Cleanup: Session teardown PASS; removed 5 containers, 3 volumes, 1 network, and local Compose images; remaining owned containers/volumes/networks 0. Dedicated host ports were free. Post-session WSL available memory was 2,142 MiB. The host command policy rejected deletion of the exact task-owned secret env file after teardown; no alternate deletion method was used. User cleanup request is pending.
+- Scope check: only three durable plan journals are included in the PR. Scratch harness/env are not tracked. No foreign Docker resources or shared caches were pruned.
+- PR: [#3873](https://github.com/drsapaev/final/pull/3873), OPEN / Ready for review at pre-update HEAD above; user owns merge. Merge commit: none.
+
+## PR #3873 exact-head follow-up — 2026-11-05T00:56:33+05:00
+
+- Commit and PR HEAD: `9ea9311a10db03285be23ab99bcb7ce0ff02741a`; base/current `origin/main`: `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- PR state: OPEN, Ready for review, mergeable; user retains merge authority. PR description now records exact HEAD, targeted smoke evidence, limitations, and required review-gate fields.
+- Result: PR Review Quality Gate run `41901375079` PASS; Lifecycle Recommendation `41901375032` PASS; Unified CI `41900690688` PASS; Gitleaks `41900690697` PASS; Security `41900690681` PASS; Agent Workflow Guards `41900690657` PASS.
+- Scope interpretation: path-aware frontend/backend/integration/Docker/readiness/load/DAST jobs were SKIPPED for the docs-only journal diff, not PASS. The prior synthetic browser Session evidence remains tied to runtime input commit `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`, not the journal commit.
+- No application, test, staging, production, merge, or deployment changes were made in this follow-up. The PR diff remains limited to the three T18 journals.
+- Tier-2 remains PARTIAL: the 11 browser console errors are NOT_CLASSIFIED; exact served asset revision attestation remains NOT_RUN (`served_revision_verified=false`); full `docs/runbooks/STAGING_VALIDATION.md` remains incomplete. No deferral was accepted.
+- Cleanup: owned Compose resources remain torn down; the task-owned synthetic env file still exists under ignored `.scratch` because host deletion policy blocked removal. User was asked to remove that exact file; no alternate deletion method was used.
+- Next: user-owned merge of #3873, then fresh-main worktree and continuation of only the remaining T18 gaps. Merge commit: none.
+
+## PR #3873 exact-head gate reconciliation — 2026-11-05T01:04:11+05:00
+
+- Commit under review: `f9bd1012f98f8fd6eaa12f8216e1b9c1b2e4110d`; base: `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- Current PR review body was corrected to retain the required `Result` field. An intermediate body version failed PR Review Quality Gate run `41902253143` because that label was omitted; no source or test failure was reported. The corrected body passed PR Review Quality Gate run `41902595406`.
+- Exact-head checks: Unified CI `41902208886` PASS; Gitleaks `41902208887` PASS; Security `41902208817` PASS; Agent Workflow Guards `41902208835` PASS; Lifecycle Recommendation `41902595472` PASS; PR Review Quality Gate `41902595406` PASS.
+- Scope: documentation journals and PR metadata only; application/runtime, tests, staging, production, merge, and deployment unchanged. Product-path jobs skipped for docs-only scope remain SKIPPED, not PASS.
+- State at verification: PR #3873 OPEN, Ready for review, mergeable; user retains merge authority. Tier-2 remains PARTIAL; no deferral accepted.
+- Next: user-owned merge, then refresh main in a fresh worktree and continue only remaining T18 checks. Merge commit: none.
+
+## T18 served frontend provenance and console diagnostics — 2026-11-05T02:34:40+05:00
+
+- Commit under test: `cbd8c64241c7a80f02b4728e63d2d132a55d708c`; frontend tree `475364c91518ceda62af758219334fe3bc3ec5cd`; PR #3873, branch `codex/t18-combined-validation`; base `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- Environment: Windows host, Ubuntu-24.04 WSL, owned synthetic Compose diagnostics only; no production endpoint/data or foreign staging project was used.
+- Execution mode: continuation of the approved validation-only T18 narrow override. The canonical gate prompt was read for this scope. Allowed durable paths remain the three T18 journals; runtime/application/test/config/production changes are denied.
+- Provenance validation: PASS. `/sw.js` returned build SHA `cbd8c64241c7a80f02b4728e63d2d132a55d708c`; 37/37 browser-fetched JS/CSS response bodies matched SHA-256 of same-path files in the same owned Nginx container. This independently verifies the served artifact. The launcher field `served_revision_verified=false` remains unchanged and must not be reported as true.
+- Browser diagnostic Session: Preflight PASS; Start/readiness PASS; Session PASS. Normal synthetic Admin password + TOTP PASS. Read-only visits to `/admin/setup-directions`, `/admin/services?servicesTab=queue-profiles`, and `/admin/users` completed; route headings checked in RU, EN, KK, uz-Latn, and uz-Cyrl.
+- Console diagnostics: the earlier broad cross-cutting run counted 11 console events. A narrower run reproduced 9: 8 sourced from the same-origin minified bundle `/assets/index-BVFGuh9T.js` (line 1), and 1 from a same-origin non-bundle. Raw messages were not retained. Two original events did not reproduce and remain unattributed; exact call sites for the eight bundle events are unmapped. Request failures 0; HTTP 4xx/5xx 0; uncaught page errors 0. Result is partial source-family classification, not a finding that all console events are benign.
+- Harness diagnosis: one initial generated env had concatenated entries and an empty PostgreSQL password; safe log classification identified `password_missing`. No kernel OOM was observed. Corrected env allowed the final canonical Start/Session to pass. A separate diagnostic harness attempt exited nonzero; its owned Session teardown passed and the later instrumented run completed. No application defect was inferred.
+- Cleanup: final canonical Session removed 5 owned containers, 3 volumes, 1 network and local Compose images; remaining owned containers/volumes/networks were 0 and dedicated ports were released. Two ignored task-owned synthetic env files remain because host policy blocked deletion: `.scratch/t18-crosscut-20261105/staging.env` and `.scratch/t18-crosscut-20261105/staging-diagnostic.env`. No alternate deletion method was attempted.
+- Changed tracked paths: `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` only. The journal update, commit, push, PR-body refresh, and exact-head checks are pending at the time of this entry.
+- Result: provenance PASS; scoped diagnostic Session PASS; console classification PARTIAL (9/11 reproduced and source-family classified; 2/11 not reproduced; exact call sites unresolved); full T18/Tier-2 PARTIAL. No deferral accepted.
+- Remaining limitation: full `docs/runbooks/STAGING_VALIDATION.md` not complete; launcher provenance flag still false; two console events unattributed. No need to repeat passed cross-cutting functional assertions absent a source change.
+- PR: #3873 OPEN, Ready for review, mergeable at last live check; user owns merge. Merge commit: none.
+
+## PR #3873 exact-head journal update — 2026-11-05T02:41:06+05:00
+
+- Commit under review: `d4d587421b92f5b122d921691030b4f41775294c`; base/current `origin/main`: `106597d67ece48ee9380ded5725ba421aed8cbc0`.
+- PR state: #3873 OPEN, Ready for review, mergeable; exact head verified from GitHub after push. PR body refreshed with the provenance match, partial console classification, remaining limitations, and updated cleanup note.
+- Changed paths: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` only. `git diff --check` PASS before commit. Commit hooks passed: large-file/conflict/private-key checks, Gitleaks, whitespace/end-of-file checks; language and application hooks were skipped as no relevant files were present.
+- Exact-head CI: 17 success, 22 skipped, 0 failures, 0 in progress. PASS: PR Required Gate, PR Review Quality Gate, lifecycle recommendation, security scan, Gitleaks, CodeQL, GitGuardian, CI Scope, Windows/Ubuntu scratch guards, and Python/TypeScript/Actions analysis. Path-aware frontend/backend/unit/E2E/integration/Docker/readiness/load/DAST checks were SKIPPED for documentation-only scope, not PASS.
+- Result: journal checkpoint and PR metadata are current at the exact pushed HEAD. No application tests or staging were rerun in this docs-only follow-up.
+- Scope check: no application/runtime, tests, API, auth, database/migrations, staging configuration, production, foreign project, merge, or deployment changes.
+- Remaining limitation: full T18 and `docs/runbooks/STAGING_VALIDATION.md` remain incomplete; Tier-2 remains PARTIAL with no deferral. User owns merge.
+- PR: [#3873](https://github.com/drsapaev/final/pull/3873). Merge commit: none.
+
+## PR #3873 review correction — T18.10 is PARTIAL — 2026-11-05T10:45:07+05:00
+
+- Review: #5780355730, thread `PRRT_kwDOPiIgt86z8Ay1`, reported a P1 evidence-status error at PR HEAD `effc1bbb3135afd5d82af2e540e1c9cfc7fdd714`.
+- Canonical requirement: `.ai-factory/plans/codex-admin-queue-simplification.md` T18.10 includes the four legacy URLs, catalog, typed return, reload, Back/Forward, the profile key `specialists`, its initial load, and a readable protected 409. The old claim that `specialists` was outside the checklist was false.
+- Existing PASS evidence retained: combined synthetic run `64a7c0b9ce422bbdac73d919158eb525669d9229` checked the four old Admin URLs and a linked-profile DELETE 409 with row retention; T11 r8 at `acb509c36a9583f917bc86d601120bef95eddc1e` checked actual `specialists` initial catalog GET and readable DELETE 409/row retention; normal-Admin/TOTP route-context run at `0513a9863b137ad2bc4143f73d322f31ca481ee2` checked `setupProfile=specialists`, typed URL context, editor tabs, return links, reload and Back/Forward.
+- Scope of prior route artifact: `frontend/output/staging/t18-route-context-20261030/route-context.spec.ts` in the prior `aqs-t18-live-specs` worktree contains the `specialists` URL assertions. At this review its SHA-256 is `606a547b52688793ccb2acb61c0ffc648296c57e83722a5de65c634cfc1b7d2c`; its local `.last-run.json` reports `passed`. No frozen hash from the original execution was found, so this inspection hash alone does not prove the present spec bytes are the bytes used in that run. Inspection shows URL, return-link and heading assertions, but no assertion that the actual `specialists` profile row/data loaded and remained associated with those transitions. It is an ignored historical artifact and is not included in this PR.
+- Result: T18.10 is PARTIAL. Its remaining evidence is a synthetic current-candidate normal Admin/2FA check tying actual `specialists` initial row/data load to typed return context, reload and Back/Forward, plus the protected 409/row guard, or equally strong source-backed evidence applicable to that candidate. No new runtime/staging result is claimed here.
+- Main synchronization: fetched origin/main `0d80bbe650a4e1bb6028e1598c71669534cbb9a3`, containing #3876 and #3877; clean merge `632714a38e4bdf50a6ae44b025dd02169822c46e`. Those upstream commits include shared dialog, queue UI, public QR and locale changes. Prior staging results remain bound to the source commits actually exercised; this sync does not establish deployment-commit acceptance.
+- Execution: `gate_known_root_cause` for `PROGRESS.md` with the three journal paths; result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; the execution prompt was read. Reference-only: canonical plan, prior safe browser spec, relevant Admin source, and incoming main diff.
+- Allowed authored paths: `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Denied: direct runtime/app/test changes, auth/DB/schema, production/deploy, staging/foreign resources, GitHub review-thread mutation and PR merge.
+- Local validation: targeted assertions for the canonical `specialists` requirement, PARTIAL status, retained passing evidence, historical correction and inspected artifact hash PASS; `git diff --check` PASS; `origin/main` is an ancestor of the branch; diff against `origin/main` contains only the three journals. `EVIDENCE.md` adds 15 lines and deletes none in this correction; the existing history is preserved. Commit/push, PR-body refresh and checks on the resulting HEAD remain pending at this entry. No new application test or staging was run in this correction.
+- PR: #3873 remains open; the review thread is not resolved or replied to in this task. User owns merge. Overall T18 and Tier-2 remain PARTIAL; no deferral is claimed.

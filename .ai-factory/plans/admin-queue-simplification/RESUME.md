@@ -1,3 +1,45 @@
+## Current resume — PR #3873 T18.10 review correction — 2026-11-05T10:45:07+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. Review #5780355730 is correct: the canonical T18.10 checklist explicitly includes profile key `specialists`, initial load, typed return, reload, Back/Forward, the four legacy URLs, and the protected 409. The prior `VALIDATED` status and claim that the key was optional were incorrect. The current status is PARTIAL.
+
+Preserve the existing positive evidence rather than treating it as a failed run: at `64a7c0b9` the four old URLs and a linked synthetic profile's DELETE 409/row retention passed; T11 r8 at `acb509c3` checked the actual `specialists` initial catalog and readable 409/row retention; a separate normal-Admin/TOTP Playwright run at `0513a986` used `setupProfile=specialists` and checked typed URL context, return links, reload and Back/Forward. That route-context spec did not assert the actual `specialists` row or its data after the transitions. Complete T18.10 still needs a synthetic current-candidate check tying real profile initial load to those transitions and the 409 evidence, with tested SHA and safe artifact.
+
+The existing branch was synchronized by clean merge `632714a38e4bdf50a6ae44b025dd02169822c46e` of fresh `origin/main` `0d80bbe650a4e1bb6028e1598c71669534cbb9a3` (#3876/#3877). Those incoming commits changed shared dialog, queue UI, public QR and locale code; older staging results remain anchored to their original commits, not automatically to this candidate. Gate: `gate_known_root_cause` with the three journal paths, result `narrow_override`, `gate_misroute=false`, `handoff_required=true`; execution prompt read.
+
+Allowed authored paths are `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` only. The review fix runs no new staging or application tests. Next: verify the three-file diff and retained history, commit/push to the existing PR, update its description to show T18.10 PARTIAL, and check GitHub CI for the new HEAD. Do not resolve or reply to the GitHub thread without authorization; user owns merge. After merge, continue the specific missing T18.10 check and the remaining overall T18/Tier-2 gaps.
+
+---
+
+## Previous resume — T18 journal update pushed to PR #3873 — 2026-11-05T02:41:06+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. PR #3865 is merged at `64a7c0b9ce422bbdac73d919158eb525669d9229`; its final code HEAD was `290d8f6d960c6207f4118783a1d48775c99ef41e`. The supplied review referring to older HEAD `4aa1857eee` is historical: both P2 coverage gaps were addressed before merge. The merged E2E covers Doctor-owned creation, QueueResource-only setup, explicit publication, readiness/effective availability, and public QR catalog checks.
+
+PR #3873 remains the active journal-only T18 PR against base `106597d67ece48ee9380ded5725ba421aed8cbc0`; resolve its exact live HEAD before merge. The previous journal commit `d4d587421b92f5b122d921691030b4f41775294c` was OPEN/Ready/mergeable and its checks were 17 success, 22 skipped, 0 failures, 0 in progress. Required Gate, Review Quality Gate, lifecycle recommendation, security, Gitleaks, CodeQL, GitGuardian, scratch guards, and language analysis passed on that previous HEAD. Product checks skipped for documentation-only scope are SKIPPED, not PASS. This follow-up records those results; recheck exact-head status on the current PR before merge. User retains merge and deployment authority; do not merge or deploy.
+
+Latest canonical synthetic diagnostic Session on HEAD `cbd8c64241c7a80f02b4728e63d2d132a55d708c` passed: normal Admin password + TOTP, visits to setup-directions / queue-profiles / users, and RU/EN/KK/uz-Latn/uz-Cyrl route headings. The prior full cross-cutting run separately passed keyboard/focus, invalid form input, hidden profile creation, empty state, synthetic 503/retry, five languages, viewports 375/768/1280/1920, 1,190/944 ms cold/repeat content, and zero page errors. Do not rerun these without a source change.
+
+Served frontend provenance is independently verified for `cbd8c64241c7a80f02b4728e63d2d132a55d708c`: `/sw.js` exposed the exact build SHA and all 37 fetched JS/CSS bodies matched the same-path files in the owned Nginx container. Keep the caveat that the canonical launcher field itself still says `served_revision_verified=false`.
+
+Console diagnostics: the original full run counted 11 events; a narrower run reproduced 9 (8 from the same-origin minified bundle `/assets/index-BVFGuh9T.js`, 1 same-origin non-bundle). Raw messages were not retained. Two events were not reproduced and remain unattributed; exact call sites for the eight bundle events are not mapped. Request failures and HTTP 4xx/5xx were 0; page errors were 0. Treat source-family classification as partial, not as proof that every console event is harmless.
+
+The malformed initial env file left PostgreSQL's password empty (`password_missing`); this was a harness setup error, not an application failure, and no kernel OOM was observed. The corrected canonical Start/Session passed. Final Session teardown removed 5 containers, 3 volumes, 1 network and local Compose images; remaining owned resources were 0. Two task-owned ignored synthetic env files remain because host policy rejected deletion; no alternate deletion method was used. Their names are `.scratch/t18-crosscut-20261105/staging.env` and `.scratch/t18-crosscut-20261105/staging-diagnostic.env`.
+
+Tier-2 remains PARTIAL with no accepted deferral. The full `docs/runbooks/STAGING_VALIDATION.md` checklist and exact served-revision attestation through the launcher remain incomplete. Next: verify current #3873 HEAD and checks, then user merges it. After merge, start from fresh `origin/main` and address only the remaining T18 acceptance gaps.
+
+---
+
+## Previous resume — T18 scenario matrix reconciled — 2026-11-04T23:48+05:00
+
+> Historical correction: this checkpoint incorrectly treated `specialists` context as optional and all ten core scenarios as validated. The current T18.10 status is PARTIAL; retain the individual passing results and see the review correction above.
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. PR #3865 is merged at `64a7c0b9ce422bbdac73d919158eb525669d9229`; its final reviewed code HEAD was `290d8f6d960c6207f4118783a1d48775c99ef41e`. The two P2 findings in the supplied older review were fixed and resolved before merge.
+
+PR #3873 remains OPEN and Ready for review against `origin/main` `106597d67ece48ee9380ded5725ba421aed8cbc0`; resolve its live HEAD and checks from GitHub before merge. It contains only T18 journal files and includes clean main-sync merge `5cf78a3a97bc9d7f559d8296fd69d2b32231d20d`. The last verified head `ebf6e1831c89bc81a14ea5ed7ebcb07e7fe65268` passed applicable CI, PR Required Gate, PR Review Quality Gate, lifecycle, security, Gitleaks, CodeQL, GitGuardian, scratch guards and language analysis. Product-path jobs were SKIPPED for docs-only scope, not PASS. This same-PR update reconciles the scenario matrix; its new exact-head checks must be verified before merge.
+
+Recorded evidence now covers each core T18 scenario 1–10: merged PRs #3861, #3865, #3805 and #3832 plus the combined synthetic run on runtime source `64a7c0b9` for scenarios 3, 5 and 10. See the reconciled status table in `PROGRESS.md` and exact run records in `EVIDENCE.md`. Cross-cutting T18 acceptance remains incomplete: keyboard/error/empty states, supported languages, target viewports, cold/repeated-navigation latency, full `STAGING_VALIDATION.md`, and exact served-frontend provenance (`served_revision_verified=false`). The special profile-key deep link is an extra unverified follow-up. Tier-2 remains PARTIAL, with no deferral.
+
+No application code, tests, or staging resources changed in this checkpoint; only the existing T18 journals are being reconciled in PR #3873. Tier-2 remains PARTIAL. Next: finish the same PR cycle and verify checks at its live HEAD, then wait for user-owned merge. After merge, refresh `origin/main` in a fresh worktree and address one remaining cross-cutting T18 gap without repeating validated scenarios. Do not deploy or claim full Tier-2.
+---
 ## Latest continuation — T18 scenario 5 PostgreSQL existing-token checks passed — 2026-11-04T00:40+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:\Users\DrSapaev\.codex\worktrees\aqs-t18-cabinet-day\final`, branch `codex/t18-cabinet-day`, runtime commit `235b4cbba6bc133e89c44a3ceeb087d227267f9d`. PR #3861 remains OPEN / Ready; user owns merge. The current journal-only evidence update is being added to that same PR; verify its resulting exact HEAD and checks before asking for merge.
