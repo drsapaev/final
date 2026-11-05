@@ -179,9 +179,13 @@ def test_dr_drill_no_destructive_cleanup_when_create_failed(tmp_path, monkeypatc
         parts = [str(part) for part in cmd]
         issued.append(parts)
         if any("CREATE DATABASE" in part for part in parts):
-            return subprocess.CompletedProcess(
+            result = subprocess.CompletedProcess(
                 cmd, 1, "", 'ERROR: database "preexisting_target" already exists\n'
             )
+            if check:
+                # emulate subprocess.run(check=True) contract
+                raise subprocess.CalledProcessError(result.returncode, cmd, stderr=result.stderr)
+            return result
         return _ok(cmd, stdout="3\n")
 
     monkeypatch.setattr(dr_drill, "_run", fake_run)
@@ -251,12 +255,10 @@ def test_update_rehearsal_rolls_back_on_backend_readiness_timeout(monkeypatch):
 
 
 def test_failed_backup_cleanup_preserves_other_writers_temp(tmp_path, monkeypatch):
-    """BR-018: when backup A fails, its cleanup may remove only A's own temp
-    file — not every ``*.tmp`` in the shared backup directory."""
+    """BR-018: when backup A fails mid-dump, its cleanup may remove only A's
+    own temp file — not every ``*.tmp`` in the shared backup directory."""
     other = tmp_path / "backup_scheduled_20990101_999999.db.tmp"
     other.write_bytes(b"OTHER-WRITER-IN-FLIGHT")
-    own = tmp_path / "backup_manual_20990101_000001.db.tmp"
-    own.write_bytes(b"CURRENT-WRITER-LEFTOVER")
 
     svc = BackupService.__new__(BackupService)
     svc.backup_dir = tmp_path
@@ -264,14 +266,34 @@ def test_failed_backup_cleanup_preserves_other_writers_temp(tmp_path, monkeypatc
     svc.max_backups = 10
     svc.db = None
 
-    def boom() -> str:
-        raise ValueError("synthetic failing dump")
+    monkeypatch.setattr(
+        backup_service_module,
+        "_get_database_url",
+        lambda: "postgresql://drill_user:drill_pass@localhost:5432/clinicdb_src",
+    )
+    monkeypatch.setattr(
+        backup_service_module, "_resolve_pg_tool", lambda name: f"synthetic_{name}"
+    )
 
-    monkeypatch.setattr(backup_service_module, "_get_database_url", boom)
+    own_targets: list[Path] = []
+
+    def failing_pg_dump(cmd, env=None, capture_output=True, text=True, check=False, **kwargs):
+        # Simulate a pg_dump that starts writing, creates a partial temp
+        # archive, and then fails (audit quality-note scenario).
+        if "pg_dump" in str(cmd[0]):
+            target = Path(cmd[list(cmd).index("-f") + 1])
+            target.write_bytes(b"PARTIAL-SYNTHETIC-DUMP")
+            own_targets.append(target)
+            return subprocess.CompletedProcess(cmd, 1, "", "pg_dump: synthetic failure")
+        raise AssertionError(f"unexpected subprocess call: {cmd}")
+
+    monkeypatch.setattr(backup_service_module.subprocess, "run", failing_pg_dump)
 
     with pytest.raises(Exception):
         svc.create_backup("manual")
 
+    assert len(own_targets) == 1, "pg_dump stub must have produced one temp artifact"
+    own = own_targets[0]
     assert own.exists() is False, "the failed writer must remove its own temp file"
     assert other.exists(), "cleanup deleted another writer's in-flight temp file"
     assert other.read_bytes() == b"OTHER-WRITER-IN-FLIGHT", (

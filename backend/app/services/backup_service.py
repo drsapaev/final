@@ -189,6 +189,10 @@ class BackupService:
         Returns:
             Backup information dict
         """
+        # BR-018: track this operation's own temp file. Cleanup may remove
+        # ONLY this file — a bulk glob("*.tmp") unlink would delete another
+        # concurrent writer's in-flight artifact in the shared directory.
+        operation_tmp: Path | None = None
         try:
             # Get database URL
             db_url = _get_database_url()
@@ -207,6 +211,7 @@ class BackupService:
             # Atomic write: pg_dump targets .tmp; final name appears only
             # after success - a failed dump no longer leaves zero-byte files.
             backup_path = self.backup_dir / (backup_filename + ".tmp")
+            operation_tmp = backup_path
 
             # Create backup based on database type
             if db_url.startswith("sqlite"):
@@ -328,10 +333,12 @@ class BackupService:
             return backup_info
 
         except Exception as e:
-            # remove .tmp leftovers from a failed dump
-            for stray in self.backup_dir.glob("*.tmp"):
+            # BR-018: remove only this operation's temp file. A bulk
+            # glob("*.tmp") unlink could delete another concurrent writer's
+            # in-flight artifact in the shared backup directory.
+            if operation_tmp is not None:
                 try:
-                    stray.unlink()
+                    operation_tmp.unlink(missing_ok=True)
                 except OSError:
                     pass
             logger.error(f"❌ Backup failed: {e}")
