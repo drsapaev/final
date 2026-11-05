@@ -11,7 +11,7 @@ from uuid import UUID  # noqa: F401
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
 from fastapi.responses import Response  # noqa: F401
-from pydantic import BaseModel, ConfigDict, Field, field_validator  # noqa: F401
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator  # noqa: F401
 from sqlalchemy import or_  # noqa: F401
 from sqlalchemy.exc import IntegrityError  # noqa: F401  # H-4: catch double-payment race
 from sqlalchemy.orm import Session, joinedload  # noqa: F401
@@ -223,6 +223,43 @@ def _validate_immediate_paid_method(value: str) -> str:
         f"Неизвестный метод оплаты: {value!r}. Разрешены: cash, card."
     )
 
+
+def _validate_cash_tender(
+    method: str, amount: Decimal, received: Decimal | None, change: Decimal | None
+) -> tuple[Decimal | None, Decimal | None]:
+    """CSH-FE-040 (follow-up audit 2026-11-02): кассовое «внесено/сдача».
+
+    Модалка кассы считает сдачу локально, но прежний контракт сужал
+    payload до visit_id/amount/method/note — документальное подтверждение
+    (сколько получено, сколько сдано) терялось ДО записи. Инвариант:
+    для cash «внесено = сумма + сдача» (и внесено ≥ суммы); поля либо
+    оба, либо ни одного; для не-наличных методов полей быть не должно
+    (там «внесено» бессмысленно). ValueError → 422.
+    """
+    if received is None and change is None:
+        return None, None
+    if method != "cash":
+        raise ValueError(
+            "Поля received_amount/change_due допустимы только для метода "
+            "cash: для card/provider оплата проходит суммой платежа без "
+            "наличной сдачи."
+        )
+    if received is None or change is None:
+        raise ValueError(
+            "Поля received_amount и change_due передаются вместе: "
+            "внесённая сумма и сдача — одна запись кассира."
+        )
+    if received < amount:
+        raise ValueError(
+            f"Внесённая сумма ({received}) меньше суммы платежа ({amount})."
+        )
+    if received - amount != change:
+        raise ValueError(
+            f"Несходство сдачи: внесено {received}, платёж {amount}, "
+            f"сдача должна быть {received - amount}, получено {change}."
+        )
+    return received, change
+
 class CreatePaymentRequest(BaseModel):
     """Запрос на создание платежа"""
     visit_id: int | None = Field(None, description="ID визита")
@@ -231,6 +268,13 @@ class CreatePaymentRequest(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Сумма платежа")
     method: str = Field(default="cash", description="Метод оплаты (cash, card)")
     note: str | None = Field(None, description="Примечание")
+    # CSH-FE-040: кассовое подтверждение «внесено/сдача» (только cash).
+    received_amount: Decimal | None = Field(
+        None, ge=0, description="Внесённая кассиром сумма (наличные, для чека)"
+    )
+    change_due: Decimal | None = Field(
+        None, ge=0, description="Сдача: received_amount - amount (для чека)"
+    )
     client_request_id: UUID | None = Field(
         None,
         description=(
@@ -246,6 +290,12 @@ class CreatePaymentRequest(BaseModel):
     @classmethod
     def _method_is_manually_receipted(cls, value: str) -> str:
         return _validate_immediate_paid_method(value)
+
+    # CSH-FE-040: инвариант кассовой сдачи «внесено = сумма + сдача».
+    @model_validator(mode="after")
+    def _cash_tender_is_coherent(self) -> "CreatePaymentRequest":
+        _validate_cash_tender(self.method, self.amount, self.received_amount, self.change_due)
+        return self
 
 
 class PaymentResponse(BaseModel):
@@ -270,6 +320,13 @@ class CreateGroupedPaymentRequest(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Total payment amount to allocate")
     method: str = Field(default="cash", description="Payment method (cash, card)")
     note: str | None = Field(None, description="Payment note")
+    # CSH-FE-040: кассовое подтверждение «внесено/сдача» (только cash).
+    received_amount: Decimal | None = Field(
+        None, ge=0, description="Cash tendered by the cashier (receipt provenance)"
+    )
+    change_due: Decimal | None = Field(
+        None, ge=0, description="Change due: received_amount - amount (receipt provenance)"
+    )
     client_request_id: UUID | None = Field(
         None,
         description=(
@@ -285,6 +342,12 @@ class CreateGroupedPaymentRequest(BaseModel):
     @classmethod
     def _method_is_manually_receipted(cls, value: str) -> str:
         return _validate_immediate_paid_method(value)
+
+    # CSH-FE-040: инвариант кассовой сдачи «внесено = сумма + сдача».
+    @model_validator(mode="after")
+    def _cash_tender_is_coherent(self) -> "CreateGroupedPaymentRequest":
+        _validate_cash_tender(self.method, self.amount, self.received_amount, self.change_due)
+        return self
 
 
 class GroupedPaymentAllocationItem(BaseModel):

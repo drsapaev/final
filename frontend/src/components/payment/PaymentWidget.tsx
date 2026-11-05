@@ -152,6 +152,14 @@ const PaymentWidget = ({
   const MAX_POLLING_ATTEMPTS = 60;
   const POLLING_INTERVAL_MS = 5000;
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // CSH-FE-042 (follow-up audit 2026-11-02): отложенный старт опроса
+  // (10с после редиректа на провайдера) — тожеOwned-ресурс виджета.
+  // Прежний код не сохранял этот setTimeout: закрытие модалки в первые
+  // 10 секунд оставало живой таймер, который ПОСЛЕ размонтирования
+  // создавал polling-interval на уже мёртвом виджете (unmount-cleanup
+  // чистил только interval). Храним ref и чистим его в clearPolling +
+  // в unmount-cleanup.
+  const delayedPollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptsRef = useRef(0);
   const [pollingAttempts, setPollingAttempts] = useState(0);
   // PR-3854 review follow-up (single-flight): `setInterval(async () => …)` let
@@ -263,6 +271,11 @@ const PaymentWidget = ({
         clearInterval(pollingRef.current);
         pollingRef.current = null;
       }
+      // CSH-FE-042: и отложенный старт тоже — таймер не должен пережить виджет.
+      if (delayedPollingRef.current) {
+        clearTimeout(delayedPollingRef.current);
+        delayedPollingRef.current = null;
+      }
     };
   }, []);
 
@@ -286,6 +299,12 @@ const PaymentWidget = ({
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
+    }
+    // CSH-FE-042: остановка отслеживания отменяет и ещё не сработавший
+    // отложенный старт опроса.
+    if (delayedPollingRef.current) {
+      clearTimeout(delayedPollingRef.current);
+      delayedPollingRef.current = null;
     }
     // PR-3854 re-review follow-up: invalidate the stopped session so its
     // still-in-flight GET (if any) can neither release the single-flight
@@ -466,7 +485,10 @@ const PaymentWidget = ({
           // HIGH #7: auto-start polling 10s after redirect (matches
           // PaymentClick/PaymentPayMe UX — gives the user time to land
           // on the provider page before we start pinging).
-          setTimeout(() => {
+          // CSH-FE-042: таймер сохраняется в ref и гасится при
+          // остановке отслеживания/размонтировании виджета.
+          delayedPollingRef.current = setTimeout(() => {
+            delayedPollingRef.current = null;
             startPolling();
           }, 10000);
         }
@@ -814,6 +836,20 @@ const PaymentWidget = ({
               {t('payment.pay_widg_cancel')}
             </Button>
           }
+          {/* CSH-FE-041 (follow-up audit 2026-11-02): «Отмена» здесь — только
+              закрытие окна отслеживания: платёж у провайдера ОСТАЁТСЯ
+              активным и может списаться. Раньше подпись молчала об этом, и
+              кассир мог решить, что деньги больше не двинутся. Честная
+              подпись видна, пока платёж не в терминальном статусе. */}
+          {paymentData && !['paid', 'failed', 'cancelled', 'canceled', 'refunded'].includes(paymentStatus) && (
+            <Typography
+              variant="caption"
+              component="p"
+              data-testid="pw-cancel-hint"
+              className="pw-cancel-hint">
+              {t('payment.pay_widg_cancel_hint')}
+            </Typography>
+          )}
         </Box>
       </CardContent>
     </Card>);

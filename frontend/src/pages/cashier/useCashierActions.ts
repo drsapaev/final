@@ -37,6 +37,7 @@ import type { UsePaymentsReturn } from '../../hooks/usePayments';
 import {
   buildPaymentMethodLabels,
   buildReceiptPrintPayload,
+  buildCashierPaymentPayload,
   canCreateDirectCashierPayment,
   createGroupedCashierPayment,
   isBackendGroupedCashierPayment,
@@ -204,19 +205,12 @@ export const useCashierActions = ({
       if (groupedPayment) {
         await createGroupedCashierPayment(appt, pData);
       } else {
-        const result = await paymentsApi.createPayment({
-          visit_id: visitId,
-          amount: pData.amount,
-          method: pData.method,
-          note: pData.note || tI18n('cashier.payment_note_default'),
-          // Issue 3859: forward the modal's idempotency key (one UUID per
-          // modal session) so a network-loss retry replays the original
-          // payment server-side instead of double-charging. Conditional
-          // spread keeps the legacy body shape for key-less callers.
-          ...(('client_request_id' in pData && pData.client_request_id)
-            ? { client_request_id: pData.client_request_id }
-            : {}),
-        });
+        // CSH-FE-040: пейлоад строится каноническим сборщиком —
+        // «внесено/сдача» (cash) и ключ идемпотентности доходят до
+        // POST /cashier/payments без сужения (прежде терялись здесь).
+        const result = await paymentsApi.createPayment(
+          buildCashierPaymentPayload(visitId, pData, tI18n('cashier.payment_note_default')) as Parameters<typeof paymentsApi.createPayment>[0],
+        );
 
         if (!(result as { success?: boolean }).success) {
           throw new Error(tI18n('cashier.payment_visit_failed', { visitId, error: (result as { error?: string }).error }));
