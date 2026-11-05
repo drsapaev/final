@@ -151,6 +151,26 @@
 - **Fail-first test:** use only a disposable PG instance with a synthetic pre-restore dataset and intentionally incompatible restore object; assert failure leaves the original database intact and never emits success. Verify Admin RBAC positive and denied-role negative cases independently.
 - **Suggested fix:** use a controlled maintenance workflow with verified source backup, isolated target, compatibility check and explicit swap/promotion; use transactional restore semantics where supported. Do not invoke on a live clinic database in a test or to collect review evidence.
 
+
+### BR-021 — P2 — Retention cleanup double-unlinks archives and can abandon the count limit
+
+- **Source:** `backend/app/services/backup_service.py:356–385`. `_cleanup_old_backups()` obtains a sorted list, unlinks expired files in the first loop, then iterates `backups[self.max_backups:]` from the **original unfiltered list**, calling `unlink()` again. A broad `except Exception` logs and terminates cleanup.
+- **Failure precondition:** an expired archive also occurs beyond the `max_backups` cutoff. `FileNotFoundError` from the second unlink aborts the remainder of the count-limit pass, leaving some nonexpired excess archives. The independent `backend/tests/unit/test_backup_atomic_and_retention.py:23–39` tests age-based cleanup without simultaneously exercising max-count enforcement.
+- **Fail-first test:** create synthetic age-controlled backup files: more than `max_backups` total, at least one expired file in the second-loop slice and at least one younger excess file after it. Assert all expired files and all extra survivors are handled and no stale-reference unlink aborts the pass.
+- **Suggested fix:** recompute the surviving list after age-based deletion and apply max-count retention only to extant files; handle disappeared files idempotently and instrument a failure to enforce retention. Avoid deletion of an active backup by requiring unique, committed backup ownership.
+
+### BR-022 — P2 — Interrupted compression leaves a partial published-looking `.db.gz` artifact
+
+- **Source:** `backend/app/services/backup_service.py:340–354`: `_compress_backup()` uses `gzip.open(compressed_path, "wb")` on the final `.db.gz` path. Any exception is logged and returns `None` without removing the partly written gzip file. `create_backup():279–287` correctly retains the good uncompressed source when compression fails; however `list_backups():395–404` and `_cleanup_old_backups():359–362` also enumerate `backup_*.db*` without excluding a partial gzip.
+- **Failure precondition:** compression fails after writing a gzip header or partial compressed bytes. The uncompressed backup may be good, but the invalid `.db.gz` remains visible as another backup, may count toward retention, or be selected as the latest by filename/time-based tools. The repository has no targeted compressor-failure cleanup regression found in `backend/tests/unit/test_backup_atomic_and_retention.py`.
+- **Fail-first test:** inject an `OSError` after a few synthetic bytes during compression; require the source `.db` to remain intact, no visible `.db.gz` to remain on failure and no false extra list entry. Then verify success atomically publishes a complete gzip archive.
+- **Suggested fix:** compress to a uniquely reserved private `.tmp`, validate successful close/size, publish without clobbering an existing archive, and delete **only** that run's partial temp file on exception.
+
+### Regression-proof quality note — existing test does not exercise a failing dump writer
+
+- **Source:** `backend/tests/unit/test_backup_atomic_and_retention.py:41–63`, `test_failed_dump_leaves_no_zero_byte_artifact`, monkeypatches `_get_database_url` to throw `ValueError("boom")` before a dump file is opened. Thus its passing assertion that no `*.tmp` exists does **not** exercise a subprocess that starts writing and then fails. It also cannot detect BR-018, because there is no unrelated in-flight writer.
+- **Improve:** use monkeypatched `subprocess.run` to create a small synthetic partial temp archive and return a failing process status; require cleanup of that file **only**, retention of an unrelated temp file, preservation of any existing good final archive, and no success/reporting/upload. This is a test-quality limitation, not a separately numbered runtime vulnerability.
+
 ## Existing defenses / limits
 
 - `restore_db.py` already has a safety check for matching normalized host/port/database; BR-002 addresses aliases and the explicit bypass, not an absent check.
@@ -171,10 +191,11 @@
 8. **DR leftover state and gzip archive safety:** BR-015–017. Preserve backup artifacts, enforce per-run database and temporary-file ownership, and report failed test DB removal.
 9. **Service backup concurrency and format correctness:** BR-018–019. Protect other writers' temp files and verify PostgreSQL archives using PostgreSQL tools.
 10. **Admin restore safety:** BR-020. Require isolated synthetic full-restore proof and explicit clinical maintenance/rollback policy before repairing live-restore behavior.
+11. **Retention and archive visibility:** BR-021–022. Test age and count limits together; isolate partial compressed artifacts until final publication.
 
 ## Verification and rollback
 
-- **Performed:** read exact GitHub `main` sources and runbooks; checked scopes, existing explicit restore guard, encrypted backup alternative, backend DR drill including cleanup/gzip, scheduled and Admin backup writers, service verification/restore and unit-test coverage, and the synthetic GitHub Actions workflow; consulted repo security/testing skills. Existing source hashes for these paths were unchanged at review time; original base was `503cc1e`.
+- **Performed:** read exact GitHub `main` sources and runbooks; checked scopes, existing explicit restore guard, encrypted backup alternative, backend DR drill including cleanup/gzip, scheduled and Admin backup writers, service verification/restore, age/count retention and partial-compression unit-test coverage, and the synthetic GitHub Actions workflow; consulted repo security/testing skills. Existing source hashes for these paths were unchanged at review time; original base was `503cc1e`.
 - **Not performed:** local `git status`, gate execution, `git diff --check`, pytest, PostgreSQL commands, archive creation, real restore, E2E smoke, CI, protected source changes, production actions.
 - **Stop condition:** no source repair, rollout, restore, or merge until safe isolation and mandatory gate evidence are available.
 - **Rollback for this document only:** close its Draft PR or revert this one docs-only commit; no deployed behavior changes.
