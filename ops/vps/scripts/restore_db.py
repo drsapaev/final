@@ -72,11 +72,25 @@ def _prepare_restore_source(backup_file: Path) -> Path:
     if backup_file.suffix != ".gz":
         return backup_file
 
+    # BR-007 (backup/restore source review, PR #3882): the expanded
+    # archive is an UNENCRYPTED SQL dump in the shared OS temp
+    # directory. The helper owns its cleanup so a malformed or
+    # truncated archive can no longer leak the temp file — even when
+    # called outside a guarded block (the historical gap: the helper
+    # ran before main()'s try/finally).
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=backup_file.stem)
     temp_file.close()
-    with gzip.open(backup_file, "rb") as source, open(temp_file.name, "wb") as target:
-        shutil.copyfileobj(source, target)
-    return Path(temp_file.name)
+    temp_path = Path(temp_file.name)
+    try:
+        # restrictive permissions regardless of platform umask; the
+        # plaintext artifact must be operator-only while it exists
+        temp_path.chmod(0o600)
+        with gzip.open(backup_file, "rb") as source, open(temp_path, "wb") as target:
+            shutil.copyfileobj(source, target)
+    except BaseException:
+        temp_path.unlink(missing_ok=True)
+        raise
+    return temp_path
 
 
 def main() -> int:
@@ -111,13 +125,26 @@ def main() -> int:
     _require_live_restore_confirmation(target_database_url=target_url)
 
     target = parse_database_url(target_url)
-    restore_source = _prepare_restore_source(backup_file)
 
+    # BR-007: the .gz expansion lives INSIDE the guarded block — a
+    # decompression failure must release everything it created.
+    restore_source = backup_file
     try:
+        restore_source = _prepare_restore_source(backup_file)
         suffix = "".join(backup_file.suffixes)
         if suffix.endswith(".sql") or suffix.endswith(".sql.gz"):
             cmd = [
                 postgres_tool("psql"),
+                # BR-001 (backup/restore source review, PR #3882): psql
+                # keeps executing statements after a SQL error and can
+                # exit 0 by default, so a failed restore still printed
+                # the success marker. -X skips psqlrc, ON_ERROR_STOP=1
+                # stops at the first error and fails the command.
+                # Transaction wrapping (-1) is deliberately deferred to
+                # the BR-011 transactional-restore fix.
+                "-X",
+                "-v",
+                "ON_ERROR_STOP=1",
                 "-h",
                 target.host,
                 "-p",
