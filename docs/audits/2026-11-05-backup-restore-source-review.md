@@ -7,7 +7,7 @@
 - **Execution mode:** `direct_execute` for a single, documentation-only finding ledger. No behavior, security policy, database, credentials, or deployment configuration changed. A repair affecting production backup/restore requires the mandatory `AGENTS.md` gate.
 - **Allowed:** this audit document only. **Denied:** `ops/**`, `backend/**`, `frontend/**`, production files, database access, runtime changes, migrations, and merge/deploy.
 - **Skills consulted:** `.agents/skills/code-security/SKILL.md` and `.agents/skills/python-testing-patterns/SKILL.md`; canonical source is the actual Python script and operator runbook.
-- **Scoped workflows:** VPS lifecycle scripts, separate from the local encrypted `ops/scripts/backup_local_to_r2.py` flow. Do not infer either flow's production schedule from the other.
+- **Scoped workflows:** VPS lifecycle scripts; this follow-up also inspects the distinct backend DR drill and its GitHub Actions synthetic fixture. The encrypted local-to-R2 flow remains separate. Do not infer any workflow's production schedule from another.
 
 ## Findings
 
@@ -81,6 +81,34 @@
 - **Test first:** identical timestamp and database name on two invocations; explicit existing backup file; simulate failing writer and assert original bytes/checksum remain untouched. Validate success path publishes an independent new filename after archive verification.
 - **Suggested fix:** write to a uniquely reserved private temporary path and atomically publish to a non-existing final name; include high-resolution timestamp/random suffix, collision-safe create, fail-closed validation, and no deletion/overwrite of good backup on error.
 
+### BR-011 — P1 candidate — Non-transactional `pg_restore --clean` can leave a partly modified target
+
+- **Source:** `ops/vps/scripts/restore_db.py:121–136` runs `pg_restore -c --if-exists <archive>` against the selected database, without `--single-transaction` or explicit atomicity requirements. The script raises on a nonzero process status, but that does **not** undo SQL changes already committed before the error.
+- **Failure precondition:** a PostgreSQL restore can drop/recreate some objects and then fail restoring later objects, leaving the target database in a mixed state. This is especially consequential if an operator intentionally selected an existing/live DB; the usual separate-target guard remains a partial defense.
+- **Test first:** use a disposable PostgreSQL target and synthetic archive with an intentional later restore error; record schema/data checksums before and after the failed restore and assert the target is unchanged after a transactional repair. Never use real patient data or a live DB.
+- **Suggested fix:** prefer a fresh, isolated target database and a verified promotion/swap protocol; for supported archives and sizes consider `pg_restore --single-transaction --exit-on-error`. PostgreSQL documentation states `--single-transaction` gives all-or-nothing behavior and implies `--exit-on-error`: https://www.postgresql.org/docs/18/app-pgrestore.html . Validate scale/lock constraints separately.
+
+### BR-012 — P1, conditional high-impact — DR drill can drop the source database if the target name is misconfigured
+
+- **Source:** `backend/app/scripts/dr_drill.py`: `main()` calls `parse_source_db_url()` but stores the source DB name only in `_source_db` and never compares it with `DRILL_DB_NAME`; `drop_and_create_drill_db()` executes `DROP DATABASE IF EXISTS "<DRILL_DB_NAME>";` on the *same PostgreSQL host* using the configured source credentials. `DRILL_DB_NAME` is read from an environment variable without an allowlisted identifier check.
+- **Failure precondition:** a manually configured `DRILL_DB_NAME` equal to the source database can cause the drill to drop the source database. The checked-in GitHub Actions job sets an isolated synthetic source `clinicdb` and drill target `clinic_dr_drill`; this finding is **not** an assertion that the scheduled CI workflow currently drops production.
+- **Test first:** with all PostgreSQL calls mocked, configure source and drill DB names identically and assert the drill exits *before any* `psql`, `DROP`, `CREATE`, or `pg_restore` command is issued; also reject names containing SQL identifier delimiters. Do not attempt a destructive integration reproduction.
+- **Suggested fix:** fail closed on same-database identity (including network aliases), require a strictly validated scratch database name and a privileged/isolated drill target that cannot access production records. Quote SQL identifiers with a proper PostgreSQL adapter rather than interpolating environment text.
+
+### BR-013 — P1 candidate — DR drill ignores command exit statuses and may certify stale data
+
+- **Source:** `backend/app/scripts/dr_drill.py`: `drop_and_create_drill_db()` invokes `psql` with `check=False` and never checks either exit status. `restore_backup()` invokes `pg_restore` with `check=False` and ignores `result.returncode`, failing only when `stderr` contains a line with `ERROR:`. `smoke_test_drill_db()` only queries a small fixed set of existing tables/one admin, without binding the result to this drill's backup identifier.
+- **Failure precondition:** if DB drop/create fails or `pg_restore` returns nonzero with a diagnostic not containing `ERROR:`, a preexisting drill database can survive and pass the generic smoke, falsely certifying the selected backup. PostgreSQL `pg_restore` can emit diagnostics with different formats; a nonzero exit must always be treated as failure.
+- **Test first:** mock unsuccessful `DROP DATABASE`, `CREATE DATABASE` and `pg_restore` calls independently; assert each causes immediate nonzero exit, no positive PASS marker, and no stale-backup success. Use an isolated synthetic DB for any true end-to-end follow-up.
+- **Suggested fix:** check subprocess return codes unconditionally; add `--exit-on-error` where applicable; assert target DB is newly created and validate restored backup-specific sentinel or manifest rather than a generic surviving schema.
+
+### BR-014 — P2 scoped evidence gap — Scheduled DR workflow verifies its own synthetic CI backup, not production archives
+
+- **Source:** `.github/workflows/dr-drill.yml` provisions a GitHub Actions `postgres:16-alpine` service, runs migrations, seeds development/demo rows, runs `pg_dump -F c -f backups/backup_ci_test.dump`, and calls `app.scripts.dr_drill` against that freshly created artifact.
+- **Consequence:** a green scheduled `DR Drill (Backup Restore Test)` proves this synthetic pipeline under CI conditions, **not** that the encrypted local-to-R2 production backup can be decrypted, retrieved, restored, and matched with uploads. This is an evidence/coverage limitation rather than a broken CI test.
+- **Test first:** retain CI synthetic smoke but add a separately authorized, isolated restore rehearsal of a sanitized or approved production-equivalent backup, with source identity and storage manifest assertions. Do not copy PHI into CI or expose R2 credentials in untrusted workflow contexts.
+- **Suggested fix:** label CI as synthetic restore proof; monitor real backup-chain freshness/manifest and conduct separately controlled off-host recovery drills to validate end-to-end RPO/RTO.
+
 ## Existing defenses / limits
 
 - `restore_db.py` already has a safety check for matching normalized host/port/database; BR-002 addresses aliases and the explicit bypass, not an absent check.
@@ -96,10 +124,12 @@
 3. **Full clinic recovery:** BR-004, with synthetic upload roots and DB/file consistency evidence; define storage ownership and failure semantics first.
 4. **Artifact confidentiality:** BR-006 after confirming actual deployment permissions and encrypted backup/key-recovery requirements.
 5. **Update rollback supervision:** BR-008 and BR-009, with synthetic readiness timeout, rollback verification and schema compatibility gates; never restore a production DB automatically.
+6. **Transactional restore and DR safety:** BR-011–013. Fail closed before any destructive operation, require a fresh target, and use synthetic negative paths for subprocess exit status.
+7. **Production-backup evidence gap:** BR-014. Keep synthetic CI smoke separate from a controlled restore proof of the actual protected backup chain.
 
 ## Verification and rollback
 
-- **Performed:** read exact GitHub `main` sources and runbooks; checked scopes, existing explicit restore guard and alternate encrypted backup workflow; confirmed PostgreSQL `psql` error-handling contract from official docs. Source anchors refer to main `503cc1e`.
+- **Performed:** read exact GitHub `main` sources and runbooks; checked scopes, existing explicit restore guard, alternative encrypted backup workflow, backend DR drill and dedicated synthetic GitHub Actions workflow; checked official PostgreSQL `psql` and `pg_restore` error/transaction behavior. Source anchors refer to main `503cc1e`.
 - **Not performed:** local `git status`, gate execution, `git diff --check`, pytest, PostgreSQL commands, archive creation, real restore, E2E smoke, CI, protected source changes, production actions.
 - **Stop condition:** no source repair, rollout, restore, or merge until safe isolation and mandatory gate evidence are available.
 - **Rollback for this document only:** close its Draft PR or revert this one docs-only commit; no deployed behavior changes.
