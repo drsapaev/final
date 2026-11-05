@@ -48,6 +48,10 @@ const IntegratedDoctorSelector = ({
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [queueSettings, setQueueSettings] = useState<Record<string, any>>({});
   const [error, setError] = useState('');
+  // REG-FE-074: сбой ОПЦИОНАЛЬНЫХ настроек очереди больше не прячет
+  // здоровый список врачей — вместо глобальной ошибки показывается
+  // отдельное предупреждение, лимиты очереди опускаются.
+  const [settingsWarning, setSettingsWarning] = useState(false);
 
   // Иконки специальностей
   const specialtyIcons: Record<string, typeof Heart> = {
@@ -78,20 +82,36 @@ const IntegratedDoctorSelector = ({
     try {
       setLoading(true);
       setError('');
+      setSettingsWarning(false);
 
       // UX Audit Registrar #1: raw fetch() с ручным Authorization-хедером
-      // заменён на Promise.all двух вызовов через api/registrar.
-      // Auth-token добавляется автоматически axios-interceptor'ом.
-      const [doctorsData, queueData] = await Promise.all([
+      // заменён на запросы через api/registrar; auth-token — axios-interceptor.
+      // REG-FE-074 (follow-up audit 2026-11-02): прежде оба запроса шли в
+      // одном Promise.all под общим try/catch — сбой ОПЦИОНАЛЬНЫХ настроек
+      // очереди превращал всё в ошибку и прятал успешно загруженный список
+      // врачей. Теперь allSettled: doctors — основной ресурс (его сбой =
+      // ошибка), queue-settings — опциональный (его сбой = предупреждение
+      // без лимитов, врачи остаются доступными).
+      const [doctorsResult, queueResult] = await Promise.allSettled([
         fetchRegistrarDoctors(),
         fetchRegistrarQueueSettings(),
       ]);
 
-      if (doctorsData?.doctors) {
-        setDoctors(doctorsData.doctors);
+      if (doctorsResult.status === 'fulfilled' && doctorsResult.value?.doctors) {
+        setDoctors(doctorsResult.value.doctors);
       }
-      if (queueData) {
-        setQueueSettings(queueData);
+      if (queueResult.status === 'fulfilled') {
+        setQueueSettings(queueResult.value);
+      } else {
+        setSettingsWarning(true);
+        logger.warn(
+          'IntegratedDoctorSelector: queue settings unavailable — показываю врачей без лимитов очереди',
+          queueResult.reason
+        );
+      }
+      if (doctorsResult.status === 'rejected') {
+        logger.error('Ошибка загрузки данных врачей:', doctorsResult.reason);
+        setError(t('misc.ids_oshibka_zagruzki_dannyh_vrac'));
       }
     } catch (err) {
       logger.error('Ошибка загрузки данных врачей:', err);
@@ -116,15 +136,21 @@ const IntegratedDoctorSelector = ({
   };
 
   const getQueueInfo = (doctor: Doctor) => {
-    const specialty = doctor.specialty ?? '';
-    const specialtySettings = queueSettings.specialties?.[specialty];
+    // REG-FE-072 (follow-up audit 2026-11-02): здесь АГРЕГАТ СПЕЦИАЛЬНОСТИ
+    // (бэкенд /registrar/queue-settings возвращает specialty-агрегат), а
+    // НЕ фактический диапазон номеров талонов этого врача. Прежде UI
+    // рисовал «Онлайн-очередь: №start-end» — выдуманный диапазон, который
+    // не обязан совпадать ни с реальными номерами врача, ни с уже
+    // выданными талонами. Теперь показываются ТОЛЬКО лимиты — честно
+    // как «лимит онлайн-записи по специальности», без fabricated №-диапазона.
+    const specialtyKey = doctor.specialty ?? '';
+    const specialtySettings = queueSettings.specialties?.[specialtyKey];
 
     if (!specialtySettings) return null;
 
     return {
       startNumber: specialtySettings?.start_number,
-      maxPerDay: specialtySettings?.max_per_day,
-      queueRange: `${specialtySettings?.start_number}-${specialtySettings?.start_number + specialtySettings?.max_per_day - 1}`
+      maxPerDay: specialtySettings?.max_per_day
     };
   };
 
@@ -150,7 +176,16 @@ const IntegratedDoctorSelector = ({
     );
   }
 
-  if (doctors.length === 0) {
+  // REG-FE-071 (follow-up audit 2026-11-02): прежде prop `specialty`
+  // принимался, но НЕ фильтровал ни запрос, ни рендер — при
+  // specialty="cardiology" оставались видимыми дерматологи и дантисты.
+  // Теперь рендер и пустое состояние считают только подходящих по
+  // специальности врачей; сервер остаётся SSOT прав (RBAC не тронут).
+  const visibleDoctors = specialty
+    ? doctors.filter((doctor: Doctor) => (doctor.specialty ?? '') === specialty)
+    : doctors;
+
+  if (visibleDoctors.length === 0) {
     return (
       <Card className={`p-8 text-center ${className}`}>
         <User size={48} className="mx-auto text-gray-400 mb-4" />
@@ -166,7 +201,23 @@ const IntegratedDoctorSelector = ({
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {doctors.map((doctor: Doctor) => {
+      {settingsWarning && (
+        <div
+          className="ids-settings-warning"
+          data-testid="ids-settings-warning"
+          role="status"
+          style={{
+            padding: '8px 12px',
+            borderRadius: 8,
+            border: '1px solid #d8dde8',
+            background: '#f5f5f7',
+            fontSize: 13,
+            color: '#1a1d29'
+          }}>
+          Настройки очереди недоступны — лимиты онлайн-записи не показаны. Врачи доступны для выбора.
+        </div>
+      )}
+      {visibleDoctors.map((doctor: Doctor) => {
         const isSelected = selectedDoctorId === doctor.id;
         const SpecialtyIcon = specialtyIcons[doctor.specialty ?? ''] || User;
         const iconColor = specialtyColors[doctor.specialty ?? ''] || 'text-gray-600';
@@ -217,10 +268,12 @@ const IntegratedDoctorSelector = ({
                       </div>
                     )}
 
-                    {/* Информация об очереди */}
+                    {/* Информация об очереди */
+                    /* REG-FE-072: только ЧЕСТНЫЕ лимиты специальности —
+                       без выдуманного №-диапазона «Онлайн-очередь: №N-M». */}
                     {queueInfo && (
                       <div className="text-sm text-blue-600 dark:text-blue-400">
-                        Онлайн-очередь: №{queueInfo.queueRange} (макс. {queueInfo.maxPerDay}/день)
+                        Лимит онлайн-записи по специальности: макс. {queueInfo.maxPerDay}/день
                       </div>
                     )}
                   </div>

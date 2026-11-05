@@ -27,6 +27,41 @@
   white-space: nowrap;
 }
 
+/* CSH-FE-049 (follow-up audit 2026-11-02): раскрытая причина возврата.
+   Прежде полный текст был доступен только через hover title на
+   нефокусируемом span — клавиатурный сотрудник не мог его прочитать
+   перед решением по возврату. Теперь есть фокусируемая кнопка
+   «Показать полностью» (см. refundRequestsColumns) и этот класс
+   раскрывает текст с переносом строк. */
+.refund-cell-reason--expanded {
+  white-space: normal;
+  max-width: 480px;
+  overflow-wrap: anywhere;
+}
+
+.refund-reason-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: var(--mac-accent-blue, #007aff);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.refund-reason-toggle:hover {
+  text-decoration: underline;
+}
+
+.refund-reason-toggle:focus-visible {
+  outline: 2px solid var(--mac-accent-blue, #007aff);
+  outline-offset: 2px;
+}
+
 .refund-inline-cluster {
   display: inline-flex;
   align-items: center;

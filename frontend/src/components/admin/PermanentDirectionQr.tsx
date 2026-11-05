@@ -100,6 +100,13 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, saved
         value: boolean | null;
     } | null>(null);
     const [copied, setCopied] = useState(false);
+    // QR-FE-007 (follow-up audit 2026-11-02): пользовательски-видимое
+    // уведомление о SVG-fallback. Прежде при недоступном canvas-2D
+    // (или ошибке декодирования) скачивался исходный SVG-блоб под именем
+    // .png — файл с PNG-расширением содержал SVG/XML байты (ломал импортёры/
+    // принтер-софт). Теперь фолбэк честно называется .svg + MIME svg, и
+    // пользователь видит уведомление; .png остаётся только для настоящего PNG.
+    const [svgFallbackNotice, setSvgFallbackNotice] = useState(false);
     const qrWrapRef = useRef<HTMLDivElement | null>(null);
     // RQ-18 follow-up round-4 (P2-2): latest-generation ref — the provision
     // callback's closure would otherwise capture a STALE generation when
@@ -186,18 +193,26 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, saved
     const downloadPng = useCallback(() => {
         // Serialize the rendered QRCodeSVG → canvas → PNG. The payload is
         // the permanent address only: no token, no TTL, no PII.
+        // QR-FE-007: расширение файла обязано соответствовать реальному
+        // формату: успешный PNG → .png (image/png), любой SVG-fallback →
+        // .svg (image/svg+xml) + видимое уведомление. Никаких SVG-байтов
+        // под .png-именем.
         const svg = qrWrapRef.current?.querySelector('svg');
         if (!svg || !provisioned) return;
         const xml = new XMLSerializer().serializeToString(svg);
         const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
         const url = URL.createObjectURL(svgBlob);
         const image = new Image();
-        const finishDownload = (href: string, revoke: boolean) => {
+        const finishDownload = (href: string, revoke: boolean, ext: 'png' | 'svg') => {
             const link = document.createElement('a');
-            link.download = `qr-direction-${provisioned.public_code}.png`;
+            link.download = `qr-direction-${provisioned.public_code}.${ext}`;
             link.href = href;
             link.click();
             if (revoke) URL.revokeObjectURL(url);
+        };
+        const svgFallback = () => {
+            setSvgFallbackNotice(true);
+            finishDownload(url, true, 'svg');
         };
         image.onload = () => {
             try {
@@ -207,8 +222,8 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, saved
                 canvas.height = image.height + padding * 2;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) {
-                    // jsdom / no-2d fallback: download the SVG itself.
-                    finishDownload(url, true);
+                    // jsdom / no-2d fallback: качаем сам SVG — честно .svg.
+                    svgFallback();
                     return;
                 }
                 // canvas 2D cannot resolve var(--mac-*) — resolve the token at
@@ -224,12 +239,19 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, saved
                 ctx.fillStyle = bg;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(image, padding, padding);
-                finishDownload(canvas.toDataURL('image/png'), true);
+                const dataUrl = canvas.toDataURL('image/png');
+                if (!dataUrl.startsWith('data:image/png')) {
+                    // toDataURL не отдал PNG — не называем файл .png.
+                    svgFallback();
+                    return;
+                }
+                setSvgFallbackNotice(false);
+                finishDownload(dataUrl, true, 'png');
             } catch {
-                finishDownload(url, true);
+                svgFallback();
             }
         };
-        image.onerror = () => finishDownload(url, true);
+        image.onerror = () => svgFallback();
         image.src = url;
     }, [provisioned]);
 
@@ -306,6 +328,17 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, saved
                             {copied ? t('admin2.qrdx_copied') : t('admin2.qrdx_copy')}
                         </Button>
                     </div>
+                    {/* QR-FE-007: видимое уведомление о честном SVG-fallback
+                        (файл сохранён как .svg — PNG недоступен в этом окружении).
+                        Вложенный ключ qrdx.* — как у остальных ключей секции. */}
+                    {svgFallbackNotice && (
+                        <div
+                            className="admin-sdx-qr-note-warn"
+                            data-testid={`setup-qr-svg-fallback-${tag}`}
+                            role="status">
+                            {t('admin2.qrdx.svg_fallback_notice')}
+                        </div>
+                    )}
                 </div>
             )}
 

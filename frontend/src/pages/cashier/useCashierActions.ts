@@ -380,15 +380,27 @@ export const useCashierActions = ({
     try {
       if (paymentRowOrId && typeof paymentRowOrId === 'object') {
         try {
-          const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId, paymentMethodLabels, tI18n('cashier.default_patient')));
-          if (opened) {
+          const outcome = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId, paymentMethodLabels, tI18n('cashier.default_patient')));
+          // CSH-FE-044 (follow-up audit 2026-11-02): прежде обёртка
+          // возвращала «true всегда»: print() бросал исключение, а кассир
+          // видел тост «диалог печати открыт» и PDF-fallback пропускался.
+          // Теперь ветвление честное: успех = окно открыто И печать
+          // подтверждена/отложена (printInvoked|deferred); провал
+          // print-вызова ведёт в серверный PDF.
+          if (outcome?.opened && (outcome.printInvoked || outcome.deferred)) {
             notify.success(tI18n('cashier.print_dialog_opened'));
             return;
           }
 
-          logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
-            paymentId
-          });
+          if (!outcome?.opened) {
+            logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
+              paymentId
+            });
+          } else {
+            logger.warn('[Cashier] Browser print invocation failed, falling back to PDF', {
+              paymentId
+            });
+          }
         } catch (error: unknown) {
           logger.error('[Cashier] Unexpected browser receipt print error:', error);
         }
