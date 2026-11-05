@@ -1,4 +1,16 @@
-## Current resume — T18 journal update pushed to PR #3873 — 2026-11-05T02:41:06+05:00
+## Current resume — PR #3873 T18.10 review correction — 2026-11-05T10:45:07+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. Review #5780355730 is correct: the canonical T18.10 checklist explicitly includes profile key `specialists`, initial load, typed return, reload, Back/Forward, the four legacy URLs, and the protected 409. The prior `VALIDATED` status and claim that the key was optional were incorrect. The current status is PARTIAL.
+
+Preserve the existing positive evidence rather than treating it as a failed run: at `64a7c0b9` the four old URLs and a linked synthetic profile's DELETE 409/row retention passed; T11 r8 at `acb509c3` checked the actual `specialists` initial catalog and readable 409/row retention; a separate normal-Admin/TOTP Playwright run at `0513a986` used `setupProfile=specialists` and checked typed URL context, return links, reload and Back/Forward. That route-context spec did not assert the actual `specialists` row or its data after the transitions. Complete T18.10 still needs a synthetic current-candidate check tying real profile initial load to those transitions and the 409 evidence, with tested SHA and safe artifact.
+
+The existing branch was synchronized by clean merge `632714a38e4bdf50a6ae44b025dd02169822c46e` of fresh `origin/main` `0d80bbe650a4e1bb6028e1598c71669534cbb9a3` (#3876/#3877). Those incoming commits changed shared dialog, queue UI, public QR and locale code; older staging results remain anchored to their original commits, not automatically to this candidate. Gate: `gate_known_root_cause` with the three journal paths, result `narrow_override`, `gate_misroute=false`, `handoff_required=true`; execution prompt read.
+
+Allowed authored paths are `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` only. The review fix runs no new staging or application tests. Next: verify the three-file diff and retained history, commit/push to the existing PR, update its description to show T18.10 PARTIAL, and check GitHub CI for the new HEAD. Do not resolve or reply to the GitHub thread without authorization; user owns merge. After merge, continue the specific missing T18.10 check and the remaining overall T18/Tier-2 gaps.
+
+---
+
+## Previous resume — T18 journal update pushed to PR #3873 — 2026-11-05T02:41:06+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. PR #3865 is merged at `64a7c0b9ce422bbdac73d919158eb525669d9229`; its final code HEAD was `290d8f6d960c6207f4118783a1d48775c99ef41e`. The supplied review referring to older HEAD `4aa1857eee` is historical: both P2 coverage gaps were addressed before merge. The merged E2E covers Doctor-owned creation, QueueResource-only setup, explicit publication, readiness/effective availability, and public QR catalog checks.
 
@@ -17,6 +29,8 @@ Tier-2 remains PARTIAL with no accepted deferral. The full `docs/runbooks/STAGIN
 ---
 
 ## Previous resume — T18 scenario matrix reconciled — 2026-11-04T23:48+05:00
+
+> Historical correction: this checkpoint incorrectly treated `specialists` context as optional and all ten core scenarios as validated. The current T18.10 status is PARTIAL; retain the individual passing results and see the review correction above.
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. PR #3865 is merged at `64a7c0b9ce422bbdac73d919158eb525669d9229`; its final reviewed code HEAD was `290d8f6d960c6207f4118783a1d48775c99ef41e`. The two P2 findings in the supplied older review were fixed and resolved before merge.
 

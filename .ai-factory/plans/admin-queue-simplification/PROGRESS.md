@@ -2,17 +2,27 @@
 
 Plan version: 1.0
 Current task: T18 integrated synthetic acceptance; cross-cutting Admin setup checks in existing PR #3873
-Current status: IN_PROGRESS; served-asset provenance verified; console errors partially source-classified; T18 remains PARTIAL; user owns merge of the journal PR
+Current status: IN_PROGRESS; PR #3873 review correction in progress; T18.10 and overall T18 remain PARTIAL; user owns merge
 Merged PRs: #3861 at bfc33837cd3028f1989b2462a998b16505a62fd6; #3865 at 64a7c0b9ce422bbdac73d919158eb525669d9229
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final
 Branch: codex/t18-combined-validation
-Base commit: origin/main 106597d67ece48ee9380ded5725ba421aed8cbc0
+Base commit: origin/main 0d80bbe650a4e1bb6028e1598c71669534cbb9a3; merged into branch locally as 632714a38e4bdf50a6ae44b025dd02169822c46e
 Current commit: latest pushed HEAD of PR #3873; resolve exact SHA from GitHub before merge
 Runtime source exercised: `cbd8c64241c7a80f02b4728e63d2d132a55d708c`; its frontend tree `475364c91518ceda62af758219334fe3bc3ec5cd` matches the previously tested frontend tree at `88cd7da19ca7fb19ea63672d191fb50f9417aa5c`.
-Last updated: 2026-11-05T02:41:06+05:00
+Last updated: 2026-11-05T10:45:07+05:00
 Tier-2: PARTIAL; no deferral accepted. User retains merge and deployment authority.
 
-## Current checkpoint — T18 console diagnostics and served frontend provenance
+## Current checkpoint — PR #3873 T18.10 review correction
+
+- Review #5780355730 correctly identified that canonical T18.10 explicitly includes profile key `specialists`, its initial load, typed return context, reload, Back/Forward, four old URLs, and a readable protected 409. The earlier statement that this key was outside the checklist was incorrect.
+- T18.10 is PARTIAL. The combined synthetic run at `64a7c0b9ce422bbdac73d919158eb525669d9229` passed the four legacy URLs and a linked-profile DELETE 409 with the row retained. T11 r8 separately passed an initial `specialists` catalog GET and a readable real DELETE 409 with row preservation at `acb509c36a9583f917bc86d601120bef95eddc1e`.
+- A prior normal-Admin/TOTP route-context browser run at `0513a9863b137ad2bc4143f73d322f31ca481ee2` used `setupProfile=specialists` and checked typed URL context, return, reload, Back/Forward, and users return. Its saved spec asserted URLs, return links, and headings; it did not prove that the actual `specialists` profile row was loaded and remained associated with those transitions. These separate older results do not establish the complete scenario at the current deployment candidate.
+- Remaining for T18.10: in owned synthetic staging with normal Admin/2FA, demonstrate the actual `specialists` profile initial load and its typed editor/return context through reload and Back/Forward, retaining the readable 409/row guard evidence; record the tested SHA and safe artifact. Do not mark the scenario VALIDATED without that evidence or a source-backed demonstration that all required behavior is covered on the relevant commit.
+- Main synchronization: origin/main advanced through #3876 and #3877 to `0d80bbe650a4e1bb6028e1598c71669534cbb9a3`; merge `632714a38e4bdf50a6ae44b025dd02169822c46e` was clean. Incoming commits include shared dialog, queue UI, public QR, and locale changes. Earlier staging evidence remains tied to its recorded source SHA; no new staging or deployment-commit acceptance is claimed.
+- Scope: only this plan's `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md` are authored in the review correction. No application, tracked test, authentication, DB, production, deployment, or GitHub review-thread change is authorized by this checkpoint.
+- Next exact action: finish and validate the journal correction, push the existing PR branch, update its description, and verify CI for the resulting HEAD. The review thread stays open until its author or an authorized reviewer resolves it; user owns PR merge. After merge, continue the missing T18.10 synthetic check and other incomplete acceptance items.
+
+## Previous checkpoint — T18 console diagnostics and served frontend provenance
 
 - Completed earlier cross-cutting checks: normal Admin password + TOTP; keyboard trap/Escape/focus return; invalid form-key rejection; hidden QueueProfile creation; empty-state editor links; synthetic 503 retry; five language headings; viewports 375/768/1280/1920; cold/repeated content 1,190/944 ms; page errors 0.
 - New canonical diagnostic Session on exact worktree HEAD `cbd8c64241c7a80f02b4728e63d2d132a55d708c`: Admin password + TOTP PASS; read-only visits to setup-directions, queue-profiles tab, and user management; RU/EN/KK/uz-Latn/uz-Cyrl navigation completed.
@@ -87,9 +97,11 @@ Last updated: 2026-11-04T01:08:00+05:00
 | T18 scenario 7 | VALIDATED | PR #3861 merged | `bfc33837cd3028f1989b2462a998b16505a62fd6` | Current-day cabinet preview, stale rejection, apply and strict audit; PostgreSQL evidence reused where source blobs were unchanged |
 | T18 scenario 8 | VALIDATED | PR #3861 merged | `bfc33837cd3028f1989b2462a998b16505a62fd6` | PostgreSQL token/GraphQL last-slot races plus availability, QR and queue-limits remaining-quota tests |
 | T18 scenario 9 | VALIDATED | PR #3861 merged | `bfc33837cd3028f1989b2462a998b16505a62fd6` | Exact retry, lost-response replay, no double count, rollback, partial success/replay and partial rollback |
-| T18 scenario 10 | VALIDATED | PR #3873 evidence; runtime source `64a7c0b9` | — | All four legacy Admin URLs passed; profile delete conflict returned 409 and retained the profile. Special profile-key deep-link behavior was not part of the T18 URL checklist and was not separately exercised |
+| T18 scenario 10 | PARTIAL | PR #3873 evidence; prior runs at `64a7c0b9`, `acb509c3`, `0513a986` | — | Four old URLs and linked-profile 409 passed; prior separate `specialists` initial-list/409 and URL-context/reload/history checks exist. The actual `specialists` row and its context transitions have not been demonstrated together for the current candidate. |
 
-## Current checkpoint
+## Historical checkpoint — prior T18 matrix
+
+> Review correction, 2026-11-05: the historical claims below that all ten scenarios were validated and that the `specialists` context was optional were incorrect. T18.10 is PARTIAL as recorded in the current checkpoint; the underlying passing observations remain preserved.
 
 - Completed: current-main synthetic Admin cabinet scenario (T18 scenario 7). Normal password + TOTP login succeeded; preview returned the clinic date and typed Doctor owner; stale apply returned 409 without write/audit; fresh preview/apply succeeded. Final database assertions confirmed the target assignment, unchanged owner default/queue identity, and exactly two expected audited changes.
 - Completed: read-only current-source review found the legacy `frontend/e2e/rq17-setup-directions-live.spec.ts` expects `setup-wizard-*` controls absent from the current `AdminSetupDirections` screen. This is test-harness drift, not a product failure. The spec was not run or edited; adapt/replace it before using it for scenario 2.
