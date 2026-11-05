@@ -286,6 +286,11 @@ describe('QueueProfilesManager interactions', () => {
     await renderManager();
 
     await user.click(screen.getAllByTitle('Редактировать')[0]);
+    // QR-FE-024: an untouched form no longer sends a PUT at all (dirty
+    // payload only), so the binding-refusal scenario must actually change a
+    // binding field to reach the backend refusal.
+    const tagsInput = screen.getByLabelText('Queue Tags');
+    await user.type(tagsInput, ', synthetic_extra');
     await user.click(screen.getByRole('button', { name: 'Сохранить вкладку очереди' }));
 
     expect(

@@ -9149,6 +9149,7 @@ const ru = {
     dbu_title_contrast: 'Контрастный режим',
     dbu_title_switch_lang: 'Переключить язык',
     dbu_offline_banner: 'Нет соединения. Показаны данные из кэша.',
+    dbu_stale_ws_banner: 'Связь с табло потеряна — данные могут быть устаревшими.',
     dbu_queue_called_at: 'Вызван: {time}',
     dbu_queue_created_at: 'Записан: {time}',
     dbu_source_online: '📱 Онлайн',
