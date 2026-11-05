@@ -274,13 +274,45 @@ describe('useCashierActions (PR-UI-14-4)', () => {
     expect(deps.worklist.triggerDataReload).toHaveBeenCalled();
   });
 
-  it('handlePrintReceipt: row with successful browser print → success notify, no receipt API call', async () => {
+  it('handlePrintReceipt: row with successful browser print (invoked/deferred) → success notify, no receipt API call', async () => {
     const deps = makeDeps();
-    (printPanelReceiptInBrowser as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    // CSH-FE-044: новый типизированный контракт PrintableWindowResult.
+    (printPanelReceiptInBrowser as ReturnType<typeof vi.fn>).mockReturnValue({ opened: true, printInvoked: true, deferred: false });
     const { result } = renderActions(deps);
     await result.current.handlePrintReceipt({ id: 5, amount: 10 } as CashierPaymentRow);
     expect(notify.success).toHaveBeenCalled();
     expect(deps.paymentsApi.getReceipt).not.toHaveBeenCalled();
+  });
+
+  it('handlePrintReceipt: deferred print (window opened, not yet confirmed) → still a success, no PDF fallback', async () => {
+    const deps = makeDeps();
+    (printPanelReceiptInBrowser as ReturnType<typeof vi.fn>).mockReturnValue({ opened: true, printInvoked: false, deferred: true });
+    const { result } = renderActions(deps);
+    await result.current.handlePrintReceipt({ id: 6, amount: 10 } as CashierPaymentRow);
+    expect(notify.success).toHaveBeenCalled();
+    expect(deps.paymentsApi.getReceipt).not.toHaveBeenCalled();
+  });
+
+  it('CSH-FE-044: print() throws → honest PDF fallback (getReceipt + warning toast), not a fake success', async () => {
+    const deps = makeDeps();
+    // Прежде обёртка возвращала true всегда: print() бросал, а кассир видел
+    // «диалог печати открыт» и PDF-fallback пропускался.
+    (printPanelReceiptInBrowser as ReturnType<typeof vi.fn>).mockReturnValue({ opened: true, printInvoked: false, deferred: false });
+    const { result } = renderActions(deps);
+    await result.current.handlePrintReceipt({ id: 7, amount: 10 } as CashierPaymentRow);
+    expect(notify.success).not.toHaveBeenCalled();
+    expect(deps.paymentsApi.getReceipt).toHaveBeenCalledWith(7);
+    expect(notify.warning).toHaveBeenCalled();
+  });
+
+  it('CSH-FE-044: popup blocked → PDF fallback with the blocked-warning path', async () => {
+    const deps = makeDeps();
+    (printPanelReceiptInBrowser as ReturnType<typeof vi.fn>).mockReturnValue({ opened: false, printInvoked: false, deferred: false });
+    const { result } = renderActions(deps);
+    await result.current.handlePrintReceipt({ id: 8, amount: 10 } as CashierPaymentRow);
+    expect(notify.success).not.toHaveBeenCalled();
+    expect(deps.paymentsApi.getReceipt).toHaveBeenCalledWith(8);
+    expect(notify.warning).toHaveBeenCalled();
   });
 
   it('handlePrintReceipt: no resolvable id → error notify', async () => {

@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   CheckCircle,
   XCircle,
@@ -67,19 +67,37 @@ const PriceOverrideApproval = () => {
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  // REG-FE-073 (follow-up audit 2026-11-02): request-epoch guard. Прежде
+  // каждый ответ безусловно звал setPriceOverrides(data): быстрое переключение
+  // фильтра pending→approved, где «медленный» pending-ответ приходил ПОСЛЕ
+  // approved-ответа, отрисовывал pending-записи под approved-фильтром. Теперь
+  // применяется только ответ ПОСЛЕДНЕЙ инициированной загрузки; то же — для
+  // loading и toast ошибок. handleApproval→loadPriceOverrides() тоже идёт
+  // через новую эпоху, поэтому не откатывает свежий фильтр.
+  const loadEpochRef = useRef(0);
 
   const loadPriceOverrides = useCallback(async () => {
+    const epoch = ++loadEpochRef.current;
     setLoading(true);
     try {
       // UX Audit Registrar #1: raw fetch() → fetchPriceOverrides() из api/registrar.
       // Auth/CSRF/refresh-token обрабатываются axios-interceptor'ом в api/client.js.
       const data = await fetchPriceOverrides({ statusFilter, limit: 100 });
+      if (epoch !== loadEpochRef.current) {
+        // Устаревший ответ: его фильтр уже не активен — не трогаем список.
+        return;
+      }
       setPriceOverrides(data);
     } catch (error) {
+      if (epoch !== loadEpochRef.current) {
+        return;
+      }
       logger.error('Error loading price overrides:', error);
       toast.error(t('misc.poa_oshibka_zagruzki_izmeneniy_t'));
     } finally {
-      setLoading(false);
+      if (epoch === loadEpochRef.current) {
+        setLoading(false);
+      }
     }
   }, [statusFilter]);
 
