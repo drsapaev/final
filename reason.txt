@@ -1,0 +1,1 @@
+Not applicable because this is a UI-only tooltip text change.
