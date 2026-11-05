@@ -27112,6 +27112,16 @@ export type components = {
              */
             note?: string | null;
             /**
+             * Received Amount
+             * @description Cash tendered by the cashier (receipt provenance)
+             */
+            received_amount?: number | string | null;
+            /**
+             * Change Due
+             * @description Change due: received_amount - amount (receipt provenance)
+             */
+            change_due?: number | string | null;
+            /**
              * Client Request Id
              * @description Ключ идемпотентности (UUID), генерируется клиентом один раз на платёжный intent; повторный запрос с тем же ключом получает сохранённый ответ исходной аллокации вместо повторного списания
              */
@@ -27153,6 +27163,16 @@ export type components = {
              * @description Примечание
              */
             note?: string | null;
+            /**
+             * Received Amount
+             * @description Внесённая кассиром сумма (наличные, для чека)
+             */
+            received_amount?: number | string | null;
+            /**
+             * Change Due
+             * @description Сдача: received_amount - amount (для чека)
+             */
+            change_due?: number | string | null;
             /**
              * Client Request Id
              * @description Ключ идемпотентности (UUID), генерируется клиентом один раз на платёжный intent; повторный запрос с тем же ключом получает сохранённый ответ исходной операции вместо второго платежа

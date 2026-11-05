@@ -14,11 +14,16 @@ export type RefundTranslationFn = (key: string, options?: Record<string, unknown
 // Shape of a refund request row surfaced by `/force-majeure/refund-requests`.
 // All fields are optional because the backend may omit context fields depending
 // on the request status and the caller's permissions.
+// CSH-FE-050 (follow-up audit 2026-11-02): the backend response DTO is
+// `RefundRequestResponse` (force_majeure.py) and carries `refund_amount`
+// (serialized by force_majeure_api_service) — it has NO `amount` field.
+// The read model and the table column must read the real field; the former
+// `amount` read rendered `—` for every legitimate refund sum.
 export interface RefundRequest {
   id?: string | number;
   patient_id?: string | number;
   patient_name?: string;
-  amount?: number | string;
+  refund_amount?: number | string;
   refund_type?: string;
   reason?: string;
   status?: string;

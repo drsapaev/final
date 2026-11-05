@@ -207,16 +207,23 @@ const attemptStateHorizonValid = (state: {
 // envelope; B's success removeItem wiped the shared slot entirely, so
 // A's lost-response reload lost its attempt identity). Removal deletes
 // ONLY the key of the attempt that owns it.
-const attemptStateKeyBase = (code: string): string => `queue_join_attempt_qdir_${code}`;
-const attemptStateKeyFor = (code: string, sessionToken: string): string =>
-  `${attemptStateKeyBase(code)}__${sessionToken}`;
+// QR-FE-005 (follow-up audit 2026-11-02): то же самое проверенное
+// envelopе-хранилище теперь обслуживает и legacy QR-токен — но в СВОЁМ
+// пространстве имён (kind 'qr'), чтобы ключи одного QR-токена никогда не
+// пересекались с ключами direction-кода и наоборот. Направление по
+// умолчанию ('qdir') оставляет существующие ключи байт-идентичными.
+type AttemptStateKind = 'qdir' | 'qr';
+const attemptStateKeyBase = (code: string, kind: AttemptStateKind = 'qdir'): string =>
+  `queue_join_attempt_${kind}_${code}`;
+const attemptStateKeyFor = (code: string, sessionToken: string, kind: AttemptStateKind = 'qdir'): string =>
+  `${attemptStateKeyBase(code, kind)}__${sessionToken}`;
 // Round-9 (review P1-2): the per-tab owner marker (sessionStorage —
 // survives a reload, dies with the tab) says WHICH outstanding attempt
 // this tab adopted. A reloaded tab finds its own attempt; a reopened
 // tab adopts the single outstanding one — and never destroys the
 // others. Round-10 (review P1): with NO live marker SEVERAL outstanding
 // envelopes are ambiguous — nothing is adopted automatically.
-const attemptStateOwnerKey = (code: string): string => `queue_join_attempt_owner_qdir_${code}`;
+const attemptStateOwnerKey = (code: string, kind: AttemptStateKind = 'qdir'): string => `queue_join_attempt_owner_${kind}_${code}`;
 
 // Round-10 (review P1): the ambiguity list labels an outstanding attempt
 // by its direction and LOCAL wall-clock time — the envelope carries no
@@ -267,48 +274,51 @@ const attemptStateParse = (raw: string | null): QueueJoinAttemptState | null => 
 const attemptStateReadFor = (
   code: string,
   sessionToken: string | null | undefined,
+  kind: AttemptStateKind = 'qdir',
 ): QueueJoinAttemptState | null => {
   if (!code || !sessionToken) return null;
-  return attemptStateParse(attemptStateStorageGet(attemptStateKeyFor(code, sessionToken)));
+  return attemptStateParse(attemptStateStorageGet(attemptStateKeyFor(code, sessionToken, kind)));
 };
 const attemptStateWriteFor = (
   code: string,
   state: QueueJoinAttemptState,
+  kind: AttemptStateKind = 'qdir',
 ): boolean => {
   if (!code || !state.sessionToken) return false;
   return attemptStateStorageSet(
-    attemptStateKeyFor(code, state.sessionToken),
+    attemptStateKeyFor(code, state.sessionToken, kind),
     JSON.stringify(state),
   );
 };
 const attemptStateRemoveFor = (
   code: string,
   sessionToken: string | null | undefined,
+  kind: AttemptStateKind = 'qdir',
 ): void => {
   if (!code || !sessionToken) return;
-  attemptStateStorageRemove(attemptStateKeyFor(code, sessionToken));
+  attemptStateStorageRemove(attemptStateKeyFor(code, sessionToken, kind));
 };
 
-const attemptStateOwnerGet = (code: string): string | null => {
+const attemptStateOwnerGet = (code: string, kind: AttemptStateKind = 'qdir'): string | null => {
   if (!code) return null;
   try {
-    return window.sessionStorage.getItem(attemptStateOwnerKey(code));
+    return window.sessionStorage.getItem(attemptStateOwnerKey(code, kind));
   } catch {
     return null;
   }
 };
-const attemptStateOwnerSet = (code: string, sessionToken: string): void => {
+const attemptStateOwnerSet = (code: string, sessionToken: string, kind: AttemptStateKind = 'qdir'): void => {
   if (!code || !sessionToken) return;
   try {
-    window.sessionStorage.setItem(attemptStateOwnerKey(code), sessionToken);
+    window.sessionStorage.setItem(attemptStateOwnerKey(code, kind), sessionToken);
   } catch {
     /* best-effort — the per-tab identity marker */
   }
 };
-const attemptStateOwnerClear = (code: string): void => {
+const attemptStateOwnerClear = (code: string, kind: AttemptStateKind = 'qdir'): void => {
   if (!code) return;
   try {
-    window.sessionStorage.removeItem(attemptStateOwnerKey(code));
+    window.sessionStorage.removeItem(attemptStateOwnerKey(code, kind));
   } catch {
     /* noop */
   }
@@ -320,11 +330,11 @@ const attemptStateOwnerClear = (code: string): void => {
 // are self-healed away; the legacy VALID slot is returned as a
 // candidate and re-homed by the boot only after its per-attempt write
 // is verified.
-const attemptStateScan = (code: string): QueueJoinAttemptState[] => {
+const attemptStateScan = (code: string, kind: AttemptStateKind = 'qdir'): QueueJoinAttemptState[] => {
   if (!code) return [];
   const found: QueueJoinAttemptState[] = [];
-  const prefix = `${attemptStateKeyBase(code)}__`;
-  const legacyKey = attemptStateKeyBase(code);
+  const prefix = `${attemptStateKeyBase(code, kind)}__`;
+  const legacyKey = attemptStateKeyBase(code, kind);
   const collect = (store: Storage, key: string) => {
     const raw = store.getItem(key);
     if (raw === null) return;
@@ -364,6 +374,39 @@ const attemptStateScan = (code: string): QueueJoinAttemptState[] => {
     /* storage unavailable */
   }
   return found.sort((a, b) => b.ts - a.ts);
+};
+
+// QR-FE-006 (follow-up audit 2026-11-02): небизнесовое хранилище legacy-флоу
+// больше не может обрушить экран регистрации. Прежде код звал
+// localStorage.* напрямую: исключение квоты/безопасного режима в том же try,
+// что и УСПЕШНЫЙ startQueueJoinSession, превращало живую серверную сессию в
+// «экран ошибки». Обёртки глотают сбой хранилища (сессия уже живёт в React
+// state); ВАЖНО: exactly-once envelope попытки (attemptState*) остаётся
+// fail-closed по контракту direction round-9 — его потеря и означает отказ
+// отправки business-попытки, а не тихое продолжение.
+const legacySessionStorageKey = (legacyToken: string | null): string | null =>
+  legacyToken ? `queue_session_${legacyToken}` : null;
+const legacyStorageGet = (key: string): string | null => {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const legacyStorageSet = (key: string, value: string): boolean => {
+  try {
+    window.localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+};
+const legacyStorageRemove = (key: string): void => {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    /* noop */
+  }
 };
 
 // RQ-18 follow-up round-4 (P2-1): the backend now refuses an unclaimable
@@ -563,23 +606,10 @@ const QueueJoin = () => {
       ? preExecRefusalMessage || t('misc.qj_preexec_not_executed')
       : t('misc.qj_preexec_refusal');
 
-  const draftGet = useCallback(
-    (key: string): string | null =>
-      directionMode
-        ? window.sessionStorage.getItem(key)
-        : window.localStorage.getItem(key),
-    [directionMode],
-  );
-  const draftSet = useCallback(
-    (key: string, value: string): void => {
-      if (directionMode) {
-        window.sessionStorage.setItem(key, value);
-      } else {
-        window.localStorage.setItem(key, value);
-      }
-    },
-    [directionMode],
-  );
+  // QR-FE-001 (follow-up audit 2026-11-02): draftGet/draftSet удалены
+  // вместе с PHI-черновиками — на анонимных поверхностях (постоянный код
+  // направления и общий legacy QR-токен) больше НЕТ чтения/записи полей
+  // пациента; остаётся только очистка обоих хранилищ.
   const draftRemove = useCallback((key: string): void => {
     // Belt & suspenders: clear BOTH stores — no PHI may linger either way.
     window.sessionStorage.removeItem(key);
@@ -640,6 +670,10 @@ const QueueJoin = () => {
   // «used session → reconcile» mechanism and turn a safe retry into a
   // second business attempt.
   const completeAttemptedRef = useRef(false);
+  // QR-FE-005: belt & suspenders — пока активна панель сверки/неоднозначности
+  // (UNKNOWN-конверт), НИКАКОЙ путь не должен автостартовать новую сессию
+  // (в т.ч. повторные вызовы loadTokenInfo без явного skipAutoStart).
+  const reconcileGuardRef = useRef(false);
   // RQ-18 follow-up round-3 (P1): the submit lock is claimed IMMEDIATELY
   // (before the first await — the button's disabled attribute only flips
   // after a React re-render, so two fast clicks would both pass a mere
@@ -712,20 +746,17 @@ const QueueJoin = () => {
       // Stale draft from another code/key — the load effect owns this commit.
       return;
     }
-    // RQ-18 follow-up round-5 (P1-1): in direction mode NOTHING about the
-    // typed patient is persisted any more — the shared permanent code is
-    // the wrong place for PHI on an anonymous device (the round-4
-    // phone-tail challenge verified nothing for families sharing one
-    // number). The legacy per-token flow keeps its own draft.
-    if (directionMode) {
-      return;
-    }
-    if (!formData.patientName && !formData.phone && !formData.telegramId) {
-      draftRemove(formStorageKey);
-      return;
-    }
-    draftSet(formStorageKey, JSON.stringify(formData));
-  }, [formData, formStorageKey, formDraftHydrated, directionMode, draftSet, draftRemove]);
+    // RQ-18 follow-up round-5 (P1-1) + QR-FE-001 (follow-up audit
+    // 2026-11-02): NOTHING about the typed patient is persisted on ANY
+    // anonymous shared surface. Round-5 removed the direction draft; the
+    // legacy QR token is equally shared — it is printed for a whole
+    // doctor-day or the entire clinic (backend qr_queue/_tokens.py), so
+    // the per-token draft restored the previous patient's name, phone
+    // and Telegram id to WHOEVER reopened the same token URL on a shared
+    // device. The only storage action left is clearing a possible stale
+    // draft from an older build (draftRemove sweeps both stores).
+    draftRemove(formStorageKey);
+  }, [formData, formStorageKey, formDraftHydrated, draftRemove]);
 
   useEffect(() => {
     // RQ-18 follow-up round-2 (P1): switching directions discards the
@@ -753,35 +784,18 @@ const QueueJoin = () => {
       setFormData({ patientName: '', phone: '', telegramId: '' });
     }
     formDataOwnerRef.current = formStorageKey;
-    const saved = draftGet(formStorageKey);
-    let restored: QueueJoinDraftData | null = null;
-    // RQ-18 follow-up round-5 (P1-1): in direction mode there is no draft
-    // to hydrate — no PHI is stored under the shared permanent code, so a
-    // reload (or the next person at the device) always finds an EMPTY
-    // form. Nothing to verify, nothing to leak.
-    if (!directionMode) {
-      try {
-        const parsed = saved ? safeJsonParse(saved) : null;
-        if (parsed && typeof parsed === 'object') {
-          const record = parsed as Record<string, unknown>;
-          restored = {
-            patientName: String(record.patientName ?? ''),
-            phone: String(record.phone ?? ''),
-            telegramId: String(record.telegramId ?? ''),
-          };
-        }
-      } catch {
-        draftRemove(formStorageKey);
-        restored = null;
-      }
-    } else if (saved) {
-      // A stale direction-mode draft from an OLDER build must not linger.
-      draftRemove(formStorageKey);
-    }
+    // RQ-18 follow-up round-5 (P1-1) + QR-FE-001 (follow-up audit
+    // 2026-11-02): no PHI rehydration on ANY anonymous surface. Direction
+    // mode never stored a draft (round-5); the legacy per-token draft is
+    // no longer written either — a reload (or the NEXT person at the same
+    // shared device) always finds an EMPTY form. Stale drafts from older
+    // builds are cleared unconditionally: draftRemove sweeps both stores,
+    // so no read is needed to decide.
+    draftRemove(formStorageKey);
     setPendingDraft(null);
-    setFormData(restored ?? { patientName: '', phone: '', telegramId: '' });
+    setFormData({ patientName: '', phone: '', telegramId: '' });
     setFormDraftHydrated(true);
-  }, [formStorageKey, directionMode, draftGet, draftRemove]);
+  }, [formStorageKey, draftRemove]);
 
   // RQ-18 follow-up round-4 (P1-2): the URL must carry the SAME canonical
   // lowercase code the backend resolves by. A non-canonical variant is
@@ -812,7 +826,11 @@ const QueueJoin = () => {
         : [];
 
       setSessionToken(sessionData.session_token);
-      localStorage.setItem(`queue_session_${legacyToken}`, sessionData.session_token);
+      // QR-FE-006: сбой ПЕРСИСТЕНЦИИ токена сессии — НЕ сбой сессии:
+      // startQueueJoinSession уже успешен, токен живёт в React state.
+      // Прежний прямой setItem в этом же try превращал живую серверную
+      // сессию в «экран ошибки» при заполненной квоте/запреле хранения.
+      legacyStorageSet(`queue_session_${legacyToken}`, sessionData.session_token);
       setQueueInfo(nextQueueInfo);
       setAvailableSpecialists(selectableSpecialists);
 
@@ -831,7 +849,7 @@ const QueueJoin = () => {
     }
   }, [getApiErrorMessage, legacyToken]);
 
-  const loadTokenInfo = useCallback(async () => {
+  const loadTokenInfo = useCallback(async (options?: { skipAutoStart?: boolean }) => {
     if (!legacyToken) {
       setError(MISSING_QUEUE_TOKEN_MESSAGE);
       setStep('error');
@@ -864,7 +882,22 @@ const QueueJoin = () => {
         return;
       }
 
-      await startJoinSession();
+      // QR-FE-005: skipAutoStart — boot с UNKNOWN-конвертом НЕ чеканит
+      // новую сессию: инфо о токене нужно UI (врачи/клиника), но исходная
+      // идентичность попытки сохраняется для панели сверки.
+      // reconcileGuardRef страхует и остальные пути вызова.
+      if (!options?.skipAutoStart && !reconcileGuardRef.current) {
+        await startJoinSession();
+      } else {
+        // Шаг выбирается по token-info — тот же критерий, что и
+        // startJoinSession для session queue_info (общий QR → выбор врачей).
+        if (tokenInfo.is_clinic_wide) {
+          setStep('select-specialists');
+        } else {
+          setStep('info');
+        }
+        setIsSpecialistsLoading(false);
+      }
 
     } catch (error: unknown) {
       setAvailableSpecialists([]);
@@ -892,9 +925,56 @@ const QueueJoin = () => {
     }
 
     // ✅ Пытаемся восстановить session_token из localStorage
-    const savedSessionToken = localStorage.getItem(`queue_session_${legacyToken}`);
+    // QR-FE-006: безопасное чтение — недоступное хранилище ≠ ошибка экрана.
+    const savedSessionToken = legacyStorageGet(`queue_session_${legacyToken}`);
     if (savedSessionToken) {
       setSessionToken(savedSessionToken);
+    }
+
+    // QR-FE-005 (follow-up audit 2026-11-02): UNKNOWN-попытка этого токена
+    // ЗАПРЕЩАЕТ автостарт новой сессии. Прежний boot безусловно звал
+    // loadTokenInfo → startJoinSession, и ПЕРЕЗАПИСЫВАЛ исходную
+    // идентичность попытки свежим токеном — после потери ответа
+    // /join/complete повторный вход терял путь replay/probe навсегда.
+    // Тот же контракт, что и у direction-режима (round-4..10): конверт с
+    // ОРИГИНАЛЬНЫМ session-токеном → панель сверки; подтверждённый no-op →
+    // самоочистка; несколько конвертов без owner-маркера → fail-closed.
+    const legacyCandidates = attemptStateScan(legacyToken, 'qr');
+    const legacyOwnerToken = attemptStateOwnerGet(legacyToken, 'qr');
+    const legacyOwned = legacyOwnerToken
+      ? legacyCandidates.find((c) => c.sessionToken === legacyOwnerToken) ?? null
+      : null;
+    const legacyAttempt =
+      legacyOwned ?? (legacyCandidates.length === 1 ? legacyCandidates[0] : null);
+    const legacyAmbiguous = legacyOwned === null && legacyCandidates.length > 1;
+    if (legacyAmbiguous) {
+      // Round-10 direction-урок: несколько outstanding-конвертов без
+      // owner-маркера могут принадлежать ДРУГОМУ пациенту этого же
+      // устройства — ничего не adopt-им и не удаляем; явная сверка.
+      reconcileGuardRef.current = true;
+      setAttemptAmbiguity(legacyCandidates);
+      setAmbiguousCheckedTokens([]);
+      setAmbiguityUnboundTokens([]);
+      setStep('form');
+      return;
+    }
+    if (legacyAttempt && legacyAttempt.completeAttempted && legacyAttempt.outcomeUnknown) {
+      attemptStateOwnerSet(legacyToken, legacyAttempt.sessionToken, 'qr');
+      completeAttemptedRef.current = true;
+      reconcileGuardRef.current = true;
+      setReconcile({
+        sessionToken: legacyAttempt.sessionToken,
+        profileId: null,
+        directionTitle: null,
+      });
+      // Инфо о токене — для UI, но БЕЗ чеканки новой сессии.
+      loadTokenInfo({ skipAutoStart: true });
+      return;
+    }
+    if (legacyAttempt && legacyAttempt.completeAttempted && !legacyAttempt.outcomeUnknown) {
+      // Исход ИЗВЕСТЕН — конверт больше ничего не сторожит.
+      attemptStateRemoveFor(legacyToken, legacyAttempt.sessionToken, 'qr');
+      attemptStateOwnerClear(legacyToken, 'qr');
     }
     loadTokenInfo();
   }, [legacyToken, loadTokenInfo, directionMode]);
@@ -1149,6 +1229,12 @@ const QueueJoin = () => {
   // action that may mint a new session after a complete attempt (a
   // confirmed pre-execution refusal or an unknown outcome). The typed
   // form/draft is the patient's own context and is kept.
+  // QR-FE-005: координаты envelope-пространства для панелей сверки —
+  // direction-код живёт в 'qdir', legacy QR-токен в 'qr'. Все операции
+  // с конвертами ниже идут через эти переменные.
+  const attemptOwnerCode = directionMode ? directionCode : legacyToken;
+  const attemptKind: AttemptStateKind = directionMode ? 'qdir' : 'qr';
+
   const handleStartOver = () => {
     // Round-9 (review P1-2): remove ONLY this attempt's envelope (the
     // adopted/owned one) — another tab's outstanding attempt for the same
@@ -1162,17 +1248,27 @@ const QueueJoin = () => {
     // contexts keep every envelope intact; only the new session is
     // minted.
     const keepEnvelopes = payloadMismatch || attemptAmbiguity !== null;
-    if (directionCode) {
+    if (directionMode && directionCode) {
       if (!keepEnvelopes) {
         const ownToken = reconcile?.sessionToken ?? attemptStateOwnerGet(directionCode);
         attemptStateRemoveFor(directionCode, ownToken);
       }
       attemptStateOwnerClear(directionCode);
+    } else if (!directionMode && legacyToken) {
+      // QR-FE-005: явный «начать заново» — единственный путь, который
+      // может чеканить НОВУЮ legacy-сессию после UNKNOWN-попытки.
+      if (!keepEnvelopes) {
+        const ownToken = reconcile?.sessionToken ?? attemptStateOwnerGet(legacyToken, 'qr');
+        attemptStateRemoveFor(legacyToken, ownToken, 'qr');
+      }
+      attemptStateOwnerClear(legacyToken, 'qr');
     }
     setAttemptAmbiguity(null);
     setAmbiguousCheckedTokens([]);
     setAmbiguityUnboundTokens([]);
     completeAttemptedRef.current = false;
+    // QR-FE-005: явный рестарт снимает запрет автостарта.
+    reconcileGuardRef.current = false;
     setReconcile(null);
     setPreExecRefusal(false);
     setPreExecRefusalReason(null);
@@ -1182,8 +1278,13 @@ const QueueJoin = () => {
     setShowSessionConsumedAdvisory(false);
     setError(null);
     // Force the fresh public start (a new session, no business action).
-    directionStartRef.current = null;
-    void runDirectionStart();
+    if (directionMode) {
+      directionStartRef.current = null;
+      void runDirectionStart();
+    } else {
+      // QR-FE-005: legacy-флоу — новая сессия только через явный рестарт.
+      void startJoinSession();
+    }
   };
 
   // Round-10 (review P1): the EXPLICIT resolution of the ownerless
@@ -1201,7 +1302,7 @@ const QueueJoin = () => {
   // per-attempt discard, and an in-flight/unknown verdict keeps the
   // fail-closed gate exactly as before.
   const handleAmbiguityCheck = async (candidate: QueueJoinAttemptState) => {
-    if (!directionCode || !attemptAmbiguity || submitAttemptRef.current) {
+    if (!attemptOwnerCode || !attemptAmbiguity || submitAttemptRef.current) {
       return;
     }
     // The probe compares the TYPED identity — the same validation the
@@ -1264,9 +1365,9 @@ const QueueJoin = () => {
         // result. Read-only: the талон was committed by the ORIGINAL
         // complete; nothing is executed here.
         setResult(probe.result as unknown as QueueJoinResultLocal);
-        if (directionCode) {
-          attemptStateRemoveFor(directionCode, candidate.sessionToken);
-          attemptStateOwnerClear(directionCode);
+        if (attemptOwnerCode) {
+          attemptStateRemoveFor(attemptOwnerCode, candidate.sessionToken, attemptKind);
+          attemptStateOwnerClear(attemptOwnerCode, attemptKind);
         }
             setAttemptAmbiguity(null);
         setAmbiguousCheckedTokens([]);
@@ -1312,8 +1413,8 @@ const QueueJoin = () => {
       if (probe.outcome === 'expired' || probe.outcome === 'not_found') {
         // Proven dead — nothing was created under this attempt. Drop ONLY
         // that envelope and re-list the survivors.
-        attemptStateRemoveFor(directionCode, candidate.sessionToken);
-        relistAfter(attemptStateScan(directionCode));
+        attemptStateRemoveFor(attemptOwnerCode, candidate.sessionToken, attemptKind);
+        relistAfter(attemptStateScan(attemptOwnerCode, attemptKind));
         setError(null);
         return;
       }
@@ -1347,11 +1448,11 @@ const QueueJoin = () => {
   // PROVEN ``pending_unbound`` candidate — nothing was ever executed
   // under that session, so removing ITS OWN envelope duplicates nothing.
   const handleAmbiguityDiscard = (candidate: QueueJoinAttemptState) => {
-    if (!directionCode || !attemptAmbiguity || submitAttemptRef.current) {
+    if (!attemptOwnerCode || !attemptAmbiguity || submitAttemptRef.current) {
       return;
     }
-    attemptStateRemoveFor(directionCode, candidate.sessionToken);
-    const rest = attemptStateScan(directionCode);
+    attemptStateRemoveFor(attemptOwnerCode, candidate.sessionToken, attemptKind);
+    const rest = attemptStateScan(attemptOwnerCode, attemptKind);
     setAttemptAmbiguity(rest);
     setAmbiguousCheckedTokens((prev) =>
       prev.filter((token) => rest.some((item) => item.sessionToken === token)),
@@ -1395,7 +1496,9 @@ const QueueJoin = () => {
     // mode gate the plain submit — no session exists on this mount until
     // the ambiguity is resolved (or the server verdict unlocks the
     // start-over). An Enter-key submit must not even hit the guard path.
-    if (directionMode && (reconcile || attemptAmbiguity)) {
+    // QR-FE-005: гейт работает и для legacy QR — панель сверки/неоднозначности
+    // блокирует обычный сабмит (кнопка «Проверить» — единственный путь).
+    if (reconcile || attemptAmbiguity) {
       return;
     }
 
@@ -1516,8 +1619,8 @@ const QueueJoin = () => {
     }
 
     if (!currentSessionToken) {
-      // Пытаемся восстановить из localStorage
-      currentSessionToken = localStorage.getItem(`queue_session_${legacyToken}`);
+      // Пытаемся восстановить из localStorage (QR-FE-006: безопасно)
+      currentSessionToken = legacyStorageGet(`queue_session_${legacyToken}`);
 
       if (!currentSessionToken) {
         // Если нет сохраненной сессии, создаем новую
@@ -1660,6 +1763,32 @@ const QueueJoin = () => {
           return;
         }
       }
+      // QR-FE-005: legacy QR-токен получает ТОТ ЖЕ верифицированный
+      // exactly-once конверт — после потери ответа /join/complete повторный
+      // вход восстанавливает ОРИГИНАЛЬНУЮ сессию, а не чеканит новую.
+      // Профиль/заголовок направления здесь бессмысленны (нет direction),
+      // горизонт — TTL-фолбэк (сервер не отдаёт expires_at для legacy).
+      if (!directionMode && legacyToken) {
+        const persistedLegacy = attemptStateWriteFor(
+          legacyToken,
+          {
+            ts: Date.now(),
+            publicCode: legacyToken,
+            sessionToken: String(currentSessionToken ?? ''),
+            profileId: null,
+            directionTitle: null,
+            completeAttempted: true,
+            outcomeUnknown: true,
+            attemptExpiresAt: null,
+          },
+          'qr',
+        );
+        if (!persistedLegacy) {
+          setError(QUEUE_JOIN_MESSAGES.attemptGuardUnavailable);
+          // Ничего не отправлено — замок снимет finally ниже.
+          return;
+        }
+      }
       // Round-9 (review P2-3): only AFTER the verified envelope persist —
       // from this moment the result is unknown, whatever happens to the
       // response (a lost answer must never trigger a renewal).
@@ -1674,7 +1803,8 @@ const QueueJoin = () => {
       }
       setResult(joinResult as unknown as QueueJoinResultLocal);
       // ✅ Очищаем session_token из localStorage после успешного присоединения
-      localStorage.removeItem(`queue_session_${legacyToken}`);
+      // (QR-FE-006: безопасное удаление)
+      legacyStorageRemove(`queue_session_${legacyToken}`);
       if (formStorageKey) {
         draftRemove(formStorageKey);
         setPendingDraft(null);
@@ -1683,9 +1813,14 @@ const QueueJoin = () => {
       // (success) — the persisted attempt state is no longer needed.
       // Round-9 (review P1-2): removal touches ONLY this attempt's own
       // per-attempt key — a parallel tab's outstanding envelope survives.
-      if (directionCode) {
+      if (directionMode && directionCode) {
         attemptStateRemoveFor(directionCode, currentSessionToken);
         attemptStateOwnerClear(directionCode);
+      }
+      // QR-FE-005: исход ИЗВЕСТЕН (успех) — конверт этой попытки не нужен.
+      if (!directionMode && legacyToken) {
+        attemptStateRemoveFor(legacyToken, currentSessionToken, 'qr');
+        attemptStateOwnerClear(legacyToken, 'qr');
       }
       setReconcile(null);
 
@@ -1782,13 +1917,25 @@ const QueueJoin = () => {
       const markOutcomeKnown = () => {
         // Round-9 (review P1-2): rewrite ONLY this attempt's own envelope
         // (the token that actually performed the attempt).
-        if (directionCode) {
+        if (directionMode && directionCode) {
           const attempt = attemptStateReadFor(directionCode, currentSessionToken);
           if (attempt) {
             attemptStateWriteFor(directionCode, {
               ...attempt,
               outcomeUnknown: false,
             });
+          }
+        }
+        // QR-FE-005: тот же протокол для legacy-конверта — решающий
+        // вердикт сервера снимает UNKNOWN-защиту и здесь.
+        if (!directionMode && legacyToken) {
+          const legacyAttemptState = attemptStateReadFor(legacyToken, currentSessionToken, 'qr');
+          if (legacyAttemptState) {
+            attemptStateWriteFor(
+              legacyToken,
+              { ...legacyAttemptState, outcomeUnknown: false },
+              'qr',
+            );
           }
         }
       };
@@ -1891,6 +2038,18 @@ const QueueJoin = () => {
       requestBody.specialist_ids = [reconcile.profileId];
       requestBody.specialist_entity_types = ['profile'];
     }
+    // QR-FE-005: legacy-сверка общего QR-кода — врач выбирается в форме
+    // (selectedSpecialists), как и в обычном сабмите; направление здесь
+    // не участвует (профиль отсутствует).
+    if (!directionMode && reconcile.profileId == null && selectedSpecialists && selectedSpecialists.length > 0) {
+      requestBody.specialist_ids = selectedSpecialists;
+      const entityTypeById = new Map(
+        availableSpecialists.map((s) => [String(s.id), s.entity_type ?? 'doctor']),
+      );
+      requestBody.specialist_entity_types = selectedSpecialists.map(
+        (id) => entityTypeById.get(String(id)) ?? 'doctor',
+      );
+    }
     try {
       const joinResult = await completeQueueJoinSession(requestBody);
       if (
@@ -1904,9 +2063,15 @@ const QueueJoin = () => {
       // The attempt's outcome is KNOWN — the persisted attempt state and
       // the reconcile panel are no longer needed. Round-9 (review P1-2):
       // removal touches ONLY this attempt's own per-attempt key.
-      if (directionCode) {
+      if (directionMode && directionCode) {
         attemptStateRemoveFor(directionCode, reconcile.sessionToken);
         attemptStateOwnerClear(directionCode);
+      }
+      // QR-FE-005: исход ИЗВЕСТЕН — legacy-конверт снят, ключ сессии тоже.
+      if (!directionMode && legacyToken) {
+        attemptStateRemoveFor(legacyToken, reconcile.sessionToken, 'qr');
+        attemptStateOwnerClear(legacyToken, 'qr');
+        legacyStorageRemove(`queue_session_${legacyToken}`);
       }
       // Round-10 (review P1): a claimed ambiguity candidate resolved
       // successfully — the ambiguity lifecycle is over for this mount.
@@ -1939,9 +2104,14 @@ const QueueJoin = () => {
         setPreExecRefusal(true);
         setPreExecRefusalReason(refusalReason);
         setPreExecRefusalMessage(getJoinRefusalMessage(err));
-        if (directionCode) {
+        if (directionMode && directionCode) {
           attemptStateRemoveFor(directionCode, reconcile.sessionToken);
           attemptStateOwnerClear(directionCode);
+        }
+        // QR-FE-005: доказано — попытка ничего не создала; legacy-конверт снят.
+        if (!directionMode && legacyToken) {
+          attemptStateRemoveFor(legacyToken, reconcile.sessionToken, 'qr');
+          attemptStateOwnerClear(legacyToken, 'qr');
         }
         // Round-11 (review P1-2): the ambiguity resolution no longer
         // routes through the reconcile submit — «Проверить» in the
@@ -1967,9 +2137,14 @@ const QueueJoin = () => {
         setPayloadMismatch(true);
       } else if (refusalReason === 'join_session_used') {
         setShowSessionConsumedAdvisory(true);
-        if (directionCode) {
+        if (directionMode && directionCode) {
           attemptStateRemoveFor(directionCode, reconcile.sessionToken);
           attemptStateOwnerClear(directionCode);
+        }
+        // QR-FE-005: сессия израсходована — исход ИЗВЕСТЕН, конверт снят.
+        if (!directionMode && legacyToken) {
+          attemptStateRemoveFor(legacyToken, reconcile.sessionToken, 'qr');
+          attemptStateOwnerClear(legacyToken, 'qr');
         }
         // Round-10 (review P1): the used verdict means the attempt's
         // outcome is KNOWN (committed) — its envelope guards nothing
@@ -2319,7 +2494,7 @@ const QueueJoin = () => {
               {t('misc.qj_home_btn')}
             </button>
             <button
-              onClick={loadTokenInfo}
+              onClick={() => { void loadTokenInfo(); }}
               className="qj-btn-primary"
               onMouseEnter={(e) => e.currentTarget.style.background = 'var(--mac-accent-blue-hover)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'var(--mac-accent-blue)'}
@@ -2389,7 +2564,18 @@ const QueueJoin = () => {
     };
 
     // RQ-10 (S-08): 0 успешных записей не называется успехом.
-    const successCount = successEntries.length;
+    // QR-FE-002 (follow-up audit 2026-11-02): канонический одиночный DTO
+    // (complete_join_session для врача-специфичного QR) — это
+    // { success: true, queue_number: N, ... } БЕЗ массива entries.
+    // Прежний счётчик смотрел ТОЛЬКО на entries.length и честно выданный
+    // талон рендерил как «не удалось присоединиться» с красной иконкой.
+    // Бизнес-исход определяется по success + top-level талону, а не по
+    // длине списка; multi-форма (entries) и частичный результат не меняются.
+    const singleShapeSuccessCount =
+      hasEntriesShape || result?.success !== true || result?.queue_number == null
+        ? 0
+        : 1;
+    const successCount = successEntries.length + singleShapeSuccessCount;
     const successTitle =
       successCount === 0
         ? t('misc.qj_join_failed')
@@ -2713,7 +2899,7 @@ const QueueJoin = () => {
                   <span> {/* UX Audit Registrar #2: был UZ, теперь RU. */} {t('misc.qj_no_specialists')}</span>
                   <button
                     type="button"
-                    onClick={loadTokenInfo}
+                    onClick={() => { void loadTokenInfo(); }}
                     style={{
                       alignSelf: 'center',
                       background: 'var(--mac-accent-blue)',
@@ -2970,7 +3156,7 @@ const QueueJoin = () => {
                   decisively, so the unsafe «Начать заново» escape is gone
                   from this panel — it remains available only on the PROVEN
                   panels below (pre-execution refusal / payload conflict). */}
-              {directionMode && attemptAmbiguity && (
+              {attemptAmbiguity && (
                 /* Round-10 (review P1): fail-closed ambiguity — several
                    outstanding attempts, no live owner marker. Nothing is
                    auto-adopted or destroyed; the patient resolves the
@@ -3063,7 +3249,7 @@ const QueueJoin = () => {
                     )}
                 </div>
               )}
-              {directionMode && reconcile && !preExecRefusal && !payloadMismatch && (
+              {reconcile && !preExecRefusal && !payloadMismatch && (
                 <div className="qj-reconcile" data-testid="qj-reconcile-banner" role="alert">
                   <p className="qj-reconcile-text" data-testid="qj-reconcile-text">
                     {t('misc.qj_reconcile_title')}
@@ -3084,7 +3270,7 @@ const QueueJoin = () => {
                   </div>
                 </div>
               )}
-              {directionMode && reconcile && preExecRefusal && (
+              {reconcile && preExecRefusal && (
                 <div className="qj-reconcile" data-testid="qj-reconcile-banner" role="alert">
                   <p className="qj-reconcile-text" data-testid="qj-preexec-refusal">
                     {preExecRefusalText}
@@ -3101,7 +3287,7 @@ const QueueJoin = () => {
                   </div>
                 </div>
               )}
-              {directionMode && reconcile && payloadMismatch && (
+              {reconcile && payloadMismatch && (
                 <div className="qj-reconcile" data-testid="qj-reconcile-banner" role="alert">
                   <p className="qj-reconcile-text" data-testid="qj-payload-mismatch">
                     {t('misc.qj_payload_mismatch')}

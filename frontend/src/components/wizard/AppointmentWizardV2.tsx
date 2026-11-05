@@ -213,6 +213,8 @@ import {
   buildEditOriginalServiceIdentity,
   buildEditDeltaTargetItems,
   describeUnroutableEditDeltaRows,
+  detectRemovedServicesWithinRetainedEntries,
+  describeRemovedWithinRetainedRows,
   resolveEditRecordDate,
   isEditDeltaNewItem,
   resolveCartServiceReferences,
@@ -919,7 +921,7 @@ const AppointmentWizardV2 = ({
     [editMode, initialData]
   );
 
-  const loadServices = useCallback(async () => {
+  const loadServices = useCallback(async (): Promise<boolean> => {
     try {
       // Codex P2 PR 3309 / RQ-05.b: каталог идёт через типизированный
       // wrapper — RegistrarCatalogService доезжает до потребителя, и
@@ -942,8 +944,10 @@ const AppointmentWizardV2 = ({
         // не должна скрывать других врачей и их услуги на шаге выбора.
         setServicesData(allServices);
         setFilteredServices(allServices);
+        return true;
     } catch (error: unknown) {
       logger.error('Ошибка загрузки услуг:', error);
+      return false; // REG-FE-070: провал загрузки — НЕ успех
     }
   }, [catalogTargetDate]);
 
@@ -2216,6 +2220,23 @@ const AppointmentWizardV2 = ({
       const originalQueueIds = editOriginalIdentity.queueIds; // ✅ available throughout handleComplete
       const entryUpdatedAtMap = editOriginalIdentity.entryUpdatedAtMap;
 
+      // REG-FE-084 (follow-up audit 2026-11-02): удаление ОДНОЙ услуги из
+      // СОХРАНЯЕМОЙ записи не поддерживается backend edit-контрактом (нет
+      // per-service remove-команды) — прежний путь молча терял правку и
+      // рапортовал успех. Громкий отказ ДО сабмита; детектор — wizardUtils.
+      if (editMode) {
+        const removed = detectRemovedServicesWithinRetainedEntries(
+          editOriginalIdentity, wizardData.cart.items);
+        if (removed.length > 0) {
+          const refusal = describeRemovedWithinRetainedRows(removed);
+          logger.warn('[AppointmentWizardV2] REG-FE-084: blocking submit', removed);
+          setErrors((prev) => ({ ...prev, quote: refusal }));
+          setCurrentStep(STEP_CART);
+          toast.error(refusal, { style: TOAST_ERROR_STYLE });
+          return; // НЕ сабмитим, НЕ рапортуем успех
+        }
+      }
+
       if (hasQueueEntries) {
         // ✅ Устанавливаем source по умолчанию для записей типа visit
         const effectiveSource = initialSourceKind || (
@@ -2539,14 +2560,15 @@ const AppointmentWizardV2 = ({
                 } else {
                   // Нет изменений в данных, просто завершаем
                   // ✅ НОВОЕ: Обработка удаленных записей очереди
-                  // Находим записи, которых больше нет в корзине
-                  const currentQueueIds = new Set(
-                    wizardData.cart.items.
-                    map((item) => item.original_queue_id).
-                    filter((id) => id)
+                  // Находим записи, которых больше нет в корзине.
+                  // REG-FE-085: единая нормализованная идентичность записи
+                  // (String) — как в cancelRemovedQueueEntries; инлайн-Set
+                  // со смешанными типами (42 vs "42") ошибочно отменял
+                  // СОХРАНЯЕМУЮ запись.
+                  const removedQueueIds = getRemovedQueueEntryIds(
+                    Array.from(originalQueueIds),
+                    wizardData.cart.items
                   );
-
-                  const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
                   if (removedQueueIds.length > 0) {
                     logger.log(`🗑️ Найдены удаленные записи очереди: ${removedQueueIds.join(', ')}. Отменяем их...`);
@@ -2645,13 +2667,12 @@ const AppointmentWizardV2 = ({
           logger.log('✅ Данные пациента успешно обновлены');
 
           // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
-          const currentQueueIds = new Set(
-            wizardData.cart.items.
-              map((item) => item.original_queue_id).
-              filter((id) => id)
+          // REG-FE-085: нормализованная идентичность записи (см. getRemovedQueueEntryIds)
+          // вместо сырого Set<string|number> сравнения.
+          const removedQueueIds = getRemovedQueueEntryIds(
+            Array.from(originalQueueIds),
+            wizardData.cart.items
           );
-
-          const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
           // Codex R14 PR 3121 (P1): отмены выполняются ДО success-тоста и
           // onComplete — неудача (QueueEntryCancelError) уходит в общий
@@ -2811,13 +2832,12 @@ const AppointmentWizardV2 = ({
       // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
 
       // Обработка удалённых записей очереди (cart path)
-      const currentQueueIds = new Set(
-        wizardData.cart.items.
-          map((item) => item.original_queue_id).
-          filter((id) => id)
+      // REG-FE-085: нормализованная идентичность записи (см. getRemovedQueueEntryIds)
+      // вместо сырого Set<string|number> сравнения.
+      const removedQueueIds = getRemovedQueueEntryIds(
+        Array.from(originalQueueIds),
+        wizardData.cart.items
       );
-
-      const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
       // Codex R14 PR 3121 (P1): отмены выполняются ДО success-тоста и
       // onComplete — неудача (QueueEntryCancelError) уходит в общий catch
@@ -2892,15 +2912,12 @@ const AppointmentWizardV2 = ({
 
   // ===================== ОБРАБОТЧИКИ ОНЛАЙН ОПЛАТЫ УБРАНЫ =====================
 
-  // Обработчик обновления услуг (для хедера)
+  // Обработчик обновления услуг (для хедера). REG-FE-070: успех = результат загрузки.
   const handleReloadServices = async () => {
     setIsReloadingServices(true);
     try {
-      await loadServices();
-      toast.success(t('misc.aw_services_list_updated'));
-    } catch (error: unknown) {
-      logger.error('Ошибка обновления услуг:', error);
-      toast.error(t('misc.aw_services_list_update_failed'));
+      const ok = await loadServices();
+      toast[ok ? 'success' : 'error'](t(ok ? 'misc.aw_services_list_updated' : 'misc.aw_services_list_update_failed'));
     } finally {
       setIsReloadingServices(false);
     }
@@ -3219,6 +3236,8 @@ const AppointmentWizardV2 = ({
         isOpen={isOpen}
         onClose={onClose}
         customHeader={currentStep === STEP_PATIENT ? Step1Header : Step2Header}
+        // REG-FE-075: имя диалога при композитном customHeader задаём явно.
+        ariaLabel={editMode ? t('misc.aw_edit_record_title') : t('misc.aw_register_patient_title')}
         actions={actions}
         maxWidth="70rem"
         closeOnBackdrop={false}

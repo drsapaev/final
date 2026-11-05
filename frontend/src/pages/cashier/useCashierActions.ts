@@ -37,6 +37,7 @@ import type { UsePaymentsReturn } from '../../hooks/usePayments';
 import {
   buildPaymentMethodLabels,
   buildReceiptPrintPayload,
+  buildCashierPaymentPayload,
   canCreateDirectCashierPayment,
   createGroupedCashierPayment,
   isBackendGroupedCashierPayment,
@@ -204,19 +205,12 @@ export const useCashierActions = ({
       if (groupedPayment) {
         await createGroupedCashierPayment(appt, pData);
       } else {
-        const result = await paymentsApi.createPayment({
-          visit_id: visitId,
-          amount: pData.amount,
-          method: pData.method,
-          note: pData.note || tI18n('cashier.payment_note_default'),
-          // Issue 3859: forward the modal's idempotency key (one UUID per
-          // modal session) so a network-loss retry replays the original
-          // payment server-side instead of double-charging. Conditional
-          // spread keeps the legacy body shape for key-less callers.
-          ...(('client_request_id' in pData && pData.client_request_id)
-            ? { client_request_id: pData.client_request_id }
-            : {}),
-        });
+        // CSH-FE-040: пейлоад строится каноническим сборщиком —
+        // «внесено/сдача» (cash) и ключ идемпотентности доходят до
+        // POST /cashier/payments без сужения (прежде терялись здесь).
+        const result = await paymentsApi.createPayment(
+          buildCashierPaymentPayload(visitId, pData, tI18n('cashier.payment_note_default')) as Parameters<typeof paymentsApi.createPayment>[0],
+        );
 
         if (!(result as { success?: boolean }).success) {
           throw new Error(tI18n('cashier.payment_visit_failed', { visitId, error: (result as { error?: string }).error }));
@@ -386,15 +380,27 @@ export const useCashierActions = ({
     try {
       if (paymentRowOrId && typeof paymentRowOrId === 'object') {
         try {
-          const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId, paymentMethodLabels, tI18n('cashier.default_patient')));
-          if (opened) {
+          const outcome = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId, paymentMethodLabels, tI18n('cashier.default_patient')));
+          // CSH-FE-044 (follow-up audit 2026-11-02): прежде обёртка
+          // возвращала «true всегда»: print() бросал исключение, а кассир
+          // видел тост «диалог печати открыт» и PDF-fallback пропускался.
+          // Теперь ветвление честное: успех = окно открыто И печать
+          // подтверждена/отложена (printInvoked|deferred); провал
+          // print-вызова ведёт в серверный PDF.
+          if (outcome?.opened && (outcome.printInvoked || outcome.deferred)) {
             notify.success(tI18n('cashier.print_dialog_opened'));
             return;
           }
 
-          logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
-            paymentId
-          });
+          if (!outcome?.opened) {
+            logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
+              paymentId
+            });
+          } else {
+            logger.warn('[Cashier] Browser print invocation failed, falling back to PDF', {
+              paymentId
+            });
+          }
         } catch (error: unknown) {
           logger.error('[Cashier] Unexpected browser receipt print error:', error);
         }

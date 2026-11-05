@@ -11,6 +11,8 @@
  * only — never row.status inference (contract-pinned).
  */
 
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle, Loader2, MoreVertical, Receipt, Undo2, XCircle } from 'lucide-react';
 
 import { AppError, Badge, Button, Skeleton } from '../../../components/ui/macos';
@@ -50,6 +52,94 @@ interface CashierHistoryTableProps {
   tI18n: CashierTranslationFn;
 }
 
+// CSH-FE-046 (follow-up audit 2026-11-02): меню действий строки истории
+// рендерится ПОРТАЛОМ в document.body с position:fixed и коллизией по
+// вьюпорту. Прежде .cashier-overflow-popover был position:absolute внутри
+// .cashier-table-scroll (overflow-x:auto ⇒ вычисляемый overflow-y:auto):
+// меню последней строки обрезалось скролл-предком — z-index не спасает от
+// клиппинга предка. Портал живёт вне скролл-контейнера, поэтому меню видно
+// целиком на любой строке; свертывание вверх при нехватке места снизу.
+interface OverflowMenuActionItem {
+  itemClassName: string;
+  onClick: () => void;
+  disabled: boolean;
+  ariaLabel: string;
+  label: string;
+  icon: ReactNode;
+}
+
+function OverflowMenuPortal({
+  getTrigger,
+  actions,
+}: {
+  getTrigger: () => HTMLElement | null;
+  actions: OverflowMenuActionItem[];
+}) {
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const [placement, setPlacement] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const computePlacement = () => {
+      const trigger = getTrigger();
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      // Оценка высоты/ширины меню до первого измерения (3 пункта ≈ 38px
+      // каждый + паддинги); после рендера уточняется по реальным размерам.
+      const measuredHeight = popoverRef.current?.offsetHeight || actions.length * 38 + 12;
+      const measuredWidth = Math.max(popoverRef.current?.offsetWidth || 0, 200);
+      const viewportWidth = window.innerWidth || 1024;
+      const viewportHeight = window.innerHeight || 768;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      // Коллизия: внизу не хватает места и сверху достаточно — раскрываемся вверх.
+      const openUpward = spaceBelow < measuredHeight + 8 && spaceAbove > measuredHeight + 8;
+      const top = openUpward
+        ? Math.max(8, rect.top - measuredHeight - 4)
+        : Math.min(rect.bottom + 4, Math.max(8, viewportHeight - measuredHeight - 8));
+      // Выравнивание по правому краю триггера с ограничением вьюпортом.
+      const left = Math.min(
+        Math.max(8, rect.right - measuredWidth),
+        Math.max(8, viewportWidth - measuredWidth - 8)
+      );
+      setPlacement({ top, left });
+    };
+
+    computePlacement();
+    // Пересчёт при ресайзе (поворот экрана/зум) — меню остаётся во вьюпорте.
+    window.addEventListener('resize', computePlacement);
+    return () => window.removeEventListener('resize', computePlacement);
+  }, [getTrigger, actions.length]);
+
+  // CSH-FE-046: единый рендер — до вычисления координат меню скрыто
+  // (visibility:hidden), после — fixed-координаты. Без мигания.
+  const menuStyle: CSSProperties = placement === null
+    ? { position: 'fixed', top: 0, left: 0, visibility: 'hidden' }
+    : { position: 'fixed', top: `${placement.top}px`, left: `${placement.left}px` };
+
+  return createPortal(
+    <div
+      ref={popoverRef}
+      className="cashier-overflow-popover"
+      role="menu"
+      data-testid="cashier-overflow-popover"
+      style={menuStyle}>
+      {actions.map((action) => (
+        <button
+          key={action.ariaLabel}
+          type="button"
+          className={action.itemClassName}
+          onClick={action.onClick}
+          disabled={action.disabled}
+          role="menuitem"
+          aria-label={action.ariaLabel}>
+          {action.icon} {action.label}
+        </button>
+      ))}
+    </div>,
+    document.body
+  );
+}
+
 const CashierHistoryTable = ({
   historyLoading,
   historyError,
@@ -70,6 +160,11 @@ const CashierHistoryTable = ({
   tI18n,
 }: CashierHistoryTableProps) => {
   const format = formatUZS;
+
+  // CSH-FE-046 (follow-up audit 2026-11-02): открытая строка меню хранит ключ
+  // строки и ссылку на её <details>; само меню рендерится порталом в body.
+  const [openMenuRowKey, setOpenMenuRowKey] = useState<string | number | null>(null);
+  const openMenuDetailsRef = useRef<HTMLDetailsElement | null>(null);
 
   // CSH-FE-001: a failed read is not a confirmed empty. With rows kept from
   // the last successful load the banner is a stale-data warning above them;
@@ -155,8 +250,11 @@ const CashierHistoryTable = ({
               </thead>
               <tbody>
                 {filteredPayments.length > 0 ?
-            filteredPayments.map((row, index) =>
-            <tr key={`payment-${row.id || row.payment_id || index}`} className="cashier-table-row">
+            filteredPayments.map((row, index) => {
+            // CSH-FE-046/047: ключ строки — единый для tr, меню-состояния и портала.
+            const rowKey = row.id || row.payment_id || index;
+            return (
+            <tr key={`payment-${rowKey}`} className="cashier-table-row">
 
                   <td
                     aria-label={tI18n('cashier.payment_history_date_aria')}
@@ -189,11 +287,15 @@ const CashierHistoryTable = ({
                       {getPaymentStatusLabel(row.status, tI18n)}
                     </Badge>
                   </td>
-                  <td className="cashier-cell-actions">
+                  {/* CSH-FE-047 (follow-up audit 2026-11-02): <td> остаётся
+                      нативной table-cell: прежде display:flex назначался
+                      ПРЯМО на <td> (класс cashier-cell-actions на ячейке),
+                      ломая табличный layout (анонимные box'ы, рассинхрон
+                      колонок/границ). Теперь flex — на внутреннем div. */}
+                  <td className="cashier-cell-padded">
+                    <div className="cashier-cell-actions">
                     {/* UX Audit #2.2: primary action + overflow menu.
-                        Раньше: 4 равноправные кнопки (success/danger/warning/ghost) —
-                        слабая визуальная иерархия (Nielsen #4),
-                        на узких экранах ломалось flex-wrap.
+                        Раньше: 4 равноправные кнопки — слабая иерархия (Nielsen #4).
                         Теперь: primary «Принять» видна всегда, остальные 3 —
                         в overflow menu через нативный <details>. */}
                     <Button
@@ -207,43 +309,62 @@ const CashierHistoryTable = ({
                         <CheckCircle size={14} />}
                       {tI18n('cashier.confirm_payment_confirm')}
                     </Button>
-                    <details className="cashier-overflow-menu">
+                    <details
+                      className="cashier-overflow-menu"
+                      onToggle={(event) => {
+                        const detailsEl = event.currentTarget;
+                        if (detailsEl.open) {
+                          openMenuDetailsRef.current = detailsEl;
+                          setOpenMenuRowKey(rowKey);
+                        } else if (openMenuRowKey === rowKey) {
+                          openMenuDetailsRef.current = null;
+                          setOpenMenuRowKey(null);
+                        }
+                      }}>
                       <summary className="cashier-overflow-trigger" aria-label={tI18n('cashier.more_actions_aria')}>
                         <MoreVertical size={16} aria-hidden="true" />
                       </summary>
-                      <div className="cashier-overflow-popover" role="menu">
-                        <button
-                          type="button"
-                          className="cashier-overflow-item cashier-overflow-item--danger"
-                          onClick={() => openCancelDialog(row)}
-                          disabled={!hasBackendPaymentAction(row, 'cancel') || processingAction?.id === row.id}
-                          role="menuitem"
-                          aria-label={tI18n('cashier.btn_cancel')}>
-                          <XCircle size={14} aria-hidden="true" /> {tI18n('cashier.btn_cancel')}
-                        </button>
-                        <button
-                          type="button"
-                          className="cashier-overflow-item cashier-overflow-item--warning"
-                          onClick={() => openRefundDialog(row)}
-                          disabled={!hasBackendPaymentAction(row, 'refund') || processingAction?.id === row.id}
-                          role="menuitem"
-                          aria-label={tI18n('cashier.refund_aria')}>
-                          <Undo2 size={14} aria-hidden="true" /> {tI18n('cashier.refund_confirm')}
-                        </button>
-                        <button
-                          type="button"
-                          className="cashier-overflow-item"
-                          onClick={() => handlePrintReceipt(row)}
-                          disabled={!hasBackendPaymentAction(row, 'print_receipt') || processingAction?.id === row.id}
-                          role="menuitem"
-                          aria-label={tI18n('cashier.print_receipt_aria')}>
-                          <Receipt size={14} aria-hidden="true" /> {tI18n('cashier.print_receipt_btn')}
-                        </button>
-                      </div>
+                      {/* CSH-FE-046: контент меню — портал в document.body
+                          (position:fixed + коллизия вьюпорта); прежний
+                          absolute-поповер внутри .cashier-table-scroll
+                          обрезался скролл-предком на нижних строках. */}
+                      {openMenuRowKey === rowKey && (
+                        <OverflowMenuPortal
+                          getTrigger={() => openMenuDetailsRef.current?.querySelector('summary') ?? null}
+                          actions={[
+                            {
+                              itemClassName: 'cashier-overflow-item cashier-overflow-item--danger',
+                              onClick: () => openCancelDialog(row),
+                              disabled: !hasBackendPaymentAction(row, 'cancel') || processingAction?.id === row.id,
+                              ariaLabel: tI18n('cashier.btn_cancel'),
+                              label: tI18n('cashier.btn_cancel'),
+                              icon: <XCircle size={14} aria-hidden="true" />
+                            },
+                            {
+                              itemClassName: 'cashier-overflow-item cashier-overflow-item--warning',
+                              onClick: () => openRefundDialog(row),
+                              disabled: !hasBackendPaymentAction(row, 'refund') || processingAction?.id === row.id,
+                              ariaLabel: tI18n('cashier.refund_aria'),
+                              label: tI18n('cashier.refund_confirm'),
+                              icon: <Undo2 size={14} aria-hidden="true" />
+                            },
+                            {
+                              itemClassName: 'cashier-overflow-item',
+                              onClick: () => handlePrintReceipt(row),
+                              disabled: !hasBackendPaymentAction(row, 'print_receipt') || processingAction?.id === row.id,
+                              ariaLabel: tI18n('cashier.print_receipt_aria'),
+                              label: tI18n('cashier.print_receipt_btn'),
+                              icon: <Receipt size={14} aria-hidden="true" />
+                            }
+                          ]}
+                        />
+                      )}
                     </details>
+                    </div>
                   </td>
                 </tr>
-            ) :
+            );
+            }) :
 
             <tr className="cashier-empty-row">
                     <td colSpan={7} className="cashier-empty-cell">

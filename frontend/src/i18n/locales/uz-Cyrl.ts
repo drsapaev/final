@@ -2899,6 +2899,8 @@ const uzCyrl = {
         failed: 'Доимий ҚР яратиб бўлмади',
         sr_qr: 'Йўналишнинг доимий манзили ҚР-коди',
         dedupe_note: 'Бу йўналишнинг доимий ҚР’и «{tag}» қаторида кўрсатилган — манзил бутун профилга тегишли, алоҳида тегка эмас.',
+        // QR-FE-007 (follow-up audit 2026-11-02): SVG-fallback ҳақидаги огоҳлантириш — файл .svg деб номланади, PNG мавжуд эмас.
+        svg_fallback_notice: 'Бу муҳитда PNG мавжуд эмас: файл SVG (.svg) сифатида сақланди.',
         },
     qrm_title: 'QueueResource реестри',
     qrm_subtitle: 'Тегларнинг ресурс эгаллари. Яратиш — draft; фоллаштириш §3.1 инвариант gate орқали. code/queue_tag яратилгандан кейin ўзгармайди (§3.2).',
@@ -6748,6 +6750,7 @@ const uzCyrl = {
     pay_widg_processing: 'Обработка...',
     pay_widg_pay_amount: 'Оплатить {amount}',
     pay_widg_cancel: 'Отмена',
+    pay_widg_cancel_hint: 'Ойнани ёпиш тўловни бекор қилмайди — тўлов провайдер тасдиқлагунча фаол бўлиб қолади',
 
     // ─── CashPaymentModal.stories.jsx (pay_story_) ─────────────────────
     pay_story_docs_description: 'Modal for processing cash/card payments. Features: quick cash denominations (50k/100k/200k/500k UZS), "{noChangeBtn}" button, change-due calculation, insufficient funds validation.',
@@ -9430,6 +9433,11 @@ const uzCyrl = {
     rrt_kogda_poyavyatsya_novye_zapr: 'Когда появятся новые запросы на возврат, они будут показаны здесь.',
     rrt_na_depozit: 'На депозит',
     rrt_na_kartu: 'На карту',
+    rrt_nalichnymi: 'Нақд пул',
+    rrt_unknown: 'Номаълум',
+    // CSH-FE-049 (follow-up audit 2026-11-02): тўлиқ сабабни очишга
+    // мо‘лжалланган фокусланадиган тугма (клавиатура қўл етказувчанлиги).
+    rrt_reason_expand: 'Тўлиқ кўрсатиш',
     rrt_obrabotka: 'Обработка',
     // ServiceChecklist.jsx (sc_)
     sc_konsultatsiya_kardiologa: 'Консультация кардиолога',
@@ -11100,6 +11108,8 @@ const uzCyrl = {
     rp_field_department: 'Отделение',
     rp_field_services: 'Услуги',
     rp_field_queue: 'Очередь',
+    // REG-FE-083 (follow-up audit 2026-11-02): рақам берилмаган ёзув учун ростгўй толтирувчи.
+    rp_queue_no_ticket: 'рақам берилмади',
     rp_field_status: 'Статус',
     rp_field_payment: 'Оплата',
     rp_field_amount: 'Сумма',

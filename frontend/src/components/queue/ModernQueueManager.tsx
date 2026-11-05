@@ -130,9 +130,27 @@ const ModernQueueManager = ({
   // RQ-11 (F-10): классификация срока из серверного expires_at (valid/expired/
   // unspecified). Пересчитывается при открытии диалога, чтобы истекший код
   // показывался честно, а не как «действует до: —».
+  // QR-FE-004 (follow-up audit 2026-11-02): пересчёт больше НЕ заморожен
+  // мемо-зависимостями — диалог, открытый ЗА минуту до истечения, доживает
+  // тик до самого горизонта и честно перекрашивается в «истек» (и подпись
+  // скачиваемого постера тоже). Ограниченный таймер до expires_at, без
+  // интервальной нагрузки.
+  const [qrExpiryNow, setQrExpiryNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!showQrDialog || !qrData?.expires_at) return;
+    const horizon = Date.parse(qrData.expires_at);
+    if (Number.isNaN(horizon)) return;
+    const delay = horizon - Date.now();
+    if (delay <= 0) {
+      setQrExpiryNow(Date.now());
+      return;
+    }
+    const timer = setTimeout(() => setQrExpiryNow(Date.now()), delay + 100);
+    return () => clearTimeout(timer);
+  }, [showQrDialog, qrData?.expires_at]);
   const qrExpiryView = useMemo(
-    () => resolveQrExpiryView(qrData?.expires_at, showQrDialog ? new Date() : undefined),
-    [qrData?.expires_at, showQrDialog]
+    () => resolveQrExpiryView(qrData?.expires_at, showQrDialog ? new Date(qrExpiryNow) : undefined),
+    [qrData?.expires_at, showQrDialog, qrExpiryNow]
   );
 
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
@@ -886,13 +904,23 @@ const ModernQueueManager = ({
               alt="QR Code"
               className="mqm-qr-image" /> :
 
-            qrData?.token ?
+            /* QR-FE-003: SVG-fallback кодирует ТОЛЬКО серверный qr_url —
+               канонический origin этого развёртывания. Хардкод
+               med-queue.uz удалён: клиника на другом домене больше не
+               отправляет пациентов на чужой сайт. */
+            qrData?.qr_url ?
             <QRCodeSVG
-              value={`https://med-queue.uz/queue/join?token=${qrData.token}`}
+              value={qrData.qr_url}
               size={240}
               level="H"
               includeMargin={true}
               className="mqm-qr-svg" /> :
+
+            qrData?.token ?
+            <div className="mqm-qr-loading" data-testid="mqm-qr-url-missing">
+                <div className="mqm-spinner"></div>
+                <span>{t('misc.mqm_qr_unavailable')}</span>
+              </div> :
 
 
             <div className="mqm-qr-loading">

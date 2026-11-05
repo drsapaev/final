@@ -3,10 +3,12 @@
  * date/amount formatters, fail-closed action cluster and the canonical
  * DataTable column builder (verbatim move from RefundRequestsTable.tsx).
  *
- * Pure presentation: no state, no network. The table component supplies
- * t, the anti-double-click processingId and the three process handlers.
+ * Presentation only, no network. The table component supplies t, the
+ * anti-double-click processingId and the three process handlers; the only
+ * local state is the per-cell reason expansion (CSH-FE-049, see below).
  */
 
+import { useId, useState } from 'react';
 import {
   Check,
   X,
@@ -43,13 +45,60 @@ export const getRefundStatusBadge = (status: unknown, t: RefundTranslationFn) =>
   );
 };
 
-export const getRefundTypeBadge = (type: unknown, t: RefundTranslationFn) => {
-  return type === 'deposit' ? (
-    <Badge variant="primary">{t('misc.rrt_na_depozit')}</Badge>
-  ) : (
-    <Badge variant="secondary">{t('misc.rrt_na_kartu')}</Badge>
-  );
+// CSH-FE-051 (follow-up audit 2026-11-02): прежний маппинг рисовал «На карту»
+// для ВСЕГО, кроме deposit — наличный возврат (cash) выдавал себя за
+// карточный, а неизвестные/будущие значения enum'а лгали тем же образом.
+// Явный словарь по каноническому RefundType бэкенда
+// (bank_transfer | deposit | cash) + честное «Неизвестно» для остального.
+export const REFUND_TYPE_BADGE_CONFIG: Record<string, { key: string; variant: string }> = {
+  deposit: { key: 'misc.rrt_na_depozit', variant: 'primary' },
+  bank_transfer: { key: 'misc.rrt_na_kartu', variant: 'secondary' },
+  cash: { key: 'misc.rrt_nalichnymi', variant: 'success' },
 };
+
+export const getRefundTypeBadge = (type: unknown, t: RefundTranslationFn) => {
+  const normalized = String(type ?? '').trim();
+  const config = REFUND_TYPE_BADGE_CONFIG[normalized];
+  if (!config) {
+    return <Badge variant="outline">{t('misc.rrt_unknown')}</Badge>;
+  }
+  return <Badge variant={config.variant}>{t(config.key)}</Badge>;
+};
+
+// CSH-FE-049 (follow-up audit 2026-11-02): ячейка причины возврата с
+// фокусируемым раскрытием полного текста. Прежде: ellipsized span с
+// hover-title на нефокусируемом элементе — sighted keyboard-only сотрудник
+// не мог прочесть полное обоснование перед одобрением/отказом по возврату
+// (DOM-текст полон, но визуально обрезан). Порог: строки до ~28 символов
+// помещаются в 220px без обрезки — для них кнопка не нужна.
+const REASON_EXPAND_THRESHOLD = 28;
+
+function RefundReasonCell({ reason, t }: { reason: unknown; t: RefundTranslationFn }) {
+  const [expanded, setExpanded] = useState(false);
+  const domId = useId();
+  const text = reason ? String(reason) : '—';
+  const isLong = text.length > REASON_EXPAND_THRESHOLD;
+  return (
+    <span
+      id={`refund-reason-${domId}`}
+      data-testid="refund-cell-reason"
+      className={`refund-cell-reason${expanded ? ' refund-cell-reason--expanded' : ''}`}
+      title={text}>
+      {text}
+      {isLong && (
+        <button
+          type="button"
+          className="refund-reason-toggle"
+          data-testid="refund-reason-toggle"
+          aria-expanded={expanded}
+          aria-controls={`refund-reason-${domId}`}
+          onClick={() => setExpanded((prev) => !prev)}>
+          {t('misc.rrt_reason_expand')}
+        </button>
+      )}
+    </span>
+  );
+}
 
 export const formatRefundDate = (dateStr: unknown) => {
   if (!dateStr) return '—';
@@ -153,7 +202,10 @@ export const buildRefundRequestColumns = (
       )
     },
     {
-      key: 'amount',
+      // CSH-FE-050: колонка читает реальное поле ответа `refund_amount`
+      // (RefundRequestResponse не отдаёт `amount` — раньше каждая легитимная
+      // сумма возврата рендерилась как «—»).
+      key: 'refund_amount',
       title: t('payment.col_amount'),
       render: (amount: unknown) => <span className="refund-cell-amount">{formatRefundAmount(amount)}</span>
     },
@@ -165,11 +217,12 @@ export const buildRefundRequestColumns = (
     {
       key: 'reason',
       title: t('payment.col_reason'),
-      render: (reason: unknown) => (
-        <span className="refund-cell-reason" title={String(reason ?? '')}>
-          {reason ? String(reason) : '—'}
-        </span>
-      )
+      // CSH-FE-049 (follow-up audit 2026-11-02): прежде полный текст причины
+      // был доступен только через hover-title на НЕфокусируемом span —
+      // клавиатурный сотрудник не мог прочесть обоснование перед
+      // одобрением/отказом. Теперь фокусируемая кнопка «Показать полностью»
+      // раскрывает текст с переносом (aria-expanded/aria-controls).
+      render: (reason: unknown) => <RefundReasonCell reason={reason} t={t} />
     },
     {
       key: 'status',

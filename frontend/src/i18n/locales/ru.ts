@@ -3013,6 +3013,8 @@ const ru = {
         failed: 'Не удалось создать постоянный QR',
         sr_qr: 'QR-код постоянного адреса направления',
         dedupe_note: 'Постоянный QR этого направления показан в строке «{tag}» — адрес принадлежит профилю целиком, а не отдельному тегу.',
+        // QR-FE-007 (follow-up audit 2026-11-02): SVG-fallback уведомление — файл честно называется .svg, PNG недоступен.
+        svg_fallback_notice: 'PNG недоступен в этом окружении: файл сохранён как SVG (.svg).',
         },
     qrm_title: 'Реестр QueueResource',
     qrm_subtitle: 'Ресурсные владельцы тегов. Создание — draft; активация через gate инварианта §3.1. code/queue_tag после создания не меняются (§3.2).',
@@ -6866,6 +6868,7 @@ const ru = {
     pay_widg_processing: 'Обработка...',
     pay_widg_pay_amount: 'Оплатить {amount}',
     pay_widg_cancel: 'Отмена',
+    pay_widg_cancel_hint: 'Закрытие окна не отменяет платёж — он остаётся активным до подтверждения провайдером',
 
     // ─── CashPaymentModal.stories.jsx (pay_story_) ─────────────────────
     pay_story_docs_description: 'Modal for processing cash/card payments. Features: quick cash denominations (50k/100k/200k/500k UZS), "{noChangeBtn}" button, change-due calculation, insufficient funds validation.',
@@ -9553,6 +9556,11 @@ const ru = {
     rrt_kogda_poyavyatsya_novye_zapr: 'Когда появятся новые запросы на возврат, они будут показаны здесь.',
     rrt_na_depozit: 'На депозит',
     rrt_na_kartu: 'На карту',
+    rrt_nalichnymi: 'Наличными',
+    rrt_unknown: 'Неизвестно',
+    // CSH-FE-049 (follow-up audit 2026-11-02): фокусируемая кнопка раскрытия
+    // полной причины возврата (клавиатурная доступность).
+    rrt_reason_expand: 'Показать полностью',
     rrt_obrabotka: 'Обработка',
     // ServiceChecklist.jsx (sc_)
     sc_konsultatsiya_kardiologa: 'Консультация кардиолога',
@@ -11237,6 +11245,9 @@ const ru = {
     rp_field_department: 'Отделение',
     rp_field_services: 'Услуги',
     rp_field_queue: 'Очередь',
+    // REG-FE-083 (follow-up audit 2026-11-02): честный плейсхолдер «без номера»
+    // для записи очереди без выданного номера талона.
+    rp_queue_no_ticket: 'без номера',
     rp_field_status: 'Статус',
     rp_field_payment: 'Оплата',
     rp_field_amount: 'Сумма',

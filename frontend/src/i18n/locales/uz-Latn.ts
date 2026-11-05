@@ -2888,6 +2888,8 @@ const uzLatn = {
         failed: 'Doimiy QR yaratib bo‘lmadi',
         sr_qr: 'Yo‘nalishning doimiy manzili QR kodi',
         dedupe_note: 'Bu yo‘nalishning doimiy QR’i «{tag}» qatorida ko‘rsatilgan — manzil butun profilga tegishli, alohida tegga emas.',
+        // QR-FE-007 (follow-up audit 2026-11-02): SVG-fallback haqidagi ogohlantirish — fayl .svg deb nomlanadi, PNG mavjud emas.
+        svg_fallback_notice: 'Bu muhitda PNG mavjud emas: fayl SVG (.svg) sifatida saqlandi.',
         },
     qrm_title: 'QueueResource reyestri',
     qrm_subtitle: 'Teglarning resurs egallari. Yaratish — draft; faollashtirish §3.1 invariant gate orqali. code/queue_tag yaratilgandan keyin o\'zgarmaydi (§3.2).',
@@ -6737,6 +6739,7 @@ const uzLatn = {
     pay_widg_processing: 'Qayta ishlanmoqda...',
     pay_widg_pay_amount: 'Toʻlash {amount}',
     pay_widg_cancel: 'Bekor qilish',
+    pay_widg_cancel_hint: 'Oynani yopish to‘lovni bekor qilmaydi — to‘lov provayder tasdiqlaguncha faol bo‘lib qoladi',
 
     // ─── CashPaymentModal.stories.jsx (pay_story_) ─────────────────────
     pay_story_docs_description: 'Modal for processing cash/card payments. Features: quick cash denominations (50k/100k/200k/500k UZS), "{noChangeBtn}" button, change-due calculation, insufficient funds validation.',
@@ -9419,6 +9422,11 @@ const uzLatn = {
     rrt_kogda_poyavyatsya_novye_zapr: 'Когда появятся новые запросы на возврат, они будут показаны здесь.',
     rrt_na_depozit: 'На депозит',
     rrt_na_kartu: 'На карту',
+    rrt_nalichnymi: 'Naqd pul',
+    rrt_unknown: 'Noma’lum',
+    // CSH-FE-049 (follow-up audit 2026-11-02): to‘liq sababni ochishga
+    // mo‘ljallangan fokuslanadigan tugma (klaviatura qo‘l yetkazuvchanligi).
+    rrt_reason_expand: 'To‘liq ko‘rsatish',
     rrt_obrabotka: 'Обработка',
     // ServiceChecklist.jsx (sc_)
     sc_konsultatsiya_kardiologa: 'Консультация кардиолога',
@@ -11089,6 +11097,8 @@ const uzLatn = {
     rp_field_department: "Bo'lim",
     rp_field_services: "Xizmatlar",
     rp_field_queue: "Navbat",
+    // REG-FE-083 (follow-up audit 2026-11-02): raqam berilmagan yozuv uchun halol to‘ldiruvchi.
+    rp_queue_no_ticket: 'raqam berilmadi',
     rp_field_status: "Holat",
     rp_field_payment: "To'lov",
     rp_field_amount: "Summa",

@@ -80343,6 +80343,40 @@
             "title": "Note",
             "description": "Payment note"
           },
+          "received_amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Received Amount",
+            "description": "Cash tendered by the cashier (receipt provenance)"
+          },
+          "change_due": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Due",
+            "description": "Change due: received_amount - amount (receipt provenance)"
+          },
           "client_request_id": {
             "anyOf": [
               {
@@ -80434,6 +80468,40 @@
             ],
             "title": "Note",
             "description": "Примечание"
+          },
+          "received_amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Received Amount",
+            "description": "Внесённая кассиром сумма (наличные, для чека)"
+          },
+          "change_due": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Due",
+            "description": "Сдача: received_amount - amount (для чека)"
           },
           "client_request_id": {
             "anyOf": [

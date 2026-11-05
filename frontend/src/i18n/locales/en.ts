@@ -2888,6 +2888,8 @@ const en = {
         failed: 'Failed to create the permanent QR',
         sr_qr: 'QR code of the permanent direction address',
         dedupe_note: 'This direction’s permanent QR is shown in the «{tag}» row — the address belongs to the whole profile, not to an individual tag.',
+        // QR-FE-007 (follow-up audit 2026-11-02): honest SVG-fallback notice — the file is named .svg, PNG unavailable.
+        svg_fallback_notice: 'PNG is unavailable in this environment: the file was saved as SVG (.svg).',
         },
     qrm_title: 'QueueResource registry',
     qrm_subtitle: 'Resource owners of tags. Creation is draft; activation goes through the §3.1 invariant gate. code/queue_tag are immutable after creation (§3.2).',
@@ -6737,6 +6739,7 @@ const en = {
     pay_widg_processing: 'Обработка...',
     pay_widg_pay_amount: 'Оплатить {amount}',
     pay_widg_cancel: 'Отмена',
+    pay_widg_cancel_hint: 'Closing this window does not cancel the payment — it stays active until the provider confirms it',
 
     // ─── CashPaymentModal.stories.jsx (pay_story_) ─────────────────────
     pay_story_docs_description: 'Modal for processing cash/card payments. Features: quick cash denominations (50k/100k/200k/500k UZS), "{noChangeBtn}" button, change-due calculation, insufficient funds validation.',
@@ -9423,6 +9426,11 @@ const en = {
     rrt_kogda_poyavyatsya_novye_zapr: 'Когда появятся новые запросы на возврат, они будут показаны здесь.',
     rrt_na_depozit: 'На депозит',
     rrt_na_kartu: 'На карту',
+    rrt_nalichnymi: 'Cash',
+    rrt_unknown: 'Unknown',
+    // CSH-FE-049 (follow-up audit 2026-11-02): focusable toggle for the full
+    // refund reason (keyboard accessibility).
+    rrt_reason_expand: 'Show full reason',
     rrt_obrabotka: 'Обработка',
     // ServiceChecklist.jsx (sc_)
     sc_konsultatsiya_kardiologa: 'Консультация кардиолога',
@@ -11093,6 +11101,9 @@ const en = {
     rp_field_department: 'Отделение',
     rp_field_services: 'Услуги',
     rp_field_queue: 'Очередь',
+    // REG-FE-083 (follow-up audit 2026-11-02): honest placeholder for a queue
+    // entry without an issued ticket number — never an invented ordinal.
+    rp_queue_no_ticket: 'no ticket number',
     rp_field_status: 'Статус',
     rp_field_payment: 'Оплата',
     rp_field_amount: 'Сумма',
