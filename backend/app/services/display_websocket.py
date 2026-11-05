@@ -270,6 +270,13 @@ class DisplayWebSocketManager:
             for entry in queue_entries:
                 queue_data.append(
                     {
+                        # QR-FE-008: queue-scoped identity — каждая строка
+                        # несёт владельца (daily_queue.id) и собственный id,
+                        # чтобы табло могло влить этот per-queue сабсет в
+                        # мультиочередной борд, не затирая строки других
+                        # очередей (зеркало initial_state).
+                        "id": entry.id,
+                        "queue_id": daily_queue.id,
                         "number": entry.number,
                         "patient_name": self._format_patient_name(
                             entry.patient_name, name_format
@@ -316,6 +323,11 @@ class DisplayWebSocketManager:
                 "type": "queue_update",
                 **({"event_type": event_type} if event_type else {}),
                 "data": {
+                    # QR-FE-008: backend-owned snapshot scope — payload
+                    # описывает ровно ОДНУ дневную очередь; потребители
+                    # обязаны вливать его по queue_id, а не заменять весь
+                    # мультиочередной борд.
+                    "queue_id": daily_queue.id,
                     "doctor_name": display_owner,
                     "specialty": specialty_label,
                     "cabinet": display_cabinet,
@@ -442,6 +454,9 @@ class DisplayWebSocketManager:
                         queue_entries.append(
                             {
                                 "id": entry.id,
+                                # QR-FE-008: очередь-владелец каждой строки
+                                # снапшота — зеркало scoped-обновлений.
+                                "queue_id": queue.id,
                                 "number": entry.number,
                                 "patient_name": self._format_patient_name(
                                     entry.patient_name or "Пациент", name_format

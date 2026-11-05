@@ -199,6 +199,10 @@ export default function DisplayBoardUnified({
 
   // Состояние очереди (новое)
   const [connected, setConnected] = useState(false);
+  // QR-FE-009: была ли WS-сессия хотя бы раз успешной. Отличает
+  // «борд ещё подключается» (баннер не нужен) от устойчивой потери
+  // соединения после успешной сессии (строки могут устареть).
+  const [wsEverConnected, setWsEverConnected] = useState(false);
   const [queueData, setQueueData] = useState<QueueEntryDto[]>([]);
   const [currentCall, setCurrentCall] = useState<CurrentCall | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -347,7 +351,7 @@ export default function DisplayBoardUnified({
       const closeWS = openDisplayBoardWS(
         currentBoardId,
         handleWebSocketMessage,
-        () => setConnected(true),
+        () => { setConnected(true); setWsEverConnected(true); },
         () => setConnected(false)
       );
 
@@ -406,20 +410,51 @@ export default function DisplayBoardUnified({
           setQueueData((prev) => [...prev, newEntry]);
           logger.log(`➕ Новая запись в очереди: №${data.number ?? ''}`);
         } else {
-          // Обновляем всю очередь; RQ-24.a.2: владелец/кабинет приходят
+          // Обновляем очередь; RQ-24.a.2: владелец/кабинет приходят
           // на уровне сообщения очереди — прикрепляем к строкам, чтобы
           // одинаковые номера разных очередей были различимы на борде.
           const queueDoctor = typeof data.doctor_name === 'string' ? data.doctor_name : undefined;
           const queueSpecialty = typeof data.specialty === 'string' ? data.specialty : undefined;
           const queueCabinet = typeof data.cabinet === 'string' ? data.cabinet : undefined;
-          setQueueData(
-            (Array.isArray(data.queue_entries) ? data.queue_entries : []).map((entry) => ({
+          // QR-FE-008: событие несёт backend-owned scope (queue_id) — payload
+          // описывает ровно ОДНУ дневную очередь. Вливаем по queue_id:
+          // заменяем только строки этой очереди, строки других очередей того
+          // же борда сохраняются. Владельца не угадываем по номеру/специальности.
+          const eventQueueId = typeof data.queue_id === 'number' || typeof data.queue_id === 'string'
+            ? data.queue_id
+            : undefined;
+          // Read-model доски зеркалит контракт initial_state: видимы только
+          // waiting/called (бэкенд _send_current_state фильтрует так же),
+          // поэтому completed/cancelled/no-show строки из per-queue сабсета
+          // на борд не возвращаются.
+          const scopedEntries = (Array.isArray(data.queue_entries) ? data.queue_entries : [])
+            .filter((entry) => entry.status === 'waiting' || entry.status === 'called')
+            .map((entry) => ({
               ...entry,
+              queue_id: entry.queue_id ?? eventQueueId,
               doctor_name: entry.doctor_name ?? queueDoctor,
               specialty: entry.specialty ?? queueSpecialty,
               cabinet: entry.cabinet ?? queueCabinet,
-            })),
-          );
+            }));
+          setQueueData((prev) => {
+            if (eventQueueId === undefined) {
+              // Защита от дрифта контракта (старый бэкенд без queue_id):
+              // прежнее поведение — полная замена. Владение очередью по
+              // номеру/метке специализации не восстанавливаем.
+              return scopedEntries;
+            }
+            const kept = prev.filter((entry) => entry.queue_id !== eventQueueId);
+            // Стабильный порядок ТВ-раскладки: группировка по очереди,
+            // внутри — по номеру (стабильный sort сохраняет порядок остальных).
+            const merged = [...kept, ...scopedEntries];
+            merged.sort((a, b) => {
+              const qa = a.queue_id === undefined || a.queue_id === null ? '' : String(a.queue_id);
+              const qb = b.queue_id === undefined || b.queue_id === null ? '' : String(b.queue_id);
+              if (qa !== qb) return qa.localeCompare(qb);
+              return Number(a.number ?? 0) - Number(b.number ?? 0);
+            });
+            return merged;
+          });
         }
         break;
       }
@@ -548,23 +583,22 @@ export default function DisplayBoardUnified({
 
     const clock = setInterval(() => setNowStr(timeNow()), 1000);
 
+    // QR-FE-009: polling здесь обновляет ТОЛЬКО снапшот статистики/настроек
+    // (/board/state) — по бэкенд-контракту (backend/app/api/v1/endpoints/
+    // board.py) этот эндпоинт не несёт живых строк очереди (только
+    // агрегаты и настройки приватности). Строки/вызовы/объявления
+    // восстанавливаются исключительно через WebSocket (initial_state при
+    // каждом реконнекте). Пока WS лежит после успешной сессии, борд
+    // показывает заметный stale-баннер вместо молчаливой претензии на
+    // живые данные.
+    //
     // H-7 (Launch Blockers Audit): polling fallback MUST run in
     // board view too. Previously the condition `isBoardView ? null`
     // disabled polling entirely when the page ran on a TV/kiosk at
-    // /queue-board or /display-board, so after 5 failed WS reconnect
-    // attempts (~15s) the board silently froze on stale data until
-    // a staff member manually refreshed the page.
-    //
-    // Now polling runs unconditionally:
+    // /queue-board or /display-board. Now polling runs unconditionally:
     //   - In admin/preview view: 15s / 5s (unchanged).
     //   - In board view: 30s / 10s (slower to avoid hammering the
-    //     server from many kiosks, but fast enough that a missed WS
-    //     update is recovered within 30s — well within patient
-    //     tolerance for "where is my number?").
-    //
-    // WS remains the primary channel (instant updates); polling is
-    // the safety net for WS dropout. If both work, polling is a
-    // cheap no-op (server returns 304 / identical snapshot).
+    //     server from many kiosks).
     const boardStateIntervalMs = isBoardView
       ? Math.max(30000, Number(refreshMs || 0))
       : Math.max(15000, Number(refreshMs || 0));
@@ -826,6 +860,17 @@ export default function DisplayBoardUnified({
       {!online &&
       <div className="displayboard-banner displayboard-banner--info">
           {t('misc.dbu_offline_banner')}
+        </div>
+      }
+
+      {/* QR-FE-009: честный индикатор устаревания. REST /board/state по
+          контракту не несёт строк очереди; строки восстанавливаются только
+          WS initial_state при реконнекте. Пока WS лежит после успешной
+          сессии — показываем заметный баннер вместо молчаливой выдачи
+          возможно устаревших строк как живых. */}
+      {!connected && wsEverConnected &&
+      <div className="displayboard-banner displayboard-banner--warning" data-testid="dbu-stale-banner">
+          {t('misc.dbu_stale_ws_banner')}
         </div>
       }
 

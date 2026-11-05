@@ -35,7 +35,9 @@ def _redact_database_url(database_url: str) -> str:
         host = f"{host}:{parsed.port}"
 
     netloc = f"{username}:***@{host}" if username else host
-    return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+    return urlunsplit(
+        (parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment)
+    )
 
 
 def _is_same_database_target(left: DatabaseTarget, right: DatabaseTarget) -> bool:
@@ -92,9 +94,18 @@ def _prepare_restore_source(backup_file: Path) -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Restore a PostgreSQL backup into a clinic database")
-    parser.add_argument("--backup-file", default=os.environ.get("BACKUP_FILE") or os.environ.get("RESTORE_BACKUP_FILE"))
-    parser.add_argument("--target-database-url", default=os.environ.get("RESTORE_DATABASE_URL") or os.environ.get("DATABASE_URL"))
+    parser = argparse.ArgumentParser(
+        description="Restore a PostgreSQL backup into a clinic database"
+    )
+    parser.add_argument(
+        "--backup-file",
+        default=os.environ.get("BACKUP_FILE") or os.environ.get("RESTORE_BACKUP_FILE"),
+    )
+    parser.add_argument(
+        "--target-database-url",
+        default=os.environ.get("RESTORE_DATABASE_URL")
+        or os.environ.get("DATABASE_URL"),
+    )
     args = parser.parse_args()
 
     load_clinic_env()
@@ -156,8 +167,14 @@ def main() -> int:
                 target.user or "postgres",
                 "-d",
                 target.name,
-                "-c",
+                "-c",  # Clean (drop) database objects before recreating
                 "--if-exists",
+                # BR-011: all-or-nothing restore. --single-transaction wraps
+                # the whole restore (including the -c drops) in one
+                # transaction and implies --exit-on-error, so a mid-restore
+                # failure leaves the target unmodified instead of leaving a
+                # partly dropped/recreated database behind.
+                "--single-transaction",
                 str(restore_source),
             ]
 

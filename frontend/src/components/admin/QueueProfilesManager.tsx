@@ -275,6 +275,10 @@ const queueProfileDeleteErrorMessage = (
     }
 };
 
+// QR-FE-024: единый дефолт цвета профиля — один литерал на файл (UI ratchet
+// tsxHex), его переиспользуют и инлайн-бейдж строки, и форма, и edit-baseline.
+const QUEUE_PROFILE_DEFAULT_COLOR = '#718096';
+
 const getQueueProfileDisplayName = (profile: QueueProfileDto): string =>
     profile.name?.trim() || profile.title_ru?.trim() || profile.title?.trim() || profile.key;
 
@@ -1332,7 +1336,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                     <div
                                         role="img"
                                         aria-label={t('admin2.qp_color_aria', { name: getQueueProfileDisplayName(profile), color: profile.color || t('admin2.qp_color_not_set') })}
-                                        className="admin-w-16-h-16-radius-50pct-bd-2px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': profile.color || '#718096' } as CSSProperties}
+                                        className="admin-w-16-h-16-radius-50pct-bd-2px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': profile.color || QUEUE_PROFILE_DEFAULT_COLOR } as CSSProperties}
                                         title={profile.color}
                                     />
                                 </td>
@@ -1764,10 +1768,32 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
         is_active: profile?.is_active !== false,
         show_on_qr_page: isEdit ? profile?.show_on_qr_page !== false : false, // New profiles remain hidden until a later explicit edit
         icon: profile?.icon || 'Package',
-        color: profile?.color || '#718096',
+        color: profile?.color || QUEUE_PROFILE_DEFAULT_COLOR,
     });
     const dialogContentRef = useRef<HTMLDivElement>(null);
     const wasSavingRef = useRef(Boolean(saving));
+    // QR-FE-024: базовый снимок профиля на момент открытия диалога,
+    // нормализованный так же, как сабмит. Edit-сабмит шлёт только
+    // изменённые поля: полный PUT пересылает устаревшие is_active/
+    // show_on_qr_page и может отменить явную отмену публикации/архивацию
+    // другим админом (бэкенд трактует любое присланное availability-поле
+    // как запрос изменения доступности).
+    const [editBaseline] = useState<Record<string, unknown> | null>(() => (
+        isEdit
+            ? {
+                key: profile?.key || '',
+                title: profile?.title || '',
+                title_ru: profile?.title_ru || '',
+                queue_tags: ((profile?.queue_tags as unknown[]) || []).map((tag) => String(tag).trim()).filter(Boolean),
+                department_key: profile?.department_key || '',
+                display_order: parseInt(String(profile?.order ?? 0), 10) || 0,
+                is_active: profile?.is_active !== false,
+                show_on_qr_page: profile?.show_on_qr_page !== false,
+                icon: profile?.icon || 'Package',
+                color: profile?.color || QUEUE_PROFILE_DEFAULT_COLOR,
+            }
+            : null
+    ));
 
     useEffect(() => {
         const wasSaving = wasSavingRef.current;
@@ -1839,13 +1865,38 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (onSubmit) {
-            onSubmit({
-                ...formData,
-                queue_tags: String(formData.queue_tags || '').split(',').map((t: string) => t.trim()).filter(Boolean),
-                display_order: parseInt(String(formData.display_order), 10) || 0,
-            });
+        if (!onSubmit) return;
+
+        const normalized: Record<string, unknown> = {
+            ...formData,
+            queue_tags: String(formData.queue_tags || '').split(',').map((t: string) => t.trim()).filter(Boolean),
+            display_order: parseInt(String(formData.display_order), 10) || 0,
+        };
+
+        if (editBaseline) {
+            // QR-FE-024: field-level dirty payload — неизменённые поля не
+            // отправляются, поэтому бэкенд (PUT с exclude_unset) никогда
+            // не трактует устаревшие is_active/show_on_qr_page как свежий
+            // запрос доступности поверх конкурирующего изменения другого
+            // админа. Владение pub/active-переходами остаётся на бэкенде.
+            const dirty: Record<string, unknown> = {};
+            for (const [field, baselineValue] of Object.entries(editBaseline)) {
+                const current = normalized[field];
+                if (JSON.stringify(current) !== JSON.stringify(baselineValue)) {
+                    dirty[field] = current;
+                }
+            }
+            if (Object.keys(dirty).length === 0) {
+                // Нечего сохранять — честный no-op без PUT и без мнимого
+                // «сохранения».
+                onCancel?.();
+                return;
+            }
+            onSubmit(dirty);
+            return;
         }
+
+        onSubmit(normalized);
     };
     return createPortal((
         <Dialog
