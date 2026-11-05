@@ -9015,6 +9015,7 @@ const uzLatn = {
     dbu_title_contrast: "Kontrast rejimi",
     dbu_title_switch_lang: "Tilni almashtirish",
     dbu_offline_banner: "Ulanish yoʻq. Keshdan maʼlumotlar koʻrsatilmoqda.",
+    dbu_stale_ws_banner: "Tablo aloqasi uzildi — maʼlumotlar eskirgan boʻlishi mumkin.",
     dbu_queue_called_at: "Chaqirilgan: {time}",
     dbu_queue_created_at: "Yozilgan: {time}",
     dbu_source_online: "📱 Onlayn",
