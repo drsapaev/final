@@ -58,7 +58,11 @@ def _wait_for_backend_ready(*, timeout_seconds: int = 120, interval_seconds: int
             last_error = str(exc)
         time.sleep(interval_seconds)
 
-    fail(
+    # BR-008: fail() raises SystemExit, which is a BaseException and escapes
+    # the `except Exception` rollback supervisor in main() — a readiness
+    # timeout after deploy/migrations would skip rollback entirely. Signal an
+    # ordinary lifecycle error so the supervisor handles it and rolls back.
+    raise LifecycleError(
         "Backend did not become ready after deploy within "
         f"{timeout_seconds}s. Last error: {last_error or 'unknown'}"
     )
