@@ -123,6 +123,34 @@
 - **Fail-first test:** in a temporary synthetic directory create a `.dump` sentinel and a separate `.dump.gz` fixture with differing bytes, mock `pg_restore`, and assert the original sentinel remains identical. Repeat with truncated gzip and assert no extracted plaintext or partial file is left after failure. No real backup material.
 - **Suggested fix:** decompress to a securely created private temporary artifact outside the backup directory, with restricted permissions and guaranteed `finally` cleanup, and never allow extraction to overwrite existing backup files. Keep the source archive immutable.
 
+### BR-017 — P1 candidate, destructive cleanup — DR drill drops a database not created by this run
+
+- **Source:** `backend/app/scripts/dr_drill.py:132–145` lets `DRILL_DB_DROP_ON_START=0` skip initial removal, but still calls `CREATE DATABASE` with `check=False`. `main():266–276` always invokes `cleanup_drill_db()` in `finally`; that function executes `DROP DATABASE IF EXISTS "<DRILL_DB_NAME>"` regardless of whether the current run created the database.
+- **Failure precondition:** an existing non-source database is named as `DRILL_DB_NAME` while `DRILL_DB_DROP_ON_START=0`; the `CREATE` fails because it exists, but the run can later delete that preexisting DB in `finally`. BR-012 covers accidental source-DB collision; this distinct finding covers **ownership of a non-source preexisting target**. PostgreSQL privileges and active connections determine whether the DROP completes.
+- **Fail-first test:** mock command execution with `DRILL_DB_DROP_ON_START=0` and an existing synthetic target; assert no destructive cleanup is issued when the current run did not create that target. Also test explicit `DRILL_KEEP_DB` behavior.
+- **Suggested fix:** track a verified, per-run scratch DB identity and creation success; only drop a DB owned by this run and never treat `check=False` failure as ownership proof. Fail closed before restore if target provisioning fails.
+
+### BR-018 — P1 candidate, cross-run file corruption — Failed backup deletes other workers' `*.tmp` files
+
+- **Source:** `backend/app/services/backup_service.py:209,329–336` writes the current `backup_<type>_<timestamp>.db.tmp` and on **any** exception loops over `self.backup_dir.glob("*.tmp")` deleting every match. `backend/app/services/scheduled_backup.py` starts backups in a daemon job; `backend/app/api/v1/endpoints/backup_management.py` independently allows an Admin to request another backup.
+- **Failure precondition:** two backup writers share the directory; job A fails while job B is writing its own `.tmp`. A's handler can unlink B's live temporary archive, causing B to fail or lose its output. Existing `backend/tests/unit/test_backup_atomic_and_retention.py:41–61` verifies that one failed attempt leaves no temp file but does **not** protect another worker's file.
+- **Fail-first test:** use two synthetic uniquely named temporary backup files in a temporary directory; trigger A's failure with mocked `pg_dump`; assert B's bytes and path remain unchanged, and only A's own temp file is removed.
+- **Suggested fix:** use an exclusive per-operation temporary filename and remove only that operation's file; add a same-directory concurrent writer regression and collision-safe final publication. Do not broaden this into deleting user-owned or other sessions' artifacts.
+
+### BR-019 — P1 candidate, verify contract — PostgreSQL `.db[.gz]` backups are interpreted as SQLite
+
+- **Source:** `backend/app/services/backup_service.py:206,246–262` writes PostgreSQL **custom-format** archives (`pg_dump -F c`) with `.db` filename, commonly gzip-compressed to `.db.gz`. In `verify_backup():531–557` both suffixes enter a **SQLite** verification path (`sqlite3.connect(...); PRAGMA integrity_check`) without inspecting `DATABASE_URL` or the archive magic.
+- **Consequence:** valid PostgreSQL custom-format dumps typically return `{"valid": false}` with SQLite's `file is not a database`, even though an actual `pg_restore --list` could read the archive. The Admin `GET /backup/verify/{backup_filename}` consumer thus gives a misleading recovery-readiness verdict. Other formats only receive a nonzero-size test.
+- **Fail-first test:** create a tiny **synthetic** PostgreSQL custom archive in disposable PostgreSQL and verify that `verify_backup` reports valid without SQLite; separately verify a corrupted PGDMP and an actual SQLite archive both take their correct format-specific paths. No real patient backups.
+- **Suggested fix:** distinguish formats via verified file signature and declared provenance, use `pg_restore --list` for PostgreSQL custom archives, SQLite `PRAGMA integrity_check` only for SQLite, and ensure integrity/listability is not misrepresented as a full restore proof.
+
+### BR-020 — P1 candidate, production integrity — Admin backup restore runs nontransactional `pg_restore -c` against the active DB
+
+- **Source:** `backend/app/api/v1/endpoints/backup_management.py:64–82` exposes an Admin-only `POST /backup/restore/{backup_filename}`. `backend/app/services/backup_service.py:419–502` first attempts a safety backup, but then invokes `pg_restore -d <DATABASE_URL db> -c <archive>` directly, without a maintenance/quiescence gate, isolated database target, explicit all-or-nothing transaction, or postrestore identity/consistency proof.
+- **Failure precondition:** live connections, archive errors, or mismatched schema/owners trigger some SQL errors after earlier objects were dropped/recreated. Checking `returncode` and having a safety backup are useful defenses, but **do not revert partially committed restore statements**. This is a separate Admin API pathway from BR-011's VPS restore script, sharing the underlying atomicity problem.
+- **Fail-first test:** use only a disposable PG instance with a synthetic pre-restore dataset and intentionally incompatible restore object; assert failure leaves the original database intact and never emits success. Verify Admin RBAC positive and denied-role negative cases independently.
+- **Suggested fix:** use a controlled maintenance workflow with verified source backup, isolated target, compatibility check and explicit swap/promotion; use transactional restore semantics where supported. Do not invoke on a live clinic database in a test or to collect review evidence.
+
 ## Existing defenses / limits
 
 - `restore_db.py` already has a safety check for matching normalized host/port/database; BR-002 addresses aliases and the explicit bypass, not an absent check.
@@ -140,11 +168,13 @@
 5. **Update rollback supervision:** BR-008 and BR-009, with synthetic readiness timeout, rollback verification and schema compatibility gates; never restore a production DB automatically.
 6. **Transactional restore and DR safety:** BR-011–013. Fail closed before any destructive operation, require a fresh target, and use synthetic negative paths for subprocess exit status.
 7. **Production-backup evidence gap:** BR-014. Keep synthetic CI smoke separate from a controlled restore proof of the actual protected backup chain.
-8. **DR leftover state and gzip archive safety:** BR-015 and BR-016. Preserve backup artifacts, enforce temporary-file cleanup and report failed test DB removal.
+8. **DR leftover state and gzip archive safety:** BR-015–017. Preserve backup artifacts, enforce per-run database and temporary-file ownership, and report failed test DB removal.
+9. **Service backup concurrency and format correctness:** BR-018–019. Protect other writers' temp files and verify PostgreSQL archives using PostgreSQL tools.
+10. **Admin restore safety:** BR-020. Require isolated synthetic full-restore proof and explicit clinical maintenance/rollback policy before repairing live-restore behavior.
 
 ## Verification and rollback
 
-- **Performed:** read exact GitHub `main` sources and runbooks; checked scopes, existing explicit restore guard, alternative encrypted backup workflow, backend DR drill (including cleanup and gzip branches) and dedicated synthetic GitHub Actions workflow; checked official PostgreSQL `psql` and `pg_restore` error/transaction behavior. Source anchors refer to main `503cc1e`.
+- **Performed:** read exact GitHub `main` sources and runbooks; checked scopes, existing explicit restore guard, encrypted backup alternative, backend DR drill including cleanup/gzip, scheduled and Admin backup writers, service verification/restore and unit-test coverage, and the synthetic GitHub Actions workflow; consulted repo security/testing skills. Existing source hashes for these paths were unchanged at review time; original base was `503cc1e`.
 - **Not performed:** local `git status`, gate execution, `git diff --check`, pytest, PostgreSQL commands, archive creation, real restore, E2E smoke, CI, protected source changes, production actions.
 - **Stop condition:** no source repair, rollout, restore, or merge until safe isolation and mandatory gate evidence are available.
 - **Rollback for this document only:** close its Draft PR or revert this one docs-only commit; no deployed behavior changes.
