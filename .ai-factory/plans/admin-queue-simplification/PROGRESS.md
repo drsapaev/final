@@ -1,6 +1,33 @@
 # Progress — T18 integrated synthetic acceptance
 
 Plan version: 1.0
+Current task: T18 integrated synthetic acceptance; `specialists` legacy navigation evidence
+Current status: IN_PROGRESS; T18.10 VALIDATED on the tested source below; overall T18 and Tier-2 remain PARTIAL
+Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-specialists-check/final
+Branch: codex/aqs-t18-specialists-check
+Base and tested runtime commit: `a9c25f5b9c25f52d12aed4fc22b74874dc441a3f` (merged PR #3873)
+Last updated: 2026-11-05T12:01:20+05:00
+
+## Current checkpoint — T18.10 `specialists` navigation
+
+| Task | Status | Evidence |
+|------|--------|----------|
+| T18.10 | VALIDATED on `a9c25f5b` | Focused synthetic Session and teardown, recorded in `EVIDENCE.md` |
+| T18 overall | PARTIAL | Broader remaining checks and full staging runbook remain open |
+
+- One completed isolated synthetic Session on the tested runtime commit passed normal Admin password plus TOTP enrollment/verification, initial database-backed catalog loading with the real `specialists` row, and all four legacy Admin entry URLs.
+- The real selected `specialists` direction supplied an outbound editor link. Profile, section and day survived the editor, tab changes, reload, Back/Forward and return to the selected direction. Deleting the linked profile returned a readable protected HTTP 409; the row remained, and no profile mutation other than the rejected DELETE was observed. No uncaught page errors were observed.
+- The served `/sw.js` contained the tested SHA; all 58 captured JS/CSS response bodies matched the corresponding files in the owned frontend container. This is a separate bounded comparison: the canonical launcher's `served_revision_verified` remains `false`.
+- Canonical Session teardown reported 5 containers, 3 volumes and 1 network removed, with zero remaining owned resources; the three selected ports were no longer listening. The task-owned synthetic env file was removed. The two env files from the separately retained prior worktree remain outside this scope.
+- T18.10 is VALIDATED for `a9c25f5b` by this complete focused run. The full `docs/runbooks/STAGING_VALIDATION.md`, remaining broader T18 checks, and production validation are not implied by this result; overall Tier-2 remains PARTIAL as the user directed.
+- Two earlier attempts were cleaned up. The first stopped at a temporary PowerShell native-stderr exception; the second passed 2FA, profile loading, cabinets and settings but timed out during direction selection. An unchanged-date React behavior was reproduced independently, the temporary harness was corrected, and the third Session passed. Details and limits are in `EVIDENCE.md`.
+- Next exact action: identify this branch's evidence PR and verify its exact-head checks; merge remains with the user. After that PR is merged, refresh `origin/main` and continue only the remaining T18 gaps; do not deploy or claim complete Tier-2.
+
+---
+
+## Previous checkpoint — PR #3873 review correction (historical metadata)
+
+Plan version: 1.0
 Current task: T18 integrated synthetic acceptance; cross-cutting Admin setup checks in existing PR #3873
 Current status: IN_PROGRESS; PR #3873 review correction in progress; T18.10 and overall T18 remain PARTIAL; user owns merge
 Merged PRs: #3861 at bfc33837cd3028f1989b2462a998b16505a62fd6; #3865 at 64a7c0b9ce422bbdac73d919158eb525669d9229
@@ -12,7 +39,7 @@ Runtime source exercised: `cbd8c64241c7a80f02b4728e63d2d132a55d708c`; its fronte
 Last updated: 2026-11-05T10:45:07+05:00
 Tier-2: PARTIAL; no deferral accepted. User retains merge and deployment authority.
 
-## Current checkpoint — PR #3873 T18.10 review correction
+### PR #3873 T18.10 review correction
 
 - Review #5780355730 correctly identified that canonical T18.10 explicitly includes profile key `specialists`, its initial load, typed return context, reload, Back/Forward, four old URLs, and a readable protected 409. The earlier statement that this key was outside the checklist was incorrect.
 - T18.10 is PARTIAL. The combined synthetic run at `64a7c0b9ce422bbdac73d919158eb525669d9229` passed the four legacy URLs and a linked-profile DELETE 409 with the row retained. T11 r8 separately passed an initial `specialists` catalog GET and a readable real DELETE 409 with row preservation at `acb509c36a9583f917bc86d601120bef95eddc1e`.
