@@ -203,17 +203,9 @@ const IntegratedDoctorSelector = ({
     <div className={`space-y-4 ${className}`}>
       {settingsWarning && (
         <div
-          className="ids-settings-warning"
+          className="ids-settings-warning p-3 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm text-gray-600 dark:text-gray-400"
           data-testid="ids-settings-warning"
-          role="status"
-          style={{
-            padding: '8px 12px',
-            borderRadius: 8,
-            border: '1px solid #d8dde8',
-            background: '#f5f5f7',
-            fontSize: 13,
-            color: '#1a1d29'
-          }}>
+          role="status">
           Настройки очереди недоступны — лимиты онлайн-записи не показаны. Врачи доступны для выбора.
         </div>
       )}

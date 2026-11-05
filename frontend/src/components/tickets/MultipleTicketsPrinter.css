@@ -243,9 +243,9 @@
   margin-bottom: 8px;
   padding: 8px 12px;
   border-radius: 8px;
-  border: 1px solid var(--mac-border, #d8dde8);
-  background: var(--mac-bg-tertiary, #f5f5f7);
-  color: var(--mac-text-primary, #1a1d29);
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-tertiary);
+  color: var(--mac-text-primary);
   font-size: 13px;
   line-height: 1.4;
   text-align: left;

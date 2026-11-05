@@ -47,7 +47,7 @@
   padding: 0 6px;
   border: none;
   background: transparent;
-  color: var(--mac-accent-blue, #007aff);
+  color: var(--mac-accent-blue);
   font-size: 12px;
   cursor: pointer;
   border-radius: 4px;
@@ -58,7 +58,7 @@
 }
 
 .refund-reason-toggle:focus-visible {
-  outline: 2px solid var(--mac-accent-blue, #007aff);
+  outline: 2px solid var(--mac-accent-blue);
   outline-offset: 2px;
 }
 
