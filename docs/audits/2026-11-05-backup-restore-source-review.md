@@ -94,7 +94,8 @@
 1. **Fail-closed correctness:** BR-001, BR-007 and BR-010, with synthetic SQL/gzip/collision cases. Verify direct helper behavior and negative cases before repair.
 2. **Restore isolation/identity:** BR-002, BR-003, BR-005. Require mandatory production/security gate and a clean disposable PostgreSQL integration test.
 3. **Full clinic recovery:** BR-004, with synthetic upload roots and DB/file consistency evidence; define storage ownership and failure semantics first.
-4. **Artifact confidentiality:** BR-006 after confirming actual deployment permissions and encrypted backup/key-recovery requirements.\n5. **Update rollback supervision:** BR-008 and BR-009, with synthetic readiness timeout, rollback verification and schema compatibility gates; never restore a production DB automatically.
+4. **Artifact confidentiality:** BR-006 after confirming actual deployment permissions and encrypted backup/key-recovery requirements.
+5. **Update rollback supervision:** BR-008 and BR-009, with synthetic readiness timeout, rollback verification and schema compatibility gates; never restore a production DB automatically.
 
 ## Verification and rollback
 
