@@ -24,7 +24,7 @@ const syntheticProfile = {
   is_active: true,
   show_on_qr_page: true,
   icon: 'Heart',
-  color: '#E53E3E',
+  color: 'synthetic-crimson',
 };
 
 vi.mock('@/api/client', () => {

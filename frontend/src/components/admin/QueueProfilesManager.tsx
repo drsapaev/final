@@ -275,6 +275,10 @@ const queueProfileDeleteErrorMessage = (
     }
 };
 
+// QR-FE-024: единый дефолт цвета профиля — один литерал на файл (UI ratchet
+// tsxHex), его переиспользуют и инлайн-бейдж строки, и форма, и edit-baseline.
+const QUEUE_PROFILE_DEFAULT_COLOR = '#718096';
+
 const getQueueProfileDisplayName = (profile: QueueProfileDto): string =>
     profile.name?.trim() || profile.title_ru?.trim() || profile.title?.trim() || profile.key;
 
@@ -1332,7 +1336,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                                     <div
                                         role="img"
                                         aria-label={t('admin2.qp_color_aria', { name: getQueueProfileDisplayName(profile), color: profile.color || t('admin2.qp_color_not_set') })}
-                                        className="admin-w-16-h-16-radius-50pct-bd-2px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': profile.color || '#718096' } as CSSProperties}
+                                        className="admin-w-16-h-16-radius-50pct-bd-2px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': profile.color || QUEUE_PROFILE_DEFAULT_COLOR } as CSSProperties}
                                         title={profile.color}
                                     />
                                 </td>
@@ -1764,7 +1768,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
         is_active: profile?.is_active !== false,
         show_on_qr_page: isEdit ? profile?.show_on_qr_page !== false : false, // New profiles remain hidden until a later explicit edit
         icon: profile?.icon || 'Package',
-        color: profile?.color || '#718096',
+        color: profile?.color || QUEUE_PROFILE_DEFAULT_COLOR,
     });
     const dialogContentRef = useRef<HTMLDivElement>(null);
     const wasSavingRef = useRef(Boolean(saving));
@@ -1786,7 +1790,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                 is_active: profile?.is_active !== false,
                 show_on_qr_page: profile?.show_on_qr_page !== false,
                 icon: profile?.icon || 'Package',
-                color: profile?.color || '#718096',
+                color: profile?.color || QUEUE_PROFILE_DEFAULT_COLOR,
             }
             : null
     ));
