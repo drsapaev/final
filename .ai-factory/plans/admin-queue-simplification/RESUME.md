@@ -6,7 +6,9 @@ T18.10 is VALIDATED on that exact runtime commit: one final owned synthetic Sess
 
 Two earlier attempts ended with successful teardown but did not pass the whole scenario: a temporary PowerShell native-stderr exception, then a direction-selection timeout after partial browser passes. A same-date React input issue was independently reproduced; the temporary harness now uses a different date and waits for asset captures before navigation. Final Session teardown removed 5 containers, 3 volumes and 1 network with zero owned resources remaining; selected ports were free and this task's synthetic env was removed. The older retained worktree and its two policy-blocked env files were not touched.
 
-Allowed authored paths remain `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`; runtime, tracked tests, production, merge and deployment were outside this validation scope. Next: identify the evidence PR for this branch and verify its exact-head checks. User retains merge. After merge, refresh `origin/main` and continue remaining broader T18 work. Overall Tier-2 and the full staging runbook remain PARTIAL/NOT_RUN; do not claim deployment or system health.
+The earlier RQ-18 lifecycle passed an anonymous QR join on `38ecd429`; source comparison shows `QueueJoin.tsx` changed afterward in #3876/#3877. The `specialists` Session did not rerun that patient flow on `a9c25f5b`; this is an evidence gap, not a proven defect. After this PR is merged, refresh `origin/main` and assess a bounded synthetic current-source RQ-18 public join/lifecycle run without repeating unrelated validated scenarios.
+
+Allowed authored paths remain `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`; runtime, tracked tests, production, merge and deployment were outside this validation scope. Next: identify the evidence PR for this branch and verify its exact-head checks. User retains merge. Overall Tier-2 and the full staging runbook remain PARTIAL/NOT_RUN; do not claim deployment or system health.
 
 ---
 

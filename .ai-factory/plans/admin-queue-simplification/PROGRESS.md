@@ -13,6 +13,7 @@ Last updated: 2026-11-05T12:01:20+05:00
 | Task | Status | Evidence |
 |------|--------|----------|
 | T18.10 | VALIDATED on `a9c25f5b` | Focused synthetic Session and teardown, recorded in `EVIDENCE.md` |
+| T18 public QR join | Current-source live check NOT_RUN | Earlier RQ-18 join passed on `38ecd429`; `QueueJoin.tsx` changed afterward |
 | T18 overall | PARTIAL | Broader remaining checks and full staging runbook remain open |
 
 - One completed isolated synthetic Session on the tested runtime commit passed normal Admin password plus TOTP enrollment/verification, initial database-backed catalog loading with the real `specialists` row, and all four legacy Admin entry URLs.
@@ -20,8 +21,9 @@ Last updated: 2026-11-05T12:01:20+05:00
 - The served `/sw.js` contained the tested SHA; all 58 captured JS/CSS response bodies matched the corresponding files in the owned frontend container. This is a separate bounded comparison: the canonical launcher's `served_revision_verified` remains `false`.
 - Canonical Session teardown reported 5 containers, 3 volumes and 1 network removed, with zero remaining owned resources; the three selected ports were no longer listening. The task-owned synthetic env file was removed. The two env files from the separately retained prior worktree remain outside this scope.
 - T18.10 is VALIDATED for `a9c25f5b` by this complete focused run. The full `docs/runbooks/STAGING_VALIDATION.md`, remaining broader T18 checks, and production validation are not implied by this result; overall Tier-2 remains PARTIAL as the user directed.
+- Next T18 gap identified by source comparison: the previously passing synthetic RQ-18 lifecycle at `38ecd429` included an anonymous `QueueJoin` booking. `frontend/src/pages/QueueJoin.tsx` subsequently changed in #3876 and #3877, so the prior live result does not by itself establish the patient join on `a9c25f5b`. No current-source QR join was run in this slice; no product defect is inferred. Keep the earlier Admin publication/address/archive evidence tied to its tested source.
 - Two earlier attempts were cleaned up. The first stopped at a temporary PowerShell native-stderr exception; the second passed 2FA, profile loading, cabinets and settings but timed out during direction selection. An unchanged-date React behavior was reproduced independently, the temporary harness was corrected, and the third Session passed. Details and limits are in `EVIDENCE.md`.
-- Next exact action: identify this branch's evidence PR and verify its exact-head checks; merge remains with the user. After that PR is merged, refresh `origin/main` and continue only the remaining T18 gaps; do not deploy or claim complete Tier-2.
+- Next exact action: identify this branch's evidence PR and verify its exact-head checks; merge remains with the user. After that PR is merged, refresh `origin/main`, assess and run a bounded synthetic RQ-18 public QR join/lifecycle check on the then-current source, and continue remaining T18 gaps; do not deploy or claim complete Tier-2.
 
 ---
 
