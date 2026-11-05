@@ -21,9 +21,11 @@ Usage:
         python backend/app/scripts/dr_drill.py
 
 Exit codes:
-    0 = drill passed
+    0 = drill passed and cleanup verified
     1 = drill failed (see logs)
     2 = preconditions not met (no backup found, no pg_restore, etc.)
+    3 = drill passed but cleanup FAILED — leftover scratch database needs
+        manual removal (BR-015)
 
 Env vars:
     BACKUP_FILE            — explicit backup path (optional; default: latest in backups/)
@@ -259,7 +261,15 @@ def smoke_test_drill_db(user: str, password: str, host: str, port: int) -> None:
 
 
 def cleanup_drill_db(user: str, password: str, host: str, port: int) -> None:
-    """Drop the drill DB (best-effort)."""
+    """Drop the drill DB — BR-015: checked and verified.
+
+    The historical best-effort DROP ran with ``check=False`` and the drill
+    still exited 0, so a failed cleanup silently left the restored database
+    (potentially holding confidential backup content) on the server. The
+    DROP is now checked (``-v ON_ERROR_STOP=1``) and its effect is verified
+    against ``pg_database``; any failure propagates to the drill verdict.
+    ``DRILL_KEEP_DB=1`` stays the explicit, clearly logged retain opt-out.
+    """
     if os.getenv("DRILL_KEEP_DB", "0") == "1":
         log.info("DRILL_KEEP_DB=1 — leaving drill DB '%s' in place for inspection.", DRILL_DB_NAME)
         return
@@ -268,10 +278,21 @@ def cleanup_drill_db(user: str, password: str, host: str, port: int) -> None:
     env["PGPASSWORD"] = password
     log.info("Cleaning up drill DB '%s'...", DRILL_DB_NAME)
     _run(
-        ["psql", "-h", host, "-p", str(port), "-U", user, "-d", "postgres", "-c", f"DROP DATABASE IF EXISTS \"{DRILL_DB_NAME}\";"],
+        ["psql", "-v", "ON_ERROR_STOP=1", "-h", host, "-p", str(port), "-U", user, "-d", "postgres", "-c", f"DROP DATABASE IF EXISTS \"{DRILL_DB_NAME}\";"],
         env=env,
-        check=False,
+        check=True,
     )
+    # BR-015: verify the database is actually gone — a silently failed DROP
+    # must not let the drill claim a clean server.
+    verify = _run(
+        ["psql", "-tAc", f"SELECT 1 FROM pg_database WHERE datname = '{DRILL_DB_NAME}';"],
+        env=env,
+        check=True,
+    )
+    if verify.stdout.strip():
+        raise RuntimeError(
+            f"drill database '{DRILL_DB_NAME}' still exists after DROP — leftover state"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -322,7 +343,21 @@ def main() -> None:
         _exit(1, f"DR drill FAILED: {e}")
     finally:
         if drill_created:
-            cleanup_drill_db(user, password, host, port)
+            try:
+                cleanup_drill_db(user, password, host, port)
+            except Exception as cleanup_exc:
+                # BR-015: a failed cleanup must be visible in the process
+                # verdict — exit 3 means "the restore proved restorable but
+                # the scratch database is LEFTOVER and needs operator
+                # removal". Never certify a clean server silently.
+                log.error(
+                    "⚠️ LEFTOVER DATABASE: cleanup of '%s' failed: %s — "
+                    "remove it manually; the restored drill database may hold "
+                    "confidential backup content.",
+                    DRILL_DB_NAME,
+                    cleanup_exc,
+                )
+                sys.exit(3)
         else:
             log.warning(
                 "Skipping drill DB cleanup: this run did not create '%s' "
