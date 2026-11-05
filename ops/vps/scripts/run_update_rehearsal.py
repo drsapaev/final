@@ -35,11 +35,15 @@ def _invoke(script_name: str, *, extra_env: dict[str, str] | None = None) -> str
     env = os.environ.copy()
     if extra_env:
         env.update(extra_env)
-    result = run_command([sys.executable, str(_script(script_name))], cwd=app_root(), env=env)
+    result = run_command(
+        [sys.executable, str(_script(script_name))], cwd=app_root(), env=env
+    )
     return result.stdout
 
 
-def _wait_for_backend_ready(*, timeout_seconds: int = 120, interval_seconds: int = 5) -> None:
+def _wait_for_backend_ready(
+    *, timeout_seconds: int = 120, interval_seconds: int = 5
+) -> None:
     deadline = time.monotonic() + timeout_seconds
     health_url = f"{backend_url()}/api/v1/health"
     last_error: str | None = None
@@ -48,7 +52,10 @@ def _wait_for_backend_ready(*, timeout_seconds: int = 120, interval_seconds: int
         try:
             status, payload, raw = http_json("GET", health_url, timeout=10)
             if status == 200 and isinstance(payload, dict):
-                health_ok = payload.get("status") in {"ok", "healthy", True} or payload.get("ok") is True
+                health_ok = (
+                    payload.get("status") in {"ok", "healthy", True}
+                    or payload.get("ok") is True
+                )
                 if health_ok:
                     return
                 last_error = f"unexpected health payload: {payload}"
@@ -78,6 +85,7 @@ def main() -> int:
     rollback_ref = os.environ.get("ROLLBACK_REF") or git_head(app_root())
     baseline_ref = git_head(app_root())
     backup_dir = os.environ.get("BACKUP_DIR")
+    backup_file: str | None = None
 
     try:
         backup_stdout = _invoke(
@@ -92,11 +100,18 @@ def main() -> int:
         _invoke("run_migrations.py")
         _wait_for_backend_ready()
         _invoke("health_check.py", extra_env={"EXPECTED_SETUP_INITIALIZED": "1"})
-        _invoke("smoke_post_update.py", extra_env={"SMOKE_REQUIRE_LOGIN": os.environ.get("SMOKE_REQUIRE_LOGIN", "1")})
+        _invoke(
+            "smoke_post_update.py",
+            extra_env={
+                "SMOKE_REQUIRE_LOGIN": os.environ.get("SMOKE_REQUIRE_LOGIN", "1")
+            },
+        )
     except Exception as exc:
         rollback_extra = {"ROLLBACK_REF": rollback_ref}
         if os.environ.get("ROLLBACK_RUN_MIGRATIONS"):
-            rollback_extra["ROLLBACK_RUN_MIGRATIONS"] = os.environ["ROLLBACK_RUN_MIGRATIONS"]
+            rollback_extra["ROLLBACK_RUN_MIGRATIONS"] = os.environ[
+                "ROLLBACK_RUN_MIGRATIONS"
+            ]
         try:
             _invoke("rollback_release.py", extra_env=rollback_extra)
         except Exception as rollback_exc:
@@ -104,7 +119,26 @@ def main() -> int:
                 f"Update rehearsal failed: {exc}. "
                 f"Rollback to {rollback_ref} also failed: {rollback_exc}"
             )
-        fail(f"Update rehearsal failed and was rolled back to {rollback_ref}: {exc}")
+        # BR-009: a code checkout is not a database rollback.
+        # rollback_release.py runs `git checkout` (+ an optional alembic
+        # UPGRADE), so after a non-backward-safe forward migration the old
+        # code would run against a newer schema. Never claim a restored or
+        # compatible database here — name the pre-update backup and leave the
+        # restore decision to the operator.
+        print("UPDATE_ROLLBACK_SCOPE=code-only", flush=True)
+        print("UPDATE_DATABASE_RESTORED=no", flush=True)
+        print(
+            f"UPDATE_BACKUP_FILE_FOR_MANUAL_RESTORE={backup_file or 'not-created'}",
+            flush=True,
+        )
+        fail(
+            f"Update rehearsal failed: {exc}. Code was rolled back to "
+            f"{rollback_ref}; the database was NOT restored and schema "
+            f"compatibility is not established (pre-update backup: "
+            f"{backup_file or 'not-created'}). Follow the update runbook's "
+            "manual restore protocol if the release migrations were not "
+            "backward-safe."
+        )
 
     print(f"UPDATE_BASELINE_REF={baseline_ref}", flush=True)
     print(f"UPDATE_RELEASE_REF={update_ref}", flush=True)
