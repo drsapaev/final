@@ -109,6 +109,20 @@
 - **Test first:** retain CI synthetic smoke but add a separately authorized, isolated restore rehearsal of a sanitized or approved production-equivalent backup, with source identity and storage manifest assertions. Do not copy PHI into CI or expose R2 credentials in untrusted workflow contexts.
 - **Suggested fix:** label CI as synthetic restore proof; monitor real backup-chain freshness/manifest and conduct separately controlled off-host recovery drills to validate end-to-end RPO/RTO.
 
+### BR-015 — P2, privacy/cleanup — DR drill can report success while leaving an undeleted restore database
+
+- **Source:** `backend/app/scripts/dr_drill.py:237–250` implements `cleanup_drill_db()` with `psql -c DROP DATABASE ...`, `check=False` and no `returncode` inspection. `main():266–276` calls `_exit(0, "DR drill PASSED ...")` before cleanup in `finally`; `DRILL_KEEP_DB=1` is a separate intentional opt-out and is not the defect.
+- **Consequence:** if cleanup fails (e.g. PostgreSQL connections remain open or DROP lacks permission), the process still exits successfully, leaving the restored database on the target server. When the drill is manually run against a confidential backup, retained PHI/PII may outlive the intended test. The checked-in GitHub Actions workflow uses demo records; no claim is made that CI currently leaks production data.
+- **Fail-first test:** mock a clean successful restore and smoke followed by an unsuccessful DROP. Require an explicit cleanup-failure status and an operator-visible leftover-database signal. Independently test that `DRILL_KEEP_DB=1` deliberately preserves the scratch database with an unambiguous retained-state verdict.
+- **Suggested fix:** inspect cleanup subprocess status, verify the database was removed (or explicitly retained by policy), and reflect failures in overall drill status. Use isolation and a bounded cleanup/connection termination policy; never silently drop a live database.
+
+### BR-016 — P1 candidate, archive integrity/privacy — Gzip drill extraction overwrites an adjacent archive and leaves plaintext behind
+
+- **Source:** `backend/app/scripts/dr_drill.py:152–158`: for a `*.gz` backup, `actual_path = backup_path.with_suffix("")` is written with `open(actual_path, "wb")` in the **backup's own directory**, without checking for an existing same-stem archive or creating a private temporary file. No later `finally` removes the extracted `actual_path`.
+- **Failure precondition:** a directory contains `backup_a.dump.gz` and an independently valid `backup_a.dump`; running the drill against the compressed archive truncates and replaces the existing uncompressed file. Even if no collision exists, an unencrypted copy can remain after the DR test; malformed gzip streams can leave partial bytes there.
+- **Fail-first test:** in a temporary synthetic directory create a `.dump` sentinel and a separate `.dump.gz` fixture with differing bytes, mock `pg_restore`, and assert the original sentinel remains identical. Repeat with truncated gzip and assert no extracted plaintext or partial file is left after failure. No real backup material.
+- **Suggested fix:** decompress to a securely created private temporary artifact outside the backup directory, with restricted permissions and guaranteed `finally` cleanup, and never allow extraction to overwrite existing backup files. Keep the source archive immutable.
+
 ## Existing defenses / limits
 
 - `restore_db.py` already has a safety check for matching normalized host/port/database; BR-002 addresses aliases and the explicit bypass, not an absent check.
@@ -126,10 +140,11 @@
 5. **Update rollback supervision:** BR-008 and BR-009, with synthetic readiness timeout, rollback verification and schema compatibility gates; never restore a production DB automatically.
 6. **Transactional restore and DR safety:** BR-011–013. Fail closed before any destructive operation, require a fresh target, and use synthetic negative paths for subprocess exit status.
 7. **Production-backup evidence gap:** BR-014. Keep synthetic CI smoke separate from a controlled restore proof of the actual protected backup chain.
+8. **DR leftover state and gzip archive safety:** BR-015 and BR-016. Preserve backup artifacts, enforce temporary-file cleanup and report failed test DB removal.
 
 ## Verification and rollback
 
-- **Performed:** read exact GitHub `main` sources and runbooks; checked scopes, existing explicit restore guard, alternative encrypted backup workflow, backend DR drill and dedicated synthetic GitHub Actions workflow; checked official PostgreSQL `psql` and `pg_restore` error/transaction behavior. Source anchors refer to main `503cc1e`.
+- **Performed:** read exact GitHub `main` sources and runbooks; checked scopes, existing explicit restore guard, alternative encrypted backup workflow, backend DR drill (including cleanup and gzip branches) and dedicated synthetic GitHub Actions workflow; checked official PostgreSQL `psql` and `pg_restore` error/transaction behavior. Source anchors refer to main `503cc1e`.
 - **Not performed:** local `git status`, gate execution, `git diff --check`, pytest, PostgreSQL commands, archive creation, real restore, E2E smoke, CI, protected source changes, production actions.
 - **Stop condition:** no source repair, rollout, restore, or merge until safe isolation and mandatory gate evidence are available.
 - **Rollback for this document only:** close its Draft PR or revert this one docs-only commit; no deployed behavior changes.
