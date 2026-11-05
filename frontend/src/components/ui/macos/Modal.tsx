@@ -2,6 +2,7 @@ import React, { useEffect, useId, useRef, type ReactNode, type CSSProperties, ty
 import { useTheme } from '@/contexts/ThemeContext';
 import Button from './Button';
 import { useTranslation } from '@/i18n/useTranslation';
+import Tooltip from './Tooltip';
 
 type ModalSize = 'small' | 'default' | 'large' | 'fullscreen' | 'sm' | 'md' | 'lg' | string;
 type ModalVariant = 'default' | 'compact' | 'sheet' | string;
@@ -281,27 +282,28 @@ const Modal = ({
 
         {/* Close button for fullscreen modals */}
         {size === 'fullscreen' &&
-        <Button
-          variant="ghost"
-          size="small"
-          onClick={onClose}
-          aria-label={t('common.close', { defaultValue: 'Close' })}
-          title={t('common.close', { defaultValue: 'Close' })}
-          style={{
-            position: 'absolute',
-            top: '12px',
-            right: '12px',
-            width: '28px',
-            height: '28px',
-            borderRadius: '6px',
-            padding: '0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
+        <Tooltip content={t('common.close', { defaultValue: 'Close' })}>
+          <Button
+            variant="ghost"
+            size="small"
+            onClick={onClose}
+            aria-label={t('common.close', { defaultValue: 'Close' })}
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              width: '28px',
+              height: '28px',
+              borderRadius: '6px',
+              padding: '0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
 
-            ✕
-          </Button>
+              ✕
+            </Button>
+        </Tooltip>
         }
       </div>
 
