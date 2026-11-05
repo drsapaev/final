@@ -205,6 +205,16 @@
 - **Output:** 7/7 **behavior scenarios observed** (six vulnerability behaviors + one corrective falsification). The harness passes only because it asserts the **current undesirable behavior**, not because a fix is present. Future real repository tests must assert the opposite (fail-first before fix, green after).
 - **Limitations:** no exact repo code was executed as an installed module, no actual database changes, no true process concurrency, no genuine archive/restore E2E and no production exposure or impact verified. Reproduce in an isolated worktree and disposable PostgreSQL before shipping a source fix.
 
+## Fail-first test draft (2026-11-05, not committed)
+
+- Prepared a standalone six-test `pytest` draft, intended for `backend/tests/unit/test_backup_restore_fail_first.py`, covering BR-012, BR-013, BR-016, BR-017, BR-008 and BR-018.
+- The draft imports the real repo modules **when placed inside the backend test tree**; it monkeypatches all PostgreSQL command execution and uses only a temporary synthetic archive. It does not run `DROP DATABASE`, `pg_restore`, Alembic, or production operations.
+- **Validation performed:** Python `compile(..., mode="exec")` syntax check passed in the isolated container; the previous seven behavior assertions in the self-contained excerpt harness were rerun and passed (six undesirable behaviors and BR-021 correction).
+- **Validation not performed:** this draft has **not** been run through `pytest` against the real repository or CI; the current backend test tree and Python dependencies are not available in the isolated container. It is deliberately red against the reviewed source and is not merge-ready proof.
+- **Source write gate:** root `AGENTS.md` requires `ai/langgraph/scripts/run_agent_gate.ps1` for DB, security and production-sensitive code/test work. The repo checkout and PowerShell launcher were unavailable in this environment. Therefore no protected source/test files were committed, no gate was claimed, and this document remains a docs-only audit.
+- **Acceptance order:** (1) run mandatory gate from a clean worktree; (2) place the draft under the backend test tree; (3) execute targeted tests and verify they fail for intended reasons, not import/setup errors; (4) implement narrow, fail-closed fixes; (5) rerun targeted and full CI; (6) conduct isolated PostgreSQL integration tests before contemplating an operational restore.
+- **High-priority stop condition:** do not execute the drill with credentials capable of dropping a live clinic DB while BR-012/013/017 remain unfixed.
+
 ## Verification and rollback
 
 - **Performed:** read exact GitHub `main` sources and runbooks; checked scopes, existing explicit restore guard, encrypted backup alternative, backend DR drill including cleanup/gzip, scheduled and Admin backup writers, service verification/restore, age/count retention and partial-compression unit-test coverage, and the synthetic GitHub Actions workflow; consulted repo security/testing skills. Existing source hashes for these paths were unchanged at review time; original base was `503cc1e`.
