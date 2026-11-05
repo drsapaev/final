@@ -6866,6 +6866,7 @@ const ru = {
     pay_widg_processing: 'Обработка...',
     pay_widg_pay_amount: 'Оплатить {amount}',
     pay_widg_cancel: 'Отмена',
+    pay_widg_cancel_hint: 'Закрытие окна не отменяет платёж — он остаётся активным до подтверждения провайдером',
 
     // ─── CashPaymentModal.stories.jsx (pay_story_) ─────────────────────
     pay_story_docs_description: 'Modal for processing cash/card payments. Features: quick cash denominations (50k/100k/200k/500k UZS), "{noChangeBtn}" button, change-due calculation, insufficient funds validation.',
@@ -9553,6 +9554,8 @@ const ru = {
     rrt_kogda_poyavyatsya_novye_zapr: 'Когда появятся новые запросы на возврат, они будут показаны здесь.',
     rrt_na_depozit: 'На депозит',
     rrt_na_kartu: 'На карту',
+    rrt_nalichnymi: 'Наличными',
+    rrt_unknown: 'Неизвестно',
     rrt_obrabotka: 'Обработка',
     // ServiceChecklist.jsx (sc_)
     sc_konsultatsiya_kardiologa: 'Консультация кардиолога',

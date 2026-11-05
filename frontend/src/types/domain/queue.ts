@@ -138,6 +138,13 @@ export interface QrData {
   target_date?: string;
   token?: string;
   expires_at?: string;
+  /**
+   * QR-FE-003 (follow-up audit 2026-11-02): серверный канонический URL
+   * join-ссылки (backend qr_queue/_tokens.py отдаёт его и для врача, и для
+   * клиники). Раньше тип не exposed поле, а SVG-fallback захардкоживал
+   * чужой домен med-queue.uz независимо от origin развёртывания.
+   */
+  qr_url?: string;
 }
 
 // === Action args / responses (was local in useQueueManager.ts) =============

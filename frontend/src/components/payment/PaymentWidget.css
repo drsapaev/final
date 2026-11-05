@@ -130,3 +130,12 @@
     flex: 1 1 auto;
     min-width: 0;
 }
+
+/* CSH-FE-041 (follow-up audit 2026-11-02): честная подпись под кнопкой
+   «Отмена» — закрытие окна не отменяет платёж у провайдера. */
+.pw-cancel-hint {
+  margin: 0.5rem 0 0;
+  text-align: center;
+  opacity: 0.75;
+  max-width: 28rem;
+}

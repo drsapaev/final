@@ -627,6 +627,18 @@ async def create_grouped_payment(
                 method=payment_data.method,
                 note=payment_data.note,
                 current_user=current_user,
+                # CSH-FE-040: общая для всей группы квитанция «внесено/сдача»
+                # (валидировано на DTO) — каждая нога групповой аллокации
+                # несёт то же подтверждение, что и client_request_id.
+                cash_tender=(
+                    {
+                        "received_amount": str(payment_data.received_amount),
+                        "change_due": str(payment_data.change_due),
+                    }
+                    if payment_data.received_amount is not None
+                    and payment_data.change_due is not None
+                    else None
+                ),
                 commit=False,  # CRITICAL: grouped payment owns the transaction
             )
 
@@ -975,6 +987,18 @@ async def create_payment(
             method=payment_data.method,
             note=payment_data.note,
             current_user=current_user,
+            # CSH-FE-040: кассовое «внесено/сдача» (валидировано на DTO:
+            # только cash, внесено = сумма + сдача) — сохраняется в
+            # provider_data строки платежа как документальное подтверждение.
+            cash_tender=(
+                {
+                    "received_amount": str(payment_data.received_amount),
+                    "change_due": str(payment_data.change_due),
+                }
+                if payment_data.received_amount is not None
+                and payment_data.change_due is not None
+                else None
+            ),
             # Issue 3859: with a client key the endpoint owns the transaction
             # so the payment row and its idempotency anchor commit atomically
             # (commit=True would leave a window: payment persisted, anchor

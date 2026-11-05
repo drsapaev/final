@@ -78,6 +78,16 @@ export interface CashierPaymentData {
   method: string;
   note?: string;
   /**
+   * CSH-FE-040 (follow-up audit 2026-11-02): кассовое подтверждение
+   * «внесено/сдача» для наличных. CashPaymentModal считает сдачу локально
+   * (HIGH #9), но прежний контракт сужал payload до amount/method/note —
+   * подтверждение терялось до записи. Бэкенд валидирует инвариант
+   * «внесено = сумма + сдача» (422 при расхождении) и сохраняет оба
+   * значения в provider_data строки платежа (только для method='cash').
+   */
+  received_amount?: number;
+  change_due?: number;
+  /**
    * Ключ идемпотентности (issue 3859): UUID, генерируется ОДИН раз на
    * жизненный цикл модального окна оплаты (см. generateCashierClientRequestId).
    * Сервер дедуплицирует повторные запросы с тем же ключом и реплеит
@@ -85,6 +95,35 @@ export interface CashierPaymentData {
    */
   client_request_id?: string;
 }
+
+/**
+ * CSH-FE-040: канонический body для POST /cashier/payments. Единственная
+ * точка, где modal-данные превращаются в API-пейлоад: «внесено/сдача»
+ * (только cash) и ключ идемпотентности проходят без потерь. Выделен из
+ * useCashierActions, чтобы контракт был проверяем тестом напрямую.
+ */
+export const buildCashierPaymentPayload = (
+  visitId: number,
+  paymentData: CashierPaymentData,
+  fallbackNote: string,
+): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {
+    visit_id: visitId,
+    amount: paymentData.amount,
+    method: paymentData.method,
+    note: paymentData.note || fallbackNote,
+  };
+  if (paymentData.method === 'cash'
+    && typeof paymentData.received_amount === 'number'
+    && typeof paymentData.change_due === 'number') {
+    payload.received_amount = paymentData.received_amount;
+    payload.change_due = paymentData.change_due;
+  }
+  if (paymentData.client_request_id) {
+    payload.client_request_id = paymentData.client_request_id;
+  }
+  return payload;
+};
 
 /**
  * Issue 3859 (CSH-FE-008 remainder): generate a payment idempotency key.
@@ -380,6 +419,16 @@ export const createGroupedCashierPayment = async (appointment: Appointment, paym
     amount: paymentData.amount,
     method: paymentData.method,
     note: paymentData.note || 'Grouped cashier payment',
+    // CSH-FE-040: «внесено/сдача» проходят и через групповую аллокацию
+    // (валидация та же: только cash, внесено = сумма + сдача).
+    ...(paymentData.method === 'cash'
+      && typeof paymentData.received_amount === 'number'
+      && typeof paymentData.change_due === 'number'
+      ? {
+        received_amount: paymentData.received_amount,
+        change_due: paymentData.change_due,
+      }
+      : {}),
     ...(paymentData.client_request_id
       ? { client_request_id: paymentData.client_request_id }
       : {}),

@@ -43,12 +43,24 @@ export const getRefundStatusBadge = (status: unknown, t: RefundTranslationFn) =>
   );
 };
 
+// CSH-FE-051 (follow-up audit 2026-11-02): прежний маппинг рисовал «На карту»
+// для ВСЕГО, кроме deposit — наличный возврат (cash) выдавал себя за
+// карточный, а неизвестные/будущие значения enum'а лгали тем же образом.
+// Явный словарь по каноническому RefundType бэкенда
+// (bank_transfer | deposit | cash) + честное «Неизвестно» для остального.
+export const REFUND_TYPE_BADGE_CONFIG: Record<string, { key: string; variant: string }> = {
+  deposit: { key: 'misc.rrt_na_depozit', variant: 'primary' },
+  bank_transfer: { key: 'misc.rrt_na_kartu', variant: 'secondary' },
+  cash: { key: 'misc.rrt_nalichnymi', variant: 'success' },
+};
+
 export const getRefundTypeBadge = (type: unknown, t: RefundTranslationFn) => {
-  return type === 'deposit' ? (
-    <Badge variant="primary">{t('misc.rrt_na_depozit')}</Badge>
-  ) : (
-    <Badge variant="secondary">{t('misc.rrt_na_kartu')}</Badge>
-  );
+  const normalized = String(type ?? '').trim();
+  const config = REFUND_TYPE_BADGE_CONFIG[normalized];
+  if (!config) {
+    return <Badge variant="outline">{t('misc.rrt_unknown')}</Badge>;
+  }
+  return <Badge variant={config.variant}>{t(config.key)}</Badge>;
 };
 
 export const formatRefundDate = (dateStr: unknown) => {

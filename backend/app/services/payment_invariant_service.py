@@ -597,6 +597,7 @@ class PaymentInvariantService:
         allow_overpayment: bool = True,
         settling_invoice_id: int | None = None,
         commit: bool = True,
+        cash_tender: dict[str, str] | None = None,
     ) -> Payment:
         """Create a payment for a visit with race-condition protection.
 
@@ -626,6 +627,14 @@ class PaymentInvariantService:
                 Use ``commit=False`` for grouped payments (multiple
                 visits in one transaction) — call the service for each
                 visit with ``commit=False``, then commit once at the end.
+            cash_tender: CSH-FE-040 (follow-up audit 2026-11-02): кассовое
+                подтверждение «внесено/сдача» для наличных. DTO уже проверил
+                инвариант «внесено = сумма + сдача»; сюда попадает
+                нормализованный словарь (``received_amount``/``change_due``),
+                который сохраняется в ``provider_data`` строки платежа —
+                документальное подтверждение кассира не теряется и попадает
+                в выгрузку/чек. Не влияет на ``amount``: «внесено» — НЕ
+                отдельная выручка, чистая сумма платежа остаётся ``amount``.
 
         Returns:
             The created Payment object (after refresh if committed, or
@@ -705,6 +714,10 @@ class PaymentInvariantService:
             status="paid",
             provider=provider,
             note=note,
+            # CSH-FE-040: кассовое «внесено/сдача» (только cash) —
+            # сохраняется как документальное подтверждение; amount
+            # остаётся чистой суммой платежа (внесено ≠ выручка).
+            provider_data={"cash_tender": cash_tender} if cash_tender else None,
             created_at=datetime.now(UTC),
             paid_at=datetime.now(UTC),
         )
