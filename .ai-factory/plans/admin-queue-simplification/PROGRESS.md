@@ -128,7 +128,7 @@ Last updated: 2026-11-04T01:08:00+05:00
 
 ## Historical checkpoint — prior T18 matrix
 
-> Review correction, 2026-11-05: the historical claims below that all ten scenarios were validated and that the `specialists` context was optional were incorrect. T18.10 is PARTIAL as recorded in the current checkpoint; the underlying passing observations remain preserved.
+> Review correction, 2026-11-05: the historical claims below that all ten scenarios were validated and that the `specialists` context was optional were incorrect at the time. T18.10 was PARTIAL at the PR #3873 checkpoint; see the current checkpoint for subsequent evidence. The earlier passing observations remain preserved.
 
 - Completed: current-main synthetic Admin cabinet scenario (T18 scenario 7). Normal password + TOTP login succeeded; preview returned the clinic date and typed Doctor owner; stale apply returned 409 without write/audit; fresh preview/apply succeeded. Final database assertions confirmed the target assignment, unchanged owner default/queue identity, and exactly two expected audited changes.
 - Completed: read-only current-source review found the legacy `frontend/e2e/rq17-setup-directions-live.spec.ts` expects `setup-wizard-*` controls absent from the current `AdminSetupDirections` screen. This is test-harness drift, not a product failure. The spec was not run or edited; adapt/replace it before using it for scenario 2.
