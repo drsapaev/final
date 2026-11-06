@@ -53,6 +53,13 @@ export function useQueueWebSocket({ specialistId, date, enabled = true, onUpdate
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onUpdateRef = useRef(onUpdate);
+  // WSQ-FE-002 (audit 3886): generation identity of the CURRENT
+  // subscription — incremented on every cleanup, so an onclose of a
+  // superseded socket (the client deliberately closed it by switching
+  // doctor/date or disabling the hook) can be distinguished from a
+  // server-initiated close WITHOUT inferring the initiator from the close
+  // code alone.
+  const subscriptionGenRef = useRef(0);
 
   // Keep onUpdate ref current without re-triggering effect
   useEffect(() => {
@@ -60,6 +67,12 @@ export function useQueueWebSocket({ specialistId, date, enabled = true, onUpdate
   }, [onUpdate]);
 
   const cleanup = useCallback(() => {
+    // WSQ-FE-001 (audit 3886): the reconnect budget belongs to ONE
+    // subscription identity (specialistId + date + enabled). The outgoing
+    // subscription's exhausted attempts must not be inherited by the NEXT
+    // doctor/date subscription — reset the budget on every cleanup.
+    subscriptionGenRef.current += 1;
+    reconnectAttemptRef.current = 0;
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
@@ -95,6 +108,9 @@ export function useQueueWebSocket({ specialistId, date, enabled = true, onUpdate
     try {
       const ws = new WebSocket(wsUrl, [`bearer.${token}`]);
       wsRef.current = ws;
+      // WSQ-FE-002: bind every handler to the CURRENT subscription
+      // generation — a superseded socket's close must never reconnect.
+      const generation = subscriptionGenRef.current;
 
       ws.onopen = () => {
         logger.info('[useQueueWebSocket] Connected', { department, date });
@@ -144,11 +160,18 @@ export function useQueueWebSocket({ specialistId, date, enabled = true, onUpdate
         setIsConnected(false);
         wsRef.current = null;
 
-        // Don't reconnect if manually closed (code 1000) or if disabled
-        if (event.code === 1000) {
+        // WSQ-FE-002 (audit 3886): this socket belonged to a superseded
+        // subscription — the CLIENT closed it deliberately (doctor/date
+        // switch or disable). Never reconnect a dead generation.
+        if (generation !== subscriptionGenRef.current) {
           setConnectionState('disconnected');
           return;
         }
+
+        // WSQ-FE-002: a close code 1000 is NOT proof that the CLIENT
+        // initiated the close — the server may send a normal lifecycle
+        // close. Reconnect within the bounded budget; only the generation
+        // guard above marks a deliberate client close.
 
         // Attempt reconnection with exponential backoff
         if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
