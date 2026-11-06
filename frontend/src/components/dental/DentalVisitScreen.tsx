@@ -877,6 +877,12 @@ const DentalVisitScreen = ({
     rowVersionRef.current = 0;
     setEmrData(EMPTY_EMR_DATA);
 
+    // DENTMODAL-FE-002 (audit 2026-11-06, PR 3892): an open tooth modal
+    // holds patient A's form; it must not survive a visit identity switch
+    // where Save could write it into visit B. Close it fail-closed.
+    setToothModalOpen(false);
+    setSelectedTooth(null);
+
     if (visitId === null || visitId === undefined || visitId === '') {
       setLoadError('missing_visit');
       setLoading(false);
@@ -1150,15 +1156,51 @@ const DentalVisitScreen = ({
     setToothModalOpen(true);
   }, []);
 
+  // DENTMODAL-FE-001 (audit 2026-11-06, PR 3892): DentalVisitScreen is the
+  // sole EMR writer for this visit. The tooth save is flushed through the
+  // same sequential persistDraft queue (no 1500 ms debounce window for a
+  // confirmed clinical procedure), carries the parent's current
+  // row_version, and reports failures through the parent save-error path.
   const handleToothSave = useCallback((toothNumber: string | number, toothData: Record<string, unknown>) => {
-    updateSpecialtyData('tooth_status', {
-      ...(emrData.specialty_data?.tooth_status || {}),
-      [toothNumber]: toothData,
-    });
+    const next = {
+      ...latestDraftRef.current,
+      specialty_data: {
+        ...latestDraftRef.current.specialty_data,
+        tooth_status: {
+          ...(latestDraftRef.current.specialty_data?.tooth_status || {}),
+          [toothNumber]: toothData,
+        },
+      },
+    } as typeof EMPTY_EMR_DATA;
+    latestDraftRef.current = next;
+    setEmrData(next);
+    setSaveError(null);
     setToothModalOpen(false);
     setSelectedTooth(null);
-    notify.success(t('dental.dental_dvs_tooth_saved', { toothNumber }));
-  }, [emrData.specialty_data, updateSpecialtyData, t]);
+
+    const targetVisitId = visitId;
+    if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') return;
+    if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) return;
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setSaving(true);
+    void persistDraft(targetVisitId, next).then(() => {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        setSaveError(null);
+        notify.success(t('dental.dental_dvs_tooth_saved', { toothNumber }));
+      }
+    }).catch((error: unknown) => {
+      if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) return;
+      setSaveError(getHttpStatus(error) === 409 ? 'conflict' : 'save');
+      logger.warn('[DentalVisitScreen] tooth save failed');
+      notify.error(t('dental2.visit_protocol_save_failed'));
+    }).finally(() => {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) setSaving(false);
+    });
+  }, [persistDraft, t, visitId]);
 
   // AI suggestion apply → writes to icd10_code field
   const handleAISuggestion = useCallback(() => {
@@ -1284,6 +1326,7 @@ const DentalVisitScreen = ({
           toothData={selectedTooth.data}
           onSave={(data: unknown) => handleToothSave(selectedTooth?.number, data as Record<string, unknown>)}
           visitId={visitId}
+          parentManagedSave
         />
       )}
 

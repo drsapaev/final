@@ -87,6 +87,7 @@ const PhotoArchive = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewCloseRef = useRef<HTMLButtonElement>(null);
   const requestId = useRef(0);
+  const previewRequestId = useRef(0);
 
   const reload = useCallback(async () => {
     if (!numericPatientId || !numericVisitId) return;
@@ -113,6 +114,31 @@ const PhotoArchive = ({
     void reload();
     return () => { requestId.current += 1; };
   }, [reload, retryKey]);
+
+  // DENTPHOTO-FE-001 / DENTPHOTO-FE-002 (audit 2026-11-06, PR 3892):
+  // upload-form state (selected file + draft fields) and the media preview
+  // belong to the current patient/visit context. Reset them fail-closed on
+  // an identity switch and invalidate any in-flight preview load so a late
+  // response cannot reopen patient A's media under patient B.
+  const mediaContextKey = `${String(numericPatientId ?? '')}|${String(numericVisitId ?? '')}`;
+  const previousMediaContextRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previousMediaContextRef.current;
+    previousMediaContextRef.current = mediaContextKey;
+    if (previous === null || previous === mediaContextKey) return;
+    requestId.current += 1;
+    previewRequestId.current += 1;
+    setSelectedFile(null);
+    setUploadTitle('');
+    setUploadDescription('');
+    setUploadTooth('');
+    setUploadDate('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setPreviewingId(null);
+    setPreview(null);
+    setActionError(null);
+    setSuccessMessage(null);
+  }, [mediaContextKey]);
 
   useEffect(() => () => {
     if (preview?.url) URL.revokeObjectURL(preview.url);
@@ -263,16 +289,19 @@ const PhotoArchive = ({
 
   const openPreview = async (item: DentalMediaItem) => {
     if (!numericVisitId) return;
+    const currentPreviewRequest = ++previewRequestId.current;
     setPreviewingId(item.id);
     setActionError(null);
     try {
       const blob = await loadDentalMediaContent(item.id, numericVisitId);
+      if (previewRequestId.current !== currentPreviewRequest) return;
       const url = URL.createObjectURL(blob);
       setPreview({ item, url });
     } catch (error: unknown) {
+      if (previewRequestId.current !== currentPreviewRequest) return;
       showActionError(error);
     } finally {
-      setPreviewingId(null);
+      if (previewRequestId.current === currentPreviewRequest) setPreviewingId(null);
     }
   };
 

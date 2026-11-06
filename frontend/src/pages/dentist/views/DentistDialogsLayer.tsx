@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect, useRef } from 'react';
 
 import { Card } from '../../../components/ui/macos';
 import TeethChart from '../../../components/dental/TeethChart';
@@ -117,6 +117,43 @@ export default function DentistDialogsLayer({
   const selectedPatientId: string | number | undefined = selectedPatient?.patient?.id || selectedPatient?.patient_id || selectedPatient?.id || undefined;
   const selectedPatientDisplayName =
     selectedPatient?.patient_name || selectedPatient?.patient_fio || selectedPatient?.name || tI18n('dental.dental_panel_patient_default');
+
+  // DENTPLAN-FE-002 / DENTPHOTO-FE-001 / DENTPHOTO-FE-002 (audit
+  // 2026-11-06, PR 3892): patient-scoped dialogs keep uncommitted local
+  // state (treatment stages, selected files, previews, tooth forms) that
+  // must never leak across a patient/visit identity switch. Close them
+  // fail-closed when the selected identity changes; unmounting resets the
+  // dialog-local drafts. Non-patient-scoped surfaces (protocol templates)
+  // stay open.
+  const contextIdentity = `${String(selectedPatientId ?? '')}|${String(selectedPatient?.visit_id ?? '')}`;
+  const previousContextIdentityRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previousContextIdentityRef.current;
+    previousContextIdentityRef.current = contextIdentity;
+    if (previous === null || previous === contextIdentity) return;
+    setShowPatientCard(false);
+    setShowDiagnosisForm(false);
+    setShowPhotoArchive(false);
+    setShowReports(false);
+    setShowDentalChart(false);
+    setShowTreatmentPlanner(false);
+    setShowPriceManager(false);
+    setSelectedServiceForPrice(null);
+    setToothModalOpen(false);
+    setSelectedTooth(null);
+  }, [
+    contextIdentity,
+    setShowPatientCard,
+    setShowDiagnosisForm,
+    setShowPhotoArchive,
+    setShowReports,
+    setShowDentalChart,
+    setShowTreatmentPlanner,
+    setShowPriceManager,
+    setSelectedServiceForPrice,
+    setToothModalOpen,
+    setSelectedTooth,
+  ]);
 
   return (
     <>

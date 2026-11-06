@@ -104,8 +104,12 @@ export function useDentistActions({
       }
 
       // Создаем объект пациента для переключения на прием
+      // DENTWORK-FE-001 (audit 2026-11-06, PR 3892): propagate the real
+      // patient_id from the queue row — the queue entry id (`row.id`) must
+      // never act as patient identity for history or completion payloads.
       const patientData: SelectedPatient = {
         id: row.id,
+        patient_id: (row.patient_id as string | number | null | undefined) ?? null,
         appointment_id: (row.appointment_id as string | number | null | undefined) || null,
         visit_id: visitId,
         patient_name: row.patient_fio,
@@ -168,8 +172,11 @@ export function useDentistActions({
             break;
           }
 
+          // DENTWORK-FE-001 (audit 2026-11-06, PR 3892): keep the real
+          // patient_id alongside the queue entry id on the complete path.
           const patient: SelectedPatient = {
             id: row.id,
+            patient_id: (row.patient_id as string | number | null | undefined) ?? null,
             appointment_id: (row.appointment_id as string | number | null | undefined) || null,
             visit_id: visitId,
             patient_name: row.patient_fio,

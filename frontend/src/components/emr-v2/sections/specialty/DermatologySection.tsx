@@ -18,7 +18,7 @@
  * прайс-менеджерами, а не клинической картой.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import EMRSection from '../EMRSection';
 
 import EMRSmartFieldV2 from '../EMRSmartFieldV2';
@@ -80,6 +80,8 @@ export function DermatologySection({
   treatmentPlan = '',
   onChange,
   disabled = false,
+  visitId,
+  patientId,
   cosmeticProcedures = [],
 }: DermatologySectionProps) {
 
@@ -92,6 +94,19 @@ export function DermatologySection({
   const [procedureDraft, setProcedureDraft] = useState<DermatologyCosmeticProcedureRecord>(
     EMPTY_PROCEDURE_DRAFT,
   );
+
+  // DERMAPROC-FE-001 (audit 2026-11-06, PR 3892): an unfinished procedure
+  // draft belongs to the current patient/visit context. Reset it fail-closed
+  // on an identity switch so it cannot be added into patient B's chart.
+  const procedureContextKey = `${String(patientId ?? '')}|${String(visitId ?? '')}`;
+  const previousProcedureContextRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previousProcedureContextRef.current;
+    previousProcedureContextRef.current = procedureContextKey;
+    if (previous === null || previous === procedureContextKey) return;
+    setShowProcedureForm(false);
+    setProcedureDraft(EMPTY_PROCEDURE_DRAFT);
+  }, [procedureContextKey]);
 
   const handleProcedureAdd = useCallback(() => {
     if (disabled) return;

@@ -249,8 +249,9 @@ const ToothModal = ({
   toothNumber,
   toothData = {} as Record<string, unknown>,
   onSave,
-  visitId
-}: { toothData?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown) => void; toothNumber?: string | number; visitId?: string | number; open?: boolean; [k: string]: unknown }) => {
+  visitId,
+  parentManagedSave,
+}: { toothData?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown) => void; toothNumber?: string | number; visitId?: string | number; parentManagedSave?: boolean; open?: boolean; [k: string]: unknown }) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const [formData, setFormData] = useState<ToothFormData>({
@@ -335,6 +336,11 @@ const ToothModal = ({
   );
 
   // Сохранение данных
+  // DENTMODAL-FE-001 (audit 2026-11-06, PR 3892): when the parent screen
+  // owns EMR persistence (`parentManagedSave`), this modal must stay a
+  // controlled editor — no independent GET/POST, no second uncoordinated
+  // writer with an unsynchronized row_version. The parent merges the tooth
+  // data into its draft and performs the single authoritative save.
   const handleSave = async () => {
     setLoading(true);
     
@@ -346,7 +352,7 @@ const ToothModal = ({
         updatedAt: new Date().toISOString(),
       };
       
-      if (visitId) {
+      if (visitId && !parentManagedSave) {
         const existingEmr = await loadExistingEmrDraft(visitId);
         await api.post(
           `/v2/emr/${visitId}`,
