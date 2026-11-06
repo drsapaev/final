@@ -1,33 +1,32 @@
 # Progress — T18 integrated synthetic acceptance
 
 Plan version: 1.0
-Current task: T18 acceptance; preserve the T18.10 `specialists` Session report and continue the current-source RQ-18 public join gap
-Current status: IN_PROGRESS; evidence PR #3894 is OPEN/Ready; T18.10 VALIDATED for its tested source; overall T18 and Tier-2 remain PARTIAL
-Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final
-Branch: codex/aqs-t18-report-provenance
-Base commit: `3de30426154cdb031b62c858fa6ff06a9b65aabc` (`origin/main` at cycle start)
-Synced before push: rebased onto `1cf06c87ef798bea4711d8ca4d3b555ec20e9b43` (#3893); incoming changes were confined to unrelated EMR backend files.
-PR #3894 initial HEAD `e46149f397abea32f572708087410fdf607e530b` passed all six fetched workflows; the checkpoint update in this commit requires exact-head rechecks. User retains merge authority.
-Runtime commit for T18.10 evidence: `a9c25f5b9c25f52d12aed4fc22b74874dc441a3f`
-Last updated: 2026-11-06T11:32:52+05:00
+Current task: T18 acceptance; record current-source RQ-18 public QR lifecycle and finish remaining staging evidence
+Current status: IN_PROGRESS; current-source RQ-18 Session PASS; T18.10 VALIDATED on its tested source; overall T18/Tier-2 remain PARTIAL; user retains merge and deployment authority
+Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final
+Branch: codex/aqs-t18-rq18-current-20261106
+Base commit: `5363a9ca53234539c5022b587250374a452a91a0` (`origin/main` at cycle start)
+Current commit: `5363a9ca53234539c5022b587250374a452a91a0`; the RQ-18 live spec is a tracked working-tree change, blob `77d46f1c77bc11b56a838296e77e570621554738`.
+PR #3894 merged at `256483d318f47ca4acb054b62467acf26a53dc8f`; fresh worktree started at current `origin/main`.
+Runtime commit for the current-source RQ-18 staging Session: `5363a9ca53234539c5022b587250374a452a91a0`; T18.10 evidence remains anchored to `a9c25f5b9c25f52d12aed4fc22b74874dc441a3f`.
+Last updated: 2026-11-06T20:11:26+05:00
 
-## Current checkpoint — T18.10 evidence and remaining T18 acceptance
+## Current checkpoint — current-source RQ-18 passed; remaining T18 acceptance
 
 | Task | Status | Evidence |
 |------|--------|----------|
-| T18.10 | VALIDATED on `a9c25f5b` | [Sanitized Session report](EVIDENCE.md#t1810-specialists-session-report-20261105); original source transcript and cleanup are identified |
-| T18 public QR join | Current-source live check NOT_RUN | Earlier RQ-18 join passed on `38ecd429`; `QueueJoin.tsx` changed afterward |
-| T18 overall | PARTIAL | Broader remaining checks and full staging runbook remain open |
+| T18.10 | VALIDATED on `a9c25f5b` | [Sanitized Session report](EVIDENCE.md#t1810-specialists-session-report-20261105) |
+| T18 public QR join/lifecycle | PASS on runtime `5363a9ca`; test blob `77d46f1c` | [Current-source RQ-18 Session](EVIDENCE.md#t18-current-source-rq18-permanent-qr-lifecycle-20261106) |
+| T18 overall | PARTIAL | Full staging runbook, exact served-build provenance, and remaining acceptance gaps stay open |
 
-- One completed isolated synthetic Session on the tested runtime commit passed normal Admin password plus TOTP enrollment/verification, initial database-backed catalog loading with the real `specialists` row, and all four legacy Admin entry URLs.
-- The real selected `specialists` direction supplied an outbound editor link. Profile, section and day survived the editor, tab changes, reload, Back/Forward and return to the selected direction. Deleting the linked profile returned a readable protected HTTP 409; the row remained, and no profile mutation other than the rejected DELETE was observed. No uncaught page errors were observed.
-- The served `/sw.js` contained the tested SHA; all 58 captured JS/CSS response bodies matched the corresponding files in the owned frontend container. This is a separate bounded comparison: the canonical launcher's `served_revision_verified` remains `false`.
-- Canonical Session teardown reported 5 containers, 3 volumes and 1 network removed, with zero remaining owned resources; the three selected ports were no longer listening. The task-owned synthetic env file was removed. The two env files from the separately retained prior worktree remain outside this scope.
-- T18.10 is VALIDATED for `a9c25f5b` by this complete focused run. The full `docs/runbooks/STAGING_VALIDATION.md`, remaining broader T18 checks, and production validation are not implied by this result; overall Tier-2 remains PARTIAL as the user directed.
-- The journal-only evidence PR #3879 merged at `e29670213a7f8f8b084469914966afc8c20e4cbb`. This follow-up stores the sanitized structured Session result and corrects the stale next action; it does not claim a fresh staging run or change the result's tested source.
-- Next T18 gap identified by source comparison: the previously passing synthetic RQ-18 lifecycle at `38ecd429` included an anonymous `QueueJoin` booking. `frontend/src/pages/QueueJoin.tsx` subsequently changed in #3876 and #3877, so the prior live result does not by itself establish the patient join on `a9c25f5b`. No current-source QR join was run in this slice; no product defect is inferred. Keep the earlier Admin publication/address/archive evidence tied to its tested source.
-- Two earlier attempts were cleaned up. The first stopped at a temporary PowerShell native-stderr exception; the second passed 2FA, profile loading, cabinets and settings but timed out during direction selection. An unchanged-date React behavior was reproduced independently, the temporary harness was corrected, and the third Session passed. Details and limits are in `EVIDENCE.md`.
-- Next exact action: verify the current exact-head checks for PR #3894 and wait for the user-owned merge. After merge, refresh `origin/main`, adapt the stale RQ-18 live spec to the current setup flow, and run a bounded synthetic public QR join/lifecycle Session with canonical cleanup. Continue remaining T18 gaps; do not deploy or claim complete Tier-2.
+- Canonical Preflight → Start → Session passed for owned synthetic Compose project `clinic-aqs-rq18-current-20261106`. The one Playwright scenario passed with normal Admin password/TOTP, hidden profile creation, doctorless service, resource creation/activation, explicit publication, permanent-address provisioning/recovery, anonymous booking, and exactly one resource-owned queue on the session's target date.
+- Lifecycle assertions passed: the existing target-date resource queue remained visible after resource deactivation; clinic-day public availability closed while the permanent address remained; archiving the published profile returned the public address to a generic unavailable response; the resource was reactivated before restoring the profile because saved publication is revalidated; the same permanent address then reopened successfully.
+- Focused ESLint, isolated strict TypeScript, Playwright collection (1 test), and `git diff --check` passed. The full browser Session result was `1 passed`, no skips. No runtime/backend/API/auth changes were made.
+- Session teardown removed 5 containers, 3 volumes and 1 network; remaining owned containers/volumes/networks were zero. Selected ports were free. Post-session WSL available memory was 1,999 MiB. Launcher `served_revision_verified=false` remains unchanged and is not claimed as verified.
+- The app runtime was built from exact clean source commit `5363a9ca`; the only tracked diff during the staging cycle was the E2E spec. The current RQ-18 spec/evidence still needs a reviewable PR and exact-head CI.
+- T18.10 evidence remains valid only for its tested runtime commit. The full `docs/runbooks/STAGING_VALIDATION.md`, current served-frontend attestation, and remaining broader T18/Tier-2 checks are not implied by these focused runs. Overall Tier-2 remains PARTIAL as the user directed; no blanket deferral, deployment or system-health claim is recorded.
+- Prior RQ-18 harness failures were narrowed and fixed in the test: QueueProfile key validation, explicit QueueJoin info-step continuation, explicit target-date versus clinic-day reads, archive/restore control direction, and required resource-before-profile restoration order. Their source-backed explanations are in the current `RESUME.md` checkpoint and task scratch.
+- Next exact action: finalize the three journals, run the scoped validation and diff review, commit and push this single-purpose RQ-18 test/evidence PR, then verify exact-head CI. The user owns merge. After merge, reconcile the remaining T18 acceptance and full staging-runbook status; do not deploy or claim full Tier-2.
 
 ---
 
