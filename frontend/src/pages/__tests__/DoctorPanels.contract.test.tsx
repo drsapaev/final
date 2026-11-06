@@ -253,8 +253,14 @@ describe('Doctor panels SSOT contract', () => {
     );
 
     expect(source).toContain('const selectNextCallEntryId =');
-    expect(source).toContain('queuePayload?.next_call_entry_id');
-    expect(source).toContain('hasBackendQueueAction(entry, \'call\', \'can_call\')');
+    expect(source).toContain('queuePayload.next_call_entry_id');
+    // QAPI-FE-001 (audit 3886): the canonical next_call_entry_id is the
+    // ONLY call target — fail closed on a missing field, never fall back
+    // to a local can_call scan.
+    expect(source).toContain(
+      "Object.prototype.hasOwnProperty.call(queuePayload, 'next_call_entry_id')",
+    );
+    expect(source).not.toContain("hasBackendQueueAction(entry, 'call', 'can_call')");
     expect(source).toContain('canCallNext: data?.can_call_next === true');
     expect(source).toContain('canCallNext: queueControls.canCallNext');
     // Contract: call-next must use selectNextCallEntryId from the queue payload.
