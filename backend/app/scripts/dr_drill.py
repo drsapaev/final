@@ -91,8 +91,21 @@ def find_latest_backup() -> Path:
     if not BACKUP_DIR.exists():
         _exit(2, f"Backup directory does not exist: {BACKUP_DIR.absolute()}")
 
+    # Second-pass review of #3888 (P2): discovery must consider only
+    # PUBLISHED archives. The old ``backup_*`` pattern also matched
+    # in-flight ``.db.tmp`` / ``.db.gz.tmp`` artifacts, which are typically
+    # NEWER than the last completed backup — the drill then restored a
+    # partial file and reported a spurious DR failure. Same allowlist as
+    # BackupService.list_backups(): plain and gzip archives plus the
+    # legacy collision form ``...db.<token>.gz`` (deduped — the gzip
+    # patterns overlap).
     candidates = sorted(
-        [p for p in BACKUP_DIR.glob("backup_*") if p.is_file()],
+        {
+            p
+            for pattern in ("backup_*.db", "backup_*.db.gz", "backup_*.db.*.gz")
+            for p in BACKUP_DIR.glob(pattern)
+            if p.is_file()
+        },
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
@@ -112,12 +125,18 @@ def parse_source_db_url() -> tuple[str, str, str, int, str]:
         _exit(2, f"DR drill requires PostgreSQL source. Got: {url[:50]}...")
 
     parsed = urllib.parse.urlparse(url.replace("postgresql://", "http://").replace("postgresql+psycopg://", "http://"))
+    # Post-merge review of #3887 (P1): urlparse keeps the path
+    # percent-encoded. `clinic%5Fdr%5Fdrill` IS `clinic_dr_drill` to
+    # PostgreSQL, so the BR-012 collision guard must compare the DECODED
+    # name — otherwise an encoded DSN bypasses the guard and the drill
+    # issues DROP DATABASE against the working database.
+    source_db = urllib.parse.unquote(parsed.path.lstrip("/"))
     return (
         parsed.username or "postgres",
         parsed.password or "",
         parsed.hostname or "localhost",
         parsed.port or 5432,
-        parsed.path.lstrip("/"),
+        source_db,
     )
 
 
