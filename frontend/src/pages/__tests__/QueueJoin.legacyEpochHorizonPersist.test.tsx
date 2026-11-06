@@ -166,6 +166,55 @@ describe('QR-FE-028: a late legacy A response must not overwrite token B', () =>
     expect(queueApiMocks.startQueueJoinSession).toHaveBeenCalledTimes(1);
     expect(screen.queryByLabelText(/кардиолог альфа/i)).toBeNull();
   });
+
+  it('a token switch resets the previous token\u2019s reconcile guard — B still starts its session', async () => {
+    // Token A has an outstanding UNKNOWN envelope: A's boot engages the
+    // reconcile guard and skips A's auto-start.
+    window.localStorage.setItem(
+      `queue_join_attempt_qr_${TOKEN_A}__session-a`,
+      JSON.stringify({
+        ts: Date.now(),
+        publicCode: TOKEN_A,
+        sessionToken: 'session-a',
+        profileId: null,
+        directionTitle: null,
+        completeAttempted: true,
+        outcomeUnknown: true,
+        attemptExpiresAt: null,
+      }),
+    );
+    queueApiMocks.fetchQrTokenInfo.mockImplementation((token: string) =>
+      token === TOKEN_A
+        ? Promise.resolve(tokenInfo(SPECIALISTS_A, 'Отделение Альфы'))
+        : Promise.resolve(tokenInfo(SPECIALISTS_B, 'Отделение Беты')),
+    );
+    queueApiMocks.startQueueJoinSession.mockImplementation((token: string) =>
+      Promise.resolve({
+        session_token: `session-${token}`,
+        queue_info: { is_clinic_wide: true, selectable_specialists: token === TOKEN_A ? SPECIALISTS_A : SPECIALISTS_B },
+      }),
+    );
+
+    renderQueueJoin(TOKEN_A);
+    // A boots with its UNKNOWN envelope — no session minted for A.
+    expect(await screen.findByLabelText(/кардиолог альфа/i)).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(queueApiMocks.startQueueJoinSession).not.toHaveBeenCalled();
+
+    // In-place switch to the FRESH token B (no envelope of its own):
+    fireEvent.click(screen.getByRole('button', { name: 'switch-token' }));
+
+    // B has no UNKNOWN envelope — its boot MUST mint B's own session
+    // (pre-fix the stale reconcile guard of A suppressed B's start).
+    expect(await screen.findByLabelText(/дерматолог бета/i)).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(queueApiMocks.startQueueJoinSession).toHaveBeenCalledTimes(1);
+    expect(queueApiMocks.startQueueJoinSession).toHaveBeenCalledWith(TOKEN_B);
+  });
 });
 
 describe('QR-FE-029: the legacy envelope keeps the server queue-day horizon', () => {
