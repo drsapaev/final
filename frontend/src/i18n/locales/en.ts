@@ -9396,6 +9396,10 @@ const en = {
     dqp_ivan_ivanov: 'Иван Иванов',
     dqp_mariya_petrova: 'Мария Петрова',
     dqp_oshibka_zagruzki_ocheredi: 'Ошибка загрузки очереди',
+    // DOCQ-FE-003 (audit 3886): distinct load-error / stale states
+    dqp_ochered_nedostupna: 'Очередь недоступна',
+    dqp_povtorit: 'Повторить',
+    dqp_dannye_mogli_ustaret: 'Не удалось обновить очередь — данные могли устареть',
     dqp_patsient_vyzvan_demo: 'Пациент вызван (демо)',
     dqp_priem_nachat_demo: 'Прием начат (демо)',
     dqp_priem_zavershen_demo: 'Прием завершен (демо)',
