@@ -26,11 +26,23 @@ def main() -> int:
     deploy_script = Path(__file__).resolve().parent / "deploy_release.py"
     run_command([sys.executable, str(deploy_script)], cwd=app_root())
 
-    if os.environ.get("ROLLBACK_RUN_MIGRATIONS", "0").strip().lower() in {"1", "true", "yes", "on"}:
+    if os.environ.get("ROLLBACK_RUN_MIGRATIONS", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
         migrations_script = Path(__file__).resolve().parent / "run_migrations.py"
         run_command([sys.executable, str(migrations_script)], cwd=app_root())
 
-    pass_message(f"rollback_release restored {rollback_ref}")
+    # BR-009: this script rolls back CODE (git checkout + redeploy, plus an
+    # optional alembic UPGRADE). It never reverts the database schema, so the
+    # verdict must not read as a full restore. An old release running against
+    # a newer schema stays possible until the operator restores the
+    # pre-update backup via the documented manual protocol.
+    pass_message(
+        f"rollback_release checked out {rollback_ref} (code rollback only; database schema not reverted)"
+    )
     return 0
 
 

@@ -6,8 +6,10 @@ Database Backup Service
 import logging
 import os
 import re
+import secrets
 import shutil
 import subprocess
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -189,6 +191,10 @@ class BackupService:
         Returns:
             Backup information dict
         """
+        # BR-018: track this operation's own temp file. Cleanup may remove
+        # ONLY this file — a bulk glob("*.tmp") unlink would delete another
+        # concurrent writer's in-flight artifact in the shared directory.
+        operation_tmp: Path | None = None
         try:
             # Get database URL
             db_url = _get_database_url()
@@ -203,10 +209,53 @@ class BackupService:
             # the pg component validator above).
             _m = _re.fullmatch(r"[a-z0-9_]{0,40}", safe_type)
             safe_type = _m.group(0) if _m else "manual"
-            backup_filename = f"backup_{safe_type or 'manual'}_{timestamp}.db"
-            # Atomic write: pg_dump targets .tmp; final name appears only
-            # after success - a failed dump no longer leaves zero-byte files.
-            backup_path = self.backup_dir / (backup_filename + ".tmp")
+            # Post-merge review of #3887 (P1 #2): the timestamp has second
+            # precision only — two same-type runs started within one second
+            # derived the SAME .tmp path and the SAME final name, so one run
+            # could delete or replace the other's archive mid-flight.
+            # Post-merge review of #3888 (P2): 32 random bits alone are not
+            # a uniqueness guarantee either — the temp path is now RESERVED
+            # exclusively (O_CREAT|O_EXCL): a same-id competitor cannot even
+            # create the file, and this run rerolls a fresh id on collision.
+            base_name = f"backup_{safe_type or 'manual'}_{timestamp}"
+            backup_path = None
+            for _attempt in range(8):
+                run_suffix = uuid.uuid4().hex[:8]
+                candidate = self.backup_dir / f"{base_name}.{run_suffix}.db.tmp"
+                try:
+                    # Exclusive reservation: create-and-close an empty file
+                    # only this run may own; the dumpers truncate it next.
+                    # Second-pass review of #3888 (P1): owner-only from the
+                    # first byte — os.open's default 0777&~umask produced
+                    # group/world-readable (0755/0644) dumps.
+                    # Review 5791968648 (P1): harden with os.chmod — NOT
+                    # os.fchmod, which is Unix-only before Python 3.13 and
+                    # raised AttributeError (leaking the open descriptor
+                    # and the temp file) on the Windows 3.11/3.12 runtimes
+                    # the deployment runbook supports. os.chmod exists on
+                    # every supported platform; on POSIX it re-asserts
+                    # owner-only regardless of umask, on Windows it maps
+                    # to the read-only attribute (the NTFS ACLs of the
+                    # service account remain the real Windows guarantee).
+                    fd = os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                    try:
+                        os.chmod(candidate, 0o600)  # umask-proof owner-only
+                    finally:
+                        os.close(fd)  # descriptor closed on EVERY path
+                except FileExistsError:
+                    continue
+                backup_path = candidate
+                break
+            if backup_path is None:
+                raise RuntimeError(
+                    f"Could not reserve a unique backup temp path in "
+                    f"{self.backup_dir} after 8 attempts"
+                )
+            backup_filename = backup_path.name[: -len(".tmp")]
+            # Atomic write: pg_dump targets the run-private .tmp; the final
+            # name appears only after success - a failed dump no longer
+            # leaves zero-byte files.
+            operation_tmp = backup_path
 
             # Create backup based on database type
             if db_url.startswith("sqlite"):
@@ -266,9 +315,20 @@ class BackupService:
             else:
                 raise ValueError(f"Unsupported database type: {db_url}")
 
-            # Dump succeeded - atomically publish the final name.
-            final_path = self.backup_dir / backup_filename
-            os.replace(backup_path, final_path)
+            # Dump succeeded. The O_EXCL reservation pre-created the temp
+            # file, so "pg_dump said ok but wrote nothing" now manifests as a
+            # zero-byte reserved file — fail loud instead of publishing it
+            # (no zero-byte artifacts under final names, Sentry-P0 rule).
+            if backup_path.stat().st_size == 0:
+                raise RuntimeError(
+                    "pg_dump reported success but produced an empty archive: "
+                    f"{backup_path}"
+                )
+            # Atomically + exclusively publish the final name (#3888 P2):
+            # os.link fails with FileExistsError if the name is already
+            # taken and this run re-stamps an extra unique suffix — a
+            # completed archive is never overwritten.
+            final_path = self._publish_backup(backup_path, backup_filename)
             backup_path = final_path
 
             # Get backup size
@@ -328,36 +388,160 @@ class BackupService:
             return backup_info
 
         except Exception as e:
-            # remove .tmp leftovers from a failed dump
-            for stray in self.backup_dir.glob("*.tmp"):
+            # BR-018: remove only this operation's temp file. A bulk
+            # glob("*.tmp") unlink could delete another concurrent writer's
+            # in-flight artifact in the shared backup directory.
+            if operation_tmp is not None:
                 try:
-                    stray.unlink()
+                    operation_tmp.unlink(missing_ok=True)
                 except OSError:
                     pass
             logger.error(f"❌ Backup failed: {e}")
             raise
 
+    def _publish_backup(self, tmp_path: Path, final_name: str) -> Path:
+        """Atomically and exclusively publish a completed artifact.
+
+        Post-merge review of #3888 (P2): publication must never overwrite a
+        completed archive. ``os.link`` fails with FileExistsError when the
+        name is already taken — this run then re-stamps an extra unique
+        suffix. ``os.replace`` is never used on this safety-critical path:
+        it silently destroys an already-completed archive when the
+        candidate name is taken. The final name appears only with full
+        content or not at all.
+
+        Review 5791968648 (P1): a filesystem WITHOUT hard-link support has
+        no atomic no-clobber publish primitive at all. The previous
+        exclusive-create fallback staged the final name and streamed bytes
+        into it, so list/restore/retention observed a truncated archive
+        mid-copy — publication therefore FAILS CLOSED there: this method
+        raises, the completed archive stays untouched and the caller's
+        run-private temp is left for its own cleanup. Run BACKUP_DIR on a
+        filesystem with hard-link support (ext4/xfs/NTFS).
+        """
+        final_path = self.backup_dir / final_name
+        for _attempt in range(8):
+            try:
+                os.link(tmp_path, final_path)
+            except FileExistsError:
+                final_path = self.backup_dir / self._collision_name(final_name)
+                continue
+            except OSError as link_err:
+                # Fail closed (review 5791968648, P1): without hard links
+                # there is no atomic no-clobber publish. A staged final
+                # name exposes a truncated archive to list/restore/
+                # retention mid-copy, and replace-style fallbacks can
+                # destroy a completed archive — refuse instead.
+                raise RuntimeError(
+                    f"Could not publish backup {final_name!r}: filesystem "
+                    f"does not support atomic exclusive publication "
+                    f"(hard links unavailable: {link_err}); refusing to "
+                    "publish a partial or clobberable archive — point "
+                    "BACKUP_DIR at a filesystem with hard-link support "
+                    "(ext4/xfs/NTFS)"
+                ) from link_err
+            tmp_path.unlink(missing_ok=True)
+            return final_path
+        raise RuntimeError(
+            f"Could not publish backup {final_name!r}: final-name collision "
+            "persisted after 8 attempts"
+        )
+
+    @staticmethod
+    def _collision_name(final_name: str) -> str:
+        """Fresh token that keeps the published-format suffix.
+
+        Second-pass review of #3888 (P2): ``Path('x.abc12345.db.gz').stem``
+        is ``x.abc12345.db``, so ``f"{stem}.{token}{suffix}"`` produced
+        ``x.abc12345.db.<token>.gz`` — a name the list/retention allowlist
+        (``backup_*.db``, ``backup_*.db.gz``) can never discover. The
+        token goes BEFORE the compound ``.db.gz`` suffix instead, so every
+        generated name still ends in the published format.
+        """
+        if final_name.endswith(".db.gz"):
+            return f"{final_name[: -len('.db.gz')]}.{secrets.token_hex(3)}.db.gz"
+        final = Path(final_name)
+        return f"{final.stem}.{secrets.token_hex(3)}{final.suffix}"
+
     def _compress_backup(self, backup_path: Path) -> Path | None:
-        """Compress backup file"""
+        """Compress backup file.
+
+        BR-022 (from #3890) + post-merge review of #3888 (P1): compression
+        must never leave a partial, published-looking ``.db.gz`` behind and
+        must never overwrite a completed archive. The archive is written to
+        this operation's private ``.gz.tmp`` file, validated, then published
+        atomically AND exclusively — a partial archive is never visible
+        under the final name, and a name collision re-stamps an extra
+        unique suffix instead of clobbering. On failure only that temp file
+        is removed and the caller keeps the good uncompressed source.
+        """
+        import gzip
+
+        compressed_path = backup_path.with_suffix(backup_path.suffix + ".gz")
+        if compressed_path.exists():
+            logger.error("Refusing to overwrite an existing archive: %s", compressed_path.name)
+            return None
+
+        temp_gz: Path | None = self.backup_dir / (compressed_path.name + ".tmp")
         try:
-            import gzip
-
-            compressed_path = backup_path.with_suffix(backup_path.suffix + ".gz")
-
-            with open(backup_path, "rb") as f_in:
-                with gzip.open(compressed_path, "wb") as f_out:
+            # Second-pass review of #3888 (P1): owner-only from the first
+            # byte — gzip.open created the temp with 0666&~umask. The path
+            # embeds this run's own uuid-suffixed source name, so an
+            # existing file is a stale crash leftover, never a live
+            # writer: refuse to touch it and keep the uncompressed .db.
+            try:
+                fd = os.open(temp_gz, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            except FileExistsError:
+                logger.error("Refusing to reuse existing gz temp: %s", temp_gz.name)
+                return None
+            with os.fdopen(fd, "wb") as raw_out:
+                # Review 5791968648 (P1): os.chmod — NOT the Unix-only
+                # pre-3.13 os.fchmod — INSIDE the fdopen with-block, so
+                # the descriptor closes on every path.
+                os.chmod(temp_gz, 0o600)
+                with open(backup_path, "rb") as f_in, gzip.open(raw_out, "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
-
-            return compressed_path
+            if temp_gz.stat().st_size == 0:
+                raise OSError("compressed output is empty")
         except Exception as e:
             logger.warning(f"Compression failed: {e}")
+            try:
+                temp_gz.unlink(missing_ok=True)
+            except OSError:
+                pass
             return None
+
+        try:
+            # Atomic + exclusive publish: no partial archive ever appears
+            # under the final name, no completed archive is clobbered.
+            return self._publish_backup(temp_gz, compressed_path.name)
+        except BaseException:
+            try:
+                temp_gz.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
 
     def _cleanup_old_backups(self):
         """Remove old backups based on retention policy"""
         try:
+            # Post-merge review of #3887 (P1 #2): retention must consider
+            # only PUBLISHED archives. The old ``backup_*.db*`` pattern also
+            # matched ``*.db.tmp`` artifacts of runs that were still dumping,
+            # so an over-limit directory swept another writer's in-flight
+            # temp file — and the tmp counted toward the keep-window,
+            # displacing published archives. .tmp files belong to their
+            # writers and are never touched here.
             backups = sorted(
-                self.backup_dir.glob("backup_*.db*"),
+                {
+                    p
+                    for pattern in (
+                        "backup_*.db",
+                        "backup_*.db.gz",
+                        "backup_*.db.*.gz",
+                    )
+                    for p in self.backup_dir.glob(pattern)
+                },
                 key=lambda p: p.stat().st_mtime,
                 reverse=True
             )
@@ -365,6 +549,7 @@ class BackupService:
             # Remove backups older than retention period
             cutoff_date = datetime.now(UTC) - timedelta(days=self.retention_days)
             removed_count = 0
+            removed_paths: set[Path] = set()
 
             for backup in backups:
                 # aware-UTC: naive fromtimestamp vs aware cutoff raised
@@ -372,12 +557,17 @@ class BackupService:
                 backup_time = datetime.fromtimestamp(backup.stat().st_mtime, tz=UTC)
                 if backup_time < cutoff_date:
                     backup.unlink()
+                    removed_paths.add(backup)
                     removed_count += 1
                     logger.info(f"🗑️  Removed old backup: {backup.name}")
 
-            # Also limit total number of backups
-            if len(backups) > self.max_backups:
-                for backup in backups[self.max_backups:]:
+            # Also limit total number of backups — survivors only (BR-021:
+            # the pre-cleanup snapshot re-unlinked an already-removed expired
+            # archive, raising FileNotFoundError and logging a misleading
+            # retention error while the outcome was actually correct).
+            survivors = [b for b in backups if b not in removed_paths]
+            if len(survivors) > self.max_backups:
+                for backup in survivors[self.max_backups:]:
                     backup.unlink()
                     removed_count += 1
                     logger.info(f"🗑️  Removed backup (max limit): {backup.name}")
@@ -392,8 +582,24 @@ class BackupService:
         """List all available backups"""
         backups = []
 
+        # Same P1 #2 family as retention: never present another writer's
+        # in-flight ``*.tmp`` as a restorable backup.
+        # Second-pass review of #3888 (P2): every published generated name
+        # must be discoverable — collision re-stamps keep the compound
+        # ``.db.gz`` suffix, and the legacy ``...db.<token>.gz`` form is
+        # tolerated. Dedupe: ``backup_*.db.gz`` and ``backup_*.db.*.gz``
+        # overlap; a duplicated path would be swept twice by retention
+        # (the BR-021 double-unlink failure mode).
         for backup_path in sorted(
-            self.backup_dir.glob("backup_*.db*"),
+            {
+                p
+                for pattern in (
+                    "backup_*.db",
+                    "backup_*.db.gz",
+                    "backup_*.db.*.gz",
+                )
+                for p in self.backup_dir.glob(pattern)
+            },
             key=lambda p: p.stat().st_mtime,
             reverse=True
         ):
@@ -478,6 +684,14 @@ class BackupService:
                     "-U", pg_user,
                     "-d", pg_db,
                     "-c",  # Clean (drop) database objects before recreating
+                    "--if-exists",
+                    # BR-020: --single-transaction wraps the whole restore
+                    # (including the -c drops) in one all-or-nothing
+                    # transaction (implies --exit-on-error), so a mid-restore
+                    # failure no longer leaves partly committed DDL. The
+                    # broader maintenance-gate/isolated-target protocol stays
+                    # an operator policy decision tracked in the ledger.
+                    "--single-transaction",
                     restore_source,
                 ]
 
@@ -527,46 +741,76 @@ class BackupService:
                     "error": "Backup file is empty",
                 }
 
-            # For SQLite, try to open and check integrity
-            if backup_path.suffix == ".db" or (backup_path.suffix == ".gz" and backup_path.stem.endswith(".db")):
-                import gzip
-                import sqlite3
-                import tempfile
+            # BR-019: route by what the archive actually is, not by its
+            # filename — this service writes PostgreSQL custom-format dumps
+            # (pg_dump -F c) under a .db[.gz] name, and the historical code
+            # fed every such file to SQLite's integrity_check, reporting a
+            # restorable PG dump as {"valid": false, "file is not a
+            # database"}. SQLite is tried first (no external tool); a
+            # non-SQLite file falls through to pg_restore --list; anything
+            # neither can read is invalid — the historical "valid: size > 0"
+            # fallback is gone.
+            is_gz = backup_path.suffix == ".gz"
+            check_path = str(backup_path)
+            temp_db = None
+            try:
+                if is_gz:
+                    import gzip
+                    import tempfile
 
-                # Extract if compressed
-                if backup_path.suffix == ".gz":
                     temp_db = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
                     with gzip.open(backup_path, "rb") as f_in:
                         with open(temp_db.name, "wb") as f_out:
                             shutil.copyfileobj(f_in, f_out)
                     check_path = temp_db.name
-                else:
-                    check_path = str(backup_path)
 
-                # Check SQLite integrity
-                conn = sqlite3.connect(check_path)
+                import sqlite3
+
                 try:
-                    result = conn.execute("PRAGMA integrity_check").fetchone()
-                    is_valid = result[0] == "ok"
-                finally:
-                    conn.close()
-                    if backup_path.suffix == ".gz":
-                        os.unlink(check_path)
+                    conn = sqlite3.connect(check_path)
+                    try:
+                        integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+                    finally:
+                        conn.close()
+                    return {
+                        "valid": integrity == "ok",
+                        **({} if integrity == "ok" else {"error": f"SQLite integrity check failed: {integrity}"}),
+                        "format": "sqlite",
+                        "verify_mode": "sqlite PRAGMA integrity_check",
+                        "size": size,
+                        "size_mb": round(size / (1024 * 1024), 2),
+                        "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    }
+                except sqlite3.DatabaseError:
+                    pass  # not a SQLite database — try the PostgreSQL path
 
-            return {
-                    "valid": is_valid,
+                list_result = subprocess.run(
+                    [_resolve_pg_tool("pg_restore"), "-l", check_path],
+                    capture_output=True, text=True, check=False,
+                )
+                if list_result.returncode == 0:
+                    return {
+                        "valid": True,
+                        "format": "postgresql-custom",
+                        "verify_mode": "pg_restore --list (archive readable; not a full restore proof)",
+                        "size": size,
+                        "size_mb": round(size / (1024 * 1024), 2),
+                        "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    }
+                return {
+                    "valid": False,
+                    "error": (
+                        "unknown archive format (not SQLite; pg_restore --list "
+                        f"failed with exit {list_result.returncode}: "
+                        f"{(list_result.stderr or list_result.stdout or '')[:200]})"
+                    ),
                     "size": size,
                     "size_mb": round(size / (1024 * 1024), 2),
                     "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                 }
-
-            # For other formats, just check size
-            return {
-                "valid": size > 0,
-                "size": size,
-                "size_mb": round(size / (1024 * 1024), 2),
-                "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            }
+            finally:
+                if temp_db is not None:
+                    os.unlink(temp_db.name)
 
         except Exception as e:
             return {
