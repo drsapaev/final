@@ -6160,3 +6160,25 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Allowed authored paths: `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Denied: direct runtime/app/test changes, auth/DB/schema, production/deploy, staging/foreign resources, GitHub review-thread mutation and PR merge.
 - Local validation: targeted assertions for the canonical `specialists` requirement, PARTIAL status, retained passing evidence, historical correction and inspected artifact hash PASS; `git diff --check` PASS; `origin/main` is an ancestor of the branch; diff against `origin/main` contains only the three journals. `EVIDENCE.md` adds 15 lines and deletes none in this correction; the existing history is preserved. Commit/push, PR-body refresh and checks on the resulting HEAD remain pending at this entry. No new application test or staging was run in this correction.
 - PR: #3873 remains open; the review thread is not resolved or replied to in this task. User owns merge. Overall T18 and Tier-2 remain PARTIAL; no deferral is claimed.
+
+## T18.10 current-source specialists Session — 2026-11-07T00:38:36+05:00
+
+- Commit under test: ea1a9011f86a8e3f9d663e3b6e7b272cefd93264 (same as PR #3897 HEAD at execution).
+- Environment: owned synthetic WSL Compose project clinic-aqs-t18-specialists-20261107; Admin account required normal TOTP enrollment and follow-up password+TOTP login. No production data or credentials were used.
+- Execution mode: continuation of the previously authorized T18 narrow_override; validation only. The canonical gate result and generated prompt are recorded in the current task checkpoint. No tracked runtime or test source was edited.
+- Allowed paths: task-owned .scratch/t18-specialists-current/, the three T18 journals, and existing current-source routes/specs as reference. Denied: app/runtime edits in this PR, production, foreign resources, merge, deployment.
+- Preflight: PASS, unique owner/project, non-production ports, no warnings. Start: PASS; source HEAD matched, worktree clean, runtime readiness PASS, served_revision_verified=false.
+- Validation command: canonical ops/scripts/wsl_staging.ps1 -Action Session -EnvFile .scratch/t18-specialists-current/staging.env -NoBuild -CommandArgs @('powershell.exe','-NoProfile','-File', <task-owned session.ps1>).
+- Browser result on the exact tested source:
+  - PASS — fresh synthetic Admin required and completed TOTP enrollment.
+  - PASS — second normal Admin password login required and passed TOTP.
+  - PASS — current Admin directions API returned the actual specialists profile and the setup screen rendered it selected.
+  - PASS — QueueProfilesManager loaded and rendered the actual specialists row.
+  - FAIL — typed return context did not preserve selected profile plus checklist selection. Source review identifies the lost field: AdminSetupDirections.tsx setupEditorLink() passes profileKey: null despite the selected specialists profile; the serializer consequently omits setupProfile.
+  - NOT_RUN — tab-switch completion, reload, Back/Forward, protected DELETE 409/readable error/row retention; the harness stopped at the first failed context assertion.
+  - Browser diagnostics: 2 console error events counted but messages were not captured; 0 uncaught page errors. Classify those events as UNCLASSIFIED, not as a clean console.
+- Result: FAIL for the current-source T18.10 return-context requirement; overall T18.10 remains PARTIAL. This is a source-backed application behavior gap, not a proven harness-only failure. Existing T18.10 PASS records for source a9c25f5b remain historical and are not promoted to current-source proof.
+- Evidence artifact: sanitized result .scratch/t18-specialists-current/result.json, SHA-256 9DA937246A275FE56F7BD5B15E76C40C92225C9260E4C61EEED8B578C04BF9B0; validation harness SHA-256 8677AC302216433C0C46428FB0ABE85DD3C413E55C411B607B7F89CBD5CFF59D. The report contains only assertion names/status, source and project identifiers; it contains no credentials, response payloads, patient data, screenshots, traces, or tokens.
+- Cleanup: canonical Session returned VALIDATION_FAILED: child exit 1; STAGING_TEARDOWN=PASS. Post-Session inventory for the exact project showed zero containers, volumes, networks, and project-local images. Synthetic env deletion was rejected by local host policy; it remains at .scratch/t18-specialists-current/staging.env and must be removed through the supported cleanup flow. No alternative deletion method was used.
+- Console/asset limitation: the prior bounded RQ-18 comparison (45/45 fetched JS/CSS files) and global served_revision_verified=false remain unchanged. This Session does not complete full T18 or docs/runbooks/STAGING_VALIDATION.md.
+- Next: document the source gap in a separate current-main PR after user merges #3897; do not expand the RQ-18 PR into runtime work. Re-run affected T18.10 cases after that fix, then continue remaining cross-cutting T18 acceptance. User retains merge/deployment authority.

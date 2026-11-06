@@ -1,3 +1,16 @@
+## Current resume — current-source T18.10 found lost selected-profile context — 2026-11-07T00:38:36+05:00
+
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final, branch codex/aqs-t18-rq18-current-20261106, source and PR HEAD ea1a9011f86a8e3f9d663e3b6e7b272cefd93264. PR #3897 is OPEN, Ready for review; user owns merge and deployment. Its exact-head CI passed before this journal update; refresh GitHub after push.
+
+Canonical Preflight and Start passed for owned synthetic project clinic-aqs-t18-specialists-20261107. One Admin/2FA Session reached the actual specialists profile and its QueueProfilesManager row, then FAILED at return-context preservation. AdminSetupDirections.tsx setupEditorLink() serializes profileKey: null even when the selected profile is specialists; the return URL therefore loses the selected profile. This conflicts with T15 context preservation and the T18.10 checklist. Subsequent catalog switch, reload, Back/Forward, and protected DELETE 409 assertions were NOT_RUN. Session result: FAIL for the context check; canonical teardown PASS; owned project containers, volumes, network, and images are absent.
+
+Keep T18.10/T18/Tier-2 PARTIAL. Earlier T18.10 PASS evidence on source a9c25f5b remains historical and does not override this current-source failure. The RQ-18 flow and bounded 45/45 asset comparison remain PASS on runtime 5363a9ca. The full staging runbook, broader integrated acceptance, two unexplained earlier console events, eight unmapped bundle call sites, and global served-revision attestation remain open.
+
+The validation-only temporary env .scratch/t18-specialists-current/staging.env remains because local host policy blocked its deletion; no alternative deletion method was used. It contains only credentials for the destroyed synthetic project. Remove this exact file through the supported local cleanup flow before another staging run. The sanitized report and harness remain under the same task-owned .scratch directory.
+
+Next exact action: commit/push the journal-only T18.10 failure record and update #3897 description; verify exact-head checks. User merges #3897. Then create a fresh worktree from current origin/main for the narrow selected-profile return-context fix plus regression tests, after the required gate and scope review. Re-run only the affected T18.10 cases. Continue remaining T18/runbook work; do not deploy.
+
+---
 ## Current resume — PR #3897 checks verified; T18 remains PARTIAL — 2026-11-06T23:00:56+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final`, branch `codex/aqs-t18-rq18-current-20261106`. Base `origin/main` is `5363a9ca53234539c5022b587250374a452a91a0`. PR #3897 is OPEN, Ready for review, and mergeable; query GitHub for its live HEAD before any follow-up. The pre-correction HEAD `0abda68169feb608b66ac7f9cf926cd001446f3c` passed applicable CI. User owns merge and deployment.
