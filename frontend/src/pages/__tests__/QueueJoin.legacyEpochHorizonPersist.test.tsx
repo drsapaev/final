@@ -1,5 +1,5 @@
 /**
- * QR-FE-028/029/030 (audit #3886, ledger group 1 — QR patient join):
+ * QR-FE-028/029/030 (audit 3886, ledger group 1 — QR patient join):
  *
  * 028: legacy /queue/join/:token accepts late cross-token responses — a
  *      deferred info/start of token A resolves AFTER the user switched to
@@ -38,10 +38,10 @@ const TOKEN_A = 'legacy-qr-token-a';
 const TOKEN_B = 'legacy-qr-token-b';
 
 const SPECIALISTS_A = [
-  { id: 6, specialty: 'cardio', specialty_display: 'Кардиолог Альфа', icon: '❤️', color: '#FF3B30' },
+  { id: 6, specialty: 'cardio', specialty_display: 'Кардиолог Альфа' },
 ];
 const SPECIALISTS_B = [
-  { id: 9, specialty: 'derma', specialty_display: 'Дерматолог Бета', icon: '🧬', color: '#007AFF' },
+  { id: 9, specialty: 'derma', specialty_display: 'Дерматолог Бета' },
 ];
 
 function tokenInfo(specialists: typeof SPECIALISTS_A, department: string) {

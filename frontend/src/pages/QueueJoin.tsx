@@ -661,7 +661,7 @@ const QueueJoin = () => {
   // LATE answer for a superseded code can never overwrite the freshly
   // booted direction (out-of-order A/B responses).
   const directionEpochRef = useRef(0);
-  // QR-FE-028 (audit #3886): the SAME epoch/ownership guard for the
+  // QR-FE-028 (audit 3886): the SAME epoch/ownership guard for the
   // LEGACY /queue/join/:token path. Without it a deferred info/start of
   // token A resolves after an in-route switch to token B (same mounted
   // route, changed :token param) and paints A's queue info/session over
@@ -851,7 +851,7 @@ const QueueJoin = () => {
         : [];
 
       setSessionToken(sessionData.session_token);
-      // QR-FE-029 (audit #3886): the same /queue/join/start response
+      // QR-FE-029 (audit 3886): the same /queue/join/start response
       // carries the server-computed attempt horizon (end of the TARGET
       // queue-day + grace, clinic timezone). Capturing it here lets the
       // legacy UNKNOWN envelope persist the REAL horizon instead of the
@@ -978,7 +978,7 @@ const QueueJoin = () => {
       return;
     }
 
-    // QR-FE-028 (audit #3886): a token change inside the mounted route
+    // QR-FE-028 (audit 3886): a token change inside the mounted route
     // bumps the legacy epoch — every in-flight info/start/submit
     // continuation of the OLD token self-cancels — and drops the previous
     // token's stale client context (session, queue info, specialists,
@@ -1849,7 +1849,7 @@ const QueueJoin = () => {
       // exactly-once конверт — после потери ответа /join/complete повторный
       // вход восстанавливает ОРИГИНАЛЬНУЮ сессию, а не чеканит новую.
       // Профиль/заголовок направления здесь бессмысленны (нет direction).
-      // QR-FE-029 (audit #3886): горизонт — СЕРВЕРНЫЙ attempt_expires_at
+      // QR-FE-029 (audit 3886): горизонт — СЕРВЕРНЫЙ attempt_expires_at
       // из ответа /queue/join/start (конец целевого дня очереди + grace);
       // 24h TTL остаётся только фолбэком для старых ответов без поля
       // (сессия, восстановленная из localStorage без свежего start).
@@ -1971,7 +1971,7 @@ const QueueJoin = () => {
           }));
         }
 
-        // ✅ QR-FE-030 (audit #3886): the lastQueueJoin flag has NO active
+        // ✅ QR-FE-030 (audit 3886): the lastQueueJoin flag has NO active
         // consumer (the registrar polling was removed — RegistrarPanel
         // R-1.7) and is nonclinical best-effort telemetry only. A storage
         // quota/security failure here must NEVER reclassify a CONFIRMED
