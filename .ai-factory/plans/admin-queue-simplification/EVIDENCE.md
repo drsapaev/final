@@ -1,3 +1,16 @@
+<a id="t18-current-source-rq18-served-asset-provenance-20261106"></a>
+## T18 current-source RQ-18 served-asset provenance — 2026-11-06T22:19:38+05:00
+
+- Commit under test: app/runtime source 5363a9ca53234539c5022b587250374a452a91a0; current PR worktree HEAD 68ed0e4b9a511f085458be7b75ff2e2dacdece75. The worktree had only the scoped E2E provenance instrumentation modified during the run; runtime frontend source paths were unchanged against origin/main.
+- Environment: owned synthetic Compose project clinic-aqs-rq18-current-20261106, Ubuntu-24.04, project ports 18088/18087/15439. Host free space 15 GiB; WSL backing free space 28 GiB. No production or foreign project was used.
+- Execution: existing synthetic lease had expired during the previous attempt; that attempt stopped before build/browser and canonical teardown reported PASS. Renewed only CLINIC_EXPIRES_AT in the owned env. Canonical Preflight PASS with no warnings (3196 MiB available); canonical Preflight → Start/build/readiness → Session then PASS.
+- Browser result: RQ-18 Playwright 1 passed, 0 skipped, 0 failed. 45 same-origin JavaScript/CSS response assets were captured. Each path/SHA-256 matched the same-path file in the owned frontend container: 45 matches, 0 mismatches. The tested E2E file blob, now included in the local follow-up, is 37bf87817d7a21d7f447d0caf9636b714125007d. Container short ID c265e5f617f5; frontend image ID sha256:fd6a67c7a96db6dd563ee4fc1580c3fb9c11953fe8dd8fd818103d81269484cc. Raw response bodies were hashed in memory and not retained; no patient or credential data was recorded.
+- Cleanup: canonical Session teardown PASS; removed 5 containers, 3 volumes, 1 network and Compose-local images; remaining owned containers/volumes/networks were 0. First post-Session Preflight reported WINDOWS_PORT_OWNER; read-only Windows listener inspection found none on the three selected ports, and the canonical Preflight retry passed without warnings (3178 MiB available). No process or foreign resource was stopped.
+- Limitation: launcher field served_revision_verified=false remains unchanged. This independent check proves byte equality for assets fetched in this RQ-18 browser scenario against the owned frontend container; it does not attest every unrequested static file, the launcher's marker, production, or the whole system.
+- Validation: focused ESLint, isolated strict TypeScript, Playwright collection and diff-check had passed before this Session; the Session executed the actual browser test. Hosted checks on the pre-instrumentation remote PR HEAD do not cover this local E2E change. Re-run exact-head CI after pushing.
+- Scope: no application/backend/API/schema/auth/RBAC, production, deployment, or merge change. The PR remains user-merge-owned.
+- Remaining: full STAGING_VALIDATION.md and broader T18/Tier-2 acceptance remain incomplete; overall T18 remains PARTIAL. No deferral or production-readiness claim.
+
 ## T18 RQ-18 exact-head CI checkpoint — 2026-11-06T20:52:58+05:00
 
 - PR: [#3897](https://github.com/drsapaev/final/pull/3897), open, non-draft. Exact checked head: `12092f18c52971c50a143fddca8d6ffcd183ef12`, base `5363a9ca53234539c5022b587250374a452a91a0`.

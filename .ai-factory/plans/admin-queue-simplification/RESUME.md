@@ -1,4 +1,17 @@
-## Current resume — PR #3897 exact-head CI passed; journal follow-up next — 2026-11-06T20:52:58+05:00
+## Current resume — RQ-18 served-asset provenance PASS; PR #3897 follow-up pending — 2026-11-06T22:24:13+05:00
+
+Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final, branch codex/aqs-t18-rq18-current-20261106. PR #3897 is OPEN, non-draft and mergeable at remote HEAD 68ed0e4b9a511f085458be7b75ff2e2dacdece75, base 5363a9ca53234539c5022b587250374a452a91a0. User owns merge and deployment.
+
+The focused RQ-18 asset-provenance Session is now PASS. It ran canonical Preflight → Start/build/readiness → Session on owned synthetic project clinic-aqs-rq18-current-20261106. Playwright result: 1 passed, 0 skipped, 0 failed. Forty-five same-origin JS/CSS assets fetched by the scenario matched their corresponding files in the owned frontend container (45/45, 0 mismatches). Container short ID c265e5f617f5; frontend image ID sha256:fd6a67c7a96db6dd563ee4fc1580c3fb9c11953fe8dd8fd818103d81269484cc. Hashes were computed in memory; raw bodies and sensitive user data were not retained.
+
+The previous attempt stopped before build/browser because the synthetic lease expired; its launcher teardown passed. Only the lease-expiry field was renewed. Session teardown removed 5 containers, 3 volumes, 1 network and local images; remaining owned resources were zero. The first post-Session Preflight detected a transient/ambiguous Windows port owner; read-only inspection found no listener on the selected ports, and a canonical retry passed without warnings. No process or foreign project was stopped.
+
+The launcher still reports served_revision_verified=false; the independent 45-file comparison is bounded to assets fetched in this browser scenario. It does not complete the full staging runbook or prove production readiness. T18/Tier-2 remain PARTIAL. The PR's currently pushed HEAD checks do not include this local test/evidence follow-up.
+
+Next exact action: compare the live PR branch with the local follow-up commit, push it if absent, update the PR description, and verify applicable checks on the resulting exact HEAD. Leave merge to the user. After merge, resume only uncompleted T18/runbook items; do not repeat validated RQ-18/T18.10 runs absent a source change. Do not deploy.
+
+---
+## Previous resume — PR #3897 before served-asset provenance — 2026-11-06T20:52:58+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final`, branch `codex/aqs-t18-rq18-current-20261106`, based on `origin/main` `5363a9ca53234539c5022b587250374a452a91a0`. PR #3894 is merged at `256483d318f47ca4acb054b62467acf26a53dc8f`. User owns all merges and deployment.
 

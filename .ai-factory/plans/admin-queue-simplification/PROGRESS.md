@@ -1,6 +1,36 @@
 # Progress — T18 integrated synthetic acceptance
 
 Plan version: 1.0
+Current task: T18 final synthetic acceptance and evidence reconciliation
+Current status: IN_PROGRESS; T00–T17 MERGED; T18 core scenarios 1–9 validated; T18.10 validated on its tested source; current-source RQ-18 functional flow and per-scenario served-asset provenance PASS; overall T18/Tier-2 remain PARTIAL; user retains merge/deployment authority
+Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final
+Branch: codex/aqs-t18-rq18-current-20261106
+Runtime source for current-source RQ-18: 5363a9ca53234539c5022b587250374a452a91a0
+Current PR: #3897 OPEN, Ready for review, mergeable; remote HEAD 68ed0e4b9a511f085458be7b75ff2e2dacdece75; applicable hosted checks PASS. One local commit contains the current E2E/evidence follow-up and is not yet pushed; compare actual PR head and rerun checks after push.
+PR #3894 merged at 256483d318f47ca4acb054b62467acf26a53dc8f.
+Last updated: 2026-11-06T22:24:13+05:00
+
+## Current checkpoint — RQ-18 asset provenance passed; T18 remains open
+
+| Task | Status | Evidence |
+|------|--------|----------|
+| T00–T17 | MERGED | Existing plan journals |
+| T18 scenarios 1–9 | VALIDATED | Scenario records in this file and EVIDENCE.md |
+| T18.10 | VALIDATED on a9c25f5b | Sanitized specialists Session report in EVIDENCE.md |
+| T18 current-source RQ-18 | PASS on runtime 5363a9ca | Functional Session and [45/45 served-asset comparison](EVIDENCE.md#t18-current-source-rq18-served-asset-provenance-20261106) |
+| T18 overall | PARTIAL | Full runbook and broader acceptance still open |
+
+- Latest owned synthetic canonical Session passed the RQ-18 browser scenario and matched all 45 fetched JS/CSS assets to files in its own frontend container (45 matches, 0 mismatches). The Session removed its 5 containers, 3 volumes, 1 network and local images; remaining owned resources were 0.
+- The first post-Session Preflight saw a transient/ambiguous port owner. Read-only listener inspection found no Windows listener on the selected ports; a canonical retry passed with no warnings. No process was stopped.
+- served_revision_verified=false remains the canonical launcher value. The independent comparison is limited to assets fetched in this browser scenario and is not a global or production attestation.
+- Current PR #3897 has applicable checks PASS at remote HEAD 68ed0e4, while backend, integration, Docker, readiness, DAST and k6 jobs are SKIPPED by scope. Those checks do not include the current local E2E instrumentation or journal update.
+- The previous expired-lease attempt stopped before build/browser and was torn down successfully; it is recorded as an environment lifecycle stop, not an application failure.
+- Next exact action: compare the live PR branch with this local follow-up commit, push it if absent, refresh the PR description and verify checks on the resulting exact HEAD. Leave merge to the user. After merge, reconcile the remaining T18 acceptance and full staging runbook; do not deploy or claim full Tier-2.
+
+---
+## Previous checkpoint — RQ-18 functional pass before served-asset attestation — 2026-11-06T20:52:58+05:00
+
+Plan version: 1.0
 Current task: T18 acceptance; record current-source RQ-18 public QR lifecycle and finish remaining staging evidence
 Current status: IN_PROGRESS; RQ-18 source/evidence PR #3897 OPEN; current-source RQ-18 Session PASS; T18.10 VALIDATED on its tested source; overall T18/Tier-2 remain PARTIAL; user retains merge and deployment authority
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final

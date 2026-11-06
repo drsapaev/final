@@ -427,6 +427,7 @@ async function openPublicAddress(
   browser: Browser,
   origin: string,
   publicCode: string,
+  recordAssetPage: (page: Page) => void,
 ): Promise<{
   context: Awaited<ReturnType<Browser['newContext']>>;
   page: Page;
@@ -436,6 +437,7 @@ async function openPublicAddress(
 }> {
   const context = await browser.newContext({ baseURL: origin });
   const page = await context.newPage();
+  recordAssetPage(page);
   const startCount = countDirectionStartRequests(page);
   const responsePromise = page.waitForResponse((response) => {
     if (response.request().method() !== 'POST') return false;
@@ -515,10 +517,87 @@ function markRq18Phase(phase: string) {
   process.stdout.write('RQ18_PHASE=' + phase + '\n');
 }
 
+function createServedAssetRecorder() {
+  const hashesByOriginAndPath = new Map<string, Set<string>>();
+  const pending: Promise<void>[] = [];
+  const captureFailures = new Set<string>();
+  const notModifiedResponses = new Set<string>();
+
+  const recordPage = (assetPage: Page) => {
+    assetPage.on('response', (response) => {
+      const resourceType = response.request().resourceType();
+      if (resourceType !== 'script' && resourceType !== 'stylesheet') return;
+
+      let url: URL;
+      try {
+        url = new URL(response.url());
+      } catch {
+        captureFailures.add('invalid-static-response-url');
+        return;
+      }
+      if (!url.pathname.startsWith('/assets/') && url.pathname !== '/sw.js') return;
+
+      const key = url.origin + url.pathname;
+      if (response.status() === 304) {
+        notModifiedResponses.add(key);
+        return;
+      }
+      if (response.status() !== 200) {
+        captureFailures.add(key);
+        return;
+      }
+
+      pending.push(response.body().then((body) => {
+        const digest = crypto.createHash('sha256').update(body).digest('hex');
+        const hashes = hashesByOriginAndPath.get(key) || new Set<string>();
+        hashes.add(digest);
+        hashesByOriginAndPath.set(key, hashes);
+      }).catch(() => {
+        captureFailures.add(key);
+      }));
+    });
+  };
+
+  const reportForOrigin = async (expectedOrigin: string) => {
+    await Promise.all(pending);
+    if (Array.from(captureFailures).some((key) => key === 'invalid-static-response-url'
+        || key.startsWith(expectedOrigin + '/'))) {
+      throw new Error('One or more same-run static asset responses could not be hashed.');
+    }
+    if (Array.from(notModifiedResponses).some((key) => key.startsWith(expectedOrigin + '/')
+        && !hashesByOriginAndPath.has(key))) {
+      throw new Error('A cached static asset had no earlier response hash in this run.');
+    }
+
+    const records = Array.from(hashesByOriginAndPath.entries())
+      .filter(([key]) => key.startsWith(expectedOrigin + '/'))
+      .map(([key, hashes]) => {
+        if (hashes.size !== 1) {
+          throw new Error('A served static asset returned conflicting content in one browser run.');
+        }
+        return { path: key.slice(expectedOrigin.length), sha256: Array.from(hashes)[0] };
+      })
+      .sort((left, right) => left.path.localeCompare(right.path));
+
+    if (records.length === 0) {
+      throw new Error('No same-origin JavaScript or CSS assets were captured.');
+    }
+
+    process.stdout.write('RQ18_ASSET_SHA256_COUNT=' + records.length + '\n');
+    for (const record of records) {
+      process.stdout.write('RQ18_ASSET_SHA256=' + record.path + ' ' + record.sha256 + '\n');
+    }
+  };
+
+  return { recordPage, reportForOrigin };
+}
+
 test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', async ({ browser, page }) => {
   test.setTimeout(600_000);
   page.setDefaultTimeout(30_000);
   page.setDefaultNavigationTimeout(30_000);
+  const servedAssets = createServedAssetRecorder();
+  servedAssets.recordPage(page);
   let pageErrors = 0;
   page.on('pageerror', () => { pageErrors += 1; });
   markRq18Phase('admin-login');
@@ -624,7 +703,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
 
   let bookingTargetDate = '';
   markRq18Phase('anonymous-booking-and-resource-ownership');
-  const booking = await openPublicAddress(browser, appOrigin, publicCode);
+  const booking = await openPublicAddress(browser, appOrigin, publicCode, servedAssets.recordPage);
   try {
     if (booking.status !== 200 || booking.startCount.value !== 1) {
       throw new Error('Available permanent QR did not open exactly one anonymous short session.');
@@ -666,7 +745,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   }
 
   markRq18Phase('reopen-permanent-address');
-  const reopen = await openPublicAddress(browser, appOrigin, publicCode);
+  const reopen = await openPublicAddress(browser, appOrigin, publicCode, servedAssets.recordPage);
   try {
     if (reopen.status !== 200 || reopen.startCount.value !== 1) {
       throw new Error('Reopening the permanent QR did not create one fresh short session.');
@@ -727,7 +806,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
     throw new Error('QueueProfile archival did not close public booking while preserving the permanent QR address.');
   }
 
-  const archived = await openPublicAddress(browser, appOrigin, publicCode);
+  const archived = await openPublicAddress(browser, appOrigin, publicCode, servedAssets.recordPage);
   try {
     if (archived.status !== 404 || archived.startCount.value !== 1) {
       throw new Error('Archived direction did not fail closed through the anonymous start-session route.');
@@ -766,7 +845,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
     throw new Error('Resource and profile restoration did not restore availability for the same permanent QR address.');
   }
 
-  const reactivated = await openPublicAddress(browser, appOrigin, publicCode);
+  const reactivated = await openPublicAddress(browser, appOrigin, publicCode, servedAssets.recordPage);
   try {
     if (reactivated.status !== 200 || reactivated.startCount.value !== 1) {
       throw new Error('Reactivated permanent QR did not open a fresh anonymous short session.');
@@ -778,4 +857,5 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
 
   markRq18Phase('completed');
   if (pageErrors !== 0) throw new Error('Unexpected uncaught Admin browser errors were observed.');
+  await servedAssets.reportForOrigin(appOrigin);
 });
