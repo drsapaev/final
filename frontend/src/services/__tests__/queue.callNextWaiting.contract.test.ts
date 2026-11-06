@@ -86,7 +86,12 @@ describe('QAPI-FE-001: the server null choice is not second-guessed', () => {
       if (url.includes('/queue/today')) {
         return queueResponse({ next_call_entry_id: 17, entries: [CALLABLE_ENTRY] });
       }
-      return { ok: true, json: async () => ({ message: 'called' }) };
+      // DOCFLOW-FE-003 (audit 3886): the call POST ack is authoritative —
+      // the canonical backend contract (_queue_ops.py) answers a committed
+      // call with `{success: true, entry: <updated>}`. The old test mocked a
+      // success-less `{message:'called'}` body because the pre-DOCFLOW code
+      // ignored the POST response entirely.
+      return { ok: true, json: async () => ({ success: true, entry: { id: 17, number: 'A017', status: 'called' } }) };
     });
 
     const result = await queueService.callNextWaiting('cardiology');
