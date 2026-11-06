@@ -1,6 +1,8 @@
-## Current resume — T18 acceptance after PR #3879 — 2026-11-06T11:27:27+05:00
+## Current resume — T18 acceptance after PR #3879 — 2026-11-06T11:39:12+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-report-provenance`, based on fresh `origin/main` `3de30426154cdb031b62c858fa6ff06a9b65aabc`. PR #3879 merged at `e29670213a7f8f8b084469914966afc8c20e4cbb`.
+
+Documentation follow-up PR [#3894](https://github.com/drsapaev/final/pull/3894) is open and Ready for review. Its initial HEAD `e46149f397abea32f572708087410fdf607e530b` passed six fetched workflows; a later journal checkpoint requires rechecking the resulting exact head. The user retains merge authority.
 
 The original `aqs-t18-specialists-check` worktree still has its task-owned uncommitted three-journal diff. It was not reset, cleaned, or reused; this branch carries the report into a fresh-main PR and reconciles its merge metadata.
 
@@ -12,7 +14,7 @@ The earlier RQ-18 lifecycle passed an anonymous QR join on `38ecd429`; source co
 
 The sanitized report is included in this three-journal evidence follow-up and identifies the saved untruncated command transcript; it is an agent-command record, not an independently signed attestation. This document-export slice did not run a new staging Session.
 
-Allowed authored paths remain `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`; runtime, tracked tests, production, staging, merge and deployment are outside this slice. Next: finish scope and document checks, commit/push the evidence follow-up, open its PR, and verify exact-head checks; the user retains merge authority. After merge, refresh `origin/main` and continue the current-source RQ-18 synthetic public join/lifecycle check. Overall Tier-2 and the full staging runbook remain PARTIAL/NOT_RUN; do not claim deployment or system health.
+Allowed authored paths remain `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`; runtime, tracked tests, production, staging, merge and deployment are outside this slice. Next: verify the current exact-head checks for PR #3894 and wait for user-owned merge. After merge, refresh `origin/main` and continue the current-source RQ-18 synthetic public join/lifecycle check. Overall Tier-2 and the full staging runbook remain PARTIAL/NOT_RUN; do not claim deployment or system health.
 
 ---
 
