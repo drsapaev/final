@@ -6,10 +6,10 @@ Current status: IN_PROGRESS; current-source RQ-18 Session PASS; T18.10 VALIDATED
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final
 Branch: codex/aqs-t18-rq18-current-20261106
 Base commit: `5363a9ca53234539c5022b587250374a452a91a0` (`origin/main` at cycle start)
-Current commit: `5363a9ca53234539c5022b587250374a452a91a0`; the RQ-18 live spec is a tracked working-tree change, blob `77d46f1c77bc11b56a838296e77e570621554738`.
+Current commit: `7039ea9c0ed02177819615cfb00a852338087e6c`; includes the RQ-18 live spec and updated T18 evidence journals.
 PR #3894 merged at `256483d318f47ca4acb054b62467acf26a53dc8f`; fresh worktree started at current `origin/main`.
 Runtime commit for the current-source RQ-18 staging Session: `5363a9ca53234539c5022b587250374a452a91a0`; T18.10 evidence remains anchored to `a9c25f5b9c25f52d12aed4fc22b74874dc441a3f`.
-Last updated: 2026-11-06T20:11:26+05:00
+Last updated: 2026-11-06T20:18:18+05:00
 
 ## Current checkpoint — current-source RQ-18 passed; remaining T18 acceptance
 
@@ -23,10 +23,10 @@ Last updated: 2026-11-06T20:11:26+05:00
 - Lifecycle assertions passed: the existing target-date resource queue remained visible after resource deactivation; clinic-day public availability closed while the permanent address remained; archiving the published profile returned the public address to a generic unavailable response; the resource was reactivated before restoring the profile because saved publication is revalidated; the same permanent address then reopened successfully.
 - Focused ESLint, isolated strict TypeScript, Playwright collection (1 test), and `git diff --check` passed. The full browser Session result was `1 passed`, no skips. No runtime/backend/API/auth changes were made.
 - Session teardown removed 5 containers, 3 volumes and 1 network; remaining owned containers/volumes/networks were zero. Selected ports were free. Post-session WSL available memory was 1,999 MiB. Launcher `served_revision_verified=false` remains unchanged and is not claimed as verified.
-- The app runtime was built from exact clean source commit `5363a9ca`; the only tracked diff during the staging cycle was the E2E spec. The current RQ-18 spec/evidence still needs a reviewable PR and exact-head CI.
+- The app runtime was built from exact clean source commit `5363a9ca`; the only tracked diff during the staging cycle was the E2E spec. The spec and evidence are committed locally as `7039ea9c`; the branch has not yet been pushed and no PR/CI exists for this commit.
 - T18.10 evidence remains valid only for its tested runtime commit. The full `docs/runbooks/STAGING_VALIDATION.md`, current served-frontend attestation, and remaining broader T18/Tier-2 checks are not implied by these focused runs. Overall Tier-2 remains PARTIAL as the user directed; no blanket deferral, deployment or system-health claim is recorded.
 - Prior RQ-18 harness failures were narrowed and fixed in the test: QueueProfile key validation, explicit QueueJoin info-step continuation, explicit target-date versus clinic-day reads, archive/restore control direction, and required resource-before-profile restoration order. Their source-backed explanations are in the current `RESUME.md` checkpoint and task scratch.
-- Next exact action: finalize the three journals, run the scoped validation and diff review, commit and push this single-purpose RQ-18 test/evidence PR, then verify exact-head CI. The user owns merge. After merge, reconcile the remaining T18 acceptance and full staging-runbook status; do not deploy or claim full Tier-2.
+- Next exact action: push `7039ea9c` and open one focused RQ-18 test/evidence PR; then verify checks on its exact HEAD and correct any failures in that PR. The user owns merge. After merge, reconcile remaining T18 acceptance and the full staging-runbook status; do not deploy or claim full Tier-2.
 
 ---
 

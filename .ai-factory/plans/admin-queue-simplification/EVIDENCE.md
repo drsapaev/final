@@ -1,3 +1,12 @@
+## T18 RQ-18 packaging checkpoint — 2026-11-06T20:18:18+05:00
+
+- Commit: `7039ea9c0ed02177819615cfb00a852338087e6c`; branch `codex/aqs-t18-rq18-current-20261106`, based on current `origin/main` `5363a9ca53234539c5022b587250374a452a91a0`.
+- Changed paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts` and the plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`; no runtime/application files changed.
+- Validation evidence: focused ESLint, isolated strict TypeScript, Playwright collection (1 test), `git diff --check`, and final canonical synthetic Preflight → Start → Session PASS are recorded in [the RQ-18 Session record](EVIDENCE.md#t18-current-source-rq18-permanent-qr-lifecycle-20261106).
+- PR status: not pushed; no PR or hosted CI exists for this commit yet. This packaging checkpoint contains the exact commit and next action; no staging run is repeated.
+- Next action: push the branch, open one focused PR, and verify checks against its exact HEAD. User retains merge and deployment authority.
+- Remaining limit: full T18/Tier-2 is PARTIAL; `docs/runbooks/STAGING_VALIDATION.md` and independent served-frontend provenance remain incomplete. No deferral, production-readiness or whole-system-health claim is made.
+
 <a id="t18-current-source-rq18-permanent-qr-lifecycle-20261106"></a>
 ## T18 current-source RQ-18 permanent QR lifecycle — 2026-11-06T20:13:02+05:00
 
