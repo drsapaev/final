@@ -6,10 +6,10 @@ Current status: IN_PROGRESS; RQ-18 source/evidence PR #3897 OPEN; current-source
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final
 Branch: codex/aqs-t18-rq18-current-20261106
 Base commit: `5363a9ca53234539c5022b587250374a452a91a0` (`origin/main` at cycle start)
-Current PR: #3897; latest observed PR head before this journal-only follow-up: `bbf3dfaadad324984c3db33658ce8549a925f33a`. Recheck live PR head after pushing this checkpoint.
+Current PR: #3897; last fully checked head before this journal-only follow-up: `12092f18c52971c50a143fddca8d6ffcd183ef12`. This follow-up advances the head; recheck all required results on the new live head.
 PR #3894 merged at `256483d318f47ca4acb054b62467acf26a53dc8f`; fresh worktree started at current `origin/main`.
 Runtime commit for the current-source RQ-18 staging Session: `5363a9ca53234539c5022b587250374a452a91a0`; T18.10 evidence remains anchored to `a9c25f5b9c25f52d12aed4fc22b74874dc441a3f`.
-Last updated: 2026-11-06T20:29:04+05:00
+Last updated: 2026-11-06T20:52:58+05:00
 
 ## Current checkpoint — current-source RQ-18 passed; remaining T18 acceptance
 
@@ -23,10 +23,10 @@ Last updated: 2026-11-06T20:29:04+05:00
 - Lifecycle assertions passed: the existing target-date resource queue remained visible after resource deactivation; clinic-day public availability closed while the permanent address remained; archiving the published profile returned the public address to a generic unavailable response; the resource was reactivated before restoring the profile because saved publication is revalidated; the same permanent address then reopened successfully.
 - Focused ESLint, isolated strict TypeScript, Playwright collection (1 test), and `git diff --check` passed. The full browser Session result was `1 passed`, no skips. No runtime/backend/API/auth changes were made.
 - Session teardown removed 5 containers, 3 volumes and 1 network; remaining owned containers/volumes/networks were zero. Selected ports were free. Post-session WSL available memory was 1,999 MiB. Launcher `served_revision_verified=false` remains unchanged and is not claimed as verified.
-- The app runtime was built from exact clean source commit `5363a9ca`; the only tracked diff during the staging cycle was the E2E spec. Test/evidence commit `7039ea9c` is in PR #3897. The PR is open and non-draft; its initial head `bbf3dfaa` has PR Quality Gate, Lifecycle Recommendation, Gitleaks, and Agent Workflow Guards PASS; Unified CI and Security were in progress. This journal-only follow-up advances the PR head, so those results must be rechecked on the new exact head.
+- The app runtime was built from exact clean source commit `5363a9ca`; the only tracked diff during the staging cycle was the E2E spec. PR #3897 is open and non-draft. Exact head `12092f18c52971c50a143fddca8d6ffcd183ef12` passed Unified CI, PR Required Gate, PR Review Quality Gate, PR Lifecycle Recommendation, security scan, Gitleaks, CodeQL, GitGuardian and both scratch guards. Backend, integration, Docker, readiness, DAST and k6 jobs were skipped by path/scope. This journal-only follow-up advances the PR head; recheck the resulting exact head before user merge.
 - T18.10 evidence remains valid only for its tested runtime commit. The full `docs/runbooks/STAGING_VALIDATION.md`, current served-frontend attestation, and remaining broader T18/Tier-2 checks are not implied by these focused runs. Overall Tier-2 remains PARTIAL as the user directed; no blanket deferral, deployment or system-health claim is recorded.
 - Prior RQ-18 harness failures were narrowed and fixed in the test: QueueProfile key validation, explicit QueueJoin info-step continuation, explicit target-date versus clinic-day reads, archive/restore control direction, and required resource-before-profile restoration order. Their source-backed explanations are in the current `RESUME.md` checkpoint and task scratch.
-- Next exact action: commit and push this journal update to PR #3897, then verify its live head and all required checks. Fix any red check in the same PR. The user owns merge. After merge, reconcile remaining T18 acceptance and the full staging-runbook status; do not deploy or claim full Tier-2.
+- Next exact action: commit and push this journal update to PR #3897, then verify its new exact head and all applicable required checks. Fix any red check in the same PR; if green, leave merge to the user. After user merge, reconcile remaining T18 acceptance and the full staging-runbook status; do not deploy or claim full Tier-2.
 
 ---
 

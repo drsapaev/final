@@ -1,3 +1,12 @@
+## T18 RQ-18 exact-head CI checkpoint — 2026-11-06T20:52:58+05:00
+
+- PR: [#3897](https://github.com/drsapaev/final/pull/3897), open, non-draft. Exact checked head: `12092f18c52971c50a143fddca8d6ffcd183ef12`, base `5363a9ca53234539c5022b587250374a452a91a0`.
+- Unified CI run `42243883098`: SUCCESS. Frontend build, lint/type-check/accessibility, unit tests, E2E, CI Scope, PR Required Gate and notifications passed. Frontend E2E completed in 17m22s.
+- Other applicable checks: PR Review Quality Gate `42243883155` PASS; PR Lifecycle Recommendation `42243883191` PASS; security scan `42243883128` PASS; secret scan `42243883145` PASS; CodeQL PASS; GitGuardian PASS; scratch guards `42243883092` PASS.
+- Skipped, not passed: backend tests, integration tests, Docker build, production/staging readiness, context boundary, DAST and k6. These skips are path/scope-based for the test/evidence-only PR.
+- This journal-only follow-up will advance the PR head. Recheck the new exact head before stating current CI is green. User owns merge and deployment.
+- Overall T18/Tier-2 remains PARTIAL; this result does not complete `docs/runbooks/STAGING_VALIDATION.md` or served-frontend provenance.
+
 ## T18 RQ-18 PR creation checkpoint — 2026-11-06T20:29:04+05:00
 
 - PR: [#3897](https://github.com/drsapaev/final/pull/3897), open, non-draft; base `main` at `5363a9ca53234539c5022b587250374a452a91a0`.
