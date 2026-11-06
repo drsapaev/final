@@ -661,6 +661,21 @@ const QueueJoin = () => {
   // LATE answer for a superseded code can never overwrite the freshly
   // booted direction (out-of-order A/B responses).
   const directionEpochRef = useRef(0);
+  // QR-FE-028 (audit 3886): the SAME epoch/ownership guard for the
+  // LEGACY /queue/join/:token path. Without it a deferred info/start of
+  // token A resolves after an in-route switch to token B (same mounted
+  // route, changed :token param) and paints A's queue info/session over
+  // B's live UI — the direction path already guards this via
+  // directionEpochRef, the legacy path did not. Bumped by the legacy
+  // boot on every token change; every legacy async continuation (info,
+  // start, submit, errors, finally) is bound to the epoch+token it was
+  // issued in and self-cancels when superseded.
+  const legacyEpochRef = useRef(0);
+  // QR-FE-028: the token the legacy epoch belongs to (null in direction
+  // mode) — lets a still-running old closure detect BOTH a token switch
+  // AND a mode switch, and lets the boot reset A's stale session context
+  // when the route moves to B.
+  const legacyTokenRef = useRef<string | null>(null);
   // RQ-18 follow-up round-3 (P1): a complete attempt makes the session's
   // business result UNKNOWN (the response may have been lost) — from that
   // moment the automatic session renewal is FORBIDDEN until an explicit
@@ -817,15 +832,32 @@ const QueueJoin = () => {
       setIsSpecialistsLoading(false);
       return;
     }
+    // QR-FE-028: bind this start to the legacy epoch+token it is issued
+    // in — a late resolution for a superseded token must self-cancel
+    // instead of overwriting the new token's session/UI.
+    const epoch = legacyEpochRef.current;
+    const token = legacyToken;
     setIsSpecialistsLoading(true);
     try {
-      const sessionData = await startQueueJoinSession(legacyToken);
+      const sessionData = await startQueueJoinSession(token);
+      if (epoch !== legacyEpochRef.current || legacyTokenRef.current !== token) {
+        // QR-FE-028: the route moved to another legacy token while this
+        // request was in flight — A's session must never replace B's.
+        return;
+      }
       const nextQueueInfo: QueueJoinPageInfo = (sessionData.queue_info ?? {}) as QueueJoinPageInfo;
       const selectableSpecialists: QueueSpecialist[] = Array.isArray(nextQueueInfo.selectable_specialists)
         ? nextQueueInfo.selectable_specialists
         : [];
 
       setSessionToken(sessionData.session_token);
+      // QR-FE-029 (audit 3886): the same /queue/join/start response
+      // carries the server-computed attempt horizon (end of the TARGET
+      // queue-day + grace, clinic timezone). Capturing it here lets the
+      // legacy UNKNOWN envelope persist the REAL horizon instead of the
+      // fixed 24h TTL fallback (a legitimate next-day QR attempt was
+      // discarded a day early before the target day even ended).
+      setAttemptExpiresAt(sessionData.attempt_expires_at ?? null);
       // QR-FE-006: сбой ПЕРСИСТЕНЦИИ токена сессии — НЕ сбой сессии:
       // startQueueJoinSession уже успешен, токен живёт в React state.
       // Прежний прямой setItem в этом же try превращал живую серверную
@@ -841,11 +873,21 @@ const QueueJoin = () => {
       }
 
     } catch (error: unknown) {
+      // QR-FE-028: a late failure of a superseded token must not paint
+      // an error screen onto the current token's flow.
+      if (epoch !== legacyEpochRef.current || legacyTokenRef.current !== token) {
+        return;
+      }
       setAvailableSpecialists([]);
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.sessionStartFailed));
       setStep('error');
     } finally {
-      setIsSpecialistsLoading(false);
+      // QR-FE-028: only the CURRENT epoch's flow may release the shared
+      // loading flag — a superseded token's finally must not unblock the
+      // new token's spinner either.
+      if (epoch === legacyEpochRef.current && legacyTokenRef.current === token) {
+        setIsSpecialistsLoading(false);
+      }
     }
   }, [getApiErrorMessage, legacyToken]);
 
@@ -856,11 +898,18 @@ const QueueJoin = () => {
       setIsSpecialistsLoading(false);
       return;
     }
+    // QR-FE-028: bind the info request to its epoch+token as well.
+    const epoch = legacyEpochRef.current;
+    const token = legacyToken;
 
     try {
       setStep('loading');
       setIsSpecialistsLoading(true);
-      const tokenInfoRaw = await fetchQrTokenInfo(legacyToken);
+      const tokenInfoRaw = await fetchQrTokenInfo(token);
+      if (epoch !== legacyEpochRef.current || legacyTokenRef.current !== token) {
+        // QR-FE-028: superseded by a token switch — drop the stale info.
+        return;
+      }
       const tokenInfo = tokenInfoRaw as unknown as QueueJoinPageInfo;
       setQueueInfo(tokenInfo);
       const tokenSpecialists = Array.isArray(tokenInfo.selectable_specialists)
@@ -900,6 +949,11 @@ const QueueJoin = () => {
       }
 
     } catch (error: unknown) {
+      // QR-FE-028: a late info failure of a superseded token must not
+      // paint an error screen over the current token.
+      if (epoch !== legacyEpochRef.current || legacyTokenRef.current !== token) {
+        return;
+      }
       setAvailableSpecialists([]);
       setIsSpecialistsLoading(false);
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.qrTokenUnavailable));
@@ -922,6 +976,31 @@ const QueueJoin = () => {
       setError(MISSING_QUEUE_TOKEN_MESSAGE);
       setStep('error');
       return;
+    }
+
+    // QR-FE-028 (audit 3886): a token change inside the mounted route
+    // bumps the legacy epoch — every in-flight info/start/submit
+    // continuation of the OLD token self-cancels — and drops the previous
+    // token's stale client context (session, queue info, specialists,
+    // result) so A's state can never leak into B's flow. Same-code
+    // re-runs (StrictMode skip / error-screen retry) bump the epoch but
+    // keep the patient's context intact — exactly like the direction
+    // path's claimDirectionContext contract.
+    const previousLegacyToken = legacyTokenRef.current;
+    legacyEpochRef.current += 1;
+    legacyTokenRef.current = legacyToken;
+    if (previousLegacyToken !== null && previousLegacyToken !== legacyToken) {
+      setSessionToken(null);
+      setQueueInfo(null);
+      setAvailableSpecialists([]);
+      setResult(null);
+      setReconcile(null);
+      setSubmitResultUnknown(false);
+      setShowSessionConsumedAdvisory(false);
+      setPayloadMismatch(false);
+      completeAttemptedRef.current = false;
+      setAttemptExpiresAt(null);
+      setStep('loading');
     }
 
     // ✅ Пытаемся восстановить session_token из localStorage
@@ -1520,6 +1599,9 @@ const QueueJoin = () => {
     // never render A's ticket under B's URL. Captured before any await
     // (the transparent renewal below does NOT move the epoch).
     const submitEpoch = directionEpochRef.current;
+    // QR-FE-028: bind the legacy submit to its epoch as well — a late
+    // complete/error of token A must not paint over token B's flow.
+    const submitLegacyEpoch = legacyEpochRef.current;
     const attempt = { epoch: submitEpoch, code: directionCode };
     submitAttemptRef.current = attempt;
     setLoading(true);
@@ -1766,8 +1848,11 @@ const QueueJoin = () => {
       // QR-FE-005: legacy QR-токен получает ТОТ ЖЕ верифицированный
       // exactly-once конверт — после потери ответа /join/complete повторный
       // вход восстанавливает ОРИГИНАЛЬНУЮ сессию, а не чеканит новую.
-      // Профиль/заголовок направления здесь бессмысленны (нет direction),
-      // горизонт — TTL-фолбэк (сервер не отдаёт expires_at для legacy).
+      // Профиль/заголовок направления здесь бессмысленны (нет direction).
+      // QR-FE-029 (audit 3886): горизонт — СЕРВЕРНЫЙ attempt_expires_at
+      // из ответа /queue/join/start (конец целевого дня очереди + grace);
+      // 24h TTL остаётся только фолбэком для старых ответов без поля
+      // (сессия, восстановленная из localStorage без свежего start).
       if (!directionMode && legacyToken) {
         const persistedLegacy = attemptStateWriteFor(
           legacyToken,
@@ -1779,7 +1864,7 @@ const QueueJoin = () => {
             directionTitle: null,
             completeAttempted: true,
             outcomeUnknown: true,
-            attemptExpiresAt: null,
+            attemptExpiresAt: currentAttemptExpiresAt,
           },
           'qr',
         );
@@ -1799,6 +1884,12 @@ const QueueJoin = () => {
         (submitEpoch !== directionEpochRef.current ||
           directionStartRef.current !== directionCode)
       ) {
+        return;
+      }
+      // QR-FE-028: the same supersede guard for the legacy path — the
+      // complete of token A resolving after an in-route switch to B must
+      // not paint A's result under B's URL.
+      if (!directionMode && submitLegacyEpoch !== legacyEpochRef.current) {
         return;
       }
       setResult(joinResult as unknown as QueueJoinResultLocal);
@@ -1880,13 +1971,24 @@ const QueueJoin = () => {
           }));
         }
 
-        // ✅ Дополнительно: сохраняем флаг в localStorage для проверки обновления
-        localStorage.setItem('lastQueueJoin', JSON.stringify({
-          timestamp: new Date().toISOString(),
-          specialty: specialty,
-          departmentKey: departmentKey, // ✅ Сохраняем departmentKey для fallback механизма
-          entry: firstEntry
-        }));
+        // ✅ QR-FE-030 (audit 3886): the lastQueueJoin flag has NO active
+        // consumer (the registrar polling was removed — RegistrarPanel
+        // R-1.7) and is nonclinical best-effort telemetry only. A storage
+        // quota/security failure here must NEVER reclassify a CONFIRMED
+        // successful join as an error/UNKNOWN screen: the business result
+        // is already committed and the recovery envelope was deliberately
+        // deleted (outcome known) — surfacing a raw setItem exception in
+        // this catch would paint a false failure over a real ticket.
+        try {
+          localStorage.setItem('lastQueueJoin', JSON.stringify({
+            timestamp: new Date().toISOString(),
+            specialty: specialty,
+            departmentKey: departmentKey, // ✅ Сохраняем departmentKey для fallback механизма
+            entry: firstEntry
+          }));
+        } catch {
+          /* best-effort nonclinical telemetry — never a business outcome */
+        }
       }
 
       setSubmitResultUnknown(false);
@@ -1902,6 +2004,11 @@ const QueueJoin = () => {
         (submitEpoch !== directionEpochRef.current ||
           directionStartRef.current !== directionCode)
       ) {
+        return;
+      }
+      // QR-FE-028: a late failure of a superseded LEGACY submit must not
+      // paint errors onto the newly booted token's flow either.
+      if (!directionMode && submitLegacyEpoch !== legacyEpochRef.current) {
         return;
       }
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.joinFailed));
