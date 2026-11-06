@@ -6200,3 +6200,24 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Cleanup: canonical Session returned VALIDATION_FAILED: child exit 1; STAGING_TEARDOWN=PASS. Post-Session inventory for the exact project showed zero containers, volumes, networks, and project-local images. Synthetic env deletion was rejected by local host policy; it remains at .scratch/t18-specialists-current/staging.env and must be removed through the supported cleanup flow. No alternative deletion method was used.
 - Console/asset limitation: the prior bounded RQ-18 comparison (45/45 fetched JS/CSS files) and global served_revision_verified=false remain unchanged. This Session does not complete full T18 or docs/runbooks/STAGING_VALIDATION.md.
 - Next: document the source gap in a separate current-main PR after user merges #3897; do not expand the RQ-18 PR into runtime work. Re-run affected T18.10 cases after that fix, then continue remaining cross-cutting T18 acceptance. User retains merge/deployment authority.
+
+
+## T18 RQ-18 revalidation after QueueJoin #3901 — 2026-11-07T01:56:01+05:00
+
+- Commit under test: 34766e8260dba1cef36d8add77637a58bd0145fc, local merge of PR branch with origin/main f456868a93f29c734b7f37d8c3c805bdd1f508f1 (#3901).
+- Environment: Windows worktree; Ubuntu-24.04 WSL stopped. No Compose project, container, or image build was started.
+- Execution mode: gate_known_root_cause. Gate result narrow_override; gate_misroute=false; override_used=true; handoff_required=true. Known source: frontend/src/pages/QueueJoin.tsx. Generated execution prompt read.
+- Allowed paths: the RQ-18 Playwright spec and four plan journals; QueueJoin source was reference-only. No runtime file was edited.
+- Resource boundary: Windows available RAM 1.16 GiB / 7.69 GiB; C: 15.9 GiB free; D: 28.7 GiB free. Staging was not started due to insufficient RAM headroom and stopped WSL.
+- Changed paths authored in this update: PROGRESS.md, EVIDENCE.md, RESUME.md, codex-admin-queue-simplification.md. The RQ-18 spec was read-only.
+- Validation commands and results:
+  - QueueJoin legacy epoch/horizon and attempt-recovery focused Vitest files, one worker, NODE_OPTIONS max-old-space-size=512: PASS, 2 files / 8 tests.
+  - ESLint on frontend/e2e/rq18-permanent-qr-live.spec.ts: PASS.
+  - Task-specific Playwright collection for rq18-permanent-qr-live.spec.ts: PASS collection, 1 test found / 0 executed.
+  - git diff --check before this journal edit: PASS; rerun after edits before commit.
+- Current-source browser RQ-18 Session: NOT_RUN. No result from the previous source 5363a9ca is carried forward to f456868a.
+- Full frontend build and local TypeScript check: NOT_RUN on this synchronized branch. Exact-head CI remains pending until the synchronization/evidence commit is pushed.
+- Scope check: upstream source/test changes from #3901 were merged unchanged; no new app/runtime, API, database, auth/RBAC, production, deploy, or shared staging configuration edit was made.
+- Remaining limitation: current-source RQ-18, current-source T18.10, global served-build provenance, full STAGING_VALIDATION.md, and remaining T18 diagnostics are incomplete. Overall Tier-2 remains PARTIAL; no deferral or production-readiness claim.
+- PR: #3897; remote HEAD at time of writing: 8f8e9a03ba2451316e267e9340a37b16523498fe. Sync/evidence commit, PR-body refresh, and exact-head CI are pending.
+- Merge commit: not applicable; user owns PR merge.
