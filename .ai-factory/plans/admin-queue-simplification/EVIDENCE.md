@@ -1,3 +1,21 @@
+## T18 RQ-18 post-#3899 local regression; live staging NOT_RUN — 2026-11-07T01:11:21+05:00
+
+- Commit under test: local worktree HEAD `4c40355b95844a4f779c582ff81f1685034be163`; it contains current `origin/main` `2093745a7d1082907f3d118fc6d90bc2e061af53` from #3899. The published PR #3897 still points to `ea1a9011f86a8e3f9d663e3b6e7b272cefd93264`, based on `5363a9ca53234539c5022b587250374a452a91a0`; local branch is ahead by three commits.
+- Environment: Windows host with 7.69 GiB visible RAM; at inspection about 1.4 GiB was free. WSL `Ubuntu-24.04` was not running. C: had about 15.3 GiB free and D: about 28.7 GiB free. No staging project was started in this validation slice.
+- Execution mode: `gate_known_root_cause` for the merged public QR source change in `frontend/src/pages/QueueJoin.tsx`; launcher returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`. The basis was the user's standing authorization for repeated synthetic T18 validation. The generated execution prompt was read. No runtime or tracked test source was edited.
+- Allowed paths: QueueJoin source as reference only; `frontend/e2e/rq18-permanent-qr-live.spec.ts`; canonical plan and T18 journals; this worktree's `.scratch/` and `.gate_artifacts/`; one owned synthetic Compose project if resources permit. Denied: production/live patient data, foreign staging, global Docker cleanup, production config, merge and deployment.
+- Original concern: the previous live RQ-18 Session passed on runtime `5363a9ca`, but #3899 changed `QueueJoin.tsx` in `2093745a`; the earlier live result cannot establish that the updated public QR flow still passes.
+- Validation commands/results:
+  - Targeted QueueJoin legacy epoch/horizon and attempt-recovery Vitest files with one worker and `NODE_OPTIONS=--max-old-space-size=512`: **PASS, 7/7**.
+  - ESLint for `frontend/e2e/rq18-permanent-qr-live.spec.ts`: **PASS**.
+  - Task-specific Playwright config collection: **PASS, 1 test collected, 0 executed**. The first collection attempt with the repository-wide config found 0 files; rerunning with `.scratch/t18-rq18-current/playwright.rq18.staging.config.cjs` collected the intended scenario.
+  - `tsc --noEmit -p e2e/tsconfig.json` with a 512 MiB Node heap: **environmental FAIL / no type result**; Node exited 134 after reaching the configured heap limit. This is not evidence of a source type error.
+  - Current-source canonical staging Preflight/Start/Session: **NOT_RUN**. At the available host headroom, WSL/build/browser were not started to avoid a memory-exhaustion cycle. No app failure is inferred.
+- Cleanup: no staging resources were created in this slice. Prior owned RQ-18 Session resources had been torn down and recorded in the preceding evidence entry.
+- Scope check: the only tracked changes are `.ai-factory/plans/codex-admin-queue-simplification.md` and the three T18 journals; product code and tracked test source are unchanged. `git diff --check` passes; exact-head CI remains pending after this journal update is pushed.
+- Remaining limitation: only focused local regressions are established on source `2093745a`; the live browser lifecycle and bounded asset comparison are still tied to `5363a9ca`. Re-run RQ-18 on `2093745a` (or its later final candidate) in one canonical owned synthetic Session when resource headroom allows. T18.10 remains PARTIAL due the separate selected-profile return-context loss; overall T18/Tier-2 remain PARTIAL.
+- PR: [#3897](https://github.com/drsapaev/final/pull/3897), OPEN / Ready for review / mergeable at last GitHub check, published HEAD `ea1a9011`. The local synchronized branch has not been pushed; no merge commit exists.
+
 ## PR #3897 pre-correction exact-head status and checkpoint reconciliation — 2026-11-06T23:00:56+05:00
 
 - Task: `bd2f7564-bd3d-449d-8d85-5a9325722a80`; reconcile the current checkpoint with the live PR and preserve T18's remaining gaps.

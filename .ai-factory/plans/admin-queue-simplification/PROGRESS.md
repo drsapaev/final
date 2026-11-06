@@ -2,34 +2,37 @@
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance and evidence reconciliation
-Current status: IN_PROGRESS; T00–T17 MERGED; scenarios 1–9 have prior source-anchored evidence; current-source T18.10 PARTIAL after the specialists generic editor link lost selected-profile context; current-source RQ-18 functional flow and bounded served-asset comparison PASS; overall T18/Tier-2 remain PARTIAL; user retains merge/deployment authority
+Current status: IN_PROGRESS; T00–T17 MERGED; scenarios 1–9 have prior source-anchored evidence; T18.10 PARTIAL after the current-source specialists return-context failure; RQ-18 passed only on 5363a9ca and needs revalidation after QueueJoin changed in #3899; overall T18/Tier-2 remain PARTIAL; user retains merge/deployment authority
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final
 Branch: codex/aqs-t18-rq18-current-20261106
-Runtime source for current-source RQ-18: 5363a9ca53234539c5022b587250374a452a91a0
-Current PR: #3897 OPEN, Ready for review. T18.10 validation ran on source/PR HEAD ea1a9011f86a8e3f9d663e3b6e7b272cefd93264; applicable checks passed on that head before this evidence update. Query GitHub for the current PR head and checks after the journal follow-up is pushed. User owns merge.
+Prior RQ-18 runtime source: 5363a9ca53234539c5022b587250374a452a91a0; post-#3899 source requiring live revalidation: 2093745a7d1082907f3d118fc6d90bc2e061af53
+Current PR: #3897 OPEN, Ready for review, mergeable; published HEAD `ea1a9011f86a8e3f9d663e3b6e7b272cefd93264`. The local branch includes a clean merge of current `origin/main`; the synchronization/evidence update is not yet pushed and exact checks for it do not exist. User owns merge.
 PR #3894 merged at 256483d318f47ca4acb054b62467acf26a53dc8f.
-Last updated: 2026-11-07T00:51:21+05:00
+Last updated: 2026-11-07T01:11:21+05:00
 
-## Current checkpoint — current-source T18.10 found a context-loss defect
+## Current checkpoint — #3899 synced; focused QueueJoin regressions pass, live revalidation pending
 
 | Task | Status | Evidence |
 |------|--------|----------|
 | T00–T17 | MERGED | Existing plan journals |
 | T18 scenarios 1–9 | VALIDATED | Scenario records in this file and EVIDENCE.md |
 | T18.10 | PARTIAL on current source; prior-source checks retained | Current-source specialists Session record in EVIDENCE.md |
-| T18 current-source RQ-18 | PASS on runtime 5363a9ca | Functional Session and [45/45 served-asset comparison](EVIDENCE.md#t18-current-source-rq18-served-asset-provenance-20261106) |
+| T18 RQ-18 on 5363a9ca | PASS, bounded to that source | Functional Session and [45/45 served-asset comparison](EVIDENCE.md#t18-current-source-rq18-served-asset-provenance-20261106) |
+| T18 RQ-18 after #3899 (`2093745a`) | NOT_RUN | Targeted unit regressions pass; live synthetic staging not started due low host memory |
 | T18 overall | PARTIAL | Full runbook and broader acceptance still open |
 
-- Latest owned synthetic canonical Session passed the RQ-18 browser scenario and matched all 45 fetched JS/CSS assets to files in its own frontend container (45 matches, 0 mismatches). The Session removed its 5 containers, 3 volumes, 1 network and local images; remaining owned resources were 0.
+- The prior owned synthetic canonical Session passed RQ-18 on runtime `5363a9ca` and matched all 45 fetched JS/CSS assets to files in its frontend container; teardown removed 5 containers, 3 volumes, 1 network and local images. This result predates #3899's `QueueJoin.tsx` changes and does not validate source `2093745a`.
 - The first post-Session Preflight saw a transient/ambiguous port owner. Read-only listener inspection found no Windows listener on the selected ports; a canonical retry passed with no warnings. No process was stopped.
 - served_revision_verified=false remains the canonical launcher value. The independent comparison is limited to assets fetched in this browser scenario and is not a global or production attestation.
 - On pre-correction PR HEAD `0abda681`, Unified CI run `42261424406`, PR Required Gate, PR Review Quality Gate, lifecycle recommendation, frontend unit/build/lint/E2E, security, Gitleaks, CodeQL, GitGuardian, and scratch guards passed. Backend, integration, Docker, readiness, parity, DAST, k6 and other path-aware jobs were SKIPPED by scope, not passed.
 - A focused review record for T18.10 now confirms the required `specialists` row, typed context, reload/back-forward, legacy routes, and protected 409 on source `a9c25f5b`. The RQ-18 public lifecycle and 45-file comparison are separately anchored to runtime source `5363a9ca`; these results are not one all-in-one current-source T18 run.
 - The previous expired-lease attempt stopped before build/browser and was torn down successfully; it is recorded as an environment lifecycle stop, not an application failure.
-- Current-source specialists check: normal Admin TOTP enrollment and a fresh password+TOTP login passed; the directions API and rendered profile row passed. The return-context assertion failed. AdminSetupDirections.tsx setupEditorLink() passes profileKey: null around lines 428–435, so the selected profile is not serialized. Subsequent editor-tab/reload/Back/Forward/DELETE-409 assertions were NOT_RUN.
+- Current-source specialists check: normal Admin TOTP enrollment and a fresh password+TOTP login passed; the directions API and rendered profile row passed. The return-context assertion failed. `AdminSetupDirections.tsx` `setupEditorLink()` passes `profileKey: null` around lines 428–435, so the selected profile is not serialized. Subsequent editor-tab/reload/Back/Forward/DELETE-409 assertions were NOT_RUN.
 - This failure is outside the RQ-18 runtime scope of #3897. No runtime code changed in this validation. Retain earlier-source T18.10 evidence, but do not claim current-source validation.
-- Remaining acceptance: the complete `docs/runbooks/STAGING_VALIDATION.md`, broader cross-cutting T18 checks, and global served-revision attestation. Prior console diagnostics reproduced 9/11 events; 2 did not reproduce and 8 bundle call sites remain unmapped. The launcher still reports `served_revision_verified=false`; the bounded 45/45 comparison does not replace it. Keep Tier-2 PARTIAL until required evidence is complete.
-- Next exact action: finalize and push the journal-only T18.10 failure record and update PR #3897, then verify exact-head checks. User owns #3897 merge. After merge, use a fresh origin/main worktree for a narrowly scoped fix and regression test for the lost specialists return context, then rerun only the affected T18.10 checks. Keep Tier-2 PARTIAL; do not deploy.
+- Focused validation on synced `origin/main` `2093745a`: QueueJoin legacy epoch/horizon and attempt-recovery unit tests PASS 7/7; ESLint PASS; the task-specific Playwright config collected 1 RQ-18 test (collection only). `tsc --noEmit -p e2e/tsconfig.json` was attempted with a 512 MiB Node heap and exited 134 with heap OOM; type validation is not established. The default Playwright config collected 0 files; using the task-specific config corrected collection, not execution.
+- Live RQ-18 after #3899 is NOT_RUN. At the preflight decision point Windows showed about 1.4 GiB free RAM and WSL was stopped; no Compose project was started and no images were built. This is an environment-capacity stop, not an application failure. The existing synthetic resources from prior Sessions are recorded as torn down.
+- Remaining acceptance: complete current-source RQ-18 Session after #3899; fix and retest T18.10 selected-profile return context in a separate PR after #3897 closes; finish the complete `docs/runbooks/STAGING_VALIDATION.md`, broader cross-cutting T18 checks, and global served-revision attestation. Prior console diagnostics reproduced 9/11 events; 2 did not reproduce and 8 bundle call sites remain unmapped. The launcher still reports `served_revision_verified=false`; bounded 45/45 does not replace it. Keep Tier-2 PARTIAL until evidence is complete.
+- Next exact action: finish the current #3897 cycle on the synchronized branch (update and push accurate evidence, then verify exact-head checks). User owns merge. After that cycle closes, use a fresh `origin/main` worktree for the selected-profile context fix and targeted T18.10 validation; rerun RQ-18 only after resource headroom permits a canonical owned synthetic Session. Keep Tier-2 PARTIAL; do not deploy.
 
 ---
 ## Previous checkpoint — RQ-18 functional pass before served-asset attestation — 2026-11-06T20:52:58+05:00

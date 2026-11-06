@@ -1,3 +1,19 @@
+## Current resume — main synced; focused QR tests pass, current-source Session pending — 2026-11-07T01:11:21+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final`, branch `codex/aqs-t18-rq18-current-20261106`. Validation subtask memory ID: `4cb8f238-950b-4f84-9458-6a390dc52926`.
+
+Current GitHub PR #3897 is OPEN, Ready for review, mergeable, published HEAD `ea1a9011f86a8e3f9d663e3b6e7b272cefd93264`, base `5363a9ca`. Locally, `origin/main` was fetched at `2093745a7d1082907f3d118fc6d90bc2e061af53` (#3899) and cleanly merged as `4c40355b95844a4f779c582ff81f1685034be163`; the validation checkout was three commits ahead before this journal update. The live PR metadata was rechecked. This synchronization/evidence update remains unpushed and exact-head checks do not yet exist.
+
+On current source `2093745a`, two focused QueueJoin regression files passed 7/7 and ESLint passed. The task-specific Playwright config collected one RQ-18 test but did not execute it. The broader E2E TypeScript check hit the deliberately configured 512 MiB Node heap and exited 134; no type result is established. At the time of the run the host had about 1.4 GiB free and WSL was stopped, so no canonical Preflight, build, Start or Session was launched. Do not report the post-#3899 live RQ-18 as PASS. The previous 1/1 live result and 45/45 asset comparison remain bound to runtime `5363a9ca`.
+
+Separate current-source T18.10 Admin/TOTP Session: the actual `specialists` profile row loaded, but navigation dropped its selected-profile context because the generic setup editor link supplied `profileKey: null`. This is a confirmed product defect outside #3897's test/evidence-only scope. Later editor-tab/reload/Back/Forward and protected 409 assertions were NOT_RUN. Do not fold the runtime fix into #3897. After this PR cycle closes, implement a narrow fix with regression coverage in a fresh current-main worktree and rerun only affected T18.10 behavior.
+
+Remaining plan work: (1) complete and publish the accurate #3897 checkpoint, then verify exact-head checks; user owns merge; (2) when host resource headroom permits, run one canonical synthetic RQ-18 Session on current main, with all project identity/expiry/port rules and teardown; (3) fix and retest T18.10 separately; (4) finish the full ten-scenario T18 evidence matrix and `docs/runbooks/STAGING_VALIDATION.md`, then reconcile remaining console diagnostics and served-build provenance. Tier-2 remains PARTIAL; do not deploy or claim plan completion.
+
+Prework and gate record: `.scratch/t18-rq18-post3899-validation/prework.txt`; gate output selected `narrow_override`, no misroute, based on the user's standing authorization for synthetic T18 cycles. Its generated prompt was read. No Compose resources were created in this continuation.
+
+---
+
 ## Current resume — current-source T18.10 found lost selected-profile context — 2026-11-07T00:38:36+05:00
 
 Continue task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final, branch codex/aqs-t18-rq18-current-20261106, source and PR HEAD ea1a9011f86a8e3f9d663e3b6e7b272cefd93264. PR #3897 is OPEN, Ready for review; user owns merge and deployment. Its exact-head CI passed before this journal update; refresh GitHub after push.
