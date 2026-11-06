@@ -2,31 +2,33 @@
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance and evidence reconciliation
-Current status: IN_PROGRESS; T00–T17 MERGED; T18 scenarios 1–9 retain source-anchored evidence; T18.10 remains PARTIAL after selected-profile return-context loss; RQ-18 live validation is still NOT_RUN on current source; overall T18/Tier-2 remain PARTIAL; user retains merge/deployment authority
+Current status: IN_PROGRESS; T00–T17 MERGED; T18 scenarios 1–9 retain source-anchored evidence; T18.10 remains PARTIAL after selected-profile return-context loss; current-source RQ-18 live validation remains NOT_RUN; overall T18/Tier-2 remain PARTIAL; user retains merge/deployment authority
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final
 Branch: codex/aqs-t18-rq18-current-20261106
-Current origin/main: f456868a93f29c734b7f37d8c3c805bdd1f508f1 (#3901). Local merge commit: 34766e8260dba1cef36d8add77637a58bd0145fc; not yet pushed.
-Current PR: #3897 OPEN, Ready for review; published HEAD 8f8e9a03ba2451316e267e9340a37b16523498fe. The local branch now includes #3900/#3901 from origin/main. Sync and evidence changes have not been pushed; exact-head checks remain pending. User owns merge.
-Prior RQ-18 live PASS: runtime 5363a9ca53234539c5022b587250374a452a91a0; this predates QueueJoin changes in #3899 and #3901.
-Last updated: 2026-11-07T01:56:01+05:00
+Current origin/main: f456868a93f29c734b7f37d8c3c805bdd1f508f1 (#3901). This PR branch is synchronized locally and remotely.
+Current PR: #3897 OPEN, Ready for review, mergeable at the latest GitHub read. Its published HEAD 04d7cd72f97706ba0df8676d553f8b6468d3dcf4 passed Unified CI and PR gates; this follow-up records those final results. User owns merge.
+Current tested QueueJoin source: f456868a93f29c734b7f37d8c3c805bdd1f508f1.
+Last updated: 2026-11-07T02:15:39+05:00
 
-## Current checkpoint — #3901 synced; focused regressions pass; live RQ-18 pending
+## Current checkpoint — hosted CI passes; live RQ-18 and T18 remain partial
 
 | Task | Status | Evidence |
 |------|--------|----------|
 | T00–T17 | MERGED | Existing plan journals |
 | T18 scenarios 1–9 | VALIDATED on their recorded source revisions | Individual scenario evidence below and in EVIDENCE.md |
-| T18.10 | PARTIAL | Current-source specialists check found selected-profile return-context loss; affected browser assertions remain incomplete |
-| RQ-18 after #3901 (source f456868a) | NOT_RUN | Focused QueueJoin tests pass 8/8; ESLint passes; one test collected, not executed |
+| T18.10 | PARTIAL | Affected Admin/2FA flow lost the selected specialists return context; later assertions remain incomplete |
+| RQ-18 after #3901 (source f456868a) | NOT_RUN | Focused tests 8/8, ESLint PASS, test collected but not executed |
+| PR #3897 code/evidence changes at 04d7cd72 | VALIDATED | Unified CI, frontend checks, PR Required Gate, quality/lifecycle gates passed |
 | T18 overall | PARTIAL | Current-source staging, full runbook, and broader acceptance remain open |
 
-- Current source includes #3901's QueueJoin change resetting the prior token's reconcile guard on token switch; this branch was synchronized at merge commit 34766e8260dba1cef36d8add77637a58bd0145fc.
-- Focused tests on that synchronized source: two QueueJoin regression files, 8/8 PASS with one Vitest worker and a 512 MiB Node heap cap. ESLint for rq18-permanent-qr-live.spec.ts PASS. Task-specific Playwright collection found 1 RQ-18 test; execution count was 0.
-- Resource check after local tests: Windows free RAM 1.16 GiB of 7.69 GiB; Ubuntu-24.04 WSL is stopped; free space C: 15.9 GiB and D: 28.7 GiB. No staging project or image build was started. Current-source RQ-18 remains NOT_RUN.
-- The earlier RQ-18 Session PASS and 45/45 asset match remain tied to runtime 5363a9ca. The canonical launcher still reports served_revision_verified=false; the bounded comparison is not a global artifact attestation.
-- T18.10 has a source-backed failure on its recorded test revision ea1a9011: setupEditorLink() passes profileKey=null, losing the selected specialists context. No fix is included here; the latest main sync did not include an AdminSetupDirections change. Current-source follow-up must verify before marking T18.10 complete.
-- Console diagnostics remain partial: 9/11 prior events reproduced, 2 were not reproduced, and 8 minified-bundle call sites remain unmapped.
-- Next exact action: commit and push this synchronized evidence update to #3897, refresh its description for the new source/checkpoint, and verify checks on the exact new HEAD. User owns merge. Do not start a separate PR until this PR is merged. Afterward, fix T18.10 in a separate fresh-main PR and run remaining synthetic checks only when memory permits.
+- On exact PR HEAD 04d7cd72, Unified CI run 42292661803 passed Frontend unit, build, lint, E2E and PR Required Gate. PR Review Quality Gate 42294865861 and lifecycle recommendation 42294865859 passed after the PR description was refreshed. Security, Gitleaks, CodeQL, GitGuardian, scratch guards and language analysis passed. Path-aware backend/integration/Docker/parity/readiness/k6/DAST jobs were skipped and are not counted as PASS.
+- The exact RQ-18 spec was collected (1 test) but executed 0 times on current source. The green general E2E job does not count as RQ-18 execution.
+- Focused tests after #3901: QueueJoin regressions 8/8 PASS; RQ-18 spec ESLint PASS. The local typecheck attempt at earlier source 2093745a hit the configured 512 MiB heap limit; current hosted E2E type-check passed.
+- Current-source RQ-18 browser Session remains NOT_RUN. Resource check found 1.16 GiB free RAM of 7.69 GiB and WSL stopped; no Compose project or image build was started.
+- Earlier RQ-18 PASS and bounded 45/45 served-asset comparison remain tied to source 5363a9ca and do not validate #3899/#3901. The canonical launcher still reports served_revision_verified=false.
+- T18.10 remains PARTIAL: a prior source-backed Admin/2FA Session found that setupEditorLink() serializes profileKey=null despite selected specialists context. The fix is separate from #3897.
+- Console diagnostics remain partial: 9/11 earlier events reproduced, 2 were not reproduced, and 8 minified-bundle call sites remain unmapped.
+- Next exact action: finish this journal-only follow-up, push it to #3897, refresh the PR description to identify the final journal HEAD, and verify its path-aware required gates. User owns merge. After that PR closes, start a separate fresh-main fix for T18.10 and resume staging only with adequate RAM.
 
 
 ---

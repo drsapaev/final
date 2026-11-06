@@ -1,18 +1,18 @@
-## Current resume — #3901 synchronized; current-source staging remains pending — 2026-11-07T01:56:01+05:00
+## Current resume — #3897 exact-head CI passed; T18 remains partial — 2026-11-07T02:15:39+05:00
 
-Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final, branch codex/aqs-t18-rq18-current-20261106. T00–T17 are merged. T18 and Tier-2 remain PARTIAL.
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final, branch codex/aqs-t18-rq18-current-20261106. T00–T17 are merged; T18/Tier-2 remain PARTIAL.
 
-PR #3897 is OPEN, Ready for review, with published HEAD 8f8e9a03ba2451316e267e9340a37b16523498fe. Current origin/main is f456868a93f29c734b7f37d8c3c805bdd1f508f1 (#3901). This worktree cleanly merged current main as 34766e8260dba1cef36d8add77637a58bd0145fc. That sync is not pushed; new exact-head checks do not yet exist. The PR description was accurate for the older published HEAD and must be refreshed after push. User owns merge and deployment.
+PR #3897 is OPEN, non-draft and mergeable at the latest GitHub read. Its code/evidence HEAD 04d7cd72f97706ba0df8676d553f8b6468d3dcf4 is synchronized with origin/main f456868a (#3901). Unified CI #42292661803 passed Frontend unit/build/lint/E2E and PR Required Gate; the current PR Review Quality Gate #42294865861 and lifecycle recommendation #42294865859 passed after the PR description update. Security/Gitleaks/CodeQL, GitGuardian, scratch guards and language analysis passed. Backend, integration, Docker, parity, staging/production readiness, k6 and DAST jobs were skipped by scope. User owns merge and deployment.
 
-The main change after 2093745a adds a QueueJoin token-switch reset for reconcileGuardRef and a regression test. Focused validation on the synchronized source: QueueJoin regression tests 8/8 PASS; rq18-permanent-qr-live.spec.ts ESLint PASS; task-specific Playwright collection 1 test, 0 executed. Full build and browser execution were not run locally. Current-source RQ-18 Preflight/Start/Session remains NOT_RUN.
+Focused current-source checks on f456868a: QueueJoin tests 8/8 PASS; RQ-18 spec ESLint PASS; task-specific Playwright collection 1 found / 0 executed. The complete RQ-18 live spec has NOT_RUN on this source. The previous live Session and 45/45 asset comparison remain limited to runtime 5363a9ca. The canonical launcher still reports served_revision_verified=false.
 
-Resource check: Windows free RAM 1.16 GiB of 7.69 GiB; WSL Ubuntu-24.04 stopped. No Compose project or image build was started. Do not retry staging in this resource state. Existing previous synthetic projects are already recorded as torn down; no resource was created in this continuation.
+At the staging resource check, Windows had 1.16 GiB free RAM and WSL was stopped. No current-source Compose project or build was started. Do not start staging until there is safe memory headroom.
 
-T18.10 remains PARTIAL. A normal Admin/TOTP session on its recorded source showed the actual specialists profile but failed return-context preservation because setupEditorLink() passes profileKey=null. Subsequent tab switching, reload, Back/Forward and protected 409 assertions were NOT_RUN. Keep this source gap separate from #3897 and fix it in its own PR after #3897 closes.
+T18.10 remains PARTIAL. The prior normal Admin/TOTP Session loaded the actual specialists profile, then failed return-context preservation because setupEditorLink() sets profileKey=null. The later editor-tab/reload/Back/Forward and protected DELETE-409 assertions were NOT_RUN. This product defect is outside #3897; fix it in a separate PR after #3897 closes.
 
-Other open acceptance: current-source RQ-18 after #3901; complete the ten-scenario T18 matrix on the final candidate; full docs/runbooks/STAGING_VALIDATION.md; global served-build provenance (launcher still says served_revision_verified=false); console diagnostics (2/11 events not reproduced, 8 bundle call sites unmapped). Do not claim production readiness or complete Tier-2.
+Other open acceptance: current-source RQ-18; full ten-scenario T18 matrix on the final candidate; full docs/runbooks/STAGING_VALIDATION.md; global served-build provenance; and remaining console diagnostics (2/11 events not reproduced, 8 bundle call sites unmapped). Do not claim full Tier-2, production readiness, or system health.
 
-Gate record for this continuation: gate_known_root_cause with frontend/src/pages/QueueJoin.tsx and exact E2E/journal scope returned narrow_override, gate_misroute=false, override_used=true, handoff_required=true. The generated prompt was read. No runtime source was edited.
+This journal-only checkpoint follows the exact-head CI pass. The current commit's own path-aware PR gates must be checked after push. The PR description must then be refreshed to the final published journal HEAD. No runtime source changed in this follow-up.
 
 
 ---

@@ -6221,3 +6221,16 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: current-source RQ-18, current-source T18.10, global served-build provenance, full STAGING_VALIDATION.md, and remaining T18 diagnostics are incomplete. Overall Tier-2 remains PARTIAL; no deferral or production-readiness claim.
 - PR: #3897; remote HEAD at time of writing: 8f8e9a03ba2451316e267e9340a37b16523498fe. Sync/evidence commit, PR-body refresh, and exact-head CI are pending.
 - Merge commit: not applicable; user owns PR merge.
+
+
+## PR #3897 exact-head CI and gate results — 2026-11-07T02:15:39+05:00
+
+- Code/evidence commit under validation: 04d7cd72f97706ba0df8676d553f8b6468d3dcf4; source base f456868a93f29c734b7f37d8c3c805bdd1f508f1 (#3901).
+- Unified CI run 42292661803: Frontend unit tests, Frontend build, Frontend lint, Frontend E2E and PR Required Gate PASS.
+- PR Review Quality Gate 42294865861 PASS; Lifecycle Recommendation 42294865859 PASS after the PR body was refreshed.
+- Additional exact-head checks: Security 42292661613, Gitleaks 42292661651, CodeQL, GitGuardian, Windows/Ubuntu scratch guards, and Actions/Python/TypeScript analyses PASS.
+- Path-aware jobs skipped, not passed: backend tests, integration tests, Docker build, frontend/backend parity, staging readiness, production readiness, k6, DAST, docs generation and context-boundary check.
+- Local focused validation on source f456868a: two QueueJoin regression files, 8/8 PASS; ESLint for rq18-permanent-qr-live.spec.ts PASS; Playwright collection 1 test / 0 executed.
+- Current-source RQ-18 synthetic Preflight/Start/Session: NOT_RUN. Host had 1.16 GiB free RAM and WSL stopped; no Compose project or image build was started.
+- PR body was updated with the exact-head results and explicit remaining limits. PR #3897 remains user-merge-owned; no merge or deployment was performed.
+- Result: scoped code/evidence PR checks PASS; T18/Tier-2 remain PARTIAL because current-source RQ-18, full runbook and broader acceptance are outstanding.
