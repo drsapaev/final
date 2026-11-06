@@ -490,7 +490,10 @@ async def sign_emr(
 
             for section_type, text in sections_to_learn:
                 if text and text.strip():
-                    await template_service.learn_from_signed_emr(
+                    # EMRTMPL-API-001: the service is synchronous (repo-wide
+                    # sync Session); awaiting it raised TypeError on every
+                    # sign and silently skipped template learning.
+                    template_service.learn_from_signed_emr(
                         doctor_id=current_user.id,
                         section_type=section_type,
                         text=text,

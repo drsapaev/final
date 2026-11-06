@@ -230,12 +230,23 @@ class EMRV2Service:
             db.rollback()
             existing = self.get_by_visit(db, visit_id)
             if existing:
-                logger.warning(
-                    "Concurrent create detected for visit %s; reusing EMR %s",
-                    visit_id,
-                    existing.id,
+                # EMRCREATE-FE-001 (fail-closed): the loser of the unique
+                # visit_id race must never present the winner's record as a
+                # successful save of its own payload — the losing clinician's
+                # content was NOT persisted. Raise an explicit conflict with
+                # canonical metadata (mapped to HTTP 409 by the save route)
+                # so the client keeps its dirty state and re-applies
+                # deliberately via the version-checked update path.
+                raise ConcurrencyError(
+                    (
+                        f"Concurrent EMR creation for visit {visit_id}: "
+                        f"record {existing.id} already exists"
+                    ),
+                    current_version=existing.row_version,
+                    your_version=0,
+                    last_edited_by=existing.created_by,
+                    last_edited_at=existing.updated_at or existing.created_at,
                 )
-                return existing
             raise
 
         # Create initial revision
