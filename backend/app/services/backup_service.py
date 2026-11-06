@@ -189,6 +189,10 @@ class BackupService:
         Returns:
             Backup information dict
         """
+        # BR-018: track this operation's own temp file. Cleanup may remove
+        # ONLY this file — a bulk glob("*.tmp") unlink would delete another
+        # concurrent writer's in-flight artifact in the shared directory.
+        operation_tmp: Path | None = None
         try:
             # Get database URL
             db_url = _get_database_url()
@@ -207,6 +211,7 @@ class BackupService:
             # Atomic write: pg_dump targets .tmp; final name appears only
             # after success - a failed dump no longer leaves zero-byte files.
             backup_path = self.backup_dir / (backup_filename + ".tmp")
+            operation_tmp = backup_path
 
             # Create backup based on database type
             if db_url.startswith("sqlite"):
@@ -328,30 +333,55 @@ class BackupService:
             return backup_info
 
         except Exception as e:
-            # remove .tmp leftovers from a failed dump
-            for stray in self.backup_dir.glob("*.tmp"):
+            # BR-018: remove only this operation's temp file. A bulk
+            # glob("*.tmp") unlink could delete another concurrent writer's
+            # in-flight artifact in the shared backup directory.
+            if operation_tmp is not None:
                 try:
-                    stray.unlink()
+                    operation_tmp.unlink(missing_ok=True)
                 except OSError:
                     pass
             logger.error(f"❌ Backup failed: {e}")
             raise
 
     def _compress_backup(self, backup_path: Path) -> Path | None:
-        """Compress backup file"""
+        """Compress backup file.
+
+        BR-022: compression must never leave a partial, published-looking
+        ``.db.gz`` behind. The archive is written to this operation's private
+        ``.gz.tmp`` file, validated, then atomically published; on failure
+        only that temp file is removed and the caller keeps the good
+        uncompressed source.
+        """
+        temp_gz: Path | None = None
         try:
             import gzip
 
             compressed_path = backup_path.with_suffix(backup_path.suffix + ".gz")
+            if compressed_path.exists():
+                logger.error("Refusing to overwrite an existing archive: %s", compressed_path.name)
+                return None
 
+            temp_gz = backup_path.with_name(backup_path.name + ".gz.tmp")
             with open(backup_path, "rb") as f_in:
-                with gzip.open(compressed_path, "wb") as f_out:
+                with gzip.open(temp_gz, "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
+            if temp_gz.stat().st_size == 0:
+                raise OSError("compressed output is empty")
 
+            os.replace(temp_gz, compressed_path)  # atomic publish
+            temp_gz = None
             return compressed_path
         except Exception as e:
             logger.warning(f"Compression failed: {e}")
             return None
+        finally:
+            # BR-022: remove only this run's partial temp file.
+            if temp_gz is not None:
+                try:
+                    temp_gz.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     def _cleanup_old_backups(self):
         """Remove old backups based on retention policy"""
@@ -365,6 +395,7 @@ class BackupService:
             # Remove backups older than retention period
             cutoff_date = datetime.now(UTC) - timedelta(days=self.retention_days)
             removed_count = 0
+            removed_paths: set[Path] = set()
 
             for backup in backups:
                 # aware-UTC: naive fromtimestamp vs aware cutoff raised
@@ -372,12 +403,17 @@ class BackupService:
                 backup_time = datetime.fromtimestamp(backup.stat().st_mtime, tz=UTC)
                 if backup_time < cutoff_date:
                     backup.unlink()
+                    removed_paths.add(backup)
                     removed_count += 1
                     logger.info(f"🗑️  Removed old backup: {backup.name}")
 
-            # Also limit total number of backups
-            if len(backups) > self.max_backups:
-                for backup in backups[self.max_backups:]:
+            # Also limit total number of backups — survivors only (BR-021:
+            # the pre-cleanup snapshot re-unlinked an already-removed expired
+            # archive, raising FileNotFoundError and logging a misleading
+            # retention error while the outcome was actually correct).
+            survivors = [b for b in backups if b not in removed_paths]
+            if len(survivors) > self.max_backups:
+                for backup in survivors[self.max_backups:]:
                     backup.unlink()
                     removed_count += 1
                     logger.info(f"🗑️  Removed backup (max limit): {backup.name}")
@@ -478,6 +514,14 @@ class BackupService:
                     "-U", pg_user,
                     "-d", pg_db,
                     "-c",  # Clean (drop) database objects before recreating
+                    "--if-exists",
+                    # BR-020: --single-transaction wraps the whole restore
+                    # (including the -c drops) in one all-or-nothing
+                    # transaction (implies --exit-on-error), so a mid-restore
+                    # failure no longer leaves partly committed DDL. The
+                    # broader maintenance-gate/isolated-target protocol stays
+                    # an operator policy decision tracked in the ledger.
+                    "--single-transaction",
                     restore_source,
                 ]
 
@@ -527,46 +571,76 @@ class BackupService:
                     "error": "Backup file is empty",
                 }
 
-            # For SQLite, try to open and check integrity
-            if backup_path.suffix == ".db" or (backup_path.suffix == ".gz" and backup_path.stem.endswith(".db")):
-                import gzip
-                import sqlite3
-                import tempfile
+            # BR-019: route by what the archive actually is, not by its
+            # filename — this service writes PostgreSQL custom-format dumps
+            # (pg_dump -F c) under a .db[.gz] name, and the historical code
+            # fed every such file to SQLite's integrity_check, reporting a
+            # restorable PG dump as {"valid": false, "file is not a
+            # database"}. SQLite is tried first (no external tool); a
+            # non-SQLite file falls through to pg_restore --list; anything
+            # neither can read is invalid — the historical "valid: size > 0"
+            # fallback is gone.
+            is_gz = backup_path.suffix == ".gz"
+            check_path = str(backup_path)
+            temp_db = None
+            try:
+                if is_gz:
+                    import gzip
+                    import tempfile
 
-                # Extract if compressed
-                if backup_path.suffix == ".gz":
                     temp_db = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
                     with gzip.open(backup_path, "rb") as f_in:
                         with open(temp_db.name, "wb") as f_out:
                             shutil.copyfileobj(f_in, f_out)
                     check_path = temp_db.name
-                else:
-                    check_path = str(backup_path)
 
-                # Check SQLite integrity
-                conn = sqlite3.connect(check_path)
+                import sqlite3
+
                 try:
-                    result = conn.execute("PRAGMA integrity_check").fetchone()
-                    is_valid = result[0] == "ok"
-                finally:
-                    conn.close()
-                    if backup_path.suffix == ".gz":
-                        os.unlink(check_path)
+                    conn = sqlite3.connect(check_path)
+                    try:
+                        integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+                    finally:
+                        conn.close()
+                    return {
+                        "valid": integrity == "ok",
+                        **({} if integrity == "ok" else {"error": f"SQLite integrity check failed: {integrity}"}),
+                        "format": "sqlite",
+                        "verify_mode": "sqlite PRAGMA integrity_check",
+                        "size": size,
+                        "size_mb": round(size / (1024 * 1024), 2),
+                        "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    }
+                except sqlite3.DatabaseError:
+                    pass  # not a SQLite database — try the PostgreSQL path
 
-            return {
-                    "valid": is_valid,
+                list_result = subprocess.run(
+                    [_resolve_pg_tool("pg_restore"), "-l", check_path],
+                    capture_output=True, text=True, check=False,
+                )
+                if list_result.returncode == 0:
+                    return {
+                        "valid": True,
+                        "format": "postgresql-custom",
+                        "verify_mode": "pg_restore --list (archive readable; not a full restore proof)",
+                        "size": size,
+                        "size_mb": round(size / (1024 * 1024), 2),
+                        "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    }
+                return {
+                    "valid": False,
+                    "error": (
+                        "unknown archive format (not SQLite; pg_restore --list "
+                        f"failed with exit {list_result.returncode}: "
+                        f"{(list_result.stderr or list_result.stdout or '')[:200]})"
+                    ),
                     "size": size,
                     "size_mb": round(size / (1024 * 1024), 2),
                     "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                 }
-
-            # For other formats, just check size
-            return {
-                "valid": size > 0,
-                "size": size,
-                "size_mb": round(size / (1024 * 1024), 2),
-                "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            }
+            finally:
+                if temp_db is not None:
+                    os.unlink(temp_db.name)
 
         except Exception as e:
             return {

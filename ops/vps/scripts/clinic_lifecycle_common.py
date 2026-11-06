@@ -4,9 +4,9 @@ import json
 import os
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
-import socket
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,7 +14,6 @@ from typing import Any, NoReturn
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
-
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -184,7 +183,9 @@ def _public_url_port() -> int:
         if not candidate:
             continue
         try:
-            parsed = urlparse(candidate if "://" in candidate else f"http://{candidate}")
+            parsed = urlparse(
+                candidate if "://" in candidate else f"http://{candidate}"
+            )
         except Exception:
             continue
         if parsed.port:
@@ -225,10 +226,14 @@ def postgres_tool(tool_name: str) -> str:
 
 
 def public_url() -> str:
-    if env_bool("CLINIC_AUTO_DETECT_PUBLIC_URL", True):
-        return f"http://{_detect_lan_ip()}:{_public_url_port()}"
+    # BR-005: an explicitly configured PUBLIC_URL must win over LAN
+    # auto-detection. The rehearsal passes a restore-scoped PUBLIC_URL; the
+    # previous order let the default-on auto-detect override it and probe a
+    # LAN address that never serves the restored stack.
     if os.environ.get("PUBLIC_URL"):
         return os.environ["PUBLIC_URL"].rstrip("/")
+    if env_bool("CLINIC_AUTO_DETECT_PUBLIC_URL", True):
+        return f"http://{_detect_lan_ip()}:{_public_url_port()}"
     if os.environ.get("APP_HOST"):
         return f"http://{os.environ['APP_HOST'].rstrip('/')}:{_public_url_port()}"
     return "http://127.0.0.1:18080"
@@ -238,7 +243,9 @@ def backend_url() -> str:
     if os.environ.get("BACKEND_URL"):
         return os.environ["BACKEND_URL"].rstrip("/")
     if os.environ.get("APP_HOST") and os.environ.get("BACKEND_PORT"):
-        return f"http://{os.environ['APP_HOST'].rstrip('/')}:{os.environ['BACKEND_PORT']}"
+        return (
+            f"http://{os.environ['APP_HOST'].rstrip('/')}:{os.environ['BACKEND_PORT']}"
+        )
     if os.environ.get("APP_HOST"):
         return f"http://{os.environ['APP_HOST'].rstrip('/')}:18000"
     return "http://127.0.0.1:18000"
@@ -317,7 +324,9 @@ def http_json(
         raise LifecycleError(f"Failed to reach {url}: {exc.reason}") from exc
 
 
-def read_json_payload(path: str | None, inline_json: str | None = None) -> dict[str, Any] | None:
+def read_json_payload(
+    path: str | None, inline_json: str | None = None
+) -> dict[str, Any] | None:
     if inline_json:
         return json.loads(inline_json)
 
@@ -354,9 +363,8 @@ def parse_database_url(url: str) -> DatabaseTarget:
     if not url:
         fail("DATABASE_URL is required")
 
-    normalized = (
-        url.replace("postgresql+psycopg://", "postgresql://")
-        .replace("postgresql+psycopg2://", "postgresql://")
+    normalized = url.replace("postgresql+psycopg://", "postgresql://").replace(
+        "postgresql+psycopg2://", "postgresql://"
     )
     parsed = urlparse(normalized)
     if parsed.scheme not in {"postgresql", "postgres"}:
@@ -388,29 +396,42 @@ def git_head(root: Path | None = None) -> str:
 
 
 def _git_has_tracked_changes(root: Path) -> bool:
-    worktree_dirty = subprocess.run(
-        ["git", "diff", "--quiet"],
-        cwd=str(root),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ).returncode != 0
-    index_dirty = subprocess.run(
-        ["git", "diff", "--cached", "--quiet"],
-        cwd=str(root),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ).returncode != 0
+    worktree_dirty = (
+        subprocess.run(
+            ["git", "diff", "--quiet"],
+            cwd=str(root),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        != 0
+    )
+    index_dirty = (
+        subprocess.run(
+            ["git", "diff", "--cached", "--quiet"],
+            cwd=str(root),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        != 0
+    )
     return worktree_dirty or index_dirty
 
 
 def _require_safe_force_checkout(args: list[str], cwd: Path | None) -> None:
-    if len(args) < 4 or args[0] != "git" or args[1] != "checkout" or args[2] != "--force":
+    if (
+        len(args) < 4
+        or args[0] != "git"
+        or args[1] != "checkout"
+        or args[2] != "--force"
+    ):
         return
 
     release_ref = args[3]
     root = (cwd or app_root()).resolve()
     if not release_ref.strip() or any(char.isspace() for char in release_ref):
-        raise LifecycleError("Refusing forced release checkout with an empty or whitespace-containing ref")
+        raise LifecycleError(
+            "Refusing forced release checkout with an empty or whitespace-containing ref"
+        )
 
     ref_check = subprocess.run(
         ["git", "rev-parse", "--verify", "--quiet", f"{release_ref}^{{commit}}"],
@@ -419,7 +440,9 @@ def _require_safe_force_checkout(args: list[str], cwd: Path | None) -> None:
         stderr=subprocess.DEVNULL,
     )
     if ref_check.returncode != 0:
-        raise LifecycleError(f"Refusing forced release checkout because ref does not resolve to a commit: {release_ref}")
+        raise LifecycleError(
+            f"Refusing forced release checkout because ref does not resolve to a commit: {release_ref}"
+        )
 
     if env_bool("CONFIRM_FORCE_RELEASE_CHECKOUT", False):
         return

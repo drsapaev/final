@@ -344,7 +344,7 @@ const DisplayBoardSettings = () => {
               </label>
               <Select
                 value={selectedBoard.show_patient_names}
-                onChange={(value: SelectChangeEvent) => handleBoardSettingChange('show_patient_names', value.target.value === 'true')}
+                onChange={(value: SelectChangeEvent) => handleBoardSettingChange('show_patient_names', value.target.value)}
                 options={privacyOptions.map((option) => ({
                   value: option.value,
                   label: `${option.label} - ${option.description}`

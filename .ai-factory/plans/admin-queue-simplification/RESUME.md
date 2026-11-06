@@ -1,4 +1,18 @@
-## Current resume — PR #3873 T18.10 review correction — 2026-11-05T10:45:07+05:00
+## Current resume — T18.10 `specialists` validated — 2026-11-05T12:01:20+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-specialists-check/final`, branch `codex/aqs-t18-specialists-check`, based on merged PR #3873 at `a9c25f5b9c25f52d12aed4fc22b74874dc441a3f`. The tracked tree was clean during validation.
+
+T18.10 is VALIDATED on that exact runtime commit: one final owned synthetic Session passed normal Admin password and TOTP enrollment/verification, the real initial `specialists` catalog row, all four legacy URLs, selected profile and actual outbound editor link, typed profile/section/day context, tab changes, reload, Back/Forward, return and reload. Its protected linked-profile DELETE returned a readable 409 and retained the row; no other profile mutation and no uncaught page error were observed. `/sw.js` carried the tested SHA and all 58 captured JS/CSS bodies matched the owned frontend container files. This separate byte comparison does not change the launcher's `served_revision_verified=false` marker.
+
+Two earlier attempts ended with successful teardown but did not pass the whole scenario: a temporary PowerShell native-stderr exception, then a direction-selection timeout after partial browser passes. A same-date React input issue was independently reproduced; the temporary harness now uses a different date and waits for asset captures before navigation. Final Session teardown removed 5 containers, 3 volumes and 1 network with zero owned resources remaining; selected ports were free and this task's synthetic env was removed. The older retained worktree and its two policy-blocked env files were not touched.
+
+The earlier RQ-18 lifecycle passed an anonymous QR join on `38ecd429`; source comparison shows `QueueJoin.tsx` changed afterward in #3876/#3877. The `specialists` Session did not rerun that patient flow on `a9c25f5b`; this is an evidence gap, not a proven defect. After this PR is merged, refresh `origin/main` and assess a bounded synthetic current-source RQ-18 public join/lifecycle run without repeating unrelated validated scenarios.
+
+Allowed authored paths remain `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`; runtime, tracked tests, production, merge and deployment were outside this validation scope. Next: identify the evidence PR for this branch and verify its exact-head checks. User retains merge. Overall Tier-2 and the full staging runbook remain PARTIAL/NOT_RUN; do not claim deployment or system health.
+
+---
+
+## Previous resume — PR #3873 T18.10 review correction — 2026-11-05T10:45:07+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-combined-validation/final`, branch `codex/t18-combined-validation`. Review #5780355730 is correct: the canonical T18.10 checklist explicitly includes profile key `specialists`, initial load, typed return, reload, Back/Forward, the four legacy URLs, and the protected 409. The prior `VALIDATED` status and claim that the key was optional were incorrect. The current status is PARTIAL.
 
