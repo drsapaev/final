@@ -127,7 +127,21 @@ const DoctorQueuePanel = ({
   const [doctorInfo, setDoctorInfo] = useState<DoctorInfo | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<QueueEntryDto | null>(null);
   const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
+  // DOCQ-FE-003 (audit 3886): a distinct load-error state — a failed fetch
+  // must render as an error/retry screen, never as the misleading
+  // «Очередь не создана» empty state; a failed REFRESH after a successful
+  // load keeps the previous rows but must flag them as possibly stale.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [queueStale, setQueueStale] = useState(false);
   const loadQueueDataRef = useRef<() => void>(() => {});
+  // DOCQ-FE-001 (audit 3886): request-identity guard — the panel re-runs
+  // loading on `specialty` change, but the earlier specialty's in-flight
+  // response may resolve later and overwrite the new specialty's queue.
+  // Every async continuation is bound to the epoch+specialty it was issued
+  // in and self-cancels when superseded.
+  const queueEpochRef = useRef(0);
+  const specialtyRef = useRef<string | null>(null);
+  const queueDataRef = useRef<QueueDataDto | null>(null);
 
   // UX Audit Doctor H-31: unified status config from shared queueStatusConfig.js.
   // Previously: waiting=info, called=warning (different from DoctorPanel).
@@ -213,6 +227,21 @@ const DoctorQueuePanel = ({
       });
     } else {
       logger.log('Loading real data for DoctorQueuePanel');
+      // DOCQ-FE-001: a real specialty change claims a new request identity —
+      // bump the epoch and drop the previous specialty's whole queue
+      // context, so A's late responses and stale rows can never leak into
+      // B's panel. Same-specialty re-runs (StrictMode/interval) bump the
+      // epoch too but keep the loaded context.
+      const previousSpecialty = specialtyRef.current;
+      specialtyRef.current = specialty;
+      queueEpochRef.current += 1;
+      if (previousSpecialty !== null && previousSpecialty !== specialty) {
+        queueDataRef.current = null;
+        setQueueData(null);
+        setMessage({ type: '', text: '' });
+        setLoadError(null);
+        setQueueStale(false);
+      }
       loadDoctorData();
       loadQueueDataRef.current();
 
@@ -265,6 +294,12 @@ const DoctorQueuePanel = ({
       return;
     }
 
+    // DOCQ-FE-001: bind this request to its epoch+specialty — a late
+    // response for a superseded specialty self-cancels (success, error and
+    // finally branches alike).
+    const epoch = queueEpochRef.current;
+    const requestSpecialty = specialty;
+
     const queueUrl = buildApiUrl(`/doctor/${specialty}/queue/today`);
     try {
       setLoading(true);
@@ -277,18 +312,58 @@ const DoctorQueuePanel = ({
         headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
+      if (epoch !== queueEpochRef.current || requestSpecialty !== specialtyRef.current) {
+        // DOCQ-FE-001: superseded by a specialty switch — drop the stale
+        // response instead of painting another specialty's patients.
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
+        queueDataRef.current = data;
         setQueueData(data);
+        setLoadError(null);
+        setQueueStale(false);
       } else {
-        const error = await response.json();
-        setMessage({ type: 'error', text: error.detail });
+        // DOCQ-FE-003: parse the error body safely (it may be non-JSON) and
+        // record a DISTINCT load-error state; a failed refresh after a
+        // successful load flags the visible rows as possibly stale instead
+        // of silently keeping them as if they were fresh.
+        let detail = '';
+        try {
+          const error = await response.json();
+          detail = (error as { detail?: string })?.detail ?? '';
+        } catch {
+          /* non-JSON error body — keep the generic message */
+        }
+        const hadPreviousData = queueDataRef.current !== null;
+        setLoadError(detail || t('misc.dqp_oshibka_zagruzki_ocheredi'));
+        if (hadPreviousData) {
+          // DOCQ-FE-003: the stale warning Alert below the loaded rows is
+          // the single surface for a failed refresh — no duplicate message.
+          setQueueStale(true);
+        } else {
+          setMessage({ type: 'error', text: detail || t('misc.dqp_oshibka_zagruzki_ocheredi') });
+        }
       }
     } catch (error) {
+      // DOCQ-FE-001: a late network failure of a superseded specialty must
+      // not paint an error over the current one.
+      if (epoch !== queueEpochRef.current || requestSpecialty !== specialtyRef.current) {
+        return;
+      }
       logger.error('Ошибка загрузки очереди:', error);
-      setMessage({ type: 'error', text: t('misc.dqp_oshibka_zagruzki_ocheredi') });
+      const hadPreviousData = queueDataRef.current !== null;
+      setLoadError(t('misc.dqp_oshibka_zagruzki_ocheredi'));
+      if (hadPreviousData) {
+        setQueueStale(true);
+      } else {
+        setMessage({ type: 'error', text: t('misc.dqp_oshibka_zagruzki_ocheredi') });
+      }
     } finally {
-      setLoading(false);
+      if (epoch === queueEpochRef.current) {
+        setLoading(false);
+      }
     }
   };
   loadQueueDataRef.current = loadQueueData;
@@ -416,6 +491,29 @@ const DoctorQueuePanel = ({
 
   }
 
+  // DOCQ-FE-003 (audit 3886): a FAILED load is an error state with an
+  // explicit retry — never the misleading «Очередь не создана» empty state
+  // (that state stays reserved for a successful canonical response with
+  // queue_exists=false).
+  if (!queueData && loadError) {
+    return (
+      // DOCQ-FE-003: tailwind utilities instead of inline styles (ui-baseline
+      // ratchet: inlineStyles/varUsagesNoFallback may only improve).
+      <Card className="flex flex-col gap-4 p-6">
+        <Alert
+          type="error"
+          title={t('misc.dqp_ochered_nedostupna')}
+          description={loadError}
+        />
+        <div>
+          <Button type="button" variant="primary" onClick={() => loadQueueDataRef.current()}>
+            {t('misc.dqp_povtorit')}
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
   if (!queueData || !queueData.queue_exists) {
     return (
       <AppEmpty
@@ -431,6 +529,15 @@ const DoctorQueuePanel = ({
 
   return (
     <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
+      {/* DOCQ-FE-003 (audit 3886): a failed refresh keeps the previous rows
+       * ONLY under an explicit stale warning — the panel never pretends
+       * the visible queue is fresh after a failed reload. */}
+      {queueStale &&
+      <Alert
+        type="error"
+        title={t('misc.dqp_dannye_mogli_ustaret')}
+        description={t('misc.dqp_oshibka_zagruzki_ocheredi')} />}
+
       {/* Сообщения */}
       {message.text &&
       <Alert
