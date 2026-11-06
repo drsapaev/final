@@ -191,6 +191,11 @@ export interface QueueActionResponse {
 export interface QueueJoinSessionData {
   session_token: string;
   queue_info?: QueueJoinInfo;
+  /** QR-FE-029 (audit #3886): the server-computed attempt horizon (end of
+   * the target queue-day + grace, clinic timezone) published by
+   * /queue/join/start. Absent/null only on older backend responses — the
+   * client then falls back to its fixed 24h attempt TTL. */
+  attempt_expires_at?: string | null;
 }
 
 export interface QueueJoinInfo {
