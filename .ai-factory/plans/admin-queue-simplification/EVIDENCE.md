@@ -6234,3 +6234,18 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Current-source RQ-18 synthetic Preflight/Start/Session: NOT_RUN. Host had 1.16 GiB free RAM and WSL stopped; no Compose project or image build was started.
 - PR body was updated with the exact-head results and explicit remaining limits. PR #3897 remains user-merge-owned; no merge or deployment was performed.
 - Result: scoped code/evidence PR checks PASS; T18/Tier-2 remain PARTIAL because current-source RQ-18, full runbook and broader acceptance are outstanding.
+
+
+## PR #3897 exact-head checks after validation-description correction — 2026-11-07T02:39:59+05:00
+
+- Commit under test: `b738a493b0d6559c5f97f6b9d675333aaf53583e`; base `f456868a93f29c734b7f37d8c3c805bdd1f508f1` (#3901).
+- Environment: GitHub Actions for the synthetic E2E/evidence PR; Windows host resource inspection only. No local staging process was started.
+- Execution mode: continuation of the previously authorized T18 validation/evidence scope. PR description was corrected to include an explicit `Result` field and replace the stale quality-gate claim.
+- Changed paths for this checkpoint: PR description only. This entry records exact-HEAD checks before the next journal-only commit.
+- Validation: Unified CI run `42295355171` — Frontend unit, build, lint, E2E and PR Required Gate PASS. Latest PR Review Quality Gate `42296413004` PASS; lifecycle recommendation `42296412348` PASS. Security/Gitleaks/CodeQL, GitGuardian, scratch guards and Actions/Python/TypeScript analysis PASS.
+- Result: applicable hosted checks on exact HEAD passed. Earlier PR Review Quality Gate run `42295466354` failed because `Result` was not recognized in the PR Validation section; the description was corrected and the subsequent rerun passed. Backend/integration/Docker/parity/readiness/k6/DAST and other path-aware checks were SKIPPED, not PASS.
+- Current-source RQ-18 browser Session: NOT_RUN. Latest host reading was 1.25 GiB available RAM of 7.69 GiB; Ubuntu-24.04 WSL was stopped. No Compose project or image build was started.
+- Scope check: no runtime, backend, API, auth/RBAC, database, production or staging configuration changed. PR #3897 is OPEN, non-draft and mergeable at this HEAD; user owns merge.
+- Remaining limitation: T18/Tier-2 PARTIAL; T18.10 has a confirmed selected-profile context defect, current-source RQ-18 is unexecuted, full `STAGING_VALIDATION.md` and global served-build provenance remain incomplete, and console diagnostics remain partial.
+- Next: user merges #3897. Then start a separate fresh-main fix for T18.10; continue current-source RQ-18 staging only with safe resource headroom.
+- Merge commit: pending user merge.

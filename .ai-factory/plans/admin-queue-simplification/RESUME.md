@@ -1,4 +1,22 @@
-## Current resume — #3897 exact-head CI passed; T18 remains partial — 2026-11-07T02:15:39+05:00
+## Current resume — #3897 gates green; T18 remains partial — 2026-11-07T02:39:59+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final`, branch `codex/aqs-t18-rq18-current-20261106`. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.
+
+PR #3897 is OPEN, non-draft and mergeable at exact HEAD `b738a493b0d6559c5f97f6b9d675333aaf53583e`, based on `f456868a93f29c734b7f37d8c3c805bdd1f508f1` (#3901). Unified CI run #42295355171 passed Frontend unit/build/lint/E2E and PR Required Gate. Latest PR Review Quality Gate #42296413004 and lifecycle recommendation #42296412348 passed after the PR body explicitly added `Result` and corrected the stale gate status. An earlier Quality Gate failure on the same HEAD was superseded by the successful rerun. Path-aware backend, integration, Docker, parity, readiness, k6 and DAST jobs were skipped, not passed.
+
+Focused source checks on f456868a: QueueJoin regressions 8/8 PASS; RQ-18 spec ESLint PASS; task-specific Playwright collection found 1 test / 0 executed. Current-source RQ-18 browser Session remains NOT_RUN. Earlier live Session and 45/45 asset comparison apply only to runtime 5363a9ca; canonical `served_revision_verified` remains false.
+
+Latest host check: 1.25 GiB free RAM of 7.69 GiB; Ubuntu-24.04 WSL stopped. No current-source staging project or build was started.
+
+T18.10 remains PARTIAL: a normal Admin/TOTP Session loaded the real `specialists` profile but failed return-context preservation because `setupEditorLink()` sets `profileKey=null`. Later editor-tab/reload/Back/Forward and protected DELETE-409 checks were NOT_RUN. Fix this in a separate fresh-main PR after #3897 closes.
+
+Remaining acceptance: current-source RQ-18; complete T18 evidence on the final candidate; full `docs/runbooks/STAGING_VALIDATION.md`; global served-build provenance; and console diagnostics (2/11 events not reproduced, 8 minified-bundle call sites unmapped). Do not claim full Tier-2, production readiness or system health.
+
+Next exact action: user merges #3897. Then fetch fresh `origin/main`, create a separate T18.10 fix PR with the required gate, validate the affected route-context flow, and resume current-source RQ-18/full T18 staging when host memory headroom is adequate. No runtime source changed in #3897.
+
+---
+
+## Previous resume — #3897 exact-head CI passed before Result-field correction — 2026-11-07T02:15:39+05:00
 
 Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final, branch codex/aqs-t18-rq18-current-20261106. T00–T17 are merged; T18/Tier-2 remain PARTIAL.
 

@@ -6,11 +6,11 @@ Current status: IN_PROGRESS; T00–T17 MERGED; T18 scenarios 1–9 retain source
 Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final
 Branch: codex/aqs-t18-rq18-current-20261106
 Current origin/main: f456868a93f29c734b7f37d8c3c805bdd1f508f1 (#3901). This PR branch is synchronized locally and remotely.
-Current PR: #3897 OPEN, Ready for review, mergeable at the latest GitHub read. Its published HEAD 04d7cd72f97706ba0df8676d553f8b6468d3dcf4 passed Unified CI and PR gates; this follow-up records those final results. User owns merge.
+Current PR: #3897 OPEN, Ready for review, mergeable at the latest GitHub read. Exact HEAD `b738a493b0d6559c5f97f6b9d675333aaf53583e`, base `f456868a93f29c734b7f37d8c3c805bdd1f508f1`. User owns merge.
 Current tested QueueJoin source: f456868a93f29c734b7f37d8c3c805bdd1f508f1.
-Last updated: 2026-11-07T02:15:39+05:00
+Last updated: 2026-11-07T02:39:59+05:00
 
-## Current checkpoint — hosted CI passes; live RQ-18 and T18 remain partial
+## Current checkpoint — #3897 checks pass; T18 remains partial
 
 | Task | Status | Evidence |
 |------|--------|----------|
@@ -18,17 +18,17 @@ Last updated: 2026-11-07T02:15:39+05:00
 | T18 scenarios 1–9 | VALIDATED on their recorded source revisions | Individual scenario evidence below and in EVIDENCE.md |
 | T18.10 | PARTIAL | Affected Admin/2FA flow lost the selected specialists return context; later assertions remain incomplete |
 | RQ-18 after #3901 (source f456868a) | NOT_RUN | Focused tests 8/8, ESLint PASS, test collected but not executed |
-| PR #3897 code/evidence changes at 04d7cd72 | VALIDATED | Unified CI, frontend checks, PR Required Gate, quality/lifecycle gates passed |
+| PR #3897 code/evidence changes at b738a493 | VALIDATED | Unified CI and applicable frontend/security/required checks passed; latest quality/lifecycle reruns passed |
 | T18 overall | PARTIAL | Current-source staging, full runbook, and broader acceptance remain open |
 
-- On exact PR HEAD 04d7cd72, Unified CI run 42292661803 passed Frontend unit, build, lint, E2E and PR Required Gate. PR Review Quality Gate 42294865861 and lifecycle recommendation 42294865859 passed after the PR description was refreshed. Security, Gitleaks, CodeQL, GitGuardian, scratch guards and language analysis passed. Path-aware backend/integration/Docker/parity/readiness/k6/DAST jobs were skipped and are not counted as PASS.
+- On exact PR HEAD b738a493, Unified CI run 42295355171 passed Frontend unit, build, lint, E2E and PR Required Gate. Latest PR Review Quality Gate 42296413004 and lifecycle recommendation 42296412348 passed after the PR description was corrected to include an explicit `Result`. Earlier Quality Gate run 42295466354 failed because that field was missing; the later successful rerun supersedes it. Security, Gitleaks, CodeQL, GitGuardian, scratch guards and language analysis passed. Path-aware backend/integration/Docker/parity/readiness/k6/DAST jobs were skipped and are not counted as PASS.
 - The exact RQ-18 spec was collected (1 test) but executed 0 times on current source. The green general E2E job does not count as RQ-18 execution.
 - Focused tests after #3901: QueueJoin regressions 8/8 PASS; RQ-18 spec ESLint PASS. The local typecheck attempt at earlier source 2093745a hit the configured 512 MiB heap limit; current hosted E2E type-check passed.
-- Current-source RQ-18 browser Session remains NOT_RUN. Resource check found 1.16 GiB free RAM of 7.69 GiB and WSL stopped; no Compose project or image build was started.
+- Current-source RQ-18 browser Session remains NOT_RUN. Latest resource check found 1.25 GiB free RAM of 7.69 GiB and Ubuntu-24.04 WSL stopped; no Compose project or image build was started.
 - Earlier RQ-18 PASS and bounded 45/45 served-asset comparison remain tied to source 5363a9ca and do not validate #3899/#3901. The canonical launcher still reports served_revision_verified=false.
 - T18.10 remains PARTIAL: a prior source-backed Admin/2FA Session found that setupEditorLink() serializes profileKey=null despite selected specialists context. The fix is separate from #3897.
 - Console diagnostics remain partial: 9/11 earlier events reproduced, 2 were not reproduced, and 8 minified-bundle call sites remain unmapped.
-- Next exact action: finish this journal-only follow-up, push it to #3897, refresh the PR description to identify the final journal HEAD, and verify its path-aware required gates. User owns merge. After that PR closes, start a separate fresh-main fix for T18.10 and resume staging only with adequate RAM.
+- Next exact action: user merges #3897. After it closes, fetch fresh `origin/main` and create a separate PR for the confirmed T18.10 `setupEditorLink()` selected-profile context defect; run only affected tests and synthetic Admin/2FA assertions. Resume current-source RQ-18 staging and full T18 acceptance when the host has safe memory headroom. User owns all merges and deployment.
 
 
 ---
