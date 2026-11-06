@@ -85,7 +85,14 @@ const loadExistingEMR = async (visitId: string | number) => {
     validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
   } as Record<string, unknown>);
   if (response.status === 404) return null;
-  return response.data as { data?: Record<string, unknown>; row_version?: number };
+  // DENTIDENT-FE-001 (audit 3892): keep the canonical patient/visit identity
+  // fields of the response so the editor can fail closed on a mismatch.
+  return response.data as {
+    data?: Record<string, unknown>;
+    row_version?: number;
+    patient_id?: string | number;
+    visit_id?: string | number;
+  };
 };
 
 const saveEMR = async (visitId: string | number, data: unknown, rowVersion: unknown, isDraft = true) => {
@@ -99,6 +106,19 @@ const saveEMR = async (visitId: string | number, data: unknown, rowVersion: unkn
 
 const isSameVisit = (left: string | number | null | undefined, right: string | number | null | undefined) =>
   left !== null && left !== undefined && right !== null && right !== undefined && String(left) === String(right);
+
+// DENTDIAG-FE-001 (audit 3892): the canonical EMR contract allows a
+// structured diagnosis object {main, icd10_code, secondary[]} in data.diagnosis.
+type StructuredDiagnosis = { main?: unknown; icd10_code?: unknown; secondary?: unknown; [k: string]: unknown };
+
+const isStructuredDiagnosis = (value: unknown): value is StructuredDiagnosis =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const diagnosisMainText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (isStructuredDiagnosis(value) && typeof value.main === 'string') return value.main;
+  return '';
+};
 
 const getHttpStatus = (error: unknown): number | undefined => {
   if (!error || typeof error !== 'object') return undefined;
@@ -832,7 +852,7 @@ const DentalVisitScreen = ({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
-  const [loadError, setLoadError] = useState<'missing_visit' | 'load' | null>(null);
+  const [loadError, setLoadError] = useState<'missing_visit' | 'load' | 'identity' | null>(null);
   const [saveError, setSaveError] = useState<'conflict' | 'save' | null>(null);
   const [loadedVisitId, setLoadedVisitId] = useState<string | number | null>(null);
   const [selectedTooth, setSelectedTooth] = useState<{ number: string | number; data: Record<string, unknown> } | null>(null);
@@ -856,11 +876,35 @@ const DentalVisitScreen = ({
   const historySequenceRef = useRef(0);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // DENTVISIT-FE-005 (audit 3892): a dirty draft must be flushed to its own
+  // visit before a patient switch replaces the editing context.
+  const draftDirtyRef = useRef(false);
+  // DENTDIAG-FE-001 (audit 3892): the structured diagnosis loaded from the
+  // EMR (if any) is preserved on edits instead of being replaced by a string.
+  const structuredDiagnosisRef = useRef<StructuredDiagnosis | null>(null);
 
   // A failed EMR read must not be treated as an empty draft. Keep the visit
   // open and require a successful read before editing or completing it.
   const loadEMR = useCallback(async () => {
     const requestSequence = ++loadSequenceRef.current;
+
+    // DENTVISIT-FE-005 (audit 3892): when the selected visit changes while a
+    // dirty draft exists, flush the draft to ITS OWN visit while that visit's
+    // identity is still bound — never discard it, never attribute it to the
+    // next patient. The snapshot and version are captured atomically here.
+    const previousVisitId = loadedVisitIdRef.current;
+    if (
+      previousVisitId !== null &&
+      draftDirtyRef.current &&
+      !isSameVisit(previousVisitId, visitId)
+    ) {
+      const previousDraft = latestDraftRef.current;
+      const previousRowVersion = rowVersionRef.current;
+      void saveEMR(previousVisitId, previousDraft, previousRowVersion, true).catch(() => {
+        logger.warn('[DentalVisitScreen] visit-change draft flush failed');
+      });
+    }
+
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
@@ -871,11 +915,17 @@ const DentalVisitScreen = ({
     setLoadError(null);
     setSaveError(null);
     retryCompletionRef.current = false;
+    draftDirtyRef.current = false;
+    structuredDiagnosisRef.current = null;
     setLoadedVisitId(null);
     loadedVisitIdRef.current = null;
     latestDraftRef.current = EMPTY_EMR_DATA;
     rowVersionRef.current = 0;
     setEmrData(EMPTY_EMR_DATA);
+    // DENTMODAL-FE-002 (audit 3892): a tooth modal opened for the previous
+    // patient must not keep writing after the selected visit changes.
+    setToothModalOpen(false);
+    setSelectedTooth(null);
 
     if (visitId === null || visitId === undefined || visitId === '') {
       setLoadError('missing_visit');
@@ -892,6 +942,24 @@ const DentalVisitScreen = ({
         throw new Error('Invalid EMR version response');
       }
 
+      // DENTIDENT-FE-001 (audit 3892): a successful EMR read carries the
+      // canonical patient/visit identity. Fail closed when it contradicts the
+      // selected patient header — never render or edit a mismatched chart.
+      const responsePatientId = existing?.patient_id;
+      const responseVisitId = existing?.visit_id;
+      if (
+        existing && (
+          (responseVisitId !== null && responseVisitId !== undefined && !isSameVisit(responseVisitId, visitId)) ||
+          (patientId !== null && responsePatientId !== null && responsePatientId !== undefined &&
+            String(responsePatientId) !== String(patientId))
+        )
+      ) {
+        logger.warn('[DentalVisitScreen] EMR identity mismatch, refusing to hydrate the editor');
+        notify.error(t('dental2.visit_identity_mismatch'));
+        setLoadError('identity');
+        return;
+      }
+
       const data = (existing?.data || EMPTY_EMR_DATA) as typeof EMPTY_EMR_DATA;
       const specialtyData = data.specialty_data || EMPTY_EMR_DATA.specialty_data;
       const protocolData = specialtyData.visit_protocol || (data as Record<string, unknown>).visit_protocol;
@@ -904,6 +972,20 @@ const DentalVisitScreen = ({
           visit_protocol: protocolData || EMPTY_EMR_DATA.specialty_data.visit_protocol,
         },
       };
+
+      // DENTDIAG-FE-001 (audit 3892): normalize a structured diagnosis for
+      // display (.main) while preserving the nested canonical fields
+      // (icd10_code, secondary) in the persisted draft.
+      const rawDiagnosis = (data as Record<string, unknown>).diagnosis;
+      const structuredDiagnosis = isStructuredDiagnosis(rawDiagnosis) ? rawDiagnosis : null;
+      structuredDiagnosisRef.current = structuredDiagnosis;
+      if (structuredDiagnosis) {
+        const structuredIcd10 = typeof structuredDiagnosis.icd10_code === 'string' ? structuredDiagnosis.icd10_code : '';
+        if (!nextDraft.icd10_code && structuredIcd10) {
+          (nextDraft as Record<string, unknown>).icd10_code = structuredIcd10;
+        }
+      }
+
       latestDraftRef.current = nextDraft;
       rowVersionRef.current = rowVersion ?? 0;
       loadedVisitIdRef.current = visitId;
@@ -917,7 +999,7 @@ const DentalVisitScreen = ({
     } finally {
       if (requestSequence === loadSequenceRef.current) setLoading(false);
     }
-  }, [visitId, t]);
+  }, [visitId, patientId, t]);
 
   // Load patient history
   const loadHistory = useCallback(async () => {
@@ -975,6 +1057,7 @@ const DentalVisitScreen = ({
       }
       if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
         rowVersionRef.current = response.row_version;
+        draftDirtyRef.current = false;
       }
     });
     saveQueueRef.current = operation.then(() => undefined, () => undefined);
@@ -1005,10 +1088,17 @@ const DentalVisitScreen = ({
   }, [persistDraft, t, visitId]);
 
   const updateField = useCallback((field: string, value: unknown) => {
-    const next = { ...latestDraftRef.current, [field]: value } as typeof EMPTY_EMR_DATA;
+    // DENTDIAG-FE-001 (audit 3892): editing the diagnosis text updates the
+    // structured object's .main instead of replacing the whole object, so
+    // nested icd10_code/secondary survive the edit.
+    const nextValue = field === 'diagnosis' && structuredDiagnosisRef.current
+      ? { ...structuredDiagnosisRef.current, main: value } as unknown
+      : value;
+    const next = { ...latestDraftRef.current, [field]: nextValue } as typeof EMPTY_EMR_DATA;
     latestDraftRef.current = next;
     setEmrData(next);
     setSaveError(null);
+    draftDirtyRef.current = true;
     scheduleAutosave(next);
   }, [scheduleAutosave]);
 
@@ -1023,6 +1113,7 @@ const DentalVisitScreen = ({
     latestDraftRef.current = next;
     setEmrData(next);
     setSaveError(null);
+    draftDirtyRef.current = true;
     scheduleAutosave(next);
   }, [scheduleAutosave]);
 
@@ -1150,7 +1241,16 @@ const DentalVisitScreen = ({
     setToothModalOpen(true);
   }, []);
 
-  const handleToothSave = useCallback((toothNumber: string | number, toothData: Record<string, unknown>) => {
+  const handleToothSave = useCallback((toothNumber: string | number, toothData: Record<string, unknown>, rowVersion?: number) => {
+    // DENTMODAL-FE-001 (audit 3892): the tooth modal performs its own server
+    // write before invoking this handler; adopt the row_version it returned so
+    // the parent's next save does not reuse the stale optimistic-lock version.
+    if (
+      typeof rowVersion === 'number' && Number.isInteger(rowVersion) &&
+      isSameVisit(loadedVisitIdRef.current, visitId)
+    ) {
+      rowVersionRef.current = rowVersion;
+    }
     updateSpecialtyData('tooth_status', {
       ...(emrData.specialty_data?.tooth_status || {}),
       [toothNumber]: toothData,
@@ -1158,7 +1258,7 @@ const DentalVisitScreen = ({
     setToothModalOpen(false);
     setSelectedTooth(null);
     notify.success(t('dental.dental_dvs_tooth_saved', { toothNumber }));
-  }, [emrData.specialty_data, updateSpecialtyData, t]);
+  }, [emrData.specialty_data, updateSpecialtyData, t, visitId]);
 
   // AI suggestion apply → writes to icd10_code field
   const handleAISuggestion = useCallback(() => {
@@ -1189,7 +1289,7 @@ const DentalVisitScreen = ({
         {loadError && (
           <Alert
             type="error"
-            description={loadError === 'missing_visit' ? t('dental.protocol_needs_visit_id') : t('dental2.visit_map_load_failed')}
+            description={loadError === 'missing_visit' ? t('dental.protocol_needs_visit_id') : loadError === 'identity' ? t('dental2.visit_identity_mismatch') : t('dental2.visit_map_load_failed')}
             action={(
               <Button variant="outline" onClick={() => { void loadEMR(); }}>
                 {t('doctor.btn_retry')}
@@ -1227,7 +1327,7 @@ const DentalVisitScreen = ({
 
             {/* Diagnosis + ICD-10 + AI button */}
             <DiagnosisSection
-              diagnosis={emrData.diagnosis || ''}
+              diagnosis={diagnosisMainText(emrData.diagnosis)}
               icd10={emrData.icd10_code || ''}
               onDiagnosisChange={(v) => updateField('diagnosis', v)}
               onIcd10Change={(v) => updateField('icd10_code', v)}
@@ -1282,7 +1382,7 @@ const DentalVisitScreen = ({
           onClose={() => { setToothModalOpen(false); setSelectedTooth(null); }}
           toothNumber={selectedTooth.number}
           toothData={selectedTooth.data}
-          onSave={(data: unknown) => handleToothSave(selectedTooth?.number, data as Record<string, unknown>)}
+          onSave={(data: unknown, rowVersion?: number) => handleToothSave(selectedTooth?.number, data as Record<string, unknown>, rowVersion)}
           visitId={visitId}
         />
       )}

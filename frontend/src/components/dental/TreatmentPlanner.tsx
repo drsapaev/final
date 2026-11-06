@@ -4,7 +4,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * План лечения с этапами
  * Согласно MASTER_TODO_LIST строка 286
  */
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   Alert,
@@ -241,6 +241,31 @@ interface TreatmentPlanState {
   totalDuration: number;
 }
 
+const EMPTY_TREATMENT_PLAN: TreatmentPlanState = {
+  name: '',
+  stages: [],
+  totalCost: 0,
+  totalDuration: 0,
+};
+
+// DENTPLAN-FE-001 (audit 3892): normalize a persisted EMR treatment plan
+// (specialty_data.treatment_plan or the legacy flat field) into local state.
+const extractTreatmentPlan = (existingEmr: Record<string, unknown> | null): TreatmentPlanState | null => {
+  const data = existingEmr?.data as Record<string, unknown> | undefined;
+  if (!data) return null;
+  const specialtyData = (data.specialty_data || {}) as Record<string, unknown>;
+  const rawPlan = specialtyData.treatment_plan ?? (data as Record<string, unknown>).treatment_plan;
+  if (!rawPlan || typeof rawPlan !== 'object' || Array.isArray(rawPlan)) return null;
+  const plan = rawPlan as { name?: unknown; stages?: unknown };
+  const stages = (Array.isArray(plan.stages) ? plan.stages : []) as TreatmentStage[];
+  return {
+    name: typeof plan.name === 'string' ? plan.name : '',
+    stages,
+    totalCost: stages.reduce((sum, stage) => sum + (Number(stage?.cost) || 0), 0),
+    totalDuration: stages.reduce((sum, stage) => sum + (Number(stage?.duration) || 0), 0),
+  };
+};
+
 const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId?: string | number; onUpdate?: () => void; patientId?: string | number; teethData?: Record<string, unknown> }) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
@@ -250,6 +275,37 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
     totalCost: 0,
     totalDuration: 0,
   });
+  // DENTPLAN-FE-002 (audit 3892): the plan being edited belongs to the
+  // bound visit; track the current visit identity so a same-mounted switch
+  // resets the local plan and aborts an in-flight save.
+  const visitIdRef = useRef<string | number | undefined>(visitId);
+  visitIdRef.current = visitId;
+  const hydrateSequenceRef = useRef(0);
+
+  // DENTPLAN-FE-001 (audit 3892): hydrate an already-saved plan from the EMR
+  // so reopening a visit never starts from a blank plan that would silently
+  // replace the existing stages on Save.
+  useEffect(() => {
+    const sequence = ++hydrateSequenceRef.current;
+    let cancelled = false;
+    const hydrate = async () => {
+      setTreatmentPlan(EMPTY_TREATMENT_PLAN);
+      if (visitId === null || visitId === undefined || visitId === '') return;
+      try {
+        const existingEmr = await loadExistingEmrDraft(visitId);
+        if (cancelled || sequence !== hydrateSequenceRef.current) return;
+        if (String(visitIdRef.current) !== String(visitId)) return;
+        const hydrated = extractTreatmentPlan(existingEmr as Record<string, unknown> | null);
+        if (hydrated) setTreatmentPlan(hydrated);
+      } catch {
+        // Fail open to an empty plan: the save path re-reads the EMR and the
+        // optimistic lock still guards the write.
+        logger.warn('Не удалось загрузить существующий план лечения');
+      }
+    };
+    void hydrate();
+    return () => { cancelled = true; };
+  }, [visitId]);
   
   const [stageDialog, setStageDialog] = useState(false);
   const [stageForm, setStageForm] = useState({
@@ -312,9 +368,16 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
         throw new Error('Treatment plan save requires visitId');
       }
 
-      const existingEmr = await loadExistingEmrDraft(visitId);
+      const targetVisitId = visitId;
+      const existingEmr = await loadExistingEmrDraft(targetVisitId);
+      // DENTPLAN-FE-002 (audit 3892): the visit changed while the save-time
+      // read was in flight — the stale-context write must not land.
+      if (String(visitIdRef.current) !== String(targetVisitId)) {
+        logger.warn('Сохранение плана лечения отменено: визит изменился до записи');
+        return;
+      }
       await api.post(
-        `/v2/emr/${visitId}`,
+        `/v2/emr/${targetVisitId}`,
         buildTreatmentPlanEmrPayload(existingEmr, treatmentPlan)
       );
       onUpdate && onUpdate();

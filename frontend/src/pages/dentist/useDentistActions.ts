@@ -104,8 +104,12 @@ export function useDentistActions({
       }
 
       // Создаем объект пациента для переключения на прием
+      // DENTWORK-FE-001 (audit 3892): carry the canonical patient_id from the
+      // queue row — `row.id` is the queue entry id and must never be used as
+      // the patient identity for history lookups or completion payloads.
       const patientData: SelectedPatient = {
         id: row.id,
+        patient_id: row.patient_id,
         appointment_id: (row.appointment_id as string | number | null | undefined) || null,
         visit_id: visitId,
         patient_name: row.patient_fio,
@@ -168,8 +172,12 @@ export function useDentistActions({
             break;
           }
 
+          // DENTWORK-FE-001 (audit 3892): same canonical patient_id fix as the
+          // row-click path — the completion payload must identify the patient,
+          // not the queue entry.
           const patient: SelectedPatient = {
             id: row.id,
+            patient_id: row.patient_id,
             appointment_id: (row.appointment_id as string | number | null | undefined) || null,
             visit_id: visitId,
             patient_name: row.patient_fio,
@@ -357,10 +365,20 @@ export function useDentistActions({
 
       // Минимальный payload: стоматолог использует EMR v2 для протокола визита,
       // а в queue completeVisit передаём только ключевые поля для закрытия очереди.
+      // DENTDIAG-FE-001 (audit 3892): the EMR draft may carry the canonical
+      // structured diagnosis {main, icd10_code, secondary}; the queue payload
+      // keeps a plain string — extract .main instead of shipping the object.
+      const draftDiagnosis = latestDraft.diagnosis as unknown;
+      const queueDiagnosisText =
+        typeof draftDiagnosis === 'string'
+          ? draftDiagnosis
+          : (draftDiagnosis && typeof draftDiagnosis === 'object' && typeof (draftDiagnosis as { main?: unknown }).main === 'string'
+              ? (draftDiagnosis as { main: string }).main
+              : '');
       const visitPayload = {
         patient_id: patientId,
         complaint: latestDraft.anamnesis_morbi || latestDraft.complaints || latestDraft.chiefComplaint || latestDraft.complaint || '',
-        diagnosis: latestDraft.diagnosis || '',
+        diagnosis: queueDiagnosisText,
         icd10: latestDraft.icd10_code || latestDraft.icd10 || latestDraft.icdCode || '',
         services: [],
         notes: latestDraft.recommendations || latestDraft.notes || '',
