@@ -142,6 +142,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  // custom/no-fake-timers-without-cleanup: fake timers must be restored in
+  // an afterEach hook — in singleFork mode leaked timers hang the runner.
+  vi.useRealTimers();
 });
 
 describe('DOCQ-FE-001: a late response of specialty A must not overwrite B', () => {
@@ -197,38 +200,35 @@ describe('DOCQ-FE-003: a failed load must not render as «queue not created»', 
 
   it('a failed refresh after a successful load flags the rows as stale', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      // Phase 1: both requests succeed.
-      fetchMock.mockImplementation(async (input) => {
-        const url = String(input);
-        if (url.includes('/doctor/my-info')) return MY_INFO_OK;
-        if (url.includes('/doctor/cardiology/queue/today')) return queueOk('cardiology', 'Альфа-Пациент Кардио');
-        throw new Error(`Unexpected fetch URL: ${url}`);
-      });
 
-      render(<DoctorQueuePanel specialty="cardiology" />);
-      expect(await screen.findByText('Альфа-Пациент Кардио')).toBeInTheDocument();
+    // Phase 1: both requests succeed.
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/doctor/my-info')) return MY_INFO_OK;
+      if (url.includes('/doctor/cardiology/queue/today')) return queueOk('cardiology', 'Альфа-Пациент Кардио');
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
 
-      // Phase 2: the 30s interval refresh now fails.
-      fetchMock.mockImplementation(async (input) => {
-        const url = String(input);
-        if (url.includes('/doctor/my-info')) return MY_INFO_OK;
-        if (url.includes('/doctor/cardiology/queue/today')) return QUEUE_LOAD_FAILED;
-        throw new Error(`Unexpected fetch URL: ${url}`);
-      });
+    render(<DoctorQueuePanel specialty="cardiology" />);
+    expect(await screen.findByText('Альфа-Пациент Кардио')).toBeInTheDocument();
 
-      await act(async () => {
-        vi.advanceTimersByTime(30000);
-      });
+    // Phase 2: the 30s interval refresh now fails.
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/doctor/my-info')) return MY_INFO_OK;
+      if (url.includes('/doctor/cardiology/queue/today')) return QUEUE_LOAD_FAILED;
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
 
-      // The stale warning must be visible next to the previously loaded rows.
-      await waitFor(() => {
-        expect(screen.getByText(/данные могли устареть/i)).toBeInTheDocument();
-      });
-      // The stale rows stay visible but the panel does not pretend they are fresh.
-      expect(screen.getByText('Альфа-Пациент Кардио')).toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
-    }
+    await act(async () => {
+      vi.advanceTimersByTime(30000);
+    });
+
+    // The stale warning must be visible next to the previously loaded rows.
+    await waitFor(() => {
+      expect(screen.getByText(/данные могли устареть/i)).toBeInTheDocument();
+    });
+    // The stale rows stay visible but the panel does not pretend they are fresh.
+    expect(screen.getByText('Альфа-Пациент Кардио')).toBeInTheDocument();
   });
 });
