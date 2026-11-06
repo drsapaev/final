@@ -1,18 +1,21 @@
 # Progress — T18 integrated synthetic acceptance
 
 Plan version: 1.0
-Current task: T18 integrated synthetic acceptance; `specialists` legacy navigation evidence
-Current status: IN_PROGRESS; T18.10 VALIDATED on the tested source below; overall T18 and Tier-2 remain PARTIAL
-Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-specialists-check/final
-Branch: codex/aqs-t18-specialists-check
-Base and tested runtime commit: `a9c25f5b9c25f52d12aed4fc22b74874dc441a3f` (merged PR #3873)
-Last updated: 2026-11-05T12:01:20+05:00
+Current task: T18 acceptance; preserve the T18.10 `specialists` Session report and continue the current-source RQ-18 public join gap
+Current status: IN_PROGRESS; evidence PR #3894 is OPEN/Ready; T18.10 VALIDATED for its tested source; overall T18 and Tier-2 remain PARTIAL
+Worktree: C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final
+Branch: codex/aqs-t18-report-provenance
+Base commit: `3de30426154cdb031b62c858fa6ff06a9b65aabc` (`origin/main` at cycle start)
+Synced before push: rebased onto `1cf06c87ef798bea4711d8ca4d3b555ec20e9b43` (#3893); incoming changes were confined to unrelated EMR backend files.
+PR #3894 initial HEAD `e46149f397abea32f572708087410fdf607e530b` passed all six fetched workflows; the checkpoint update in this commit requires exact-head rechecks. User retains merge authority.
+Runtime commit for T18.10 evidence: `a9c25f5b9c25f52d12aed4fc22b74874dc441a3f`
+Last updated: 2026-11-06T11:32:52+05:00
 
-## Current checkpoint — T18.10 `specialists` navigation
+## Current checkpoint — T18.10 evidence and remaining T18 acceptance
 
 | Task | Status | Evidence |
 |------|--------|----------|
-| T18.10 | VALIDATED on `a9c25f5b` | Focused synthetic Session and teardown, recorded in `EVIDENCE.md` |
+| T18.10 | VALIDATED on `a9c25f5b` | [Sanitized Session report](EVIDENCE.md#t1810-specialists-session-report-20261105); original source transcript and cleanup are identified |
 | T18 public QR join | Current-source live check NOT_RUN | Earlier RQ-18 join passed on `38ecd429`; `QueueJoin.tsx` changed afterward |
 | T18 overall | PARTIAL | Broader remaining checks and full staging runbook remain open |
 
@@ -21,9 +24,10 @@ Last updated: 2026-11-05T12:01:20+05:00
 - The served `/sw.js` contained the tested SHA; all 58 captured JS/CSS response bodies matched the corresponding files in the owned frontend container. This is a separate bounded comparison: the canonical launcher's `served_revision_verified` remains `false`.
 - Canonical Session teardown reported 5 containers, 3 volumes and 1 network removed, with zero remaining owned resources; the three selected ports were no longer listening. The task-owned synthetic env file was removed. The two env files from the separately retained prior worktree remain outside this scope.
 - T18.10 is VALIDATED for `a9c25f5b` by this complete focused run. The full `docs/runbooks/STAGING_VALIDATION.md`, remaining broader T18 checks, and production validation are not implied by this result; overall Tier-2 remains PARTIAL as the user directed.
+- The journal-only evidence PR #3879 merged at `e29670213a7f8f8b084469914966afc8c20e4cbb`. This follow-up stores the sanitized structured Session result and corrects the stale next action; it does not claim a fresh staging run or change the result's tested source.
 - Next T18 gap identified by source comparison: the previously passing synthetic RQ-18 lifecycle at `38ecd429` included an anonymous `QueueJoin` booking. `frontend/src/pages/QueueJoin.tsx` subsequently changed in #3876 and #3877, so the prior live result does not by itself establish the patient join on `a9c25f5b`. No current-source QR join was run in this slice; no product defect is inferred. Keep the earlier Admin publication/address/archive evidence tied to its tested source.
 - Two earlier attempts were cleaned up. The first stopped at a temporary PowerShell native-stderr exception; the second passed 2FA, profile loading, cabinets and settings but timed out during direction selection. An unchanged-date React behavior was reproduced independently, the temporary harness was corrected, and the third Session passed. Details and limits are in `EVIDENCE.md`.
-- Next exact action: identify this branch's evidence PR and verify its exact-head checks; merge remains with the user. After that PR is merged, refresh `origin/main`, assess and run a bounded synthetic RQ-18 public QR join/lifecycle check on the then-current source, and continue remaining T18 gaps; do not deploy or claim complete Tier-2.
+- Next exact action: verify the current exact-head checks for PR #3894 and wait for the user-owned merge. After merge, refresh `origin/main`, adapt the stale RQ-18 live spec to the current setup flow, and run a bounded synthetic public QR join/lifecycle Session with canonical cleanup. Continue remaining T18 gaps; do not deploy or claim complete Tier-2.
 
 ---
 

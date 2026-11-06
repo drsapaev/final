@@ -11,7 +11,102 @@
 - Teardown and scope: final Session removed 5 containers, 3 volumes and 1 network; zero owned containers/volumes/networks remained, and the three selected host ports had no listeners. The owned synthetic env was removed. No application source, tracked test, deployment, or production data changed.
 - Subsequent read-only source comparison: the RQ-18 synthetic lifecycle recorded below passed anonymous patient join on `38ecd42927fee6fe867a75188d5cb941e081ec6f`. `git diff --numstat 38ecd42927fee6fe867a75188d5cb941e081ec6f a9c25f5b9c25f52d12aed4fc22b74874dc441a3f -- frontend/src/pages/QueueJoin.tsx` reports 292 additions and 106 deletions; #3876 and #3877 changed that file. The current-source public QR join was not exercised in the `specialists` Session. This is an acceptance evidence gap, not a confirmed regression.
 - Result: T18.10 VALIDATED for the tested source. Full T18, the complete `docs/runbooks/STAGING_VALIDATION.md` checklist, and production readiness remain PARTIAL/NOT_RUN as applicable. Prior console-diagnostic limitations remain recorded in earlier evidence.
-- PR: identify the journal-only PR for branch `codex/aqs-t18-specialists-check` in GitHub; user retains merge authority. Merge commit: not yet available.
+- PR: [#3879](https://github.com/drsapaev/final/pull/3879); merged at `e29670213a7f8f8b084469914966afc8c20e4cbb`. User retains merge and deployment authority.
+
+<a id="t1810-specialists-session-report-20261105"></a>
+### Sanitized T18.10 Session report — run `T18.10-specialists-20261105-session-3`
+
+This report was exported after the run from the original, untruncated Codex Desktop command transcript. The thread, turn, command-event and local session identifiers below identify that saved source; the command completed with exit code 0. The runner object preserves the recorded structured result. The launcher object is a sanitized projection of its recorded result: local workstation path, port details and image IDs are omitted. No authentication material, QR code, patient data or network payload is included.
+
+Report-export execution mode: mandatory known-root gate for the three journal paths. It returned `narrow_override`, `gate_misroute=false`, `override_used=true`, and `handoff_required=true`; the execution prompt was read. Basis: the supplied review requested a verifiable report and correction of the stale next action. This follow-up changed no runtime or tracked tests and ran no new staging Session.
+
+Historical command, run from the isolated worktree:
+
+```powershell
+$runner = Join-Path (Get-Location) '.scratch/t18-specialists/run-session.ps1'
+$privateEnv = Join-Path (Get-Location) '.scratch/t18-specialists/staging.env'
+.\ops\scripts\wsl_staging.ps1 -Action Session -EnvFile .scratch/t18-specialists/staging.env -NoBuild -TimeoutSec 600 -CommandArgs @('powershell.exe', '-NoProfile', '-File', $runner, '-EnvFile', $privateEnv)
+```
+
+The command follows a passing Preflight and Start. The private synthetic env was removed after teardown, and the task-local harness is not part of this PR; the historical command is therefore not a one-line reproduction on a fresh checkout.
+
+Assertion key: `admin2fa` = synthetic Admin password and TOTP enrollment/verification; `initialProfileRow` = database-backed `specialists` catalog row; `legacyCabinets` and `legacySettings` = the other two legacy pages with successful reads; `selectedDirection` = setup page and real selected profile; `outboundContext`, `editorProfileRow`, `tabsAndHistory`, `editorReload`, and `setupReturnAndReload` = typed context and row through the actual editor and history; `deleteGuard` = linked-profile DELETE returned HTTP 409 with the expected readable reason and retained row. The runner also asserted no profile mutation except that rejected DELETE and no uncaught page errors.
+
+```json
+{
+  "report_id": "T18.10-specialists-20261105-session-3",
+  "source": {
+    "kind": "Codex Desktop saved command transcript",
+    "thread_id": "01a12691-3d53-7b11-9fd2-1df8482bafd3",
+    "turn_id": "01a1aa53-697a-75b1-8dd5-9a2d1b42e07a",
+    "command_event_id": "exec-bc7ee5f6-72f4-44b5-a51f-85ec6ebe64b6",
+    "session_id": 36858,
+    "exit_code": 0,
+    "output_truncated": false,
+    "duration_ms": 75473
+  },
+  "runner": {
+    "overall": "PASS",
+    "phase": "complete",
+    "fixture": {
+      "result": "PASS"
+    },
+    "servedMarker": "PASS",
+    "browser": {
+      "overall": "PASS",
+      "admin2fa": "PASS",
+      "initialProfileRow": "PASS",
+      "legacyCabinets": "PASS",
+      "legacySettings": "PASS",
+      "selectedDirection": "PASS",
+      "outboundContext": "PASS",
+      "editorProfileRow": "PASS",
+      "tabsAndHistory": "PASS",
+      "editorReload": "PASS",
+      "deleteGuard": "PASS",
+      "setupReturnAndReload": "PASS",
+      "pageErrors": 0,
+      "profileMutationMethods": [
+        "DELETE"
+      ],
+      "failureStep": "",
+      "errorType": ""
+    },
+    "provenance": {
+      "sourceSha": "a9c25f5b9c25f52d12aed4fc22b74874dc441a3f",
+      "assetCount": 58,
+      "assetMatches": 58,
+      "assetReadFailures": 0,
+      "assetHashConflicts": 0
+    }
+  },
+  "launcher": {
+    "project": "clinic-aqs-t18-specialists-20261105",
+    "commit": "a9c25f5b9c25f52d12aed4fc22b74874dc441a3f",
+    "worktree_dirty": false,
+    "runtime_readiness": "PASS",
+    "served_revision_verified": false,
+    "teardown": {
+      "status": "PASS",
+      "removed": {
+        "container": 5,
+        "volume": 3,
+        "network": 1
+      },
+      "remaining": {
+        "container": 0,
+        "volume": 0,
+        "network": 0
+      },
+      "local_images": "compose --rmi local"
+    },
+    "action": "session",
+    "result": "PASS"
+  }
+}
+```
+
+The desktop transcript can be re-read by a collaborator with access to this chat using the listed command-event ID. This exported record is an agent-command transcript, not an independently signed attestation; it does not establish full Tier-2, unobserved assets or production readiness.
 
 ## T18 — PR #3801 review fixes locally validated — 2026-10-29T20:43+05:00
 
