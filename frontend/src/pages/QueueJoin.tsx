@@ -1000,6 +1000,13 @@ const QueueJoin = () => {
       setPayloadMismatch(false);
       completeAttemptedRef.current = false;
       setAttemptExpiresAt(null);
+      // Codex review of PR 3900 (QR-FE-028 follow-up): the token-scoped
+      // reconcile guard of the PREVIOUS token must not leak into B's flow —
+      // a stale `reconcileGuardRef` would make B's loadTokenInfo skip
+      // startJoinSession forever (B rendered without a session). B's own
+      // UNKNOWN envelope scan below re-enables the guard when B actually
+      // has one.
+      reconcileGuardRef.current = false;
       setStep('loading');
     }
 
