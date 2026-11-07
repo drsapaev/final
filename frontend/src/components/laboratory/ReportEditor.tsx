@@ -9,7 +9,7 @@ import { useLabToast } from './hooks/useLabToast';
 import { useLabReporting } from '../../hooks/useLabReporting';
 import { useTranslation } from '../../i18n/useTranslation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 /**
  * STRAT#24: ReportEditor — extracted from LabReportWorkbench.
@@ -59,6 +59,7 @@ interface LabReportInstance {
 
 interface LabReportHistoryEntry {
   id?: string | number;
+  patient_id?: string | number;
   template_id?: string | number;
   created_at?: string;
 }
@@ -90,49 +91,137 @@ export default function ReportEditor({
   // interactive* methods (which call toast directly, not the notify callback).
   const labToast = useLabToast(notify ?? ((_type: string, _message: string) => {}));
 
-  // LABEDIT-FE-001 (audit 3886): the list API returns summary DTOs WITHOUT
-  // `sections` (backend LabReportInstanceSummaryOut), so the previous-value
-  // trend can never come from a history row. The trend reads the authorized
-  // DETAILS of the actual preceding SAME-TEMPLATE instance — the first
-  // non-current history entry with the active template — fetched once per
-  // predecessor id (fail-closed: a failed/unshaped read simply renders no
-  // trend, never a fabricated value).
+  // LABEDIT-FE-001 (audit 3886) + LABEDIT-FE-003/004 (post-merge review of
+  // PR 3916): the list API returns summary DTOs WITHOUT `sections` (backend
+  // LabReportInstanceSummaryOut), so the previous-value trend can never come
+  // from a history row. The trend reads the authorized DETAILS of the actual
+  // preceding SAME-TEMPLATE, SAME-PATIENT instance — fetched once per
+  // predecessor id (fail-closed: a failed/unshaped/mismatched read simply
+  // renders no trend, never a fabricated value).
+  //
+  // LABEDIT-FE-003 (P1): the fetched details are bound to the predecessor +
+  // patient identity they were fetched for and dropped SYNCHRONOUSLY when
+  // that identity changes — a report/patient switch must never render the
+  // previous report's (potentially another patient's) clinical values
+  // beside the new report's fields, not even while the new GET is pending.
+  //
+  // LABEDIT-FE-004 (P2): the predecessor must be chronologically OLDER than
+  // the active instance (created_at, deterministic id tie-break) — a newer
+  // entry (the operator opened an older report) is a FUTURE result and is
+  // never presented as the «previous» value; the nearest preceding entry is
+  // chosen without relying on the history list order.
   const labReportingApi = useLabReporting();
-  const [previousInstanceDetails, setPreviousInstanceDetails] = useState<LabReportInstance | null>(null);
+  const [previousInstanceDetails, setPreviousInstanceDetails] = useState<{
+    predecessorId: string;
+    patientId: string;
+    details: LabReportInstance;
+  } | null>(null);
+  const activeIdentity = useMemo(() => {
+    const inst = activeInstance as {
+      id?: string | number;
+      patient_id?: string | number;
+      template_id?: string | number;
+      created_at?: string;
+    };
+    return {
+      id: inst.id ?? null,
+      patientId: inst.patient_id ?? null,
+      templateId: inst.template_id ?? null,
+      createdAt: inst.created_at ?? null,
+    };
+  }, [activeInstance]);
   const previousSameTemplateEntry = useMemo(() => {
-    const activeId = (activeInstance as { id?: string | number }).id;
-    const activeTemplateId = (activeInstance as { template_id?: string | number }).template_id;
-    if (!Array.isArray(reportHistory) || activeId == null || activeTemplateId == null) return null;
-    return reportHistory.find((entry) =>
-      entry?.id != null
-      && String(entry.id) !== String(activeId)
-      && entry.template_id != null
-      && String(entry.template_id) === String(activeTemplateId)
-    ) ?? null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportHistory, (activeInstance as { id?: string | number }).id, (activeInstance as { template_id?: string | number }).template_id]);
-  const previousIdRef = useRef<string | number | null>(null);
-  useEffect(() => {
-    const previousId = previousSameTemplateEntry?.id ?? null;
-    if (previousIdRef.current === previousId) return;
-    previousIdRef.current = previousId;
-    if (previousId == null) {
-      setPreviousInstanceDetails(null);
-      return;
+    const { id: activeId, patientId, templateId, createdAt } = activeIdentity;
+    if (!Array.isArray(reportHistory) || activeId == null || templateId == null) return null;
+    // LABEDIT-FE-003: enforce same-patient scope — the trend compares values
+    // of the SAME patient's longitudinal history only; without a known
+    // patient scope there is no honest trend (fail-closed: none rendered).
+    if (patientId == null) return null;
+    // LABEDIT-FE-004: the chronology must be establishable.
+    const activeTs = createdAt != null ? Date.parse(createdAt) : NaN;
+    if (!Number.isFinite(activeTs)) return null;
+    const compareIds = (a: string | number, b: string | number): number => {
+      const na = typeof a === 'number' ? a : Number(a);
+      const nb = typeof b === 'number' ? b : Number(b);
+      if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+      return String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
+    };
+    let best: { entry: LabReportHistoryEntry; ts: number } | null = null;
+    for (const entry of reportHistory) {
+      if (entry?.id == null || String(entry.id) === String(activeId)) continue;
+      if (entry.template_id == null || String(entry.template_id) !== String(templateId)) continue;
+      if (entry.patient_id == null || String(entry.patient_id) !== String(patientId)) continue;
+      const ts = entry.created_at != null ? Date.parse(entry.created_at) : NaN;
+      if (!Number.isFinite(ts)) continue;
+      // LABEDIT-FE-004: only chronologically older entries qualify — a newer
+      // same-template entry is a FUTURE result. Deterministic id tie-break
+      // for an equal created_at: the smaller id precedes the active report.
+      const older = ts < activeTs || (ts === activeTs && compareIds(entry.id, activeId) < 0);
+      if (!older) continue;
+      // Nearest preceding entry wins (max created_at, then max id) —
+      // independent of the list order.
+      if (
+        best == null
+        || ts > best.ts
+        || (ts === best.ts && compareIds(entry.id, best.entry.id as string | number) > 0)
+      ) {
+        best = { entry, ts };
+      }
     }
+    return best?.entry ?? null;
+  }, [reportHistory, activeIdentity]);
+  const previousEntryId = previousSameTemplateEntry?.id ?? null;
+  useEffect(() => {
+    const predecessorKey = previousEntryId != null ? String(previousEntryId) : null;
+    const patientKey = activeIdentity.patientId != null ? String(activeIdentity.patientId) : null;
+    const boundNow = previousInstanceDetails;
+    const boundIsCurrent = boundNow != null
+      && predecessorKey != null
+      && patientKey != null
+      && boundNow.predecessorId === predecessorKey
+      && boundNow.patientId === patientKey;
+    // The bound details already describe the CURRENT (patient, predecessor)
+    // identity — effect re-runs for the SAME identity (e.g. a hook object
+    // recreated between renders) must not drop them or refetch. This also
+    // keeps the fetch StrictMode-safe: a simulated remount re-runs the
+    // effect, the cancelled first fetch is simply repeated.
+    if (boundIsCurrent) return;
+    // LABEDIT-FE-003 (P1): drop the previous report's trend details
+    // SYNCHRONOUSLY the moment the predecessor/active identity changes —
+    // A's analytes must never render beside B's fields while B's detail
+    // GET is pending (or stuck).
+    setPreviousInstanceDetails(null);
+    if (previousEntryId == null || patientKey == null) return;
     let cancelled = false;
     labReportingApi
-      .getInstance(previousId)
+      .getInstance(previousEntryId)
       .then((details: unknown) => {
         if (cancelled) return;
-        const shaped = details as LabReportInstance | null;
-        setPreviousInstanceDetails(shaped && Array.isArray(shaped.sections) ? shaped : null);
+        const shaped = details as (LabReportInstance & { patient_id?: string | number }) | null;
+        // Fail-closed: only a well-shaped details DTO renders a trend.
+        if (!shaped || !Array.isArray(shaped.sections)) return;
+        // LABEDIT-FE-003: the details must belong to the same patient as
+        // the active report — a mismatched DTO is suppressed entirely.
+        if (shaped.patient_id != null && String(shaped.patient_id) !== patientKey) return;
+        setPreviousInstanceDetails({ predecessorId: String(previousEntryId), patientId: patientKey, details: shaped });
       })
       .catch(() => {
         if (!cancelled) setPreviousInstanceDetails(null);
       });
     return () => { cancelled = true; };
-  }, [previousSameTemplateEntry, labReportingApi]);
+  }, [previousEntryId, activeIdentity.patientId, labReportingApi, previousInstanceDetails]);
+  // LABEDIT-FE-003 (P1): render the trend ONLY when the fetched details are
+  // bound to the CURRENT predecessor + patient — during a report/patient
+  // switch the stale bound record fails this guard and nothing renders
+  // (even before the clearing effect flushes).
+  const previousTrendDetails = useMemo(() => {
+    const bound = previousInstanceDetails;
+    if (!bound) return null;
+    if (previousSameTemplateEntry?.id == null) return null;
+    if (String(previousSameTemplateEntry.id) !== bound.predecessorId) return null;
+    if (activeIdentity.patientId == null || String(activeIdentity.patientId) !== bound.patientId) return null;
+    return bound.details;
+  }, [previousInstanceDetails, previousSameTemplateEntry, activeIdentity.patientId]);
 
   function updateField(fieldKey: string, value: string) {
     onUpdateField(fieldKey, value);
@@ -183,13 +272,16 @@ export default function ReportEditor({
                         )}
                       </div>
                     </div>
-                    {/* PR-67 / High-9 + LABEDIT-FE-001 (audit 3886): previous-result
-                        trending — rendered from the authorized DETAILS of the actual
-                        preceding same-template instance (the list API returns summary
-                        DTOs without `sections`, so a history row can never provide
-                        the previous value). */}
-                    {previousInstanceDetails && (() => {
-                      const prevReport = previousInstanceDetails;
+                    {/* PR-67 / High-9 + LABEDIT-FE-001/003/004 (audit 3886 +
+                        post-merge review of PR 3916): previous-result trending —
+                        rendered ONLY from the identity-bound DETAILS of the
+                        actual chronologically older, same-template,
+                        same-patient preceding instance (the list API returns
+                        summary DTOs without `sections`, so a history row can
+                        never provide the previous value; the details are
+                        dropped synchronously when the active report changes). */}
+                    {previousTrendDetails && (() => {
+                      const prevReport = previousTrendDetails;
                       const prevEntryCreatedAt = previousSameTemplateEntry?.created_at;
                       let prevValue: string | null = null;
                       for (const sec of prevReport.sections) {
