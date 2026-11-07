@@ -1538,18 +1538,16 @@ export default function LabReportWorkbench({
               </details>
 
               {printFeedback && (
-                <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
+                <div>
                   <Alert severity={printFeedback.severity}>{printFeedback.text}</Alert>
                   {pdfConfirmPendingInstanceId != null && (
-                    <div>
-                      <Button
-                        variant="primary"
-                        size="default"
-                        onClick={() => { void confirmPdfPrinted(); }}
-                      >
-                        {t('workbench.print_confirm_mark_printed')}
-                      </Button>
-                    </div>
+                    <Button
+                      variant="primary"
+                      size="default"
+                      onClick={() => { void confirmPdfPrinted(); }}
+                    >
+                      {t('workbench.print_confirm_mark_printed')}
+                    </Button>
                   )}
                 </div>
               )}

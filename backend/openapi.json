@@ -23028,7 +23028,7 @@
           "print-api"
         ],
         "summary": "Print Lab Results",
-        "description": "Печать результатов лабораторных анализов",
+        "description": "Печать лабораторного бланка по авторизованному отчёту.\n\nLABPRINT-FE-001 (audit 3886, round 14): раньше роут принимал СВОБОДНЫЕ\nклиентские данные (результаты/флаги/снапшоты пациента) и рендерил их\nкак «лабораторный бланк» без какой-либо сверки с LabReportInstance —\nдоверенная роль могла распечатать несохранённые/изменённые/чужие\nзначения, а UI после этого помечал *другой* канонический инстанс как\nPRINTED. Теперь фронт отправляет ТОЛЬКО report_instance_id (+ опцию\nпринтера); сервер загружает инстанс, проверяет право чтения Doctor\n(тот же guard, что у /lab/report-instances/{id}/pdf), требует статус\nFINALIZED/PRINTED и материализует бланк из БД тем же пайплайном\n(materialize_instance + снапшоты), что и канонический PDF.",
         "operationId": "print_lab_results_api_v1_print_lab_results_post",
         "requestBody": {
           "content": {
@@ -104677,38 +104677,10 @@
       },
       "PrintLabResultsRequest": {
         "properties": {
-          "lab_order": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Lab Order",
-            "description": "Данные заказа"
-          },
-          "lab_results": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Lab Results",
-            "description": "Результаты анализов"
-          },
-          "patient": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Patient",
-            "description": "Данные пациента"
-          },
-          "clinic": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Clinic"
+          "report_instance_id": {
+            "type": "integer",
+            "title": "Report Instance Id",
+            "description": "ID существующего лабораторного отчёта (FINALIZED/PRINTED)"
           },
           "printer_name": {
             "anyOf": [
@@ -104719,17 +104691,17 @@
                 "type": "null"
               }
             ],
-            "title": "Printer Name"
+            "title": "Printer Name",
+            "description": "Опциональный выбор принтера"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
-          "lab_order",
-          "lab_results",
-          "patient"
+          "report_instance_id"
         ],
         "title": "PrintLabResultsRequest",
-        "description": "Схема для печати результатов анализов"
+        "description": "LABPRINT-FE-001 (audit 3886, round 14): печать лабораторного бланка\nТОЛЬКО по авторизованному идентификатору отчёта. Клиентские значения\n(результаты/флаги/снапшоты пациента) больше не принимаются: сервер\nматериализует бланк из БД тем же пайплайном, что и канонический\n/lab/report-instances/{id}/pdf. Свободные поля отвергаются (forbid)."
       },
       "PrintPrescriptionRequest": {
         "properties": {
