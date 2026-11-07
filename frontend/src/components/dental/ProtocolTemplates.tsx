@@ -229,8 +229,11 @@ const ProtocolTemplates = ({
   const [filterDifficulty, setFilterDifficulty] = useState('all');
   type Template = typeof templates[number];
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [, setIsEditing] = useState(false);
-  const [, setEditingTemplate] = useState<Template | null>(null);
+  // DENTTMPL-FE-001 (audit 3892): the former `isEditing` / `editingTemplate`
+  // state was never consumed by any render path — Create and Edit toggled
+  // dead state while no editor ever appeared. Until template editing is
+  // actually implemented, the controls stay honestly disabled with an
+  // explicit not-supported notice instead of pretending to work.
 
   // Фильтрация шаблонов
   const filteredTemplates = templates.filter((template) => {
@@ -269,7 +272,6 @@ const ProtocolTemplates = ({
     }
     onClose?.();
   };
-
   useEffect(() => {
     const handlers: Array<[Element, (event: Event) => void]> = [];
 
@@ -297,11 +299,6 @@ const ProtocolTemplates = ({
       });
     };
   }, [handleSelectTemplate, templates, filteredTemplates, selectedTemplate]);
-
-  const handleEditTemplate = (template: Template) => {
-    setEditingTemplate(template);
-    setIsEditing(true);
-  };
 
   const handleDeleteTemplate = (templateId: string) => {
     setTemplates((prev) => prev.filter((t) => t.id !== templateId));
@@ -395,11 +392,12 @@ const ProtocolTemplates = ({
           {t('dental.dental_pt_btn_use')}
         </button>
         <button
-        onClick={() => handleEditTemplate(template)}
-        className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-        aria-label={t('dental.dental_pt_aria_edit_template', { name: template.name })}
-        title={t('dental.dental_pt_btn_edit')}>
-        
+        disabled
+        title={t('dental.dental_pt_create_unsupported')}
+        aria-label={t('dental.dental_pt_create_unsupported')}
+        className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md opacity-50 cursor-not-allowed"
+      >
+
           <Edit className="h-4 w-4" />
         </button>
         <button
@@ -536,9 +534,11 @@ const ProtocolTemplates = ({
           {t('dental.dental_pt_btn_use_template')}
         </button>
         <button
-        onClick={() => handleEditTemplate(template)}
-        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">
-        
+        disabled
+        title={t('dental.dental_pt_create_unsupported')}
+        aria-label={t('dental.dental_pt_create_unsupported')}
+        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md opacity-50 cursor-not-allowed">
+
           {t('dental.dental_pt_btn_edit')}
         </button>
       </div>
@@ -558,18 +558,26 @@ const ProtocolTemplates = ({
           </div>
           
           <div className="flex items-center gap-2">
+            {/* DENTTMPL-FE-001 (audit 3892): template creation is not
+                implemented — the control is honestly disabled instead of
+                toggling state that no render path consumes. */}
             <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-              
+              disabled
+              title={t('dental.dental_pt_create_unsupported')}
+              aria-label={t('dental.dental_pt_create_unsupported')}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md opacity-50 cursor-not-allowed">
+
               <Plus className="h-4 w-4" />
               {t('dental.dental_pt_btn_create')}
             </button>
+            <span className="text-gray-500 text-xs hidden lg:inline">
+              {t('dental.dental_pt_create_unsupported')}
+            </span>
             <button
               onClick={onClose}
               aria-label={t('dental.dental_pt_aria_close_modal')}
               className="p-2 text-gray-500 hover:text-gray-700">
-              
+
               <X className="h-5 w-5" />
             </button>
           </div>

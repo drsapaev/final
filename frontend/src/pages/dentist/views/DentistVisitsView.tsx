@@ -20,7 +20,10 @@ export default function DentistVisitsView({
 }: {
   selectedPatient: SelectedPatient | Record<string, unknown> | null;
   loading: boolean;
-  onCompleteVisit: () => void;
+  // DENTVISIT-FE-002 (audit 3892): the completion callback may report its
+  // outcome (false = the queue completion failed) so the visit screen can
+  // surface a persistent, retryable failure state.
+  onCompleteVisit: () => void | boolean | Promise<void | boolean>;
   onBackToQueue: () => void;
   onGoToPatients: () => void;
   tI18n: (key: string, params?: Record<string, unknown>) => string;

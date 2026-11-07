@@ -32,7 +32,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  *   - Встроен в экран, не отдельная вкладка
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Button, Card, Badge, Input, Textarea, Label,
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -87,11 +87,14 @@ const loadExistingEMR = async (visitId: string | number) => {
   if (response.status === 404) return null;
   // DENTIDENT-FE-001 (audit 3892): keep the canonical patient/visit identity
   // fields of the response so the editor can fail closed on a mismatch.
+  // DENTVISIT-FE-001 (audit 3892): keep the record status so a signed EMR
+  // renders read-only instead of failing opaquely at autosave time.
   return response.data as {
     data?: Record<string, unknown>;
     row_version?: number;
     patient_id?: string | number;
     visit_id?: string | number;
+    status?: string;
   };
 };
 
@@ -126,6 +129,16 @@ const getHttpStatus = (error: unknown): number | undefined => {
   return typeof response?.status === 'number' ? response.status : undefined;
 };
 
+// DENTVISIT-FE-001 (audit 3892): the backend's ordinary save path rejects
+// only the `signed` status (EMRSignedError — amendments go through the
+// dedicated amend endpoint), so `signed` is the read-only state here.
+// `amended` records remain editable and are surfaced informationally.
+const isSignedRecord = (status: string | null | undefined): boolean =>
+  String(status ?? '').trim().toLowerCase() === 'signed';
+
+const isAmendedRecord = (status: string | null | undefined): boolean =>
+  String(status ?? '').trim().toLowerCase() === 'amended';
+
 // =============================================================================
 // Sub-components
 // =============================================================================
@@ -136,9 +149,13 @@ interface PatientHeaderProps {
   onBackToQueue?: () => void | Promise<void>;
   backDisabled?: boolean;
   loading?: boolean;
+  // DENTVISIT-FE-001 (audit 3892): a signed record blocks completion from
+  // this screen (its ordinary save would be rejected by the backend).
+  completeDisabled?: boolean;
+  statusBadge?: string | null;
 }
 
-const PatientHeader = ({ patient, onCompleteVisit, onBackToQueue, backDisabled, loading }: PatientHeaderProps) => {
+const PatientHeader = ({ patient, onCompleteVisit, onBackToQueue, backDisabled, loading, completeDisabled, statusBadge }: PatientHeaderProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const patientName =
@@ -172,6 +189,9 @@ const PatientHeader = ({ patient, onCompleteVisit, onBackToQueue, backDisabled, 
         </div>
       </div>
       <div className="dental-flex dental-gap-12">
+        {statusBadge && (
+          <Badge variant="primary" size="small">{statusBadge}</Badge>
+        )}
         {onBackToQueue && (
           <Button
             variant="outline"
@@ -185,7 +205,7 @@ const PatientHeader = ({ patient, onCompleteVisit, onBackToQueue, backDisabled, 
         <Button
           variant="primary"
           onClick={() => { void onCompleteVisit(); }}
-          disabled={loading}
+          disabled={loading || completeDisabled}
           aria-label={t('dental.dental_dvs_aria_complete')}>
           <CheckCircle size={16} style={{ marginRight: 6 }} aria-hidden="true" />
           {loading ? t('dental.dental_dvs_saving') : t('dental.dental_dvs_complete_visit')}
@@ -750,9 +770,13 @@ const VisitHistory = ({ history, loading }: VisitHistoryProps) => {
               <Badge variant="primary" size="small">{t('dental.dental_dvs_icd10_label')}: {String(v.icd10_code)}</Badge>
             )}
           </div>
-          {Boolean(v.diagnosis) && (
+          {/* DENTHIST-FE-001 (audit 3892): the summary DTO exposes the primary
+              diagnosis as `diagnosis_main`; the legacy `diagnosis` key is only
+              tolerated for older payloads. Complaints are not part of the
+              summary contract and are never fabricated here. */}
+          {Boolean(v.diagnosis_main || v.diagnosis) && (
             <Typography variant="body2" color="textSecondary" style={{ marginTop: 4 }}>
-              {String(v.diagnosis)}
+              {String(v.diagnosis_main ?? v.diagnosis)}
             </Typography>
           )}
           {Boolean(v.complaints) && (
@@ -834,7 +858,10 @@ const DentalVisitScreen = ({
   loading: parentLoading,
 }: {
   patient?: { visit_id?: string | number; patient_id?: string | number; id?: string | number; patient?: { id?: string | number } };
-  onCompleteVisit?: (latestDraft: Record<string, unknown>) => void | Promise<void>;
+  // DENTVISIT-FE-002 (audit 3892): the queue-completion callback may report
+  // its outcome — `false` (or a rejection) means the visit was NOT completed
+  // and the screen must surface a persistent, retryable failure state.
+  onCompleteVisit?: (latestDraft: Record<string, unknown>) => void | boolean | Promise<void | boolean>;
   onBackToQueue?: () => void | Promise<void>;
   loading?: boolean;
   [k: string]: unknown;
@@ -854,8 +881,16 @@ const DentalVisitScreen = ({
   const [completing, setCompleting] = useState(false);
   const [loadError, setLoadError] = useState<'missing_visit' | 'load' | 'identity' | null>(null);
   const [saveError, setSaveError] = useState<'conflict' | 'save' | null>(null);
+  // DENTVISIT-FE-001 (audit 3892): canonical EMR status of the loaded record.
+  const [emrStatus, setEmrStatus] = useState<string | null>(null);
+  // DENTVISIT-FE-002 (audit 3892): the queue completion failed AFTER the EMR
+  // draft was already persisted — needs a visible, retryable failure state.
+  const [completionError, setCompletionError] = useState(false);
+  // DENTVISIT-FE-004 (audit 3892): a 409 opens an explicit server-vs-local
+  // review instead of a blind re-POST of the stale row_version.
+  const [conflictReview, setConflictReview] = useState<{ serverDraft: Record<string, unknown>; serverRowVersion: number } | null>(null);
   const [loadedVisitId, setLoadedVisitId] = useState<string | number | null>(null);
-  const [selectedTooth, setSelectedTooth] = useState<{ number: string | number; data: Record<string, unknown> } | null>(null);
+  const [selectedTooth, setSelectedTooth] = useState<{ number: string | number; data: Record<string, unknown>; suggestedStatus?: string } | null>(null);
   const [toothModalOpen, setToothModalOpen] = useState(false);
   const [showAIDialog, setShowAIDialog] = useState(false);
   const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
@@ -958,6 +993,9 @@ const DentalVisitScreen = ({
     setCompleting(false);
     setLoadError(null);
     setSaveError(null);
+    setCompletionError(false);
+    setConflictReview(null);
+    setEmrStatus(null);
     retryCompletionRef.current = false;
     draftDirtyRef.current = false;
     structuredDiagnosisRef.current = null;
@@ -1020,6 +1058,7 @@ const DentalVisitScreen = ({
           visitRowVersionsRef.current.set(String(visitId), rowVersion ?? 0);
           loadedVisitIdRef.current = visitId;
           setLoadedVisitId(visitId);
+          setEmrStatus(existing?.status ?? null);
           setEmrData(stashedDraft.draft);
           logger.info('[DentalVisitScreen] restored a draft recovered from a failed visit-change flush', { visitId: String(visitId) });
           return;
@@ -1057,6 +1096,9 @@ const DentalVisitScreen = ({
       visitRowVersionsRef.current.set(String(visitId), rowVersion ?? 0);
       loadedVisitIdRef.current = visitId;
       setLoadedVisitId(visitId);
+      // DENTVISIT-FE-001 (audit 3892): keep the canonical record status so
+      // the editor can render a signed record read-only up front.
+      setEmrStatus(existing?.status ?? null);
       setEmrData(nextDraft);
     } catch {
       if (requestSequence !== loadSequenceRef.current) return;
@@ -1211,6 +1253,13 @@ const DentalVisitScreen = ({
       setLoadError('load');
       return;
     }
+    // DENTVISIT-FE-001 (audit 3892): a signed record cannot be saved through
+    // the ordinary save path this completion relies on — refuse up front
+    // with the visible read-only state instead of failing opaquely later.
+    if (isSignedRecord(emrStatus)) {
+      notify.error(t('dental2.visit_emr_signed_readonly'));
+      return;
+    }
 
     const snapshot = latestDraftRef.current;
     if (saveTimerRef.current) {
@@ -1219,6 +1268,7 @@ const DentalVisitScreen = ({
     }
     setCompleting(true);
     setSaveError(null);
+    setCompletionError(false);
     retryCompletionRef.current = false;
     try {
       await persistDraft(targetVisitId, snapshot);
@@ -1235,14 +1285,59 @@ const DentalVisitScreen = ({
 
     if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
       setSaveError(null);
+      // DENTVISIT-FE-002 (audit 3892): the queue completion callback owns the
+      // last mile. A rejection OR an explicit `false` ack (the actions hook
+      // reports its outcome) means the visit was NOT completed — surface a
+      // persistent failure state with a completion-only retry instead of
+      // silently swallowing it after a successful EMR save.
       try {
-        await onCompleteVisit?.(snapshot);
+        const completionAck = await onCompleteVisit?.(snapshot);
+        if (completionAck === false) {
+          setCompletionError(true);
+          notify.error(t('dental2.visit_completion_failed'));
+        } else {
+          setCompletionError(false);
+        }
       } catch {
+        setCompletionError(true);
         logger.warn('[DentalVisitScreen] queue completion callback failed');
+        notify.error(t('dental2.visit_completion_failed'));
       }
     }
     setCompleting(false);
-  }, [onCompleteVisit, persistDraft, t, visitId]);
+  }, [onCompleteVisit, persistDraft, t, visitId, emrStatus]);
+
+  // DENTVISIT-FE-002 (audit 3892): retry ONLY the queue completion — the EMR
+  // draft was already persisted successfully, so no duplicate save POST is
+  // dispatched from this path.
+  const handleRetryCompletion = useCallback(async () => {
+    const targetVisitId = visitId;
+    if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') {
+      setLoadError('missing_visit');
+      return;
+    }
+    if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+      setCompletionError(false);
+      return;
+    }
+
+    setCompleting(true);
+    try {
+      const completionAck = await onCompleteVisit?.(latestDraftRef.current);
+      if (completionAck === false) {
+        setCompletionError(true);
+        notify.error(t('dental2.visit_completion_failed'));
+      } else {
+        setCompletionError(false);
+      }
+    } catch {
+      setCompletionError(true);
+      logger.warn('[DentalVisitScreen] queue completion retry failed');
+      notify.error(t('dental2.visit_completion_failed'));
+    } finally {
+      setCompleting(false);
+    }
+  }, [onCompleteVisit, t, visitId]);
 
   const handleBackToQueue = useCallback(async () => {
     if (!onBackToQueue) return;
@@ -1264,7 +1359,12 @@ const DentalVisitScreen = ({
     setCompleting(true);
     setSaveError(null);
     try {
-      await persistDraft(targetVisitId, snapshot);
+      // DENTVISIT-FE-001 (audit 3892): a signed record rejects ordinary saves,
+      // and its editors were read-only anyway — navigate without the doomed
+      // save POST instead of failing the queue navigation on it.
+      if (!isSignedRecord(emrStatus)) {
+        await persistDraft(targetVisitId, snapshot);
+      }
       if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
         await onBackToQueue();
       }
@@ -1277,9 +1377,127 @@ const DentalVisitScreen = ({
     } finally {
       if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) setCompleting(false);
     }
-  }, [onBackToQueue, persistDraft, t, visitId]);
+  }, [onBackToQueue, persistDraft, t, visitId, emrStatus]);
+
+  // DENTVISIT-FE-004 (audit 3892): a 409 means another writer advanced the
+  // record. Revalidate the canonical server version and let the clinician
+  // explicitly resolve server-vs-local — never blindly re-POST the stale
+  // row_version.
+  const beginConflictReview = useCallback(async () => {
+    const targetVisitId = visitId;
+    if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') {
+      setLoadError('missing_visit');
+      return;
+    }
+    if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+      setLoadError('load');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const existing = await loadExistingEMR(targetVisitId);
+      if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) return;
+      if (!existing || typeof existing.row_version !== 'number' || !Number.isInteger(existing.row_version)) {
+        notify.error(t('dental2.visit_conflict_reload_failed'));
+        return;
+      }
+      setConflictReview({
+        serverDraft: (existing.data || {}) as Record<string, unknown>,
+        serverRowVersion: existing.row_version,
+      });
+    } catch {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        notify.error(t('dental2.visit_conflict_reload_failed'));
+      }
+    } finally {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) setSaving(false);
+    }
+  }, [t, visitId]);
+
+  // DENTVISIT-FE-004 (audit 3892): explicit resolution — keep the local
+  // draft, but submit it against the SERVER's current row_version.
+  const resolveConflictKeepLocal = useCallback(async () => {
+    if (!conflictReview) return;
+    const targetVisitId = visitId;
+    if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') return;
+
+    if (conflictReview.serverRowVersion > rowVersionRef.current) {
+      rowVersionRef.current = conflictReview.serverRowVersion;
+    }
+    visitRowVersionsRef.current.set(String(targetVisitId), conflictReview.serverRowVersion);
+    setConflictReview(null);
+    setSaveError(null);
+    setSaving(true);
+    try {
+      await persistDraft(targetVisitId, latestDraftRef.current);
+      setSaveError(null);
+    } catch (error: unknown) {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        setSaveError(getHttpStatus(error) === 409 ? 'conflict' : 'save');
+        logger.warn('[DentalVisitScreen] conflict resolution save failed');
+        notify.error(t('dental2.visit_protocol_save_failed'));
+      }
+    } finally {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) setSaving(false);
+    }
+  }, [conflictReview, persistDraft, t, visitId]);
+
+  // DENTVISIT-FE-004 (audit 3892): explicit resolution — discard the local
+  // draft in favor of the canonical server version (an explicit, reviewed
+  // discard — never a silent overwrite).
+  const resolveConflictUseServer = useCallback(() => {
+    if (!conflictReview) return;
+    const targetVisitId = visitId;
+    if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') return;
+
+    const serverData = (conflictReview.serverDraft || {}) as typeof EMPTY_EMR_DATA;
+    const specialtyData = serverData.specialty_data || EMPTY_EMR_DATA.specialty_data;
+    const protocolData = specialtyData.visit_protocol || (serverData as Record<string, unknown>).visit_protocol;
+    const nextDraft = {
+      ...EMPTY_EMR_DATA,
+      ...serverData,
+      specialty_data: {
+        ...EMPTY_EMR_DATA.specialty_data,
+        ...specialtyData,
+        visit_protocol: protocolData || EMPTY_EMR_DATA.specialty_data.visit_protocol,
+      },
+    } as typeof EMPTY_EMR_DATA;
+    const rawDiagnosis = (serverData as Record<string, unknown>).diagnosis;
+    const structuredDiagnosis = isStructuredDiagnosis(rawDiagnosis) ? rawDiagnosis : null;
+    structuredDiagnosisRef.current = structuredDiagnosis;
+    if (structuredDiagnosis) {
+      const structuredIcd10 = typeof structuredDiagnosis.icd10_code === 'string' ? structuredDiagnosis.icd10_code : '';
+      if (!nextDraft.icd10_code && structuredIcd10) {
+        (nextDraft as Record<string, unknown>).icd10_code = structuredIcd10;
+      }
+    }
+
+    latestDraftRef.current = nextDraft;
+    rowVersionRef.current = conflictReview.serverRowVersion;
+    visitRowVersionsRef.current.set(String(targetVisitId), conflictReview.serverRowVersion);
+    draftDirtyRef.current = false;
+    setEmrData(nextDraft);
+    setConflictReview(null);
+    setSaveError(null);
+  }, [conflictReview, visitId]);
 
   const handleRetrySave = useCallback(async () => {
+    // DENTVISIT-FE-002 (audit 3892): a completion-failure retry re-runs ONLY
+    // the queue completion callback — the EMR draft is already saved.
+    if (completionError) {
+      await handleRetryCompletion();
+      return;
+    }
+
+    // DENTVISIT-FE-004 (audit 3892): a 409 conflict is a clinical
+    // concurrency state — revalidate and resolve explicitly instead of
+    // re-submitting the same stale row_version.
+    if (saveError === 'conflict') {
+      await beginConflictReview();
+      return;
+    }
+
     if (retryCompletionRef.current) {
       await handleCompleteVisit();
       return;
@@ -1312,11 +1530,14 @@ const DentalVisitScreen = ({
     } finally {
       if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) setSaving(false);
     }
-  }, [handleCompleteVisit, persistDraft, t, visitId]);
+  }, [beginConflictReview, completionError, handleCompleteVisit, handleRetryCompletion, persistDraft, saveError, t, visitId]);
 
   // Tooth click → open ToothModal
-  const handleToothClick = useCallback((toothNumber: string | number, toothData: Record<string, unknown> | null) => {
-    setSelectedTooth({ number: toothNumber, data: toothData || {} });
+  const handleToothClick = useCallback((toothNumber: string | number, toothData: Record<string, unknown> | null, suggestedStatus?: string) => {
+    // DENTVISIT-FE-003 (audit 3892): the click carries the tooth's CURRENT
+    // data plus the chart palette's suggested status; the modal confirms the
+    // status and the chart only changes after that confirmed save.
+    setSelectedTooth({ number: toothNumber, data: toothData || {}, suggestedStatus });
     setToothModalOpen(true);
   }, []);
 
@@ -1371,8 +1592,17 @@ const DentalVisitScreen = ({
 
   const isEMRLoaded = isSameVisit(loadedVisitId, visitId);
   const isLoading = loading || parentLoading || (Boolean(visitId) && !isEMRLoaded && !loadError);
-  const fieldsDisabled = completing || !isEMRLoaded;
-  const toothStatus = emrData.specialty_data?.tooth_status || {};
+  // DENTVISIT-FE-001 (audit 3892): a signed record is read-only — the
+  // backend's ordinary save path rejects it, so the editors must not offer
+  // edits that would only fail at autosave/queue-exit time.
+  const recordLocked = isSignedRecord(emrStatus);
+  const fieldsDisabled = completing || !isEMRLoaded || recordLocked;
+  // Stable identity so TeethChart only resyncs when the canonical
+  // specialty_data.tooth_status actually changes (DENTVISIT-FE-003).
+  const toothStatus = useMemo(
+    () => emrData.specialty_data?.tooth_status || {},
+    [emrData.specialty_data?.tooth_status],
+  );
 
   return (
     <div className="dental-flex-col dental-gap-24">
@@ -1383,6 +1613,12 @@ const DentalVisitScreen = ({
           onBackToQueue={onBackToQueue ? handleBackToQueue : undefined}
           backDisabled={completing || Boolean(parentLoading) || (loading && !loadError)}
           loading={saving || completing || parentLoading || !isEMRLoaded || Boolean(loadError)}
+          completeDisabled={recordLocked}
+          statusBadge={recordLocked
+            ? t('dental2.visit_emr_status_signed')
+            : isAmendedRecord(emrStatus)
+              ? t('dental2.visit_emr_status_amended')
+              : null}
         />
 
         {loadError && (
@@ -1397,10 +1633,36 @@ const DentalVisitScreen = ({
           />
         )}
 
+        {/* DENTVISIT-FE-001 (audit 3892): a clearly indicated signed/read-only
+            state (and an informational badge for amended records). */}
+        {isEMRLoaded && recordLocked && (
+          <Alert type="warning" description={t('dental2.visit_emr_signed_readonly')} />
+        )}
+        {isEMRLoaded && !recordLocked && isAmendedRecord(emrStatus) && (
+          <Alert type="info" description={t('dental2.visit_emr_status_amended')} />
+        )}
+
+        {/* DENTVISIT-FE-002 (audit 3892): the queue completion failed AFTER
+            the EMR draft was already saved — a persistent, visible failure
+            with a completion-only retry (no duplicate EMR POST). */}
+        {completionError && (
+          <Alert
+            type="error"
+            description={t('dental2.visit_completion_failed')}
+            action={(
+              <Button variant="outline" onClick={() => { void handleRetryCompletion(); }} disabled={saving || completing}>
+                {t('doctor.btn_retry')}
+              </Button>
+            )}
+          />
+        )}
+
         {saveError && (
           <Alert
             type="error"
-            description={t('dental2.visit_protocol_save_failed')}
+            description={saveError === 'conflict'
+              ? t('dental2.visit_conflict_description')
+              : t('dental2.visit_protocol_save_failed')}
             action={(
               <Button variant="outline" onClick={() => { void handleRetrySave(); }} disabled={saving || completing}>
                 {t('doctor.btn_retry')}
@@ -1481,9 +1743,59 @@ const DentalVisitScreen = ({
           onClose={() => { setToothModalOpen(false); setSelectedTooth(null); }}
           toothNumber={selectedTooth.number}
           toothData={selectedTooth.data}
+          suggestedStatus={selectedTooth.suggestedStatus}
           onSave={(data: unknown, rowVersion?: number) => handleToothSave(selectedTooth?.number, data as Record<string, unknown>, rowVersion)}
           visitId={visitId}
         />
+      )}
+
+      {/* DENTVISIT-FE-004 (audit 3892): explicit 409 conflict review */}
+      {conflictReview && (
+        <Dialog open onClose={() => setConflictReview(null)} maxWidth="md" fullWidth>
+          <DialogTitle>{t('dental2.visit_conflict_title')}</DialogTitle>
+          <DialogContent>
+            <Alert type="warning" description={t('dental2.visit_conflict_description')} />
+            <div className="dental-flex-col dental-gap-16 dental-mt-16">
+              <div>
+                <Typography variant="subtitle2" className="dental-text-label dental-text-primary">
+                  {t('dental2.visit_conflict_server_version')} (row_version {conflictReview.serverRowVersion})
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {String(
+                    diagnosisMainText((conflictReview.serverDraft as Record<string, unknown>).diagnosis) ||
+                    (conflictReview.serverDraft as Record<string, unknown>).anamnesis_morbi ||
+                    (conflictReview.serverDraft as Record<string, unknown>).complaints ||
+                    ''
+                  )}
+                </Typography>
+              </div>
+              <div>
+                <Typography variant="subtitle2" className="dental-text-label dental-text-primary">
+                  {t('dental2.visit_conflict_local_version')}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {String(
+                    diagnosisMainText((latestDraftRef.current as Record<string, unknown>).diagnosis) ||
+                    (latestDraftRef.current as Record<string, unknown>).anamnesis_morbi ||
+                    (latestDraftRef.current as Record<string, unknown>).complaints ||
+                    ''
+                  )}
+                </Typography>
+              </div>
+            </div>
+          </DialogContent>
+          <DialogActions>
+            <Button variant="outline" onClick={() => setConflictReview(null)}>
+              {t('dental.dental_dvs_close')}
+            </Button>
+            <Button variant="outline" onClick={() => { void resolveConflictKeepLocal(); }} disabled={saving || completing}>
+              {t('dental2.visit_conflict_keep_local')}
+            </Button>
+            <Button variant="primary" onClick={resolveConflictUseServer} disabled={saving || completing}>
+              {t('dental2.visit_conflict_use_server')}
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
 
       {/* AI Suggestion Dialog */}

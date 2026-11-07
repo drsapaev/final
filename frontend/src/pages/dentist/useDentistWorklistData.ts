@@ -44,6 +44,10 @@ export function useDentistWorklistData({
   const [services, setServices] = useState<Record<string, unknown>>({});
   const appointmentsTableDataRef = useRef<Appointment[]>([]);
   const appointmentsLoadPromiseRef = useRef<Promise<Appointment[]> | null>(null);
+  // DENTCACHE-FE-001 (audit 3892): the epoch the hook-local in-flight promise
+  // belongs to. An invalidated epoch's promise is not joinable — a fresh
+  // load must start instead of returning the revoked one.
+  const appointmentsLoadEpochRef = useRef<number>(-1);
 
   useEffect(() => {
     appointmentsTableDataRef.current = appointmentsTableData;
@@ -110,10 +114,18 @@ export function useDentistWorklistData({
       return dentistCache.appointments;
     }
 
-    if (appointmentsLoadPromiseRef.current || dentistCache.appointmentsLoadPromise) {
-      return (appointmentsLoadPromiseRef.current || dentistCache.appointmentsLoadPromise) as Promise<Appointment[]>;
+    if (appointmentsLoadPromiseRef.current && appointmentsLoadEpochRef.current === dentistCache.appointmentsEpoch) {
+      return appointmentsLoadPromiseRef.current;
+    }
+    if (dentistCache.appointmentsLoadPromise) {
+      return dentistCache.appointmentsLoadPromise;
     }
 
+    // DENTCACHE-FE-001 (audit 3892): capture the ownership epoch BEFORE the
+    // request — if the caches are invalidated while this load is in flight
+    // (context switch, unmount, principal change), the response loses its
+    // right to write the module cache or the panel state.
+    const loadEpoch = dentistCache.appointmentsEpoch;
     const loadPromise = (async (): Promise<Appointment[]> => {
       setAppointmentsLoading(true);
       try {
@@ -127,6 +139,14 @@ export function useDentistWorklistData({
         const response = await apiClient.get('/registrar/queues/today');
 
         if (response.status < 400) {
+          // DENTCACHE-FE-001 (audit 3892): a revoked load (cache invalidated
+          // while the request was in flight) must not repopulate the module
+          // cache or the panel state — a newer load owns them now.
+          if (loadEpoch !== dentistCache.appointmentsEpoch) {
+            logger.info('[Dentist] Dropping a stale worklist response whose cache ownership was revoked');
+            return [];
+          }
+
           const data = response.data as Record<string, unknown>;
 
           // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
@@ -218,6 +238,7 @@ export function useDentistWorklistData({
       }
     })();
 
+    appointmentsLoadEpochRef.current = loadEpoch;
     appointmentsLoadPromiseRef.current = loadPromise;
     dentistCache.appointmentsLoadPromise = loadPromise;
 

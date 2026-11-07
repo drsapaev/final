@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import logger from '../../utils/logger';
 import { normalizeNumericId } from '../../utils/doctorPanelShared';
@@ -15,6 +15,12 @@ import { dentistCache, type SelectedPatient } from './dentistContracts';
  * matches the deep link against the current appointments table (refreshing
  * once if needed); falls back to a safe URL-fallback patient object (with a
  * once-per-key logger guard) so stale deep links never crash the panel.
+ *
+ * DENTURL-FE-002 (audit 3892): every async resolution is bound to the URL
+ * target it was started for AND to the selection state at resolution time.
+ * A URL change or unmount cancels the run; a manual navigation to another
+ * patient/visit revokes the stale resolution — a slow older URL load can
+ * never overwrite a newer selection.
  */
 export function useDentistUrlPatient({
   locationSearch,
@@ -37,11 +43,35 @@ export function useDentistUrlPatient({
   handleTabChange: (tab: string) => void;
   tI18n: (key: string, params?: Record<string, unknown>) => string;
 }) {
+  // Live view of the panel's selection for resolution-time checks (the
+  // effect deps intentionally omit it — the verbatim PR-UI-15-6 contract).
+  const selectedPatientRef = useRef(selectedPatient);
+  selectedPatientRef.current = selectedPatient;
+
   // ✅ Автоматическая загрузка пациента из URL параметра patientId
   useEffect(() => {
+    // DENTURL-FE-002 (audit 3892): cancellation for URL changes/unmount.
+    let cancelled = false;
+
     const loadPatientFromUrl = async () => {
       // P-009: patientIdFromUrl / visitIdFromUrl come from useDoctorPanelState
       if (!patientIdFromUrl && !visitIdFromUrl) return;
+
+      // The selection state observed when this run started. A resolution is
+      // stale when the selection has since moved to a DIFFERENT target than
+      // the one this URL run is about to select (manual navigation wins).
+      const startedSelection = selectedPatientRef.current;
+      const staleResolution = () => {
+        const current = selectedPatientRef.current;
+        if (!current || current === startedSelection) return false;
+        if (patientIdFromUrl) {
+          return String(current.patient_id ?? '') !== String(patientIdFromUrl);
+        }
+        if (visitIdFromUrl) {
+          return String(normalizeNumericId(current.visit_id) ?? '') !== String(visitIdFromUrl);
+        }
+        return false;
+      };
 
       // Если пациент уже загружен с этим ID/визитом, пропускаем
       const currentPatientId = selectedPatient?.patient_id || null;
@@ -78,10 +108,14 @@ export function useDentistUrlPatient({
         let matchingAppointment = findMatchingAppointment(appointmentsTableData);
         if (!matchingAppointment) {
           const refreshedAppointments = await loadDentistryAppointments();
+          // DENTURL-FE-002 (audit 3892): the URL or the selection may have
+          // moved on while the queue refresh was in flight.
+          if (cancelled || staleResolution()) return;
           matchingAppointment = findMatchingAppointment(refreshedAppointments || []);
         }
 
         if (matchingAppointment) {
+          if (cancelled || staleResolution()) return;
           const patientName =
             matchingAppointment.patient_fio ||
             matchingAppointment.patient_name ||
@@ -108,6 +142,7 @@ export function useDentistUrlPatient({
 
         if (visitIdFromUrl || patientIdFromUrl) {
           if (patientIdFromUrl) {
+            if (cancelled || staleResolution()) return;
             // Patient-scoped deep link: the patient id in the URL is the
             // canonical identity — keep the historical safe fallback.
             const fallbackLabel = tI18n('dental.dental_panel_patient_url_fallback', { id: patientIdFromUrl });
@@ -145,6 +180,7 @@ export function useDentistUrlPatient({
               silent: true,
               validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
             } as Record<string, unknown>) as { status?: number; data?: { patient_id?: unknown } };
+            if (cancelled || staleResolution()) return;
             const authoritativePatientId = response?.data?.patient_id;
             const visitResolved =
               response && response.status !== 404 && response.status !== undefined && response.status < 400 &&
@@ -186,5 +222,11 @@ export function useDentistUrlPatient({
     };
 
     loadPatientFromUrl();
+
+    // DENTURL-FE-002 (audit 3892): a URL change or unmount revokes the
+    // pending run — its late resolution can no longer touch the selection.
+    return () => {
+      cancelled = true;
+    };
   }, [locationSearch, patientIdFromUrl, visitIdFromUrl, appointmentsTableData, loadDentistryAppointments]); // eslint-disable-line react-hooks/exhaustive-deps
 }
