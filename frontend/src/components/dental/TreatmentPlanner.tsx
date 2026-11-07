@@ -523,7 +523,6 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
                   {t('doctor.btn_retry')}
                 </Button>
               )}
-              style={{ marginBottom: 'var(--mac-spacing-4)' }}
             />
           )}
 
