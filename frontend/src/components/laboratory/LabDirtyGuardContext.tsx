@@ -534,7 +534,13 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
           labLeaveSentinel.endLeaveIntent();
         }
       },
-      { onCancel: () => { labLeaveSentinel.endLeaveIntent(); } },
+      {
+        onCancel: () => { labLeaveSentinel.endLeaveIntent(); },
+        // LABGUARD-FE-003 (audit 3886, round 13): уход с /lab —
+        // иммутабельный интент: пока диалог открыт, новый leave-переход
+        // не подменяет этот (см. useDirtyTransitionGuard).
+        intentPolicy: 'leave',
+      },
     );
     return decided;
     // guard.guardTransition стабилен (useCallback без deps внутри хука):
@@ -826,8 +832,41 @@ function LabLeaveRouteGuard({
       // PR 3351 (review round 3, P1): route identity — точный маршрут
       // LabPanel, а не любой /lab/*.
       if (!isLabRoutePath(window.location.pathname)) {
-        // Защитная ветка: при вооружённом sentinel недостижима (pop
-        // абсорбируется на /lab). Разоружаем и отдаём поп роутеру.
+        // LABGUARD-FE-001 (audit 3886): multi-entry POP (history.go(-2)
+        // и дальше, жест-меню браузера, консоль) при вооружённом sentinel
+        // приземляется ЗА twin — прежняя «защитная ветка» молча
+        // разоружалась и отдавала поп роутеру: панель размонтировалась,
+        // несохранённый черновик терялся без вопроса. Незапрошенный
+        // прыжок при dirty/pending теперь ОТКАТЫВАЕТСЯ к sentinel
+        // (stateful rollback: go(+delta)) и открывает тот же guard-диалог;
+        // подтверждение уходит на страницу прыжка, отмена оставляет
+        // пользователя и черновик на /lab. Диалог открывается СИНХРОННО
+        // здесь (источники ещё живы в реестре), popstate отката
+        // глотается ниже (isSentinelEntry) — роутер возвращает /lab.
+        const landedState = window.history.state as Record<string, unknown> | null;
+        const landedIdx = typeof landedState?.idx === 'number' ? landedState.idx : null;
+        // sentinelIdx — idx двойника; sentinel-запись физически на одну
+        // выше, поэтому delta возврата = sentinelIdx - landedIdx + 1.
+        const restoreDelta = labLeaveSentinel.sentinelIdx !== null && landedIdx !== null
+          ? labLeaveSentinel.sentinelIdx - landedIdx + 1
+          : null;
+        const blocked = hasDirtyRef.current() || hasHistoryPendingRef.current;
+        if (blocked && restoreDelta !== null && restoreDelta >= 2) {
+          const jumpedTo = { pathname: window.location.pathname, search: window.location.search };
+          window.history.go(restoreDelta);
+          guardRouteLeaveRef.current(() => {
+            // Подтверждённый уход на страницу прыжка: мы уже на
+            // sentinel-записи (откат) — заменяем её (replace), Back с
+            // цели вернётся на /lab без второго дубля.
+            labLeaveSentinel.disarm();
+            labLeaveSentinel.endLeaveIntent();
+            navigate(jumpedTo, { replace: true });
+          });
+          syncHistoryGuardEngaged();
+          return;
+        }
+        // Fallback: landing без router-idx (внешняя запись) или чистое
+        // состояние — прежнее поведение: разоружаем и отдаём поп роутеру.
         labLeaveSentinel.disarm();
         syncHistoryGuardEngaged();
         return;
@@ -957,16 +996,39 @@ export function useGuardedLabNavigate() {
   ) => {
     const { onLeave, ...navigateOptions } = options ?? {};
     if (typeof to === 'number') {
+      // LABGUARD-FE-001 (audit 3886): дельта ±1 остаётся на sentinel-
+      // механике (pop вытесняет sentinel и приземляется на twin — тот же
+      // /lab URL, диалог показывает popstate-обработчик; guardRouteLeave
+      // здесь был бы ошибочен — см. комментарий выше). Дельты |n| > 1
+      // перепрыгивают twin и приземляются сразу на не-lab запись:
+      // «защитная ветка» поп-обработчика отдаёт поп роутеру и панель
+      // размонтируется без решения. Публичный навигационный контракт не
+      // должен принимать произвольные прыжки без явного leave-контракта:
+      // чистое состояние — немедленный переход (прежняя семантика),
+      // dirty/pending — guard-диалог; подтверждение разоружает sentinel
+      // ДО traverse, чтобы поп от go(n) не откатился новым циклом.
+      if (Math.abs(to) > 1) {
+        guardRouteLeaveRef.current(() => {
+          labLeaveSentinel.disarm();
+          navigate(to);
+        });
+        return;
+      }
       // Числовая дельта: второй overload NavigateFunction — без options.
       navigate(to);
       return;
     }
     const targetPathname = typeof to === 'string'
-      ? new URL(to, window.location.origin).pathname
+      ? new URL(to, window.location.href).pathname
       : (to.pathname ?? window.location.pathname);
-    // PR 3351 (review round 3, P1): route identity — точный маршрут LabPanel.
-    // '/lab/results' не зарегистрирован (wildcard → /not-found размонтирует
-    // панель), поэтому это уход, а не внутренний переход.
+    // LABGUARD-FE-002 (audit 3886): относительные строковые цели
+    // (query-only '?tab=…', fragment '#results') резолвятся против
+    // ТЕКУЩЕГО href — как в resolveToHref. Прежний резолв против
+    // origin корня misклассифицировал '?tab=templates' на /lab как
+    // уход (pathname '/') и открывал destructive Save/Discard/Cancel
+    // диалог для внутрилабораторного переключения вкладки.
+    // Route identity — точный маршрут LabPanel: '/lab/results' не
+    // зарегистрирован (wildcard → /not-found размонтирует панель).
     const leavesLabRoute = !isLabRoutePath(targetPathname);
     if (!leavesLabRoute) {
       // PR 3351 (review round 5, P1): переход УЖЕ с lab-маршрута на тот же

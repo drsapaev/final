@@ -304,6 +304,7 @@ export default function ReportEditor({
                     {field.value_type === 'choice' && choiceOptions.length > 0 ? (
                       <select
                         className="macos-input"
+                        aria-label={`${t('workbench.result_label')}: ${field.label}`}
                         value={currentValue}
                         onChange={(event) => updateField(field.field_key, event.target.value)}
                         disabled={!canEditActiveInstance}

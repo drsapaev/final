@@ -42,6 +42,38 @@ describe('useDirtyTransitionGuard (PR5)', () => {
     expect(result.current.isDialogOpen).toBe(false);
   });
 
+  it('context policy (panel urlIntent) keeps the supersede contract', async () => {
+    // LABGUARD-FE-003 (audit 3886, round 13): 'context' — прежний
+    // контракт in-lab supersede (e2e round 7: superseding tab-less intent
+    // обновляет цель, база отката нет) — перезапись ОСТАЁТСЯ легитимной.
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    const firstTransition = vi.fn();
+    act(() => {
+      result.current.registerDirtySource({ id: 'report', isDirty: () => true, save });
+      result.current.guardTransition(firstTransition, { intentPolicy: 'context' });
+    });
+    expect(result.current.isDialogOpen).toBe(true);
+
+    // Внутрилабораторный supersede перезаписывает цель (без leave-политики).
+    // guardTransition возвращает false = «переход НЕ выполнен немедленно,
+    // ждёт подтверждения» — но pending уже заменён на supersede-цель.
+    const supersedingTransition = vi.fn();
+    let accepted = true;
+    act(() => {
+      accepted = result.current.guardTransition(supersedingTransition);
+    });
+    expect(accepted).toBe(false);
+    expect(result.current.isDialogOpen).toBe(true);
+    expect(firstTransition).not.toHaveBeenCalled();
+
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Выйти без сохранения' }));
+    await flush();
+    expect(supersedingTransition).toHaveBeenCalledTimes(1);
+    expect(firstTransition).not.toHaveBeenCalled();
+  });
+
   it('cancel keeps the user in place: no save, no transition', () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() => useDirtyTransitionGuard());
@@ -143,37 +175,58 @@ describe('useDirtyTransitionGuard (PR5)', () => {
   });
 
   it('does not run an obsolete transition when a newer intent arrives during save', async () => {
+    // LABGUARD-FE-003 (audit 3886, round 13): переписан под контракт
+    // иммутабельности открытого диалога. Прежняя версия кодифицировала
+    // баг: второй guardTransition при открытом диалоге МОЛЧА подменял
+    // первый интент (pendingTransitionRef перезаписывался) — Save/Discard
+    // выполнял уже ЧУЖОЙ переход. Новый контракт: пока диалог открыт
+    // (включая окно in-flight save), новые интенты отклоняются (false),
+    // pending не трогается; подтверждение выполняет ПЕРВЫЙ интент.
     let resolveSave: (() => void) | undefined;
     const save = vi.fn(() => new Promise<void>((resolve) => {
       resolveSave = resolve;
     }));
     const { result } = renderHook(() => useDirtyTransitionGuard());
+    const firstTransition = vi.fn();
     act(() => {
       result.current.registerDirtySource({ id: 'report', isDirty: () => true, save });
-      result.current.guardTransition(vi.fn());
+      result.current.guardTransition(firstTransition, { intentPolicy: 'leave' });
     });
+    expect(result.current.isDialogOpen).toBe(true);
+
+    // Второй интент при открытом диалоге — отклонён, pending сохранён.
     const obsoleteTransition = vi.fn();
+    let obsoleteAccepted = true;
     act(() => {
-      result.current.guardTransition(obsoleteTransition);
+      obsoleteAccepted = result.current.guardTransition(obsoleteTransition, { intentPolicy: 'leave' });
     });
+    expect(obsoleteAccepted).toBe(false);
+    expect(result.current.isDialogOpen).toBe(true);
+
     render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить и перейти' }));
     await act(async () => {
       await Promise.resolve();
     });
 
+    // Третий интент прибывает, пока save в полёте (busy): тоже отклонён —
+    // он НЕ выполняется сразу и НЕ подменяет подтверждённый первый.
     const latestTransition = vi.fn();
+    let latestAccepted = true;
     act(() => {
-      result.current.guardTransition(latestTransition);
+      latestAccepted = result.current.guardTransition(latestTransition, { intentPolicy: 'leave' });
     });
+    expect(latestAccepted).toBe(false);
     await act(async () => {
       resolveSave?.();
       await Promise.resolve();
     });
 
+    // Save завершился: выполнен ПЕРВЫЙ интент; подмены не случилось.
+    expect(firstTransition).toHaveBeenCalledTimes(1);
     expect(obsoleteTransition).not.toHaveBeenCalled();
     expect(latestTransition).not.toHaveBeenCalled();
-    expect(result.current.isDialogOpen).toBe(true);
+    expect(result.current.isDialogOpen).toBe(false);
   });
 
   it('a failed save keeps the user in place and does not continue the transition', async () => {

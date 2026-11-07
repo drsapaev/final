@@ -11,15 +11,11 @@
  */
 import logger from './logger';
 import { safeJsonParse } from '../utils/safeJsonParse';
+import { decodeJwtClaims, numericClaim } from './jwt';
 
 const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_KEY = 'user';
-
-interface JwtPayload {
-  exp?: number;
-  [key: string]: unknown;
-}
 
 /**
  * Менеджер токенов
@@ -123,30 +119,31 @@ export const tokenManager = {
 
   /**
    * Проверить валидность токена (базовая проверка).
-   * JWT format check + exp claim check. Non-JWT tokens are treated as valid
-   * (the backend will reject them on the next /me call).
+   * JWT format check + exp claim check — AUTH-FE-001 (audit 3886):
+   * ошибка декода payload теперь fail-closed (раньше — true из catch);
+   * трёхчастные строки без числового exp остаются «валидными» на
+   * UI-уровне (backend отклонит их на следующем /me).
    */
   isTokenValid(): boolean {
     const token = this.getAccessToken();
     if (!token) return false;
 
-    // Базовая проверка формата JWT (xxx.yyy.zzz)
-    const parts = token.split('.');
-    if (parts.length !== 3) return false;
+    // AUTH-FE-001 (audit 3886): fail-closed на UI-уровне. Прежний код
+    // возвращал TRUE из catch: битый/нечитаемый JWT-_payload (в т.ч.
+    // легальные Base64URL `-`/`_`, на которых падал «сырой» atob)
+    // считался «валидным» — истёкший токен мог при этом прочитаться как
+    // валидный. Теперь ошибка декода честно отклоняет токен; сервер
+    // остаётся авторитетом на /me.
+    const claims = decodeJwtClaims(token);
+    if (claims === null) return false;
 
-    try {
-      // Проверка срока действия (если это JWT)
-      // atob returns string; safeJsonParse returns unknown.
-      const payload: JwtPayload = safeJsonParse(atob(parts[1])) as JwtPayload;
-      if (payload.exp) {
-        const expirationTime = payload.exp * 1000;
-        return Date.now() < expirationTime;
-      }
-      return true;
-    } catch {
-      // Не JWT или ошибка парсинга — считаем валидным
+    const exp = numericClaim(claims, 'exp');
+    if (exp === null) {
+      // Трёхчастная строка без числового exp — не считаем истёкшим
+      // на UI-уровне (backend отклонит на следующем /me).
       return true;
     }
+    return Date.now() < exp * 1000;
   },
 };
 
