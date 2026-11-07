@@ -15489,6 +15489,32 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram/send-lab-report-instance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Lab Report Instance Notification
+         * @description Отправить финализированный лабораторный бланк пациенту в Telegram (PDF).
+         *
+         *     Семантика статусов зеркалит legacy /send-lab-results: 200 +
+         *     ``{"success": false, "message": ...}`` означает, что пациент
+         *     НЕ получил отправку (не связан с ботом или отключил уведомления) —
+         *     фронтенд обязан показывать это как неудачу (LABN-FE-002), а не как
+         *     «отправлено».
+         */
+        post: operations["send_lab_report_instance_notification_api_v1_telegram_send_lab_report_instance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/telegram/send-payment-confirmation": {
         parameters: {
             query?: never;
@@ -31762,6 +31788,20 @@ export type components = {
             branding_overrides?: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * LabReportInstanceNotificationRequest
+         * @description Explicit body contract for the instance-scoped report notification.
+         *
+         *     A wrong-shape request (e.g. the legacy field name ``instance_id`` or a
+         *     legacy ``lab_result_ids`` list) fails Pydantic validation with a
+         *     readable 422 instead of silently mapping unrelated ID spaces.
+         */
+        LabReportInstanceNotificationRequest: {
+            /** Patient Id */
+            patient_id: number;
+            /** Report Instance Id */
+            report_instance_id: number;
         };
         /** LabReportInstanceOut */
         LabReportInstanceOut: {
@@ -72183,6 +72223,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": number[];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_lab_report_instance_notification_api_v1_telegram_send_lab_report_instance_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabReportInstanceNotificationRequest"];
             };
         };
         responses: {

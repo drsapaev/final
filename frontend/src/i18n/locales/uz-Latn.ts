@@ -410,6 +410,7 @@ const uzLatn = {
     finalize_failed: 'Hisobotni tasdiqlab bo\'lmadi.',
     print_failed: 'PDF shakllantirib bo\'lmadi.',
     notify_failed: 'Natijalarni bemorga yuborib bo\'lmadi.',
+    notify_not_delivered: 'Bemor natijalarni olmadi: yetkazib berilmadi.',
     order_failed: 'Buyurtma yaratib bo\'lmadi.',
     invalid_numeric: 'Noto\'g\'ri raqamli qiymat',
     field_restored: 'Maydon oldingi qiymatiga qaytarildi.',

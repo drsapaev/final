@@ -46059,6 +46059,55 @@
         }
       }
     },
+    "/api/v1/telegram/send-lab-report-instance": {
+      "post": {
+        "tags": [
+          "telegram-notifications"
+        ],
+        "summary": "Send Lab Report Instance Notification",
+        "description": "Отправить финализированный лабораторный бланк пациенту в Telegram (PDF).\n\nСемантика статусов зеркалит legacy /send-lab-results: 200 +\n``{\"success\": false, \"message\": ...}`` означает, что пациент\nНЕ получил отправку (не связан с ботом или отключил уведомления) —\nфронтенд обязан показывать это как неудачу (LABN-FE-002), а не как\n«отправлено».",
+        "operationId": "send_lab_report_instance_notification_api_v1_telegram_send_lab_report_instance_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabReportInstanceNotificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Send Lab Report Instance Notification Api V1 Telegram Send Lab Report Instance Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/telegram/send-payment-confirmation": {
       "post": {
         "tags": [
@@ -93123,6 +93172,25 @@
           "template_id"
         ],
         "title": "LabReportInstanceCreate"
+      },
+      "LabReportInstanceNotificationRequest": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "report_instance_id": {
+            "type": "integer",
+            "title": "Report Instance Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "report_instance_id"
+        ],
+        "title": "LabReportInstanceNotificationRequest",
+        "description": "Explicit body contract for the instance-scoped report notification.\n\nA wrong-shape request (e.g. the legacy field name ``instance_id`` or a\nlegacy ``lab_result_ids`` list) fails Pydantic validation with a\nreadable 422 instead of silently mapping unrelated ID spaces."
       },
       "LabReportInstanceOut": {
         "properties": {
