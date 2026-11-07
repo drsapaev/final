@@ -32,7 +32,6 @@ import {
   formatFlagLabel,
   formatThreshold,
   getServiceContextItems,
-  buildLabPrintPayload,
 } from './utils/labReportNormalize';
 import {
   hasLabReportAction,
@@ -943,9 +942,26 @@ export default function LabReportWorkbench({
       text: t('workbench.print_sending')
     });
     try {
-      const printResult = await printService.printLabResults(
-        buildLabPrintPayload(activeInstance, selectedAppointment)
-      ) as Record<string, unknown>;
+      // LABPRINT-FE-001 (audit 3886, round 14): отправляем ТОЛЬКО
+      // авторизованный идентификатор отчёта — сервер материализует бланк
+      // из БД (тот же пайплайн, что канонический PDF). Клиентские
+      // значения больше не собираются и не отправляются.
+      const printResult = await printService.printLabResults({
+        report_instance_id: Number(expectedInstanceId),
+      }) as Record<string, unknown>;
+
+      // LABPRINT-FE-003 (audit 3886, round 14): 2xx без положительного
+      // ACK — ambiguous: задание МОГЛО встать в очередь. Никакого
+      // слепого повтора и автофолбэка: оператор проверяет очередь печати,
+      // статус не помечается.
+      if ((printResult as { ambiguous?: boolean }).ambiguous) {
+        if (!isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
+        setPrintFeedback({ severity: 'warning', text: t('workbench.print_unconfirmed') });
+        return;
+      }
 
       if (printResult.success) {
         let printed: Record<string, unknown>;
@@ -1053,46 +1069,18 @@ export default function LabReportWorkbench({
       }
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      // WF-05 fix: не помечаем как PRINTED при неудаче popup.
       if (popup) {
-        let printed: Record<string, unknown>;
-        try {
-          printed = (await labReportingApi.markPrinted(expectedInstanceId)) as Record<string, unknown>;
-        } catch (markError) {
-          logger.error('[LabReportWorkbench] opened PDF status update failed', markError);
-          if (isOperationCurrent(operation) && printAttemptRef.current === printAttempt) {
-            setPrintFeedback({ severity: 'error', text: t('workbench.print_status_failed') });
-          }
-          notify?.('error', t('workbench.print_status_failed'));
-          return;
-        }
-        const accepted = onInstanceChange?.(printed, {
-          kind: 'update',
-          expectedInstanceId,
-          operation,
-        }) !== false;
-        if (!accepted || !isOperationCurrent(operation)) {
-          clearOwnedPrintFeedback();
-          return;
-        }
-        await onRefreshHistory?.(printed.patient_id as string | number);
-        if (!isOperationCurrent(operation)) {
-          clearOwnedPrintFeedback();
-          return;
-        }
-        await onRefreshRecentReports?.();
-        if (!isOperationCurrent(operation)) {
-          clearOwnedPrintFeedback();
-          return;
-        }
-        await onQueueChanged?.();
-        if (!isOperationCurrent(operation)) {
-          clearOwnedPrintFeedback();
-          return;
-        }
+        // LABPRINT-FE-002 (audit 3886, round 14): открытая PDF-вкладка —
+        // это НЕ физическая печать. Раньше UI немедленно вызывал
+        // markPrinted, и бланк получал статус PRINTED без подтверждённого
+        // печатного задания (оператор мог отменить печать или только
+        // просмотреть). Теперь статус меняет ТОЛЬКО явное подтверждение
+        // оператора (кнопка в inline Alert); до этого отчёт остаётся
+        // FINALIZED.
+        setPdfConfirmPendingInstanceId(expectedInstanceId);
         setPrintFeedback({
-          severity: 'success',
-          text: t('workbench.print_pdf_opened')
+          severity: 'info',
+          text: t('workbench.print_pdf_opened_confirm')
         });
       } else {
         if (!isOperationCurrent(operation)) return;
@@ -1116,6 +1104,55 @@ export default function LabReportWorkbench({
         setSaving(false);
         setBusyAction('');
       }
+    }
+  }
+
+  // LABPRINT-FE-002 (audit 3886, round 14): PDF-вкладка открыта, но
+  // физическая печать не подтверждена. Пока оператор не нажмёт
+  // «Отметить как напечатанное», статус отчёта не меняется: открытый
+  // PDF-превью — это не печатное задание. Сбрасывается при смене
+  // активного отчёта (WF-12 parity).
+  const [pdfConfirmPendingInstanceId, setPdfConfirmPendingInstanceId] = useState<string | number | null>(null);
+  useEffect(() => {
+    setPdfConfirmPendingInstanceId(null);
+  }, [activeInstance?.id]);
+
+  async function confirmPdfPrinted() {
+    const targetInstanceId = pdfConfirmPendingInstanceId;
+    if (targetInstanceId == null) return;
+    const operation = captureOperationContext();
+    setBusyAction('print');
+    try {
+      let printed: Record<string, unknown>;
+      try {
+        printed = (await labReportingApi.markPrinted(targetInstanceId)) as Record<string, unknown>;
+      } catch (markError) {
+        logger.error('[LabReportWorkbench] confirmed PDF print status update failed', markError);
+        setPrintFeedback({ severity: 'error', text: t('workbench.print_status_failed') });
+        notify?.('error', t('workbench.print_status_failed'));
+        return;
+      }
+      setPdfConfirmPendingInstanceId(null);
+      const accepted = onInstanceChange?.(printed, {
+        kind: 'update',
+        expectedInstanceId: targetInstanceId,
+        operation,
+      }) !== false;
+      if (!accepted) return;
+      await onRefreshHistory?.(printed.patient_id as string | number);
+      await onRefreshRecentReports?.();
+      await onQueueChanged?.();
+      setPrintFeedback({ severity: 'success', text: t('workbench.print_marked') });
+      if (printFeedbackTimerRef.current) {
+        clearTimeout(printFeedbackTimerRef.current);
+        printFeedbackTimerRef.current = null;
+      }
+      printFeedbackTimerRef.current = setTimeout(() => {
+        setPrintFeedback(null);
+        printFeedbackTimerRef.current = null;
+      }, 5000);
+    } finally {
+      setBusyAction((current) => (current === 'print' ? '' : current));
     }
   }
 
@@ -1501,7 +1538,20 @@ export default function LabReportWorkbench({
               </details>
 
               {printFeedback && (
-                <Alert severity={printFeedback.severity}>{printFeedback.text}</Alert>
+                <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
+                  <Alert severity={printFeedback.severity}>{printFeedback.text}</Alert>
+                  {pdfConfirmPendingInstanceId != null && (
+                    <div>
+                      <Button
+                        variant="primary"
+                        size="default"
+                        onClick={() => { void confirmPdfPrinted(); }}
+                      >
+                        {t('workbench.print_confirm_mark_printed')}
+                      </Button>
+                    </div>
+                  )}
+                </div>
               )}
 
               {((activeInstance.critical_findings as Array<Record<string, unknown>> | undefined)?.length ?? 0) > 0 && (

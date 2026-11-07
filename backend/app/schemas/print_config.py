@@ -192,13 +192,19 @@ class PrintReceiptRequest(BaseModel):
 
 
 class PrintLabResultsRequest(BaseModel):
-    """Схема для печати результатов анализов"""
+    """LABPRINT-FE-001 (audit 3886, round 14): печать лабораторного бланка
+    ТОЛЬКО по авторизованному идентификатору отчёта. Клиентские значения
+    (результаты/флаги/снапшоты пациента) больше не принимаются: сервер
+    материализует бланк из БД тем же пайплайном, что и канонический
+    /lab/report-instances/{id}/pdf. Свободные поля отвергаются (forbid).
+    """
 
-    lab_order: dict[str, Any] = Field(..., description="Данные заказа")
-    lab_results: list[dict[str, Any]] = Field(..., description="Результаты анализов")
-    patient: dict[str, Any] = Field(..., description="Данные пациента")
-    clinic: dict[str, Any] | None = None
-    printer_name: str | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    report_instance_id: int = Field(
+        ..., description="ID существующего лабораторного отчёта (FINALIZED/PRINTED)"
+    )
+    printer_name: str | None = Field(None, description="Опциональный выбор принтера")
 
 
 class PrintResponse(BaseModel):

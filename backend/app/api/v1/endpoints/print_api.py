@@ -5,7 +5,7 @@ API endpoints для печати документов
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -183,6 +183,10 @@ async def print_payment_receipt(
         )
 
 
+def _iso(value) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
 @router.post("/lab-results", response_model=PrintResponse)
 async def print_lab_results(
     request: PrintLabResultsRequest,
@@ -190,21 +194,122 @@ async def print_lab_results(
     current_user: User = Depends(require_roles("Admin", "Doctor", "Lab")),
     print_service: PrintService = Depends(get_print_service),
 ):
+    """Печать лабораторного бланка по авторизованному отчёту.
+
+    LABPRINT-FE-001 (audit 3886, round 14): раньше роут принимал СВОБОДНЫЕ
+    клиентские данные (результаты/флаги/снапшоты пациента) и рендерил их
+    как «лабораторный бланк» без какой-либо сверки с LabReportInstance —
+    доверенная роль могла распечатать несохранённые/изменённые/чужие
+    значения, а UI после этого помечал *другой* канонический инстанс как
+    PRINTED. Теперь фронт отправляет ТОЛЬКО report_instance_id (+ опцию
+    принтера); сервер загружает инстанс, проверяет право чтения Doctor
+    (тот же guard, что у /lab/report-instances/{id}/pdf), требует статус
+    FINALIZED/PRINTED и материализует бланк из БД тем же пайплайном
+    (materialize_instance + снапшоты), что и канонический PDF.
     """
-    Печать результатов лабораторных анализов
-    """
+    from app.api.v1.endpoints.lab_reporting import (
+        LabReportingDomainError,
+        LabReportingService,
+        _ensure_doctor_can_read_lab_instance,
+    )
+
     try:
-        lab_data = request.dict()
+        lab_service = LabReportingService(db)
+        instance = lab_service.get_instance(request.report_instance_id)
+        _ensure_doctor_can_read_lab_instance(db, instance, current_user)
+        if instance.status not in {"FINALIZED", "PRINTED"}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only finalized reports can be printed",
+            )
+
+        materialized_sections = lab_service.materialize_instance(instance)
+        critical_findings = lab_service.summarize_critical_findings(materialized_sections)
+        patient_snapshot = instance.patient_snapshot or {}
+        branding = instance.branding_snapshot or {}
+        patient_full_name = (
+            patient_snapshot.get("full_name")
+            or f"Patient #{instance.patient_id}"
+        )
+        template_name = instance.template.name if instance.template else None
+        report_date = (
+            instance.finalized_at or instance.created_at or datetime.now(UTC)
+        )
+
+        # Тот же формат документа, что раньше собирал браузер
+        # (buildLabPrintPayload), — но каждое значение теперь читается из
+        # персистентного состояния инстанса, а не из запроса клиента.
+        document_data = {
+            "lab_order": {
+                "id": instance.id,
+                "visit_id": instance.visit_id,
+                "patient_id": instance.patient_id,
+                "template_id": instance.template_id,
+                "template_name": template_name,
+                "status": instance.status,
+                "created_at": _iso(instance.created_at),
+                "finalized_at": _iso(instance.finalized_at),
+                "printed_at": _iso(instance.printed_at),
+            },
+            "lab_results": [
+                {
+                    "section_key": section.get("key"),
+                    "section_title": section.get("title"),
+                    "field_key": field.get("field_key"),
+                    "label": field.get("label"),
+                    "value_numeric": field.get("value_numeric"),
+                    "value_text": field.get("value_text"),
+                    "reference_text": field.get("reference_text"),
+                    "unit": field.get("unit"),
+                    "resolved_flag": field.get("resolved_flag"),
+                    "resolved_flag_severity": field.get("resolved_flag_severity"),
+                }
+                for section in materialized_sections
+                for field in section.get("fields", [])
+            ],
+            "patient": {
+                "full_name": patient_full_name,
+                "birth_date": patient_snapshot.get("birth_date") or "",
+                "address": patient_snapshot.get("address") or "",
+                "phone": patient_snapshot.get("phone") or "",
+                "sex": patient_snapshot.get("sex") or "",
+            },
+            "clinic": {
+                "name": branding.get("name") or branding.get("clinic_name") or "",
+                "address": branding.get("address") or "",
+                "phone": branding.get("phone") or "",
+                "website": branding.get("website") or "",
+                "license_number": branding.get("license_number") or "",
+            },
+            "branding": {
+                "clinic_name": branding.get("name") or branding.get("clinic_name") or "",
+                "address": branding.get("address") or "",
+                "phone": branding.get("phone") or "",
+                "document_title": template_name or "",
+                "document_subtitle": (getattr(instance.template, "subtitle", "") if instance.template else "") or "",
+            },
+            "signers": instance.signer_snapshot or {},
+            "sections": materialized_sections,
+            "template_name": template_name,
+            "report_date": _iso(report_date),
+            "footer_notes": (instance.template_version.footer_notes if instance.template_version else "") or "",
+            "critical_findings": critical_findings,
+        }
+
         result = await print_service.print_document(
             document_type="lab_results",
-            document_data=lab_data,
+            document_data=document_data,
             printer_name=request.printer_name,
             user=current_user,
         )
-
         return result
 
+    except LabReportingDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    except HTTPException:
+        raise
     except Exception:
+        logger.exception("print_lab_results failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
