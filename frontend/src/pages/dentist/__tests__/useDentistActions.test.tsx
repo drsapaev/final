@@ -476,14 +476,16 @@ describe('useDentistActions (PR-UI-15-5) — dialog-opening handlers', () => {
     expect(deps.setShowVisitProtocol).toHaveBeenCalledWith(true);
   });
 
-  it('handleDentalChart passes the chart payload and opens the chart dialog', () => {
-    const deps = makeDeps();
+  it('handleDentalChart passes the chart payload and opens the chart dialog', async () => {
+    // Audit 3892 round 3 (DENTDIALOG-FE-001): the chart dialog requires the
+    // canonical visit before opening — an editable chart writes tooth
+    // records into the visit's EMR.
+    const deps = makeDeps({ ensureCanonicalVisitId: vi.fn(async () => 55) });
     const { result } = renderHook(() => useDentistActions(deps));
-    act(() => {
-      result.current.handleDentalChart({ patient_name: 'P', dentalChart: { teeth: 32 } });
-    });
+    await result.current.handleDentalChart({ patient_name: 'P', dentalChart: { teeth: 32 } });
     expect(deps.setDentalChartData).toHaveBeenCalledWith({ teeth: 32 });
     expect(deps.setShowDentalChart).toHaveBeenCalledWith(true);
+    expect(deps.setSelectedPatient).toHaveBeenCalledWith(expect.objectContaining({ visit_id: 55 }));
   });
 
   it('handleTreatmentPlanner requires a visit id', async () => {

@@ -135,7 +135,10 @@ describe('DentalVisitScreen EMR persistence', () => {
     fireEvent.change(textarea, { target: { value: 'unsaved change' } });
     fireEvent.click(getCompleteButton());
 
-    expect(await screen.findByText('dental2.visit_protocol_save_failed')).toBeTruthy();
+    // Audit 3892 round 3 (DENTVISIT-FE-004): a 409 surfaces the specific
+    // conflict explanation; the retry behind it revalidates the server
+    // version instead of blindly re-POSTing the stale row_version.
+    expect(await screen.findByText('dental2.visit_conflict_description')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'doctor.btn_retry' })).toBeTruthy();
     expect(onCompleteVisit).not.toHaveBeenCalled();
   });

@@ -7,7 +7,7 @@
  * H6 fix: status / color / label / FDI-number constants now imported
  * from dentalConstants.js (SSOT) instead of being redefined here.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box,
   Card,
@@ -55,9 +55,9 @@ export interface ToothData {
 export type TeethChartMap = Record<string, ToothData>;
 
 export interface TeethChartProps {
-  /** Called whenever a tooth is clicked. Receives the tooth number and its current data. */
-  onToothClick?: (toothNumber: number, toothData: ToothData) => void;
-  /** Initial per-tooth state (typically loaded from EMR specialty_data.tooth_status). */
+  /** Called whenever a tooth is clicked. Receives the tooth number, its current data and the palette-suggested status. */
+  onToothClick?: (toothNumber: number, toothData: ToothData, suggestedStatus?: string) => void;
+  /** Current per-tooth state (typically loaded from EMR specialty_data.tooth_status). */
   initialData?: TeethChartMap;
   /** When true, the chart only emits clicks without mutating internal state. */
   readOnly?: boolean;
@@ -68,33 +68,34 @@ export interface TeethChartProps {
 
 const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethChartProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
+  // DENTVISIT-FE-003 (audit 3892): the chart is a VIEW of the canonical
+  // specialty_data.tooth_status. It never paints a status on click — the
+  // status only changes after the parent commits a confirmed modal save,
+  // which lands here as a new initialData reference.
   const [teethData, setTeethData] = useState<TeethChartMap>(initialData);
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>(TOOTH_STATUS.CARIES);
   const [viewMode, setViewMode] = useState('adult'); // adult, child
   const [zoom, setZoom] = useState(1);
 
+  // Follow the canonical per-tooth state whenever the parent's data changes
+  // (e.g. a confirmed ToothModal save updates specialty_data.tooth_status).
+  useEffect(() => {
+    setTeethData(initialData);
+  }, [initialData]);
+
   // Обработка клика по зубу
   const handleToothClick = (toothNumber: number) => {
+    // DENTVISIT-FE-003 (audit 3892): a click only SELECTS the tooth and emits
+    // its CURRENT data plus the palette-suggested status for the modal to
+    // confirm. The displayed status is never mutated before that
+    // confirmation, so cancelling the modal leaves no inconsistent chart.
     if (readOnly) {
-      onToothClick && onToothClick(toothNumber, teethData[toothNumber] || {});
+      onToothClick && onToothClick(toothNumber, teethData[String(toothNumber)] || {}, selectedStatus);
       return;
     }
-
     setSelectedTooth(toothNumber);
-
-    // Обновляем статус зуба
-    const newData: TeethChartMap = {
-      ...teethData,
-      [String(toothNumber)]: {
-        ...(teethData[String(toothNumber)] || {}),
-        status: selectedStatus,
-        updatedAt: new Date().toISOString()
-      }
-    };
-
-    setTeethData(newData);
-    onToothClick && onToothClick(toothNumber, newData[String(toothNumber)]);
+    onToothClick && onToothClick(toothNumber, teethData[String(toothNumber)] || {}, selectedStatus);
   };
 
   // Очистить все данные

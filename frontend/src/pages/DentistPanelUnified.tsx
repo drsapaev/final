@@ -190,6 +190,16 @@ const DentistPanelUnified = () => {
   },
   );
 
+  // DENTCACHE-FE-001 (audit 3892): useVisitLifecycle's unmount effect clears
+  // only the cacheService layer — the dentist module-level caches would keep
+  // the previous session's data (and an in-flight worklist response could
+  // still repopulate them after logout/navigation without a reload).
+  // Revoking their ownership on unmount closes that hole for the next mount
+  // (e.g. another principal logging in without a full page reload).
+  useEffect(() => () => {
+    invalidateDentistPanelCaches();
+  }, []);
+
   // PR-UI-15-4: EMR v2 visit-protocol lifecycle (saved protocols + loaders +
   // persist + reopen + hydrate) — verbatim port; deps-object wiring keeps the
   // original setSelectedPatient / setShowVisitProtocol semantics.

@@ -20,8 +20,7 @@ import {
 } from '../ui/macos';
 import {
   Activity,
-  CheckCircle,
-  History,
+  AlertTriangle,
   Hospital,
   Plus,
   Trash2,
@@ -33,6 +32,8 @@ import notify from '../../services/notify';
 import {
   TOOTH_PROCEDURES,
   MATERIALS,
+  TOOTH_STATUS,
+  TOOTH_STATUS_LABELS,
   getToothName as ssotGetToothName,
   computeToothTotalPrice,
   isProstheticProcedure,
@@ -41,20 +42,18 @@ import { safeJsonParse } from '../../utils/safeJsonParse';
 
 const iconSize = 15;
 
+// DENTMODAL-FE-004 (audit 3892): wall-clock milliseconds are not a unique
+// identity — same-millisecond procedure additions used to share one React
+// key, and deleting one silently removed both. A module-local monotonic
+// counter guarantees collision resistance even under a frozen clock.
+let procedureIdSequence = 0;
+
 interface Procedure {
   id: string;
   name: string;
   price: number;
   isProsthetic?: boolean;
   date?: string;
-  [key: string]: unknown;
-}
-
-interface HistoryRecord {
-  procedure?: string;
-  date: string;
-  doctor?: string;
-  notes?: string;
   [key: string]: unknown;
 }
 
@@ -249,8 +248,9 @@ const ToothModal = ({
   toothNumber,
   toothData = {} as Record<string, unknown>,
   onSave,
-  visitId
-}: { toothData?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown, rowVersion?: number) => void; toothNumber?: string | number; visitId?: string | number; open?: boolean; [k: string]: unknown }) => {
+  visitId,
+  suggestedStatus,
+}: { toothData?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown, rowVersion?: number) => void; toothNumber?: string | number; visitId?: string | number; suggestedStatus?: string; open?: boolean; [k: string]: unknown }) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const [formData, setFormData] = useState<ToothFormData>({
@@ -269,8 +269,7 @@ const ToothModal = ({
     warrantyPeriod: '',
     patientSatisfaction: '',
   });
-  
-  const [history, setHistory] = useState<HistoryRecord[]>([]);
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -280,7 +279,10 @@ const ToothModal = ({
     if (open && toothData) {
       const td = toothData as Record<string, unknown>;
       setFormData({
-        status: String(td.status ?? ''),
+        // DENTVISIT-FE-003 (audit 3892): the tooth's own persisted status is
+        // authoritative; the chart palette's suggested status only seeds a
+        // tooth that has no status yet. The clinician confirms it here.
+        status: String(td.status ?? suggestedStatus ?? ''),
         procedures: (td.procedures as Procedure[]) || [],
         material: String(td.material ?? ''),
         notes: String(td.notes ?? ''),
@@ -292,22 +294,20 @@ const ToothModal = ({
         warrantyPeriod: String(td.warrantyPeriod ?? td.warranty_period ?? ''),
         patientSatisfaction: String(td.patientSatisfaction ?? td.patient_satisfaction ?? ''),
       });
-
-      setHistory([]);
     }
-  }, [open, toothData, visitId]);
+  }, [open, toothData, visitId, suggestedStatus]);
 
   // Добавление процедуры
   const addProcedure = (procedureId: string) => {
     const procedure = (TOOTH_PROCEDURES as Record<string, typeof TOOTH_PROCEDURES[keyof typeof TOOTH_PROCEDURES]>)[procedureId];
     if (!procedure) return;
-    
+
     const newProcedure = {
       ...procedure,
-      id: `${procedure.id}_${Date.now()}`,
+      id: `${procedure.id}_${Date.now()}_${++procedureIdSequence}`,
       date: new Date().toISOString(),
     };
-    
+
     setFormData(prev => ({
       ...prev,
       procedures: [...prev.procedures, newProcedure],
@@ -337,10 +337,37 @@ const ToothModal = ({
     (proc) => isProstheticProcedure(proc.id) || proc.isProsthetic === true,
   );
 
+  // DENTMODAL-FE-003 (audit 3892): Save must be available for ANY clinically
+  // meaningful tooth record — notes, material, follow-up, next-visit date or
+  // status are all persistable without a procedure. Only a truly empty,
+  // no-op form stays disabled.
+  const hasMeaningfulToothRecord = Boolean(
+    formData.status ||
+    formData.procedures.length > 0 ||
+    formData.material ||
+    formData.notes ||
+    formData.nextVisitDate ||
+    formData.requiresFollowUp ||
+    formData.shade ||
+    formData.fitQuality ||
+    formData.warrantyPeriod ||
+    formData.patientSatisfaction
+  );
+
+  // DENTDIALOG-FE-001 (audit 3892): without a canonical visit the modal has
+  // no EMR destination — it must fail closed instead of pretending that a
+  // local-state change was a save.
+  const missingVisit = visitId === null || visitId === undefined || visitId === '';
+
   // Сохранение данных
   const handleSave = async () => {
+    if (missingVisit) {
+      notify.error(t('dental2.tooth_save_requires_visit'));
+      return;
+    }
+
     setLoading(true);
-    
+
     try {
       const dataToSave = {
         ...formData,
@@ -348,7 +375,7 @@ const ToothModal = ({
         price: calculateTotalPrice(),
         updatedAt: new Date().toISOString(),
       };
-      
+
       if (visitId) {
         const existingEmr = await loadExistingEmrDraft(visitId);
         const response = await api.post(
@@ -362,12 +389,10 @@ const ToothModal = ({
         if (typeof onSave === 'function') {
           onSave(dataToSave as Record<string, unknown>, typeof savedRowVersion === 'number' ? savedRowVersion : undefined);
         }
-      } else if (typeof onSave === 'function') {
-        onSave(dataToSave as Record<string, unknown>);
       }
 
       if (typeof onClose === 'function') onClose();
-      
+
     } catch (error) {
       logger.error('Ошибка сохранения данных зуба:', error);
       notify.error(t('dental2.tooth_save_failed'));
@@ -392,8 +417,18 @@ const ToothModal = ({
           </Badge>
         </div>
       </DialogTitle>
-
       <DialogContent style={styles.content}>
+        {missingVisit && (
+          // DENTDIALOG-FE-001 (audit 3892): honest failure state — a tooth
+          // record cannot be saved without a canonical visit to write to.
+          <Alert severity="warning">
+            <span className="dental-flex dental-gap-8">
+              <AlertTriangle size={16} aria-hidden="true" />
+              {t('dental2.tooth_save_requires_visit')}
+            </span>
+          </Alert>
+        )}
+
         <section style={styles.section}>
           <h3 style={styles.sectionTitle}>{t('dental.dental_tm_procedures_title')}</h3>
 
@@ -439,6 +474,23 @@ const ToothModal = ({
         </section>
 
         <div style={styles.twoColumnGrid}>
+          {/* DENTVISIT-FE-003 (audit 3892): the tooth's clinical status is
+              confirmed HERE — seeded from the chart palette's suggestion for
+              a statusless tooth — instead of being painted onto the chart
+              before this modal is accepted. */}
+          <Select
+            label={t('dental.dental_tm_status_label')}
+            value={formData.status}
+            onValueChange={(value) => setFormData({ ...formData, status: String(value) })}
+            options={[
+              { value: '', label: '—' },
+              ...Object.entries(TOOTH_STATUS).map(([, status]) => ({
+                value: status,
+                label: TOOTH_STATUS_LABELS[status as keyof typeof TOOTH_STATUS_LABELS],
+              })),
+            ]}
+          />
+
           <Select
             label={t('dental.dental_tm_material_label')}
             value={formData.material}
@@ -533,33 +585,6 @@ const ToothModal = ({
           <span>{t('dental.dental_tm_follow_up_label')}</span>
         </label>
 
-        {history.length > 0 && (
-          <section style={styles.section}>
-            <div style={styles.divider} />
-            <h3 style={styles.sectionTitle}>
-              <History size={16} aria-hidden="true" />
-              {t('dental.dental_tm_history_title')}
-            </h3>
-
-            <ul style={styles.list}>
-              {history.map((record, index) => (
-                <li key={index} style={styles.listItemStatic}>
-                  <span style={styles.listIcon} aria-hidden="true">
-                    <CheckCircle size={15} />
-                  </span>
-                  <div>
-                    <p style={styles.itemTitle}>{record.procedure}</p>
-                    <p style={styles.itemMeta}>
-                      {new Date(record.date).toLocaleDateString()} - {record.doctor}
-                    </p>
-                    {record.notes && <p style={styles.itemMeta}>{record.notes}</p>}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
         <Alert severity="info">
           <h3 style={styles.totalTitle}>
             {t('dental.dental_tm_total_cost_label')}: {(calculateTotalPrice() / 1000).toFixed(0)}k {t('dental.dental_tm_currency_suffix')}
@@ -581,7 +606,7 @@ const ToothModal = ({
           type="button"
           variant="primary"
           onClick={handleSave}
-          disabled={loading || formData.procedures.length === 0}
+          disabled={loading || missingVisit || !hasMeaningfulToothRecord}
           loading={loading}
         >
           {t('dental.dental_tm_save')}
