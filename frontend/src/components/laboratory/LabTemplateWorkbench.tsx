@@ -14,6 +14,7 @@ import {
   hydrateVersion,
   buildVersionPayload,
   hasTemplateVersionAction,
+  nextSectionKey,
   parseJsonInput,
 } from './templateEditor/utils';
 import {
@@ -103,6 +104,25 @@ export default function LabTemplateWorkbench({
   const [draftVersion, setDraftVersion] = useState(hydrateVersion(null));
   const [saving, setSaving] = useState(false);
   const [draftSourceVersion, setDraftSourceVersion] = useState<Record<string, unknown> | null>(null);
+  // TEMPL-FE-001/002 (audit 3886 round 11): async catalog loads and deferred
+  // delete confirmations capture the draft EPOCH plus the section/field
+  // identity at initiation. Every draft rehydration (template/version
+  // switch, discard, reset) increments the epoch, so a late continuation
+  // whose draft context is gone is dropped instead of mutating a different
+  // template's draft. draftVersionRef mirrors the latest committed draft
+  // for identity revalidation after an await.
+  const draftEpochRef = useRef(0);
+  const draftVersionRef = useRef(draftVersion);
+  useEffect(() => {
+    draftVersionRef.current = draftVersion;
+  }, [draftVersion]);
+  const rehydrateDraft = (version: Record<string, unknown> | null | undefined, options?: { keepSource?: boolean }) => {
+    draftEpochRef.current += 1;
+    setDraftVersion(hydrateVersion(version));
+    if (!options?.keepSource) {
+      setDraftSourceVersion(version ?? null);
+    }
+  };
   const pendingCreatedDraftRef = useRef<{
     templateId: string | number;
     sourceVersionId: string | number | null;
@@ -184,9 +204,8 @@ export default function LabTemplateWorkbench({
   }, [activeVersion, selectedTemplate]);
 
   useLayoutEffect(() => {
-    setDraftVersion(hydrateVersion(activeVersion));
-    setDraftSourceVersion(activeVersion);
-  }, [activeVersion]);
+    rehydrateDraft(activeVersion);
+  }, [activeVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let cancelled = false;
@@ -351,6 +370,30 @@ export default function LabTemplateWorkbench({
     return errors;
   }
 
+  // TEMPL-FE-004 (audit 3886 round 11): section keys are unique per
+  // template version (backend UniqueConstraint(template_version_id,key)).
+  // The frontend previously validated only FIELD keys, so a duplicate
+  // section key (manual edit or the old remove-then-add generator) reached
+  // the backend and failed the whole save. Empty section keys are reported
+  // here too — they are equally unsavable.
+  function validateSectionKeyUniqueness() {
+    if (!draftVersion?.sections) return [] as string[];
+    const errors: string[] = [];
+    const seenKeys = new Set<string>();
+    draftVersion.sections.forEach((section: Record<string, unknown>, sIdx: number) => {
+      const key = String(section.key ?? '').trim();
+      if (!key) {
+        errors.push(t('misc.ltw_pustoy_klyuch_sektsii', { sIdx: (section.title as string) || sIdx + 1 }));
+        return;
+      }
+      if (seenKeys.has(key)) {
+        errors.push(t('misc.ltw_dublikat_klyuch_sektsii', { key, sIdx: (section.title as string) || sIdx + 1 }));
+      }
+      seenKeys.add(key);
+    });
+    return errors;
+  }
+
   // PR5: ядро сохранения draft шаблона — бросает исключение при неудаче,
   // чтобы dirty-guard не продолжал переход после неуспешного сохранения.
   async function attemptSaveTemplate() {
@@ -360,7 +403,7 @@ export default function LabTemplateWorkbench({
     }
     const rangeErrors = validateReferenceRanges();
     const jsonErrors = validateRuleJsonErrors();
-    const keyErrors = validateFieldKeyUniqueness();
+    const keyErrors = [...validateFieldKeyUniqueness(), ...validateSectionKeyUniqueness()];
     if (rangeErrors.length > 0 || jsonErrors.length > 0 || keyErrors.length > 0) {
       const allErrors = [...rangeErrors, ...jsonErrors, ...keyErrors];
       const message = `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`;
@@ -404,7 +447,7 @@ export default function LabTemplateWorkbench({
     }
     const rangeErrors = validateReferenceRanges();
     const jsonErrors = validateRuleJsonErrors();
-    const keyErrors = validateFieldKeyUniqueness();
+    const keyErrors = [...validateFieldKeyUniqueness(), ...validateSectionKeyUniqueness()];
     if (rangeErrors.length > 0 || jsonErrors.length > 0 || keyErrors.length > 0) {
       const allErrors = [...rangeErrors, ...jsonErrors, ...keyErrors];
       notify?.('error', `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
@@ -563,14 +606,52 @@ export default function LabTemplateWorkbench({
   }
 
   async function loadCatalogReferenceRange(sectionIndex: number, fieldIndex: number, analyteCode: string) {
+    // TEMPL-FE-001 (audit 3886 round 11): capture the request target's
+    // identity — draft epoch + section key + field key + analyte — BEFORE
+    // awaiting. A late response applies ONLY if the same field (by key) in
+    // the same section (by key) still carries the same analyte in the
+    // CURRENT draft; reorder/removal/analyte change/template switch makes
+    // the old indexes point at a different element and the stale range is
+    // dropped instead of written into it.
+    const epoch = draftEpochRef.current;
+    const sectionAtClick = draftVersionRef.current.sections[sectionIndex] as Record<string, unknown> | undefined;
+    const sectionKey = String(sectionAtClick?.key ?? '');
+    const fieldAtClick = (sectionAtClick?.fields as Record<string, unknown>[] | undefined)?.[fieldIndex];
+    const fieldKey = String(fieldAtClick?.field_key ?? '');
     try {
       const ranges = await labReportingApi.listCatalogReferenceRanges(analyteCode as unknown as null) as unknown as Array<{ text?: string; low?: number; high?: number }>;
+      if (epoch !== draftEpochRef.current) return; // draft switched under us
       if (ranges && ranges.length > 0) {
         const range = ranges[0];
-        updateField(sectionIndex, fieldIndex, 'reference_text',
-          range.text || `${range.low || ''}–${range.high || ''}`);
-        if (range.low != null) updateField(sectionIndex, fieldIndex, 'reference_low', range.low as number);
-        if (range.high != null) updateField(sectionIndex, fieldIndex, 'reference_high', range.high as number);
+        // Identity revalidation against the LATEST draft; the functional
+        // updater re-checks identity for the write itself.
+        const latestSection = draftVersionRef.current.sections.find(
+          (section: Record<string, unknown>) => String(section.key ?? '') === sectionKey
+        );
+        const latestField = ((latestSection?.fields as Record<string, unknown>[] | undefined) ?? [])
+          .find((field) => String(field.field_key ?? '') === fieldKey);
+        const targetUnchanged =
+          Boolean(latestField) && String(latestField?.analyte_code ?? '') === String(analyteCode);
+        if (!targetUnchanged) return; // stale range: never write into a different target
+        setDraftVersion((prev) => ({
+          ...prev,
+          sections: prev.sections.map((section: Record<string, unknown>) => {
+            if (String(section.key ?? '') !== sectionKey) return section;
+            return {
+              ...section,
+              fields: (section.fields as Record<string, unknown>[]).map((field: Record<string, unknown>) => {
+                if (String(field.field_key ?? '') !== fieldKey) return field;
+                if (String(field.analyte_code ?? '') !== String(analyteCode)) return field;
+                return {
+                  ...field,
+                  reference_text: range.text || `${range.low || ''}–${range.high || ''}`,
+                  ...(range.low != null ? { reference_low: range.low as number } : {}),
+                  ...(range.high != null ? { reference_high: range.high as number } : {}),
+                };
+              })
+            };
+          })
+        }));
         notify?.('success', `${t('success.norm_loaded_from_catalog')}: ${range.text || ''}`);
       } else {
         notify?.('info', t('errors.no_norm_in_catalog'));
@@ -581,10 +662,18 @@ export default function LabTemplateWorkbench({
   }
 
   function addSection() {
-    setDraftVersion((prev) => ({
-      ...prev,
-      sections: [...prev.sections, blankSection(prev.sections.length + 1)]
-    }));
+    // TEMPL-FE-004 (audit 3886 round 11): the new section key is the
+    // smallest UNUSED `section_N`, so a remove-then-add sequence can never
+    // regenerate an existing key (the old `length + 1` produced a duplicate
+    // after a middle removal, rejected by the backend UniqueConstraint).
+    setDraftVersion((prev) => {
+      const nextKey = nextSectionKey(prev.sections.map((section: Record<string, unknown>) => String(section.key ?? '')));
+      const index = prev.sections.length + 1;
+      return {
+        ...prev,
+        sections: [...prev.sections, { ...blankSection(index), key: nextKey }]
+      };
+    });
   }
 
   function addField(sectionIndex: number) {
@@ -598,21 +687,75 @@ export default function LabTemplateWorkbench({
     }));
   }
 
-  function removeField(sectionIndex: number, fieldIndex: number) {
+  // TEMPL-FE-002 (audit 3886 round 11): removal is identity-scoped. The
+  // delete confirmation is asynchronous, and indexes captured at click time
+  // can point at a DIFFERENT section/field by the time the user confirms
+  // (reorder/removal/template switch). The handlers receive the captured
+  // section/field KEYS, revalidate them against the LATEST draft and the
+  // captured epoch, and remove the element that actually carries that key —
+  // or nothing at all if it no longer exists or the draft context switched.
+  function removeField(sectionIndex: number, fieldIndex: number, fieldKey?: string, sectionKey?: string) {
+    void sectionIndex; void fieldIndex; // indexes are informational only
+    if (fieldKey == null || fieldKey === '' || sectionKey == null || sectionKey === '') return;
     setDraftVersion((prev) => ({
       ...prev,
-      sections: prev.sections.map((section: Record<string, unknown>, index: number) => (
-        index === sectionIndex
-          ? { ...section, fields: (section.fields as Record<string, unknown>[]).filter((_, nestedIndex: number) => nestedIndex !== fieldIndex) }
-          : section
-      ))
+      sections: prev.sections.map((section: Record<string, unknown>) => {
+        if (String(section.key ?? '') !== String(sectionKey)) return section;
+        return {
+          ...section,
+          fields: (section.fields as Record<string, unknown>[]).filter(
+            (field) => String(field.field_key ?? '') !== String(fieldKey)
+          )
+        };
+      })
     }));
   }
 
-  function removeSection(sectionIndex: number) {
+  function removeSection(sectionIndex: number, sectionKey?: string) {
+    void sectionIndex; // index is informational only
+    if (sectionKey == null || sectionKey === '') return;
     setDraftVersion((prev) => ({
       ...prev,
-      sections: prev.sections.filter((_: Record<string, unknown>, index: number) => index !== sectionIndex)
+      sections: prev.sections.filter(
+        (section: Record<string, unknown>) => String(section.key ?? '') !== String(sectionKey)
+      )
+    }));
+  }
+
+  // TEMPL-FE-002: called by ContentTab AFTER the async confirmation
+  // resolves — the epoch guard drops the removal if the draft was
+  // rehydrated (template/version switch) while the dialog was pending.
+  // Empty-key sections/fields (an already-unsavable state) fall back to
+  // the captured object reference so the trash icon keeps working for them.
+  function removeSectionConfirmed(sectionKey: string, epoch: number, sectionRef?: unknown) {
+    if (epoch !== draftEpochRef.current) return;
+    if (sectionKey) {
+      removeSection(-1, sectionKey);
+      return;
+    }
+    if (sectionRef == null) return;
+    setDraftVersion((prev) => ({
+      ...prev,
+      sections: prev.sections.filter((section: Record<string, unknown>) => section !== sectionRef)
+    }));
+  }
+
+  function removeFieldConfirmed(fieldKey: string, sectionKey: string, epoch: number, fieldRef?: unknown, sectionRef?: unknown) {
+    if (epoch !== draftEpochRef.current) return;
+    if (fieldKey && sectionKey) {
+      removeField(-1, -1, fieldKey, sectionKey);
+      return;
+    }
+    if (fieldRef == null || sectionRef == null) return;
+    setDraftVersion((prev) => ({
+      ...prev,
+      sections: prev.sections.map((section: Record<string, unknown>) => {
+        if (section !== sectionRef) return section;
+        return {
+          ...section,
+          fields: (section.fields as Record<string, unknown>[]).filter((field) => field !== fieldRef)
+        };
+      })
     }));
   }
 
@@ -705,7 +848,7 @@ export default function LabTemplateWorkbench({
       // selectedTemplate, сброшенный draft не останется dirty и не будет
       // перезаписан поздним сохранением.
       discard: () => {
-        setDraftVersion(hydrateVersion(activeVersionRef.current));
+        rehydrateDraft(activeVersionRef.current, { keepSource: true });
       },
     });
   }, []);
@@ -723,6 +866,7 @@ export default function LabTemplateWorkbench({
     ...validateReferenceRanges(),
     ...validateRuleJsonErrors(),
     ...validateFieldKeyUniqueness(),
+    ...validateSectionKeyUniqueness(),
   ];
 
   return (
@@ -829,7 +973,7 @@ export default function LabTemplateWorkbench({
                       intent: 'warning',
                     });
                     if (!ok) return;
-                    setDraftVersion(hydrateVersion(activeVersion));
+                    rehydrateDraft(activeVersion);
                     notify?.('success', t('misc.ltw_chernovik_vosstanovlen_iz_se'));
                   }}
                   disabled={saving || !activeVersion}
@@ -930,8 +1074,9 @@ export default function LabTemplateWorkbench({
                   onToggleField={toggleField}
                   onAddSection={addSection}
                   onAddField={addField}
-                  onRemoveSection={removeSection}
-                  onRemoveField={removeField}
+                  onRemoveSection={removeSectionConfirmed}
+                  onRemoveField={removeFieldConfirmed}
+                  getDraftEpoch={() => draftEpochRef.current}
                   onDuplicateField={duplicateField}
                   onMoveField={moveField}
                   onMoveSection={moveSection}

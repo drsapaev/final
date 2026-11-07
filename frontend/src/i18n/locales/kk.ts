@@ -10034,6 +10034,8 @@ const kk = {
     ltw_sektsiya_section_title_sidx_: 'Секция "{section.title || sIdx + 1}", поле "{field.label || field.field_key}": default low ({def.low}) ≥ high ({def.high})',
     ltw_sektsiya_section_title_sidx__2: 'Секция "{section.title || sIdx + 1}", поле "{field.label || field.field_key}", условие {cIdx + 1}: low ({c.low}) ≥ high ({c.high})',
     ltw_dublikat_field_key_key_v_sek: 'Дубликат field_key "{key}" в секции "{section.title || sIdx + 1}"',
+    ltw_pustoy_klyuch_sektsii: 'Бөлім кілті бос: {sIdx}. Бөлім кілті міндетті және бірегей болуы тиіс.',
+    ltw_dublikat_klyuch_sektsii: '«{key}» бөлім кілті қайталанады ({sIdx}). Бөлім кілттері бірегей болуы тиіс.',
     ltw_fieldtoclone_label_pole_kopi: '{fieldToClone.label || \'Поле\'} (копия)',
     ltw_poisk_po_nazvaniyu_kodu_seme: 'Поиск по названию, коду, семейству…',
     ltw_poisk_shablonov: 'Поиск шаблонов',

@@ -28,6 +28,20 @@ export const blankSection = (index: number) => ({
   fields: [blankField()]
 });
 
+// TEMPL-FE-004 (audit 3886 round 11): the smallest unused positive
+// `section_N` key. The old `blankSection(prev.sections.length + 1)`
+// regenerated a key that could already exist after a removal (create
+// section_1..3, delete section_2, add → duplicate section_3 rejected by
+// the backend UniqueConstraint at save time).
+export function nextSectionKey(existingKeys: ReadonlyArray<string>): string {
+  const used = new Set(existingKeys.map((key) => String(key ?? '')));
+  let n = 1;
+  while (used.has(`section_${n}`)) {
+    n += 1;
+  }
+  return `section_${n}`;
+}
+
 export const blankVersion = {
   layout_preset: 'lab_table_classic_v1',
   page_settings: { paper_size: 'A4', orientation: 'portrait' },
@@ -98,9 +112,15 @@ export function stringifyJson(value: unknown) {
 }
 
 export function buildVersionPayload(draftVersion: Record<string, any>) {
+  // TEMPL-FE-003 (audit 3886 round 11): sort_order is ALWAYS renumbered
+  // from the current array positions. The old `sort_order ?? (index + 1) * 10`
+  // kept stale persisted values after Move Up/Down swapped only the arrays,
+  // so a reloaded/printed template reverted to the pre-move ordering while
+  // the editor showed the new one. The array order IS the user's intended
+  // order; the persisted sort_order must match it on every build.
   const sections = draftVersion.sections.map((section: Record<string, any>, sectionIndex: number) => ({
     ...section,
-    sort_order: section.sort_order ?? (sectionIndex + 1) * 10,
+    sort_order: (sectionIndex + 1) * 10,
     section_style: section.section_style || {},
     fields: section.fields.map((field: Record<string, any>, fieldIndex: number) => {
       const referenceRule = parseJsonInput(field.reference_rule_text || '');
@@ -111,7 +131,7 @@ export function buildVersionPayload(draftVersion: Record<string, any>) {
       }
       return {
         ...field,
-        sort_order: field.sort_order ?? (fieldIndex + 1) * 10,
+        sort_order: (fieldIndex + 1) * 10,
         reference_rule: referenceRule,
         visibility_rule: visibilityRule,
         highlight_rule: highlightRule,
