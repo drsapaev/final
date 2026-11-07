@@ -1,5 +1,5 @@
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import {
   Card, CardContent, Typography, Alert, Badge, CircularProgress, Button,
@@ -171,6 +171,10 @@ const AIAssistant = ({
   const [provider, setProvider] = useState('deepseek');
   const [retryCount, setRetryCount] = useState(0);
   const [isOpen, setIsOpen] = useState(expanded);
+  // LABAI-FE-001 (audit 3886): the initiating input's identity — a pending
+  // analysis must never publish its result/error into a NEWER input's dialog.
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
   // X-1 (UX audit): If specialty is provided, auto-configure analysisType and data
   // so the AI tab works without the parent having to pass analysisType explicitly.
@@ -184,6 +188,8 @@ const AIAssistant = ({
 
   const analyzeData = async (manualRetry = false) => {
     if (!data) return;
+    // LABAI-FE-001: capture the initiating input generation.
+    const input = dataRef.current;
     setLoading(true);
     setError(null);
     if (!manualRetry) {
@@ -315,6 +321,13 @@ const AIAssistant = ({
         throw new Error(responseError);
       }
 
+      // LABAI-FE-001: the input changed while this analysis was in flight —
+      // the response belongs to the OLD input; never publish it into the
+      // newer input's dialog (result, side effect or success notice).
+      if (dataRef.current !== input) {
+        logger.warn('[AIAssistant] Stale AI response ignored for a changed input generation');
+        return;
+      }
       const sanitizedData = sanitizeAIResponse(response?.data) as AIResult;
       setResult(sanitizedData);
       if (onResult) onResult(sanitizedData);
@@ -326,6 +339,12 @@ const AIAssistant = ({
       const errorMsg = normalizeAIErrorMessage(
         errData?.detail || errData?.error || (err instanceof Error ? err.message : String(err))
       );
+      if (dataRef.current !== input) {
+        // LABAI-FE-001: a stale input's failure must not surface as the
+        // newer input's error.
+        logger.warn('[AIAssistant] Stale AI failure ignored for a changed input generation');
+        return;
+      }
       setError(errorMsg);
       notify.error(t('misc.aia_analysis_error', { message: errorMsg }));
       setRetryCount((prev) => prev + 1);

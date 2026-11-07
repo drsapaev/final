@@ -165,6 +165,9 @@ export default function LabReportWorkbench({
     signerSnapshot: Record<string, unknown>;
   } | null>(null);
   const printAttemptRef = useRef(0);
+  // LABR-FE-002 (audit 3886): preview attempt epoch — a late preview
+  // response must never open/report into a context that replaced it.
+  const previewAttemptRef = useRef(0);
   const printFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const captureOperationContext = useCallback(
     () => getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT,
@@ -177,6 +180,11 @@ export default function LabReportWorkbench({
     ),
     [getOperationContext],
   );
+  // LABR-FE-002 (audit 3886): the CURRENT operation context through a ref —
+  // an awaited continuation must re-check against the LIVE context, not the
+  // callback captured in the render that launched it.
+  const operationContextRef = useRef<LabReportOperationContext>(EMPTY_OPERATION_CONTEXT);
+  operationContextRef.current = getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT;
 
   // STRAT#2: единый канал нотификаций.
   const labToast = useLabToast(notify as (type: string, message: string) => void);
@@ -844,12 +852,29 @@ export default function LabReportWorkbench({
   async function handlePreviewPdf() {
     if (!activeInstance || instanceTransitionPending) return;
     const expectedInstanceId = activeInstance.id as string | number;
+    // LABR-FE-002 (audit 3886): capture the operation context and a
+    // preview epoch — after the awaited read, the response may only open
+    // while THIS preview still owns the active instance/context.
+    const previewOperation = getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT;
+    const previewAttempt = ++previewAttemptRef.current;
+    const previewStillCurrent = () =>
+      previewAttemptRef.current === previewAttempt &&
+      operationContextsMatch(previewOperation, operationContextRef.current);
     setBusyAction('preview');
     setPrintFeedback({ severity: 'info', text: t('workbench.preview_building') });
     try {
       const blob = await labReportingApi.previewInstancePdf(expectedInstanceId);
       if (!blob || !(blob instanceof Blob)) {
-        setPrintFeedback({ severity: 'error', text: t('workbench.print_pdf_invalid') });
+        if (previewStillCurrent()) {
+          setPrintFeedback({ severity: 'error', text: t('workbench.print_pdf_invalid') });
+        }
+        return;
+      }
+      // LABR-FE-002: the operator switched the report/patient while the
+      // read was pending — drop the stale blob BEFORE any object URL is
+      // created; no window.open, no feedback overwrite on the new screen.
+      if (!previewStillCurrent()) {
+        logger.warn('[LabReportWorkbench] Stale PDF preview ignored for a changed report context');
         return;
       }
       const url = URL.createObjectURL(blob);
@@ -867,15 +892,26 @@ export default function LabReportWorkbench({
         printFeedbackTimerRef.current = null;
       }
       printFeedbackTimerRef.current = setTimeout(() => {
-        setPrintFeedback(null);
-        printFeedbackTimerRef.current = null;
+        if (previewAttemptRef.current === previewAttempt) {
+          setPrintFeedback(null);
+          printFeedbackTimerRef.current = null;
+        }
       }, 5000);
     } catch (previewError) {
+      if (!previewStillCurrent()) {
+        // LABR-FE-002: a stale preview's failure belongs to the old context.
+        logger.warn('[LabReportWorkbench] Stale PDF preview failure ignored for a changed report context');
+        return;
+      }
       logger.error('[LabReportWorkbench] PDF preview failed', previewError);
       setPrintFeedback({ severity: 'error', text: t('workbench.preview_failed') });
       notify?.('error', getErrorMessage(previewError) || t('errors.print_failed'));
     } finally {
-      setBusyAction('');
+      // LABR-FE-002: only the current preview owns the busy flag — a stale
+      // completion must not clear a newer action's busy state.
+      if (previewAttemptRef.current === previewAttempt) {
+        setBusyAction('');
+      }
     }
   }
 

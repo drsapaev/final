@@ -69,6 +69,7 @@ export default function ReportSidebar({
     <>
       {showAI && (
         <LabReportAIAnalysis
+          key={activeInstance ? String(activeInstance.id) : 'none'}
           activeInstance={activeInstance}
           notify={notify as (severity: string, message: string) => void}
         />
