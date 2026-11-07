@@ -85,7 +85,14 @@ const loadExistingEMR = async (visitId: string | number) => {
     validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
   } as Record<string, unknown>);
   if (response.status === 404) return null;
-  return response.data as { data?: Record<string, unknown>; row_version?: number };
+  // DENTIDENT-FE-001 (audit 3892): keep the canonical patient/visit identity
+  // fields of the response so the editor can fail closed on a mismatch.
+  return response.data as {
+    data?: Record<string, unknown>;
+    row_version?: number;
+    patient_id?: string | number;
+    visit_id?: string | number;
+  };
 };
 
 const saveEMR = async (visitId: string | number, data: unknown, rowVersion: unknown, isDraft = true) => {
@@ -99,6 +106,19 @@ const saveEMR = async (visitId: string | number, data: unknown, rowVersion: unkn
 
 const isSameVisit = (left: string | number | null | undefined, right: string | number | null | undefined) =>
   left !== null && left !== undefined && right !== null && right !== undefined && String(left) === String(right);
+
+// DENTDIAG-FE-001 (audit 3892): the canonical EMR contract allows a
+// structured diagnosis object {main, icd10_code, secondary[]} in data.diagnosis.
+type StructuredDiagnosis = { main?: unknown; icd10_code?: unknown; secondary?: unknown; [k: string]: unknown };
+
+const isStructuredDiagnosis = (value: unknown): value is StructuredDiagnosis =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const diagnosisMainText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (isStructuredDiagnosis(value) && typeof value.main === 'string') return value.main;
+  return '';
+};
 
 const getHttpStatus = (error: unknown): number | undefined => {
   if (!error || typeof error !== 'object') return undefined;
@@ -832,7 +852,7 @@ const DentalVisitScreen = ({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
-  const [loadError, setLoadError] = useState<'missing_visit' | 'load' | null>(null);
+  const [loadError, setLoadError] = useState<'missing_visit' | 'load' | 'identity' | null>(null);
   const [saveError, setSaveError] = useState<'conflict' | 'save' | null>(null);
   const [loadedVisitId, setLoadedVisitId] = useState<string | number | null>(null);
   const [selectedTooth, setSelectedTooth] = useState<{ number: string | number; data: Record<string, unknown> } | null>(null);
@@ -856,14 +876,82 @@ const DentalVisitScreen = ({
   const historySequenceRef = useRef(0);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // DENTVISIT-FE-005 (audit 3892): a dirty draft must be flushed to its own
+  // visit before a patient switch replaces the editing context.
+  const draftDirtyRef = useRef(false);
+  // Review 3903 P1 (DENTVISIT): edit generation counter — an autosave
+  // acknowledgement may only clear the dirty flag for the edit generation it
+  // actually saved. A newer edit made while that POST was in flight keeps the
+  // draft dirty so the visit-change flush still carries it.
+  const draftGenerationRef = useRef(0);
+  // Review 3903 P1 (DENTVISIT): last-known row_version per visit. A
+  // visit-change flush runs behind the visit's pending autosave and must use
+  // the version that autosave's acknowledgement returned, not the version
+  // captured when the switch began.
+  const visitRowVersionsRef = useRef<Map<string, number>>(new Map());
+  // Review 3903 P1 (DENTVISIT): recovery stash for drafts whose visit-change
+  // flush failed. Keyed by visit id; restored when that visit is reopened and
+  // the server row_version has not advanced since the failure.
+  const failedDraftsRef = useRef<Map<string, { draft: typeof EMPTY_EMR_DATA; rowVersion: number }>>(new Map());
+  // DENTDIAG-FE-001 (audit 3892): the structured diagnosis loaded from the
+  // EMR (if any) is preserved on edits instead of being replaced by a string.
+  const structuredDiagnosisRef = useRef<StructuredDiagnosis | null>(null);
+
+  // Review 3903 P1 (DENTVISIT): serialize the outgoing visit's dirty draft
+  // behind any pending autosave (both share saveQueueRef, so at most one POST
+  // per visit is ever in flight) and read the row_version at execution time,
+  // once the pending autosave's acknowledgement has updated the per-visit
+  // version. A failed flush is surfaced and its snapshot stashed for recovery
+  // instead of being discarded together with the editing context.
+  const flushDirtyDraft = useCallback((targetVisitId: string | number) => {
+    const snapshot = latestDraftRef.current;
+    const operation = saveQueueRef.current.catch(() => undefined).then(async () => {
+      const baseRowVersion = visitRowVersionsRef.current.get(String(targetVisitId)) ?? rowVersionRef.current;
+      try {
+        const response = await saveEMR(targetVisitId, snapshot, baseRowVersion, true) as { row_version?: unknown };
+        if (typeof response.row_version === 'number' && Number.isInteger(response.row_version)) {
+          visitRowVersionsRef.current.set(String(targetVisitId), response.row_version);
+          if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+            rowVersionRef.current = response.row_version;
+          }
+        }
+        failedDraftsRef.current.delete(String(targetVisitId));
+      } catch {
+        failedDraftsRef.current.set(String(targetVisitId), { draft: snapshot, rowVersion: baseRowVersion });
+        logger.warn('[DentalVisitScreen] visit-change draft flush failed', { visitId: String(targetVisitId) });
+        notify.error(t('dental2.visit_protocol_save_failed'));
+      }
+    });
+    saveQueueRef.current = operation.then(() => undefined, () => undefined);
+    return operation;
+  }, [t]);
 
   // A failed EMR read must not be treated as an empty draft. Keep the visit
   // open and require a successful read before editing or completing it.
   const loadEMR = useCallback(async () => {
     const requestSequence = ++loadSequenceRef.current;
+
+    // DENTVISIT-FE-005 (audit 3892) + review 3903 P1: when the selected visit
+    // changes while a dirty draft exists, flush the draft to ITS OWN visit
+    // through the sequential save queue — behind any autosave still in
+    // flight, with the row_version that autosave's acknowledgement returns.
+    // The pending debounce timer is cancelled first so the flush snapshot is
+    // strictly the newest local state, and the draft is handed off (dirty
+    // flag lowered) before the editing context is torn down.
+    const previousVisitId = loadedVisitIdRef.current;
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
+    }
+    if (
+      previousVisitId !== null &&
+      draftDirtyRef.current &&
+      !isSameVisit(previousVisitId, visitId)
+    ) {
+      draftDirtyRef.current = false;
+      setLoading(true);
+      await flushDirtyDraft(previousVisitId);
+      if (requestSequence !== loadSequenceRef.current) return;
     }
     setLoading(true);
     setSaving(false);
@@ -871,11 +959,17 @@ const DentalVisitScreen = ({
     setLoadError(null);
     setSaveError(null);
     retryCompletionRef.current = false;
+    draftDirtyRef.current = false;
+    structuredDiagnosisRef.current = null;
     setLoadedVisitId(null);
     loadedVisitIdRef.current = null;
     latestDraftRef.current = EMPTY_EMR_DATA;
     rowVersionRef.current = 0;
     setEmrData(EMPTY_EMR_DATA);
+    // DENTMODAL-FE-002 (audit 3892): a tooth modal opened for the previous
+    // patient must not keep writing after the selected visit changes.
+    setToothModalOpen(false);
+    setSelectedTooth(null);
 
     if (visitId === null || visitId === undefined || visitId === '') {
       setLoadError('missing_visit');
@@ -892,6 +986,46 @@ const DentalVisitScreen = ({
         throw new Error('Invalid EMR version response');
       }
 
+      // DENTIDENT-FE-001 (audit 3892): a successful EMR read carries the
+      // canonical patient/visit identity. Fail closed when it contradicts the
+      // selected patient header — never render or edit a mismatched chart.
+      const responsePatientId = existing?.patient_id;
+      const responseVisitId = existing?.visit_id;
+      if (
+        existing && (
+          (responseVisitId !== null && responseVisitId !== undefined && !isSameVisit(responseVisitId, visitId)) ||
+          (patientId !== null && responsePatientId !== null && responsePatientId !== undefined &&
+            String(responsePatientId) !== String(patientId))
+        )
+      ) {
+        logger.warn('[DentalVisitScreen] EMR identity mismatch, refusing to hydrate the editor');
+        notify.error(t('dental2.visit_identity_mismatch'));
+        setLoadError('identity');
+        return;
+      }
+
+      // Review 3903 P1 (DENTVISIT): restore a draft whose visit-change flush
+      // failed when the visit is reopened and the server row_version has not
+      // advanced since the failure — the stashed snapshot is then strictly
+      // newer than the server state. An advanced version invalidates the
+      // stash (another writer landed changes in the meantime).
+      const stashedDraft = failedDraftsRef.current.get(String(visitId));
+      if (stashedDraft) {
+        failedDraftsRef.current.delete(String(visitId));
+        if (stashedDraft.rowVersion === (rowVersion ?? 0)) {
+          const rawStashedDiagnosis = (stashedDraft.draft as Record<string, unknown>).diagnosis;
+          structuredDiagnosisRef.current = isStructuredDiagnosis(rawStashedDiagnosis) ? rawStashedDiagnosis : null;
+          latestDraftRef.current = stashedDraft.draft;
+          rowVersionRef.current = rowVersion ?? 0;
+          visitRowVersionsRef.current.set(String(visitId), rowVersion ?? 0);
+          loadedVisitIdRef.current = visitId;
+          setLoadedVisitId(visitId);
+          setEmrData(stashedDraft.draft);
+          logger.info('[DentalVisitScreen] restored a draft recovered from a failed visit-change flush', { visitId: String(visitId) });
+          return;
+        }
+      }
+
       const data = (existing?.data || EMPTY_EMR_DATA) as typeof EMPTY_EMR_DATA;
       const specialtyData = data.specialty_data || EMPTY_EMR_DATA.specialty_data;
       const protocolData = specialtyData.visit_protocol || (data as Record<string, unknown>).visit_protocol;
@@ -904,8 +1038,23 @@ const DentalVisitScreen = ({
           visit_protocol: protocolData || EMPTY_EMR_DATA.specialty_data.visit_protocol,
         },
       };
+
+      // DENTDIAG-FE-001 (audit 3892): normalize a structured diagnosis for
+      // display (.main) while preserving the nested canonical fields
+      // (icd10_code, secondary) in the persisted draft.
+      const rawDiagnosis = (data as Record<string, unknown>).diagnosis;
+      const structuredDiagnosis = isStructuredDiagnosis(rawDiagnosis) ? rawDiagnosis : null;
+      structuredDiagnosisRef.current = structuredDiagnosis;
+      if (structuredDiagnosis) {
+        const structuredIcd10 = typeof structuredDiagnosis.icd10_code === 'string' ? structuredDiagnosis.icd10_code : '';
+        if (!nextDraft.icd10_code && structuredIcd10) {
+          (nextDraft as Record<string, unknown>).icd10_code = structuredIcd10;
+        }
+      }
+
       latestDraftRef.current = nextDraft;
       rowVersionRef.current = rowVersion ?? 0;
+      visitRowVersionsRef.current.set(String(visitId), rowVersion ?? 0);
       loadedVisitIdRef.current = visitId;
       setLoadedVisitId(visitId);
       setEmrData(nextDraft);
@@ -917,7 +1066,7 @@ const DentalVisitScreen = ({
     } finally {
       if (requestSequence === loadSequenceRef.current) setLoading(false);
     }
-  }, [visitId, t]);
+  }, [visitId, patientId, t, flushDirtyDraft]);
 
   // Load patient history
   const loadHistory = useCallback(async () => {
@@ -964,6 +1113,10 @@ const DentalVisitScreen = ({
   }, [loadEMR, loadHistory]);
 
   const persistDraft = useCallback((targetVisitId: string | number, snapshot: typeof EMPTY_EMR_DATA) => {
+    // Review 3903 P1 (DENTVISIT): remember which edit generation this save
+    // represents; its acknowledgement may clear the dirty flag only if no
+    // newer edit arrived while the POST was in flight.
+    const generation = draftGenerationRef.current;
     const operation = saveQueueRef.current.catch(() => undefined).then(async () => {
       if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
         throw new Error('Visit changed before EMR save');
@@ -973,8 +1126,15 @@ const DentalVisitScreen = ({
       if (typeof response.row_version !== 'number' || !Number.isInteger(response.row_version)) {
         throw new Error('EMR save response is missing row_version');
       }
+      // The per-visit version advances even when the editing context has
+      // already moved on, so a later visit-change flush for this visit uses
+      // the version this save returned.
+      visitRowVersionsRef.current.set(String(targetVisitId), response.row_version);
       if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
         rowVersionRef.current = response.row_version;
+        if (generation === draftGenerationRef.current) {
+          draftDirtyRef.current = false;
+        }
       }
     });
     saveQueueRef.current = operation.then(() => undefined, () => undefined);
@@ -1005,10 +1165,18 @@ const DentalVisitScreen = ({
   }, [persistDraft, t, visitId]);
 
   const updateField = useCallback((field: string, value: unknown) => {
-    const next = { ...latestDraftRef.current, [field]: value } as typeof EMPTY_EMR_DATA;
+    // DENTDIAG-FE-001 (audit 3892): editing the diagnosis text updates the
+    // structured object's .main instead of replacing the whole object, so
+    // nested icd10_code/secondary survive the edit.
+    const nextValue = field === 'diagnosis' && structuredDiagnosisRef.current
+      ? { ...structuredDiagnosisRef.current, main: value } as unknown
+      : value;
+    const next = { ...latestDraftRef.current, [field]: nextValue } as typeof EMPTY_EMR_DATA;
     latestDraftRef.current = next;
     setEmrData(next);
     setSaveError(null);
+    draftDirtyRef.current = true;
+    draftGenerationRef.current += 1;
     scheduleAutosave(next);
   }, [scheduleAutosave]);
 
@@ -1023,6 +1191,8 @@ const DentalVisitScreen = ({
     latestDraftRef.current = next;
     setEmrData(next);
     setSaveError(null);
+    draftDirtyRef.current = true;
+    draftGenerationRef.current += 1;
     scheduleAutosave(next);
   }, [scheduleAutosave]);
 
@@ -1150,15 +1320,44 @@ const DentalVisitScreen = ({
     setToothModalOpen(true);
   }, []);
 
-  const handleToothSave = useCallback((toothNumber: string | number, toothData: Record<string, unknown>) => {
+  const handleToothSave = useCallback((toothNumber: string | number, toothData: Record<string, unknown>, rowVersion?: number) => {
+    // Review 3903 P1 (DENTMODAL): the tooth modal performs its own server
+    // write before invoking this handler, and that POST can still be pending
+    // when the selected visit changes underneath it. The late callback runs
+    // with the visit captured while the modal was open, so validate that
+    // origin against the CURRENT editor context before any state mutation:
+    // patient A's tooth data must never land in patient B's draft.
+    const originVisitId = visitId;
+    if (
+      originVisitId !== null && originVisitId !== undefined &&
+      !isSameVisit(loadedVisitIdRef.current, originVisitId)
+    ) {
+      logger.warn('[DentalVisitScreen] dropped a stale tooth save for a previous visit', { visitId: String(originVisitId) });
+      return;
+    }
+    // DENTMODAL-FE-001 (audit 3892): adopt the row_version the modal's POST
+    // returned so the parent's next save does not reuse the stale
+    // optimistic-lock version — but never regress it below a version a newer
+    // save has already delivered.
+    if (
+      typeof rowVersion === 'number' && Number.isInteger(rowVersion) &&
+      rowVersion > rowVersionRef.current &&
+      isSameVisit(loadedVisitIdRef.current, originVisitId)
+    ) {
+      rowVersionRef.current = rowVersion;
+      visitRowVersionsRef.current.set(String(originVisitId), rowVersion);
+    }
+    // Merge into the CURRENT draft (latestDraftRef), not the render-scoped
+    // emrData snapshot this closure captured, so concurrent edits to the
+    // draft are never clobbered by a stale tooth write.
     updateSpecialtyData('tooth_status', {
-      ...(emrData.specialty_data?.tooth_status || {}),
+      ...(latestDraftRef.current.specialty_data?.tooth_status || {}),
       [toothNumber]: toothData,
     });
     setToothModalOpen(false);
     setSelectedTooth(null);
     notify.success(t('dental.dental_dvs_tooth_saved', { toothNumber }));
-  }, [emrData.specialty_data, updateSpecialtyData, t]);
+  }, [updateSpecialtyData, t, visitId]);
 
   // AI suggestion apply → writes to icd10_code field
   const handleAISuggestion = useCallback(() => {
@@ -1189,7 +1388,7 @@ const DentalVisitScreen = ({
         {loadError && (
           <Alert
             type="error"
-            description={loadError === 'missing_visit' ? t('dental.protocol_needs_visit_id') : t('dental2.visit_map_load_failed')}
+            description={loadError === 'missing_visit' ? t('dental.protocol_needs_visit_id') : loadError === 'identity' ? t('dental2.visit_identity_mismatch') : t('dental2.visit_map_load_failed')}
             action={(
               <Button variant="outline" onClick={() => { void loadEMR(); }}>
                 {t('doctor.btn_retry')}
@@ -1227,7 +1426,7 @@ const DentalVisitScreen = ({
 
             {/* Diagnosis + ICD-10 + AI button */}
             <DiagnosisSection
-              diagnosis={emrData.diagnosis || ''}
+              diagnosis={diagnosisMainText(emrData.diagnosis)}
               icd10={emrData.icd10_code || ''}
               onDiagnosisChange={(v) => updateField('diagnosis', v)}
               onIcd10Change={(v) => updateField('icd10_code', v)}
@@ -1282,7 +1481,7 @@ const DentalVisitScreen = ({
           onClose={() => { setToothModalOpen(false); setSelectedTooth(null); }}
           toothNumber={selectedTooth.number}
           toothData={selectedTooth.data}
-          onSave={(data: unknown) => handleToothSave(selectedTooth?.number, data as Record<string, unknown>)}
+          onSave={(data: unknown, rowVersion?: number) => handleToothSave(selectedTooth?.number, data as Record<string, unknown>, rowVersion)}
           visitId={visitId}
         />
       )}

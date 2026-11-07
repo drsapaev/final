@@ -130,6 +130,13 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     visitDeepLinkTab: 'visit',
     patientDeepLinkTab: 'patients',
   }) as DoctorPanelState;
+
+  // DOCFLOW-FE-002 (audit 3886): the LATEST selected patient must be
+  // reachable from a ref so a completion flow that started for patient A can
+  // re-verify the selection identity after every async boundary (confirm
+  // dialog, network) before the irreversible POST and the clinical UI reset.
+  const selectedPatientRef = useRef(selectedPatient);
+  selectedPatientRef.current = selectedPatient;
   const [selectedServices, setSelectedServices] = useState<unknown[]>([]);
   const [visitData, setVisitData] = useState({
     complaint: '',
@@ -1167,6 +1174,18 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   const handleSaveVisit = async (savedEMRData: Record<string, unknown>) => {
     if (!selectedPatient) return;
 
+    // DOCFLOW-FE-002 (audit 3886): snapshot the queue-entry/patient identity
+    // BEFORE the async confirm boundary so the completion can be re-verified
+    // against the live selection after the dialog resolves.
+    const completionIdentity = {
+      queueEntryId: resolveDoctorQueueEntryId(selectedPatient),
+      patientId: selectedPatient.patient?.id ?? selectedPatient.patient_id ?? selectedPatient.id ?? null,
+    };
+    if (completionIdentity.queueEntryId === null) {
+      notify.error(tI18n('cardio.no_queue_id_for_visit'));
+      return;
+    }
+
     const complaint = emrTextValue(savedEMRData.complaints);
     const diagnosis = emrTextValue(savedEMRData.diagnosis);
     const legacyDiagnosis = savedEMRData.diagnosis && typeof savedEMRData.diagnosis === 'object'
@@ -1235,23 +1254,49 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       return;
     }
 
+    // DOCFLOW-FE-002 (audit 3886): the confirm dialog is an async boundary —
+    // the selection may have changed while it was pending. Bind the
+    // completion to the snapshotted queue-entry/patient identity and abort
+    // (no POST, no UI reset) when the panel has moved to another patient;
+    // otherwise a stale handler could complete A and wipe B's state
+    // (dermatology's isSameDermatologyVisit recheck is the repo reference).
+    const currentSelection = selectedPatientRef.current;
+    if (
+      String(resolveDoctorQueueEntryId(currentSelection)) !== String(completionIdentity.queueEntryId) ||
+      String(currentSelection?.patient?.id ?? currentSelection?.patient_id ?? currentSelection?.id ?? null) !== String(completionIdentity.patientId)
+    ) {
+      logger.warn('[Cardiology] Selection changed during completion confirmation — aborting stale completion');
+      return;
+    }
+
     try {
       setLoading(true);
-      const queueEntryId = resolveDoctorQueueEntryId(selectedPatient);
-      if (queueEntryId === null) {
-        notify.error(tI18n('cardio.no_queue_id_for_visit'));
-        return;
-      }
 
       const visitPayload = {
-        patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
+        patient_id: completionIdentity.patientId,
         complaint,
         diagnosis,
         icd10,
         services: selectedServices,
         notes,
       };
-      await queueService.completeVisit(queueEntryId, visitPayload);
+      // DOCFLOW-FE-001 (audit 3886): only a confirmed `success: true` DTO
+      // completes the visit in the UI. An ambiguous (unreadable 2xx) or
+      // rejected response keeps the clinical state intact; the ambiguous
+      // branch additionally reconciles the visible queue with the canonical
+      // server snapshot instead of blindly retrying.
+      const completionAck = await queueService.completeVisit(completionIdentity.queueEntryId, visitPayload);
+      if (completionAck?.success !== true) {
+        const ackMessage = (completionAck as { message?: unknown } | undefined)?.message;
+        notify.error(
+          (typeof ackMessage === 'string' && ackMessage) || tI18n('cardio.cardio_panel_action_failed')
+        );
+        if ((completionAck as { unknown?: unknown } | undefined)?.unknown === true) {
+          // Ambiguous outcome — refresh the visible queue from the server.
+          void loadMacOSCardiologyAppointments(true);
+        }
+        return;
+      }
       notify.success(tI18n('cardio.visit_completed'));
 
       // Очищаем форму и возвращаемся в очередь

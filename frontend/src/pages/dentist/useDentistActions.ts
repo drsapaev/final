@@ -104,8 +104,12 @@ export function useDentistActions({
       }
 
       // Создаем объект пациента для переключения на прием
+      // DENTWORK-FE-001 (audit 3892): carry the canonical patient_id from the
+      // queue row — `row.id` is the queue entry id and must never be used as
+      // the patient identity for history lookups or completion payloads.
       const patientData: SelectedPatient = {
         id: row.id,
+        patient_id: row.patient_id,
         appointment_id: (row.appointment_id as string | number | null | undefined) || null,
         visit_id: visitId,
         patient_name: row.patient_fio,
@@ -168,8 +172,12 @@ export function useDentistActions({
             break;
           }
 
+          // DENTWORK-FE-001 (audit 3892): same canonical patient_id fix as the
+          // row-click path — the completion payload must identify the patient,
+          // not the queue entry.
           const patient: SelectedPatient = {
             id: row.id,
+            patient_id: row.patient_id,
             appointment_id: (row.appointment_id as string | number | null | undefined) || null,
             visit_id: visitId,
             patient_name: row.patient_fio,
@@ -259,6 +267,13 @@ export function useDentistActions({
   // is present in the visit's icd10 field.
   const CRITICAL_ICD10_CODES = useRef(['K04', 'K10']).current;
 
+  // DOCFLOW-FE-002 (audit 3886): the LATEST selected patient must be
+  // reachable from a ref so a completion flow that started for patient A can
+  // re-verify the selection identity after every async boundary (confirm
+  // dialog, network) before the irreversible POST and the clinical UI reset.
+  const selectedPatientRef = useRef(selectedPatient);
+  selectedPatientRef.current = selectedPatient;
+
   const getCriticalDiagnosisWarning = useCallback(
     (icd10Code: unknown) => {
       if (!icd10Code || typeof icd10Code !== 'string') return null;
@@ -309,6 +324,14 @@ export function useDentistActions({
       return;
     }
 
+    // DOCFLOW-FE-002 (audit 3886): snapshot the queue-entry/patient identity
+    // BEFORE the async confirm boundary so the completion can be re-verified
+    // against the live selection after the dialog resolves.
+    const completionIdentity = {
+      queueEntryId,
+      patientId: resolvePatientId(selectedPatient),
+    };
+
     // C-1 + C-3 (UX audit): tiered confirmation before completing the visit.
     // C-3: if the ICD-10 code matches a critical dental diagnosis (K04 —
     // pulp/periapical diseases, K10 — jaw diseases including osteomyelitis
@@ -345,28 +368,65 @@ export function useDentistActions({
       return;
     }
 
+    // DOCFLOW-FE-002 (audit 3886): the confirm dialog is an async boundary —
+    // the selection may have changed while it was pending. Bind the
+    // completion to the snapshotted queue-entry/patient identity and abort
+    // (no POST, no UI reset) when the panel has moved to another patient;
+    // otherwise a stale handler could complete A and wipe B's state.
+    const currentSelection = selectedPatientRef.current;
+    if (
+      String(resolveDoctorQueueEntryId(currentSelection)) !== String(completionIdentity.queueEntryId) ||
+      String(resolvePatientId(currentSelection)) !== String(completionIdentity.patientId)
+    ) {
+      logger.warn('[Dentistry] Selection changed during completion confirmation — aborting stale completion');
+      return;
+    }
+
     try {
       setLoading(true);
       logger.info('[Dentistry] Completing queue visit');
 
-      const patientId =
-        selectedPatient?.patient?.id ||
-        selectedPatient?.patient_id ||
-        selectedPatient?.id ||
-        null;
+      const patientId = completionIdentity.patientId;
 
       // Минимальный payload: стоматолог использует EMR v2 для протокола визита,
       // а в queue completeVisit передаём только ключевые поля для закрытия очереди.
+      // DENTDIAG-FE-001 (audit 3892): the EMR draft may carry the canonical
+      // structured diagnosis {main, icd10_code, secondary}; the queue payload
+      // keeps a plain string — extract .main instead of shipping the object.
+      const draftDiagnosis = latestDraft.diagnosis as unknown;
+      const queueDiagnosisText =
+        typeof draftDiagnosis === 'string'
+          ? draftDiagnosis
+          : (draftDiagnosis && typeof draftDiagnosis === 'object' && typeof (draftDiagnosis as { main?: unknown }).main === 'string'
+              ? (draftDiagnosis as { main: string }).main
+              : '');
       const visitPayload = {
         patient_id: patientId,
         complaint: latestDraft.anamnesis_morbi || latestDraft.complaints || latestDraft.chiefComplaint || latestDraft.complaint || '',
-        diagnosis: latestDraft.diagnosis || '',
+        diagnosis: queueDiagnosisText,
         icd10: latestDraft.icd10_code || latestDraft.icd10 || latestDraft.icdCode || '',
         services: [],
         notes: latestDraft.recommendations || latestDraft.notes || '',
       };
 
-      await queueService.completeVisit(queueEntryId, visitPayload);
+      // DOCFLOW-FE-001 (audit 3886): only a confirmed `success: true` DTO
+      // completes the visit in the UI. An ambiguous (unreadable 2xx) or
+      // rejected response keeps the clinical state intact; the ambiguous
+      // branch additionally reconciles the visible queue with the canonical
+      // server snapshot instead of blindly retrying.
+      const completionAck = await queueService.completeVisit(queueEntryId, visitPayload);
+      if (completionAck?.success !== true) {
+        const ackMessage = (completionAck as { message?: unknown } | undefined)?.message;
+        notify.error(
+          (typeof ackMessage === 'string' && ackMessage) || tI18n('dental.dental_panel_complete_failed')
+        );
+        logger.error('[Dentistry] Visit completion NOT confirmed by the server');
+        if ((completionAck as { unknown?: unknown } | undefined)?.unknown === true) {
+          // Ambiguous outcome — refresh the visible queue from the server.
+          void loadDentistryAppointments(true);
+        }
+        return;
+      }
       logger.info('[Dentistry] Queue visit completed');
       notify.success(tI18n('dental.visit_completed'));
 

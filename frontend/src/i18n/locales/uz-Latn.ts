@@ -6561,7 +6561,9 @@ const uzLatn = {
     tooth_save_failed: 'Не удалось сохранить данные зуба. Проверьте соединение и попробуйте снова.',
     treatment_plan_title: 'План лечения',
     treatment_plan_save_failed: 'Не удалось сохранить план лечения. Проверьте соединение и попробуйте снова.',
-    visit_protocol_save_failed: 'Не удалось сохранить протокол визита. Проверьте соединение и попробуйте снова.'
+    treatment_plan_load_failed: 'Не удалось загрузить существующий план лечения. Повторите загрузку перед редактированием.',
+    visit_protocol_save_failed: 'Не удалось сохранить протокол визита. Проверьте соединение и попробуйте снова.',
+    visit_identity_mismatch: 'Пациент визита не совпадает с выбранным пациентом. Проверьте карточку пациента перед редактированием.'
   },
   payment: {
     timeout: 'Время ожидания истекло',
@@ -6847,6 +6849,9 @@ const uzLatn = {
     mqm_btn_close_reception: 'Qabulni yopish',
     mqm_refresh_queue: 'Navbatni yangilash',
     mqm_call: 'Chaqirish',
+    // QMAN-FE-001 (audit 3886): failed current-selection load is visible and recoverable
+    mqm_queue_load_failed: "Tanlangan shifokor navbatini yuklash amalga oshmadi. Oldingi shifokor ma'lumotlari yashirilgan — yuklashni qayta bajaring.",
+    mqm_retry_load: 'Qayta yuklash',
     mqm_aria_auto_refresh_off: 'Navbat avtomatik yangilanishini oʻchirish',
     mqm_aria_auto_refresh_on: 'Navbat avtomatik yangilanishini yoqish',
     mqm_title_auto_refresh_on: 'Avtomatik yangilanish yoqilgan',

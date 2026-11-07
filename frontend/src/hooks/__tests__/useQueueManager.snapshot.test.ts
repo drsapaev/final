@@ -315,3 +315,76 @@ describe('useQueueManager snapshot lifecycle (REG-FE-035 / REG-FE-042)', () => {
     expect(result.current.loading).toBe(false);
   });
 });
+
+describe('QMAN-FE-001 (audit 3886): failed current-selection load is fail-closed', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('a failed CURRENT selection load clears the previous selection\'s queue and stats — no stale doctor data', async () => {
+    // Doctor A (lab) loads successfully; the switch to doctor B (cardio)
+    // FAILS. The hook must not leave A's queue/statistics on screen as if
+    // they were B's current queue.
+    // Lazy rejection: the failure is created at call time (an eagerly
+    // created Promise.reject would surface as an unhandled rejection
+    // before the hook attaches its handler).
+    let todayCallCount = 0;
+    apiMock.get.mockImplementation(async (url: string) => {
+      if (url === '/queue/available-specialists') {
+        return { data: { specialists: [] } };
+      }
+      if (url === '/registrar/queues/today') {
+        todayCallCount += 1;
+        if (todayCallCount === 1) return { data: { queues: [labQueue] } };
+        throw new Error('network down');
+      }
+      throw new Error(`unexpected api.get url: ${url}`);
+    });
+
+    const { result } = renderHook(() => useQueueManager());
+
+    await act(async () => {
+      await result.current.loadQueueSnapshot({
+        specialistId: LAB_SPECIALIST_ID,
+        targetDate: '2026-11-03',
+      });
+    });
+    expect(result.current.queueData?.queue_id).toBe(1);
+    expect(result.current.statistics?.total_entries).toBe(2);
+
+    await act(async () => {
+      await expect(
+        result.current.loadQueueSnapshot({
+          specialistId: CARDIO_DOCTOR_ID,
+          targetDate: '2026-11-03',
+        }),
+      ).rejects.toThrow('network down');
+    });
+
+    // Fail-closed: the failed current selection owns NO data — the previous
+    // doctor's rows/is_open decisions must not be presented as current.
+    expect(result.current.queueData).toBeNull();
+    expect(result.current.statistics).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('positive control: a successful switch still replaces the queue with the new selection', async () => {
+    mockTodayQueue([
+      Promise.resolve({ data: { queues: [labQueue] } }),
+      Promise.resolve({ data: { queues: [cardioQueue] } }),
+    ]);
+
+    const { result } = renderHook(() => useQueueManager());
+
+    await act(async () => {
+      await result.current.loadQueueSnapshot({ specialistId: LAB_SPECIALIST_ID, targetDate: '2026-11-03' });
+    });
+    expect(result.current.queueData?.queue_id).toBe(1);
+
+    await act(async () => {
+      await result.current.loadQueueSnapshot({ specialistId: CARDIO_DOCTOR_ID, targetDate: '2026-11-03' });
+    });
+    expect(result.current.queueData?.queue_id).toBe(2);
+    expect(result.current.statistics).toEqual({ total_entries: 0, waiting: 0, completed: 0 });
+  });
+});

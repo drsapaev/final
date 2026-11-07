@@ -258,7 +258,7 @@ describe('DentalVisitScreen EMR persistence', () => {
     expect(onCompleteVisit).not.toHaveBeenCalled();
   });
 
-  it('does not carry a previous patient draft across a patient switch', async () => {
+  it('flushes patient A\'s unsaved draft to A\'s visit across a patient switch (audit 3892 DENTVISIT-FE-005)', async () => {
     vi.mocked(apiClient.get).mockImplementation((url: string) => {
       if (url.includes('/patient/')) return Promise.resolve({ status: 404, data: null }) as never;
       return Promise.resolve(url.endsWith('/41')
@@ -275,7 +275,14 @@ describe('DentalVisitScreen EMR persistence', () => {
 
     view.rerender(<DentalVisitScreen patient={patient(42, 8)} onCompleteVisit={onCompleteVisit} />);
     await waitFor(() => expect(getTextarea()).toHaveProperty('value', 'patient B draft'));
-    expect(apiClient.post).not.toHaveBeenCalled();
+
+    // A's unsaved edit is flushed to A's own visit while the A identity was
+    // still bound — never discarded, never attributed to B.
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/v2/emr/41', expect.objectContaining({
+      row_version: 1,
+      is_draft: true,
+      data: expect.objectContaining({ anamnesis_morbi: 'unsaved patient A edit' }),
+    })));
 
     fireEvent.click(getCompleteButton());
     await waitFor(() => expect(onCompleteVisit).toHaveBeenCalledWith(

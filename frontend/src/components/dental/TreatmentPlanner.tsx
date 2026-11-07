@@ -4,7 +4,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * План лечения с этапами
  * Согласно MASTER_TODO_LIST строка 286
  */
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   Alert,
@@ -241,6 +241,31 @@ interface TreatmentPlanState {
   totalDuration: number;
 }
 
+const EMPTY_TREATMENT_PLAN: TreatmentPlanState = {
+  name: '',
+  stages: [],
+  totalCost: 0,
+  totalDuration: 0,
+};
+
+// DENTPLAN-FE-001 (audit 3892): normalize a persisted EMR treatment plan
+// (specialty_data.treatment_plan or the legacy flat field) into local state.
+const extractTreatmentPlan = (existingEmr: Record<string, unknown> | null): TreatmentPlanState | null => {
+  const data = existingEmr?.data as Record<string, unknown> | undefined;
+  if (!data) return null;
+  const specialtyData = (data.specialty_data || {}) as Record<string, unknown>;
+  const rawPlan = specialtyData.treatment_plan ?? (data as Record<string, unknown>).treatment_plan;
+  if (!rawPlan || typeof rawPlan !== 'object' || Array.isArray(rawPlan)) return null;
+  const plan = rawPlan as { name?: unknown; stages?: unknown };
+  const stages = (Array.isArray(plan.stages) ? plan.stages : []) as TreatmentStage[];
+  return {
+    name: typeof plan.name === 'string' ? plan.name : '',
+    stages,
+    totalCost: stages.reduce((sum, stage) => sum + (Number(stage?.cost) || 0), 0),
+    totalDuration: stages.reduce((sum, stage) => sum + (Number(stage?.duration) || 0), 0),
+  };
+};
+
 const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId?: string | number; onUpdate?: () => void; patientId?: string | number; teethData?: Record<string, unknown> }) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
@@ -250,7 +275,61 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
     totalCost: 0,
     totalDuration: 0,
   });
-  
+  // Review 3903 P1 (DENTPLAN): the editor must not fail open to an empty
+  // editable plan when the hydration GET errors — a later successful
+  // save-time re-read would pair a fresh row_version with that never-hydrated
+  // empty local plan and replace the patient's saved stages. Editing and
+  // saving stay disabled until a successful read (or a verified 404 = no
+  // record yet).
+  const [hydration, setHydration] = useState<'loading' | 'ready' | 'failed'>('loading');
+  const [hydrationRetryKey, setHydrationRetryKey] = useState(0);
+  // Review 3903 P1 (DENTPLAN): a late hydration response must not replace
+  // stages the clinician entered locally while the GET was in flight.
+  const planEditedRef = useRef(false);
+  // DENTPLAN-FE-002 (audit 3892): the plan being edited belongs to the
+  // bound visit; track the current visit identity so a same-mounted switch
+  // resets the local plan and aborts an in-flight save.
+  const visitIdRef = useRef<string | number | undefined>(visitId);
+  visitIdRef.current = visitId;
+  const hydrateSequenceRef = useRef(0);
+
+  // DENTPLAN-FE-001 (audit 3892): hydrate an already-saved plan from the EMR
+  // so reopening a visit never starts from a blank plan that would silently
+  // replace the existing stages on Save.
+  useEffect(() => {
+    const sequence = ++hydrateSequenceRef.current;
+    let cancelled = false;
+    const hydrate = async () => {
+      // A dialog opened for the previous visit must not keep adding stages
+      // to the new visit's not-yet-hydrated plan.
+      setStageDialog(false);
+      setTreatmentPlan(EMPTY_TREATMENT_PLAN);
+      planEditedRef.current = false;
+      if (visitId === null || visitId === undefined || visitId === '') {
+        setHydration('ready');
+        return;
+      }
+      setHydration('loading');
+      try {
+        const existingEmr = await loadExistingEmrDraft(visitId);
+        if (cancelled || sequence !== hydrateSequenceRef.current) return;
+        if (String(visitIdRef.current) !== String(visitId)) return;
+        const hydrated = extractTreatmentPlan(existingEmr as Record<string, unknown> | null);
+        if (hydrated && !planEditedRef.current) setTreatmentPlan(hydrated);
+        setHydration('ready');
+      } catch {
+        if (cancelled || sequence !== hydrateSequenceRef.current) return;
+        // Fail closed: the plan stays non-editable and non-savable until a
+        // successful read, so the save path can never pair a fresh
+        // row_version with an unhydrated local plan.
+        setHydration('failed');
+        logger.warn('Не удалось загрузить существующий план лечения');
+      }
+    };
+    void hydrate();
+    return () => { cancelled = true; };
+  }, [visitId, hydrationRetryKey]);
+
   const [stageDialog, setStageDialog] = useState(false);
   const [stageForm, setStageForm] = useState({
     name: '',
@@ -269,6 +348,10 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
   };
 
   const handleSaveStage = () => {
+    // Review 3903 P1 (DENTPLAN): stages can only be added to a plan that has
+    // actually been hydrated from the server.
+    if (hydration !== 'ready') return;
+    planEditedRef.current = true;
     const stage = {
       ...stageForm,
       id: `stage_${Date.now()}`,
@@ -295,6 +378,7 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
   };
 
   const handleDeleteStage = (stageId: string) => {
+    planEditedRef.current = true;
     setTreatmentPlan(prev => {
       const stage = prev.stages.find(s => s.id === stageId);
       return {
@@ -311,10 +395,25 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
       if (!visitId) {
         throw new Error('Treatment plan save requires visitId');
       }
+      // Review 3903 P1 (DENTPLAN): never save a plan that was not hydrated
+      // from the server — a fresh save-time row_version must not legitimize
+      // an unhydrated (empty or partial) local plan overwriting the saved
+      // stages.
+      if (hydration !== 'ready') {
+        logger.warn('Сохранение плана лечения заблокировано: план не загружен с сервера');
+        return;
+      }
 
-      const existingEmr = await loadExistingEmrDraft(visitId);
+      const targetVisitId = visitId;
+      const existingEmr = await loadExistingEmrDraft(targetVisitId);
+      // DENTPLAN-FE-002 (audit 3892): the visit changed while the save-time
+      // read was in flight — the stale-context write must not land.
+      if (String(visitIdRef.current) !== String(targetVisitId)) {
+        logger.warn('Сохранение плана лечения отменено: визит изменился до записи');
+        return;
+      }
       await api.post(
-        `/v2/emr/${visitId}`,
+        `/v2/emr/${targetVisitId}`,
         buildTreatmentPlanEmrPayload(existingEmr, treatmentPlan)
       );
       onUpdate && onUpdate();
@@ -404,7 +503,7 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
             </h2>
 
             <div style={styles.actions}>
-              <Button type="button" size="small" onClick={() => setStageDialog(true)}>
+              <Button type="button" size="small" onClick={() => setStageDialog(true)} disabled={hydration !== 'ready'}>
                 <Plus size={iconSize} aria-hidden="true" />
                 {t('dental.dental_tp_add_stage')}
               </Button>
@@ -415,11 +514,27 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
             </div>
           </div>
 
+          {hydration === 'failed' && (
+            <Alert
+              type="error"
+              description={t('dental2.treatment_plan_load_failed')}
+              action={(
+                <Button type="button" size="small" variant="outline" onClick={() => setHydrationRetryKey((key) => key + 1)}>
+                  {t('doctor.btn_retry')}
+                </Button>
+              )}
+            />
+          )}
+
           <div style={styles.fieldGrid}>
             <Input
               label={t('dental.dental_tp_plan_name_label')}
               value={treatmentPlan.name}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTreatmentPlan({ ...treatmentPlan, name: e.target.value })}
+              disabled={hydration !== 'ready'}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+                planEditedRef.current = true;
+                setTreatmentPlan({ ...treatmentPlan, name: e.target.value });
+              }}
               style={{ width: '100%', boxSizing: 'border-box' }}
             />
           </div>
@@ -473,6 +588,7 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
                       aria-label={t('dental.dental_tp_delete')}
                       title={t('dental.dental_tp_delete')}
                       style={styles.iconButton}
+                      disabled={hydration !== 'ready'}
                       onClick={() => handleDeleteStage(stage.id)}
                     >
                       <Trash2 size={16} aria-hidden="true" />
@@ -481,13 +597,13 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
                 </Fragment>
               ))}
             </ul>
-          ) : (
+          ) : hydration === 'ready' ? (
             <Alert severity="info">
               {t('dental.dental_tp_empty_plan')}
             </Alert>
-          )}
+          ) : null}
 
-          {treatmentPlan.stages.length > 0 && (
+          {treatmentPlan.stages.length > 0 && hydration === 'ready' && (
             <div style={styles.saveRow}>
               <Button type="button" variant="primary" size="large" onClick={savePlan}>
                 {t('dental.dental_tp_save_plan')}
