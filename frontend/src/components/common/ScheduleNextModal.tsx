@@ -2,8 +2,6 @@ import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import logger from '../../utils/logger';
-import { getApiOrigin } from '../../api/runtime';
-import tokenManager from '../../utils/tokenManager';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import {
@@ -86,7 +84,11 @@ const ScheduleNextModal = ({
 
       // Если передан пациент, устанавливаем его
       if (patient) {
-        setFormData((prev) => ({ ...prev, patient_id: String(patient.id ?? '') }));
+        // DERMSCHED-FE-002 (audit 3892): prefer the canonical patient_id.
+        // A queue-row-shaped patient carries the visit/queue record id in
+        // `id` — the backend resolves `Patient.id`, so `patient_id` wins
+        // whenever it is present.
+        setFormData((prev) => ({ ...prev, patient_id: String(patient.patient_id ?? patient.id ?? '') }));
       }
     }
   }, [isOpen, patient]);
@@ -130,18 +132,15 @@ const ScheduleNextModal = ({
 
   const loadPatients = async () => {
     try {
-      const token = tokenManager.getAccessToken();
-      const apiBase = getApiOrigin();
-      const response = await fetch('patients/', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPatients(data);
+      // DERMSCHED-FE-001 (audit 3892): raw `fetch('patients/')`-style
+      // SPA-relative URLs resolve under the panel route (e.g.
+      // /doctor/patients/), not the configured API origin, which silently
+      // dead-ends the whole schedule-next feature. Use the shared
+      // authenticated client with absolute versioned API paths.
+      const response = await api.get('/patients');
+      if (response.status < 400) {
+        const data = Array.isArray(response.data) ? response.data : [];
+        setPatients(data as PatientRecord[]);
       }
     } catch (err) {
       logger.error('Ошибка загрузки пациентов:', err);
@@ -150,18 +149,11 @@ const ScheduleNextModal = ({
 
   const loadServices = async () => {
     try {
-      const token = tokenManager.getAccessToken();
-      const apiBase = getApiOrigin();
-      const response = await fetch('services', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setServices(data);
+      // DERMSCHED-FE-001 (audit 3892): same shared-client fix as patients.
+      const response = await api.get('/services');
+      if (response.status < 400) {
+        const data = Array.isArray(response.data) ? response.data : [];
+        setServices(data as ServiceItem[]);
       }
     } catch (err) {
       logger.error('Ошибка загрузки услуг:', err);
@@ -211,56 +203,48 @@ const ScheduleNextModal = ({
         throw new Error(t('misc.snm_err_select_all_services'));
       }
 
-      const token = tokenManager.getAccessToken();
-      const apiBase = getApiOrigin();
-      const response = await fetch('doctor/visits/schedule-next', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
+      // DERMSCHED-FE-001 (audit 3892): submit through the shared
+      // authenticated client — absolute `/api/v1/doctor/visits/
+      // schedule-next` path, interceptors own auth/refresh/CSRF.
+      const response = await api.post('/doctor/visits/schedule-next', formData);
+      const result = response.data as {
+        visit_id?: number | string;
+        confirmation?: { token?: string; channel?: string };
+      };
+      const normalizedFormData = {
+        ...formData,
+        patient_id: formData.patient_id ? Number(formData.patient_id) : null,
+        services: formData.services.map((service) => ({
+          ...service,
+          service_id: service.service_id ? Number(service.service_id) : service.service_id,
+          quantity: Number(service.quantity || 1)
+        }))
+      };
+
+      logger.info('[DOC-05] schedule-next succeeded', {
+        visitId: result?.visit_id,
+        patientId: normalizedFormData.patient_id,
+        confirmationChannel: result?.confirmation?.channel || normalizedFormData.confirmation_channel
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        const normalizedFormData = {
-          ...formData,
-          patient_id: formData.patient_id ? Number(formData.patient_id) : null,
-          services: formData.services.map((service) => ({
-            ...service,
-            service_id: service.service_id ? Number(service.service_id) : service.service_id,
-            quantity: Number(service.quantity || 1)
-          }))
-        };
-
-        logger.info('[DOC-05] schedule-next succeeded', {
-          visitId: result?.visit_id,
-          patientId: normalizedFormData.patient_id,
-          confirmationChannel: result?.confirmation?.channel || normalizedFormData.confirmation_channel
-        });
-
-        if (typeof onSuccess === 'function') {
-          try {
-            onSuccess(result, normalizedFormData);
-          } catch (callbackError) {
-            logger.error('[DOC-05] schedule-next success callback failed', callbackError);
-          }
+      if (typeof onSuccess === 'function') {
+        try {
+          onSuccess(result, normalizedFormData);
+        } catch (callbackError) {
+          logger.error('[DOC-05] schedule-next success callback failed', callbackError);
         }
-
-        setSuccess(t('misc.snm_visit_scheduled', { token: result.confirmation.token }));
-
-        // Сброс формы через 2 секунды
-        setTimeout(() => {
-          onClose?.();
-          resetForm();
-        }, 2000);
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || t('misc.snm_err_create_visit'));
       }
+
+      setSuccess(t('misc.snm_visit_scheduled', { token: result?.confirmation?.token ?? '' }));
+
+      // Сброс формы через 2 секунды
+      setTimeout(() => {
+        onClose?.();
+        resetForm();
+      }, 2000);
     } catch (err) {
-      setError((err instanceof Error ? err.message : String(err)));
+      const errorData = (err as { response?: { data?: { detail?: string } } })?.response?.data;
+      setError(String(errorData?.detail || t('misc.snm_err_create_visit')));
     } finally {
       setLoading(false);
     }
