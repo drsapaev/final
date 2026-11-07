@@ -230,6 +230,10 @@ export default function LabPanel() {
   // STRAT#16: ref для AbortController очереди — отменяет предыдущий
   // запрос при быстром повторном вызове loadLabAppointments.
   const queueAbortControllerRef = useRef<AbortController | null>(null);
+  // LABQ-FE-001 (audit 3886): shared queue generation — every refresh opens
+  // a new generation; load-more pages are owned by the generation they were
+  // launched in, so a stale page can never append into a newer snapshot.
+  const queueGenerationRef = useRef(0);
   // STRAT#16: отдельный ref для load-more запросов.
   const loadMoreAbortControllerRef = useRef<AbortController | null>(null);
   const [templates, setTemplates] = useState<Record<string, unknown>[]>([]);
@@ -574,6 +578,14 @@ export default function LabPanel() {
     // STRAT#16: AbortController для отмены предыдущего запроса при
     // быстром повторном вызове (refresh, tab switch). Предотвращает
     // setState-after-unmount и race conditions.
+    // LABQ-FE-001 (audit 3886): every refresh opens a NEW queue generation:
+    // an in-flight load-more from an older generation must not append its
+    // page into the freshly refreshed snapshot.
+    queueGenerationRef.current += 1;
+    const generation = queueGenerationRef.current;
+    if (loadMoreAbortControllerRef.current) {
+      loadMoreAbortControllerRef.current.abort();
+    }
     if (queueAbortControllerRef.current) {
       queueAbortControllerRef.current.abort();
     }
@@ -599,6 +611,13 @@ export default function LabPanel() {
         offset: 0,
         signal: controller.signal,
       })) as Record<string, unknown>;
+      // LABQ-FE-001: a newer generation owns the snapshot now — ignore this
+      // completion entirely (an epoch guard, not only AbortController
+      // cancellation: a request mock resolving despite abort() must not
+      // resurrect the stale page).
+      if (queueGenerationRef.current !== generation) {
+        return;
+      }
       const queueEntries = normalizeListPayload(payload?.entries ?? []);
       appointmentsRef.current = queueEntries;
       setAppointments(queueEntries);
@@ -613,7 +632,9 @@ export default function LabPanel() {
       logger.info('[LabPanel] loaded lab queue entries', queueEntries.length);
     } catch (error) {
       // STRAT#16: не показываем error notification для отменённых запросов.
-      if (isAbortLikeError(error)) return;
+      // LABQ-FE-001/002: a stale generation's failure is not the current
+      // snapshot's failure.
+      if (isAbortLikeError(error) || queueGenerationRef.current !== generation) return;
       logger.error('[LabPanel] loadLabAppointments failed', error);
       notify(
         'error',
@@ -622,7 +643,11 @@ export default function LabPanel() {
         { retryAction: () => loadLabAppointments(), retryLabel: t('misc.lp_zagruzit_snova') }
       );
     } finally {
-      setAppointmentsLoading(false);
+      // LABQ-FE-002: an aborted/outdated request must not clear the NEWER
+      // request's loading state — only the current generation may unset it.
+      if (queueGenerationRef.current === generation) {
+        setAppointmentsLoading(false);
+      }
     }
   }, [bindAppointmentForActiveInstance, notify, refreshSelectedAppointmentFromEntries]);
 
@@ -632,6 +657,10 @@ export default function LabPanel() {
   // LabQueueWorkbench (заменит client-side load-more из FIX#13).
   const loadMoreAppointments = useCallback(async () => {
     if (loadingMore || !hasMoreQueue) return;
+    // LABQ-FE-001 (audit 3886): the page belongs to the CURRENT queue
+    // generation — if a refresh opens a new one while this page is in
+    // flight, its completion must not append into the newer snapshot.
+    const generation = queueGenerationRef.current;
     // STRAT#16: AbortController для load-more (аналогично loadLabAppointments).
     if (loadMoreAbortControllerRef.current) {
       loadMoreAbortControllerRef.current.abort();
@@ -646,6 +675,12 @@ export default function LabPanel() {
         offset: queueOffset,
         signal: controller.signal,
       })) as Record<string, unknown>;
+      // LABQ-FE-001: epoch guard — even a request that resolves despite
+      // abort() must not append the stale page (and must not advance the
+      // current offset/hasMore).
+      if (queueGenerationRef.current !== generation) {
+        return;
+      }
       const newEntries = normalizeListPayload(payload?.entries ?? []);
       appointmentsRef.current = [...appointmentsRef.current, ...newEntries];
       setAppointments((current) => [...current, ...newEntries]);
@@ -658,11 +693,16 @@ export default function LabPanel() {
       logger.info('[LabPanel] loaded more lab queue entries', newEntries.length);
     } catch (error) {
       // STRAT#16: не показываем error notification для отменённых запросов.
-      if (isAbortLikeError(error)) return;
+      // LABQ-FE-001: a stale page's failure belongs to the old generation.
+      if (isAbortLikeError(error) || queueGenerationRef.current !== generation) return;
       logger.error('[LabPanel] loadMoreAppointments failed', error);
       notify('error', getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_dopolnite')));
     } finally {
-      setLoadingMore(false);
+      // LABQ-FE-002: only the current generation's page may unset the
+      // incremental loading flag.
+      if (queueGenerationRef.current === generation) {
+        setLoadingMore(false);
+      }
     }
   }, [
     bindAppointmentForActiveInstance,

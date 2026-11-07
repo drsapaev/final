@@ -91,7 +91,14 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }: Queue
 
       <div className="lqw-card-bottom">
         <div className="lqw-card-id">
-          <details className="lqw-pii-details">
+          {/* LABQ-FE-003 (audit 3886): the patient-ID disclosure is a peer
+              interactive region — its clicks/keys must not bubble into the
+              parent card's open-patient action. */}
+          <details
+            className="lqw-pii-details"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
             <summary
               className="lqw-pii-summary"
               aria-label={t('queue.patient_id_aria')}
