@@ -6978,6 +6978,9 @@ const ru = {
     mqm_btn_close_reception: 'Закрыть приём',
     mqm_refresh_queue: 'Обновить очередь',
     mqm_call: 'Вызвать',
+    // QMAN-FE-001 (audit 3886): failed current-selection load is visible and recoverable
+    mqm_queue_load_failed: 'Не удалось загрузить очередь выбранного врача. Данные предыдущего врача скрыты — повторите загрузку.',
+    mqm_retry_load: 'Повторить загрузку',
     mqm_aria_auto_refresh_off: 'Отключить автообновление очереди',
     mqm_aria_auto_refresh_on: 'Включить автообновление очереди',
     mqm_title_auto_refresh_on: 'Автообновление включено',
@@ -9526,6 +9529,10 @@ const ru = {
     dqp_ivan_ivanov: 'Иван Иванов',
     dqp_mariya_petrova: 'Мария Петрова',
     dqp_oshibka_zagruzki_ocheredi: 'Ошибка загрузки очереди',
+    // DOCQ-FE-003 (audit 3886): distinct load-error / stale states
+    dqp_ochered_nedostupna: 'Очередь недоступна',
+    dqp_povtorit: 'Повторить',
+    dqp_dannye_mogli_ustaret: 'Не удалось обновить очередь — данные могли устареть',
     dqp_patsient_vyzvan_demo: 'Пациент вызван (демо)',
     dqp_priem_nachat_demo: 'Прием начат (демо)',
     dqp_priem_zavershen_demo: 'Прием завершен (демо)',

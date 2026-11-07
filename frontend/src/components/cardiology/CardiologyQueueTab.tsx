@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, RotateCw, UserRound } from 'lucide-react';
 
 import { useTranslation } from '../../i18n/useTranslation';
@@ -56,20 +56,37 @@ export function CardiologyQueueTab({ onStartVisit, onOpenVisit }: CardiologyQueu
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [busyEntryId, setBusyEntryId] = useState<number | string | null>(null);
+  // CARDQ-FE-001 (audit 3886): loadQueue is triggered on mount, on every
+  // queueUpdated event and by the 30s interval — every request must be
+  // bound to a monotonically increasing load id; a LATE response of an
+  // earlier load self-cancels (success, catch and finally alike) instead
+  // of overwriting the newer snapshot with an obsolete patient list.
+  const loadIdRef = useRef(0);
 
   const loadQueue = useCallback(async () => {
+    const loadId = ++loadIdRef.current;
     setLoading(true);
     setError(false);
     try {
       const result = await queueService.getTodayQueue('cardiology') as DoctorQueueResponse | null;
+      if (loadId !== loadIdRef.current) {
+        // CARDQ-FE-001: a newer load has already been triggered — drop the
+        // stale response (and do not touch its loading/error state).
+        return;
+      }
       if (!result || !Array.isArray(result.entries) || !result.doctor?.id) {
         throw new Error('Invalid doctor queue response');
       }
       setQueue(result);
     } catch {
+      if (loadId !== loadIdRef.current) {
+        return;
+      }
       setError(true);
     } finally {
-      setLoading(false);
+      if (loadId === loadIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -178,12 +195,17 @@ export function CardiologyQueueTab({ onStartVisit, onOpenVisit }: CardiologyQueu
                 </div>
 
                 <div className="cardio-queue__actions">
-                  {hasAction(entry, 'call') && (
+                  {/* CARDQ-FE-002 (audit 3886): after a failed refresh the
+                   * previous snapshot may stay visible as read-only context,
+                   * but its call/start actions must NOT stay actionable as if
+                   * the data were current — only a backend-confirmed fresh
+                   * read may enable commands. */}
+                  {hasAction(entry, 'call') && !error && (
                     <Button variant="primary" loading={busyEntryId === entry.id} disabled={busyEntryId !== null} onClick={() => void runAction(entry, 'call')}>
                       {t('cardio.cardio_queue_call')}
                     </Button>
                   )}
-                  {hasAction(entry, 'start_visit') && (
+                  {hasAction(entry, 'start_visit') && !error && (
                     <Button variant="primary" loading={busyEntryId === entry.id} disabled={busyEntryId !== null} onClick={() => void runAction(entry, 'start_visit')}>
                       {t('cardio.cardio_queue_start_visit')}
                     </Button>

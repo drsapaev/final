@@ -258,6 +258,14 @@ export const useQueueManager = (): UseQueueManagerReturn => {
           // вызова — его владелец уже другой.
           return null;
         }
+        // QMAN-FE-001 (audit 3886): the CURRENT selection failed to load —
+        // fail closed. The previous selection's queue/statistics must not
+        // stay on screen as if they were the current selection's data
+        // (another doctor's rows and is_open decisions are not this
+        // selection's truth). Clear the snapshot and let the caller
+        // surface a recoverable error with a retry.
+        setQueueData(null);
+        setStatistics(null);
         throw toError(err, 'Ошибка загрузки очереди');
       } finally {
         if (epoch === snapshotEpochRef.current) {
