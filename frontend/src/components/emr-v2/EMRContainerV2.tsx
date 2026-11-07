@@ -103,6 +103,7 @@ interface EMRContainerV2Props {
     onCompletionBlocked?: () => void;
     ICD10Component?: React.ComponentType<Record<string, unknown>> | null;
     onPersisted?: () => void | Promise<void>;
+    onDirtyChange?: (dirty: boolean) => void;
 }
 
 interface EMRDataShape {
@@ -275,6 +276,7 @@ export function EMRContainerV2({
     onCompletionBlocked,
     ICD10Component = null,
     onPersisted,
+    onDirtyChange,
 }: EMRContainerV2Props) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
@@ -354,6 +356,16 @@ export function EMRContainerV2({
 
     // Navigation guard
     useBeforeUnload(isDirty);
+
+    // DERMAHOTKEY-FE-001 (audit 3892): expose the dirty flag so panel-level
+    // exits (e.g. the dermatologist Escape hotkey) can guard against
+    // silently discarding an unsaved draft. Optional and purely additive.
+    useEffect(() => {
+        onDirtyChange?.(isDirty);
+        return () => {
+            onDirtyChange?.(false);
+        };
+    }, [isDirty, onDirtyChange]);
 
     // Local UI state
     const [showHistory, setShowHistory] = useState(false);
