@@ -79,8 +79,9 @@ describe('LabTemplateWorkbench template version command contract', () => {
     expect(onClickBody).toContain("t('confirm.reset_draft_title')");
     expect(onClickBody).toContain("intent: 'warning'");
     expect(onClickBody).toContain('if (!ok) return;');
-    // Не должно быть мгновенного setDraftVersion без confirm
-    const setDraftIdx = onClickBody.indexOf('setDraftVersion(hydrateVersion(');
+    // Не должно быть мгновенного сброса без confirm (TEMPL-FE-002 round 11:
+    // сброс идёт через rehydrateDraft, который инкрементирует draft epoch)
+    const setDraftIdx = onClickBody.indexOf('rehydrateDraft(');
     const confirmIdx = onClickBody.indexOf('await confirm(');
     expect(setDraftIdx).toBeGreaterThan(confirmIdx);
   });
