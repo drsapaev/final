@@ -907,10 +907,16 @@ export default function LabReportWorkbench({
       setPrintFeedback({ severity: 'error', text: t('workbench.preview_failed') });
       notify?.('error', getErrorMessage(previewError) || t('errors.print_failed'));
     } finally {
-      // LABR-FE-002: only the current preview owns the busy flag — a stale
-      // completion must not clear a newer action's busy state.
+      // LABR-FE-002 + LABR-FE-003 (post-merge review of #3909, P2): only
+      // the current preview owns the busy flag — and ownership is not the
+      // preview epoch alone: the try/catch above also compares the LIVE
+      // operation context, so a NEWER report action started in a replaced
+      // context owns the busy flag now. Compare-and-clear against the live
+      // value: the flag is released only when it is still this preview's
+      // (an overlapping newer preview keeps its own flag because the epoch
+      // check above already skipped this release).
       if (previewAttemptRef.current === previewAttempt) {
-        setBusyAction('');
+        setBusyAction((current) => (current === 'preview' ? '' : current));
       }
     }
   }

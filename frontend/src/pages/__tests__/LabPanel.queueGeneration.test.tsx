@@ -294,3 +294,96 @@ describe('LABQ-FE-001 — a load-more page is owned by the queue generation it w
   });
 
 });
+
+describe('LABQ-FE-004 — the generation transition releases the incremental pagination flag', () => {
+  // Post-merge review of #3907 (P2): a refresh aborts the in-flight
+  // load-more page and advances the generation; that page's finally is
+  // generation-guarded (LABQ-FE-002) and therefore does NOT reset
+  // `loadingMore`. Without an explicit ownership transfer at the
+  // generation boundary the flag stays stuck `true` forever and the
+  // refreshed list can never request further pages (pagination deadlock).
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listQueueTodayMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('after a refresh aborted the in-flight page, load-more still works on the refreshed snapshot (pre-fix: stuck loadingMore blocks every further page)', async () => {
+    const callLog: string[] = [];
+    let releaseStalePage: (mode: 'data' | 'abort') => void = () => {
+      throw new Error('stale page release not armed');
+    };
+    // Snapshot C2 after refresh: 8 rows, MORE available (total 20) so the
+    // load-more control stays meaningful on the refreshed snapshot.
+    const SNAP_C2 = rows('C2', 2101, 8);
+    const SNAP_D = rows('D', 4101, 4);
+    listQueueTodayMock.mockImplementation(async (_date: unknown, params: { offset?: number } & Record<string, unknown>) => {
+      const offset = Number(params?.offset ?? 0);
+      callLog.push(`offset=${offset}`);
+      if (offset === 0) {
+        const zeroCalls = callLog.filter((c) => c === 'offset=0').length;
+        return zeroCalls === 1
+          ? { entries: SNAP_B_PAGE1, total: 25 }
+          : { entries: SNAP_C2, total: 20 };
+      }
+      if (offset === 10) {
+        // The pre-refresh load-more page hangs until the test releases it.
+        return new Promise((resolve, reject) => {
+          releaseStalePage = (mode) => {
+            if (mode === 'abort') {
+              reject(abortLikeError());
+            } else {
+              resolve({ entries: STALE_PAGE, total: 25 });
+            }
+          };
+        });
+      }
+      // offset=8: the post-refresh load-more page resolves immediately.
+      return { entries: SNAP_D, total: 12 };
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/lab?tab=queue']}>
+        <ThemeProvider>
+          <LabDirtyGuardProvider>
+            <LabPanel />
+          </LabDirtyGuardProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
+    );
+    await settle();
+
+    // Snapshot B page 1 rendered; its page 2 (offset 10) starts and hangs.
+    expect(screen.getByTestId('vql-row-1001')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('vql-load-more'));
+    await settle();
+    expect(callLog.filter((c) => c === 'offset=10')).toHaveLength(1);
+
+    // A refresh opens a new generation: it aborts the in-flight page and
+    // installs snapshot C2 (8 rows of 20).
+    fireEvent.click(screen.getByRole('button', { name: /Yangilash|Обновить|Refresh/i }));
+    await settle();
+    expect(screen.getByTestId('vql-row-2101')).toBeInTheDocument();
+    expect(screen.queryByTestId('vql-row-1001')).toBeNull();
+
+    // The aborted page settles with an AbortError-like rejection — its
+    // finally must NOT reset the NEW generation's flag, and the generation
+    // transition must have released the stale `loadingMore`.
+    releaseStalePage('abort');
+    await settle();
+
+    // The refreshed snapshot still has pages available (8 of 20): clicking
+    // load-more must actually request the next page (offset 8).
+    fireEvent.click(screen.getByTestId('vql-load-more'));
+    await settle();
+
+    // Pre-fix: the stuck `loadingMore` guard blocked the request entirely.
+    expect(callLog.filter((c) => c === 'offset=8')).toHaveLength(1);
+    for (const row of SNAP_D) {
+      expect(screen.getByTestId(`vql-row-${row.id}`)).toBeInTheDocument();
+    }
+  });
+});

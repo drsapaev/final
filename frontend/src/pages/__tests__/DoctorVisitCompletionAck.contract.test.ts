@@ -54,6 +54,25 @@ describe('DOCFLOW-FE-001/002 — cardiology visit completion honesty (source con
   it('DOCFLOW-FE-001: the ambiguous branch reconciles the queue with the canonical server snapshot', () => {
     expect(completionHandler).toMatch(/loadMacOSCardiologyAppointments/);
   });
+
+  it('DOCFLOW-FE-004: rechecks the selected patient identity AFTER the completion POST resolves (before reset/auto-call)', () => {
+    // Post-merge review of #3902 (P1): the completion POST is itself an
+    // async boundary — the selection may move to another patient while the
+    // request is in flight. A stale ack must not wipe the newer patient's
+    // state, switch the tab or auto-call the next entry. The pre-POST
+    // (post-confirm) recheck alone does not cover this window.
+    const ackAt = completionHandler.indexOf('const completionAck = await queueService.completeVisit');
+    const recheckMarkerAt = completionHandler.indexOf('Stale completion response ignored for a changed selection');
+    const resetAt = completionHandler.indexOf('setSelectedPatient(null)');
+    const autoCallAt = completionHandler.indexOf('callNextWaiting');
+    expect(ackAt).toBeGreaterThanOrEqual(0);
+    expect(recheckMarkerAt).toBeGreaterThan(ackAt);
+    expect(resetAt).toBeGreaterThan(recheckMarkerAt);
+    expect(autoCallAt).toBeGreaterThan(recheckMarkerAt);
+    // The post-POST recheck compares against the LIVE selection ref.
+    const recheckBlock = completionHandler.slice(ackAt, resetAt);
+    expect(recheckBlock).toContain('selectedPatientRef.current');
+  });
 });
 
 describe('DOCFLOW-FE-001/002 — dermatology visit completion honesty (source contract)', () => {
@@ -77,5 +96,16 @@ describe('DOCFLOW-FE-001/002 — dermatology visit completion honesty (source co
 
   it('DOCFLOW-FE-001: the ambiguous branch reconciles the queue with the canonical server snapshot', () => {
     expect(completionHandler).toMatch(/loadDermatologyAppointments\(true\)/);
+  });
+
+  it('DOCFLOW-FE-004 (positive reference parity): the derma post-POST recheck sits after the ack and before the reset/auto-call', () => {
+    const ackAt = completionHandler.indexOf('await queueService.completeVisit');
+    const recheckMarkerAt = completionHandler.indexOf('Stale completion response ignored for a changed visit context');
+    const resetAt = completionHandler.indexOf('setSelectedPatient(null)');
+    const autoCallAt = completionHandler.indexOf('callNextWaiting');
+    expect(ackAt).toBeGreaterThanOrEqual(0);
+    expect(recheckMarkerAt).toBeGreaterThan(ackAt);
+    expect(resetAt).toBeGreaterThan(recheckMarkerAt);
+    expect(autoCallAt).toBeGreaterThan(recheckMarkerAt);
   });
 });

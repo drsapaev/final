@@ -1297,6 +1297,23 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         }
         return;
       }
+
+      // DOCFLOW-FE-004 (post-merge review of #3902, P1): the completion
+      // POST is itself an async boundary — the selection may have moved to
+      // another patient while the request was in flight (row click, deep
+      // link, Escape). The completion belongs to the CAPTURED identity: a
+      // stale ack must not wipe the newer patient's state, must not switch
+      // the tab, and must not auto-call the next queue entry over the
+      // newer context (dermatology's DERMACOMPLETE-FE-002 recheck is the
+      // repo reference).
+      const postCompletionSelection = selectedPatientRef.current;
+      if (
+        String(resolveDoctorQueueEntryId(postCompletionSelection)) !== String(completionIdentity.queueEntryId) ||
+        String(postCompletionSelection?.patient?.id ?? postCompletionSelection?.patient_id ?? postCompletionSelection?.id ?? null) !== String(completionIdentity.patientId)
+      ) {
+        logger.warn('[Cardiology] Stale completion response ignored for a changed selection — the newer patient\'s state is preserved');
+        return;
+      }
       notify.success(tI18n('cardio.visit_completed'));
 
       // Очищаем форму и возвращаемся в очередь

@@ -168,3 +168,112 @@ describe('LABAI-FE-001 — the AI dialog is reset by report identity', () => {
     void screen;
   });
 });
+
+describe('LABAI-FE-002 — the loading flag and staleness follow the input CONTENT, not object identity', () => {
+  // Post-merge review of #3909 (P2): an old AI analysis still cleared the
+  // loading flag for a newer input. The deeper cause: the stale guard
+  // compared INPUT OBJECT IDENTITY, while parents pass inline data
+  // literals — every incidental parent re-render minted a "newer input"
+  // out of IDENTICAL content, silently dropping the in-flight analysis
+  // result and resetting the loading flag for a dialog whose content had
+  // not changed.
+  it('a same-content re-render must not drop the in-flight analysis result (pre-fix: identity-based staleness suppressed it)', async () => {
+    let releaseInterpretation: () => void = () => {
+      throw new Error('interpretation release not armed');
+    };
+    interpretLabResultsMock.mockImplementation(() => new Promise((resolve) => {
+      releaseInterpretation = () => resolve({
+        status: 'success',
+        data: {
+          summary: 'SYNTHETIC SAME-CONTENT INTERPRETATION',
+          results: [],
+        },
+      });
+    }));
+
+    const dataA = {
+      results: [{ name: 'Гемоглобин', value: '140', unit: 'г/л', reference: '130-170', flag: '' }],
+      patient_age: 30,
+      patient_gender: 'male',
+    };
+    // A NEW object with IDENTICAL content — what every incidental parent
+    // re-render produces for inline data literals.
+    const dataA2 = JSON.parse(JSON.stringify(dataA)) as typeof dataA;
+    const onResult = vi.fn();
+
+    const first = render(
+      <ThemeProvider>
+        <AIAssistant analysisType="lab" useMCP data={dataA} onResult={onResult} />
+      </ThemeProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Обновить|Refresh|Yangilash/i }));
+    await waitFor(() => expect(interpretLabResultsMock).toHaveBeenCalled());
+
+    // The parent re-renders with a new object of the SAME content while
+    // the analysis is in flight (queue polling, autosave timers, toasts).
+    first.rerender(
+      <ThemeProvider>
+        <AIAssistant analysisType="lab" useMCP data={dataA2} onResult={onResult} />
+      </ThemeProvider>
+    );
+
+    releaseInterpretation();
+    await new Promise((resolve) => { setTimeout(resolve, 120); });
+
+    // Pre-fix: the identity-only stale guard dropped the result.
+    expect(onResult).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/SYNTHETIC SAME-CONTENT INTERPRETATION/)).toBeInTheDocument();
+  });
+
+  it('a REAL content change still suppresses the stale result and releases the loading flag', async () => {
+    let releaseInterpretation: () => void = () => {
+      throw new Error('interpretation release not armed');
+    };
+    interpretLabResultsMock.mockImplementation(() => new Promise((resolve) => {
+      releaseInterpretation = () => resolve({
+        status: 'success',
+        data: { summary: 'SYNTHETIC A INTERPRETATION', results: [] },
+      });
+    }));
+
+    const dataA = {
+      results: [{ name: 'Гемоглобин', value: '140', unit: 'г/л', reference: '130-170', flag: '' }],
+      patient_age: 30,
+      patient_gender: 'male',
+    };
+    const dataB = {
+      results: [{ name: 'Гемоглобин', value: '110', unit: 'г/л', reference: '120-150', flag: 'low' }],
+      patient_age: 40,
+      patient_gender: 'female',
+    };
+    const onResult = vi.fn();
+
+    const first = render(
+      <ThemeProvider>
+        <AIAssistant analysisType="lab" useMCP data={dataA} onResult={onResult} />
+      </ThemeProvider>
+    );
+
+    const refreshButton = screen.getByRole('button', { name: /Обновить|Refresh|Yangilash/i });
+    fireEvent.click(refreshButton);
+    await waitFor(() => expect(interpretLabResultsMock).toHaveBeenCalled());
+
+    // A REAL newer input replaces the dialog's data while A is in flight.
+    first.rerender(
+      <ThemeProvider>
+        <AIAssistant analysisType="lab" useMCP data={dataB} onResult={onResult} />
+      </ThemeProvider>
+    );
+
+    releaseInterpretation();
+    await new Promise((resolve) => { setTimeout(resolve, 120); });
+
+    // The stale A interpretation is still suppressed...
+    expect(onResult).not.toHaveBeenCalled();
+    expect(screen.queryByText(/SYNTHETIC A INTERPRETATION/)).toBeNull();
+    // ...and the loading flag is honestly released for the newer input:
+    // the refresh control is usable again (not stuck «analyzing»).
+    expect(screen.getByRole('button', { name: /Обновить|Refresh|Yangilash/i })).toBeEnabled();
+  });
+});

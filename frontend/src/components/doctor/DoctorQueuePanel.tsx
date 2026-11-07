@@ -119,6 +119,40 @@ const hasBackendQueueAction = (entry: QueueEntryDto | null | undefined, action: 
   return aliases.some((alias: string) => actions.includes(alias));
 };
 
+// DOCQ-FE-004 (post-merge review of #3905, P1): a resolved 2xx is NOT a
+// confirmed queue command. Only an explicit `success: true` DTO confirms
+// the write — the same fail-closed contract as queueService.completeVisit
+// (DOCFLOW-FE-001, audit 3886): a 2xx body that is unreadable or lacks the
+// ack is AMBIGUOUS (the server may have committed; no blind retry, do not
+// report success), while `success: false` is an explicit rejection.
+interface QueueCommandAck {
+  success: boolean;
+  unknown?: boolean;
+  message: string;
+}
+
+const AMBIGUOUS_QUEUE_COMMAND_MESSAGE =
+  'Ответ сервера не удалось прочитать — операция не подтверждена. Состояние очереди уточняется у сервера; не повторяйте операцию автоматически. / Unreadable server response — the operation is NOT confirmed. The queue state is being reconciled with the server; do not blindly retry.';
+
+const REJECTED_QUEUE_COMMAND_MESSAGE =
+  'Сервер отклонил операцию. / The server rejected the operation.';
+
+function queueCommandAck(data: unknown): QueueCommandAck {
+  if (data && typeof data === 'object' && (data as { success?: unknown }).success === true) {
+    const message = (data as { message?: unknown }).message;
+    return { success: true, message: typeof message === 'string' ? message : '' };
+  }
+  if (data === null || data === undefined || typeof data !== 'object') {
+    return { success: false, unknown: true, message: AMBIGUOUS_QUEUE_COMMAND_MESSAGE };
+  }
+  const detail = (data as { detail?: unknown; message?: unknown }).detail
+    ?? (data as { message?: unknown }).message;
+  return {
+    success: false,
+    message: typeof detail === 'string' && detail.trim() ? detail : REJECTED_QUEUE_COMMAND_MESSAGE,
+  };
+}
+
 /**
  * Панель очереди для врача - показывает пациентов из регистратуры
  * Основа: passport.md стр. 1417-1427
@@ -372,8 +406,19 @@ const DoctorQueuePanel = ({
       logger.info('[FIX:DOCTOR_QUEUE_PANEL] Calling patient via the canonical api client', {
         entryId,
       });
-      const { data } = await api.post(`/doctor/queue/${entryId}/call`) as { data: { message?: string } };
-      setMessage({ type: 'success', text: data.message || '' });
+      const { data } = await api.post(`/doctor/queue/${entryId}/call`) as { data: unknown };
+      // DOCQ-FE-004: only an explicit `success: true` ack confirms the call.
+      const ack = queueCommandAck(data);
+      if (ack.success !== true) {
+        logger.error('[FIX:DOCTOR_QUEUE_PANEL] Call NOT confirmed by an explicit success ack', {
+          entryId,
+          unknown: ack.unknown === true,
+        });
+        setMessage({ type: 'error', text: ack.message });
+        await loadQueueData();
+        return;
+      }
+      setMessage({ type: 'success', text: ack.message });
       await loadQueueData();
     } catch (error: unknown) {
       logger.error('Ошибка вызова пациента:', error);
@@ -397,8 +442,19 @@ const DoctorQueuePanel = ({
       logger.info('[FIX:DOCTOR_QUEUE_PANEL] Starting visit via the canonical api client', {
         entryId,
       });
-      const { data } = await api.post(`/doctor/queue/${entryId}/start-visit`) as { data: { message?: string } };
-      setMessage({ type: 'success', text: data.message || '' });
+      const { data } = await api.post(`/doctor/queue/${entryId}/start-visit`) as { data: unknown };
+      // DOCQ-FE-004: only an explicit `success: true` ack confirms the start.
+      const ack = queueCommandAck(data);
+      if (ack.success !== true) {
+        logger.error('[FIX:DOCTOR_QUEUE_PANEL] Start visit NOT confirmed by an explicit success ack', {
+          entryId,
+          unknown: ack.unknown === true,
+        });
+        setMessage({ type: 'error', text: ack.message });
+        await loadQueueData();
+        return;
+      }
+      setMessage({ type: 'success', text: ack.message });
       await loadQueueData();
     } catch (error: unknown) {
       logger.error('Ошибка начала приема:', error);
@@ -425,8 +481,21 @@ const DoctorQueuePanel = ({
       });
       const { data } = await api.post(`/doctor/queue/${entryId}/complete`, {
         // Здесь будут данные визита
-      }) as { data: { message?: string } };
-      setMessage({ type: 'success', text: data.message || '' });
+      }) as { data: unknown };
+      // DOCQ-FE-004: a clinical visit completion is reported ONLY on an
+      // explicit `success: true` ack — any resolved 2xx without the ack is
+      // an ambiguous or rejected write, never «Успешно».
+      const ack = queueCommandAck(data);
+      if (ack.success !== true) {
+        logger.error('[FIX:DOCTOR_QUEUE_PANEL] Completion NOT confirmed by an explicit success ack', {
+          entryId,
+          unknown: ack.unknown === true,
+        });
+        setMessage({ type: 'error', text: ack.message });
+        await loadQueueData();
+        return;
+      }
+      setMessage({ type: 'success', text: ack.message });
       await loadQueueData();
     } catch (error: unknown) {
       logger.error('Ошибка завершения приема:', error);
