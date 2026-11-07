@@ -345,6 +345,10 @@ const DermatologistPanelUnified = () => {
   useEffect(() => {
     const reset = () => {
       resetDermatologyRequestCache();
+      // Self-review (audit 3892 wave 2): the same-mounted component's
+      // per-entry load promise must not be handed to the NEXT principal
+      // before the module cache is consulted — drop it on auth change.
+      appointmentsLoadPromiseRef.current = null;
     };
     const unsubscribe = subscribeAuth(reset);
     window.addEventListener('authStateChanged', reset);
@@ -370,6 +374,10 @@ const DermatologistPanelUnified = () => {
       if (emrDirtyRef.current) {
         // DERMAHOTKEY-FE-001: an unsaved EMR draft is on screen — require an
         // explicit discard confirmation instead of silently dropping it.
+        // Self-review (audit 3892 wave 2): snapshot the visit the dialog
+        // was opened for — a deferred confirmation must not clear a NEWER
+        // selection that replaced it while the dialog was pending.
+        const dialogVisitContext = currentVisitContextRef.current;
         void confirm({
           title: t('derma.derma_panel_discard_draft_title'),
           message: t('derma.derma_panel_discard_draft_message'),
@@ -377,11 +385,13 @@ const DermatologistPanelUnified = () => {
           cancelLabel: t('derma.cancel'),
           intent: 'danger',
         }).then((ok) => {
-          if (ok) {
-            emrDirtyRef.current = false;
-            setSelectedPatient(null);
-            setCurrentAppointment(null);
+          if (!ok) return;
+          if (!isSameDermatologyVisit(dialogVisitContext, currentVisitContextRef.current)) {
+            return;
           }
+          emrDirtyRef.current = false;
+          setSelectedPatient(null);
+          setCurrentAppointment(null);
         });
         return;
       }
@@ -491,6 +501,10 @@ const DermatologistPanelUnified = () => {
   // Загрузка услуг для правильного отображения в tooltips
   const loadServices = useCallback(async (force = false) => {
     ensureDermatologyCacheOwner(dermatologyRequestCache.services);
+    // Self-review (audit 3892 wave 2): capture the principal at launch — a
+    // continuation that resolves after an auth change must not write the
+    // previous principal's services into the new principal's state/cache.
+    const ownerKeyAtLaunch = dermatologyCacheOwnerKey();
     if (!force) {
       if (dermatologyRequestCache.services.promise) {
         return dermatologyRequestCache.services.promise;
@@ -509,6 +523,11 @@ const DermatologistPanelUnified = () => {
         const token = tokenManager.getAccessToken();
         if (!token) return {};
         const response = (await api.get('/registrar/services')) as AxiosResponse<Record<string, unknown>>;
+        // Self-review (audit 3892 wave 2): stale continuation guard —
+        // another principal owns the cache now; ignore this response.
+        if (dermatologyCacheOwnerKey() !== ownerKeyAtLaunch) {
+          return (dermatologyRequestCache.services.data as Record<string, unknown>) || {};
+        }
         if (response.status < 400) {
           const data = response.data as Record<string, unknown>;
           const servicesData = (data.services_by_group as Record<string, unknown>) || {};
@@ -542,6 +561,11 @@ const DermatologistPanelUnified = () => {
   // Загрузка записей дерматолога
   const loadDermatologyAppointments = useCallback(async (force = false) => {
     ensureDermatologyCacheOwner(dermatologyRequestCache.appointments);
+    // Self-review (audit 3892 wave 2): capture the principal at launch —
+    // an in-flight queue response that resolves after an auth change must
+    // never write the previous principal's rows into the next principal's
+    // state or into the freshly reset module cache object.
+    const ownerKeyAtLaunch = dermatologyCacheOwnerKey();
     if (!force) {
       if (appointmentsLoadPromiseRef.current) {
         return appointmentsLoadPromiseRef.current;
@@ -572,6 +596,14 @@ const DermatologistPanelUnified = () => {
         // PR-47: removed unused `today` variable
         // 1. Получаем очереди для информации об услугах
         const queuesResponse = (await api.get('/registrar/queues/today')) as AxiosResponse<Record<string, unknown>>;
+
+        // Self-review (audit 3892 wave 2): stale continuation guard — the
+        // principal changed while this response was in flight; do not let
+        // the OLD principal's queue rows reach the new principal's state
+        // or cache (fail closed to an empty snapshot).
+        if (dermatologyCacheOwnerKey() !== ownerKeyAtLaunch) {
+          return [];
+        }
 
         const allAppointments: DermatologyAppointment[] = [];
         if (queuesResponse.status < 400) {
@@ -651,7 +683,12 @@ const DermatologistPanelUnified = () => {
         logger.error('[Dermatology] Appointment list request failed', safeErrorMetadata(error));
         return [];
       } finally {
-        setAppointmentsLoading(false);
+        // Self-review (audit 3892 wave 2): a stale continuation must not
+        // clear the NEXT principal's loading flag while its own request
+        // is still in flight.
+        if (dermatologyCacheOwnerKey() === ownerKeyAtLaunch) {
+          setAppointmentsLoading(false);
+        }
       }
     })();
 
@@ -954,7 +991,18 @@ const DermatologistPanelUnified = () => {
           );
         }
         if (visitIdFromUrl) {
-          return rowVisitId !== null && String(rowVisitId) === String(visitIdFromUrl);
+          // Self-review (audit 3892 wave 2): a visit-only match must carry a
+          // canonical patient_id. A queue-only row (online/QR, patient_id:
+          // null) would otherwise fabricate the patient identity from its
+          // queue-entry id through buildDermatologyPatientFromAppointment's
+          // `patient_id || id` fallback — refuse to open the editor instead.
+          return (
+            rowVisitId !== null &&
+            String(rowVisitId) === String(visitIdFromUrl) &&
+            appointment.patient_id !== null &&
+            appointment.patient_id !== undefined &&
+            appointment.patient_id !== ''
+          );
         }
         if (patientIdFromUrl) {
           return String(appointment.patient_id) === String(patientIdFromUrl);
@@ -1385,7 +1433,32 @@ const DermatologistPanelUnified = () => {
   // DERMAQUEUE-FE-001 (audit 3892): the dermatologist's live queue gets
   // the same Start Visit handoff dentistry wires — backend start-visit
   // ack resolves the canonical patient/visit, fail-closed otherwise.
-  const handleStartQueueVisit = useDermaQueueVisit({ selectPatient: selectQueueVisitPatient });
+  // Self-review (audit 3892 wave 2): the deferred ack guard — a start-visit
+  // acknowledgement that arrives after a newer selection/navigation must
+  // not pull the panel back into the stale queue row.
+  const shouldApplyStartVisitAck = useCallback((queueEntryId: string | number): boolean => {
+    const current = selectedPatientRef.current;
+    if (current === null || current === undefined) {
+      // No active selection — nothing for the ack to override.
+      return true;
+    }
+    const currentEntry =
+      (current as { doctor_queue_entry_id?: unknown; queue_entry_id?: unknown }).doctor_queue_entry_id ??
+      (current as { queue_entry_id?: unknown }).queue_entry_id ?? null;
+    if (currentEntry === null || currentEntry === undefined) {
+      // The active selection has no queue identity (e.g. patients-tab) —
+      // an explicit user action owns it, not this ack.
+      return false;
+    }
+    return String(currentEntry) === String(queueEntryId);
+  }, []);
+  const handleStartQueueVisit = useDermaQueueVisit({
+    selectPatient: selectQueueVisitPatient,
+    shouldApplyAck: shouldApplyStartVisitAck,
+    onDeferredAck: (queueEntryId) => {
+      logger.warn('[Dermatology] Deferred start-visit ack not applied — a newer selection is active', { queueEntryId });
+    },
+  });
 
   const currentVisitAppointmentId = currentVisitContext.appointmentId === null || currentVisitContext.appointmentId === undefined
     ? null
@@ -1460,15 +1533,16 @@ const DermatologistPanelUnified = () => {
 
       // DERMACOMPLETE-FE-002 (audit 3892): the POST was in flight while
       // the clinician could switch to another visit (row click, deep link,
-      // Escape). The completion belongs to the CAPTURED visit: acknowledge
-      // it, but never reset the newly selected visit's state, never open
-      // the schedule-next modal over it, and never auto-call the next
-      // patient for the stale context.
-      notify.success(t('derma.visit_completed'));
+      // Escape). The completion belongs to the CAPTURED visit: a stale
+      // ack is suppressed entirely — no unqualified success toast over
+      // the newer context, no reset of the newly selected visit's state,
+      // no schedule-next modal over it, and no auto-call for the stale
+      // context.
       if (!isSameDermatologyVisit(completionContext, currentVisitContextRef.current)) {
         logger.warn('[Dermatology] Stale completion response ignored for a changed visit context');
         return;
       }
+      notify.success(t('derma.visit_completed'));
 
       // D-004 fix: offer to schedule next visit (was dead code — setScheduleNextModal was never called)
       if (selectedPatient) {

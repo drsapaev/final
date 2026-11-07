@@ -115,3 +115,59 @@ describe('useDermaQueueVisit — start-visit handoff (DERMAQUEUE-FE-001)', () =>
     expect(notifyService.error).toHaveBeenCalledWith('derma.derma_panel_start_visit_failed');
   });
 });
+
+describe('useDermaQueueVisit — deferred ack guard (audit 3892 wave-2 self-review)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does not apply a deferred ack over a newer selection (server start stays acknowledged)', async () => {
+    const selectPatient = vi.fn();
+    const shouldApplyAck = vi.fn(() => false);
+    const onDeferredAck = vi.fn();
+    mockedStartVisit.mockResolvedValue({
+      success: true,
+      entry_id: 17,
+      patient_id: 9,
+      visit_id: 77,
+      status: 'in_progress',
+    } as never);
+
+    const { result } = renderHook(() =>
+      useDermaQueueVisit({ selectPatient, shouldApplyAck, onDeferredAck }));
+    const started = await result.current(CALLED_PATIENT);
+
+    // The server-side start of the OLD row is confirmed — but the UI must
+    // not replace the clinician's newer selection.
+    expect(started).toBe(true);
+    expect(mockedStartVisit).toHaveBeenCalledWith(17);
+    expect(selectPatient).not.toHaveBeenCalled();
+    expect(shouldApplyAck).toHaveBeenCalledWith(17, 9, 77);
+    expect(onDeferredAck).toHaveBeenCalledWith(17);
+    expect(notifyService.error).not.toHaveBeenCalled();
+  });
+
+  it('control: applies the ack while the guard allows it', async () => {
+    const selectPatient = vi.fn();
+    const shouldApplyAck = vi.fn(() => true);
+    mockedStartVisit.mockResolvedValue({
+      success: true,
+      entry_id: 17,
+      patient_id: 9,
+      visit_id: 77,
+      status: 'in_progress',
+    } as never);
+
+    const { result } = renderHook(() =>
+      useDermaQueueVisit({ selectPatient, shouldApplyAck }));
+    const started = await result.current(CALLED_PATIENT);
+
+    expect(started).toBe(true);
+    expect(selectPatient).toHaveBeenCalledTimes(1);
+    expect(selectPatient.mock.calls[0][0]).toMatchObject({
+      patient_id: 9,
+      visit_id: 77,
+      doctor_queue_entry_id: 17,
+    });
+  });
+});

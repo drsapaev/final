@@ -263,3 +263,44 @@ describe('DERMAURL-FE-002 — a manual selection survives the applied deep link'
     expect(emrEditor()?.getAttribute('data-visit')).toBe('55');
   });
 });
+
+describe('DERMAURL-FE-001 self-review — visit-only deep links never fabricate a patient id', () => {
+  it('refuses to open the editor for a queue-only row (patient_id null) matched by visitId (pre-fix: patient_id = queue-entry id 503)', async () => {
+    // A queue-only row: online/QR entry with NO canonical patient id, but a
+    // real visit. Distinct queue-entry (503) and patient (would-be 503) ids.
+    mountPanel('/doctor/dermatology?visitId=77', [{
+      id: 503,
+      appointment_id: 42,
+      patient_id: null,
+      patient_name: 'QUEUE-ONLY ROW',
+      phone: '300',
+      status: 'waiting',
+      visit_id: 77,
+    }]);
+
+    await waitFor(() => expect(mockedGet).toHaveBeenCalledWith('/registrar/queues/today'));
+
+    // The visit exists, but the row carries no canonical patient id — the
+    // editor must NOT open with a patient identity fabricated from the
+    // queue-entry id (503).
+    await waitFor(() => {
+      expect(emrEditor()).toBeNull();
+    }, { timeout: 2500 });
+  });
+
+  it('positive control: a visit-only deep link opens the editor for a row with a canonical patient id', async () => {
+    mountPanel('/doctor/dermatology?visitId=77', [{
+      id: 503,
+      appointment_id: 42,
+      patient_id: 23,
+      patient_name: 'SYNTHETIC PATIENT A',
+      phone: '300',
+      status: 'waiting',
+      visit_id: 77,
+    }]);
+
+    const editor = await screen.findByTestId('emr-editor', {}, { timeout: 2500 });
+    expect(editor.getAttribute('data-patient')).toBe('23');
+    expect(editor.getAttribute('data-visit')).toBe('77');
+  });
+});

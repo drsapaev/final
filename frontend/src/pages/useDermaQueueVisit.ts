@@ -21,9 +21,17 @@ interface CalledQueuePatient {
 
 interface UseDermaQueueVisitDeps {
   selectPatient: (patient: Record<string, unknown>) => void;
+  /**
+   * Audit 3892 self-review (deferred start-visit ack): returns false when a
+   * newer selection/navigation has replaced the queue row this ack belongs
+   * to. The server-side start stays acknowledged, but the UI must not
+   * override the newer selection without an explicit action.
+   */
+  shouldApplyAck?: (queueEntryId: string | number, patientId: string | number, visitId: string | number) => boolean;
+  onDeferredAck?: (queueEntryId: string | number) => void;
 }
 
-export function useDermaQueueVisit({ selectPatient }: UseDermaQueueVisitDeps) {
+export function useDermaQueueVisit({ selectPatient, shouldApplyAck, onDeferredAck }: UseDermaQueueVisitDeps) {
   const { t } = useTranslation();
 
   return useCallback(async (calledPatient: CalledQueuePatient | null | undefined): Promise<boolean> => {
@@ -53,6 +61,14 @@ export function useDermaQueueVisit({ selectPatient }: UseDermaQueueVisitDeps) {
         return false;
       }
 
+      // Audit 3892 self-review: a deferred ack must not replace a newer
+      // manual selection — apply the handoff only while the panel's current
+      // selection still allows it (no selection, or the same queue entry).
+      if (shouldApplyAck && !shouldApplyAck(queueEntryId, patientId, visitId)) {
+        onDeferredAck?.(queueEntryId);
+        return true;
+      }
+
       const patientName =
         (typeof calledPatient.name === 'string' && calledPatient.name) ||
         t('derma.derma_panel_patient_default');
@@ -73,7 +89,7 @@ export function useDermaQueueVisit({ selectPatient }: UseDermaQueueVisitDeps) {
       notify.error(t('derma.derma_panel_start_visit_failed'));
       return false;
     }
-  }, [selectPatient, t]);
+  }, [selectPatient, shouldApplyAck, onDeferredAck, t]);
 }
 
 export default useDermaQueueVisit;
