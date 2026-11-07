@@ -75,6 +75,42 @@ function notifyQueueUpdate(specialty: string, action: string = 'update'): void {
   window.dispatchEvent(event);
 }
 
+// DOCFLOW-FE-001 / DOCFLOW-FE-003 (audit 3886): a doctor-queue write is
+// CONFIRMED only by an explicit `success: true` DTO in a parseable 2xx
+// body. `apiRequest` returns `null` for a 2xx body that fails to parse —
+// that outcome is AMBIGUOUS (the server may have committed; no blind
+// retry), while `success: false` is an explicit rejection. Neither may be
+// reported as success, reset clinical UI state, or fire the optimistic
+// `queueUpdated` refresh event.
+export type QueueWriteResult = {
+  success: boolean;
+  unknown?: boolean;
+  message?: string;
+  entry?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+const AMBIGUOUS_QUEUE_WRITE_MESSAGE =
+  'Ответ сервера не удалось прочитать — завершение не подтверждено. Состояние очереди уточняется у сервера; не повторяйте операцию автоматически. / Unreadable server response — the operation is NOT confirmed. The queue state is being reconciled with the server; do not blindly retry.';
+
+const REJECTED_QUEUE_WRITE_MESSAGE =
+  'Сервер отклонил операцию. / The server rejected the operation.';
+
+function queueWriteAck(result: Record<string, unknown> | null | undefined): QueueWriteResult {
+  if (result && typeof result === 'object' && result.success === true) {
+    return { success: true, ...result };
+  }
+  if (result === null || result === undefined || typeof result !== 'object') {
+    return { success: false, unknown: true, message: AMBIGUOUS_QUEUE_WRITE_MESSAGE };
+  }
+  const detail = (result as { detail?: unknown; message?: unknown }).detail
+    ?? (result as { message?: unknown }).message;
+  return {
+    success: false,
+    message: typeof detail === 'string' && detail.trim() ? detail : REJECTED_QUEUE_WRITE_MESSAGE,
+  };
+}
+
 function selectNextCallEntry(
   queue: Record<string, unknown> | null | undefined,
 ): { entry: Record<string, unknown> | null; contractError: string | null } {
@@ -128,15 +164,26 @@ export const queueService = {
   },
 
   // Завершить прием пациента (можно передать med data)
-  completeVisit: async (entryId: string | number, visitData: Record<string, unknown>) => {
-    const result = await apiRequest(`/doctor/queue/${entryId}/complete`, {
+  completeVisit: async (entryId: string | number, visitData: Record<string, unknown>): Promise<QueueWriteResult> => {
+    const result = await apiRequest<Record<string, unknown> | null>(`/doctor/queue/${entryId}/complete`, {
       method: 'POST',
       body: visitData || {}
     });
-    // Уведомляем об обновлении после завершения приема
+    // DOCFLOW-FE-001 (audit 3886): only an explicit `success: true` DTO
+    // confirms the completion. An ambiguous (unparseable 2xx body) or
+    // explicitly rejected outcome must NOT fire the optimistic
+    // `queueUpdated` event and must NOT be presented as a success — the
+    // server may have committed, so the caller reconciles with the
+    // canonical queue snapshot instead of blindly retrying.
+    const ack = queueWriteAck(result);
+    if (ack.success !== true) {
+      logger.error('[queueService] completeVisit NOT confirmed:', ack.unknown ? 'ambiguous-2xx' : 'rejected', ack.message);
+      return ack;
+    }
+    // Уведомляем об обновлении после завершения приема (только подтвержденное завершение)
     notifyQueueUpdate('all', 'visitCompleted');
     logger.log('[queueService] completeVisit: отправлено уведомление об обновлении очереди');
-    return result;
+    return ack;
   },
 
   // Вызвать следующего ожидающего пациента по специальности
@@ -154,9 +201,24 @@ export const queueService = {
       return { success: false, message: contractError };
     }
     if (!nextEntry?.id) return { success: false, message: 'Нет ожидающих пациентов' };
-    await apiRequest(`/doctor/queue/${nextEntry.id}/call`, { method: 'POST' });
-    // Уведомляем об обновлении
+    // DOCFLOW-FE-003 (audit 3886): the call POST result is authoritative.
+    // The old code ignored the response and always fabricated
+    // `{success: true, entry: <pre-call GET snapshot>}`. Only a confirmed
+    // `success: true` may notify and report the call, and the
+    // backend-returned entry (when present) is the canonical one — the
+    // pre-call GET snapshot may already be stale.
+    const callResult = await apiRequest<Record<string, unknown> | null>(`/doctor/queue/${nextEntry.id}/call`, { method: 'POST' });
+    const callAck = queueWriteAck(callResult);
+    if (callAck.success !== true) {
+      logger.error('[queueService] callNextWaiting NOT confirmed:', callAck.unknown ? 'ambiguous-2xx' : 'rejected', callAck.message);
+      return callAck;
+    }
+    // Уведомляем об обновлении (только подтвержденный вызов)
     notifyQueueUpdate(specialty, 'nextPatientCalled');
-    return { success: true, entry: nextEntry };
+    const canonicalEntry: Record<string, unknown> =
+      callResult && typeof callResult === 'object' && 'entry' in callResult && (callResult as { entry?: unknown }).entry
+        ? (callResult as { entry: Record<string, unknown> }).entry
+        : nextEntry;
+    return { success: true, entry: canonicalEntry };
   }
 };

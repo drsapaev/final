@@ -1246,7 +1246,24 @@ const DermatologistPanelUnified = () => {
 
     try {
       setLoading(true);
-      await queueService.completeVisit(entryId, {});
+      // DOCFLOW-FE-001 (audit 3886): only a confirmed `success: true` DTO
+      // completes the visit in the UI. An ambiguous (unreadable 2xx) or
+      // rejected response keeps the clinical state intact; the ambiguous
+      // branch additionally reconciles the visible queue with the canonical
+      // server snapshot instead of blindly retrying.
+      const completionAck = await queueService.completeVisit(entryId, {});
+      if (completionAck?.success !== true) {
+        const ackMessage = (completionAck as { message?: unknown } | undefined)?.message;
+        notify.error(
+          (typeof ackMessage === 'string' && ackMessage) || t('derma.derma_panel_complete_failed')
+        );
+        logger.error('[Dermatology] Visit completion NOT confirmed by the server');
+        if ((completionAck as { unknown?: unknown } | undefined)?.unknown === true) {
+          // Ambiguous outcome — refresh the visible queue from the server.
+          void loadDermatologyAppointments(true);
+        }
+        return;
+      }
 
       notify.success(t('derma.visit_completed'));
 

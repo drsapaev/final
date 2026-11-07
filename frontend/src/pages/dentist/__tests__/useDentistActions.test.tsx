@@ -550,3 +550,108 @@ describe('useDentistActions (PR-UI-15-5) — loading gate around loadData', () =
     await waitFor(() => expect(deps.setLoading).not.toHaveBeenCalled());
   });
 });
+
+describe('useDentistActions — DOCFLOW-FE-001/002 (audit 3886): honest completion ack + confirm identity binding', () => {
+  const synth = (extra: Partial<SelectedPatient>): SelectedPatient =>
+    ({ doctor_queue_entry_id: 99, patient_name: 'P', ...extra }) as SelectedPatient;
+  const patientA = synth({ doctor_queue_entry_id: 91, patient_id: 11, patient_name: 'A' });
+  const patientB = synth({ doctor_queue_entry_id: 92, patient_id: 22, patient_name: 'B' });
+
+  it('DOCFLOW-FE-001: an ambiguous (unreadable 2xx) completion ack is NOT a success — no reset, no auto-next-call', async () => {
+    vi.mocked(queueService.completeVisit).mockResolvedValueOnce({
+      success: false,
+      unknown: true,
+      message: 'Не подтверждено сервером / Not confirmed by the server',
+    } as never);
+    const deps = makeDeps({ selectedPatient: patientA });
+    const { result } = renderHook(() => useDentistActions(deps));
+
+    await result.current.handleCompleteVisit({ diagnosis: 'd', icd10_code: 'K02.1' });
+
+    expect(queueService.completeVisit).toHaveBeenCalledTimes(1);
+    expect(notify.error).toHaveBeenCalledWith(expect.stringContaining('Не подтверждено сервером'));
+    expect(notify.success).not.toHaveBeenCalledWith('dental.visit_completed');
+    expect(deps.setSelectedPatient).not.toHaveBeenCalledWith(null);
+    expect(deps.setShowVisitProtocol).not.toHaveBeenCalledWith(false);
+    expect(deps.handleTabChange).not.toHaveBeenCalledWith('queue');
+    expect(queueService.callNextWaiting).not.toHaveBeenCalled();
+    expect(deps.setLoading).toHaveBeenCalledWith(false);
+  });
+
+  it('DOCFLOW-FE-001: an explicit success:false rejection keeps the clinical state intact', async () => {
+    vi.mocked(queueService.completeVisit).mockResolvedValueOnce({
+      success: false,
+      message: 'Сервер отклонил завершение визита. / The server rejected the visit completion.',
+    } as never);
+    const deps = makeDeps({ selectedPatient: patientA });
+    const { result } = renderHook(() => useDentistActions(deps));
+
+    await result.current.handleCompleteVisit({ diagnosis: 'd', icd10_code: 'K02.1' });
+
+    expect(queueService.completeVisit).toHaveBeenCalledTimes(1);
+    expect(notify.error).toHaveBeenCalled();
+    expect(notify.success).not.toHaveBeenCalledWith('dental.visit_completed');
+    expect(deps.setSelectedPatient).not.toHaveBeenCalledWith(null);
+    expect(queueService.callNextWaiting).not.toHaveBeenCalled();
+  });
+
+  it('DOCFLOW-FE-001: the ambiguous branch reconciles the visible queue with the canonical server snapshot', async () => {
+    vi.mocked(queueService.completeVisit).mockResolvedValueOnce({
+      success: false,
+      unknown: true,
+      message: 'ambiguous',
+    } as never);
+    const deps = makeDeps({ selectedPatient: patientA });
+    const { result } = renderHook(() => useDentistActions(deps));
+
+    await result.current.handleCompleteVisit({ diagnosis: 'd', icd10_code: 'K02.1' });
+
+    expect(deps.loadDentistryAppointments).toHaveBeenCalledWith(true);
+  });
+
+  it('DOCFLOW-FE-002: a confirm resolved after the selection changed A→B never completes A and never wipes B', async () => {
+    let resolveConfirm!: (value: boolean) => void;
+    const confirm = vi.fn(
+      (_options: Record<string, unknown>) => new Promise<boolean>((resolve) => { resolveConfirm = resolve; }),
+    );
+    const depsA = makeDeps({ confirm, selectedPatient: patientA });
+    const { result, rerender } = renderHook(
+      ({ deps }: { deps: Deps }) => useDentistActions(deps),
+      { initialProps: { deps: depsA } },
+    );
+
+    const completion = result.current.handleCompleteVisit({ diagnosis: 'd', icd10_code: 'K02.1' });
+    // While the confirm dialog for A is pending, the panel moves to patient B.
+    rerender({ deps: makeDeps({ confirm, selectedPatient: patientB }) });
+    resolveConfirm(true);
+    await completion;
+
+    expect(queueService.completeVisit).not.toHaveBeenCalled();
+    expect(depsA.setSelectedPatient).not.toHaveBeenCalledWith(null);
+    expect(depsA.handleTabChange).not.toHaveBeenCalledWith('queue');
+    expect(queueService.callNextWaiting).not.toHaveBeenCalled();
+    expect(notify.success).not.toHaveBeenCalledWith('dental.visit_completed');
+  });
+
+  it('DOCFLOW-FE-002 positive control: an unchanged selection across the confirm still completes normally', async () => {
+    let resolveConfirm!: (value: boolean) => void;
+    const confirm = vi.fn(
+      (_options: Record<string, unknown>) => new Promise<boolean>((resolve) => { resolveConfirm = resolve; }),
+    );
+    const depsA = makeDeps({ confirm, selectedPatient: patientA });
+    const { result, rerender } = renderHook(
+      ({ deps }: { deps: Deps }) => useDentistActions(deps),
+      { initialProps: { deps: depsA } },
+    );
+
+    const completion = result.current.handleCompleteVisit({ diagnosis: 'd', icd10_code: 'K02.1' });
+    // Same patient re-selected (fresh object, same identity) while confirming.
+    rerender({ deps: makeDeps({ confirm, selectedPatient: synth({ doctor_queue_entry_id: 91, patient_id: 11 }) }) });
+    resolveConfirm(true);
+    await completion;
+
+    expect(queueService.completeVisit).toHaveBeenCalledWith(91, expect.objectContaining({ patient_id: 11 }));
+    expect(depsA.setSelectedPatient).toHaveBeenCalledWith(null);
+    expect(queueService.callNextWaiting).toHaveBeenCalledWith('dentistry');
+  });
+});
