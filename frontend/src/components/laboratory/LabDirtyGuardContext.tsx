@@ -534,7 +534,13 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
           labLeaveSentinel.endLeaveIntent();
         }
       },
-      { onCancel: () => { labLeaveSentinel.endLeaveIntent(); } },
+      {
+        onCancel: () => { labLeaveSentinel.endLeaveIntent(); },
+        // LABGUARD-FE-003 (audit 3886, round 13): уход с /lab —
+        // иммутабельный интент: пока диалог открыт, новый leave-переход
+        // не подменяет этот (см. useDirtyTransitionGuard).
+        intentPolicy: 'leave',
+      },
     );
     return decided;
     // guard.guardTransition стабилен (useCallback без deps внутри хука):

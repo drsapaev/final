@@ -83,6 +83,21 @@ export interface DirtyGuardTransitionOptions {
    * им достаточно тоста «сохраняется…».
    */
   onPendingBlock?: () => void;
+  /**
+   * LABGUARD-FE-003 (audit 3886, round 13): политика владения интентом
+   * при открытом диалоге.
+   * - 'leave' (guardRouteLeave: Logout/Back/покидание /lab): диалог
+   *   иммутабелен — новый dirty-переход отклоняется (false), pending не
+   *   трогается; подтверждение выполняет ПЕРВЫЙ интент. Прежнее поведение
+   *   молча подменяло onLeave (например Logout clearToken) чужим
+   *   коллбеком под тем же открытым окном.
+   * - 'context' (default; панельный urlIntent-флоу): сохраняет прежний
+   *   контракт supersede — in-lab URL-intent обновляет цель (например
+   *   переход на другой отчёт), база отката не меняется. Это
+   *   ВНУТРИЛАБОРАТОРНЫЙ переход, он не уничтожает сессию, и обновление
+   *   цели легитимно (e2e round 7: superseding tab-less intent).
+   */
+  intentPolicy?: 'leave' | 'context';
 }
 
 export interface DirtyTransitionGuard {
@@ -180,18 +195,17 @@ export function useDirtyTransitionGuard(options?: {
       void transition();
       return true;
     }
-    // LABGUARD-FE-003 (audit 3886): пока dirty-диалог открыт, новый
-    // dirty-переход НЕ перезаписывает молча чужой интент. Прежний код
-    // затирал pendingTransitionRef: первый guardRouteLeave (Logout:
-    // onLeave очищает токен и уводит на /login) подменялся вторым
-    // browser-Back guardRouteLeave(navigate(-2)), и Save/Discard
-    // выполнял уже ЧУЖОЙ переход под тем же открытым окном. Диалог
-    // отказывает второму интенту (false, состояние не тронуто):
-    // вызывающий код (popstate уже перевзвесил sentinel) остаётся на
-    // первом интенте; пользователь решает по нему, отмена — onCancel
-    // (guardRouteLeave снимает leaveIntent), повторная попытка — после
-    // закрытия диалога.
-    if (pendingTransitionRef.current !== null) {
+    // LABGUARD-FE-003 (audit 3886, round 13): политика владения интентом
+    // при открытом диалоге. 'leave' (guardRouteLeave: Logout/Back — уход
+    // с /lab): диалог иммутабелен — второй dirty-переход отклоняется без
+    // изменения pending. Прежний код затирал pendingTransitionRef:
+    // первый интент (Logout: onLeave очищает токен и уводит на /login)
+    // подменялся вторым browser-Back guardRouteLeave(navigate(-2)), и
+    // Save/Discard выполнял уже ЧУЖОЙ переход под тем же открытым окном.
+    // 'context' (панельный urlIntent): прежний контракт supersede —
+    // цель обновляется, база отката нет.
+    if (pendingTransitionRef.current !== null
+      && transitionOptions?.intentPolicy === 'leave') {
       return false;
     }
     const pending: PendingDirtyTransition = {

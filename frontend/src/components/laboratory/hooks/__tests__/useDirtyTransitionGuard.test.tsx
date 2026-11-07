@@ -42,6 +42,38 @@ describe('useDirtyTransitionGuard (PR5)', () => {
     expect(result.current.isDialogOpen).toBe(false);
   });
 
+  it('context policy (panel urlIntent) keeps the supersede contract', async () => {
+    // LABGUARD-FE-003 (audit 3886, round 13): 'context' — прежний
+    // контракт in-lab supersede (e2e round 7: superseding tab-less intent
+    // обновляет цель, база отката нет) — перезапись ОСТАЁТСЯ легитимной.
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    const firstTransition = vi.fn();
+    act(() => {
+      result.current.registerDirtySource({ id: 'report', isDirty: () => true, save });
+      result.current.guardTransition(firstTransition, { intentPolicy: 'context' });
+    });
+    expect(result.current.isDialogOpen).toBe(true);
+
+    // Внутрилабораторный supersede перезаписывает цель (без leave-политики).
+    // guardTransition возвращает false = «переход НЕ выполнен немедленно,
+    // ждёт подтверждения» — но pending уже заменён на supersede-цель.
+    const supersedingTransition = vi.fn();
+    let accepted = true;
+    act(() => {
+      accepted = result.current.guardTransition(supersedingTransition);
+    });
+    expect(accepted).toBe(false);
+    expect(result.current.isDialogOpen).toBe(true);
+    expect(firstTransition).not.toHaveBeenCalled();
+
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Выйти без сохранения' }));
+    await flush();
+    expect(supersedingTransition).toHaveBeenCalledTimes(1);
+    expect(firstTransition).not.toHaveBeenCalled();
+  });
+
   it('cancel keeps the user in place: no save, no transition', () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() => useDirtyTransitionGuard());
@@ -158,7 +190,7 @@ describe('useDirtyTransitionGuard (PR5)', () => {
     const firstTransition = vi.fn();
     act(() => {
       result.current.registerDirtySource({ id: 'report', isDirty: () => true, save });
-      result.current.guardTransition(firstTransition);
+      result.current.guardTransition(firstTransition, { intentPolicy: 'leave' });
     });
     expect(result.current.isDialogOpen).toBe(true);
 
@@ -166,7 +198,7 @@ describe('useDirtyTransitionGuard (PR5)', () => {
     const obsoleteTransition = vi.fn();
     let obsoleteAccepted = true;
     act(() => {
-      obsoleteAccepted = result.current.guardTransition(obsoleteTransition);
+      obsoleteAccepted = result.current.guardTransition(obsoleteTransition, { intentPolicy: 'leave' });
     });
     expect(obsoleteAccepted).toBe(false);
     expect(result.current.isDialogOpen).toBe(true);
@@ -182,7 +214,7 @@ describe('useDirtyTransitionGuard (PR5)', () => {
     const latestTransition = vi.fn();
     let latestAccepted = true;
     act(() => {
-      latestAccepted = result.current.guardTransition(latestTransition);
+      latestAccepted = result.current.guardTransition(latestTransition, { intentPolicy: 'leave' });
     });
     expect(latestAccepted).toBe(false);
     await act(async () => {
