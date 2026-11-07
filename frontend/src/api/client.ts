@@ -16,8 +16,8 @@ import logger from '../utils/logger';
 import type { LoginResult } from '../types/domain/auth';
 import { parseLoginResponse, AuthInvariantViolationError } from '../types/auth-mapper';
 import type { LoginResponseRaw, UserDto } from '../types/api';
-import { safeJsonParse } from '../utils/safeJsonParse';
 import type { HttpApiError } from '../types/errors';
+import { decodeJwtClaims, numericClaim } from '../utils/jwt';
 
 const API_BASE = getApiBaseUrl();
 // PR-39 / Medium-11: CSRF bootstrap defaults to ON. Set VITE_CSRF_BOOTSTRAP=0
@@ -119,19 +119,22 @@ const api = axios.create({
 });
 
 // ✅ SECURITY: Check if token is expiring soon (within 5 minutes)
-function isTokenExpiringSoon(token: string | null | undefined): boolean {
+// AUTH-FE-001 (audit 3886): exported for fail-first tests (jwt.claims.test.ts).
+export function isTokenExpiringSoon(token: string | null | undefined): boolean {
   if (!token) return true;
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return false;
-    const payload: { exp?: number } = safeJsonParse(atob(parts[1])) as { exp?: number };
-    if (!payload.exp) return false;
-    const expiresAt = payload.exp * 1000;
-    const fiveMinutes = 5 * 60 * 1000;
-    return Date.now() > (expiresAt - fiveMinutes);
-  } catch {
-    return false;
-  }
+  // AUTH-FE-001 (audit 3886): толерантный Base64URL-декодер. Прежний
+  // «сырой» atob бросал InvalidCharacterError на легальных `-`/`_`
+  // в JWT payload — catch возвращал false, и проактивный refresh
+  // молча skip-ался (оставалась только реактивная 401-страховка).
+  // Битый/не-JWT токен по-прежнему false: не триггерим превентивный
+  // refresh — 401-реактивный путь остаётся авторитетом.
+  const claims = decodeJwtClaims(token);
+  if (claims === null) return false;
+  const exp = numericClaim(claims, 'exp');
+  if (exp === null) return false;
+  const expiresAt = exp * 1000;
+  const fiveMinutes = 5 * 60 * 1000;
+  return Date.now() > (expiresAt - fiveMinutes);
 }
 
 // ✅ SECURITY: Single-flight pattern for token refresh

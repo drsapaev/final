@@ -57,9 +57,18 @@ export const useLabHotkeys = ({
       // Checking the DOM also covers nested confirm dialogs whose state is
       // local to report/template workbenches and not exposed to LabPanel.
       if (currentDisabled || document.querySelector('[role="dialog"]')) return;
-      // Ignore shortcuts when user is typing in an input/textarea
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      // Ignore shortcuts when the user is interacting with a native control.
+      // LABUX-FE-001 (audit 3886): previously only INPUT/TEXTAREA were
+      // excluded — a native <select> (ReportEditor choice values), a
+      // contenteditable region or an ARIA combobox received global Escape
+      // (clearing the selected patient/report behind the popup) and
+      // Ctrl/⌘+1–3 (switching panel tabs mid-choice). Semantic check via
+      // closest() covers ancestors (e.g. a select inside a labelled
+      // wrapper) the way isContentEditable does for rich text.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest(
+        'input, textarea, select, [contenteditable], [role="combobox"], [role="listbox"]',
+      )) {
         return;
       }
 

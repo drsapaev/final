@@ -143,37 +143,58 @@ describe('useDirtyTransitionGuard (PR5)', () => {
   });
 
   it('does not run an obsolete transition when a newer intent arrives during save', async () => {
+    // LABGUARD-FE-003 (audit 3886, round 13): переписан под контракт
+    // иммутабельности открытого диалога. Прежняя версия кодифицировала
+    // баг: второй guardTransition при открытом диалоге МОЛЧА подменял
+    // первый интент (pendingTransitionRef перезаписывался) — Save/Discard
+    // выполнял уже ЧУЖОЙ переход. Новый контракт: пока диалог открыт
+    // (включая окно in-flight save), новые интенты отклоняются (false),
+    // pending не трогается; подтверждение выполняет ПЕРВЫЙ интент.
     let resolveSave: (() => void) | undefined;
     const save = vi.fn(() => new Promise<void>((resolve) => {
       resolveSave = resolve;
     }));
     const { result } = renderHook(() => useDirtyTransitionGuard());
+    const firstTransition = vi.fn();
     act(() => {
       result.current.registerDirtySource({ id: 'report', isDirty: () => true, save });
-      result.current.guardTransition(vi.fn());
+      result.current.guardTransition(firstTransition);
     });
+    expect(result.current.isDialogOpen).toBe(true);
+
+    // Второй интент при открытом диалоге — отклонён, pending сохранён.
     const obsoleteTransition = vi.fn();
+    let obsoleteAccepted = true;
     act(() => {
-      result.current.guardTransition(obsoleteTransition);
+      obsoleteAccepted = result.current.guardTransition(obsoleteTransition);
     });
+    expect(obsoleteAccepted).toBe(false);
+    expect(result.current.isDialogOpen).toBe(true);
+
     render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить и перейти' }));
     await act(async () => {
       await Promise.resolve();
     });
 
+    // Третий интент прибывает, пока save в полёте (busy): тоже отклонён —
+    // он НЕ выполняется сразу и НЕ подменяет подтверждённый первый.
     const latestTransition = vi.fn();
+    let latestAccepted = true;
     act(() => {
-      result.current.guardTransition(latestTransition);
+      latestAccepted = result.current.guardTransition(latestTransition);
     });
+    expect(latestAccepted).toBe(false);
     await act(async () => {
       resolveSave?.();
       await Promise.resolve();
     });
 
+    // Save завершился: выполнен ПЕРВЫЙ интент; подмены не случилось.
+    expect(firstTransition).toHaveBeenCalledTimes(1);
     expect(obsoleteTransition).not.toHaveBeenCalled();
     expect(latestTransition).not.toHaveBeenCalled();
-    expect(result.current.isDialogOpen).toBe(true);
+    expect(result.current.isDialogOpen).toBe(false);
   });
 
   it('a failed save keeps the user in place and does not continue the transition', async () => {

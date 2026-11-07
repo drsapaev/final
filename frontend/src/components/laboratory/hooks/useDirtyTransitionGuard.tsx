@@ -180,6 +180,20 @@ export function useDirtyTransitionGuard(options?: {
       void transition();
       return true;
     }
+    // LABGUARD-FE-003 (audit 3886): пока dirty-диалог открыт, новый
+    // dirty-переход НЕ перезаписывает молча чужой интент. Прежний код
+    // затирал pendingTransitionRef: первый guardRouteLeave (Logout:
+    // onLeave очищает токен и уводит на /login) подменялся вторым
+    // browser-Back guardRouteLeave(navigate(-2)), и Save/Discard
+    // выполнял уже ЧУЖОЙ переход под тем же открытым окном. Диалог
+    // отказывает второму интенту (false, состояние не тронуто):
+    // вызывающий код (popstate уже перевзвесил sentinel) остаётся на
+    // первом интенте; пользователь решает по нему, отмена — onCancel
+    // (guardRouteLeave снимает leaveIntent), повторная попытка — после
+    // закрытия диалога.
+    if (pendingTransitionRef.current !== null) {
+      return false;
+    }
     const pending: PendingDirtyTransition = {
       run: transition,
       onCancel: transitionOptions?.onCancel,
