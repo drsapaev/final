@@ -6848,6 +6848,9 @@ const kk = {
     mqm_btn_close_reception: 'Закрыть приём',
     mqm_refresh_queue: 'Обновить очередь',
     mqm_call: 'Вызвать',
+    // QMAN-FE-001 (audit 3886): failed current-selection load is visible and recoverable
+    mqm_queue_load_failed: 'Таңдалған дәрігердің кезегін жүктеу сәтсіз аяқталды. Алдыңғы дәрігердің деректері жасырылған — жүктеуді қайталаңыз.',
+    mqm_retry_load: 'Жүктеуді қайталау',
     mqm_aria_auto_refresh_off: 'Отключить автообновление очереди',
     mqm_aria_auto_refresh_on: 'Включить автообновление очереди',
     mqm_title_auto_refresh_on: 'Автообновление включено',

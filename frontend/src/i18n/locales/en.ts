@@ -6848,6 +6848,9 @@ const en = {
     mqm_btn_close_reception: 'Закрыть приём',
     mqm_refresh_queue: 'Обновить очередь',
     mqm_call: 'Вызвать',
+    // QMAN-FE-001 (audit 3886): failed current-selection load is visible and recoverable
+    mqm_queue_load_failed: "Failed to load the selected doctor's queue. The previous doctor's data is hidden — retry the load.",
+    mqm_retry_load: 'Retry load',
     mqm_aria_auto_refresh_off: 'Отключить автообновление очереди',
     mqm_aria_auto_refresh_on: 'Включить автообновление очереди',
     mqm_title_auto_refresh_on: 'Автообновление включено',
