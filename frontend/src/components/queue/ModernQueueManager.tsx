@@ -1,5 +1,5 @@
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';
@@ -126,6 +126,25 @@ const ModernQueueManager = ({
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [calledPatients, setCalledPatients] = useState<NonNullable<QueueActionResponse['patient']>[]>([]);
   const [startingQueueEntryId, setStartingQueueEntryId] = useState<string | number | null>(null);
+  // QMAN-FE-001 (audit 3886): a failed load of the CURRENT selection must be
+  // visible and recoverable — the previous selection's queue is no longer
+  // presented as current (the hook clears it fail-closed).
+  const [queueLoadError, setQueueLoadError] = useState<string | null>(null);
+  // QMAN-FE-002 (audit 3886): the live doctor/date selection must be
+  // reachable from a ref so a pending call-next response for a superseded
+  // selection can be dropped before it appends to the new selection's
+  // called list.
+  const selectionIdentityRef = useRef({ specialistId: effectiveDoctor, targetDate: effectiveDate });
+  selectionIdentityRef.current = { specialistId: effectiveDoctor, targetDate: effectiveDate };
+
+  // QMAN-FE-002 (audit 3886): called entries belong to ONE doctor/date
+  // selection. A selection transition invalidates the local called list —
+  // entries called under the previous selection must not expose Start
+  // Visit actions under the new one (backend authorization stays the
+  // SSOT; this only stops presenting stale local state as actionable).
+  useEffect(() => {
+    setCalledPatients([]);
+  }, [effectiveDoctor, effectiveDate]);
 
   // RQ-11 (F-10): классификация срока из серверного expires_at (valid/expired/
   // unspecified). Пересчитывается при открытии диалога, чтобы истекший код
@@ -193,10 +212,29 @@ const ModernQueueManager = ({
         targetDate: effectiveDate,
         doctor
       });
+      setQueueLoadError(null);
     } catch (error) {
-      // Не показываем тост при автообновлении, чтобы не спамить
+      // QMAN-FE-001 (audit 3886): a failed load of the CURRENT selection is
+      // surfaced as a recoverable error with a retry — the hook has already
+      // cleared the previous selection's data, so nothing stale is
+      // presented as current. (No toast: the polling fallback would spam.)
       logger.error('Ошибка загрузки очереди:', error);
+      // Localized headline always; the raw failure detail rides along in
+      // parentheses so the doctor sees both the meaning and the cause.
+      const loadFailureDetail = getErrorMessage(error);
+      setQueueLoadError(
+        loadFailureDetail
+          ? `${t('misc.mqm_queue_load_failed')} (${loadFailureDetail})`
+          : t('misc.mqm_queue_load_failed')
+      );
     }
+    // `t` is intentionally NOT a dependency: useTranslation returns a fresh
+    // function identity on every render, and adding it here would re-create
+    // `loadQueue` on every render and re-trigger the auto-load effect in an
+    // endless snapshot loop (surfaced by the PR-UI-12-4 e2e geometry check).
+    // The translation is locale-pure for a fixed key — a stale closure only
+    // means the previous locale's text for one error message.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveDoctor, effectiveDate, doctors, loadQueueSnapshot]);
 
   // Автоматическая загрузка при изменении врача или даты
@@ -382,17 +420,32 @@ const ModernQueueManager = ({
       return;
     }
 
+    // QMAN-FE-002 (audit 3886): snapshot the selection identity this call
+    // belongs to; a response that resolves after the selection moved to
+    // another doctor/date must not append to the new selection's list.
+    const callIdentity = { specialistId: effectiveDoctor, targetDate: effectiveDate };
+
     try {
       const result = await callNextPatientInQueue({
         specialistId: effectiveDoctor,
         targetDate: effectiveDate
       });
 
+      const selectionMoved =
+        String(selectionIdentityRef.current.specialistId) !== String(callIdentity.specialistId) ||
+        String(selectionIdentityRef.current.targetDate) !== String(callIdentity.targetDate);
+
       if (result?.success && result?.patient) {
         if (onStartVisit && result.patient.id !== null && result.patient.id !== undefined) {
-          setCalledPatients((current) => current.some((patient) => String(patient.id) === String(result.patient?.id))
-            ? current
-            : [...current, result.patient!]);
+          if (selectionMoved) {
+            // The call succeeded for the PREVIOUS selection — report it but
+            // never expose its Start Visit action under the new selection.
+            logger.warn('[ModernQueueManager] call-next resolved for a superseded selection — dropping the local called entry');
+          } else {
+            setCalledPatients((current) => current.some((patient) => String(patient.id) === String(result.patient?.id))
+              ? current
+              : [...current, result.patient!]);
+          }
         } else if (onStartVisit) {
           toast.error(t('dental.dental_panel_start_visit_failed'));
         }
@@ -829,6 +882,22 @@ const ModernQueueManager = ({
               </Badge>
             }
           </div>
+
+          {/* QMAN-FE-001 (audit 3886): a failed load of the CURRENT selection
+              is visible and recoverable — the previous selection's queue has
+              been cleared by the hook and must not be presented as current. */}
+          {queueLoadError && (
+            <div className="mqm-queue-load-error" role="alert">
+              <span>{queueLoadError}</span>
+              <Button
+                variant="outline"
+                size="small"
+                onClick={() => { void loadQueue(); }}
+              >
+                {t('misc.mqm_retry_load')}
+              </Button>
+            </div>
+          )}
 
           <QueueTable
             queueData={queueData as unknown as QueueTableData | null}
