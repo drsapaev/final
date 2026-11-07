@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-11-05 - Missing aria-hidden on Decorative SVGs in ARIA components
+**Learning:** When an element communicates a state via ARIA attributes (e.g., a `<button>` with `aria-busy` or a progress bar with `aria-valuenow`), any internal visual SVGs (like loading spinners or progress rings) can create noise for screen readers or inadvertently capture focus on some browsers.
+**Action:** Ensure internal visual SVGs have both `aria-hidden="true"` and `focusable="false"` applied to prevent screen readers from redundantly announcing them and to avoid them capturing focus.
