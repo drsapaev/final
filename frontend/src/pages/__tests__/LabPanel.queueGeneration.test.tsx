@@ -148,7 +148,9 @@ describe('LABQ-FE-001 — a load-more page is owned by the queue generation it w
   });
 
   it('does not append the stale page into the refreshed snapshot (mock resolves despite abort)', async () => {
-    let releaseStalePage: ((mode: 'data' | 'abort') => void) | null = null;
+    let releaseStalePage: (mode: 'data' | 'abort') => void = () => {
+      throw new Error('stale page release not armed');
+    };
     const callLog: string[] = [];
     listQueueTodayMock.mockImplementation(async (_date: unknown, params: { offset?: number; signal?: AbortSignal } & Record<string, unknown>) => {
       const offset = Number(params?.offset ?? 0);
@@ -190,7 +192,6 @@ describe('LABQ-FE-001 — a load-more page is owned by the queue generation it w
     // Page 2 for snapshot B starts (offset 10) and hangs.
     fireEvent.click(screen.getByTestId('vql-load-more'));
     await settle();
-    expect(releaseStalePage).not.toBeNull();
 
     // Refresh installs snapshot C while the page is in flight.
     fireEvent.click(screen.getByRole('button', { name: /Yangilash|Обновить|Refresh/i }));
@@ -204,7 +205,7 @@ describe('LABQ-FE-001 — a load-more page is owned by the queue generation it w
     expect(screen.queryByTestId('vql-row-3001')).toBeNull();
 
     // The stale page resolves despite its abort() — it must be ignored.
-    releaseStalePage?.('data');
+    releaseStalePage('data');
     await settle();
 
     // Pre-fix: A's rows were appended into C's snapshot. Post-fix: absent.
@@ -227,8 +228,12 @@ describe('LABQ-FE-001 — a load-more page is owned by the queue generation it w
     // Two overlapping REFRESH requests (the finding is about
     // loadLabAppointments' own loading flag, not the incremental one):
     // generation 1 hangs, generation 2 aborts it and stays pending.
-    let releaseFirst: ((mode: 'data' | 'abort') => void) | null = null;
-    let releaseSecond: (() => void) | null = null;
+    let releaseFirst: (mode: 'data' | 'abort') => void = () => {
+      throw new Error('first release not armed');
+    };
+    let releaseSecond: () => void = () => {
+      throw new Error('second release not armed');
+    };
     listQueueTodayMock.mockImplementation(async (_date: unknown, params: { offset?: number } & Record<string, unknown>) => {
       const offset = Number(params?.offset ?? 0);
       expect(offset).toBe(0);
@@ -268,12 +273,10 @@ describe('LABQ-FE-001 — a load-more page is owned by the queue generation it w
     // stays pending.
     fireEvent.keyDown(document.body, { key: 'F5' });
     await settle();
-    expect(releaseFirst).not.toBeNull();
-    expect(releaseSecond).not.toBeNull();
 
     // Generation 1 completes with an AbortError-like rejection while
     // generation 2 is STILL pending.
-    releaseFirst?.('abort');
+    releaseFirst('abort');
     await settle();
 
     // Pre-fix: the outdated finally cleared the loading state here and the
@@ -282,7 +285,7 @@ describe('LABQ-FE-001 — a load-more page is owned by the queue generation it w
     expect(skeletonVisible()).toBe(true);
 
     // Generation 2 completes and may clear the loading state.
-    releaseSecond?.();
+    releaseSecond();
     await settle();
     expect(skeletonVisible()).toBe(false);
     expect(screen.getByTestId('vql-row-2001')).toBeInTheDocument();

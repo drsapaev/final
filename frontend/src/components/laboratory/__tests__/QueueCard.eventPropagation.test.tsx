@@ -37,7 +37,7 @@ function renderCard(onOpenAppointment: ReturnType<typeof vi.fn>) {
     <QueueCard
       appointment={APPOINTMENT as never}
       isSelected={false}
-      onOpenAppointment={onOpenAppointment}
+      onOpenAppointment={onOpenAppointment as never}
     />,
   );
 }
