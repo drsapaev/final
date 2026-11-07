@@ -223,6 +223,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
       {loading &&
       <svg
         className="mac-button-spinner"
+        aria-hidden="true"
+        focusable="false"
         style={{
           width: '14px',
           height: '14px',
