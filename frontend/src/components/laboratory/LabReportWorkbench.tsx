@@ -1119,8 +1119,20 @@ export default function LabReportWorkbench({
     }
   }
 
-  // P1 fix: Notify patient via Telegram — sends lab results PDF to patient's
-  // Telegram chat via POST /telegram/send-lab-results backend endpoint.
+  // LABN-FE-001/002 (audit 3886 round 10): Notify patient via Telegram —
+  // sends the FINALIZED report-instance PDF to the patient's Telegram chat
+  // via POST /telegram/send-lab-report-instance. The old call posted
+  // {patient_id, instance_id} to /telegram/send-lab-results, a legacy
+  // lab_result-scoped route with query-parameter validation — every call
+  // was rejected 422 before business logic, and the route never implemented
+  // the promised PDF delivery.
+  //
+  // LABN-FE-002: an HTTP 2xx does NOT mean the patient received anything —
+  // the route answers 200 + {success:false} when the patient is not linked
+  // to the bot or disabled lab notifications. Success is asserted ONLY on
+  // an explicit success === true; a false/absent/malformed payload is
+  // surfaced as an honest failure (server-provided, non-PHI reason when
+  // present), never as «отправлено».
   //
   // UX-AUDIT-QW1: Добавлен ConfirmDialog. Отправка в Telegram необратима
   // (нельзя отозвать сообщение). Соответствие Nielsen Heuristic #5
@@ -1145,12 +1157,33 @@ export default function LabReportWorkbench({
     setSaving(true);
     setBusyAction('notify');
     try {
-      await api.post('/telegram/send-lab-results', {
+      const response = await api.post('/telegram/send-lab-report-instance', {
         patient_id: patientId,
-        instance_id: instanceId,
+        report_instance_id: instanceId,
       });
       if (!isOperationCurrent(operation)) return;
-      notify?.('success', t('success.notified'));
+      const payload = (response as { data?: unknown })?.data;
+      const delivered =
+        payload != null &&
+        typeof payload === 'object' &&
+        (payload as { success?: unknown }).success === true;
+      if (delivered) {
+        notify?.('success', t('success.notified'));
+      } else {
+        // Honest failure: the dispatch attempt resolved, but the patient
+        // did not receive the report (not linked / notifications disabled /
+        // unreadable payload). Show the server's redacted reason when the
+        // shape carries one; never report a false «sent» confirmation.
+        const serverReason =
+          payload != null && typeof payload === 'object'
+            ? (payload as { message?: unknown }).message
+            : undefined;
+        const reason =
+          typeof serverReason === 'string' && serverReason.trim()
+            ? serverReason.trim()
+            : t('errors.notify_not_delivered');
+        notify?.('error', reason);
+      }
     } catch (error) {
       if (!isOperationCurrent(operation)) return;
       const msg = getErrorMessage(error) || 'Не удалось отправить результаты пациенту.';

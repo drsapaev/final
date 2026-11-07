@@ -273,7 +273,8 @@ describe('LabReportWorkbench', () => {
 
   it('UX-AUDIT-QW1: requires confirm dialog before sending results to patient via Telegram', () => {
     // QW1 fix: handleNotifyPatient — необратимая отправка в Telegram.
-    // Должен вызывать useConfirm() перед POST /telegram/send-lab-results.
+    // Должен вызывать useConfirm() перед POST /telegram/send-lab-report-instance
+    // (LABN-FE-001, audit 3886 round 10: instance-scoped PDF contract).
     const source = fs.readFileSync(workbenchPath, 'utf8');
 
     // Ищем функцию handleNotifyPatient и проверяем, что она вызывает confirm()
@@ -289,7 +290,7 @@ describe('LabReportWorkbench', () => {
     // Действие не должно выполняться без подтверждения
     expect(fnBody).toContain('if (!ok) return;');
     // Не должен быть POST до confirm
-    const postIndex = fnBody.indexOf("api.post('/telegram/send-lab-results'");
+    const postIndex = fnBody.indexOf("api.post('/telegram/send-lab-report-instance'");
     const confirmIndex = fnBody.indexOf('await confirm(');
     expect(postIndex).toBeGreaterThan(confirmIndex);
   });

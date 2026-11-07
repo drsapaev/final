@@ -3,7 +3,7 @@
 Поддержка массовых рассылок, планировщика и аналитики
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import (
@@ -15,6 +15,7 @@ from fastapi import (
     Request,
     status,
 )
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -439,6 +440,153 @@ async def send_lab_results(
                 detail="Ошибка отправки результатов",
             )
 
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
+
+
+# LABN-FE-001 (audit 3886 round 10): the lab workbench «Отправить пациенту»
+# action operates on a lab report INSTANCE (new lab-reporting module). The
+# legacy /send-lab-results route serves legacy lab_result rows with a
+# templated TEXT message and cannot accept an instance ID — the pre-fix
+# frontend posted {patient_id, instance_id} JSON to it and was rejected 422
+# at validation before any business logic. This dedicated route renders the
+# same finalized-report PDF as GET /lab/report-instances/{id}/pdf and
+# delivers it through the bot's sendDocument path. Patient binding, doctor
+# scope and Telegram consent are enforced server-side.
+LAB_REPORT_INSTANCE_NOTIFY_ALLOWED_STATUSES = {"FINALIZED", "PRINTED"}
+
+
+class LabReportInstanceNotificationRequest(BaseModel):
+    """Explicit body contract for the instance-scoped report notification.
+
+    A wrong-shape request (e.g. the legacy field name ``instance_id`` or a
+    legacy ``lab_result_ids`` list) fails Pydantic validation with a
+    readable 422 instead of silently mapping unrelated ID spaces.
+    """
+
+    patient_id: int
+    report_instance_id: int
+
+
+@router.post("/send-lab-report-instance", response_model=dict[str, Any])
+async def send_lab_report_instance_notification(
+    payload: LabReportInstanceNotificationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
+):
+    """Отправить финализированный лабораторный бланк пациенту в Telegram (PDF).
+
+    Семантика статусов зеркалит legacy /send-lab-results: 200 +
+    ``{"success": false, "message": ...}`` означает, что пациент
+    НЕ получил отправку (не связан с ботом или отключил уведомления) —
+    фронтенд обязан показывать это как неудачу (LABN-FE-002), а не как
+    «отправлено».
+    """
+    from app.services.lab_reporting import LabReportingDomainError, LabReportingService
+    from app.services.lab_report_pdf_service import lab_report_pdf_service
+
+    from .lab_reporting import _ensure_doctor_can_read_lab_instance
+
+    try:
+        patient = crud_patient.get_patient(db, payload.patient_id)
+        if not patient:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=t("patient.not_found")
+            )
+
+        # Doctor scope parity with the legacy lab-results send.
+        _ensure_doctor_can_send_patient_lab_results(db, payload.patient_id, current_user)
+
+        telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient.phone)
+        if not telegram_user:
+            return {
+                "success": False,
+                "message": "Пациент не зарегистрирован в Telegram боте",
+            }
+
+        if not _telegram_notification_allowed(telegram_user, "lab_notifications"):
+            return _telegram_notifications_disabled_response()
+
+        service = LabReportingService(db)
+        try:
+            instance = service.get_instance(payload.report_instance_id)
+        except LabReportingDomainError as exc:
+            raise HTTPException(
+                status_code=exc.status_code, detail=exc.detail
+            ) from exc
+
+        # Same read/PDF guard as GET /lab/report-instances/{id}/pdf.
+        _ensure_doctor_can_read_lab_instance(db, instance, current_user)
+
+        if int(getattr(instance, "patient_id", -1) or -1) != int(payload.patient_id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Отчёт не принадлежит указанному пациенту",
+            )
+
+        if str(getattr(instance, "status", "")) not in (
+            LAB_REPORT_INSTANCE_NOTIFY_ALLOWED_STATUSES
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only finalized reports can be sent to the patient",
+            )
+
+        # Identical render payload to the download endpoint, so the
+        # delivered PDF is byte-equivalent to what staff prints.
+        materialized_sections = service.materialize_instance(instance)
+        critical_findings = service.summarize_critical_findings(materialized_sections)
+        pdf_bytes = lab_report_pdf_service.render_report(
+            {
+                "template_name": instance.template.name,
+                "layout_preset": instance.template_version.layout_preset,
+                "page_settings": instance.template_version.page_settings or {},
+                "branding": instance.branding_snapshot or {},
+                "patient": instance.patient_snapshot or {},
+                "signers": instance.signer_snapshot or {},
+                "sections": materialized_sections,
+                "critical_findings": critical_findings,
+                "footer_notes": instance.template_version.footer_notes,
+                "report_date": (
+                    instance.finalized_at or instance.created_at or datetime.now(UTC)
+                ).strftime("%d.%m.%Y"),
+            }
+        )
+
+        bot_service = await get_telegram_bot_service()
+        # PR-2 (round 9): cross-process rotation/revocation visibility.
+        from app.api.v1.endpoints.telegram_webhook._helpers import (
+            _ensure_bot_service_fresh,
+        )
+
+        await _ensure_bot_service_fresh(db, bot_service)
+
+        filename = f"lab-report-{instance.id}.pdf"
+        # Caption intentionally empty: the PDF itself is the payload and
+        # carries the full report; no patient metadata is duplicated in
+        # the message text and nothing is logged.
+        sent, _message_id, _send_error = await bot_service._send_document(
+            chat_id=telegram_user.chat_id,
+            filename=filename,
+            document_bytes=pdf_bytes,
+        )
+
+        if not sent:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Ошибка отправки отчёта",
+            )
+
+        return {
+            "success": True,
+            "message": "Отчёт отправлен пациенту",
+            "report_instance_id": payload.report_instance_id,
+        }
     except HTTPException:
         raise
     except Exception:

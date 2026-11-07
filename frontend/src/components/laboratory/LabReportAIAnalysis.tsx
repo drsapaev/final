@@ -22,12 +22,21 @@ import { X } from 'lucide-react';
  *   - есть активный бланк (activeInstance)
  *   - есть заполненные поля (не только пустые values)
  */
+// LABAI-FE-002 (audit 3886 round 10): whitelist the canonical sex domain
+// instead of coalescing every non-empty string into 'other'. The backend
+// patient model's canonical domain is M|F|X: a legitimate non-binary 'X'
+// stays a supported 'other' category for AI analysis, while legacy or
+// free-form values ('unknown', 'N/A', '?', whitespace, unexpected codes)
+// are UNKNOWN — AI interpretation is fail-closed (null blocks the analysis)
+// instead of silently proceeding with a fabricated demographic parameter.
 function normalizeSexForAI(sex: unknown): 'male' | 'female' | 'other' | null {
-  if (!sex) return null;
+  if (sex == null) return null;
   const s = String(sex).trim().toUpperCase();
+  if (!s) return null;
   if (s === 'M' || s === 'MALE') return 'male';
   if (s === 'F' || s === 'FEMALE') return 'female';
-  return 'other';
+  if (s === 'X') return 'other';
+  return null;
 }
 
 interface LabField {

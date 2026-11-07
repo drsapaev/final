@@ -47,8 +47,13 @@ interface ContentTabProps {
   onToggleField: (sectionIndex: number, fieldIndex: number) => void;
   onAddSection: () => void;
   onAddField: (sectionIndex: number) => void;
-  onRemoveSection: (sectionIndex: number) => void;
-  onRemoveField: (sectionIndex: number, fieldIndex: number) => void;
+  /** TEMPL-FE-002 (audit 3886 round 11): removal is identity-scoped — the
+   * callback receives the captured section KEY (plus the draft epoch and
+   * object reference fallback), never bare indexes that can point at a
+   * different element after an async confirmation. */
+  onRemoveSection: (sectionKey: string, epoch: number, sectionRef?: unknown) => void;
+  onRemoveField: (fieldKey: string, sectionKey: string, epoch: number, fieldRef?: unknown, sectionRef?: unknown) => void;
+  getDraftEpoch: () => number;
   onDuplicateField: (sectionIndex: number, fieldIndex: number) => void;
   onMoveField: (sectionIndex: number, fieldIndex: number, direction: MoveDirection) => void;
   onMoveSection: (sectionIndex: number, direction: MoveDirection) => void;
@@ -93,6 +98,7 @@ function ContentTab({
   onAddField,
   onRemoveSection,
   onRemoveField,
+  getDraftEpoch,
   onDuplicateField,
   onMoveField,
   onMoveSection,
@@ -107,7 +113,10 @@ function ContentTab({
 }: ContentTabProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
   // UX-AUDIT-FIX4: useConfirm для деструктивных действий (удаление секции/поля).
-  const [confirm] = useConfirm();
+  // TEMPL-FE-002 (audit 3886 round 11): the dialog PORTAL element returned by
+  // the hook MUST be rendered — it was previously destructured away, so the
+  // confirm promise never resolved and the trash icons were silent no-ops.
+  const [confirm, confirmDialogElement] = useConfirm();
 
   // UX-AUDIT-FIX5: глобальный тоггл для raw JSON правил.
   // По умолчанию выключен — raw JSON скрыт из основного UI.
@@ -115,6 +124,13 @@ function ContentTab({
 
   async function handleRemoveSection(sectionIndex: number, section: ContentTabSection) {
     // STRAT#11: строки мигрированы на t() / tInterpolate() из labTranslations.
+    // TEMPL-FE-002 (audit 3886 round 11): capture the section identity and
+    // the draft epoch at CLICK time; the async confirm may resolve after a
+    // reorder/removal/template switch, and the deferred removal must target
+    // the SAME named section (by key), not whatever occupies the old index.
+    const epoch = getDraftEpoch();
+    const sectionKey = String(section?.key ?? '');
+    const sectionRef = section;
     const sectionName = section?.title || section?.key || `${t('content.section_fallback')} #${sectionIndex + 1}`;
     const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
       title: t('confirm.delete_section_title'),
@@ -124,11 +140,20 @@ function ContentTab({
       cancelLabel: t('confirm.cancel'),
       intent: 'danger',
     });
-    if (ok) onRemoveSection(sectionIndex);
+    if (ok) onRemoveSection(sectionKey, epoch, sectionRef);
   }
 
-  async function handleRemoveField(sectionIndex: number, fieldIndex: number, field: ContentTabField) {
+  async function handleRemoveField(sectionIndex: number, fieldIndex: number, field: ContentTabField, section?: ContentTabSection) {
     // STRAT#11: строки мигрированы на t() / tInterpolate() из labTranslations.
+    // TEMPL-FE-002 (audit 3886 round 11): capture the field + section
+    // identity and the draft epoch at CLICK time; after the async confirm,
+    // the removal targets the same named field (by keys), never a displaced
+    // index occupant.
+    const epoch = getDraftEpoch();
+    const fieldKey = String(field?.field_key ?? '');
+    const owningSectionKey = String(section?.key ?? '');
+    const fieldRef = field;
+    const sectionRef = section;
     const fieldName = field?.label || field?.field_key || `${t('content.field_fallback')} #${fieldIndex + 1}`;
     const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
       title: t('confirm.delete_field_title'),
@@ -138,7 +163,7 @@ function ContentTab({
       cancelLabel: t('confirm.cancel'),
       intent: 'danger',
     });
-    if (ok) onRemoveField(sectionIndex, fieldIndex);
+    if (ok) onRemoveField(fieldKey, owningSectionKey, epoch, fieldRef, sectionRef);
   }
 
   // UX-AUDIT-FIX7: Bulk-загрузка всех референсных интервалов из каталога.
@@ -171,6 +196,7 @@ function ContentTab({
 
   return (
     <div className="ltw-grid">
+      {confirmDialogElement}
       <div className="ltw-flex-between">
         <div className="ltw-fw-600">
           {t('content.header')} ({draftVersion?.sections?.reduce((acc: number, s: ContentTabSection) => acc + (s.fields?.length || 0), 0) || 0} {t('content.header_fields')} {draftVersion?.sections?.length || 0} {t('content.header_sections')})
@@ -287,7 +313,7 @@ function ContentTab({
                             <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onDuplicateField(sectionIndex, fieldIndex); }} aria-label={t('content.duplicate_field')}>
                               <Files size={12} aria-hidden="true" />
                             </Button>
-                            <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); handleRemoveField(sectionIndex, fieldIndex, field); }} aria-label={t('content.delete_field')}>
+                            <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); handleRemoveField(sectionIndex, fieldIndex, field, section); }} aria-label={t('content.delete_field')}>
                               <Trash2 size={12} aria-hidden="true" />
                             </Button>
                           </span>
