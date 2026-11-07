@@ -52,7 +52,15 @@ jobs:
           pip install pytest pytest-cov pytest-asyncio httpx
           # Pinned: mutmut 3 removed the --paths-to-mutate CLI flag this job
           # used before; config now lives in backend/pyproject.toml [tool.mutmut].
-          pip install mutmut==3.7.0
+          # 3.8.1 fix: 3.7.0's pytest plugin hook read item._nodeid, which
+          # pytest 9 (2026-10-30 release, installed unpinned above) removed;
+          # stats collection died with AttributeError at teardown and the
+          # nightly backend-mutation job failed every run since 2026-10-31.
+          # 3.8.1 reads the public item.nodeid API; [tool.mutmut] config keys
+          # (source_paths / pytest_add_cli_args_test_selection / only_mutate)
+          # and the summary line parsed by scripts/parse-mutmut-score.py are
+          # unchanged between 3.7.0 and 3.8.1.
+          pip install mutmut==3.8.1
 
       - name: Wait for Postgres + apply migrations
         working-directory: backend
