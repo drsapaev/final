@@ -1,3 +1,89 @@
+## T18 RQ-18 post-#3899 local regression; live staging NOT_RUN — 2026-11-07T01:11:21+05:00
+
+- Commit under test: local worktree HEAD `4c40355b95844a4f779c582ff81f1685034be163`; it contains current `origin/main` `2093745a7d1082907f3d118fc6d90bc2e061af53` from #3899. The published PR #3897 still points to `ea1a9011f86a8e3f9d663e3b6e7b272cefd93264`, based on `5363a9ca53234539c5022b587250374a452a91a0`; local branch is ahead by three commits.
+- Environment: Windows host with 7.69 GiB visible RAM; at inspection about 1.4 GiB was free. WSL `Ubuntu-24.04` was not running. C: had about 15.3 GiB free and D: about 28.7 GiB free. No staging project was started in this validation slice.
+- Execution mode: `gate_known_root_cause` for the merged public QR source change in `frontend/src/pages/QueueJoin.tsx`; launcher returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`. The basis was the user's standing authorization for repeated synthetic T18 validation. The generated execution prompt was read. No runtime or tracked test source was edited.
+- Allowed paths: QueueJoin source as reference only; `frontend/e2e/rq18-permanent-qr-live.spec.ts`; canonical plan and T18 journals; this worktree's `.scratch/` and `.gate_artifacts/`; one owned synthetic Compose project if resources permit. Denied: production/live patient data, foreign staging, global Docker cleanup, production config, merge and deployment.
+- Original concern: the previous live RQ-18 Session passed on runtime `5363a9ca`, but #3899 changed `QueueJoin.tsx` in `2093745a`; the earlier live result cannot establish that the updated public QR flow still passes.
+- Validation commands/results:
+  - Targeted QueueJoin legacy epoch/horizon and attempt-recovery Vitest files with one worker and `NODE_OPTIONS=--max-old-space-size=512`: **PASS, 7/7**.
+  - ESLint for `frontend/e2e/rq18-permanent-qr-live.spec.ts`: **PASS**.
+  - Task-specific Playwright config collection: **PASS, 1 test collected, 0 executed**. The first collection attempt with the repository-wide config found 0 files; rerunning with `.scratch/t18-rq18-current/playwright.rq18.staging.config.cjs` collected the intended scenario.
+  - `tsc --noEmit -p e2e/tsconfig.json` with a 512 MiB Node heap: **environmental FAIL / no type result**; Node exited 134 after reaching the configured heap limit. This is not evidence of a source type error.
+  - Current-source canonical staging Preflight/Start/Session: **NOT_RUN**. At the available host headroom, WSL/build/browser were not started to avoid a memory-exhaustion cycle. No app failure is inferred.
+- Cleanup: no staging resources were created in this slice. Prior owned RQ-18 Session resources had been torn down and recorded in the preceding evidence entry.
+- Scope check: the only tracked changes are `.ai-factory/plans/codex-admin-queue-simplification.md` and the three T18 journals; product code and tracked test source are unchanged. `git diff --check` passes; exact-head CI remains pending after this journal update is pushed.
+- Remaining limitation: only focused local regressions are established on source `2093745a`; the live browser lifecycle and bounded asset comparison are still tied to `5363a9ca`. Re-run RQ-18 on `2093745a` (or its later final candidate) in one canonical owned synthetic Session when resource headroom allows. T18.10 remains PARTIAL due the separate selected-profile return-context loss; overall T18/Tier-2 remain PARTIAL.
+- PR: [#3897](https://github.com/drsapaev/final/pull/3897), OPEN / Ready for review / mergeable at last GitHub check, published HEAD `ea1a9011`. The local synchronized branch has not been pushed; no merge commit exists.
+
+## PR #3897 pre-correction exact-head status and checkpoint reconciliation — 2026-11-06T23:00:56+05:00
+
+- Task: `bd2f7564-bd3d-449d-8d85-5a9325722a80`; reconcile the current checkpoint with the live PR and preserve T18's remaining gaps.
+- Verified state before this journal-only follow-up: PR #3897 OPEN, Ready for review, mergeable; HEAD `0abda68169feb608b66ac7f9cf926cd001446f3c`; base and `origin/main` `5363a9ca53234539c5022b587250374a452a91a0`.
+- Exact-head checks on `0abda681`: Unified CI `42261424406` SUCCESS; Frontend unit/build/lint/E2E, PR Required Gate, PR Review Quality Gate `42265610638`, lifecycle recommendation `42265610696`, security, Gitleaks, CodeQL, GitGuardian, CI Scope, notifications, and Windows/Ubuntu scratch guards PASS. Backend, integration, Docker, staging/production readiness, parity, DAST, k6 and other path-aware checks were SKIPPED by scope; these skips are not PASS.
+- Current-source runtime evidence remains anchored to `5363a9ca`: RQ-18 synthetic browser Session PASS; 45/45 JS/CSS assets fetched by that scenario matched same-path files in its owned frontend container. The canonical launcher still reports `served_revision_verified=false`; the comparison is bounded and does not establish global or production provenance.
+- T18.10 remains VALIDATED only for its tested source `a9c25f5b`; the sanitized Session report records the `specialists` row, typed editor/return context, reload and Back/Forward, four legacy routes, and protected 409. Do not conflate that run with the separate current-source RQ-18 Session.
+- Remaining T18 work: full `docs/runbooks/STAGING_VALIDATION.md`, broader cross-cutting acceptance, console-event diagnosis (the previous run reproduced 9/11 events, with 2 not reproduced and 8 bundle call sites unmapped), and a canonical served-revision attestation. Overall T18/Tier-2 remain PARTIAL; no deferral or waiver is claimed.
+- Gate: `run_agent_gate.ps1` from `ai/langgraph`; known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, scope `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`; result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt read. Cause was the confirmed stale checkpoint. First-touch scope was limited to these three journals.
+- Allowed paths: the three T18 journal files only. Denied: application/runtime and tracked-test changes, backend/API/schema/auth/RBAC, staging configuration or execution, production, foreign resources, merge, and deployment. No staging or application test was run in this documentation follow-up.
+- Validation: before editing, clean worktree and branch verified at `0abda681`; fetched `origin/main`; confirmed it is an ancestor of the PR HEAD; verified live PR state and exact-head checks. After editing, `git diff --check` PASS; manual review of changed paths and current checkpoint references PASS; only the three scoped journal files changed. No application tests or staging were run for this documentation correction.
+- Cleanup: the owned Compose Session had already removed all containers, volumes, network, and local images. The task-owned ignored synthetic env and safe DevBrain capture payload still exist under `.scratch/t18-rq18-current/`; host policy blocked their standard removal in the prior cleanup attempt. No alternate deletion method was used.
+- Result at checkpoint time: code/evidence HEAD `0abda681` has applicable CI PASS; this journal-only follow-up must be pushed and its resulting exact PR head checked before merge. User owns merge/deployment. T18 remains IN_PROGRESS.
+- Next: commit and push only the three scoped journals to the existing #3897 PR, confirm exact-head checks, then leave merge to the user. After merge, refresh `origin/main` in a fresh worktree and continue only outstanding T18 items; do not deploy.
+
+<a id="t18-current-source-rq18-served-asset-provenance-20261106"></a>
+## T18 current-source RQ-18 served-asset provenance — 2026-11-06T22:19:38+05:00
+
+- Commit under test: app/runtime source 5363a9ca53234539c5022b587250374a452a91a0; current PR worktree HEAD 68ed0e4b9a511f085458be7b75ff2e2dacdece75. The worktree had only the scoped E2E provenance instrumentation modified during the run; runtime frontend source paths were unchanged against origin/main.
+- Environment: owned synthetic Compose project clinic-aqs-rq18-current-20261106, Ubuntu-24.04, project ports 18088/18087/15439. Host free space 15 GiB; WSL backing free space 28 GiB. No production or foreign project was used.
+- Execution: existing synthetic lease had expired during the previous attempt; that attempt stopped before build/browser and canonical teardown reported PASS. Renewed only CLINIC_EXPIRES_AT in the owned env. Canonical Preflight PASS with no warnings (3196 MiB available); canonical Preflight → Start/build/readiness → Session then PASS.
+- Browser result: RQ-18 Playwright 1 passed, 0 skipped, 0 failed. 45 same-origin JavaScript/CSS response assets were captured. Each path/SHA-256 matched the same-path file in the owned frontend container: 45 matches, 0 mismatches. The tested E2E file blob, now included in the local follow-up, is 37bf87817d7a21d7f447d0caf9636b714125007d. Container short ID c265e5f617f5; frontend image ID sha256:fd6a67c7a96db6dd563ee4fc1580c3fb9c11953fe8dd8fd818103d81269484cc. Raw response bodies were hashed in memory and not retained; no patient or credential data was recorded.
+- Cleanup: canonical Session teardown PASS; removed 5 containers, 3 volumes, 1 network and Compose-local images; remaining owned containers/volumes/networks were 0. First post-Session Preflight reported WINDOWS_PORT_OWNER; read-only Windows listener inspection found none on the three selected ports, and the canonical Preflight retry passed without warnings (3178 MiB available). No process or foreign resource was stopped.
+- Limitation: launcher field served_revision_verified=false remains unchanged. This independent check proves byte equality for assets fetched in this RQ-18 browser scenario against the owned frontend container; it does not attest every unrequested static file, the launcher's marker, production, or the whole system.
+- Validation: focused ESLint, isolated strict TypeScript, Playwright collection and diff-check had passed before this Session; the Session executed the actual browser test. Hosted checks on the pre-instrumentation remote PR HEAD do not cover this local E2E change. Re-run exact-head CI after pushing.
+- Scope: no application/backend/API/schema/auth/RBAC, production, deployment, or merge change. The PR remains user-merge-owned.
+- Remaining: full STAGING_VALIDATION.md and broader T18/Tier-2 acceptance remain incomplete; overall T18 remains PARTIAL. No deferral or production-readiness claim.
+
+## T18 RQ-18 exact-head CI checkpoint — 2026-11-06T20:52:58+05:00
+
+- PR: [#3897](https://github.com/drsapaev/final/pull/3897), open, non-draft. Exact checked head: `12092f18c52971c50a143fddca8d6ffcd183ef12`, base `5363a9ca53234539c5022b587250374a452a91a0`.
+- Unified CI run `42243883098`: SUCCESS. Frontend build, lint/type-check/accessibility, unit tests, E2E, CI Scope, PR Required Gate and notifications passed. Frontend E2E completed in 17m22s.
+- Other applicable checks: PR Review Quality Gate `42243883155` PASS; PR Lifecycle Recommendation `42243883191` PASS; security scan `42243883128` PASS; secret scan `42243883145` PASS; CodeQL PASS; GitGuardian PASS; scratch guards `42243883092` PASS.
+- Skipped, not passed: backend tests, integration tests, Docker build, production/staging readiness, context boundary, DAST and k6. These skips are path/scope-based for the test/evidence-only PR.
+- This journal-only follow-up will advance the PR head. Recheck the new exact head before stating current CI is green. User owns merge and deployment.
+- Overall T18/Tier-2 remains PARTIAL; this result does not complete `docs/runbooks/STAGING_VALIDATION.md` or served-frontend provenance.
+
+## T18 RQ-18 PR creation checkpoint — 2026-11-06T20:29:04+05:00
+
+- PR: [#3897](https://github.com/drsapaev/final/pull/3897), open, non-draft; base `main` at `5363a9ca53234539c5022b587250374a452a91a0`.
+- Initial PR head: `bbf3dfaadad324984c3db33658ce8549a925f33a`; two task-scoped commits and four files. The PR body quality gate passed locally (19 validator tests and sample-body validation).
+- GitHub checks at that initial head: PR Review Quality Gate, PR Lifecycle Recommendation, Gitleaks, and Agent Workflow Guards PASS; Unified CI and Security Scan were `in_progress`. Combined commit-status endpoint returned no status entries; Actions workflow runs are the source for these states.
+- This checkpoint is journal-only and will advance the PR head. Re-fetch the live PR head and check results after pushing; do not reuse the initial-head CI as proof for the resulting head.
+- Scope remains test/evidence only; the runtime and successful synthetic Session source remains `5363a9ca`. User retains merge and deployment authority. Overall Tier-2 remains PARTIAL.
+
+## T18 RQ-18 packaging checkpoint — 2026-11-06T20:18:18+05:00
+
+- Commit: `7039ea9c0ed02177819615cfb00a852338087e6c`; branch `codex/aqs-t18-rq18-current-20261106`, based on current `origin/main` `5363a9ca53234539c5022b587250374a452a91a0`.
+- Changed paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts` and the plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`; no runtime/application files changed.
+- Validation evidence: focused ESLint, isolated strict TypeScript, Playwright collection (1 test), `git diff --check`, and final canonical synthetic Preflight → Start → Session PASS are recorded in [the RQ-18 Session record](EVIDENCE.md#t18-current-source-rq18-permanent-qr-lifecycle-20261106).
+- PR status: not pushed; no PR or hosted CI exists for this commit yet. This packaging checkpoint contains the exact commit and next action; no staging run is repeated.
+- Next action: push the branch, open one focused PR, and verify checks against its exact HEAD. User retains merge and deployment authority.
+- Remaining limit: full T18/Tier-2 is PARTIAL; `docs/runbooks/STAGING_VALIDATION.md` and independent served-frontend provenance remain incomplete. No deferral, production-readiness or whole-system-health claim is made.
+
+<a id="t18-current-source-rq18-permanent-qr-lifecycle-20261106"></a>
+## T18 current-source RQ-18 permanent QR lifecycle — 2026-11-06T20:13:02+05:00
+
+- Commit under test: application/runtime source `5363a9ca53234539c5022b587250374a452a91a0` (`origin/main` at cycle start); tracked test blob `77d46f1c77bc11b56a838296e77e570621554738`. The only tracked change during the runtime Session was `frontend/e2e/rq18-permanent-qr-live.spec.ts`; no application runtime file changed.
+- Environment: Windows with Ubuntu-24.04 WSL; owned ephemeral synthetic Compose project `clinic-aqs-rq18-current-20261106`; project ports 18088/18087/15439. No production database, patient data, or foreign Docker project was used. Admin credentials and generated values remain private and are not included here.
+- Execution mode: mandatory known-root gate for `frontend/e2e/rq18-permanent-qr-live.spec.ts` and this plan's three journals. Result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt read. Basis: the user's standing authorization for repeated bounded T18 synthetic validation. Scope and stop conditions are in `.scratch/t18-rq18-current/prework.md`.
+- Focused validation: ESLint PASS; isolated strict TypeScript check PASS; Playwright collection PASS (1 Chromium test collected); `git diff --check` PASS. The final exact-source live Playwright Session result was **1 passed, 0 skipped, 0 failed**.
+- Browser coverage: normal Admin password + TOTP; hidden QueueProfile create; doctorless Service create; QueueResource create/activate; backend target facts; explicit QR publish; permanent address provision and same-address recovery after reload; one anonymous short-session start; patient join; resource-owned DailyQueue assertion on the session's selected target date; resource deactivation preserving that selected-day queue; clinic-day public availability closed while the permanent address remained; profile archival causing a generic anonymous unavailable response; resource reactivation followed by reactivation of the published profile; same permanent address reopened successfully. No patient input, opaque QR code, token, screenshot, trace or video was printed or retained in the safe report.
+- Final canonical lifecycle: Preflight PASS → Start/build/readiness PASS → Session PASS. Teardown removed 5 containers, 3 volumes and 1 network; remaining owned containers/volumes/networks were all 0. Selected ports were free. WSL available memory after teardown was 1,999 MiB; no warnings were reported.
+- Earlier failed attempts in this same worktree were harness failures, not claimed as product defects: invalid generated QueueProfile key; missing explicit Continue from the QueueJoin info step; reading the target-date queue through the default clinic-day view; inverted archive/restore action selection; and restoring publication before reactivating its target. Each was corrected within the allowed E2E file, and the final full Session passed.
+- Served frontend provenance limitation: launcher still reports `served_revision_verified=false`. The build was produced by canonical Start from runtime source `5363a9ca`, and the spec is test-only, but no independent static-asset byte attestation was performed in this Session. Do not convert the helper flag to PASS.
+- Scope check: no backend/API/schema/auth/RBAC/production/deployment changes. Only the RQ-18 E2E and this plan's journals are in scope. The test/evidence PR has not yet been committed or opened at the time of this record; user retains merge and deployment authority.
+- Remaining limitation: the full `docs/runbooks/STAGING_VALIDATION.md` checklist and exact served-frontend attestation remain incomplete; overall T18/Tier-2 stays PARTIAL as directed by the user. This focused pass does not imply production readiness or whole-system health.
+
 ## T18.10 — `specialists` legacy navigation in synthetic staging — 2026-11-05T12:01:20+05:00
 
 - Commit under test: `a9c25f5b9c25f52d12aed4fc22b74874dc441a3f`; isolated worktree `aqs-t18-specialists-check`; branch `codex/aqs-t18-specialists-check`. Tracked tree was clean during the run.
@@ -6092,3 +6178,74 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Allowed authored paths: `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Denied: direct runtime/app/test changes, auth/DB/schema, production/deploy, staging/foreign resources, GitHub review-thread mutation and PR merge.
 - Local validation: targeted assertions for the canonical `specialists` requirement, PARTIAL status, retained passing evidence, historical correction and inspected artifact hash PASS; `git diff --check` PASS; `origin/main` is an ancestor of the branch; diff against `origin/main` contains only the three journals. `EVIDENCE.md` adds 15 lines and deletes none in this correction; the existing history is preserved. Commit/push, PR-body refresh and checks on the resulting HEAD remain pending at this entry. No new application test or staging was run in this correction.
 - PR: #3873 remains open; the review thread is not resolved or replied to in this task. User owns merge. Overall T18 and Tier-2 remain PARTIAL; no deferral is claimed.
+
+## T18.10 current-source specialists Session — 2026-11-07T00:38:36+05:00
+
+- Commit under test: ea1a9011f86a8e3f9d663e3b6e7b272cefd93264 (same as PR #3897 HEAD at execution).
+- Environment: owned synthetic WSL Compose project clinic-aqs-t18-specialists-20261107; Admin account required normal TOTP enrollment and follow-up password+TOTP login. No production data or credentials were used.
+- Execution mode: continuation of the previously authorized T18 narrow_override; validation only. The canonical gate result and generated prompt are recorded in the current task checkpoint. No tracked runtime or test source was edited.
+- Allowed paths: task-owned .scratch/t18-specialists-current/, the three T18 journals, and existing current-source routes/specs as reference. Denied: app/runtime edits in this PR, production, foreign resources, merge, deployment.
+- Preflight: PASS, unique owner/project, non-production ports, no warnings. Start: PASS; source HEAD matched, worktree clean, runtime readiness PASS, served_revision_verified=false.
+- Validation command: canonical ops/scripts/wsl_staging.ps1 -Action Session -EnvFile .scratch/t18-specialists-current/staging.env -NoBuild -CommandArgs @('powershell.exe','-NoProfile','-File', <task-owned session.ps1>).
+- Browser result on the exact tested source:
+  - PASS — fresh synthetic Admin required and completed TOTP enrollment.
+  - PASS — second normal Admin password login required and passed TOTP.
+  - PASS — current Admin directions API returned the actual specialists profile and the setup screen rendered it selected.
+  - PASS — QueueProfilesManager loaded and rendered the actual specialists row.
+  - FAIL — typed return context did not preserve selected profile plus checklist selection. Source review identifies the lost field: AdminSetupDirections.tsx setupEditorLink() passes profileKey: null despite the selected specialists profile; the serializer consequently omits setupProfile.
+  - NOT_RUN — tab-switch completion, reload, Back/Forward, protected DELETE 409/readable error/row retention; the harness stopped at the first failed context assertion.
+  - Browser diagnostics: 2 console error events counted but messages were not captured; 0 uncaught page errors. Classify those events as UNCLASSIFIED, not as a clean console.
+- Result: FAIL for the current-source T18.10 return-context requirement; overall T18.10 remains PARTIAL. This is a source-backed application behavior gap, not a proven harness-only failure. Existing T18.10 PASS records for source a9c25f5b remain historical and are not promoted to current-source proof.
+- Evidence artifact: sanitized result .scratch/t18-specialists-current/result.json, SHA-256 9DA937246A275FE56F7BD5B15E76C40C92225C9260E4C61EEED8B578C04BF9B0; validation harness SHA-256 8677AC302216433C0C46428FB0ABE85DD3C413E55C411B607B7F89CBD5CFF59D. The report contains only assertion names/status, source and project identifiers; it contains no credentials, response payloads, patient data, screenshots, traces, or tokens.
+- Cleanup: canonical Session returned VALIDATION_FAILED: child exit 1; STAGING_TEARDOWN=PASS. Post-Session inventory for the exact project showed zero containers, volumes, networks, and project-local images. Synthetic env deletion was rejected by local host policy; it remains at .scratch/t18-specialists-current/staging.env and must be removed through the supported cleanup flow. No alternative deletion method was used.
+- Console/asset limitation: the prior bounded RQ-18 comparison (45/45 fetched JS/CSS files) and global served_revision_verified=false remain unchanged. This Session does not complete full T18 or docs/runbooks/STAGING_VALIDATION.md.
+- Next: document the source gap in a separate current-main PR after user merges #3897; do not expand the RQ-18 PR into runtime work. Re-run affected T18.10 cases after that fix, then continue remaining cross-cutting T18 acceptance. User retains merge/deployment authority.
+
+
+## T18 RQ-18 revalidation after QueueJoin #3901 — 2026-11-07T01:56:01+05:00
+
+- Commit under test: 34766e8260dba1cef36d8add77637a58bd0145fc, local merge of PR branch with origin/main f456868a93f29c734b7f37d8c3c805bdd1f508f1 (#3901).
+- Environment: Windows worktree; Ubuntu-24.04 WSL stopped. No Compose project, container, or image build was started.
+- Execution mode: gate_known_root_cause. Gate result narrow_override; gate_misroute=false; override_used=true; handoff_required=true. Known source: frontend/src/pages/QueueJoin.tsx. Generated execution prompt read.
+- Allowed paths: the RQ-18 Playwright spec and four plan journals; QueueJoin source was reference-only. No runtime file was edited.
+- Resource boundary: Windows available RAM 1.16 GiB / 7.69 GiB; C: 15.9 GiB free; D: 28.7 GiB free. Staging was not started due to insufficient RAM headroom and stopped WSL.
+- Changed paths authored in this update: PROGRESS.md, EVIDENCE.md, RESUME.md, codex-admin-queue-simplification.md. The RQ-18 spec was read-only.
+- Validation commands and results:
+  - QueueJoin legacy epoch/horizon and attempt-recovery focused Vitest files, one worker, NODE_OPTIONS max-old-space-size=512: PASS, 2 files / 8 tests.
+  - ESLint on frontend/e2e/rq18-permanent-qr-live.spec.ts: PASS.
+  - Task-specific Playwright collection for rq18-permanent-qr-live.spec.ts: PASS collection, 1 test found / 0 executed.
+  - git diff --check before this journal edit: PASS; rerun after edits before commit.
+- Current-source browser RQ-18 Session: NOT_RUN. No result from the previous source 5363a9ca is carried forward to f456868a.
+- Full frontend build and local TypeScript check: NOT_RUN on this synchronized branch. Exact-head CI remains pending until the synchronization/evidence commit is pushed.
+- Scope check: upstream source/test changes from #3901 were merged unchanged; no new app/runtime, API, database, auth/RBAC, production, deploy, or shared staging configuration edit was made.
+- Remaining limitation: current-source RQ-18, current-source T18.10, global served-build provenance, full STAGING_VALIDATION.md, and remaining T18 diagnostics are incomplete. Overall Tier-2 remains PARTIAL; no deferral or production-readiness claim.
+- PR: #3897; remote HEAD at time of writing: 8f8e9a03ba2451316e267e9340a37b16523498fe. Sync/evidence commit, PR-body refresh, and exact-head CI are pending.
+- Merge commit: not applicable; user owns PR merge.
+
+
+## PR #3897 exact-head CI and gate results — 2026-11-07T02:15:39+05:00
+
+- Code/evidence commit under validation: 04d7cd72f97706ba0df8676d553f8b6468d3dcf4; source base f456868a93f29c734b7f37d8c3c805bdd1f508f1 (#3901).
+- Unified CI run 42292661803: Frontend unit tests, Frontend build, Frontend lint, Frontend E2E and PR Required Gate PASS.
+- PR Review Quality Gate 42294865861 PASS; Lifecycle Recommendation 42294865859 PASS after the PR body was refreshed.
+- Additional exact-head checks: Security 42292661613, Gitleaks 42292661651, CodeQL, GitGuardian, Windows/Ubuntu scratch guards, and Actions/Python/TypeScript analyses PASS.
+- Path-aware jobs skipped, not passed: backend tests, integration tests, Docker build, frontend/backend parity, staging readiness, production readiness, k6, DAST, docs generation and context-boundary check.
+- Local focused validation on source f456868a: two QueueJoin regression files, 8/8 PASS; ESLint for rq18-permanent-qr-live.spec.ts PASS; Playwright collection 1 test / 0 executed.
+- Current-source RQ-18 synthetic Preflight/Start/Session: NOT_RUN. Host had 1.16 GiB free RAM and WSL stopped; no Compose project or image build was started.
+- PR body was updated with the exact-head results and explicit remaining limits. PR #3897 remains user-merge-owned; no merge or deployment was performed.
+- Result: scoped code/evidence PR checks PASS; T18/Tier-2 remain PARTIAL because current-source RQ-18, full runbook and broader acceptance are outstanding.
+
+
+## PR #3897 exact-head checks after validation-description correction — 2026-11-07T02:39:59+05:00
+
+- Commit under test: `b738a493b0d6559c5f97f6b9d675333aaf53583e`; base `f456868a93f29c734b7f37d8c3c805bdd1f508f1` (#3901).
+- Environment: GitHub Actions for the synthetic E2E/evidence PR; Windows host resource inspection only. No local staging process was started.
+- Execution mode: continuation of the previously authorized T18 validation/evidence scope. PR description was corrected to include an explicit `Result` field and replace the stale quality-gate claim.
+- Changed paths for this checkpoint: PR description only. This entry records exact-HEAD checks before the next journal-only commit.
+- Validation: Unified CI run `42295355171` — Frontend unit, build, lint, E2E and PR Required Gate PASS. Latest PR Review Quality Gate `42296413004` PASS; lifecycle recommendation `42296412348` PASS. Security/Gitleaks/CodeQL, GitGuardian, scratch guards and Actions/Python/TypeScript analysis PASS.
+- Result: applicable hosted checks on exact HEAD passed. Earlier PR Review Quality Gate run `42295466354` failed because `Result` was not recognized in the PR Validation section; the description was corrected and the subsequent rerun passed. Backend/integration/Docker/parity/readiness/k6/DAST and other path-aware checks were SKIPPED, not PASS.
+- Current-source RQ-18 browser Session: NOT_RUN. Latest host reading was 1.25 GiB available RAM of 7.69 GiB; Ubuntu-24.04 WSL was stopped. No Compose project or image build was started.
+- Scope check: no runtime, backend, API, auth/RBAC, database, production or staging configuration changed. PR #3897 is OPEN, non-draft and mergeable at this HEAD; user owns merge.
+- Remaining limitation: T18/Tier-2 PARTIAL; T18.10 has a confirmed selected-profile context defect, current-source RQ-18 is unexecuted, full `STAGING_VALIDATION.md` and global served-build provenance remain incomplete, and console diagnostics remain partial.
+- Next: user merges #3897. Then start a separate fresh-main fix for T18.10; continue current-source RQ-18 staging only with safe resource headroom.
+- Merge commit: pending user merge.

@@ -23,8 +23,9 @@ import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { fetchMock, loggerInfo, loggerError, tokenGetAccessToken } = vi.hoisted(() => ({
-  fetchMock: vi.fn(),
+const { apiGet, apiPost, loggerInfo, loggerError, tokenGetAccessToken } = vi.hoisted(() => ({
+  apiGet: vi.fn(),
+  apiPost: vi.fn(),
   loggerInfo: vi.fn(),
   loggerError: vi.fn(),
   tokenGetAccessToken: vi.fn(() => 'doctor-token'),
@@ -35,6 +36,13 @@ vi.mock('../../utils/logger', () => ({
 }));
 vi.mock('../../utils/tokenManager', () => ({
   default: { getAccessToken: tokenGetAccessToken },
+}));
+// DOCQ-FE-002 (audit 3886): the panel routes through the canonical api
+// client — the 401 refresh/retry machinery is the client's own tested
+// surface (api/__tests__/client.401.test.ts); these tests mock the client
+// boundary the same way.
+vi.mock('../../../api/client', () => ({
+  api: { get: apiGet, post: apiPost },
 }));
 
 const {
@@ -80,20 +88,18 @@ vi.mock('../../ui/macos', () => ({
 import DoctorQueuePanel from '../DoctorQueuePanel';
 
 const MY_INFO_OK = {
-  ok: true,
-  json: async () => ({
+  data: {
     id: 7,
     name: 'Dr. Test',
     specialty: 'cardiology',
     queue_settings: { start_number: 'A001', max_per_day: 20, timezone: 'Asia/Tashkent' },
     doctor: { cabinet: '101' },
-  }),
+  },
 };
 
 function queueOk(specialty: string, patient: string) {
   return {
-    ok: true,
-    json: async () => ({
+    data: {
       queue_exists: true,
       opened_at: '2026-03-30T00:00:00Z',
       stats: { total: 1, waiting: 1, served: 0, online_entries: 1 },
@@ -114,15 +120,16 @@ function queueOk(specialty: string, patient: string) {
           created_at: '2026-03-30T08:00:00Z',
         },
       ],
-    }),
+    },
   };
 }
 
-const QUEUE_LOAD_FAILED = {
-  ok: false,
-  status: 500,
-  json: async () => ({ detail: 'internal error' }),
-};
+// Axios-shaped rejection: the canonical client rejects non-2xx with the
+// parsed body on error.response.data.
+const QUEUE_LOAD_FAILED = Object.assign(
+  new Error('Request failed with status code 500'),
+  { isAxiosError: true, response: { status: 500, statusText: 'Internal Server Error', data: { detail: 'internal error' } } },
+);
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -133,11 +140,11 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
-  fetchMock.mockReset();
+  apiGet.mockReset();
+  apiPost.mockReset();
   loggerInfo.mockReset();
   loggerError.mockReset();
   tokenGetAccessToken.mockReturnValue('doctor-token');
-  global.fetch = fetchMock as never;
 });
 
 afterEach(() => {
@@ -150,12 +157,11 @@ afterEach(() => {
 describe('DOCQ-FE-001: a late response of specialty A must not overwrite B', () => {
   it('deferred cardiology queue resolves after the switch to dermatology — B stays on screen', async () => {
     const cardioQueue = deferred<ReturnType<typeof queueOk>>();
-    fetchMock.mockImplementation(async (input) => {
-      const url = String(input);
+    apiGet.mockImplementation(async (url: string) => {
       if (url.includes('/doctor/my-info')) return MY_INFO_OK;
       if (url.includes('/doctor/cardiology/queue/today')) return cardioQueue.promise;
       if (url.includes('/doctor/dermatology/queue/today')) return queueOk('dermatology', 'Бета-Пациент Дерма');
-      throw new Error(`Unexpected fetch URL: ${url}`);
+      throw new Error(`Unexpected api.get URL: ${url}`);
     });
 
     const { rerender } = render(<DoctorQueuePanel specialty="cardiology" />);
@@ -182,11 +188,10 @@ describe('DOCQ-FE-001: a late response of specialty A must not overwrite B', () 
 
 describe('DOCQ-FE-003: a failed load must not render as «queue not created»', () => {
   it('initial 500 shows a load error, never the misleading empty state', async () => {
-    fetchMock.mockImplementation(async (input) => {
-      const url = String(input);
+    apiGet.mockImplementation(async (url: string) => {
       if (url.includes('/doctor/my-info')) return MY_INFO_OK;
-      if (url.includes('/doctor/cardiology/queue/today')) return QUEUE_LOAD_FAILED;
-      throw new Error(`Unexpected fetch URL: ${url}`);
+      if (url.includes('/doctor/cardiology/queue/today')) throw QUEUE_LOAD_FAILED;
+      throw new Error(`Unexpected api.get URL: ${url}`);
     });
 
     render(<DoctorQueuePanel specialty="cardiology" />);
@@ -202,22 +207,20 @@ describe('DOCQ-FE-003: a failed load must not render as «queue not created»', 
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
     // Phase 1: both requests succeed.
-    fetchMock.mockImplementation(async (input) => {
-      const url = String(input);
+    apiGet.mockImplementation(async (url: string) => {
       if (url.includes('/doctor/my-info')) return MY_INFO_OK;
       if (url.includes('/doctor/cardiology/queue/today')) return queueOk('cardiology', 'Альфа-Пациент Кардио');
-      throw new Error(`Unexpected fetch URL: ${url}`);
+      throw new Error(`Unexpected api.get URL: ${url}`);
     });
 
     render(<DoctorQueuePanel specialty="cardiology" />);
     expect(await screen.findByText('Альфа-Пациент Кардио')).toBeInTheDocument();
 
     // Phase 2: the 30s interval refresh now fails.
-    fetchMock.mockImplementation(async (input) => {
-      const url = String(input);
+    apiGet.mockImplementation(async (url: string) => {
       if (url.includes('/doctor/my-info')) return MY_INFO_OK;
-      if (url.includes('/doctor/cardiology/queue/today')) return QUEUE_LOAD_FAILED;
-      throw new Error(`Unexpected fetch URL: ${url}`);
+      if (url.includes('/doctor/cardiology/queue/today')) throw QUEUE_LOAD_FAILED;
+      throw new Error(`Unexpected api.get URL: ${url}`);
     });
 
     await act(async () => {

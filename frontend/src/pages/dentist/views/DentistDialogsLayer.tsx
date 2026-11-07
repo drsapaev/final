@@ -145,6 +145,7 @@ export default function DentistDialogsLayer({
 
       {showPhotoArchive && selectedPatient &&
       <PhotoArchive
+        key={`photo-archive:${(selectedPatient.patient_id || selectedPatient.patient?.id) ?? ''}:${selectedPatient.visit_id ?? ''}`}
         patientId={(selectedPatient.patient_id || selectedPatient.patient?.id) as string | number | undefined}
         visitId={selectedPatient.visit_id}
         patientName={selectedPatientDisplayName}
@@ -240,6 +241,7 @@ export default function DentistDialogsLayer({
               </button>
             </div>
             <TreatmentPlanner
+            key={`treatment-planner:${selectedPatientId ?? ''}:${selectedPatient.visit_id ?? ''}`}
             patientId={selectedPatientId}
             visitId={(selectedPatient.visit_id as string | number | undefined)}
             teethData={dentalChartData || {}}

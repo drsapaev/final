@@ -250,7 +250,7 @@ const ToothModal = ({
   toothData = {} as Record<string, unknown>,
   onSave,
   visitId
-}: { toothData?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown) => void; toothNumber?: string | number; visitId?: string | number; open?: boolean; [k: string]: unknown }) => {
+}: { toothData?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown, rowVersion?: number) => void; toothNumber?: string | number; visitId?: string | number; open?: boolean; [k: string]: unknown }) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const [formData, setFormData] = useState<ToothFormData>({
@@ -274,6 +274,9 @@ const ToothModal = ({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // DENTMODAL-FE-002 (audit 3892): re-hydrate the clinical form whenever the
+    // bound visit changes while the modal stays open, so local edits made for
+    // the previous patient's tooth are never kept against the new visit.
     if (open && toothData) {
       const td = toothData as Record<string, unknown>;
       setFormData({
@@ -292,7 +295,7 @@ const ToothModal = ({
 
       setHistory([]);
     }
-  }, [open, toothData]);
+  }, [open, toothData, visitId]);
 
   // Добавление процедуры
   const addProcedure = (procedureId: string) => {
@@ -348,13 +351,21 @@ const ToothModal = ({
       
       if (visitId) {
         const existingEmr = await loadExistingEmrDraft(visitId);
-        await api.post(
+        const response = await api.post(
           `/v2/emr/${visitId}`,
           buildToothEmrPayload(existingEmr as { data?: unknown; row_version?: number } | null, toothNumber ?? '', dataToSave)
-        );
+        ) as { data?: { row_version?: unknown } };
+        // DENTMODAL-FE-001 (audit 3892): this POST advances the server's
+        // row_version; hand it back to the parent so its next autosave does
+        // not reuse the stale optimistic-lock version.
+        const savedRowVersion = response?.data?.row_version;
+        if (typeof onSave === 'function') {
+          onSave(dataToSave as Record<string, unknown>, typeof savedRowVersion === 'number' ? savedRowVersion : undefined);
+        }
+      } else if (typeof onSave === 'function') {
+        onSave(dataToSave as Record<string, unknown>);
       }
-      
-      if (typeof onSave === 'function') onSave(dataToSave as Record<string, unknown>);
+
       if (typeof onClose === 'function') onClose();
       
     } catch (error) {

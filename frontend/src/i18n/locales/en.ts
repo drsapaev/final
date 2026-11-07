@@ -6565,7 +6565,9 @@ const en = {
     tooth_save_failed: 'Не удалось сохранить данные зуба. Проверьте соединение и попробуйте снова.',
     treatment_plan_title: 'План лечения',
     treatment_plan_save_failed: 'Не удалось сохранить план лечения. Проверьте соединение и попробуйте снова.',
-    visit_protocol_save_failed: 'Не удалось сохранить протокол визита. Проверьте соединение и попробуйте снова.'
+    treatment_plan_load_failed: 'Не удалось загрузить существующий план лечения. Повторите загрузку перед редактированием.',
+    visit_protocol_save_failed: 'Не удалось сохранить протокол визита. Проверьте соединение и попробуйте снова.',
+    visit_identity_mismatch: 'Пациент визита не совпадает с выбранным пациентом. Проверьте карточку пациента перед редактированием.'
   },
   payment: {
     timeout: 'Время ожидания истекло',
@@ -6852,6 +6854,9 @@ const en = {
     mqm_btn_close_reception: 'Закрыть приём',
     mqm_refresh_queue: 'Обновить очередь',
     mqm_call: 'Вызвать',
+    // QMAN-FE-001 (audit 3886): failed current-selection load is visible and recoverable
+    mqm_queue_load_failed: "Failed to load the selected doctor's queue. The previous doctor's data is hidden — retry the load.",
+    mqm_retry_load: 'Retry load',
     mqm_aria_auto_refresh_off: 'Отключить автообновление очереди',
     mqm_aria_auto_refresh_on: 'Включить автообновление очереди',
     mqm_title_auto_refresh_on: 'Автообновление включено',
