@@ -65,7 +65,7 @@ function isResultObject(value: AIResult | null | undefined): value is Record<str
   return !!value && !Array.isArray(value);
 }
 
-// LABAI-FE-002 (post-merge review of PR 3909, P2): stable content fingerprint
+// LABAI-FE-003 (post-merge review of PR 3909, P2): stable content fingerprint
 // of an analysis input. Parents pass INLINE data literals, so the object
 // identity changes on every incidental parent re-render (queue polling,
 // autosave timers, toasts) — identity-based staleness would mint a "newer
@@ -211,12 +211,12 @@ const AIAssistant = ({
   const [isOpen, setIsOpen] = useState(expanded);
   // LABAI-FE-001 (audit 3886): the initiating input's identity — a pending
   // analysis must never publish its result/error into a NEWER input's dialog.
-  // LABAI-FE-002: the staleness comparison uses the input's CONTENT
+  // LABAI-FE-003: the staleness comparison uses the input's CONTENT
   // fingerprint (see aiInputFingerprint) — object identity alone changes on
   // every incidental parent re-render of inline data literals.
   const inputFingerprintRef = useRef('');
   inputFingerprintRef.current = aiInputFingerprint(data);
-  // LABAI-FE-002: the LATEST analyzeData invocation owns the loading flag —
+  // LABAI-FE-003: the LATEST analyzeData invocation owns the loading flag —
   // an older run's finally must not clear the flag a newer run raised.
   const analysisRunRef = useRef(0);
 
@@ -397,7 +397,7 @@ const AIAssistant = ({
       notify.error(t('misc.aia_analysis_error', { message: errorMsg }));
       setRetryCount((prev) => prev + 1);
     } finally {
-      // LABAI-FE-002: only the LATEST run owns the loading flag. An older
+      // LABAI-FE-003: only the LATEST run owns the loading flag. An older
       // invocation's finally must not clear the flag a newer run raised
       // (double-submit overlap between the click and the re-render that
       // disables the trigger); when this run IS the latest, the release is

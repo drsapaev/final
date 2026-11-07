@@ -1,5 +1,5 @@
 /**
- * LABAI-FE-002 (post-merge review of #3909, source contract) — the AI
+ * LABAI-FE-003 (post-merge review of #3909, source contract) — the AI
  * analysis loading flag has a single owner:
  *
  * - the LATEST analyzeData invocation owns `loading` — an older run's
@@ -24,7 +24,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const readSource = (relative: string) =>
   fs.readFileSync(path.join(__dirname, relative), 'utf8');
 
-describe('LABAI-FE-002 — loading-flag ownership and content-based staleness (source contract)', () => {
+describe('LABAI-FE-003 — loading-flag ownership and content-based staleness (source contract)', () => {
   const source = readSource('../AIAssistant.tsx');
   const analyzeBlock =
     source.match(/const analyzeData = async[\s\S]*?\n {2}\};/)?.[0] ?? '';

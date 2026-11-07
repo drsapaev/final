@@ -169,7 +169,7 @@ describe('LABAI-FE-001 — the AI dialog is reset by report identity', () => {
   });
 });
 
-describe('LABAI-FE-002 — the loading flag and staleness follow the input CONTENT, not object identity', () => {
+describe('LABAI-FE-003 — the loading flag and staleness follow the input CONTENT, not object identity', () => {
   // Post-merge review of #3909 (P2): an old AI analysis still cleared the
   // loading flag for a newer input. The deeper cause: the stale guard
   // compared INPUT OBJECT IDENTITY, while parents pass inline data
