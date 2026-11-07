@@ -91,6 +91,7 @@ vi.mock('../../components/dermatology/DermaPatientsTab', () => ({
     <button
       type="button"
       data-testid="patients-tab"
+      aria-label="Select the synthetic patient"
       onClick={() => props.onSelectPatient?.(holder.manualPatient as Record<string, unknown>)}
     />
   ),
