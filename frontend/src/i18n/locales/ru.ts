@@ -272,6 +272,10 @@ const ru = {
     unsaved_changes: 'несохранённые изменения',
     saving: 'сохраняется…',
     saved_at: 'сохранено',
+    // LABGUARD-FE-001/003 (audit 3886): honest multi-step rollback notice +
+    // pending-leave-intent guard notice.
+    leave_decision_pending: 'Сначала завершите открытый диалог ухода — решение по текущему переходу ещё не принято',
+    multi_step_history_reverted: 'Многошаговый переход по истории отменён: вы вернулись в лабораторию. Несохранённый черновик сохранить не удалось.',
     signatures: 'Подписи',
     signatures_readonly_hint: 'только для чтения — отчёт утверждён',
     progress_aria_label: 'Прогресс бланка',

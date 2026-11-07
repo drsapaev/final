@@ -228,6 +228,10 @@ const en = {
     unsaved_changes: 'несохранённые изменения',
     saving: 'сохраняется…',
     saved_at: 'сохранено',
+    // LABGUARD-FE-001/003 (audit 3886): honest multi-step rollback notice +
+    // pending-leave-intent guard notice.
+    leave_decision_pending: 'Finish or cancel the open leave dialog first — the pending navigation decision takes priority',
+    multi_step_history_reverted: 'A multi-step history jump was reverted: you are back in the lab. The unsaved draft could not be preserved.',
     signatures: 'Подписи',
     signatures_readonly_hint: 'только для чтения — отчёт утверждён',
     progress_aria_label: 'Прогресс бланка',

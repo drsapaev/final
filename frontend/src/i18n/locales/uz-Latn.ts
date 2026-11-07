@@ -228,6 +228,10 @@ const uzLatn = {
     unsaved_changes: 'saqlanmagan o\'zgarishlar',
     saving: 'saqlanmoqda…',
     saved_at: 'saqlandi',
+    // LABGUARD-FE-001/003 (audit 3886): honest multi-step rollback notice +
+    // pending-leave-intent guard notice.
+    leave_decision_pending: 'Ochiq chiqish dialogini avval tugating — qabul qilinayotgan o\'tish qarori ustun',
+    multi_step_history_reverted: 'Tarixdagi ko\'p qadamli o\'tish bekor qilindi: siz laboratoriyaga qaytdingiz. Saqlanmagan qoralamani saqlab bo\'lmadi.',
     signatures: 'Imzolar',
     signatures_readonly_hint: 'faqat o\'qish uchun — hisobot tasdiqlangan',
     progress_aria_label: 'Blanka progressi',

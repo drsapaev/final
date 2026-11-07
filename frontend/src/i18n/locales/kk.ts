@@ -228,6 +228,10 @@ const kk = {
     unsaved_changes: 'несохранённые изменения',
     saving: 'сохраняется…',
     saved_at: 'сохранено',
+    // LABGUARD-FE-001/003 (audit 3886): honest multi-step rollback notice +
+    // pending-leave-intent guard notice.
+    leave_decision_pending: 'Ашық шығу диалогын алдымен аяқтаңыз — қабылдаудағы өту шешімі басым',
+    multi_step_history_reverted: 'Тарихтағы көп қадамды өту болдырылды: сіз зертханаға қайттыңыз. Сақталмаған құйылғыны сақтау мүмкін болмады.',
     signatures: 'Подписи',
     signatures_readonly_hint: 'только для чтения — отчёт утверждён',
     progress_aria_label: 'Прогресс бланка',

@@ -232,6 +232,10 @@ const uzCyrl = {
     unsaved_changes: 'несохранённые изменения',
     saving: 'сохраняется…',
     saved_at: 'сохранено',
+    // LABGUARD-FE-001/003 (audit 3886): honest multi-step rollback notice +
+    // pending-leave-intent guard notice.
+    leave_decision_pending: 'Очиқ чиқиш диалогини аввал тугатинг — қабул қилинаётган ўтиш қарори устун',
+    multi_step_history_reverted: 'Тарихдаги кўп қадамли ўтиш бекор қилинди: сиз лабораторияга қайтдингиз. Сақланмаган қораламани сақлаб бўлмади.',
     signatures: 'Подписи',
     signatures_readonly_hint: 'только для чтения — отчёт утверждён',
     progress_aria_label: 'Прогресс бланка',
