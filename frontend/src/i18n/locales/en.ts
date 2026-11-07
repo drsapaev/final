@@ -411,6 +411,7 @@ const en = {
     finalize_failed: 'Не удалось утвердить отчёт.',
     print_failed: 'Не удалось сформировать PDF.',
     notify_failed: 'Не удалось отправить результаты пациенту.',
+    notify_not_delivered: 'The patient did not receive the results: delivery was not completed.',
     order_failed: 'Не удалось создать заказ.',
     invalid_numeric: 'Некорректное числовое значение',
     field_restored: 'Поле возвращено к предыдущему значению.',

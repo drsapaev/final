@@ -75,13 +75,17 @@ export default function ReportSidebar({
         />
       )}
       {showHistory && (
+        /* LABH-FE-001 (audit 3886 round 10): pass the REAL active report ID
+           so the history panel can highlight the open report. The old
+           expression always produced null/undefined, so the selected-item
+           highlight could never appear. */
         <LabReportHistoryPanel
           showRecentReportsBrowser={showRecentReportsBrowser}
           recentReports={recentReports as never[]}
           reportHistory={reportHistory as never[]}
           historySeverityFilter={historySeverityFilter}
           onSeverityFilterChange={onSeverityFilterChange as (filter: string) => void}
-          activeInstanceId={(typeof activeInstance?.id === 'number' ? null : undefined)}
+          activeInstanceId={activeInstance?.id ?? null}
           onOpenInstance={onOpenInstance as (instanceId: string | number) => void}
         />
       )}
