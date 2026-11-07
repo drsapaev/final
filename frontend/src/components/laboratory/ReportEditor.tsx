@@ -5,8 +5,11 @@ import { flagVariant } from './utils/labReportActions';
 // STRAT#24: t() для i18n — field-level strings.
 // STRAT#2: labToast для interactive numeric validation toasts.
 import { useLabToast } from './hooks/useLabToast';
+// ADR-0015: lab reporting API accessed via hook (LABEDIT-FE-001 details read).
+import { useLabReporting } from '../../hooks/useLabReporting';
 import { useTranslation } from '../../i18n/useTranslation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * STRAT#24: ReportEditor — extracted from LabReportWorkbench.
@@ -55,7 +58,8 @@ interface LabReportInstance {
 }
 
 interface LabReportHistoryEntry {
-  sections?: LabReportSection[];
+  id?: string | number;
+  template_id?: string | number;
   created_at?: string;
 }
 
@@ -85,6 +89,50 @@ export default function ReportEditor({
   // Fallback no-op preserves runtime behavior: ReportEditor only uses the
   // interactive* methods (which call toast directly, not the notify callback).
   const labToast = useLabToast(notify ?? ((_type: string, _message: string) => {}));
+
+  // LABEDIT-FE-001 (audit 3886): the list API returns summary DTOs WITHOUT
+  // `sections` (backend LabReportInstanceSummaryOut), so the previous-value
+  // trend can never come from a history row. The trend reads the authorized
+  // DETAILS of the actual preceding SAME-TEMPLATE instance — the first
+  // non-current history entry with the active template — fetched once per
+  // predecessor id (fail-closed: a failed/unshaped read simply renders no
+  // trend, never a fabricated value).
+  const labReportingApi = useLabReporting();
+  const [previousInstanceDetails, setPreviousInstanceDetails] = useState<LabReportInstance | null>(null);
+  const previousSameTemplateEntry = useMemo(() => {
+    const activeId = (activeInstance as { id?: string | number }).id;
+    const activeTemplateId = (activeInstance as { template_id?: string | number }).template_id;
+    if (!Array.isArray(reportHistory) || activeId == null || activeTemplateId == null) return null;
+    return reportHistory.find((entry) =>
+      entry?.id != null
+      && String(entry.id) !== String(activeId)
+      && entry.template_id != null
+      && String(entry.template_id) === String(activeTemplateId)
+    ) ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportHistory, (activeInstance as { id?: string | number }).id, (activeInstance as { template_id?: string | number }).template_id]);
+  const previousIdRef = useRef<string | number | null>(null);
+  useEffect(() => {
+    const previousId = previousSameTemplateEntry?.id ?? null;
+    if (previousIdRef.current === previousId) return;
+    previousIdRef.current = previousId;
+    if (previousId == null) {
+      setPreviousInstanceDetails(null);
+      return;
+    }
+    let cancelled = false;
+    labReportingApi
+      .getInstance(previousId)
+      .then((details: unknown) => {
+        if (cancelled) return;
+        const shaped = details as LabReportInstance | null;
+        setPreviousInstanceDetails(shaped && Array.isArray(shaped.sections) ? shaped : null);
+      })
+      .catch(() => {
+        if (!cancelled) setPreviousInstanceDetails(null);
+      });
+    return () => { cancelled = true; };
+  }, [previousSameTemplateEntry, labReportingApi]);
 
   function updateField(fieldKey: string, value: string) {
     onUpdateField(fieldKey, value);
@@ -135,10 +183,14 @@ export default function ReportEditor({
                         )}
                       </div>
                     </div>
-                    {/* PR-67 / High-9: previous-result trending */}
-                    {reportHistory.length > 1 && (() => {
-                      const prevReport = reportHistory[1];
-                      if (!prevReport?.sections) return null;
+                    {/* PR-67 / High-9 + LABEDIT-FE-001 (audit 3886): previous-result
+                        trending — rendered from the authorized DETAILS of the actual
+                        preceding same-template instance (the list API returns summary
+                        DTOs without `sections`, so a history row can never provide
+                        the previous value). */}
+                    {previousInstanceDetails && (() => {
+                      const prevReport = previousInstanceDetails;
+                      const prevEntryCreatedAt = previousSameTemplateEntry?.created_at;
                       let prevValue: string | null = null;
                       for (const sec of prevReport.sections) {
                         for (const f of (sec.fields || [])) {
@@ -150,7 +202,7 @@ export default function ReportEditor({
                         if (prevValue) break;
                       }
                       if (!prevValue) return null;
-                      const prevDate = prevReport.created_at ? new Date(prevReport.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
+                      const prevDate = prevEntryCreatedAt ? new Date(prevEntryCreatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
                       return (
                         <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', whiteSpace: 'nowrap' }}>
                           ↗ {prevValue} {prevDate && `(${prevDate})`}
@@ -251,9 +303,33 @@ export default function ReportEditor({
                     <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
                       {field.unit || '—'}
                     </div>
-                    <Badge variant={flagVariant(field.resolved_flag ?? '', field.resolved_flag_severity ?? null)}>
-                      {formatFlagLabel(field)}
-                    </Badge>
+                    {(() => {
+                      // LABEDIT-FE-002 (audit 3886): the persisted clinical flag
+                      // describes the LAST SAVED value. While the unsaved draft
+                      // differs from the persisted value, the badge must not
+                      // present that flag as if it described the draft input —
+                      // render an explicit unsaved marker instead (the
+                      // authoritative flag returns after the backend
+                      // save/refresh re-evaluates the stored report).
+                      const persistedValue = field.value_text ?? '';
+                      const draftValue = draftValues[field.field_key] ?? '';
+                      if (draftValue !== persistedValue) {
+                        return (
+                          <Badge
+                            variant="outline"
+                            title={t('workbench.flag_unsaved_title')}
+                            aria-label={t('workbench.flag_unsaved_title')}
+                          >
+                            {t('workbench.flag_unsaved')}
+                          </Badge>
+                        );
+                      }
+                      return (
+                        <Badge variant={flagVariant(field.resolved_flag ?? '', field.resolved_flag_severity ?? null)}>
+                          {formatFlagLabel(field)}
+                        </Badge>
+                      );
+                    })()}
                     {field.required ? <Badge variant="warning">{t('content.field_required')}</Badge> : <span aria-hidden="true" />}
                     <input
                       type="text"

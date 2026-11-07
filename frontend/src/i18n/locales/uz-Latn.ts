@@ -263,6 +263,8 @@ const uzLatn = {
     norm_label: 'Me\'yori',
     norm_not_set: 'belgilanmagan',
     threshold_label: 'Chegara',
+    flag_unsaved: 'qoralama',
+    flag_unsaved_title: 'Bayroqcha oxirgi saqlangan qiymatga tegishli',
     select_value: 'Qiymatni tanlang',
     result_label: 'Natija',
     comment_placeholder: 'izoh…',
