@@ -69,10 +69,15 @@ import ReportEditorRaw from '../ReportEditor';
 
 const ReportEditor = ReportEditorRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
+// Fixtures carry the real DTO contract: LabReportInstanceOut /
+// LabReportInstanceSummaryOut always include patient_id and created_at
+// (the LABEDIT-FE-003 same-patient scope relies on them).
 const ACTIVE_INSTANCE = {
   id: 91,
+  patient_id: 1,
   template_id: 3,
   status: 'IN_PROGRESS',
+  created_at: '2026-11-07T10:00:00Z',
   sections: [
     {
       key: 'cbc',
@@ -96,13 +101,14 @@ const ACTIVE_INSTANCE = {
 
 // Real list-API contract: summary DTOs WITHOUT `sections`.
 const HISTORY = [
-  { id: 91, template_id: 3, created_at: '2026-11-07T10:00:00Z' },
-  { id: 90, template_id: 3, created_at: '2026-10-05T10:00:00Z' },
-  { id: 80, template_id: 7, created_at: '2026-09-01T10:00:00Z' },
+  { id: 91, patient_id: 1, template_id: 3, created_at: '2026-11-07T10:00:00Z' },
+  { id: 90, patient_id: 1, template_id: 3, created_at: '2026-10-05T10:00:00Z' },
+  { id: 80, patient_id: 1, template_id: 7, created_at: '2026-09-01T10:00:00Z' },
 ];
 
 const PREV_DETAILS = {
   id: 90,
+  patient_id: 1,
   template_id: 3,
   status: 'FINALIZED',
   created_at: '2026-10-05T10:00:00Z',
@@ -163,7 +169,7 @@ describe('LABEDIT-FE-001 — the previous-value trend reads the preceding same-t
       <ThemeProvider>
         <ReportEditor
           {...baseProps}
-          reportHistory={[{ id: 91, template_id: 3, created_at: '2026-11-07T10:00:00Z' }, { id: 80, template_id: 7, created_at: '2026-09-01T10:00:00Z' }]}
+          reportHistory={[{ id: 91, patient_id: 1, template_id: 3, created_at: '2026-11-07T10:00:00Z' }, { id: 80, patient_id: 1, template_id: 7, created_at: '2026-09-01T10:00:00Z' }]}
         />
       </ThemeProvider>
     );
