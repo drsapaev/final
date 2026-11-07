@@ -308,6 +308,8 @@ const ru = {
     norm_label: 'Норма',
     norm_not_set: 'не задана',
     threshold_label: 'Порог',
+    flag_unsaved: 'черновик',
+    flag_unsaved_title: 'Флаг относится к последнему сохранённому значению',
     select_value: 'Выберите значение',
     result_label: 'Результат',
     comment_placeholder: 'комментарий…',

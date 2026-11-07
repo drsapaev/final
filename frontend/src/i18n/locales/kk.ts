@@ -264,6 +264,8 @@ const kk = {
     norm_label: 'Норма',
     norm_not_set: 'не задана',
     threshold_label: 'Порог',
+    flag_unsaved: 'жоба',
+    flag_unsaved_title: 'Белгі соңғы сақталған мәнге қатысты',
     select_value: 'Выберите значение',
     result_label: 'Результат',
     comment_placeholder: 'комментарий…',
