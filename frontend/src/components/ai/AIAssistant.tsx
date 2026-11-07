@@ -65,7 +65,7 @@ function isResultObject(value: AIResult | null | undefined): value is Record<str
   return !!value && !Array.isArray(value);
 }
 
-// LABAI-FE-002 (post-merge review of #3909, P2): stable content fingerprint
+// LABAI-FE-002 (post-merge review of PR 3909, P2): stable content fingerprint
 // of an analysis input. Parents pass INLINE data literals, so the object
 // identity changes on every incidental parent re-render (queue polling,
 // autosave timers, toasts) — identity-based staleness would mint a "newer

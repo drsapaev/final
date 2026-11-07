@@ -589,7 +589,7 @@ export default function LabPanel() {
     if (queueAbortControllerRef.current) {
       queueAbortControllerRef.current.abort();
     }
-    // LABQ-FE-004 (post-merge review of #3907, P2): the NEW generation
+    // LABQ-FE-004 (post-merge review of PR 3907, P2): the NEW generation
     // takes ownership of the incremental pagination flag. The aborted
     // page's finally is generation-guarded (LABQ-FE-002) and will NOT
     // release `loadingMore` — without this transfer the flag stays stuck

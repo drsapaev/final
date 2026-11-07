@@ -1298,7 +1298,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         return;
       }
 
-      // DOCFLOW-FE-004 (post-merge review of #3902, P1): the completion
+      // DOCFLOW-FE-004 (post-merge review of PR 3902, P1): the completion
       // POST is itself an async boundary — the selection may have moved to
       // another patient while the request was in flight (row click, deep
       // link, Escape). The completion belongs to the CAPTURED identity: a

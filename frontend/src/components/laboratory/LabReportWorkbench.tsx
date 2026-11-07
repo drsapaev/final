@@ -907,7 +907,7 @@ export default function LabReportWorkbench({
       setPrintFeedback({ severity: 'error', text: t('workbench.preview_failed') });
       notify?.('error', getErrorMessage(previewError) || t('errors.print_failed'));
     } finally {
-      // LABR-FE-002 + LABR-FE-003 (post-merge review of #3909, P2): only
+      // LABR-FE-002 + LABR-FE-003 (post-merge review of PR 3909, P2): only
       // the current preview owns the busy flag — and ownership is not the
       // preview epoch alone: the try/catch above also compares the LIVE
       // operation context, so a NEWER report action started in a replaced

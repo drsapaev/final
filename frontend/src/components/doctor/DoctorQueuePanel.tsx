@@ -119,7 +119,7 @@ const hasBackendQueueAction = (entry: QueueEntryDto | null | undefined, action: 
   return aliases.some((alias: string) => actions.includes(alias));
 };
 
-// DOCQ-FE-004 (post-merge review of #3905, P1): a resolved 2xx is NOT a
+// DOCQ-FE-004 (post-merge review of PR 3905, P1): a resolved 2xx is NOT a
 // confirmed queue command. Only an explicit `success: true` DTO confirms
 // the write — the same fail-closed contract as queueService.completeVisit
 // (DOCFLOW-FE-001, audit 3886): a 2xx body that is unreadable or lacks the
