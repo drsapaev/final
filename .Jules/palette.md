@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2024-10-30 - Missing aria-hidden on Button loading spinners
+**Learning:** [Accessibility] While buttons successfully announce their loading state via `aria-busy={true}`, inner loading visual indicators (like `<svg>` spinners) create redundant screen reader noise if they aren't hidden.
+**Action:** Always add `aria-hidden="true"` to purely visual loading spinners inside interactive elements that already convey state via `aria-busy`.
