@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
-import { buildApiUrl } from '../../api/runtime';
+import { api } from '../../api/client';
 import {
 
   Phone,
@@ -95,6 +94,18 @@ interface DoctorQueuePanelProps {
   specialty?: string;
   onPatientSelect?: (patient: Record<string, unknown>) => void;
   className?: string;
+}
+
+// DOCQ-FE-002 (audit 3886): non-2xx responses reject through the canonical
+// axios client with the parsed body on error.response.data — extract the
+// backend-provided detail/message the way the previous fetch code did.
+function extractApiErrorDetail(error: unknown): string {
+  const axiosLike = error as {
+    response?: { data?: { detail?: unknown; message?: unknown } };
+  };
+  const data = axiosLike?.response?.data;
+  const detail = data?.detail ?? data?.message;
+  return typeof detail === 'string' ? detail : '';
 }
 
 const hasBackendQueueAction = (entry: QueueEntryDto | null | undefined, action: string, flagName?: string) => {
@@ -265,19 +276,14 @@ const DoctorQueuePanel = ({
       return;
     }
 
-    const doctorInfoUrl = buildApiUrl('/doctor/my-info');
+    // DOCQ-FE-002 (audit 3886): all doctor-queue reads and commands route
+    // through the canonical api client — the shared axios instance owns the
+    // expired-JWT single-flight refresh + 401 retry, CSRF and rate-limit
+    // handling that a raw fetch bypassed.
     try {
-      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Loading doctor info from canonical API origin', {
-        url: doctorInfoUrl,
-      });
-      const response = await fetch(doctorInfoUrl, {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setDoctorInfo(data);
-      }
+      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Loading doctor info via the canonical api client');
+      const { data } = await api.get('/doctor/my-info');
+      setDoctorInfo(data);
     } catch (error) {
       logger.error('Ошибка загрузки информации врача:', error);
     }
@@ -300,17 +306,13 @@ const DoctorQueuePanel = ({
     const epoch = queueEpochRef.current;
     const requestSpecialty = specialty;
 
-    const queueUrl = buildApiUrl(`/doctor/${specialty}/queue/today`);
     try {
       setLoading(true);
 
-      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Loading doctor queue from canonical API origin', {
+      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Loading doctor queue via the canonical api client', {
         specialty,
-        url: queueUrl,
       });
-      const response = await fetch(queueUrl, {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      });
+      const { data } = await api.get(`/doctor/${specialty}/queue/today`);
 
       if (epoch !== queueEpochRef.current || requestSpecialty !== specialtyRef.current) {
         // DOCQ-FE-001: superseded by a specialty switch — drop the stale
@@ -318,47 +320,33 @@ const DoctorQueuePanel = ({
         return;
       }
 
-      if (response.ok) {
-        const data = await response.json();
-        queueDataRef.current = data;
-        setQueueData(data);
-        setLoadError(null);
-        setQueueStale(false);
-      } else {
-        // DOCQ-FE-003: parse the error body safely (it may be non-JSON) and
-        // record a DISTINCT load-error state; a failed refresh after a
-        // successful load flags the visible rows as possibly stale instead
-        // of silently keeping them as if they were fresh.
-        let detail = '';
-        try {
-          const error = await response.json();
-          detail = (error as { detail?: string })?.detail ?? '';
-        } catch {
-          /* non-JSON error body — keep the generic message */
-        }
-        const hadPreviousData = queueDataRef.current !== null;
-        setLoadError(detail || t('misc.dqp_oshibka_zagruzki_ocheredi'));
-        if (hadPreviousData) {
-          // DOCQ-FE-003: the stale warning Alert below the loaded rows is
-          // the single surface for a failed refresh — no duplicate message.
-          setQueueStale(true);
-        } else {
-          setMessage({ type: 'error', text: detail || t('misc.dqp_oshibka_zagruzki_ocheredi') });
-        }
-      }
+      queueDataRef.current = data;
+      setQueueData(data);
+      setLoadError(null);
+      setQueueStale(false);
     } catch (error) {
       // DOCQ-FE-001: a late network failure of a superseded specialty must
       // not paint an error over the current one.
       if (epoch !== queueEpochRef.current || requestSpecialty !== specialtyRef.current) {
         return;
       }
+      // DOCQ-FE-003: parse the error body safely (it may be non-JSON) and
+      // record a DISTINCT load-error state; a failed refresh after a
+      // successful load flags the visible rows as possibly stale instead
+      // of silently keeping them as if they were fresh. Non-2xx responses
+      // reject through the canonical client with the parsed body on
+      // error.response.data (401s get one refresh+retry inside the client
+      // before ever surfacing here).
+      const detail = extractApiErrorDetail(error);
       logger.error('Ошибка загрузки очереди:', error);
       const hadPreviousData = queueDataRef.current !== null;
-      setLoadError(t('misc.dqp_oshibka_zagruzki_ocheredi'));
+      setLoadError(detail || t('misc.dqp_oshibka_zagruzki_ocheredi'));
       if (hadPreviousData) {
+        // DOCQ-FE-003: the stale warning Alert below the loaded rows is
+        // the single surface for a failed refresh — no duplicate message.
         setQueueStale(true);
       } else {
-        setMessage({ type: 'error', text: t('misc.dqp_oshibka_zagruzki_ocheredi') });
+        setMessage({ type: 'error', text: detail || t('misc.dqp_oshibka_zagruzki_ocheredi') });
       }
     } finally {
       if (epoch === queueEpochRef.current) {
@@ -380,27 +368,16 @@ const DoctorQueuePanel = ({
     }
 
     try {
-      const callUrl = buildApiUrl(`/doctor/queue/${entryId}/call`);
-      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Calling patient via canonical API origin', {
+      // DOCQ-FE-002: canonical client transport (refresh/retry/CSRF).
+      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Calling patient via the canonical api client', {
         entryId,
-        url: callUrl,
       });
-      const response = await fetch(callUrl, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      });
-
-      if (response.ok) {
-        const result = await response.json() as { message?: string };
-        setMessage({ type: 'success', text: result.message || '' });
-        await loadQueueData();
-      } else {
-        const error = await response.json() as { detail?: string };
-        throw new Error(error.detail || '');
-      }
+      const { data } = await api.post(`/doctor/queue/${entryId}/call`) as { data: { message?: string } };
+      setMessage({ type: 'success', text: data.message || '' });
+      await loadQueueData();
     } catch (error: unknown) {
       logger.error('Ошибка вызова пациента:', error);
-      setMessage({ type: 'error', text: (error instanceof Error ? error.message : String(error)) });
+      setMessage({ type: 'error', text: extractApiErrorDetail(error) || (error instanceof Error ? error.message : String(error)) });
     }
   };
 
@@ -416,27 +393,16 @@ const DoctorQueuePanel = ({
     }
 
     try {
-      const startVisitUrl = buildApiUrl(`/doctor/queue/${entryId}/start-visit`);
-      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Starting visit via canonical API origin', {
+      // DOCQ-FE-002: canonical client transport (refresh/retry/CSRF).
+      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Starting visit via the canonical api client', {
         entryId,
-        url: startVisitUrl,
       });
-      const response = await fetch(startVisitUrl, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      });
-
-      if (response.ok) {
-        const result = await response.json() as { message?: string };
-        setMessage({ type: 'success', text: result.message || '' });
-        await loadQueueData();
-      } else {
-        const error = await response.json() as { detail?: string };
-        throw new Error(error.detail || '');
-      }
+      const { data } = await api.post(`/doctor/queue/${entryId}/start-visit`) as { data: { message?: string } };
+      setMessage({ type: 'success', text: data.message || '' });
+      await loadQueueData();
     } catch (error: unknown) {
       logger.error('Ошибка начала приема:', error);
-      setMessage({ type: 'error', text: (error instanceof Error ? error.message : String(error)) });
+      setMessage({ type: 'error', text: extractApiErrorDetail(error) || (error instanceof Error ? error.message : String(error)) });
     }
   };
 
@@ -453,33 +419,18 @@ const DoctorQueuePanel = ({
     }
 
     try {
-      const completeVisitUrl = buildApiUrl(`/doctor/queue/${entryId}/complete`);
-      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Completing visit via canonical API origin', {
+      // DOCQ-FE-002: canonical client transport (refresh/retry/CSRF).
+      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Completing visit via the canonical api client', {
         entryId,
-        url: completeVisitUrl,
       });
-      const response = await fetch(completeVisitUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-
-          // Здесь будут данные визита
-        }) });
-
-      if (response.ok) {
-        const result = await response.json() as { message?: string };
-        setMessage({ type: 'success', text: result.message || '' });
-        await loadQueueData();
-      } else {
-        const error = await response.json() as { detail?: string };
-        throw new Error(error.detail || '');
-      }
+      const { data } = await api.post(`/doctor/queue/${entryId}/complete`, {
+        // Здесь будут данные визита
+      }) as { data: { message?: string } };
+      setMessage({ type: 'success', text: data.message || '' });
+      await loadQueueData();
     } catch (error: unknown) {
       logger.error('Ошибка завершения приема:', error);
-      setMessage({ type: 'error', text: (error instanceof Error ? error.message : String(error)) });
+      setMessage({ type: 'error', text: extractApiErrorDetail(error) || (error instanceof Error ? error.message : String(error)) });
     }
   };
 
