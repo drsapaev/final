@@ -65,6 +65,44 @@ function isResultObject(value: AIResult | null | undefined): value is Record<str
   return !!value && !Array.isArray(value);
 }
 
+// LABAI-FE-003 (post-merge review of PR 3909, P2): stable content fingerprint
+// of an analysis input. Parents pass INLINE data literals, so the object
+// identity changes on every incidental parent re-render (queue polling,
+// autosave timers, toasts) — identity-based staleness would mint a "newer
+// input" out of IDENTICAL content and silently drop the in-flight
+// analysis. Blobs/Files (skin/imaging inputs) are tokenized per object so
+// two different images never share a fingerprint.
+const aiBlobTokens = new WeakMap<object, number>();
+let aiBlobTokenSeq = 0;
+
+function aiInputFingerprint(input: unknown): string {
+  try {
+    return JSON.stringify(input, (_key, value: unknown) => {
+      if (value instanceof Blob) {
+        let token = aiBlobTokens.get(value);
+        if (token === undefined) {
+          token = ++aiBlobTokenSeq;
+          aiBlobTokens.set(value, token);
+        }
+        return `blob:${token}`;
+      }
+      return value;
+    }) ?? 'null';
+  } catch {
+    // Unserializable input (cyclic structure): fall back to a unique
+    // per-object token — never a shared constant, so a replaced input is
+    // still detected as changed.
+    const obj = input as object | null | undefined;
+    if (!obj || typeof obj !== 'object') return String(input);
+    let token = aiBlobTokens.get(obj);
+    if (token === undefined) {
+      token = ++aiBlobTokenSeq;
+      aiBlobTokens.set(obj, token);
+    }
+    return `object:${token}`;
+  }
+}
+
 function getAIResponseError(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return null;
@@ -173,8 +211,14 @@ const AIAssistant = ({
   const [isOpen, setIsOpen] = useState(expanded);
   // LABAI-FE-001 (audit 3886): the initiating input's identity — a pending
   // analysis must never publish its result/error into a NEWER input's dialog.
-  const dataRef = useRef(data);
-  dataRef.current = data;
+  // LABAI-FE-003: the staleness comparison uses the input's CONTENT
+  // fingerprint (see aiInputFingerprint) — object identity alone changes on
+  // every incidental parent re-render of inline data literals.
+  const inputFingerprintRef = useRef('');
+  inputFingerprintRef.current = aiInputFingerprint(data);
+  // LABAI-FE-003: the LATEST analyzeData invocation owns the loading flag —
+  // an older run's finally must not clear the flag a newer run raised.
+  const analysisRunRef = useRef(0);
 
   // X-1 (UX audit): If specialty is provided, auto-configure analysisType and data
   // so the AI tab works without the parent having to pass analysisType explicitly.
@@ -188,8 +232,12 @@ const AIAssistant = ({
 
   const analyzeData = async (manualRetry = false) => {
     if (!data) return;
-    // LABAI-FE-001: capture the initiating input generation.
-    const input = dataRef.current;
+    // LABAI-FE-001/002: capture the initiating input generation — the run's
+    // identity is BOTH its invocation epoch and its input's content
+    // fingerprint (the trigger is disabled while loading, so a newer run
+    // for a newer input can only start after this one released the flag).
+    const inputKey = aiInputFingerprint(data);
+    const runId = ++analysisRunRef.current;
     setLoading(true);
     setError(null);
     if (!manualRetry) {
@@ -321,10 +369,10 @@ const AIAssistant = ({
         throw new Error(responseError);
       }
 
-      // LABAI-FE-001: the input changed while this analysis was in flight —
-      // the response belongs to the OLD input; never publish it into the
-      // newer input's dialog (result, side effect or success notice).
-      if (dataRef.current !== input) {
+      // LABAI-FE-001/002: the input CONTENT changed while this analysis was
+      // in flight — the response belongs to the OLD input; never publish it
+      // into the newer input's dialog (result, side effect or success notice).
+      if (inputFingerprintRef.current !== inputKey) {
         logger.warn('[AIAssistant] Stale AI response ignored for a changed input generation');
         return;
       }
@@ -339,8 +387,8 @@ const AIAssistant = ({
       const errorMsg = normalizeAIErrorMessage(
         errData?.detail || errData?.error || (err instanceof Error ? err.message : String(err))
       );
-      if (dataRef.current !== input) {
-        // LABAI-FE-001: a stale input's failure must not surface as the
+      if (inputFingerprintRef.current !== inputKey) {
+        // LABAI-FE-001/002: a stale input's failure must not surface as the
         // newer input's error.
         logger.warn('[AIAssistant] Stale AI failure ignored for a changed input generation');
         return;
@@ -349,7 +397,15 @@ const AIAssistant = ({
       notify.error(t('misc.aia_analysis_error', { message: errorMsg }));
       setRetryCount((prev) => prev + 1);
     } finally {
-      setLoading(false);
+      // LABAI-FE-003: only the LATEST run owns the loading flag. An older
+      // invocation's finally must not clear the flag a newer run raised
+      // (double-submit overlap between the click and the re-render that
+      // disables the trigger); when this run IS the latest, the release is
+      // honest even if the input content changed mid-flight — a newer run
+      // cannot exist yet, and leaving the flag up would wedge the dialog.
+      if (analysisRunRef.current === runId) {
+        setLoading(false);
+      }
     }
   };
 

@@ -225,3 +225,118 @@ describe('DOCQ-FE-002 401-after-refresh: a dead session renders the honest error
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
+
+// An in-progress entry: start-visit and complete are the offered commands.
+const QUEUE_IN_PROGRESS = {
+  data: {
+    queue_exists: true,
+    opened_at: '2026-03-30T00:00:00Z',
+    stats: { total: 1, waiting: 0, served: 0, online_entries: 0 },
+    doctor: { name: 'Dr. Test', specialty: 'cardiology', cabinet: '101' },
+    next_call_entry_id: 12,
+    entries: [
+      {
+        id: 12,
+        number: 'A002',
+        patient_name: 'Синтетический Пациент Два',
+        status: 'in_progress',
+        available_actions: ['start_visit', 'complete'],
+        can_call: false,
+        can_start_visit: true,
+        can_complete: true,
+        source: 'desk',
+        phone: '+998901234568',
+        created_at: '2026-03-30T08:00:00Z',
+        called_at: '2026-03-30T08:05:00Z',
+      },
+    ],
+  },
+};
+
+const setupInProgressQueue = () => {
+  apiGet.mockImplementation(async (url: string) => {
+    if (url === '/doctor/my-info') return MY_INFO;
+    if (url === '/doctor/cardiology/queue/today') return QUEUE_IN_PROGRESS;
+    throw new Error(`Unexpected api.get URL: ${url}`);
+  });
+};
+
+describe('DOCQ-FE-004 write-ACK: a resolved 2xx without an explicit success ack is never a confirmed command', () => {
+  // Post-merge review of #3905 (P1): the panel reported a clinical visit
+  // completed on ANY resolved 2xx. The #3902 queue contract (DOCFLOW-FE-001)
+  // fail-closes on rejected/ambiguous bodies — the panel must apply the
+  // same contract to call/start-visit/complete.
+  it('complete: a 2xx body with success:false is a rejection, not «Успешно» (pre-fix: success toast)', async () => {
+    setupInProgressQueue();
+    apiPost.mockResolvedValue({ data: { success: false, detail: 'Прием уже завершен другим врачом' } });
+
+    render(<DoctorQueuePanel specialty="cardiology" />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Завершить/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Прием уже завершен другим врачом/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Успешно/)).toBeNull();
+  });
+
+  it('complete: an unreadable 2xx body is reported as an unconfirmed operation, not a success', async () => {
+    setupInProgressQueue();
+    apiPost.mockResolvedValue({ data: null });
+
+    render(<DoctorQueuePanel specialty="cardiology" />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Завершить/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/не подтверждена|NOT confirmed/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Успешно/)).toBeNull();
+  });
+
+  it('start-visit: a 2xx body with success:false is a rejection, not «Успешно»', async () => {
+    setupInProgressQueue();
+    apiPost.mockResolvedValue({ data: { success: false, message: 'Визит уже начат' } });
+
+    render(<DoctorQueuePanel specialty="cardiology" />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Начать/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Визит уже начат/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Успешно/)).toBeNull();
+  });
+
+  it('call: a 2xx body with success:false is a rejection, not «Успешно»', async () => {
+    apiGet.mockImplementation(async (url: string) => {
+      if (url === '/doctor/my-info') return MY_INFO;
+      if (url === '/doctor/cardiology/queue/today') return QUEUE;
+      throw new Error(`Unexpected api.get URL: ${url}`);
+    });
+    apiPost.mockResolvedValue({ data: { success: false, detail: 'Пациент уже вызван' } });
+
+    render(<DoctorQueuePanel specialty="cardiology" />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Вызвать/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Пациент уже вызван/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Успешно/)).toBeNull();
+  });
+
+  it('control: an explicit success:true ack confirms the command', async () => {
+    setupInProgressQueue();
+    apiPost.mockResolvedValue({ data: { success: true, message: 'Прием пациента завершен' } });
+
+    render(<DoctorQueuePanel specialty="cardiology" />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Завершить/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Успешно/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Прием пациента завершен/)).toBeInTheDocument();
+  });
+});

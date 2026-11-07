@@ -198,3 +198,82 @@ describe('LABR-FE-002 — a late preview is owned by its initiating context', ()
     expect(mockedApi.markPrinted).not.toHaveBeenCalled();
   });
 });
+
+describe('LABR-FE-003 — a stale preview\'s finally must not clear a newer action\'s busy flag', () => {
+  // Post-merge review of #3909 (P2): the preview finally checks ONLY the
+  // preview epoch, while the try/catch ownership check also compares the
+  // live operation context. A preview launched in context A that settles
+  // after the operator switched to B (and started a NEWER report action
+  // there) still owns the preview epoch — its finally cleared the newer
+  // action's busy indicator.
+  const INSTANCE_A_REVISE = {
+    ...INSTANCE_A,
+    available_actions: ['edit', 'save_draft', 'finalize', 'preview', 'revise'],
+  };
+  const INSTANCE_B_REVISE = {
+    ...INSTANCE_A_REVISE,
+    id: 92,
+    patient_id: 555,
+  };
+
+  it('the stale A preview does not reset the newer revise action\'s busy state (pre-fix: epoch-only finally clobbered it)', async () => {
+    let releasePreview: (mode: 'blob' | 'reject') => void = () => {
+      throw new Error('preview release not armed');
+    };
+    let releaseRevise: () => void = () => {
+      throw new Error('revise release not armed');
+    };
+    mockedApi.previewInstancePdf.mockImplementation(() => new Promise((resolve, reject) => {
+      releasePreview = (mode) => {
+        if (mode === 'reject') {
+          reject(new Error('preview failed'));
+        } else {
+          resolve(new Blob(['%PDF-synthetic-A'], { type: 'application/pdf' }));
+        }
+      };
+    }));
+    mockedApi.revise.mockImplementation(() => new Promise((resolve) => {
+      releaseRevise = () => resolve({ id: 93, status: 'IN_PROGRESS', patient_id: 555 });
+    }));
+
+    const { rerender } = render(
+      <ThemeProvider>
+        <LabReportWorkbench {...workbenchProps(INSTANCE_A_REVISE, () => CONTEXT_A)} />
+      </ThemeProvider>
+    );
+
+    // The A preview starts and hangs (busyAction = 'preview').
+    fireEvent.click(screen.getByRole('button', { name: /Предпросмотр PDF/ }));
+    await waitFor(() => expect(mockedApi.previewInstancePdf).toHaveBeenCalledWith(91));
+
+    // The operator switches to report B while the preview read is pending.
+    rerender(
+      <ThemeProvider>
+        <LabReportWorkbench {...workbenchProps(INSTANCE_B_REVISE, () => CONTEXT_B)} />
+      </ThemeProvider>
+    );
+
+    // A NEWER report action starts in context B: revise (its confirm
+    // resolves, then the revise request hangs — busyAction = 'revise').
+    fireEvent.click(screen.getByRole('button', { name: /Исправленная версия/ }));
+    const confirmButton = await screen.findByRole('button', { name: 'Создать версию' });
+    fireEvent.click(confirmButton);
+    await waitFor(() => expect(mockedApi.revise).toHaveBeenCalledWith(92));
+
+    // The revise action is visibly busy on the actions bar.
+    expect(screen.getByRole('button', { name: /Создаю…/ })).toBeInTheDocument();
+
+    // The stale A preview settles now: its body must be dropped (try-guard)
+    // AND its finally must not clear the newer action's busy flag.
+    releasePreview('blob');
+    await new Promise((resolve) => { setTimeout(resolve, 120); });
+
+    // Pre-fix: the epoch-only finally reset busyAction here and the revise
+    // button fell back to its idle label while the revise was still busy.
+    expect(screen.getByRole('button', { name: /Создаю…/ })).toBeInTheDocument();
+
+    // Cleanup: let the revise settle so no promise stays pending.
+    releaseRevise();
+    await new Promise((resolve) => { setTimeout(resolve, 120); });
+  });
+});
