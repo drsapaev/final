@@ -103,6 +103,59 @@ describe('PhotoArchive patient-context isolation (audit 3892 round 1)', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-preview-url');
   });
 
+  it('review 3903 P2 (DENTPHOTO): a late A-context upload completion preserves B\'s in-progress upload form', async () => {
+    let resolveUpload: (() => void) | undefined;
+    mediaApi.uploadDentalMedia.mockImplementation(() => new Promise<void>((resolve) => {
+      resolveUpload = resolve;
+    }));
+    const view = renderWithProviders(
+      <PhotoArchive patientId={7} visitId={9} patientName="SYNTHETIC-Patient-A" />,
+    );
+
+    const input = await screen.findByLabelText(fileInputLabel) as HTMLInputElement;
+    const aFile = new File(['synthetic patient A bytes'], 'a-xray.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [aFile] } });
+    const titleInput = screen.getByLabelText(/Название снимка|Title/) as HTMLInputElement;
+    fireEvent.change(titleInput, { target: { value: 'SYNTHETIC A title' } });
+    fireEvent.click(uploadButton());
+
+    // The archive switches to B while A's upload POST is still pending; B
+    // picks a file and types metadata.
+    view.rerender(
+      <PhotoArchive patientId={8} visitId={42} patientName="SYNTHETIC-Patient-B" />,
+    );
+    await waitFor(() => expect(mediaApi.listDentalMedia).toHaveBeenCalledWith(8, 42));
+
+    const bFile = new File(['synthetic patient B bytes'], 'b-photo.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [bFile] } });
+    fireEvent.change(titleInput, { target: { value: 'SYNTHETIC B title' } });
+
+    // A's upload completes only now — its late callback must not clear B's
+    // in-progress form.
+    await act(async () => {
+      resolveUpload?.();
+      await Promise.resolve();
+    });
+
+    // B's in-progress form survives: the typed metadata is intact, the
+    // selected file is still B's (the submit control stays enabled — jsdom
+    // file inputs do not reflect the file name in .value, so the enabled
+    // state and the eventual upload carry prove preservation), and the
+    // spinner A left behind was cleared by the context switch.
+    expect(titleInput).toHaveProperty('value', 'SYNTHETIC B title');
+    expect(uploadButton()).toHaveProperty('disabled', false);
+
+    mediaApi.uploadDentalMedia.mockResolvedValue(undefined);
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(mediaApi.uploadDentalMedia).toHaveBeenCalledWith(
+      8,
+      42,
+      'photo',
+      bFile,
+      expect.objectContaining({ title: 'SYNTHETIC B title' }),
+    ));
+  });
+
   it('DENTPHOTO-FE-002: a delayed old-patient preview response cannot reopen under the new patient', async () => {
     let resolveContent: ((blob: Blob) => void) | undefined;
     mediaApi.loadDentalMediaContent.mockImplementation(() => new Promise((resolve) => {

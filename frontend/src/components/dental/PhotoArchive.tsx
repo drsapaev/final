@@ -133,6 +133,9 @@ const PhotoArchive = ({
   // DENTPHOTO-FE-001/002 (audit 3892): a patient/visit switch invalidates the
   // previous patient's pending upload form and any open preview. Setting
   // preview to null lets the existing url-cleanup effect revoke the blob URL.
+  // Review 3903 P2 (DENTPHOTO): the switch also clears A's in-flight upload
+  // spinner — the submit handler's identity guard deliberately leaves
+  // `uploading` untouched for B, so it must be reset here instead.
   useEffect(() => {
     setSelectedFile(null);
     setUploadTitle('');
@@ -144,6 +147,7 @@ const PhotoArchive = ({
     setSuccessMessage(null);
     setPreview(null);
     setPreviewingId(null);
+    setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [archiveContextKey]);
 
@@ -235,15 +239,17 @@ const PhotoArchive = ({
         tooth: uploadTooth.trim() || null,
         capture_date: uploadDate || null,
       });
+      // Review 3903 P2 (DENTPHOTO): verify the origin identity BEFORE any
+      // form state mutation. When A's upload completes after the archive has
+      // switched to B, B may already be filling in a new file and metadata —
+      // a late A-context completion must not erase it.
+      if (identityRef.current !== originIdentity) return;
       setSelectedFile(null);
       setUploadTitle('');
       setUploadDescription('');
       setUploadTooth('');
       setUploadDate('');
       if (fileInputRef.current) fileInputRef.current.value = '';
-      // DENTPHOTO-FE-001: the context switch effect has already reset the form
-      // for the new patient; do not paint A's success over B's archive.
-      if (identityRef.current !== originIdentity) return;
       setSuccessMessage(t('dental.dental_pa_upload_success'));
       await reload();
     } catch (error: unknown) {
