@@ -248,6 +248,8 @@ let lastBulkSaveQuery = '';
 let previewGetCount = 0;
 let finalizePostCount = 0;
 let printLabResultsPostCount = 0;
+// LABPRINT-FE-001 (audit 3886, round 14): тела POST /print/lab-results.
+const printLabResultsBodies: Array<Record<string, unknown>> = [];
 let pdfGetCount = 0;
 let markPrintedPostCount = 0;
 let revisePostCount = 0;
@@ -429,6 +431,10 @@ async function installApiMocks(page: Page) {
   // чинил PR8 hotfix) и помечает бланк PRINTED.
   await page.route('**/api/v1/print/lab-results', (route) => {
     printLabResultsPostCount += 1;
+    // LABPRINT-FE-001 (audit 3886, round 14): фронт обязан отправлять
+    // ТОЛЬКО report_instance_id (+ опция принтера) — тело фиксируется
+    // и ассертится ниже (фаза 7).
+    printLabResultsBodies.push(route.request().postDataJSON());
     return json(route, { success: false, error: 'no printer attached (mocked)' });
   });
 
@@ -494,6 +500,7 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     previewGetCount = 0;
     finalizePostCount = 0;
     printLabResultsPostCount = 0;
+  printLabResultsBodies.length = 0;
     pdfGetCount = 0;
     markPrintedPostCount = 0;
     revisePostCount = 0;
@@ -606,10 +613,17 @@ test.describe('Lab full-path (final gate, mocked)', () => {
 
     // ── Фаза 7: печать (PDF-fallback) ──────────────────────────────────
     await page.getByRole('button', { name: 'Печать результата' }).click();
-    // Прямой канал печати отвергнут -> PDF-маршрут -> blob-вкладка ->
-    // mark-printed. Порядок строго такой (handlePrint fallback).
+    // Прямой канал печати отвергнут (явный success:false) -> PDF-маршрут
+    // -> blob-вкладка. LABPRINT-FE-002 (audit 3886, round 14): открытая
+    // PDF-вкладка — НЕ физическая печать; mark-printed выполняется только
+    // по явному подтверждению оператора (кнопка в inline Alert).
     await expect.poll(() => printLabResultsPostCount).toBe(1);
+    // LABPRINT-FE-001: тело запроса — только report_instance_id.
+    expect(printLabResultsBodies[0]).toEqual({ report_instance_id: CREATED_INSTANCE_ID });
     await expect.poll(() => pdfGetCount).toBe(1);
+    // До подтверждения статус не меняется: mark-printed не вызывался.
+    expect(markPrintedPostCount).toBe(0);
+    await page.getByRole('button', { name: 'Отметить как напечатанное' }).click();
     await expect.poll(() => markPrintedPostCount).toBe(1);
     const printIndex = labApiCalls.findIndex((call) => call.url.includes('/print/lab-results'));
     const pdfIndex = labApiCalls.findIndex((call) => call.url.includes(`/lab/report-instances/${CREATED_INSTANCE_ID}/pdf`));

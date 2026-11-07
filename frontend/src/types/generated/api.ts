@@ -7550,7 +7550,18 @@ export type paths = {
         put?: never;
         /**
          * Print Lab Results
-         * @description Печать результатов лабораторных анализов
+         * @description Печать лабораторного бланка по авторизованному отчёту.
+         *
+         *     LABPRINT-FE-001 (audit 3886, round 14): раньше роут принимал СВОБОДНЫЕ
+         *     клиентские данные (результаты/флаги/снапшоты пациента) и рендерил их
+         *     как «лабораторный бланк» без какой-либо сверки с LabReportInstance —
+         *     доверенная роль могла распечатать несохранённые/изменённые/чужие
+         *     значения, а UI после этого помечал *другой* канонический инстанс как
+         *     PRINTED. Теперь фронт отправляет ТОЛЬКО report_instance_id (+ опцию
+         *     принтера); сервер загружает инстанс, проверяет право чтения Doctor
+         *     (тот же guard, что у /lab/report-instances/{id}/pdf), требует статус
+         *     FINALIZED/PRINTED и материализует бланк из БД тем же пайплайном
+         *     (materialize_instance + снапшоты), что и канонический PDF.
          */
         post: operations["print_lab_results_api_v1_print_lab_results_post"];
         delete?: never;
@@ -36146,35 +36157,22 @@ export type components = {
         };
         /**
          * PrintLabResultsRequest
-         * @description Схема для печати результатов анализов
+         * @description LABPRINT-FE-001 (audit 3886, round 14): печать лабораторного бланка
+         *     ТОЛЬКО по авторизованному идентификатору отчёта. Клиентские значения
+         *     (результаты/флаги/снапшоты пациента) больше не принимаются: сервер
+         *     материализует бланк из БД тем же пайплайном, что и канонический
+         *     /lab/report-instances/{id}/pdf. Свободные поля отвергаются (forbid).
          */
         PrintLabResultsRequest: {
             /**
-             * Lab Order
-             * @description Данные заказа
+             * Report Instance Id
+             * @description ID существующего лабораторного отчёта (FINALIZED/PRINTED)
              */
-            lab_order: {
-                [key: string]: unknown;
-            };
+            report_instance_id: number;
             /**
-             * Lab Results
-             * @description Результаты анализов
+             * Printer Name
+             * @description Опциональный выбор принтера
              */
-            lab_results: {
-                [key: string]: unknown;
-            }[];
-            /**
-             * Patient
-             * @description Данные пациента
-             */
-            patient: {
-                [key: string]: unknown;
-            };
-            /** Clinic */
-            clinic?: {
-                [key: string]: unknown;
-            } | null;
-            /** Printer Name */
             printer_name?: string | null;
         };
         /**

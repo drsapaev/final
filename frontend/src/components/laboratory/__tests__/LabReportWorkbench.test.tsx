@@ -140,13 +140,18 @@ describe('LabReportWorkbench', () => {
   });
 
   it('does not invent draft status in the print payload when backend status is missing', () => {
-    // P-04 fix: buildLabPrintPayload вынесена в utils/labReportNormalize.js.
+    // LABPRINT-FE-001 (audit 3886, round 14): клиентский печатный payload
+    // удалён — печать отправляет только report_instance_id (сервер
+    // материализует бланк из БД).
     // Проверяем там, что status берётся как есть, без fallback на 'DRAFT'.
-    const normalizePath = path.resolve(__dirname, '../utils/labReportNormalize.ts');
+        const normalizePath = path.resolve(__dirname, '../utils/labReportNormalize.ts');
     const source = fs.readFileSync(normalizePath, 'utf8');
 
-    expect(source).toContain('status: instance?.status || null');
-    expect(source).not.toContain('status: instance?.status || \'DRAFT\'');
+    // Клиентский печатный билдер удалён; статус печатного бланка
+    // материализует сервер из персистентной записи.
+    expect(source).not.toContain('buildLabPrintPayload');
+    const workbenchSource = fs.readFileSync(workbenchPath, 'utf8');
+    expect(workbenchSource).toContain('report_instance_id: Number(expectedInstanceId)');
   });
 
   it('does not auto-create or auto-open a report when exactly one template is allowed', async () => {
@@ -385,7 +390,9 @@ describe('LabReportWorkbench', () => {
     expect(source).toContain("t('workbench.print_sent')");
     expect(source).toContain("t('workbench.print_pdf_failed')");
     expect(source).toContain("t('workbench.print_pdf_invalid')");
-    expect(source).toContain("t('workbench.print_pdf_opened')");
+    expect(source).toContain("t('workbench.print_pdf_opened_confirm')");
+    expect(source).toContain("t('workbench.print_unconfirmed')");
+    expect(source).toContain("t('workbench.print_confirm_mark_printed')");
     expect(source).toContain("t('workbench.print_pdf_blocked')");
 
     // Editor header
@@ -492,6 +499,103 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       </ThemeProvider>
     );
   }
+
+  // ── LABPRINT (audit 3886, round 14) ─────────────────────────────────
+  it('LABPRINT-FE-003: an ambiguous 2xx ACK does not mark printed, does not fall back and does not blind-retry', async () => {
+    mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({
+      success: false,
+      ambiguous: true,
+      error: 'print_ack_unconfirmed',
+    } as never);
+    mockedApi.downloadPdf.mockReset();
+    mockedApi.markPrinted.mockReset();
+    renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedPrintService.printLabResults).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+
+    // Известно только «подтверждения нет»: задание могло встать в очередь —
+    // никакого слепого повтора и никакого PDF-фолбэка/статуса.
+    expect(mockedApi.downloadPdf).not.toHaveBeenCalled();
+    expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+    expect(screen.getByText(/не подтверждён/)).toBeInTheDocument();
+  });
+
+  it('LABPRINT-FE-001: the direct print call carries ONLY the report_instance_id', async () => {
+    mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({ success: true } as never);
+    mockedApi.markPrinted.mockReset().mockResolvedValue({
+      ...reopenedDraftInstance,
+      status: 'PRINTED',
+    });
+    renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedPrintService.printLabResults).toHaveBeenCalledTimes(1));
+
+    // До фикса: workbench собирал в браузере целый бланк
+    // (buildLabPrintPayload) с результатами и снапшотами пациента.
+    expect(mockedPrintService.printLabResults).toHaveBeenCalledWith({
+      report_instance_id: 77,
+    });
+    expect(mockedApi.markPrinted).toHaveBeenCalledWith(77);
+  });
+
+  it('LABPRINT-FE-002: opening the PDF fallback does NOT mark printed; explicit operator confirmation does', async () => {
+    const windowOpenSpy = vi.spyOn(window, 'open').mockReturnValue({} as Window);
+    mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({
+      success: false,
+      error: 'printer offline',
+    } as never);
+    mockedApi.downloadPdf.mockReset().mockResolvedValue(new Blob(['%PDF-synthetic'], { type: 'application/pdf' }));
+    mockedApi.markPrinted.mockReset().mockResolvedValue({
+      ...reopenedDraftInstance,
+      status: 'PRINTED',
+    });
+    const onRefreshHistory = vi.fn();
+    renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+      onRefreshHistory,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedApi.downloadPdf).toHaveBeenCalled());
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+
+    expect(windowOpenSpy).toHaveBeenCalled();
+    // Открытая PDF-вкладка — НЕ физическая печать: до подтверждения
+    // оператора статус не меняется. До фикса markPrinted вызывался
+    // немедленно после window.open.
+    expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Отметить как напечатанное' })).toBeInTheDocument();
+
+    // Явное подтверждение оператора — единственный путь к PRINTED.
+    fireEvent.click(screen.getByRole('button', { name: 'Отметить как напечатанное' }));
+    await waitFor(() => expect(mockedApi.markPrinted).toHaveBeenCalledWith(77));
+    await waitFor(() => expect(onRefreshHistory).toHaveBeenCalled());
+    expect(screen.getByText(/Отчёт отмечен как напечатанный/)).toBeInTheDocument();
+    windowOpenSpy.mockRestore();
+  });
 
   it('locks report values and signer inputs while another report is loading', () => {
     renderWithActiveInstance({ instanceTransitionPending: true });

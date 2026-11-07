@@ -82,15 +82,46 @@ export const printService = {
   },
 
   /**
-   * Печать лабораторных результатов
+   * Печать лабораторного бланка.
+   *
+   * LABPRINT-FE-001 (audit 3886, round 14): отправляется ТОЛЬКО
+   * авторизованный идентификатор отчёта (+ опция принтера) — сервер
+   * материализует значения из БД тем же пайплайном, что канонический
+   * /lab/report-instances/{id}/pdf. Клиентские значения больше не
+   * передаются и не рендерятся.
+   *
+   * LABPRINT-FE-003 (audit 3886, round 14): строгий ACK. Прежний
+   * «non-false»-нормализатор (normalizePrintResponse) считал успехом
+   * ЛЮБОЙ 2xx без явного success:false — {}/{success:null} синтезировали
+   * подтверждение и UI помечал отчёт PRINTED без подтверждённого задания
+   * печати. Теперь успех только при success === true; 2xx без
+   * положительного ACK — честный ambiguous-отказ (задание могло уже
+   * встать в очередь: никакого слепого повтора/автофолбэка).
    */
-  async printLabResults(labResultsData: Record<string, unknown>) {
+  async printLabResults(command: { report_instance_id: number; printer_name?: string | null }) {
     try {
-      const response = await api.post('/print/lab-results', labResultsData);
-
-      return normalizePrintResponse(response.data, 'Ошибка печати лабораторных результатов');
+      const response = await api.post('/print/lab-results', command);
+      const payload = (response?.data ?? null) as Record<string, unknown> | null;
+      if (payload && payload.success === true) {
+        return { success: true, data: payload };
+      }
+      if (payload && payload.success === false) {
+        return {
+          success: false,
+          ambiguous: false,
+          error: (payload.error as string) || (payload.message as string) || 'Ошибка печати лабораторных результатов',
+          data: payload,
+        };
+      }
+      return {
+        success: false,
+        ambiguous: true,
+        error: 'print_ack_unconfirmed',
+        data: payload,
+      };
     } catch (error) {
-      return normalizePrintError(error, 'Ошибка печати лабораторных результатов');
+      // Известный отказ транспорта — не ambiguous.
+      return { ...normalizePrintError(error, 'Ошибка печати лабораторных результатов'), ambiguous: false };
     }
   },
 
