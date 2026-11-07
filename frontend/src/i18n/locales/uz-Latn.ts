@@ -6849,6 +6849,9 @@ const uzLatn = {
     mqm_btn_close_reception: 'Qabulni yopish',
     mqm_refresh_queue: 'Navbatni yangilash',
     mqm_call: 'Chaqirish',
+    // QMAN-FE-001 (audit 3886): failed current-selection load is visible and recoverable
+    mqm_queue_load_failed: "Tanlangan shifokor navbatini yuklash amalga oshmadi. Oldingi shifokor ma'lumotlari yashirilgan — yuklashni qayta bajaring.",
+    mqm_retry_load: 'Qayta yuklash',
     mqm_aria_auto_refresh_off: 'Navbat avtomatik yangilanishini oʻchirish',
     mqm_aria_auto_refresh_on: 'Navbat avtomatik yangilanishini yoqish',
     mqm_title_auto_refresh_on: 'Avtomatik yangilanish yoqilgan',

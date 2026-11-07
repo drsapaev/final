@@ -267,6 +267,13 @@ export function useDentistActions({
   // is present in the visit's icd10 field.
   const CRITICAL_ICD10_CODES = useRef(['K04', 'K10']).current;
 
+  // DOCFLOW-FE-002 (audit 3886): the LATEST selected patient must be
+  // reachable from a ref so a completion flow that started for patient A can
+  // re-verify the selection identity after every async boundary (confirm
+  // dialog, network) before the irreversible POST and the clinical UI reset.
+  const selectedPatientRef = useRef(selectedPatient);
+  selectedPatientRef.current = selectedPatient;
+
   const getCriticalDiagnosisWarning = useCallback(
     (icd10Code: unknown) => {
       if (!icd10Code || typeof icd10Code !== 'string') return null;
@@ -317,6 +324,14 @@ export function useDentistActions({
       return;
     }
 
+    // DOCFLOW-FE-002 (audit 3886): snapshot the queue-entry/patient identity
+    // BEFORE the async confirm boundary so the completion can be re-verified
+    // against the live selection after the dialog resolves.
+    const completionIdentity = {
+      queueEntryId,
+      patientId: resolvePatientId(selectedPatient),
+    };
+
     // C-1 + C-3 (UX audit): tiered confirmation before completing the visit.
     // C-3: if the ICD-10 code matches a critical dental diagnosis (K04 —
     // pulp/periapical diseases, K10 — jaw diseases including osteomyelitis
@@ -353,15 +368,25 @@ export function useDentistActions({
       return;
     }
 
+    // DOCFLOW-FE-002 (audit 3886): the confirm dialog is an async boundary —
+    // the selection may have changed while it was pending. Bind the
+    // completion to the snapshotted queue-entry/patient identity and abort
+    // (no POST, no UI reset) when the panel has moved to another patient;
+    // otherwise a stale handler could complete A and wipe B's state.
+    const currentSelection = selectedPatientRef.current;
+    if (
+      String(resolveDoctorQueueEntryId(currentSelection)) !== String(completionIdentity.queueEntryId) ||
+      String(resolvePatientId(currentSelection)) !== String(completionIdentity.patientId)
+    ) {
+      logger.warn('[Dentistry] Selection changed during completion confirmation — aborting stale completion');
+      return;
+    }
+
     try {
       setLoading(true);
       logger.info('[Dentistry] Completing queue visit');
 
-      const patientId =
-        selectedPatient?.patient?.id ||
-        selectedPatient?.patient_id ||
-        selectedPatient?.id ||
-        null;
+      const patientId = completionIdentity.patientId;
 
       // Минимальный payload: стоматолог использует EMR v2 для протокола визита,
       // а в queue completeVisit передаём только ключевые поля для закрытия очереди.
@@ -384,7 +409,24 @@ export function useDentistActions({
         notes: latestDraft.recommendations || latestDraft.notes || '',
       };
 
-      await queueService.completeVisit(queueEntryId, visitPayload);
+      // DOCFLOW-FE-001 (audit 3886): only a confirmed `success: true` DTO
+      // completes the visit in the UI. An ambiguous (unreadable 2xx) or
+      // rejected response keeps the clinical state intact; the ambiguous
+      // branch additionally reconciles the visible queue with the canonical
+      // server snapshot instead of blindly retrying.
+      const completionAck = await queueService.completeVisit(queueEntryId, visitPayload);
+      if (completionAck?.success !== true) {
+        const ackMessage = (completionAck as { message?: unknown } | undefined)?.message;
+        notify.error(
+          (typeof ackMessage === 'string' && ackMessage) || tI18n('dental.dental_panel_complete_failed')
+        );
+        logger.error('[Dentistry] Visit completion NOT confirmed by the server');
+        if ((completionAck as { unknown?: unknown } | undefined)?.unknown === true) {
+          // Ambiguous outcome — refresh the visible queue from the server.
+          void loadDentistryAppointments(true);
+        }
+        return;
+      }
       logger.info('[Dentistry] Queue visit completed');
       notify.success(tI18n('dental.visit_completed'));
 
