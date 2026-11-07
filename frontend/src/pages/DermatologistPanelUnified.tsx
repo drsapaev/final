@@ -436,7 +436,7 @@ const DermatologistPanelUnified = () => {
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [services, setServices] = useState<Record<string, unknown>>({});
   const appointmentsLoadPromiseRef = useRef<Promise<DermatologyAppointment[]> | null>(null);
-  const urlResolutionRef = useRef({ search: '', refreshAttempted: false, notified: false, appliedPair: null as { patientId: number | string | null; visitId: number | string | null } | null });
+  const urlResolutionRef = useRef({ search: '', refreshAttempted: false, refreshSettled: false, notified: false, appliedPair: null as { patientId: number | string | null; visitId: number | string | null } | null });
   // DERMAURL-FE-002 (audit 3892): monotonic generation for the deep-link
   // resolution — invalidates in-flight resolutions on unmount/re-run.
   const urlResolutionGenerationRef = useRef(0);
@@ -885,6 +885,7 @@ const DermatologistPanelUnified = () => {
         urlResolutionRef.current = {
           search: searchKey,
           refreshAttempted: false,
+          refreshSettled: false,
           notified: false,
           appliedPair: null,
         };
@@ -895,6 +896,7 @@ const DermatologistPanelUnified = () => {
         urlResolutionRef.current = {
           search: searchKey,
           refreshAttempted: false,
+          refreshSettled: false,
           notified: false,
           // DERMAURL-FE-002: appliedPair survives a pure `tab` param change —
           // only a change of the patient/visit pair itself invalidates it.
@@ -996,8 +998,13 @@ const DermatologistPanelUnified = () => {
         if (!urlResolutionRef.current.refreshAttempted) {
           urlResolutionRef.current.refreshAttempted = true;
           const refreshedAppointments = await loadDermatologyAppointments() as DermatologyAppointment[] | null | undefined;
+          // The queue snapshot this resolution depends on has settled — a
+          // re-run that arrives while the request is in flight must not
+          // conclude "not found" from a temporarily empty list.
+          urlResolutionRef.current.refreshSettled = true;
           // DERMAURL-FE-002: the awaited refresh raced with a newer URL
-          // or selection — drop this continuation entirely.
+          // or selection — drop this continuation entirely (the re-run that
+          // observes the loaded `appointments` owns the resolution now).
           if (urlResolutionGenerationRef.current !== generation || location.search !== searchKey) {
             return;
           }
@@ -1037,6 +1044,12 @@ const DermatologistPanelUnified = () => {
         }
 
         if (!urlResolutionRef.current.notified) {
+          if (!urlResolutionRef.current.refreshSettled) {
+            // DERMAURL-FE-001: the refresh is still in flight (or its rows
+            // have not been reflected yet) — deciding "not found" now would
+            // clear a context the in-flight resolution is about to apply.
+            return;
+          }
           urlResolutionRef.current.notified = true;
           urlResolutionRef.current.appliedPair = null;
           setSelectedPatient(null);
