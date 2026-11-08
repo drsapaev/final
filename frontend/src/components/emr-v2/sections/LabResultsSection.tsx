@@ -14,7 +14,7 @@
  *   - Collapsible (defaultOpen=false — supplementary data, not needed on every visit)
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 // UX-AUDIT-FIX6 (история, направление ОТМЕНЕНО Track 3-2, §3.3 / Plan v2.10):
 // macos-Icon обёртка → прямые lucide-react импорты. Канонический end-state —
 // одна иконок-система (lucide), Nielsen Heuristic #4 сохраняется в обратную
@@ -98,35 +98,99 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
   // и просить отменить. Соответствует Nielsen Heuristic #5 (Error Prevention).
   const [confirm] = useConfirm();
 
-  const loadInstances = useCallback(async () => {
+  // EMRLAB-FE-002 (audit 3886, round 15): epoch-guard — ответы/ошибки
+  // superseded-контекста больше не могут перезаписать списки/spinner
+  // нового пациента; пустой контекст (null/null) немедленно чистит
+  // предыдущие строки.
+  const requestEpochRef = useRef(0);
+
+  const loadInstances = useCallback(async (epoch: number) => {
+    if (epoch !== requestEpochRef.current) return;
     if (!patientId && !visitId) {
+      setInstances([]);
+      setError(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, unknown> = { limit: 20 };
-      if (visitId) params.visit_id = visitId;
-      else if (patientId) params.patient_id = patientId;
-
-      const result = await labReportingApi.listInstances(params);
-      const list = Array.isArray(result) ? result : ((result as Record<string, unknown>)?.items || []);
-      // Only show finalized/printed — drafts are lab-internal.
-      setInstances((list as LabReportInstance[]).filter((r) => r.status === 'FINALIZED' || r.status === 'PRINTED'));
+      // EMRLAB-FE-001: канонические параметры контракта list-роута —
+      // visit_ids-МАССИВ (не несуществующий singular visit_id, который
+      // сервер игнорировал, отдавая Doctor'у все его визиты) плюс
+      // patient_id ОБА, когда известны оба. Render-time второй пояс
+      // ниже отбрасывает записи с чужим контекстом.
+      // EMRLAB-FE-003: статус фильтруется СЕРВЕРОМ ДО лимита: без
+      // статус-параметра 20 более новых черновиков могли вытеснить
+      // старые финализированные записи за пределы limit, и клиентский
+      // фильтр показывал «нет результатов». Постранично добираем каждый
+      // статус до исчерпания (защитный потолок на цикл пагинации).
+      const collected: LabReportInstance[] = [];
+      const PAGE = 50;
+      const MAX_PAGES_PER_STATUS = 5;
+      for (const status of ['FINALIZED', 'PRINTED'] as const) {
+        let offset = 0;
+        for (let page = 0; page < MAX_PAGES_PER_STATUS; page += 1) {
+          const params: Record<string, unknown> = {
+            limit: PAGE,
+            offset,
+            status,
+          };
+          if (patientId != null) params.patient_id = patientId;
+          if (visitId != null) params.visit_ids = [visitId];
+          const result = await labReportingApi.listInstances(params);
+          if (epoch !== requestEpochRef.current) return;
+          const list = Array.isArray(result)
+            ? result
+            : ((result as Record<string, unknown>)?.items || []);
+          collected.push(...(list as LabReportInstance[]));
+          if ((list as unknown[]).length < PAGE) break;
+          offset += PAGE;
+        }
+      }
+      if (epoch !== requestEpochRef.current) return;
+      // Второй пояс (render-time sanity): в списке — только финализированные
+      // записи текущего контекста; дубли по id подавляются, порядок —
+      // новее-первый по дате финализации.
+      const seenIds = new Set<string>();
+      const merged = collected
+        .filter((r) => r.status === 'FINALIZED' || r.status === 'PRINTED')
+        .filter((r) => {
+          const key = String(r.id);
+          if (seenIds.has(key)) return false;
+          seenIds.add(key);
+          return true;
+        })
+        .sort(
+          (a, b) =>
+            new Date(b.finalized_at || b.updated_at || 0).getTime()
+            - new Date(a.finalized_at || a.updated_at || 0).getTime(),
+        );
+      setInstances(merged);
     } catch (err: unknown) {
+      if (epoch !== requestEpochRef.current) return;
       const errShape = err as { message?: string };
       logger.warn('[LabResultsSection] Failed to load lab instances', { error: errShape?.message });
       setError('Не удалось загрузить результаты анализов.');
       setInstances([]);
     } finally {
-      setLoading(false);
+      if (epoch === requestEpochRef.current) setLoading(false);
     }
   }, [patientId, visitId]);
 
   useEffect(() => {
-    loadInstances();
-  }, [loadInstances]);
+    // EMRLAB-FE-002: смена контекста — мгновенная очистка и новая эпоха;
+    // поздние ответы предыдущей эпохи отбрасываются целиком.
+    const epoch = requestEpochRef.current + 1;
+    requestEpochRef.current = epoch;
+    setInstances([]);
+    setError(null);
+    setLoading(Boolean(patientId || visitId));
+    void loadInstances(epoch);
+    return () => {
+      requestEpochRef.current += 1;
+    };
+  }, [patientId, visitId, loadInstances]);
 
   const handleDownload = async (instanceId: string | number) => {
     try {
@@ -239,16 +303,18 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
               <Badge variant={getLabStatusVariant(instance.status || '') || 'default'} size="small">
                 {formatLabStatus(instance.status || '') || instance.status}
               </Badge>
-              {!disabled && (
-                <Button
-                  variant="outline"
-                  size="small"
-                  onClick={() => handleDownload(instance.id)}
-                  aria-label={`Скачать PDF: ${instance.template_name || 'лабораторный отчёт'}`}>
-                  <Download size={14} style={{ marginRight: 4 }} aria-hidden="true" />
-                  PDF
-                </Button>
-              )}
+              {/* EMRLAB-FE-004 (audit 3886, round 15): read-only просмотр
+                  не отзывает права читать канонический PDF (бэкенд
+                  разрешает Doctor'у finalized/printed). disabled гейтит
+                  только мутации (create order), а не чтение. */}
+              <Button
+                variant="outline"
+                size="small"
+                onClick={() => handleDownload(instance.id)}
+                aria-label={`Скачать PDF: ${instance.template_name || 'лабораторный отчёт'}`}>
+                <Download size={14} style={{ marginRight: 4 }} aria-hidden="true" />
+                PDF
+              </Button>
             </div>
           </div>
         ))}
@@ -258,10 +324,12 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
 
   return (
     <>
+      {/* EMRLAB-FE-004: секция интерактивна для ЧТЕНИЯ даже в
+          signed/read-only EMR (аккордеон раскрывается, PDF доступен);
+          disabled больше не глушит pointer-events всего блока. */}
       <EMRSection
         title="Результаты анализов"
         icon={<FileText size={16} aria-hidden="true" />}
-        disabled={disabled}
         defaultOpen={instances.length > 0}
         headerAction={!disabled && patientId ? (
           <Button variant="outline" size="small" onClick={handleOpenOrderModal}>
