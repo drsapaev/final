@@ -51,6 +51,12 @@ export function PatientSearch({ onPick, selectedPatientId = null }: PatientSearc
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PatientSearchResult[] | null>(null);
+  // CARDSEARCH-FE-001 (audit 3886 round 20): results are associated with
+  // the query they were fetched for. Rows are only rendered while the
+  // current input still matches that query, so results for a previous
+  // query can never stay clickable after the doctor starts typing a new
+  // one (previously they remained clickable through the 300-ms debounce).
+  const [resultsForQuery, setResultsForQuery] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const requestSeq = useRef(0);
@@ -68,10 +74,12 @@ export function PatientSearch({ onPick, selectedPatientId = null }: PatientSearc
           .map((item) => toSearchResult(item as Record<string, unknown>))
           .filter((item): item is PatientSearchResult => item !== null),
       );
+      setResultsForQuery(trimmed);
     } catch {
       if (seq !== requestSeq.current) return;
       setError(true);
       setResults(null);
+      setResultsForQuery(null);
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
@@ -79,11 +87,17 @@ export function PatientSearch({ onPick, selectedPatientId = null }: PatientSearc
 
   useEffect(() => {
     const trimmed = query.trim();
+    // CARDSEARCH-FE-001: EVERY query change invalidates the previous
+    // search — in-flight responses are dropped via the sequence guard and
+    // previously fetched rows stop rendering immediately, instead of
+    // staying clickable under the "results for <new query>" label during
+    // the debounce window.
+    requestSeq.current += 1;
+    setResults(null);
+    setResultsForQuery(null);
+    setError(false);
+    setLoading(false);
     if (trimmed.length < PATIENT_SEARCH_MIN_CHARS) {
-      requestSeq.current += 1; // invalidate any in-flight request
-      setResults(null);
-      setError(false);
-      setLoading(false);
       return;
     }
     const timer = window.setTimeout(() => { void runSearch(trimmed); }, PATIENT_SEARCH_DEBOUNCE_MS);
@@ -91,6 +105,8 @@ export function PatientSearch({ onPick, selectedPatientId = null }: PatientSearc
   }, [query, runSearch]);
 
   const tooShort = query.trim().length < PATIENT_SEARCH_MIN_CHARS;
+  const trimmedQuery = query.trim();
+  const rowsBelongToCurrentQuery = resultsForQuery !== null && resultsForQuery === trimmedQuery;
 
   return (
     <Card className="cardio-card-fullwidth">
@@ -124,11 +140,11 @@ export function PatientSearch({ onPick, selectedPatientId = null }: PatientSearc
         />
       )}
 
-      {!tooShort && !loading && !error && results && results.length === 0 && (
+      {!tooShort && !loading && !error && results && rowsBelongToCurrentQuery && results.length === 0 && (
         <AppEmpty title={t('cardio.patient_search_empty_title')} description={t('cardio.patient_search_empty_desc')} />
       )}
 
-      {!tooShort && !loading && !error && results && results.length > 0 && (
+      {!tooShort && !loading && !error && results && rowsBelongToCurrentQuery && results.length > 0 && (
         <ul className="cardio-patient-search__list" role="list">
           {results.map((patient) => (
             <li key={String(patient.id)}>
