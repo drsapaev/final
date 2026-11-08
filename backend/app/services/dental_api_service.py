@@ -87,6 +87,22 @@ class DentalApiService:
         if not self._visit_belongs_to_doctor(visit=visit, doctor=doctor, user_id=user.id):
             raise DentalApiDomainError(403, "Access denied")
 
+        # DERMAPRICE-BE-001 shared policy (audit #3892, group 15): the dental
+        # sibling feeds the SAME DoctorPriceOverride workflow and the SAME
+        # shared approval — the requested service must be attached to the
+        # visit (VisitService membership), otherwise the approval would
+        # either silently skip the price update (old false-success) or be
+        # refused later at fail-closed approval time.
+        visit_service = self.repository.get_visit_service(
+            visit_id=override_data.visit_id,
+            service_id=override_data.service_id,
+        )
+        if visit_service is None:
+            raise DentalApiDomainError(
+                409,
+                "Услуга не привязана к выбранному визиту",
+            )
+
         price_override = DoctorPriceOverride(
             visit_id=override_data.visit_id,
             doctor_id=doctor.id,
@@ -95,6 +111,9 @@ class DentalApiService:
             new_price=override_data.new_price,
             reason=override_data.reason,
             details=override_data.details,
+            # DERMAPRICE-BE-002: visit-level before-price (may differ from the
+            # catalogue reference after discounts/overrides).
+            visit_price_before=visit_service.price,
             status="pending",
         )
 
@@ -213,20 +232,36 @@ class DentalApiService:
                 "При отклонении необходимо указать причину",
             )
 
+        visit_service = None
+        if action == "approve":
+            # DERMAPRICE-BE-001 (audit #3892, group 15): approving an override
+            # whose VisitService row is missing must FAIL CLOSED — previously
+            # the price update was silently skipped while the override was
+            # still marked approved and success reported (false-positive
+            # financial workflow). The check runs BEFORE any status mutation
+            # so a failed approval leaves the override pending for manual
+            # resolution (the registrar can reject it explicitly).
+            visit_service = self.repository.get_visit_service(
+                visit_id=price_override.visit_id,
+                service_id=price_override.service_id,
+            )
+            if visit_service is None:
+                raise DentalApiDomainError(
+                    409,
+                    "Услуга не привязана к визиту — изменение цены не может "
+                    "быть одобрено (запрос создан до привязки услуги либо "
+                    "услуга удалена из визита)",
+                )
+
         price_override.status = "approved" if action == "approve" else "rejected"
         price_override.approved_by = user.id
         price_override.approved_at = datetime.now(UTC)
         if action == "reject":
             price_override.rejection_reason = approval_data.rejection_reason
 
-        if action == "approve":
-            visit_service = self.repository.get_visit_service(
-                visit_id=price_override.visit_id,
-                service_id=price_override.service_id,
-            )
-            if visit_service:
-                visit_service.price = price_override.new_price
-                visit_service.custom_price = price_override.new_price
+        if action == "approve" and visit_service is not None:
+            visit_service.price = price_override.new_price
+            visit_service.custom_price = price_override.new_price
 
         self.repository.commit()
 
@@ -312,6 +347,21 @@ class DentalApiService:
                         "code": self._service_code(service),
                     },
                     "original_price": float(override.original_price),
+                    # DERMAPRICE-BE-002 (audit #3892, group 15): the
+                    # reviewer additionally sees the visit's ACTUAL
+                    # before-price and the delta relative to it; the
+                    # catalogue-based original_price/price_difference keep
+                    # their immutable reference semantics.
+                    "visit_price_before": (
+                        float(override.visit_price_before)
+                        if override.visit_price_before is not None
+                        else None
+                    ),
+                    "visit_price_difference": (
+                        float(override.new_price - override.visit_price_before)
+                        if override.visit_price_before is not None
+                        else None
+                    ),
                     "new_price": float(override.new_price),
                     "price_difference": float(override.new_price - override.original_price),
                     "reason": override.reason,

@@ -22,6 +22,9 @@ class TestDermaApiService:
                     price=Decimal("120"),
                 )
 
+            def get_visit_service(self, *, visit_id, service_id):
+                return SimpleNamespace(visit_id=visit_id, service_id=service_id, price=Decimal("120"))
+
             def get_doctor_by_user_id(self, user_id):
                 return SimpleNamespace(id=8, specialty="cardiology")
 
@@ -54,6 +57,9 @@ class TestDermaApiService:
                     allow_doctor_price_override=True,
                     price=Decimal("120"),
                 )
+
+            def get_visit_service(self, *, visit_id, service_id):
+                return SimpleNamespace(visit_id=visit_id, service_id=service_id, price=Decimal("120"))
 
             def get_doctor_by_user_id(self, user_id):
                 return SimpleNamespace(id=7, specialty="dermatology")
@@ -89,6 +95,9 @@ class TestDermaApiService:
                     allow_doctor_price_override=True,
                     price=Decimal("120"),
                 )
+
+            def get_visit_service(self, *, visit_id, service_id):
+                return SimpleNamespace(visit_id=visit_id, service_id=service_id, price=Decimal("120"))
 
             def get_doctor_by_user_id(self, user_id):
                 return SimpleNamespace(id=7, specialty="dermatology")

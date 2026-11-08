@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -40,8 +40,22 @@ class PriceOverrideRequest(BaseModel):
     service_id: int
     # SPEC-AUDIT-28 P0-3: validate price is positive and reasonable
     new_price: Decimal = Field(..., gt=0, le=Decimal("1000000000"))
-    reason: str
+    # DERMAPRICE-BE-003 (audit #3892, group 15): non-null does not mean
+    # non-empty — the justification is canonicalized (stripped) and must be
+    # meaningful, bounded by the String(255) DB contract.
+    reason: str = Field(..., min_length=1, max_length=255)
     details: str | None = None
+
+    @field_validator("reason")
+    @classmethod
+    def _reason_is_meaningful(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError(
+                "Причина изменения цены не может быть пустой или из одних "
+                "пробелов"
+            )
+        return normalized
 
 
 class PriceOverrideResponse(BaseModel):
@@ -49,6 +63,9 @@ class PriceOverrideResponse(BaseModel):
     visit_id: int
     service_id: int
     original_price: Decimal
+    # DERMAPRICE-BE-002: visit-level before-price captured at creation —
+    # additive truth alongside the immutable catalogue reference.
+    visit_price_before: Decimal | None = None
     # SPEC-AUDIT-28 P0-3: validate price is positive and reasonable
     new_price: Decimal = Field(..., gt=0, le=Decimal("1000000000"))
     reason: str
@@ -366,6 +383,7 @@ async def create_price_override(
             visit_id=price_override.visit_id,
             service_id=price_override.service_id,
             original_price=price_override.original_price,
+            visit_price_before=price_override.visit_price_before,
             new_price=price_override.new_price,
             reason=price_override.reason,
             details=price_override.details,
@@ -404,6 +422,10 @@ async def get_price_overrides(
             visit_id=visit_id,
             status=status,
             limit=limit,
+            # DERMAPRICE-BE-004: DERMA_ROLES includes Admin for the list
+            # route — an Admin without a linked Doctor row gets the
+            # aggregated view instead of a domain 404.
+            is_admin=_is_admin_user(user),
         )
 
         return [
@@ -412,6 +434,7 @@ async def get_price_overrides(
                 visit_id=override.visit_id,
                 service_id=override.service_id,
                 original_price=override.original_price,
+                visit_price_before=override.visit_price_before,
                 new_price=override.new_price,
                 reason=override.reason,
                 details=override.details,
