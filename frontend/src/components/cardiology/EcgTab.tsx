@@ -39,6 +39,15 @@ export function EcgTab({
     return null;
   }
 
+  const patientIdentity = (selectedPatient?.patient_id || (selectedPatient?.patient as Record<string, unknown> | undefined)?.id) as string | number | undefined;
+  const visitIdentity = selectedPatient?.visit_id as string | number | undefined;
+  // ECGVIEW-FE-002 / ECHO-FE-001 (audit 3886 round 20): remount the viewer
+  // and the echo form when the patient/visit context changes, so no local
+  // file list, preview or form state from patient A can survive into
+  // patient B's tab. Both components additionally carry internal
+  // owner-epoch guards for async work that is already in flight.
+  const ownerKey = `${String(patientIdentity ?? 'none')}|${String(visitIdentity ?? 'none')}`;
+
   return (
     <div style={{
       width: '100%',
@@ -54,13 +63,15 @@ export function EcgTab({
         </Button>
       </div>
       <ECGViewer
-        visitId={selectedPatient?.visit_id as string | number | undefined}
-        patientId={(selectedPatient?.patient_id || (selectedPatient?.patient as Record<string, unknown> | undefined)?.id) as string | number | undefined}
+        key={`ecg-viewer-${ownerKey}`}
+        visitId={visitIdentity}
+        patientId={patientIdentity}
         onDataUpdate={onDataUpdate}
       />
       <EchoForm
-        visitId={selectedPatient?.visit_id as string | number | undefined}
-        patientId={(selectedPatient?.patient_id || (selectedPatient?.patient as Record<string, unknown> | undefined)?.id) as string | number | null | undefined}
+        key={`echo-form-${ownerKey}`}
+        visitId={visitIdentity}
+        patientId={patientIdentity}
         onDataUpdate={onDataUpdate}
       />
     </div>
