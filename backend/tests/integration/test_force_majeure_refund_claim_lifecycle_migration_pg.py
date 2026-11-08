@@ -329,7 +329,9 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
                 version = conn.execute(
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
-                assert version == "0090_payment_client_request", version
+                # Head pin follows the latest migration (0091 — RETRO-FIN-001
+                # payment request fingerprint).
+                assert version == "0091_payment_request_fingerprint", version
 
                 def _claims(payment_id: int) -> list[tuple]:
                     return conn.execute(

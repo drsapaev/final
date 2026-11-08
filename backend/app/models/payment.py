@@ -192,6 +192,16 @@ class PaymentClientRequest(Base):
         nullable=False,
         comment="Снимок ответа исходной операции для реплея (JSON)",
     )
+    request_fingerprint: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        comment=(
+            "RETRO-FIN-001: SHA-256 канонического fingerprint intent'а "
+            "(эндпоинт + пациент/визиты + сумма + метод). Реплей ключа с "
+            "другим intent отклоняется 409 вместо ложного успеха; NULL у "
+            "исторических якорей — реплей без проверки intent"
+        ),
+    )
     created_by: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),

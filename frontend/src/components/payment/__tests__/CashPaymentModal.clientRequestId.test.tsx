@@ -136,3 +136,76 @@ describe('CashPaymentModal — client_request_id lifecycle (issue 3859)', () => 
     expect(secondKey).not.toBe(firstKey);
   });
 });
+
+describe('CashPaymentModal — client_request_id intent rotation (RETRO-FIN-001)', () => {
+  it('rotates the key when the appointment prop changes while the modal stays mounted', async () => {
+    // The audited defect (#3864 retrospective): the modal kept ONE UUID for
+    // its whole mounted lifetime and updated only the amount when the
+    // parent swapped the appointment — the same key was then submitted for
+    // a DIFFERENT visit/patient, and the server replayed the first
+    // operation's success as if the new intent had been charged.
+    const onProcessPayment = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    const { rerender } = render(
+      <CashPaymentModal
+        appointment={payableVisit}
+        onProcessPayment={onProcessPayment}
+        onClose={vi.fn()}
+      />,
+    );
+
+    submitOnce();
+    await vi.waitFor(() => expect(onProcessPayment).toHaveBeenCalledTimes(1));
+    const firstKey = (onProcessPayment.mock.calls[0][1] as Record<string, unknown>)
+      .client_request_id;
+
+    // Parent swaps the appointment WITHOUT unmounting the modal.
+    const nextVisit = { ...payableVisit, id: 53, patient_id: 14 };
+    rerender(
+      <CashPaymentModal
+        appointment={nextVisit}
+        onProcessPayment={onProcessPayment}
+        onClose={vi.fn()}
+      />,
+    );
+
+    submitOnce();
+    await vi.waitFor(() => expect(onProcessPayment).toHaveBeenCalledTimes(2));
+    const secondKey = (onProcessPayment.mock.calls[1][1] as Record<string, unknown>)
+      .client_request_id;
+
+    expect(secondKey).toMatch(UUID_RE);
+    expect(secondKey).not.toBe(firstKey);
+  });
+
+  it('keeps the same key when only the amount is edited (same intent retry)', async () => {
+    const onProcessPayment = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('validation failed'))
+      .mockResolvedValueOnce(undefined);
+    render(
+      <CashPaymentModal
+        appointment={payableVisit}
+        onProcessPayment={onProcessPayment}
+        onClose={vi.fn()}
+      />,
+    );
+
+    submitOnce();
+    await vi.waitFor(() => expect(onProcessPayment).toHaveBeenCalledTimes(1));
+    const firstKey = (onProcessPayment.mock.calls[0][1] as Record<string, unknown>)
+      .client_request_id;
+
+    // Same appointment, cashier fixes the amount in place and retries —
+    // the failed submit left no server anchor, so the SAME key is correct.
+    fireEvent.change(getAmountInput(), { target: { value: '200000' } });
+    fireEvent.submit(getForm());
+    await vi.waitFor(() => expect(onProcessPayment).toHaveBeenCalledTimes(2));
+    const secondKey = (onProcessPayment.mock.calls[1][1] as Record<string, unknown>)
+      .client_request_id;
+
+    expect(secondKey).toBe(firstKey);
+  });
+});

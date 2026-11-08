@@ -34,6 +34,50 @@ from app.api.v1.endpoints.cashier._helpers import (  # noqa: F401
 from app.models.payment import PaymentClientRequest
 
 
+def _payment_intent_fingerprint(
+    *,
+    endpoint: str,
+    patient_id: int | None,
+    visit_ids: tuple[int, ...],
+    amount: Any,
+    method: str,
+) -> str:
+    """RETRO-FIN-001: canonical SHA-256 over the SEMANTIC payment intent.
+
+    The fingerprint binds an idempotency key to WHAT is being charged:
+    endpoint + patient/visit allocation + amount + method. A key reused
+    for a different intent must NOT replay the original success — the
+    stored anchor's fingerprint is compared before replay and a mismatch
+    is refused with 409. Canonicalization rules:
+
+    * ``visit_ids`` are deduplicated and sorted (allocation order is
+      backend-owned, so [3, 1] and [1, 3] are the same intent);
+    * ``amount`` is normalized through ``Decimal.normalize()`` so equal
+      values produce equal strings (``100`` == ``100.00``);
+    * JSON keys are sorted and separators are compact — byte-stable hash
+      input regardless of Python version or field order at the call site.
+
+    Receipt-provenance fields (``received_amount``/``change_due``/``note``)
+    are deliberately NOT part of the intent: they do not change what is
+    charged, only how the receipt is rendered.
+    """
+    import hashlib
+    import json
+    from decimal import Decimal
+
+    canonical = {
+        "endpoint": endpoint,
+        "patient_id": patient_id,
+        "visit_ids": sorted(set(visit_ids)),
+        "amount": str(Decimal(str(amount)).normalize()),
+        "method": method,
+    }
+    encoded = json.dumps(
+        canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    )
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
 def _find_payment_client_request(
     db: Session, client_request_id: str
 ) -> PaymentClientRequest | None:
@@ -50,7 +94,12 @@ def _find_payment_client_request(
 
 
 def _replay_payment_client_request(
-    db: Session, client_request_id: str, endpoint: str
+    db: Session,
+    client_request_id: str,
+    endpoint: str,
+    *,
+    request_fingerprint: str | None = None,
+    current_user_id: int | None = None,
 ) -> dict[str, Any] | None:
     """Return the stored response payload for a duplicate client key.
 
@@ -60,6 +109,18 @@ def _replay_payment_client_request(
     on since the first attempt, so re-running validation would 400 a
     legitimate retry. A key minted by the OTHER endpoint is refused with
     409 instead of being replayed through a mismatched response model.
+
+    RETRO-FIN-001 (intent binding): the anchor also stores the SHA-256
+    fingerprint of the original request's SEMANTIC intent (endpoint +
+    patient/visit allocation + amount + method). A repeated key carrying
+    a DIFFERENT intent is refused with 409
+    ``client_request_id_intent_mismatch`` — it must never replay the
+    original success as if the new intent had been charged. Historical
+    anchors (fingerprint NULL, minted before this guard) keep the
+    key+endpoint-only replay semantics. The replay is additionally bound
+    to the anchor owner: another authorized user replaying someone else's
+    key gets 409 instead of the stored payment metadata (``created_by``
+    NULL → unbound legacy anchor, replay allowed).
     """
     stored = _find_payment_client_request(db, client_request_id)
     if stored is None:
@@ -79,6 +140,53 @@ def _replay_payment_client_request(
                 "message": (
                     "Этот ключ идемпотентности был создан другим эндпоинтом "
                     "оплаты. Сгенерируйте новый ключ для новой операции."
+                ),
+            },
+        )
+    if (
+        request_fingerprint is not None
+        and stored.request_fingerprint is not None
+        and stored.request_fingerprint != request_fingerprint
+    ):
+        logger.warning(
+            "payment.client_request_intent_mismatch client_request_id=%s "
+            "endpoint=%s stored_fingerprint=%s requested_fingerprint=%s",
+            client_request_id,
+            endpoint,
+            stored.request_fingerprint,
+            request_fingerprint,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "client_request_id_intent_mismatch",
+                "message": (
+                    "Ключ идемпотентности использован с другим платёжным "
+                    "назначением (пациент/визит/сумма/метод). Сгенерируйте "
+                    "новый ключ для новой операции."
+                ),
+            },
+        )
+    if (
+        current_user_id is not None
+        and stored.created_by is not None
+        and stored.created_by != current_user_id
+    ):
+        logger.warning(
+            "payment.client_request_owner_mismatch client_request_id=%s "
+            "endpoint=%s stored_owner=%s requesting_user=%s",
+            client_request_id,
+            endpoint,
+            stored.created_by,
+            current_user_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "client_request_id_owner_mismatch",
+                "message": (
+                    "Ключ идемпотентности принадлежит другой учётной записи. "
+                    "Сгенерируйте новый ключ для новой операции."
                 ),
             },
         )
@@ -104,6 +212,7 @@ def _commit_with_client_request(
     endpoint: str,
     response_payload: dict[str, Any],
     created_by: int | None,
+    request_fingerprint: str | None = None,
 ) -> dict[str, Any] | None:
     """Commit the payment rows together with their idempotency anchor.
 
@@ -114,6 +223,13 @@ def _commit_with_client_request(
     loses the unique-index race here: its whole transaction (payments +
     anchor) rolls back and the caller replays the winner's snapshot.
 
+    RETRO-FIN-001: the anchor persists the request intent fingerprint.
+    In the concurrent-race recovery the WINNER's fingerprint must match
+    this request's fingerprint — a byte-equivalent duplicate recovers
+    into the winner's replay as before, while a same-key/different-intent
+    race (integration anomaly) is refused with 409 instead of replaying
+    an unrelated success.
+
     Returns ``None`` on a clean commit, or the WINNER's stored payload
     when this request lost the concurrent race (the caller must replay it
     with 200 instead of surfacing an error to the cashier).
@@ -123,6 +239,7 @@ def _commit_with_client_request(
             client_request_id=client_request_id,
             endpoint=endpoint,
             response_payload=response_payload,
+            request_fingerprint=request_fingerprint,
             created_by=created_by,
         )
     )
@@ -132,7 +249,15 @@ def _commit_with_client_request(
     except IntegrityError:
         db.rollback()
         stored = _find_payment_client_request(db, client_request_id)
-        if stored is not None and stored.endpoint == endpoint:
+        if (
+            stored is not None
+            and stored.endpoint == endpoint
+            and (
+                request_fingerprint is None
+                or stored.request_fingerprint is None
+                or stored.request_fingerprint == request_fingerprint
+            )
+        ):
             payload = stored.response_payload
             if isinstance(payload, str):  # defensive: JSON round-trip
                 import json
@@ -145,6 +270,26 @@ def _commit_with_client_request(
                 endpoint,
             )
             return payload
+        if stored is not None and stored.request_fingerprint is not None:
+            logger.warning(
+                "payment.client_request_intent_mismatch client_request_id=%s "
+                "endpoint=%s stored_fingerprint=%s requested_fingerprint=%s",
+                client_request_id,
+                endpoint,
+                stored.request_fingerprint,
+                request_fingerprint,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "reason": "client_request_id_intent_mismatch",
+                    "message": (
+                        "Ключ идемпотентности использован с другим платёжным "
+                        "назначением (пациент/визит/сумма/метод). Сгенерируйте "
+                        "новый ключ для новой операции."
+                    ),
+                },
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -522,9 +667,23 @@ async def create_grouped_payment(
     # Idempotency replay FIRST, before any validation: the original
     # operation already succeeded; re-running today's checks against a
     # since-settled debt would wrongly 400 a legitimate retry.
+    # RETRO-FIN-001: the key is bound to the request's SEMANTIC intent —
+    # a same-key/different-intent repeat is refused with 409 before the
+    # stored success can be falsely replayed.
+    intent_fingerprint = _payment_intent_fingerprint(
+        endpoint="grouped",
+        patient_id=payment_data.patient_id,
+        visit_ids=tuple(payment_data.visit_ids),
+        amount=payment_data.amount,
+        method=payment_data.method,
+    )
     if payment_data.client_request_id is not None:
         replayed = _replay_payment_client_request(
-            db, str(payment_data.client_request_id), "grouped"
+            db,
+            str(payment_data.client_request_id),
+            "grouped",
+            request_fingerprint=intent_fingerprint,
+            current_user_id=current_user.id,
         )
         if replayed is not None:
             return GroupedPaymentResponse.model_validate(replayed)
@@ -704,6 +863,7 @@ async def create_grouped_payment(
                 endpoint="grouped",
                 response_payload=staged_response.model_dump(mode="json"),
                 created_by=getattr(current_user, "id", None),
+                request_fingerprint=intent_fingerprint,
             )
             if race_replay is not None:
                 # This request lost the concurrent race: the winner's
@@ -808,9 +968,25 @@ async def create_payment(
     # operation already succeeded; re-running today's checks against a
     # since-settled visit would wrongly 400 a legitimate retry (e.g. after
     # the rest of the debt was paid with a different key).
+    # RETRO-FIN-001: the key is bound to the request's SEMANTIC intent —
+    # a same-key/different-intent repeat is refused with 409 before the
+    # stored success can be falsely replayed.
+    intent_fingerprint = _payment_intent_fingerprint(
+        endpoint="single",
+        patient_id=payment_data.patient_id,
+        visit_ids=(
+            (payment_data.visit_id,) if payment_data.visit_id is not None else ()
+        ),
+        amount=payment_data.amount,
+        method=payment_data.method,
+    )
     if payment_data.client_request_id is not None:
         replayed = _replay_payment_client_request(
-            db, str(payment_data.client_request_id), "single"
+            db,
+            str(payment_data.client_request_id),
+            "single",
+            request_fingerprint=intent_fingerprint,
+            current_user_id=current_user.id,
         )
         if replayed is not None:
             return PaymentResponse.model_validate(replayed)
@@ -1030,6 +1206,7 @@ async def create_payment(
                 endpoint="single",
                 response_payload=staged_keyed_response.model_dump(mode="json"),
                 created_by=getattr(current_user, "id", None),
+                request_fingerprint=intent_fingerprint,
             )
             if race_replay is not None:
                 # This request lost the concurrent race: the winner's
