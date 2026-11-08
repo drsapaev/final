@@ -2,16 +2,36 @@
 
 Plan version: 1.0
 Current task: T18.10 selected-profile return-context repair and remaining T18 acceptance
-Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN/non-draft; remote head `bd202edd4311e95c6e4409ad89e9b27afffeb9b2` passed applicable CI but was behind `main`; latest `origin/main` #3929 `52deec0716f2edb4ba3fee79cd2e6de39d31cec7` is merged locally at `cf2e397205862ce475f79d5db4741f3deae90fa7` without conflicts; focused test 25/25 and scoped ESLint pass on this candidate; current journal-only sync checkpoint and exact-head hosted checks are pending; no independent GitHub review is recorded; T18.10 live Admin/2FA and current-source RQ-18 remain NOT_RUN; Tier-2/T18 PARTIAL; user owns merge/deployment
+Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN/non-draft; remote head `f8f4e71620fe29d9a79aea031de848fd239e2607` has applicable CI success after one failed E2E job was rerun; latest `origin/main` #3930 `fe4943d046e5a23fe37b902782cde5c56e71e706` is merged locally at `ddb35b5183df66e10d471896ef99caea303f160a7` without conflicts; focused test 25/25, scoped ESLint and diff check pass on this candidate; journal-only sync checkpoint, push, PR description refresh and exact-head hosted checks are pending; no independent GitHub review is recorded; T18.10 live Admin/2FA and current-source RQ-18 remain NOT_RUN; Tier-2/T18 PARTIAL; user owns merge/deployment
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`
 Branch: `codex/aqs-t18-selected-profile-context-20261108`
 Source/test commit: `404ba482a26085ee740ee10d16959b2504c9bd72`
-Last exact-head CI candidate: `bd202edd4311e95c6e4409ad89e9b27afffeb9b2` (applicable configured CI PASS)
-Current local candidate: `cf2e397205862ce475f79d5db4741f3deae90fa7` (merged latest `origin/main`; local targeted checks PASS; hosted CI pending)
-Current `origin/main`: `52deec0716f2edb4ba3fee79cd2e6de39d31cec7` (#3929)
-Last updated: 2026-11-08T11:28:50+05:00
+Last exact-head CI candidate: `f8f4e71620fe29d9a79aea031de848fd239e2607` (applicable configured CI PASS after failed E2E job retry)
+Current local candidate: `ddb35b5183df66e10d471896ef99caea303f160a7` (merged latest `origin/main`; local targeted checks PASS; hosted CI pending)
+Current `origin/main`: `fe4943d046e5a23fe37b902782cde5c56e71e706` (#3930)
+Last updated: 2026-11-08T12:08:30+05:00
 
-## Current checkpoint — PR #3925 synchronized with #3929; candidate checks pending
+## Current checkpoint — #3930 synchronized locally; journal commit and exact-head CI pending
+
+| Task | Status | Evidence |
+|------|--------|----------|
+| T00–T17 | MERGED | Existing plan journals; latest queue-plan PR #3897 merged at `569d5fe5` |
+| T18 scenarios 1–9 | VALIDATED on recorded source revisions; final-source reconciliation IN_PROGRESS | Keep each prior result tied to its tested SHA; do not promote historical staging runs to final-source PASS without source reconciliation |
+| T18.10 selected-profile source fix | VALIDATED on `bd202edd` by focused test and applicable exact-head CI | The three editor links retain URL-selected `specialists` and selected day; live Admin/2FA acceptance remains NOT_RUN |
+| T18.10 synthetic Admin/2FA flow | NOT_RUN | Verify the actual `specialists` row, editor return, reload, Back/Forward, legacy URLs, and protected DELETE 409 with the row retained |
+| Current-source RQ-18 | NOT_RUN | Current QR/queue consumers changed after the previous live run at `5363a9ca`; repeat on final source |
+| Full staging runbook / served-build provenance | PARTIAL / NOT_RUN | Complete required `STAGING_VALIDATION.md` cases and byte-level exact-build attestation |
+| T18 overall / Tier-2 | PARTIAL | No full acceptance, production-readiness, or system-health claim |
+
+### PR #3925 current-main sync
+
+- Remote PR HEAD `f8f4e71620fe29d9a79aea031de848fd239e2607` is open, non-draft and mergeable at the last GitHub read. Review submissions and inline threads are empty; no independent review is recorded. Its applicable CI is green after retrying one failed E2E job; the first attempt timed out in the unchanged lab dirty-guard test while waiting for a second synthetic queue row. This is a transient-run observation, not a confirmed source defect.
+- Latest `origin/main` is #3930 at `fe4943d046e5a23fe37b902782cde5c56e71e706`. Its seven incoming EMR/Cardiology files do not overlap this PR's source/test or T18 journals. It was merged locally without conflicts at `ddb35b5183df66e10d471896ef99caea303f160a7`.
+- On `ddb35b5`, focused Vitest `adminSetupDirections.textPin.test.tsx` passed 25/25; scoped ESLint passed; `git diff --check` passed before the journal update. This merge candidate has not been pushed, so exact-head hosted checks are pending.
+- The prior canonical journal gate result applies to the same three-file scope: canonical launcher, known root `PROGRESS.md`, exact scopes `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`; result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; execution prompt read and followed. No gate/router/source/test/staging files were changed.
+- Next: finish reviewing the three-journal diff, commit and push the branch, refresh PR #3925's body to #3930 and the retry evidence, then verify current exact-head CI/review state. User retains merge authority. After user merge, run one bounded synthetic T18 session for remaining Admin/2FA, current-source RQ-18, applicable profile/QR behaviors, incomplete runbook items, browser checks, console analysis, asset provenance and teardown. Reconcile T18.1–T18.9 without replaying unchanged checks.
+
+## Previous checkpoint — PR #3925 synchronized with #3929; superseded by #3930
 
 | Task | Status | Evidence |
 |------|--------|----------|

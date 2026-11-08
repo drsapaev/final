@@ -1,3 +1,15 @@
+## T18.10 PR #3925 sync with main #3930 and CI retry — 2026-11-08T12:08:30+05:00
+
+- PR exact HEAD checked: `f8f4e71620fe29d9a79aea031de848fd239e2607`; PR #3925 is OPEN, non-draft, mergeable. Review submissions and inline threads are empty; no independent review is recorded.
+- On that exact HEAD, Unified CI run `42455211120` is now SUCCESS. Its first attempt failed when `frontend/e2e/lab-dirty-guard.spec.ts` timed out waiting for the second synthetic queue row at line 1662; the test file is unchanged in this PR and incoming main. The failed E2E job was rerun and passed. Do not infer a product root cause from the transient timeout.
+- Other exact-head workflows passed: PR Lifecycle Recommendation `42455263716`, PR Review Quality Gate `42455263840`, Security `42455211112`, i18n `42455211113`, Regression Audit `42455211114`, Agent Workflow Guards `42455211117`, and Gitleaks `42455211121`. Path/scope-aware skipped jobs are not counted as PASS.
+- The PR description at `f8f4e71` still names main #3929 and predates the latest synchronization. Current `origin/main` is #3930, commit `fe4943d046e5a23fe37b902782cde5c56e71e706`. Its seven EMR/Cardiology paths do not overlap the PR's source/test or journals. Local merge `ddb35b5183df66e10d471896ef99caea303f160a7` completed without conflicts.
+- Local validation on `ddb35b5`: focused Vitest `adminSetupDirections.textPin.test.tsx` — PASS 25/25; scoped ESLint — PASS; `git diff --check` — PASS before this journal edit. The synchronized candidate has not been pushed; exact-head hosted checks are therefore NOT_RUN.
+- Environment: owned isolated Windows worktree `aqs-t18-selected-profile-context-20261108`; no WSL, Docker, Compose, application staging or production was started.
+- Scope: allowed paths are `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Runtime source, tests, gate/router, staging configuration, production, merge, and deployment are unchanged/out of scope. No patient data or secrets used.
+- Gate: reuse the current-turn journal-only gate decision for these exact three paths: `narrow_override`; `gate_misroute=false`; `override_used=true`; `handoff_required=true`; execution prompt read. No gate/router changes.
+- Remaining: review, commit and push the updated journals; refresh PR body for #3930 and distinguish f8f4e71 CI from the pending ddb35b5 checks; verify exact-head checks/review; user merges. T18.10 Admin/2FA, current-source RQ-18, remaining staging runbook, exact served-build provenance, console diagnosis and full T18 reconciliation remain open. T18/Tier-2 remain PARTIAL.
+
 ## T18.10 PR #3925 exact-head CI after main synchronization — 2026-11-08T09:41:59+05:00
 
 - Code candidate under test: PR HEAD `6001e13dc2c7ea74ec66b990d6f14ad3958a5f2d`; base/current main `9d1b0e808563509e553f990dd0fbb893d2a7c723`. Source fix remains `404ba482a26085ee740ee10d16959b2504c9bd72`; synchronized branch includes merge commit `54873073`.

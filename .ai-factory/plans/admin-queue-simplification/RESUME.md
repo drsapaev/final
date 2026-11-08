@@ -1,4 +1,18 @@
-# Current resume — synced to main #3929; exact-head checks pending — 2026-11-08T11:28:50+05:00
+# Current resume — #3930 synced locally; journal commit and exact-head checks pending — 2026-11-08T12:08:30+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`, branch `codex/aqs-t18-selected-profile-context-20261108`. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.
+
+PR #3925 remote HEAD `f8f4e71620fe29d9a79aea031de848fd239e2607` is OPEN/non-draft/mergeable; no review submission or inline thread is recorded. Its Unified CI and applicable PR checks passed after the first E2E attempt timed out in an unchanged lab dirty-guard test and that job was rerun successfully. The PR body is stale and still references #3929. Current `origin/main` is #3930 `fe4943d046e5a23fe37b902782cde5c56e71e706`; it was merged without conflicts into local candidate `ddb35b5183df66e10d471896ef99caea303f160a7`. Incoming changes are seven EMR/Cardiology files with no overlap in the PR's source/test or T18 journals. Local focused Vitest passed 25/25; scoped ESLint and pre-journal `git diff --check` passed. The local main-sync candidate is unpushed and has no hosted checks yet.
+
+The current allowed scope is only the three T18 journals: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md`. The continuation gate was run using the canonical launcher with the known `PROGRESS.md` root; it returned `narrow_override`, no misroute, override used, handoff required, and the prompt was read. No source/test, gate/router, staging, production, merge or deployment changes. No staging has started.
+
+Remaining before this PR cycle can be handed back for merge: finish and inspect the three-journal diff; commit/push it; update the PR body with #3930, the f8f4e71 CI retry evidence, and pending exact-head checks; then verify CI, mergeability and independent review status. User merges.
+
+After merge, T18 still requires one combined synthetic staging session: ordinary Admin 2FA; `specialists` navigation/return/reload/Back-Forward/legacy URL and protected DELETE 409; current-source RQ-18 QR/join/lifecycle; changed QueueProfiles availability/edit paths; remaining mandatory `STAGING_VALIDATION.md` items; keyboard/forms/errors/empty states/languages and 375/768/1280/1920 viewports; cold/revisit row latency; console event diagnosis; byte-level served frontend provenance; owned teardown. Reconcile T18.1–T18.9 evidence against final source without replaying unchanged checks. Do not complete T18 while required evidence remains NOT_RUN; production/deployment is separate.
+
+---
+
+# Previous resume — synced to main #3929; exact-head checks pending — 2026-11-08T11:28:50+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`, branch `codex/aqs-t18-selected-profile-context-20261108`. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.
 
