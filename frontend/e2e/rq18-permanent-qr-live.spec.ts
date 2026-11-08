@@ -296,12 +296,20 @@ async function readProfiles(page: Page): Promise<QueueProfileRow[]> {
   return Array.isArray(payload.profiles) ? payload.profiles : [];
 }
 
-async function createDoctorlessService(page: Page, profiles: QueueProfileRow[]) {
+async function createDoctorlessService(
+  page: Page,
+  profiles: QueueProfileRow[],
+  target: { profileKey: string; queueTag: string; serviceName: string } = {
+    profileKey,
+    queueTag,
+    serviceName,
+  },
+) {
   await page.getByRole('button', { name: /Добавить услугу|Add service|Xizmat qoʻshish/i }).first().click();
   const editor = page.getByRole('heading', { name: /Добавление услуги|Add service|Xizmat qoʻshish/i }).locator('..');
   const form = editor.locator('form').last();
   await expect(form).toBeVisible();
-  await form.locator('input[type="text"]').first().fill(serviceName);
+  await form.locator('input[type="text"]').first().fill(target.serviceName);
 
   const categorySelect = form.locator('.mac-select').first().getByRole('button');
   await categorySelect.click();
@@ -316,8 +324,8 @@ async function createDoctorlessService(page: Page, profiles: QueueProfileRow[]) 
   const queueTagSelect = form.locator('.mac-select').first().getByRole('button');
   await queueTagSelect.click();
   const options = serviceQueueTagOptions(profiles);
-  const optionIndex = options.findIndex((option) => option.profileKey === profileKey
-    && option.value === queueTag);
+  const optionIndex = options.findIndex((option) => option.profileKey === target.profileKey
+    && option.value === target.queueTag);
   if (optionIndex < 0) throw new Error('Synthetic profile queue tag was not offered to the Service Catalog.');
   const visibleOptions = page.getByRole('listbox').getByRole('option');
   await expect(visibleOptions).toHaveCount(options.length + 1);
@@ -339,10 +347,144 @@ async function createDoctorlessService(page: Page, profiles: QueueProfileRow[]) 
     doctor_id?: number | null;
     requires_doctor?: boolean;
   } | null;
-  if (!body || body.queue_tag !== queueTag || body.doctor_id != null || body.requires_doctor !== false) {
+  if (!body || body.queue_tag !== target.queueTag || body.doctor_id != null || body.requires_doctor !== false) {
     throw new Error('Synthetic Service did not preserve the expected doctorless queue mapping.');
   }
-  await expect(page.getByText(serviceName, { exact: true })).toBeVisible();
+  await expect(page.getByText(target.serviceName, { exact: true })).toBeVisible();
+}
+
+function clinicTodayTashkent(): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+async function verifyT18SpecialistsNavigation(page: Page) {
+  const key = 'specialists';
+  const day = clinicTodayTashkent();
+  markRq18Phase('t18-specialists-catalog');
+  const profiles = await readProfiles(page);
+  if (!profiles.some((profile) => profile.key === key)) {
+    throw new Error('The migrated synthetic QueueProfile specialists was not present in the Admin catalog.');
+  }
+
+  const specialistsService = `SYNTHETIC-RQ18 profile guard ${suffixKey}`;
+  await createDoctorlessService(page, profiles, {
+    profileKey: key,
+    queueTag: 'cardiology',
+    serviceName: specialistsService,
+  });
+
+  markRq18Phase('t18-specialists-queue-profiles-route');
+  await page.goto('/admin/services?servicesTab=queue-profiles');
+  await expect(page.getByRole('heading', {
+    name: /Вкладки регистратуры|Queue profiles|Кезек профильдері|Registratura yorliqlari|Навбат профиллари/i,
+  }).first()).toBeVisible({ timeout: 30_000 });
+  const specialistsKeyCell = page.locator('tbody code').getByText(key, { exact: true });
+  await expect(specialistsKeyCell).toHaveCount(1);
+  const specialistsRow = specialistsKeyCell.locator('xpath=ancestor::tr');
+  await expect(specialistsRow).toHaveCount(1);
+
+  markRq18Phase('t18-specialists-cabinet-route');
+  await page.goto('/admin/queue-cabinet-management');
+  await expect(page.getByRole('heading', {
+    name: /Кабинеты очередей|Queue cabinets|Кезек кабинеттері|Navbat kabinetlari|Навбат кабинетлари/i,
+  }).first()).toBeVisible({ timeout: 30_000 });
+
+  markRq18Phase('t18-specialists-settings-route');
+  await page.goto('/admin/queue-settings');
+  await expect(page.getByRole('heading', {
+    name: /Настройки очередей|Queue settings|Navbat sozlamalari/i,
+  }).first()).toBeVisible({ timeout: 30_000 });
+
+  markRq18Phase('t18-specialists-selected-profile');
+  const facts = await readAdminDirections(page, key, day);
+  directionByKey(facts, key);
+  await expect(page.getByTestId('setup-editor-links')).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.get('profile')).toBe(key);
+  await expect.poll(() => new URL(page.url()).searchParams.get('day')).toBe(day);
+
+  markRq18Phase('t18-specialists-editor-return');
+  await page.getByTestId('setup-editor-links').locator('a[href*="servicesTab=queue-profiles"]').click();
+  const assertReturnContext = async (tab: 'catalog' | 'queue-profiles') => {
+    await expect.poll(() => new URL(page.url()).searchParams.get('servicesTab')).toBe(tab);
+    const params = new URL(page.url()).searchParams;
+    if (params.get('setupReturn') !== 'queue-directions-v1'
+        || params.get('setupSection') !== 'checklist'
+        || params.get('setupProfile') !== key
+        || params.get('setupDay') !== day) {
+      throw new Error('Typed setup return context lost the selected specialists profile or clinic day.');
+    }
+    await expect(page.getByTestId('queue-setup-return-link')).toBeVisible();
+  };
+  await assertReturnContext('queue-profiles');
+
+  const tabs = page.locator('.admin-services-tab-bar button');
+  await expect(tabs).toHaveCount(2);
+  await tabs.nth(0).click();
+  await assertReturnContext('catalog');
+  await tabs.nth(1).click();
+  await assertReturnContext('queue-profiles');
+
+  markRq18Phase('t18-specialists-reload-history');
+  await page.reload();
+  await assertReturnContext('queue-profiles');
+  await page.goBack();
+  await assertReturnContext('catalog');
+  await page.goForward();
+  await assertReturnContext('queue-profiles');
+  await page.getByTestId('queue-setup-return-link').click();
+  await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.get('profile')).toBe(key);
+  await expect.poll(() => new URL(page.url()).searchParams.get('day')).toBe(day);
+
+  markRq18Phase('t18-specialists-delete-guard-preview');
+  await page.goto('/admin/services?servicesTab=queue-profiles');
+  await expect(specialistsRow).toHaveCount(1);
+  const impact = await page.evaluate(async (profileKey) => {
+    const token = sessionStorage.getItem('auth_token');
+    const response = await fetch(`/api/v1/queues/profiles/${encodeURIComponent(profileKey)}/impact-preview`, {
+      cache: 'no-store',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const body = await response.json().catch(() => null) as {
+      profile?: { key?: string };
+      links?: Record<string, unknown>;
+      can_hard_delete?: boolean;
+    } | null;
+    const linkCount = Object.values(body?.links || {}).reduce(
+      (total: number, value) => total + (typeof value === 'number' ? value : 0),
+      0,
+    );
+    return { status: response.status, profileKey: body?.profile?.key, canHardDelete: body?.can_hard_delete, linkCount };
+  }, key);
+  if (impact.status !== 200 || impact.profileKey !== key || impact.canHardDelete !== false || impact.linkCount < 1) {
+    throw new Error('The specialists profile lacks the confirmed synthetic link needed for a safe 409 delete-guard check.');
+  }
+
+  const deleteResponsePromise = page.waitForResponse((response) => {
+    return response.request().method() === 'DELETE'
+      && new URL(response.url()).pathname.endsWith('/queues/profiles/' + key);
+  }, { timeout: 30_000 });
+  await specialistsRow.getByRole('button').last().click();
+  const deleteDialog = page.getByRole('dialog');
+  await expect(deleteDialog).toBeVisible();
+  await deleteDialog.getByRole('button', { name: /Удалить|Delete|Жою|O‘chirish|O'chirish|Ўчириш/i }).last().click();
+  const deleteResponse = await deleteResponsePromise;
+  if (deleteResponse.status() !== 409) {
+    throw new Error('The linked specialists QueueProfile delete guard did not return HTTP 409.');
+  }
+  const deletePayload = await deleteResponse.json() as { detail?: { reason?: string } };
+  if (deletePayload.detail?.reason !== 'profile_has_significant_links') {
+    throw new Error('The specialists QueueProfile delete was blocked for an unexpected reason.');
+  }
+  await expect(specialistsRow).toHaveCount(1);
+  process.stdout.write('RQ18_T18_10=PASS\n');
 }
 
 async function createAndActivateQueueResource(page: Page): Promise<number> {
@@ -620,6 +762,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   page.on('pageerror', () => { pageErrors += 1; });
   markRq18Phase('admin-login');
   await loginAdminWithRequiredTwoFactor(page);
+  await verifyT18SpecialistsNavigation(page);
   markRq18Phase('admin-setup-page');
   await page.goto('/admin/setup-directions');
   await expect(page.getByTestId('setup-directions-heading')).toBeVisible();

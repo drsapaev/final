@@ -1,45 +1,49 @@
 # Progress — T18 final acceptance
 
 Plan version: 1.0
-Current task: T18 final synthetic acceptance and evidence reconciliation
-Current status: IN_PROGRESS; T00–T17 MERGED; current-source RQ-18 browser flow and observed frontend-asset provenance PASS on test commit `e003ab787a93dd72c49e632c63e323ee42842d3b`; ordinary synthetic Admin password + TOTP PASS; current-source T18.10 `specialists` live navigation NOT_RUN; full `STAGING_VALIDATION.md` and remaining T18 reconciliation/QA are PARTIAL; overall T18/Tier-2 PARTIAL; user owns PR merges and deployment
+Current task: T18 final synthetic acceptance, source reconciliation and evidence PR
+Current status: IN_PROGRESS; T00–T17 MERGED; current-source T18.10 and RQ-18 passed in one synthetic Admin/2FA Session on application source `16e04af35e47663481a08923d8625d94a1c9d010`; exact observed frontend assets matched 68/68 and service-worker marker matched. Canonical teardown PASS. T18/Tier-2 remain PARTIAL pending scenario reconciliation, remaining QA/runbook evidence and PR merge. User owns merge/deployment.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`
 Branch: `codex/aqs-t18-completion-20261108`
-Base commit: `origin/main` `404043bb62a4b8081242c453957ae939ed4b06ff` (#3927)
-Current commit: `e003ab787a93dd72c49e632c63e323ee42842d3b`
-Current `origin/main`: `404043bb62a4b8081242c453957ae939ed4b06ff`
-Last updated: 2026-11-08T18:58:05+05:00
+Base commit: fresh `origin/main` `8299d7d6897621bc284051004309b39acbef6adc` (#3935)
+Application commit under test: `16e04af35e47663481a08923d8625d94a1c9d010`
+Validated E2E working-copy SHA-256: `BC14D2F70A9145A6EB8949E05091CDF2F95E691049ECF06C96C006CFA078AF54`
+Last updated: 2026-11-08T20:10:12+05:00
 
-## Current checkpoint — RQ-18 and observed frontend provenance pass; full T18 remains partial
+## Current checkpoint — T18.10 and RQ-18 PASS; final acceptance remains partial
 
 | Task | Status | Evidence |
 |------|--------|----------|
-| T00–T17 | MERGED | Existing plan journals; current base is `origin/main` #3927 at `404043bb` |
-| T18 scenarios 1–9 | VALIDATED on recorded source revisions; final-source reconciliation IN_PROGRESS | Keep every earlier result tied to its tested SHA; reconcile changed paths without replaying unaffected scenarios |
-| T18.10 selected-profile source fix | MERGED; focused tests and applicable CI recorded | Live current-source Admin/2FA flow for the `specialists` row, editor return/history, legacy URLs and guarded DELETE remains NOT_RUN |
-| Current-source RQ-18 permanent QR lifecycle | PASS on `e003ab787a93dd72c49e632c63e323ee42842d3b` | Synthetic Admin/TOTP, publish, permanent address, anonymous booking, resource ownership, deactivation/archive and reactivation; canonical Session PASS |
-| Observed served frontend bytes | PASS for this RQ-18 run: 50/50 observed JS/CSS + `sw.js` hashes match the owned frontend container; exact commit marker in `sw.js` | The generic launcher field `served_revision_verified` remains `false`; this evidence covers browser-observed files for this run only |
-| Full `STAGING_VALIDATION.md` and broader UI/console/latency checks | PARTIAL / NOT_RUN | See open items below and prior evidence; do not report whole-system or production readiness |
-| T18 overall / Tier-2 | PARTIAL | Required T18.10 live flow, full runbook reconciliation, and final-source evidence closure remain open |
+| T00–T17 | MERGED | Plan PRs merged; current base is `origin/main` #3935 at `8299d7d6` |
+| T18.1–T18.9 | Historical PASS; current-source reconciliation IN_PROGRESS | Keep each prior result tied to its SHA; inspect source deltas and rerun impacted assertions only |
+| T18.10 specialists navigation | PASS on app source `16e04af3` | Normal Admin password + TOTP; four legacy entry paths; selected profile/day; typed editor return; tab switch; reload; Back/Forward; real linked profile DELETE returns `409`, row retained |
+| Current-source RQ-18 lifecycle | PASS on app source `16e04af3` | Hidden profile, explicit publish, permanent QR, anonymous resource-owned booking, deactivation/archive/reactivation; Playwright 1 passed |
+| Observed frontend provenance | PASS, scoped to this synthetic Session | 67 browser-observed JS/CSS paths plus `/sw.js`; 68/68 byte hashes matched the owned frontend container; service worker contains full tested SHA. Generic `served_revision_verified` remains `false` |
+| Owned staging cleanup | PASS | Canonical teardown removed 5 containers, 3 volumes and 1 network; exact audits of all four task-owned projects found zero containers/images/volumes/networks and zero listening sockets |
+| Frontend local checks | PASS with warning | Scoped ESLint: 0 errors, 1 raw-fetch warning; type-check, build, Playwright collection (1 test), `git diff --check` passed |
+| Full `STAGING_VALIDATION.md` / cross-cutting UI / console / latency | PARTIAL / NOT_RUN | Per-check statuses and remaining work below; no full-system or production-readiness claim |
+| T18 / Tier-2 overall | PARTIAL | Current T18.10/RQ-18 acceptance passed, but final-source reconciliation and required evidence remain open |
 
-### Current RQ-18 test and Session
+### Session evidence and harness corrections
 
-- The current local branch is three commits ahead of `origin/main`; current HEAD is `e003ab787a93dd72c49e632c63e323ee42842d3b`. The RQ-18 test/capture changes are local and not yet pushed; no PR or hosted CI is claimed for this candidate.
-- On the exact clean test commit, scoped ESLint, `npm run type-check`, and Playwright `--list` passed; one Chromium RQ-18 test was collected. Commit hooks passed, including whitespace/conflict and Gitleaks checks.
-- Canonical `Preflight → Session` on owned synthetic project `clinic-aqs-t18-rq18e-20261108`: Preflight PASS, WSL available memory 3,201 MiB, backing-volume free space 26 GiB, worktree-volume free space 13 GiB, no warnings. No production or foreign project was used.
-- Browser session: one RQ-18 scenario completed successfully. Admin password login and TOTP enrollment/verification passed; the hidden profile, doctorless service and resource were created; publication and permanent QR address were verified; anonymous booking produced a resource-owned queue; deactivation preserved the existing queue while closing new public booking; archive and reactivation behaved as expected and reused the permanent address.
-- Provenance: 49 browser-observed JS/CSS paths plus `/sw.js` were hashed through the same synthetic frontend endpoint with cache bypass. All 50 hashes matched the exact owned frontend container; `/sw.js` contained the full tested commit SHA. This does not change the launcher's generic `served_revision_verified=false` field or attest production.
-- Teardown: canonical Session PASS; 5 containers, 3 volumes and 1 network removed; owned containers, volumes and networks remaining: 0; local images were handled with Compose `--rmi local`. No patient data, public QR code, token, screenshot, trace or video was retained in the evidence.
-- A preceding run reached the final functional phase but the temporary PowerShell runner failed to recognize the service-worker marker line. The runner was changed to check the marker with a separate exact `grep` call. The final run above passed; both sessions reported canonical teardown PASS. This was a validation-harness issue, not evidence of an application defect.
+- Fresh canonical Preflight for `clinic-aqs-t18-final3-20261108`: PASS; WSL available memory 3,205 MiB, backing storage 26 GiB, worktree storage 13 GiB, no warnings. Runtime readiness PASS.
+- Canonical Session used only the task-owned synthetic project, normal Admin 2FA, and exact local source. Result PASS; teardown PASS. A follow-up strict state check found no `LISTENING` socket; transient TCP TIME_WAIT/FIN_WAIT states were not counted as listeners.
+- Two earlier Session attempts were harness failures, not product findings: first used stale port `18285` while the env exposed `18385`; second used a regex row locator that did not match the rendered key cell. Both canonical Sessions tore down successfully. The runner now derives its port from the private env; the E2E locates the exact profile key cell.
+- The successful run reported `RQ18_T18_10=PASS`, `RQ18_PHASE=completed`, `RQ18_PROVENANCE_BROWSER_ASSETS_MATCHED=68/68`, `RQ18_PROVENANCE_SW_COMMIT_MARKER=PASS`, `RQ18_PLAYWRIGHT=PASS`, `1 passed (33.7s)`, and canonical `teardown.status=PASS`.
+- Generic launcher `served_revision_verified=false` was not changed. Custom evidence attests only browser-observed assets in this owned test Session, not production.
 
 ### Remaining before T18 can close
 
-1. Validate T18.10 on the current source in a synthetic Admin/2FA session: real `specialists` profile row, the four compatible entry URLs, editor link and typed return context, reload, Back/Forward, and protected DELETE `409` with the row retained.
-2. Reconcile scenarios T18.1–T18.9 against the final source and account for every applicable item in `docs/runbooks/STAGING_VALIDATION.md`, preserving explicit PASS/FAIL/NOT_RUN for checks 0–10 and their prerequisites.
-3. The earlier cross-cutting Session on `cbd8c642` passed keyboard/focus, form validation, empty state, synthetic 503/retry, five language headings, viewports 375/768/1280/1920, cold/repeat row appearance (1,190/944 ms), and zero page errors. Current `origin/main` is not descended from that test SHA and later changed `AdminSetupDirections.tsx` (selected-profile context) and `QueueProfilesManager.tsx` (dirty-field edit payload and shared default color). Revalidate those changed editor/profile flows and the relevant cold/repeat path; do not repeat unaffected keyboard/viewport checks without a source delta.
-4. Finish the existing console investigation: two of the earlier 11 events were not reproduced, and eight minified-bundle call sites remain unmapped. Keep the result partial until each is explained or explicitly classified as unresolved.
-5. Review, commit and publish this RQ-18 test/evidence change as one focused PR; verify exact-head CI and independent review. The user retains merge authority. After merge, continue T18 from fresh `origin/main` without replaying unchanged checks.
+1. Review and publish the focused E2E/evidence PR; obtain exact-head CI and independent review. The current branch is five commits ahead of `origin/main`, with the T18.10 E2E change still uncommitted; no PR or hosted CI is claimed. User retains merge authority.
+2. After that PR cycle, reconcile T18.1–T18.9 to current source. Revalidate changed setup/profile editor paths, relevant cold/revisit row timing, and any assertions affected by source changes; do not promote older SHA evidence to current-source PASS without analysis.
+3. Finish keyboard/focus, forms/errors/empty/retry, language and viewport checks for affected paths; complete the latency waterfall on changed screens. Earlier checks on `cbd8c642` remain revision-scoped.
+4. Resolve or explicitly classify the remaining console investigation: two of 11 historical events were not reproduced, and eight minified-bundle call sites remain unmapped.
+5. Reconcile every applicable prerequisite and check 0–9 in `docs/runbooks/STAGING_VALIDATION.md` as PASS/FAIL/NOT_RUN/DEFERRED with its SHA. Dedicated external Sentry/AI/Telegram/live telemetry checks are not silently passed; checks requiring external systems remain pending safe applicability/authorization.
+6. After merge, continue from fresh `origin/main`, update the top-level plan and journals, and leave any pre-deploy items explicitly open until evidence exists. Full production validation, deployment and v1-flag activation are separate and not authorized.
 
+## Next exact action
+
+Review the final E2E and journal diff, record this successful Session in `EVIDENCE.md`/`RESUME.md` and the plan, run `git diff --check`, clean only this task's verified scratch, then commit/push/open the focused PR. Do not start another PR cycle until this one is reviewed and merged.
 ## Previous checkpoint — #3930 synchronized locally; journal commit and exact-head CI pending
 
 | Task | Status | Evidence |

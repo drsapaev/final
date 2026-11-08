@@ -1,6 +1,23 @@
-# Current resume — RQ-18 and observed asset provenance pass; T18 partial — 2026-11-08T18:58:05+05:00
+# Current resume — T18.10 and RQ-18 passed; acceptance PR not yet opened — 2026-11-08T20:20:52+05:00
 
-Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. Base/current `origin/main` is #3927 at `404043bb62a4b8081242c453957ae939ed4b06ff`; local candidate HEAD `e003ab787a93dd72c49e632c63e323ee42842d3b` is three commits ahead. The test and journal work is not pushed; no PR or hosted CI is claimed. User owns merge and deployment.
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. Fresh `origin/main` is #3935 at `8299d7d6897621bc284051004309b39acbef6adc`; application source tested was `16e04af35e47663481a08923d8625d94a1c9d010`. The branch is five commits ahead; five tracked paths have local changes and no PR exists yet. The staged E2E test patch SHA-256 was `BC14D2F70A9145A6EB8949E05091CDF2F95E691049ECF06C96C006CFA078AF54`. User owns merge and deployment.
+
+Latest canonical synthetic Admin/2FA Session passed both T18.10 and RQ-18. T18.10 covered the real `specialists` row, four legacy routes, typed return context, tab switch, reload, Back/Forward, and guarded UI DELETE 409 with row retained. RQ-18 covered permanent QR publication/join/deactivation/archive/reactivation. All 68 browser-observed JS/CSS/service-worker hashes matched the owned frontend container; `/sw.js` contained the full tested source SHA. The launcher's generic `served_revision_verified=false` remains unchanged. Canonical Session teardown passed; exact-label audits found zero resources and no listeners for all four owned task projects.
+
+Local checks: scoped ESLint (0 errors, one raw-fetch warning), TypeScript, Playwright collection (1 test), frontend build, and `git diff --check` passed. Two failed staging attempts were harness-only (old frontend port; regex row locator), each canonical teardown passed; both fixes are recorded in EVIDENCE.
+
+Scratch cleanup: canonical Compose teardown and exact-project audits passed. Removal of only this task's `.scratch/t18-final-acceptance-20261108` was rejected by the local execution policy before PowerShell started; the directory remains with synthetic credential env files and temporary test output. No alternate deletion method was used. `frontend/node_modules` is a junction into sibling worktree `aqs-t18-selected-profile-context-20261108`; preserve its target.
+
+## Next exact actions
+
+1. Stage only the five reviewed tracked paths, inspect the staged diff and run `git diff --cached --check`; commit the focused test/evidence update.
+2. Push `codex/aqs-t18-completion-20261108`, open one focused T18 acceptance PR, then verify exact-head CI and independent review. Leave merge to the user.
+3. After user merge, refresh `origin/main` in a new worktree and continue T18.1–T18.9 source reconciliation, changed editor/profile QA, latency and console investigation, and per-check `STAGING_VALIDATION.md` statuses 0–9. Keep all remaining `NOT_RUN`/`DEFERRED` visible; no production-ready or completed-T18 claim until required evidence is present.
+
+T18/Tier-2 is still PARTIAL. No production, deployment, merge, external Sentry/AI/Telegram action, or v1 feature-flag change occurred.
+
+---
+a task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. Base/current `origin/main` is #3927 at `404043bb62a4b8081242c453957ae939ed4b06ff`; local candidate HEAD `e003ab787a93dd72c49e632c63e323ee42842d3b` is three commits ahead. The test and journal work is not pushed; no PR or hosted CI is claimed. User owns merge and deployment.
 
 Current-source RQ-18 passed in canonical synthetic `Preflight → Session`: normal Admin password + TOTP; hidden QueueProfile, doctorless Service and QueueResource; explicit publication; permanent QR provision/reload; anonymous booking to a resource-owned queue; deactivation preserving the queue and closing new booking; profile archive/reactivation and reopening the same address. The browser observed 49 JS/CSS paths plus `/sw.js`; all 50 SHA-256 values matched the owned frontend container and the service worker carried the full tested commit SHA. The helper still reports `served_revision_verified=false`; do not rewrite that field. Teardown PASS removed 5 containers, 3 volumes and 1 network; no project containers/volumes/networks remained.
 
