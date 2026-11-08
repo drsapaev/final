@@ -428,7 +428,7 @@ const AdminSetupDirections = () => {
     const setupEditorLink = (destination: QueueSetupEditorDestination) => serializeQueueSetupEditorLink({
         version: 1,
         destination,
-        profileKey: null,
+        profileKey: selectedProfileKey,
         section: view,
         day: selectedDay || null,
         entity: null,
