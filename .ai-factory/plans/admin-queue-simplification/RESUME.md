@@ -1,4 +1,23 @@
-# Current resume — PR #3937 CI green; current-source T18 staging interrupted — 2026-11-08T21:45:42+05:00
+# Current resume — PR #3937 exact-head CI PASS; artifact path diagnosis recorded — 2026-11-08T22:43:23+05:00
+
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final, branch codex/aqs-t18-completion-20261108. T00–T17 are merged. PR #3937 was last read OPEN, Ready and mergeable at HEAD 2c285e44a30d6290db8b00c198c4384f11e8507d, based on #3935 8299d7d6897621bc284051004309b39acbef6adc. Applicable checks passed on that head; backend/integration/Docker/readiness jobs were skipped, and no independent review or inline threads were recorded. New journal-only changes are local and require push plus exact-head CI. User owns merge and deployment.
+
+The PR description now reflects exact-head results. The earlier body-format gate failure was corrected; the latest PR Review Quality Gate passed. Frontend E2E passed as general CI, but its logged suite commands did not include the T18 live specs. Do not use it as proof of current-source T18.1–5 or T18.8–9.
+
+T18.10 specialists navigation and current-source RQ-18 lifecycle passed in synthetic Admin/2FA Session on app source 16e04af35e47663481a08923d8625d94a1c9d010. Observed JS/CSS/service-worker assets matched 68/68 in that Session; the generic launcher still reports served_revision_verified=false. Canonical teardown passed.
+
+T18.1–5 remains NOT_RUN: the latest canonical Session was interrupted during frontend image build after Windows free RAM fell from 1.76 GiB to 0.13 GiB. Exact owned Compose teardown and post-audit passed. T18.8–9 browser join/replay checks remain open; backend subchecks can be carried forward only where their source owners match.
+
+Current resource sample: Windows free RAM 1.70 GiB; WSL available memory 3,177 MiB. No new build/staging was started. The hosted staging-frontend-artifact workflow is not usable as-is: API/WS origins are fixed to port 18082, it omits the embedded commit marker, and Compose has no artifact mount/image selection. Do not use it as a workaround until a canonical, checksum-verifying artifact path is implemented and tested. A private synthetic env file .scratch/t18-final-acceptance-20261108/staging-final4.env is still pending manual removal because local policy blocked deletion. Do not bypass that policy.
+
+Next:
+1. Push the four-file journal follow-up to #3937, verify exact-head CI, then obtain independent review; user merges.
+2. Start the next T18 validation cycle from the merged main. First add and validate a staging-only canonical path that serves a checksum-verified, exact-source frontend artifact without compiling it inside WSL; then run only current-source T18.1–5 and T18.8–9 plus applicable missing assertions.
+3. Finish affected keyboard/focus/forms/errors/empty/retry/languages/viewports/latency checks; classify two unreproduced historical console events and eight unmapped bundle call sites.
+4. Mark each applicable prerequisite and STAGING_VALIDATION.md Check 0–10 PASS/FAIL/NOT_RUN/DEFERRED with its tested SHA. Keep T18/Tier-2 PARTIAL until all applicable evidence is complete. Production, deployment and v1 flag activation remain separate.
+
+---
+# Previous resume — PR #3937 prior-head CI; current-source T18 staging interrupted — 2026-11-08T21:45:42+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. T00–T17 are merged. PR #3937 is OPEN, Ready for review and mergeable at HEAD `a166befeadbac7fea69164bf434c937a98b6dc23`, based on current `origin/main` #3935 `8299d7d6897621bc284051004309b39acbef6adc`. Exact-head Frontend build/unit/lint/E2E, PR Required Gate, PR Review Quality Gate, CodeQL, Gitleaks and security checks passed. Path-aware Backend/integration/Docker/readiness checks were skipped. No independent review has been submitted; user owns merge/deployment.
 
