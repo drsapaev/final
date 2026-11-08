@@ -6,7 +6,7 @@
  * ✅ "Мой опыт" - всегда доступен
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 
 import EMRSection from './EMRSection';
 import React from 'react';
@@ -106,12 +106,37 @@ export function ExaminationSection({
     return [...historyItems, ...suggestions];
   }, [doctorSuggestions, suggestions]);
 
-  // Append generated text from matrix
+  // EMREXAM-FE-001 (audit 3886, round 19): the matrix emits the FULL
+  // snapshot of the currently active items on every toggle (including an
+  // empty string when the last mark is removed). The old handler blindly
+  // APPENDED each emission, so «norm» and «pathology» phrases accumulated
+  // into contradictory saved text and toggling a mark off could not retract
+  // its phrase. Now the generated block is keyed by its previous content
+  // (lastMatrixTextRef) and REPLACED in place on every matrix change; an
+  // empty snapshot removes the block entirely. Manual prose around the
+  // block is never erased; if the doctor manually deleted the block, a new
+  // selection appends a fresh block.
+  const lastMatrixTextRef = useRef<string | null>(null);
+
   const handleMatrixText = (text: string) => {
-    if (!text) return;
     const current = value || '';
-    const newValue = current ? `${current} ${text}` : text;
-    onChange?.(newValue, { source: 'matrix' });
+    const prev = lastMatrixTextRef.current;
+    let next: string;
+
+    if (prev && current.includes(prev)) {
+      // Replace the previous generated block in place with the new snapshot
+      // (an empty snapshot deletes the block).
+      next = current.replace(prev, text);
+    } else {
+      // No block to replace (first generation, or the doctor manually
+      // removed/edited it away): append a fresh block after the manual text.
+      next = text ? (current ? `${current.trimEnd()} ${text}` : text) : current;
+    }
+    // Normalize whitespace artifacts left around the replaced block.
+    next = next.replace(/[ \t]{2,}/g, ' ').trim();
+    lastMatrixTextRef.current = text || null;
+    if (next === current) return;
+    onChange?.(next, { source: 'matrix' });
   };
 
   // Handle AI request - only if complaints exist

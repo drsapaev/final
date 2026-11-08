@@ -403,6 +403,14 @@ export function EMRContainerV2({
             // Очищаем AI-состояние при смене визита
             setAiSuggestions({});
             setAiLoading({});
+            // EMRHIST-FE-002 (audit 3886, round 19): инвариантные diff-виджеты
+            // сбрасываются вместе со сменой визита — выбранная версия и
+            // открытый overlay сравнения не переживают переход к другому
+            // пациенту/визиту (поздние ответы старого визита отбрасываются
+            // самими панелями, но контейнер не должен оставлять выбранный
+            // снапшот чужого визита в state).
+            setSelectedVersion(null);
+            setShowDiff(false);
             logger.info('[EMR] Visit changed', { prevVisitId, newVisitId });
         },
         onCleanup: () => {
@@ -1116,6 +1124,7 @@ export function EMRContainerV2({
                         suggestions={aiSuggestions.treatment || []}
                         aiLoading={aiLoading.treatment || false}
                         defaultOpen={false}
+                        visitKey={visitId}
                     />
 
                     {/* Recommendations is reused in TreatmentSection above, or separate?

@@ -69,7 +69,16 @@ export function EMRSection({
                     <span className={`emr-section__chevron ${isOpen ? 'emr-section__chevron--open' : ''}`}>▼</span>
                 </button>
                 {headerAction && (
-                    <div className="emr-section__header-action" onClickCapture={(e) => e.stopPropagation()}>
+                    // EMRORDER-FE-001 (audit 3886, round 19): this wrapper used
+                    // to carry onClickCapture={stopPropagation} — a CAPTURE-phase
+                    // stop kills the event before it ever reaches the action
+                    // button, so every headerAction (e.g. «Заказать анализы» in
+                    // LabResultsSection) was dead UI that could never fire its
+                    // onClick. The shield was also unnecessary: the action is a
+                    // SIBLING of the section-toggle <button>, so a click on the
+                    // action can never dispatch through the toggle anyway. A
+                    // plain wrapper keeps the actions alive and a11y-clean.
+                    <div className="emr-section__header-action">
                         {headerAction}
                     </div>
                 )}
