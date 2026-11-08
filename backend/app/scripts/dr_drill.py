@@ -302,9 +302,16 @@ def cleanup_drill_db(user: str, password: str, host: str, port: int) -> None:
         check=True,
     )
     # BR-015: verify the database is actually gone — a silently failed DROP
-    # must not let the drill claim a clean server.
+    # must not let the drill claim a clean server. Same connection parameters
+    # as the DROP above: without -h/-p/-U/-d psql falls back to the OS user
+    # and its default database (role/database "runner" does not exist on the
+    # CI host, psql exit status 2), so the verify itself failed on a healthy
+    # server and the drill exited 3 with a false LEFTOVER DATABASE after a
+    # successful DROP (branch dispatch 2026-11-08, run 42476991772, right
+    # after the backup-discovery fix — first Sunday run after #3889).
     verify = _run(
-        ["psql", "-tAc", f"SELECT 1 FROM pg_database WHERE datname = '{DRILL_DB_NAME}';"],
+        ["psql", "-h", host, "-p", str(port), "-U", user, "-d", "postgres",
+         "-tAc", f"SELECT 1 FROM pg_database WHERE datname = '{DRILL_DB_NAME}';"],
         env=env,
         check=True,
     )

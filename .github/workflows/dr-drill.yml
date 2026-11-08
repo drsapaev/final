@@ -78,9 +78,20 @@ jobs:
         run: |
           mkdir -p backend/backups
           cd backend
+          # The archive name MUST match the published-backup allowlist in
+          # app/scripts/dr_drill.py find_latest_backup() (backup_*.db,
+          # backup_*.db.gz, backup_*.db.*.gz — same as
+          # BackupService.list_backups()). The previous name
+          # backup_ci_test.dump was invisible to discovery, so the drill
+          # aborted with exit 2 "No backup files found" on every run after
+          # #3888 tightened the pattern (2026-11-08 run 42473705759,
+          # issue #3933). Gzipping mirrors the production published format
+          # (.db.gz) so the weekly drill also exercises the BR-016
+          # decompress-then-pg_restore path instead of bypassing it.
           PGPASSWORD=clinic_ci_only_password pg_dump \
             -h localhost -p 5432 -U clinic -d clinicdb \
-            -F c -f backups/backup_ci_test.dump
+            -F c -f backups/backup_ci_test.db
+          gzip -f backups/backup_ci_test.db
           ls -lh backups/
 
       - name: Run DR drill
