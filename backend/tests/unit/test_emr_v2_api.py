@@ -170,7 +170,14 @@ def test_doctor_cannot_save_emr_for_another_doctors_visit(client, db_session):
                 "row_version": 0,
             },
         ),
-        ("/restore", {"target_version": 1, "reason": "Unauthorized lab restore"}),
+        (
+            "/restore",
+            {
+                "target_version": 1,
+                "row_version": 0,
+                "reason": "Unauthorized lab restore",
+            },
+        ),
     ],
 )
 def test_lab_role_cannot_write_emr_v2_records(

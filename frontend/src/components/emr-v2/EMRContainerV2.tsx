@@ -260,10 +260,10 @@ interface EMRHookResult {
     signEMR: (opts?: { rowVersion?: number }) => Promise<unknown>;
     amendEMR: (reason: string, opts?: Record<string, unknown>) => Promise<unknown>;
     setField: (field: string, value: unknown) => void;
+    setNestedField: (path: string, value: unknown) => void;
     undo: () => void;
     redo: () => void;
     reloadFromServer: () => Promise<unknown>;
-    forceOverwrite: () => Promise<unknown>;
 }
 
 export function EMRContainerV2({
@@ -307,14 +307,30 @@ export function EMRContainerV2({
         signEMR,
         amendEMR,
         setField,
+        setNestedField,
         undo,
         redo,
         reloadFromServer,
-        forceOverwrite,
     } = useEMR(visitId, { specialty: canonicalSpecialty }) as EMRHookResult;
     const [isPreparingCompletion, setIsPreparingCompletion] = useState(false);
     const completionScopeRef = useRef({ visitId, active: true });
-    const editingDisabled = isReadOnly || isSigned || isPreparingCompletion || completionBusy;
+    // EMRSIGN-FE-001 + EMRAMEND-FE-002 (audit 3886 round 17): `isSaving` now
+    // locks field editing for the whole save→sign transaction so the doctor
+    // cannot type text B while the save of text A is in flight — the signed
+    // revision must equal the latest explicitly approved clinical snapshot.
+    // `isAmended` joins `isSigned` because an amended record is a finalized
+    // state whose ordinary fields must never be editable through the plain
+    // save/sign UI (the reasoned amendment flow is the only sanctioned
+    // correction pathway — see `amendAllowed` below).
+    const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSaving;
+    // EMRAMEND-FE-001 (audit 3886 round 17): the amendment workflow must be
+    // REACHABLE on the very records it exists for (signed, and — after round
+    // 16 — amended ones eligible for a repeat reasoned correction). The old
+    // `editingDisabled` (which includes isSigned) permanently disabled the
+    // «Внести поправку» button on every signed EMR, making the backend's
+    // reasoned amendment path dead UI. Amendment stays blocked only for
+    // read-only observers and while a completion transaction is running.
+    const amendAllowed = (isSigned || isAmended) && !isReadOnly && !isPreparingCompletion && !completionBusy;
     const savedEMRStatus = String(emr?.status ?? '').trim().toLowerCase();
     const canSignReadOnly = isReadOnly
         && Boolean(emr?.id)
@@ -669,6 +685,34 @@ export function EMRContainerV2({
         setField(field, value);
     }, [setField]);
 
+    const handleNestedFieldChange = useCallback((path: string) => (value: unknown) => {
+        setNestedField(path, value);
+    }, [setNestedField]);
+
+    // EMRDIAG-FE-001/002 (audit 3886 round 18): the visible ICD-10 field must
+    // read and write the CANONICAL nested diagnosis.icd10_code (the backend
+    // prefers it when materializing the searchable code), mirror to the legacy
+    // flat field so older consumers stay in agreement, and never clobber
+    // diagnosis.main / secondary[]. A legacy string diagnosis is migrated to
+    // the structured shape on first edit.
+    const structuredDiagnosis = data && typeof (data as Record<string, unknown>).diagnosis === 'object'
+        && (data as Record<string, unknown>).diagnosis !== null
+        ? (data as Record<string, unknown>).diagnosis as Record<string, unknown>
+        : null;
+    const canonicalIcd10Code = (structuredDiagnosis?.icd10_code as string | undefined)
+        || ((data as Record<string, unknown> | null)?.icd10_code as string | undefined)
+        || '';
+    const handleCanonicalIcd10Change = useCallback((value: string) => {
+        const currentDiagnosis = (data as Record<string, unknown> | null)?.diagnosis;
+        if (typeof currentDiagnosis === 'string') {
+            // Legacy flat diagnosis string — migrate to the structured shape,
+            // preserving the visible main text, before setting the code.
+            setNestedField('diagnosis', { main: currentDiagnosis });
+        }
+        setNestedField('diagnosis.icd10_code', value);
+        setField('icd10_code', value);
+    }, [data, setNestedField, setField]);
+
     const refreshParentStatus = useCallback(async () => {
         try {
             await onPersisted?.();
@@ -827,12 +871,39 @@ export function EMRContainerV2({
     }
 
     const handleAmend = async () => {
-        if (editingDisabled) return;
+        // EMRAMEND-FE-001 (audit 3886 round 17): the guard must NOT use
+        // `editingDisabled` — that flag contains `isSigned`/`isAmended` by
+        // definition of the amendment workflow, so the old check made this
+        // handler unreachable dead code. Only true blockers apply.
+        if (isReadOnly || isPreparingCompletion || completionBusy) return;
         if (amendReason.trim().length >= 10) {
             await amendEMR(amendReason);
             setShowAmendForm(false);
             setAmendReason('');
         }
+    };
+
+    // EMRRELOAD-FE-001 (audit 3886 round 17): the toolbar Refresh used to
+    // call loadEMR() directly, which replaces the entire reducer state
+    // (data + undo/redo history) with the cached/server snapshot — silently
+    // discarding unsaved clinical edits with no warning. Now a dirty
+    // document must be explicitly discarded by the doctor; cancelling keeps
+    // the draft (text + Undo history) untouched, and a confirmed discard
+    // bypasses the cache (loadEMR(true)) so the doctor sees the truly
+    // authoritative server version, not a stale cached copy.
+    const handleToolbarRefresh = async () => {
+        if (isDirty && !isSigned && !isAmended && !isReadOnly) {
+            const confirmed = await confirm({
+                title: t('misc.emr_refresh_title'),
+                message: t('misc.emr_refresh_discard_message'),
+                description: t('misc.emr_refresh_discard_description'),
+                confirmLabel: t('misc.emr_refresh_discard_confirm'),
+                cancelLabel: t('misc.cancel'),
+                intent: 'danger',
+            });
+            if (!confirmed) return;
+        }
+        await loadEMR(true);
     };
 
     // Conflict handlers
@@ -929,7 +1000,7 @@ export function EMRContainerV2({
                     <Button variant="ghost" size="small" onClick={redo} disabled={!canRedo || editingDisabled} title={t('misc.emr_redo_title')} aria-label={t('misc.emr_redo_title')}>
                         <Redo2 size={14} aria-hidden="true" /> {t('misc.emr_redo')}
                     </Button>
-                    <Button variant="ghost" size="small" onClick={() => { void loadEMR(); }} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
+                    <Button variant="ghost" size="small" onClick={() => { void handleToolbarRefresh(); }} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
                         <RefreshCw size={14} aria-hidden="true" /> {t('misc.emr_refresh')}
                     </Button>
                 </div>
@@ -1010,9 +1081,9 @@ export function EMRContainerV2({
 
                     <DiagnosisSection
                         diagnosis={data?.diagnosis}
-                        icd10Code={data?.icd10_code}
-                        onDiagnosisChange={handleFieldChange('diagnosis')}
-                        onIcd10Change={handleFieldChange('icd10_code')}
+                        icd10Code={canonicalIcd10Code}
+                        onDiagnosisChange={handleNestedFieldChange('diagnosis.main')}
+                        onIcd10Change={handleCanonicalIcd10Change}
                         disabled={editingDisabled}
                         ICD10Component={ICD10Component}
                         doctorId={doctorId}
@@ -1168,7 +1239,7 @@ export function EMRContainerV2({
                                 </button>
                             )}
                         </>
-                    ) : !isSigned ? (
+                    ) : !isSigned && !isAmended ? (
                         <>
                             <button
                                 className="emr-v2-btn emr-v2-btn--primary"
@@ -1203,7 +1274,7 @@ export function EMRContainerV2({
                                 <button
                                     className="emr-v2-btn emr-v2-btn--warning"
                                     onClick={() => setShowAmendForm(true)}
-                                    disabled={editingDisabled}
+                                    disabled={!amendAllowed || isSaving}
                                     aria-label={t('misc.emr_amend_aria')}
                                 >
                                     <FilePenLine size={14} aria-hidden="true" /> {t('misc.emr_amend')}
@@ -1215,20 +1286,20 @@ export function EMRContainerV2({
                                         value={amendReason}
                                         onChange={(e) => setAmendReason(e.target.value)}
                                         placeholder={t('misc.emr_amend_reason_ph')}
-                                        disabled={editingDisabled}
+                                        disabled={!amendAllowed}
                                     />
                                     <div className="emr-v2-amend-actions">
                                         <button
                                             className="emr-v2-btn emr-v2-btn--primary"
                                             onClick={handleAmend}
-                                            disabled={amendReason.trim().length < 10 || editingDisabled}
+                                            disabled={amendReason.trim().length < 10 || !amendAllowed || isSaving}
                                         >
                                             {t('misc.emr_save')}
                                         </button>
                                         <button
                                             className="emr-v2-btn"
                                             onClick={() => setShowAmendForm(false)}
-                                            disabled={editingDisabled}
+                                            disabled={!amendAllowed}
                                         >
                                             {t('misc.cancel')}
                                         </button>
@@ -1299,7 +1370,6 @@ export function EMRContainerV2({
                     onReload={reloadFromServer}
                     onCompare={handleCompareConflict}
                     onAmend={() => setShowAmendForm(true)}
-                    onForceOverwrite={forceOverwrite}
                     loading={isSaving}
                 />
             )}

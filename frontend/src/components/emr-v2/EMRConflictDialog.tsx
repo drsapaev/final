@@ -10,12 +10,16 @@
  * - Auto-merge
  * - Silent overwrite
  * - "We did it for you"
+ * - A "force overwrite" button: the backend deliberately rejects the
+ *   row_version=0 bypass for genuine cross-session conflicts (EMR-AUDIT-28
+ *   P0-3), so such a button could never deliver what it promises — it only
+ *   trapped the doctor in a 409 loop (EMRCONFLICT-FE-002, audit 3886
+ *   round 17). The server-protected revision history is the authority.
  * 
  * UX Principle:
  * Nothing happens without a conscious click by the doctor
  */
 
-import { useState } from 'react';
 import './EMRConflictDialog.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -32,7 +36,6 @@ interface EMRConflictDialogProps {
     onReload?: () => void;
     onCompare?: () => void;
     onAmend?: () => void;
-    onForceOverwrite?: () => void;
     loading?: boolean;
 }
 
@@ -49,7 +52,6 @@ interface EMRConflictDialogProps {
  * @param {Function} props.onReload - Reload from server callback
  * @param {Function} props.onCompare - Show diff callback
  * @param {Function} props.onAmend - Create amendment callback (signed only)
- * @param {Function} props.onForceOverwrite - Force overwrite callback (not recommended)
  * @param {boolean} props.loading - Is action in progress
  */
 export function EMRConflictDialog({
@@ -58,11 +60,8 @@ export function EMRConflictDialog({
     onReload,
     onCompare,
     onAmend,
-    onForceOverwrite,
     loading = false,
 }: EMRConflictDialogProps = {}) {
-    const [showAdvanced, setShowAdvanced] = useState(false);
-
     if (!conflict) return null;
 
     const formatTime = (dateStr?: string) => {
@@ -166,32 +165,14 @@ export function EMRConflictDialog({
                     )}
                 </div>
 
-                {/* Advanced options (hidden by default) */}
+                {/* Advanced info (hidden by default) */}
                 <div className="emr-conflict-dialog__advanced">
-                    {!showAdvanced ? (
-                        <button
-                            className="emr-conflict-dialog__advanced-toggle"
-                            onClick={() => setShowAdvanced(true)}
-                        >
-                            Расширенные опции...
-                        </button>
-                    ) : (
-                        <div className="emr-conflict-dialog__advanced-content">
-                            <p className="emr-conflict-dialog__advanced-warning">
-                                Используйте с осторожностью. Это может привести к потере данных других пользователей.
-                            </p>
-                            <button
-                                className="emr-conflict-btn emr-conflict-btn--danger"
-                                onClick={onForceOverwrite}
-                                disabled={loading}
-                            >
-                                Перезаписать принудительно
-                                <span className="emr-conflict-btn__hint">
-                                    (данные сервера будут заменены)
-                                </span>
-                            </button>
-                        </div>
-                    )}
+                    <p className="emr-conflict-dialog__advanced-warning">
+                        Принудительная перезапись чужих изменений отключена: сервер
+                        защищает историю клинических версий и отклоняет запись по
+                        устаревшей версии (409). Ваши правки можно перенести вручную
+                        после загрузки новой версии или оформить поправкой.
+                    </p>
                 </div>
 
                 {/* Loading indicator */}
