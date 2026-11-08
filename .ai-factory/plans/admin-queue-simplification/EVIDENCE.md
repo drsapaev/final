@@ -6485,11 +6485,11 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Next: check exact-head CI/body gates for this checkpoint-only commit; obtain independent review and let the user merge #3937. Then begin the separate staging-artifact PR from refreshed `origin/main`.
 ## PR #3937 review P2 corrections — 2026-11-09T01:10:44+05:00
 
-- Commit under test: base `377b0f5451175135a83d908a62b5e76cfbbdefbd`; fixes currently in the worktree and not yet committed.
+- Commit under test: fix commit `25d981667a148005f549b102e32b3ffc8470d850`, based on PR review HEAD `377b0f5451175135a83d908a62b5e76cfbbdefbd`.
 - Environment: Windows worktree `aqs-t18-report-fix`; no WSL, Docker, Compose or production services started for this slice.
 - Execution mode: `gate_known_root_cause`; canonical gate result `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. The generated execution prompt was read. Basis: human review #5819382573 explicitly requested correction of these two test findings before merge.
 - Allowed paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts` and T18 journals `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Denied paths: application/runtime, backend/API, schema/migrations, staging config, production, foreign worktrees and merge.
-- Actual changed paths so far: `frontend/e2e/rq18-permanent-qr-live.spec.ts`, `PROGRESS.md`, `RESUME.md`; this evidence entry is part of the same record.
+- Actual changed paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts` and the T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md` journals.
 - Original findings: the provenance helper hashed a second HTTP request rather than the response body delivered to the browser; the specialists delete-guard scenario could pass because unrelated pre-existing profile links already made DELETE return 409.
 - Corrections: capture and SHA-256 hash `Response.body()` from same-origin browser response events; reject non-200/body-unavailable/conflicting bodies; no independent asset refetch. The test now rereads the created Service by its returned ID, verifies persisted `queue_tag`, and checks the target profile's `services` link count increased by exactly one relative to a pre-create snapshot before asserting the delete guard.
 - Validation commands/results:
@@ -6501,5 +6501,5 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Result: both P2 findings are corrected in source; the isolated browser-byte regression is executed and passes. The full RQ-18 Admin/2FA/database live flow using the revised persisted-Service checks is **NOT_RUN**; the prior RQ-18 PASS applies to the earlier test revision only.
 - Scope check: no app/runtime/API/schema/staging/production change. No secrets, patient data, or persistent test artifacts were created. The regression server and browser context were closed in `finally`.
 - Remaining limitation: do not treat this isolated test or the prior staging run as full Tier-2 for the corrected test. A safe full live rerun awaits the planned memory-safe staging artifact path; prior WSL image builds reduced host free memory below safe levels.
-- PR: #3937; unresolved review comments `4507545518` and `4507545521` await updated HEAD and reviewer disposition. User owns merge.
+- PR: #3937; fix commit `25d9816` is committed locally but not pushed. Review comments `4507545518` and `4507545521` remain unresolved pending an updated PR HEAD and reviewer disposition. User owns merge.
 - Merge commit: pending user action.
