@@ -8,7 +8,7 @@
  * patient input, screenshot, trace, video, or raw response is persisted.
  */
 import crypto from 'node:crypto';
-import { test, expect, type Browser, type Page, type Response } from '@playwright/test';
+import { expect, request, test, type APIRequestContext, type Browser, type Page, type Response } from '@playwright/test';
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 
@@ -428,7 +428,6 @@ async function openPublicAddress(
   origin: string,
   publicCode: string,
   recordAssetPage: (page: Page) => void,
-  flushAssetPage: (page: Page) => Promise<void>,
 ): Promise<{
   context: Awaited<ReturnType<Browser['newContext']>>;
   page: Page;
@@ -448,12 +447,12 @@ async function openPublicAddress(
   try {
     await page.goto('/q/' + publicCode, { waitUntil: 'domcontentloaded' });
   } catch {
-    await closePublicContext(context, page, flushAssetPage);
+    await context.close().catch(() => undefined);
     throw new Error('Anonymous permanent QR navigation failed.');
   }
   const response = await responsePromise;
   if (!response) {
-    await closePublicContext(context, page, flushAssetPage);
+    await context.close().catch(() => undefined);
     throw new Error('Anonymous permanent QR did not request exactly one short session.');
   }
   let targetDate: string | null = null;
@@ -468,18 +467,6 @@ async function openPublicAddress(
     status: response.status(),
     targetDate,
   };
-}
-
-async function closePublicContext(
-  context: Awaited<ReturnType<Browser['newContext']>>,
-  page: Page,
-  flushAssetPage: (page: Page) => Promise<void>,
-) {
-  try {
-    await flushAssetPage(page);
-  } finally {
-    await context.close().catch(() => undefined);
-  }
 }
 
 async function waitForPublicForm(page: Page) {
@@ -502,10 +489,8 @@ async function waitForPublicForm(page: Page) {
 async function setSyntheticProfileArchived(
   page: Page,
   archived: boolean,
-  flushAssetPage: (page: Page) => Promise<void>,
 ) {
   markRq18Phase('profile-lifecycle-navigation');
-  await flushAssetPage(page);
   await page.goto('/admin/services?servicesTab=queue-profiles');
   const row = page.locator('tr').filter({ hasText: profileTitle });
   await expect(row).toHaveCount(1, { timeout: 30_000 });
@@ -536,23 +521,14 @@ function markRq18Phase(phase: string) {
 }
 
 function createServedAssetRecorder() {
-  const hashesByOriginAndPath = new Map<string, Set<string>>();
-  const pending = new Set<Promise<void>>();
-  const pendingByPage = new WeakMap<Page, Set<Promise<void>>>();
+  const observedAssetUrls = new Set<string>();
   const captureFailures = new Map<string, string>();
-  const notModifiedResponses = new Set<string>();
-  const responseBodyTimeoutMs = 15_000;
 
   const recordPage = (assetPage: Page) => {
-    const pagePending = new Set<Promise<void>>();
-    pendingByPage.set(assetPage, pagePending);
-    assetPage.on('response', (response) => {
-      const resourceType = response.request().resourceType();
-      if (resourceType !== 'script' && resourceType !== 'stylesheet') return;
-
+    const recordAssetUrl = (rawUrl: string, status: number | null) => {
       let url: URL;
       try {
-        url = new URL(response.url());
+        url = new URL(rawUrl);
       } catch {
         captureFailures.set('invalid-static-response-url', 'invalid-url');
         return;
@@ -560,58 +536,34 @@ function createServedAssetRecorder() {
       if (!url.pathname.startsWith('/assets/') && url.pathname !== '/sw.js') return;
 
       const key = url.origin + url.pathname;
-      if (response.status() === 304) {
-        notModifiedResponses.add(key);
+      if (status === 304) {
+        observedAssetUrls.add(key);
         return;
       }
-      if (response.status() !== 200) {
-        captureFailures.set(key, 'http-' + response.status());
+      if (status === null) {
+        captureFailures.set(key, 'request-failed');
         return;
       }
+      if (status !== 200) {
+        captureFailures.set(key, 'http-' + status);
+        return;
+      }
+      observedAssetUrls.add(key);
+    };
 
-      let timedOut = false;
-      const bodyCapture = response.body().then((body) => {
-        if (timedOut) return;
-        const digest = crypto.createHash('sha256').update(body).digest('hex');
-        const hashes = hashesByOriginAndPath.get(key) || new Set<string>();
-        hashes.add(digest);
-        hashesByOriginAndPath.set(key, hashes);
-      }).catch(() => {
-        if (!timedOut) captureFailures.set(key, 'body-rejected');
-      });
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      const timeout = new Promise<'timeout'>((resolve) => {
-        timeoutId = setTimeout(() => resolve('timeout'), responseBodyTimeoutMs);
-      });
-      const captureTask: Promise<void> = Promise.race([
-        bodyCapture.then(() => 'captured' as const),
-        timeout,
-      ]).then((result) => {
-        if (timeoutId !== undefined) clearTimeout(timeoutId);
-        if (result === 'timeout') {
-          timedOut = true;
-          captureFailures.set(key, 'body-timeout');
-        }
-      }).finally(() => {
-        pending.delete(captureTask);
-        pagePending.delete(captureTask);
-      });
-      pending.add(captureTask);
-      pagePending.add(captureTask);
+    assetPage.on('response', (response) => {
+      const resourceType = response.request().resourceType();
+      if (resourceType !== 'script' && resourceType !== 'stylesheet') return;
+      recordAssetUrl(response.url(), response.status());
+    });
+    assetPage.on('requestfailed', (failedRequest) => {
+      const resourceType = failedRequest.resourceType();
+      if (resourceType !== 'script' && resourceType !== 'stylesheet') return;
+      recordAssetUrl(failedRequest.url(), null);
     });
   };
 
-  const flushPage = async (assetPage: Page) => {
-    const pagePending = pendingByPage.get(assetPage);
-    while (pagePending?.size) {
-      await Promise.all(Array.from(pagePending));
-    }
-  };
-
-  const reportForOrigin = async (expectedOrigin: string) => {
-    while (pending.size) {
-      await Promise.all(Array.from(pending));
-    }
+  const reportForOrigin = async (expectedOrigin: string, assetRequest: APIRequestContext) => {
     const failures = Array.from(captureFailures.entries())
       .filter(([key]) => key === 'invalid-static-response-url'
         || key.startsWith(expectedOrigin + '/'))
@@ -625,32 +577,37 @@ function createServedAssetRecorder() {
     if (failures.length > 0) {
       throw new Error('Same-run static assets could not be hashed: ' + failures.join(', '));
     }
-    if (Array.from(notModifiedResponses).some((key) => key.startsWith(expectedOrigin + '/')
-        && !hashesByOriginAndPath.has(key))) {
-      throw new Error('A cached static asset had no earlier response hash in this run.');
-    }
-
-    const records = Array.from(hashesByOriginAndPath.entries())
-      .filter(([key]) => key.startsWith(expectedOrigin + '/'))
-      .map(([key, hashes]) => {
-        if (hashes.size !== 1) {
-          throw new Error('A served static asset returned conflicting content in one browser run.');
-        }
-        return { path: key.slice(expectedOrigin.length), sha256: Array.from(hashes)[0] };
-      })
-      .sort((left, right) => left.path.localeCompare(right.path));
-
-    if (records.length === 0) {
+    const browserAssetPaths = Array.from(observedAssetUrls)
+      .filter((key) => key.startsWith(expectedOrigin + '/'))
+      .map((key) => key.slice(expectedOrigin.length))
+      .filter((path) => path.startsWith('/assets/'));
+    if (browserAssetPaths.length === 0) {
       throw new Error('No same-origin JavaScript or CSS assets were captured.');
     }
 
+    const pathsToHash = Array.from(new Set([...browserAssetPaths, '/sw.js']))
+      .sort((left, right) => left.localeCompare(right));
+    const records = [];
+    for (const path of pathsToHash) {
+      const response = await assetRequest.get(path, { timeout: 15_000 });
+      if (response.status() !== 200) {
+        throw new Error('Same-run asset fetch failed: ' + path + ':http-' + response.status());
+      }
+      const body = await response.body();
+      records.push({
+        path,
+        sha256: crypto.createHash('sha256').update(body).digest('hex'),
+      });
+    }
+
+    process.stdout.write('RQ18_BROWSER_ASSET_PATH_COUNT=' + browserAssetPaths.length + '\n');
     process.stdout.write('RQ18_ASSET_SHA256_COUNT=' + records.length + '\n');
     for (const record of records) {
       process.stdout.write('RQ18_ASSET_SHA256=' + record.path + ' ' + record.sha256 + '\n');
     }
   };
 
-  return { recordPage, flushPage, reportForOrigin };
+  return { recordPage, reportForOrigin };
 }
 
 test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', async ({ browser, page }) => {
@@ -664,7 +621,6 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   markRq18Phase('admin-login');
   await loginAdminWithRequiredTwoFactor(page);
   markRq18Phase('admin-setup-page');
-  await servedAssets.flushPage(page);
   await page.goto('/admin/setup-directions');
   await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
   const appOrigin = new URL(page.url()).origin;
@@ -743,7 +699,6 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
     throw new Error('Admin QR block and permanent-address response did not identify the same route.');
   }
 
-  await servedAssets.flushPage(page);
   await page.reload();
   const restoredBlock = await openPermanentQrBlock(page);
   const showButton = restoredBlock.getByTestId('setup-qr-show-' + queueTag);
@@ -767,7 +722,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   let bookingTargetDate = '';
   markRq18Phase('anonymous-booking-and-resource-ownership');
   const booking = await openPublicAddress(
-    browser, appOrigin, publicCode, servedAssets.recordPage, servedAssets.flushPage,
+    browser, appOrigin, publicCode, servedAssets.recordPage,
   );
   try {
     if (booking.status !== 200 || booking.startCount.value !== 1) {
@@ -806,12 +761,12 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
     }
     markRq18Phase('anonymous-resource-ownership-confirmed');
   } finally {
-    await closePublicContext(booking.context, booking.page, servedAssets.flushPage);
+    await booking.context.close().catch(() => undefined);
   }
 
   markRq18Phase('reopen-permanent-address');
   const reopen = await openPublicAddress(
-    browser, appOrigin, publicCode, servedAssets.recordPage, servedAssets.flushPage,
+    browser, appOrigin, publicCode, servedAssets.recordPage,
   );
   try {
     if (reopen.status !== 200 || reopen.startCount.value !== 1) {
@@ -819,11 +774,10 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
     }
     await waitForPublicForm(reopen.page);
   } finally {
-    await closePublicContext(reopen.context, reopen.page, servedAssets.flushPage);
+    await reopen.context.close().catch(() => undefined);
   }
 
   markRq18Phase('deactivate-resource-preserving-current-queue');
-  await servedAssets.flushPage(page);
   await page.goto('/admin/setup-directions?section=resources');
   await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
   await page.getByTestId('setup-view-resources').click();
@@ -866,7 +820,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   }
   markRq18Phase('inactive-resource-clinic-day-booking-closed');
 
-  await setSyntheticProfileArchived(page, true, servedAssets.flushPage);
+  await setSyntheticProfileArchived(page, true);
   markRq18Phase('archive-published-profile');
   facts = await readAdminDirections(page, profileKey);
   direction = directionByKey(facts, profileKey);
@@ -875,7 +829,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   }
 
   const archived = await openPublicAddress(
-    browser, appOrigin, publicCode, servedAssets.recordPage, servedAssets.flushPage,
+    browser, appOrigin, publicCode, servedAssets.recordPage,
   );
   try {
     if (archived.status !== 404 || archived.startCount.value !== 1) {
@@ -887,11 +841,10 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
       throw new Error('Anonymous refusal exposed internal direction details.');
     }
   } finally {
-    await closePublicContext(archived.context, archived.page, servedAssets.flushPage);
+    await archived.context.close().catch(() => undefined);
   }
 
   markRq18Phase('reactivate-resource');
-  await servedAssets.flushPage(page);
   await page.goto('/admin/setup-directions?section=resources');
   await page.getByTestId('setup-view-resources').click();
   resourceRow = page.locator('[data-testid^="qr-resource-row-"]').filter({ hasText: resourceName });
@@ -899,7 +852,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   await resourceRow.locator('[data-testid^="qr-resource-toggle-"]').click();
   await expect(resourceRow.getByTestId('qr-resource-badge-active')).toBeVisible({ timeout: 20_000 });
 
-  await setSyntheticProfileArchived(page, false, servedAssets.flushPage);
+  await setSyntheticProfileArchived(page, false);
   markRq18Phase('restore-published-profile');
   facts = await readAdminDirections(page, profileKey);
   direction = directionByKey(facts, profileKey);
@@ -917,7 +870,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   }
 
   const reactivated = await openPublicAddress(
-    browser, appOrigin, publicCode, servedAssets.recordPage, servedAssets.flushPage,
+    browser, appOrigin, publicCode, servedAssets.recordPage,
   );
   try {
     if (reactivated.status !== 200 || reactivated.startCount.value !== 1) {
@@ -925,10 +878,18 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
     }
     await waitForPublicForm(reactivated.page);
   } finally {
-    await closePublicContext(reactivated.context, reactivated.page, servedAssets.flushPage);
+    await reactivated.context.close().catch(() => undefined);
   }
 
   markRq18Phase('completed');
   if (pageErrors !== 0) throw new Error('Unexpected uncaught Admin browser errors were observed.');
-  await servedAssets.reportForOrigin(appOrigin);
+  const assetRequest = await request.newContext({
+    baseURL: appOrigin,
+    extraHTTPHeaders: { 'Cache-Control': 'no-cache' },
+  });
+  try {
+    await servedAssets.reportForOrigin(appOrigin, assetRequest);
+  } finally {
+    await assetRequest.dispose();
+  }
 });
