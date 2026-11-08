@@ -88,7 +88,15 @@ export type EmrAction =
     } }
   | { type: 'UNDO' }
   | { type: 'REDO' }
-  | { type: 'RESET_DIRTY' };
+  | { type: 'RESET_DIRTY' }
+  /**
+   * EMRCTX-FE-001 (audit 3886 round 18): hard context reset when the
+   * canonical visit identity changes on a still-mounted hook — the whole
+   * reducer state (data, dirty flag, history, conflict, error) returns to
+   * the initial shape so no clinical state of the previous visit can leak
+   * into the new one while its authoritative load is in flight.
+   */
+  | { type: 'CONTEXT_RESET' };
 
 /**
  * Vital signs sub-record — used inside EMR data.
