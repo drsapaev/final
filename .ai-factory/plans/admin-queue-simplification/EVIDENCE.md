@@ -6288,6 +6288,19 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Next: user merges #3897. Then start a separate fresh-main fix for T18.10; continue current-source RQ-18 staging only with safe resource headroom.
 - Merge commit: pending user merge.
 
+## PR #3925 sync to #3923 and candidate checks — 2026-11-08T10:40:31+05:00
+
+- Task: Continue the queue-plan umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`; T18.10 selected-profile context repair and remaining T18 acceptance.
+- Environment: isolated Windows worktree `aqs-t18-selected-profile-context-20261108`; branch `codex/aqs-t18-selected-profile-context-20261108`; synthetic staging not started.
+- Remote PR state before this checkpoint: #3925 OPEN/non-draft, mergeable; remote HEAD `afd968641c79eec0ed5484d2b291abca392d29e9`, base `5e6fb56e3f47f6e16f2590a3333ddd74e1680869`; review submissions and inline threads empty. PR description was stale. Combined-status lookup returned no status rows; current hosted result is not claimed.
+- Fresh main: `origin/main` `372d6924e964613524c5c9e77fd8f456f4d1f2e4` (#3923) merged without conflicts at local candidate `f47e27f3a06c5a7be48267839ab0323fe84dffb6`. Incoming changes are EMR lifecycle/API/OpenAPI/tests/generated types across seven files, with no overlap in the selected-profile source/test.
+- Actual changed paths for this checkpoint: `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. No application, test, API, schema, auth/RBAC, gate, router, staging configuration, production, or foreign-worktree changes.
+- Validation on exact local candidate `f47e27f3a06c5a7be48267839ab0323fe84dffb6`: `npm run test:run -- src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx` — PASS, 25/25; scoped ESLint on `AdminSetupDirections.tsx` and its focused test — PASS; `git diff --check` before this journal edit — PASS. Re-run `git diff --check` after this edit. Hosted checks for `f47e27f` have not run because the candidate is not pushed.
+- Gate: canonical `run_agent_gate.ps1` from `ai/langgraph`; known root `PROGRESS.md`, scope exactly the three T18 journals. Result `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; execution prompt read and followed. No source code was edited.
+- Host resources: 1.83 GiB free RAM of 7.69 GiB at the time of check. WSL/Docker/Compose/staging were not started. Production, merge, and deployment were not performed.
+- Remaining: commit and push journal/main-sync checkpoint, update PR description, obtain exact-head CI and independent review, and leave merge to user. After merge, complete T18.10 live Admin/2FA, current-source RQ-18, remaining `STAGING_VALIDATION.md`, served-build provenance, cross-revision reconciliation, and console diagnostic follow-up. T18/Tier-2 remain PARTIAL.
+- PR: #3925. Merge commit: pending user merge.
+
 ## PR #3925 latest-main synchronization and local validation — 2026-11-08T10:02:24+05:00
 
 - Umbrella task: `bd2f7564-bd3d-449d-8d85-5a9325722a80`. Worktree: `aqs-t18-selected-profile-context-20261108`, branch `codex/aqs-t18-selected-profile-context-20261108`.

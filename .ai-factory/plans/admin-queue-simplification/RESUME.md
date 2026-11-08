@@ -1,4 +1,16 @@
-## Current resume — latest main synced locally; exact-head CI and T18 browser acceptance remain — 2026-11-08T10:02:24+05:00
+# Current resume — #3923 sync is local; PR push and T18 acceptance remain — 2026-11-08T10:40:31+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`, branch `codex/aqs-t18-selected-profile-context-20261108`. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.
+
+PR #3925 is OPEN/non-draft, mergeable, and has no review submission or inline threads at the latest GitHub read. Remote HEAD `afd968641c79eec0ed5484d2b291abca392d29e9` is based on `5e6fb56e3f47f6e16f2590a3333ddd74e1680869`; its PR description is stale. Current `origin/main` is `372d6924e964613524c5c9e77fd8f456f4d1f2e4` (#3923), merged without conflicts into local candidate `f47e27f3a06c5a7be48267839ab0323fe84dffb6`. The local branch is two commits ahead of its remote. Incoming EMR/API/OpenAPI changes do not overlap the selected-profile source/test. Local current-candidate focused Vitest passed 25/25; scoped ESLint and `git diff --check` passed. Exact-head hosted checks and independent review remain pending.
+
+T18.10 live Admin/2FA acceptance and current-source RQ-18 remain NOT_RUN. T18.1–T18.9 evidence is revision-scoped and must be reconciled with the final candidate. Full `STAGING_VALIDATION.md`, served frontend revision provenance, and remaining console diagnostics (2/11 events unreproduced; 8 bundle call sites unmapped) remain open. Latest free RAM was 1.83 GiB; no staging was started. Before the single combined synthetic session, recheck memory and use only the owned Compose project, then verify full teardown.
+
+Next: review the three-journal diff; refresh PR #3925 description for `f47e27f`, commit/push the current-main sync, then wait for exact-head checks and independent review. Leave merge to the user. After merge, run the bounded synthetic T18.10 plus current-source RQ-18 session, complete the remaining staging runbook/provenance checks, reconcile earlier scenarios, resolve diagnostics, and record evidence. Do not mark T18 complete until all required evidence is tied to final source and no mandatory item remains NOT_RUN.
+
+---
+
+## Previous resume — #3926 main sync (superseded) — 2026-11-08T10:02:24+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`, branch `codex/aqs-t18-selected-profile-context-20261108`. T00–T17 are merged; PR #3897 merged at `569d5fe5f5f0c24f1e8aa72a782aaf73ed44bbe3`. User owns PR merges and deployment.
 

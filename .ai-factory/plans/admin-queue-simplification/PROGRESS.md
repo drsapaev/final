@@ -2,16 +2,38 @@
 
 Plan version: 1.0
 Current task: T18.10 selected-profile return-context repair and remaining T18 acceptance
-Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN, non-draft; remote HEAD `af0eedb6e496812780c67737037f168021155b97` has successful applicable CI but is behind `origin/main`; local branch is synchronized to `origin/main` `5e6fb56e3f47f6e16f2590a3333ddd74e1680869` at `653fae5137d125a085f18ba158d908d506da70b5`, not yet pushed; T18.10 browser acceptance and current-source RQ-18 remain NOT_RUN; overall T18/Tier-2 remain PARTIAL; user owns merge/deployment
+Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN/non-draft at remote HEAD `afd968641c79eec0ed5484d2b291abca392d29e9` (base `5e6fb56e3f47f6e16f2590a3333ddd74e1680869`); local branch includes latest `origin/main` `372d6924e964613524c5c9e77fd8f456f4d1f2e4` at candidate `f47e27f3a06c5a7be48267839ab0323fe84dffb6`, two commits ahead of remote; focused local test, ESLint, and diff check PASS on this candidate; exact-head hosted checks and independent review pending; T18.10 live Admin/2FA and current-source RQ-18 remain NOT_RUN; Tier-2/T18 PARTIAL; user owns merge/deployment
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`
 Branch: `codex/aqs-t18-selected-profile-context-20261108`
 Source/test commit: `404ba482a26085ee740ee10d16959b2504c9bd72`
 Remote PR HEAD before latest sync: `af0eedb6e496812780c67737037f168021155b97`
-Current local candidate: `653fae5137d125a085f18ba158d908d506da70b5` (merge of latest `origin/main`; push pending)
-Current `origin/main`: `5e6fb56e3f47f6e16f2590a3333ddd74e1680869`
-Last updated: 2026-11-08T10:02:24+05:00
+Current local candidate: `f47e27f3a06c5a7be48267839ab0323fe84dffb6` (merge of latest `origin/main`; push pending)
+Current `origin/main`: `372d6924e964613524c5c9e77fd8f456f4d1f2e4`
+Last updated: 2026-11-08T10:40:31+05:00
 
-## Current checkpoint — latest main merged locally; PR push and T18 acceptance remain open
+## Current checkpoint — #3923 main sync merged locally; PR update and T18 acceptance remain open
+
+| Task | Status | Evidence |
+|------|--------|----------|
+| T00–T17 | MERGED | Existing plan journals; latest queue-plan PR #3897 merged at `569d5fe5` |
+| T18 scenarios 1–9 | VALIDATED on recorded source revisions | Historical evidence remains tied to each tested revision; reconcile against final candidate before claiming integrated completion |
+| T18.10 selected-profile source fix | VALIDATED locally on candidate `f47e27f` | `profile=specialists` is retained in editor return links; focused regression test passes on candidate; synthetic browser acceptance remains NOT_RUN |
+| T18.10 synthetic Admin/2FA flow | NOT_RUN | Verify the actual `specialists` profile, editor navigation/return, reload, Back/Forward, legacy URLs, and protected DELETE 409 with the row retained |
+| Current-source RQ-18 | NOT_RUN | Validate public QR join/lifecycle on final source |
+| Full staging runbook / served-build provenance | PARTIAL / NOT_RUN | Complete `STAGING_VALIDATION.md` and canonical served-revision attestation |
+| T18 overall / Tier-2 | PARTIAL | No full acceptance, production-readiness, or system-health claim |
+
+### Current candidate and next actions
+
+- PR #3925 remains OPEN, non-draft, and mergeable on GitHub at remote HEAD `afd968641c79eec0ed5484d2b291abca392d29e9`, based on `5e6fb56e3f47f6e16f2590a3333ddd74e1680869`. No review submissions or inline threads were returned. Its description is stale and does not yet record the latest `main` sync.
+- Fresh `origin/main` is `372d6924e964613524c5c9e77fd8f456f4d1f2e4` (#3923). It was merged without conflicts into local candidate `f47e27f3a06c5a7be48267839ab0323fe84dffb6`. The merge adds EMR lifecycle/API/OpenAPI/tests/generated types in seven files and does not overlap the selected-profile screen/test. Local branch is two commits ahead of the remote PR branch; nothing has been pushed from this sync.
+- Local validation on `f47e27f`: focused Vitest `adminSetupDirections.textPin.test.tsx` — 25/25 PASS; scoped ESLint on `AdminSetupDirections.tsx` and its focused test — PASS; `git diff --check` — PASS. Combined-status lookup for remote HEAD `afd9686` returned no status rows, so do not infer a current hosted result from it. The synchronized candidate has not received hosted CI.
+- This journal-only update uses the canonical launcher with known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` and exactly the three T18 journal paths. Result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. No source, test, gate, or router files were edited in this checkpoint.
+- Host check: 1.83 GiB free RAM of 7.69 GiB. No WSL, Docker, Compose, or staging session was started. Recheck resources before the one combined synthetic acceptance session.
+- Allowed scope remains the existing T18 source/test PR plus `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Production, shared/foreign staging, merge, and deployment are excluded; user owns merge/deploy.
+- Next exact action: finish and inspect this three-journal update; refresh PR #3925 description against candidate `f47e27f`, commit and push the existing branch; wait for exact-head checks and independent review. After the user merges, run one bounded synthetic staging session for T18.10 and current-source RQ-18, complete only the outstanding runbook checks, verify served-build provenance, reconcile T18.1–T18.9, resolve remaining console diagnostics, teardown the owned project, and update all three journals.
+
+## Previous checkpoint — #3926 main sync (superseded by the #3923 sync above)
 
 | Task | Status | Evidence |
 |------|--------|----------|
