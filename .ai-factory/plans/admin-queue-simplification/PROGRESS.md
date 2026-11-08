@@ -27,27 +27,27 @@
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance, source reconciliation and evidence PR
-Current status: IN_PROGRESS; T00–T17 MERGED. PR #3937 is synchronized with `origin/main` #3941 (`34da7981fe6985c1cc33be127fd3b32fd89c8f6f`) in local merge commit `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`; the merge commit and checkpoint update are not yet pushed. The two P2 fixes remain in `25d981667a148005f549b102e32b3ffc8470d850`; both review threads were resolved on the pre-sync PR head. Exact-head hosted checks are pending after sync. Local type-check, isolated browser-byte regression, build and the earlier scoped ESLint results are recorded below. Full live RQ-18 staging remains NOT_RUN. T18.1–5 remains NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. T18/Tier-2 PARTIAL. User owns merge.
+Current status: IN_PROGRESS; T00–T17 MERGED. PR #3937 was synchronized with `origin/main` #3941 (`34da7981fe6985c1cc33be127fd3b32fd89c8f6f`) in merge commit `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`; branch push at PR HEAD `620c3c13313e543f6b290ccd5fa6b2b17971ee59` succeeded. The PR description now names the synchronized base/head. Both P2 threads remain resolved. Current PR Review Quality Gate and Lifecycle Recommendation passed after correcting the accepted punctuation for `not applicable` reasons; Agent Workflow Guards, Security and Gitleaks passed. Unified CI was still running at the last check. Local type-check, isolated browser-byte regression, build and the earlier scoped ESLint results are recorded below. Full live RQ-18 staging remains NOT_RUN. T18.1–5 remains NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. T18/Tier-2 PARTIAL. User owns merge.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`
 Branch: `codex/aqs-t18-completion-20261108`
 Base commit: fresh `origin/main` `34da7981fe6985c1cc33be127fd3b32fd89c8f6f` (#3941), merged locally by `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`
 Application commit under test: `16e04af35e47663481a08923d8625d94a1c9d010`
 Validated E2E working-copy SHA-256: `BC14D2F70A9145A6EB8949E05091CDF2F95E691049ECF06C96C006CFA078AF54`
-Last updated: 2026-11-09T02:04:34+05:00
+Last updated: 2026-11-09T02:11:10+05:00
 
-## Current checkpoint — PR #3937 synchronized with main — 2026-11-09T02:04:34+05:00
+## Current checkpoint — PR #3937 synchronized and pushed — 2026-11-09T02:11:10+05:00
 
 | Task | Status | Evidence |
 |------|--------|----------|
 | T00–T17 | MERGED | Main #3941 is `34da7981fe6985c1cc33be127fd3b32fd89c8f6f`; merged locally without conflict. |
-| PR #3937 sync | VALIDATED LOCALLY | Merge commit `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`, parents `1fa685728f21dca236b39617fc661e65d79db5a1` and `34da7981fe6985c1cc33be127fd3b32fd89c8f6f`. Incoming main change is Cardiology-only; no overlap with PR changes. |
+| PR #3937 sync | PUSHED | Merge commit `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`, parents `1fa685728f21dca236b39617fc661e65d79db5a1` and `34da7981fe6985c1cc33be127fd3b32fd89c8f6f`. Incoming main change is Cardiology-only; no overlap with PR changes. PR branch push at checkpoint head `620c3c13313e543f6b290ccd5fa6b2b17971ee59` succeeded. |
 | Review findings 4507545518 / 4507545521 | FIXED; threads RESOLVED on pre-sync head | Both narrow RQ-18 E2E corrections remain in `25d981667a148005f549b102e32b3ffc8470d850`; sync contains no runtime/test source changes. Reconfirm thread state after publishing new head. |
-| PR #3937 | OPEN; PUSH PENDING | Local sync commit and this journal update need to be pushed. Recheck exact-head CI and PR Review Quality/Required gates after push. User owns merge. |
+| PR #3937 | OPEN; SYNCED; HEAD 620c3c1 | PR body updated to current base/head. Both review threads are resolved. Agent Workflow Guards, PR Review Quality Gate (after ASCII-hyphen correction), Lifecycle Recommendation, Security and Gitleaks passed; Unified CI was still in progress at the last check. The journal follow-up now being prepared is docs-only and will create a new exact head. User owns merge. |
 | T18 / Tier-2 | PARTIAL | Corrected full live RQ-18/Admin/2FA run remains NOT_RUN. T18.1–5 and T18.8–9 acceptance also remain open; do not treat the isolated Chromium regression as full staging evidence. |
 | Staging readiness | BLOCKED FOR THIS SESSION | Earlier checkpoint recorded low free RAM and the owned synthetic env file `.scratch/t18-final-acceptance-20261108/staging-final4.env` still present. Do not start WSL/Compose or delete/bypass local file protections. |
 | Hosted frontend artifact | VERIFIED FOR MAIN #3938 ONLY | Workflow `42522335861`, artifact `clinic-staging-frontend-8edd6a25ed6b88ba4fddcf247dae2e397848d8cc`; source SHA matched `8edd6a25…`, 261/261 checksums passed. This is not the new main #3941 artifact and is not served-revision proof for #3937. |
 
-Exact next action: commit this journal synchronization record, push the existing PR branch normally, then verify GitHub's exact head, current base, review threads, and required checks. Do not merge. After the user merges #3937, continue the remaining T18 work from fresh `origin/main`; staging requires a verified memory-safe artifact path and cleanup of the pre-existing owned env through the permitted local process.
+Exact next action: run `git diff --check`, commit and push this final status correction, refresh the PR description to that docs-only head, then verify current exact-head CI and review threads. Do not merge. After the user merges #3937, continue the remaining T18 work from fresh `origin/main`; staging requires a verified memory-safe artifact path and cleanup of the pre-existing owned env through the permitted local process.
 
 ## Current checkpoint — PR #3937 review fixes committed locally — 2026-11-09T01:13:13+05:00
 
