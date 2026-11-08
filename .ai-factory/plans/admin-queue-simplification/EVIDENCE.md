@@ -6503,3 +6503,19 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitation: do not treat this isolated test or the prior staging run as full Tier-2 for the corrected test. A safe full live rerun awaits the planned memory-safe staging artifact path; prior WSL image builds reduced host free memory below safe levels.
 - PR: #3937; fix commit `25d9816` is committed locally but not pushed. Review comments `4507545518` and `4507545521` remain unresolved pending an updated PR HEAD and reviewer disposition. User owns merge.
 - Merge commit: pending user action.
+
+## PR #3937 main synchronization — 2026-11-09T02:04:34+05:00
+
+- Commit under test: local sync candidate `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`; parents are PR head `1fa685728f21dca236b39617fc661e65d79db5a1` and current `origin/main` #3941 `34da7981fe6985c1cc33be127fd3b32fd89c8f6f`.
+- Environment: Windows worktree `aqs-t18-report-fix`; no WSL, Docker, Compose, staging, or production services started.
+- Execution mode: `gate_known_root_cause`. Canonical launcher from `ai/langgraph`; known root was `PROGRESS.md`, exact journal scope was `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Result `narrow_override`; `gate_misroute=false`; `override_used=true`; `handoff_required=true`; generated execution prompt read. The PR must be synchronized before the user's merge; no source change was requested.
+- Allowed paths: the three T18 journals; branch sync from current main. Denied: runtime, backend/API, schema/migrations, authentication/RBAC, staging execution/configuration, production/deployment, foreign worktrees, force-push, and merge.
+- Original state: PR was at `1fa685728f21dca236b39617fc661e65d79db5a1` on base #3938 `8edd6a25ed6b88ba4fddcf247dae2e397848d8cc`; current main had advanced to #3941. Incoming main changes were Cardiology-only and did not overlap PR paths.
+- Actual changed paths in this checkpoint: `PROGRESS.md`, `RESUME.md`, `EVIDENCE.md`; merge ancestry also includes the non-overlapping current-main commit. No application/runtime source changed during sync.
+- Validation: merge completed without conflict; resulting parents verified; PR diff against current main contains only the existing E2E/journal scope; no Cardiology file is in the PR diff. Post-checkpoint `git diff --check`, journal scope review, commit, push, and exact-head GitHub checks are pending.
+- Prior hosted frontend artifact: workflow `42522335861` built from main #3938 `8edd6a25ed6b88ba4fddcf247dae2e397848d8cc`; `source.sha` matched that source, and all 261/261 checksums passed. This artifact does not attest current main #3941 or PR #3937's served runtime.
+- Result: local synchronization PASS; no code checks are inferred from this documentation checkpoint. PR remains open and user-owned for merge. Review P2 threads were resolved on the previous PR head; verify their status after publishing the synchronized head.
+- Remaining limitation: exact-head CI is pending. Full RQ-18 synthetic Admin/2FA staging, T18.1–5 and T18.8–9 remain not complete; T18/Tier-2 remains PARTIAL. Do not start staging while the host-memory/env-file stop conditions from the current checkpoint remain unresolved.
+- Next exact action: run `git diff --check`, inspect only the three journal diffs, commit the checkpoint, push the branch normally, then verify PR head/base, review threads, and required checks. Do not merge.
+- PR: #3937.
+- Merge commit: pending user action.

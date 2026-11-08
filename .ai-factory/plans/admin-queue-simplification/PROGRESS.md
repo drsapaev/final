@@ -1,5 +1,18 @@
 # Progress — T18 final acceptance
 
+## PR #3937 main sync — pre-work checkpoint — 2026-11-09
+
+- Objective: bring the reviewed RQ-18 test PR up to the current `origin/main` before user-owned merge; do not start the next PR cycle.
+- Before sync: PR #3937 HEAD `1fa685728f21dca236b39617fc661e65d79db5a1`, base `8edd6a25ed6b88ba4fddcf247dae2e397848d8cc`; current `origin/main` is `34da7981fe6985c1cc33be127fd3b32fd89c8f6f`.
+- Path inspection: incoming main changes are Cardiology-only; PR changes are `frontend/e2e/rq18-permanent-qr-live.spec.ts` and the T18 plan/evidence files. No changed path overlaps.
+- Execution mode: mandatory `gate_known_root_cause`. Canonical launcher from `ai/langgraph` used `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` as the known root and the three T18 journals as exact scope. Result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read.
+- Canonical anchors: `AGENTS.md`, `docs/runbooks/AGENT_CYCLIC_WORKFLOW.md`, `docs/devbrain/PROJECT_MEMORY.md`, `docs/devbrain/DEVBRAIN_STATUS.md`, current PR diff and current `origin/main`.
+- First-touch/allowed tracked paths: `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. The branch sync itself may bring in the non-overlapping current main commit; do not edit its source files.
+- Reference-only: current PR E2E source, main's Cardiology changes, the hosted frontend artifact and canonical staging configuration.
+- Denied: runtime/backend/API, schema/migrations, auth/RBAC, staging execution/config, production/deployment, foreign worktrees, merge of PR #3937.
+- Validation target: merge current `origin/main` without conflicts; verify resulting ancestry and PR file scope, run `git diff --check`, push the synchronized branch, and confirm exact-head hosted checks.
+- First stop condition: any conflict or unexpected overlapping path, new change to `origin/main` before synchronization, or required edit outside the three journals.
+
 ## PR #3937 review fixes — pre-edit checkpoint — 2026-11-09T00:56:06+05:00
 
 - Task: continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`; address the two P2 findings on PR #3937 HEAD `377b0f5451175135a83d908a62b5e76cfbbdefbd`.
@@ -14,19 +27,33 @@
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance, source reconciliation and evidence PR
-Current status: IN_PROGRESS; T00–T17 MERGED. The two P2 fixes for PR #3937 review #5819382573 are committed locally as `25d981667a148005f549b102e32b3ffc8470d850`; push and exact-head checks are pending. Final candidate type-check and isolated browser-byte regression passed; frontend build passed for unchanged product code. Scoped ESLint passed before a final test-resource-cleanup-only edit (0 errors, 2 direct-fetch warnings). Full live RQ-18 staging rerun remains NOT_RUN. T18.1–5 remains NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. T18/Tier-2 PARTIAL. User owns merge.
+Current status: IN_PROGRESS; T00–T17 MERGED. PR #3937 is synchronized with `origin/main` #3941 (`34da7981fe6985c1cc33be127fd3b32fd89c8f6f`) in local merge commit `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`; the merge commit and checkpoint update are not yet pushed. The two P2 fixes remain in `25d981667a148005f549b102e32b3ffc8470d850`; both review threads were resolved on the pre-sync PR head. Exact-head hosted checks are pending after sync. Local type-check, isolated browser-byte regression, build and the earlier scoped ESLint results are recorded below. Full live RQ-18 staging remains NOT_RUN. T18.1–5 remains NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. T18/Tier-2 PARTIAL. User owns merge.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`
 Branch: `codex/aqs-t18-completion-20261108`
-Base commit: fresh `origin/main` `8edd6a25ed6b88ba4fddcf247dae2e397848d8cc` (#3938)
+Base commit: fresh `origin/main` `34da7981fe6985c1cc33be127fd3b32fd89c8f6f` (#3941), merged locally by `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`
 Application commit under test: `16e04af35e47663481a08923d8625d94a1c9d010`
 Validated E2E working-copy SHA-256: `BC14D2F70A9145A6EB8949E05091CDF2F95E691049ECF06C96C006CFA078AF54`
-Last updated: 2026-11-09T01:13:13+05:00
+Last updated: 2026-11-09T02:04:34+05:00
+
+## Current checkpoint — PR #3937 synchronized with main — 2026-11-09T02:04:34+05:00
+
+| Task | Status | Evidence |
+|------|--------|----------|
+| T00–T17 | MERGED | Main #3941 is `34da7981fe6985c1cc33be127fd3b32fd89c8f6f`; merged locally without conflict. |
+| PR #3937 sync | VALIDATED LOCALLY | Merge commit `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`, parents `1fa685728f21dca236b39617fc661e65d79db5a1` and `34da7981fe6985c1cc33be127fd3b32fd89c8f6f`. Incoming main change is Cardiology-only; no overlap with PR changes. |
+| Review findings 4507545518 / 4507545521 | FIXED; threads RESOLVED on pre-sync head | Both narrow RQ-18 E2E corrections remain in `25d981667a148005f549b102e32b3ffc8470d850`; sync contains no runtime/test source changes. Reconfirm thread state after publishing new head. |
+| PR #3937 | OPEN; PUSH PENDING | Local sync commit and this journal update need to be pushed. Recheck exact-head CI and PR Review Quality/Required gates after push. User owns merge. |
+| T18 / Tier-2 | PARTIAL | Corrected full live RQ-18/Admin/2FA run remains NOT_RUN. T18.1–5 and T18.8–9 acceptance also remain open; do not treat the isolated Chromium regression as full staging evidence. |
+| Staging readiness | BLOCKED FOR THIS SESSION | Earlier checkpoint recorded low free RAM and the owned synthetic env file `.scratch/t18-final-acceptance-20261108/staging-final4.env` still present. Do not start WSL/Compose or delete/bypass local file protections. |
+| Hosted frontend artifact | VERIFIED FOR MAIN #3938 ONLY | Workflow `42522335861`, artifact `clinic-staging-frontend-8edd6a25ed6b88ba4fddcf247dae2e397848d8cc`; source SHA matched `8edd6a25…`, 261/261 checksums passed. This is not the new main #3941 artifact and is not served-revision proof for #3937. |
+
+Exact next action: commit this journal synchronization record, push the existing PR branch normally, then verify GitHub's exact head, current base, review threads, and required checks. Do not merge. After the user merges #3937, continue the remaining T18 work from fresh `origin/main`; staging requires a verified memory-safe artifact path and cleanup of the pre-existing owned env through the permitted local process.
 
 ## Current checkpoint — PR #3937 review fixes committed locally — 2026-11-09T01:13:13+05:00
 
 | Task | Status | Evidence |
 |------|--------|----------|
-| T00–T17 | MERGED | Current base remains `origin/main` #3938 at `8edd6a25` |
+| T00–T17 | MERGED | At the time of this historical checkpoint, base was `origin/main` #3938 at `8edd6a25` |
 | PR #3937 review finding 4507545518 | FIXED IN `25d9816` | Recorder hashes `Response.body()` from the browser's response event; 304/errors/body-read failures and conflicting bodies fail closed. An isolated regression deliberately returns different bytes to the browser and independent HTTP client and verifies the reported SHA matches the browser response. |
 | PR #3937 review finding 4507545521 | FIXED IN `25d9816` | The test reads back the exact Service ID through Admin `GET /api/v1/services/{id}`, checks its persisted queue tag and confirms the target profile's service-link count increased by exactly one over its pre-create count before checking the delete guard. |
 | Local validation | PASS / SCOPE NOTED | Final candidate: `npm.cmd run type-check`; isolated Chromium regression (1/1); `git diff --check`. `npm.cmd run build` passed; product/runtime source is unchanged by this E2E-only patch. Scoped ESLint passed before the final test-resource-cleanup-only edit (0 errors, 2 raw-fetch warnings). Build emitted existing third-party CSS-comment/property warnings. |
