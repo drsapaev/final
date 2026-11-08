@@ -1,8 +1,8 @@
 # План исправления и упрощения административной настройки очередей
 
-**Версия:** 4.19 — T00–T17 MERGED; T18.10/RQ-18 PASS; T18 final acceptance IN_PROGRESS; Tier-2 PARTIAL; PR #3937 was last read at HEAD 2c285e44 with applicable CI PASS. New source trace shows the hosted artifact is incompatible with arbitrary project origins and canonical Compose; this journal follow-up awaits push and exact-head checks.
+**Версия:** 4.20 — T00–T17 MERGED; T18.10/RQ-18 PASS; T18 final acceptance IN_PROGRESS; Tier-2 PARTIAL. PR #3937 is OPEN/Ready at HEAD `9a97b304e6db388a62ac133388acf9c9718d2760`, based on main #3938 `8edd6a25ed6b88ba4fddcf247dae2e397848d8cc`; exact-head applicable CI and body gates PASS, reviews/threads empty, user owns merge. A memory-safe canonical artifact path and current-source T18.1–5/T18.8–9 verification remain.
 **Создан:** 30 сентября 2026. **Обновлён:** 2026-11-08, Asia/Tashkent.
-**Текущий этап:** T00–T17 MERGED. T18.10/RQ-18 passed on app SHA 16e04af35e47663481a08923d8625d94a1c9d010; 68/68 observed assets matched in that Session. PR #3937 remains open/Ready; the artifact-path journal follow-up is pushed. Read current exact-head CI/review status from GitHub; user owns merge. T18.1–5 remains NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. The hosted artifact is not usable as-is; a checksum-verified canonical artifact path is required before another local staging build. T18/Tier-2 PARTIAL.
+**Текущий этап:** T00–T17 MERGED. T18.10/RQ-18 passed on app SHA `16e04af35e47663481a08923d8625d94a1c9d010`; 68/68 observed assets matched in that Session. PR #3937 exact-head checks are green, but independent review and user merge remain. T18.1–5 is NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. The existing hosted artifact path is incompatible; implement a checksum-verified staging artifact path before another local staging build. T18/Tier-2 PARTIAL.
 **Task memory ID:** bd2f7564-bd3d-449d-8d85-5a9325722a80.
 **T11 результат:** PR #3639 merged commit 7443b0e290b9143e877d5898a5589df52592d3b3. Ограниченный T11 Tier-2 прошёл на зафиксированном кодовом HEAD; три legacy live-spec остаются DEFERRED для T18 с 0% credit; полный STAGING_VALIDATION.md не завершён.
 **Ограничения:** пользователь мержит PR самостоятельно. Production, deployment и активация v1-флага не разрешены. Текущий локальный кандидат меняет E2E и журналы приёмки; приложение/runtime не меняются. Исторические Tier-2 deferrals и partial evidence не наследуются и не превращаются в PASS. Любую следующую T18-проверку привязывать к проверенному source SHA, отмечать PASS/FAIL/NOT_RUN и удалять только ресурсы собственного synthetic project.
@@ -82,8 +82,8 @@
 | T14 | MERGED | Setup UI на backend facts; #3702, merge `99f0b5a098dccce4f1166ae52bd7d5c93d92af70` |
 | T15 | MERGED | Восстанавливаемый URL-контекст; #3711, merge `ccbf519fdb0f9a32c3a71837202dfea296f13383` |
 | T16 | MERGED | Конечная навигация и совместимые входы; PR #3718, merge `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` |
-| T17 | PR_OPEN / READY FOR REVIEW | Bulk/CSV; PR #3721 at docs HEAD `ef41f75c262488741053d74e8b96ab9059514aa8`; focused 64/64, exact-head applicable CI `39399756835`, targeted r6 Tier 2, PR body gate and post-Ready quality/lifecycle checks PASS; final status checkpoint pending. Local ignored env/harness cleanup was rejected by host policy and disclosed |
-| T18 | PLANNED | Сквозная приёмка и оставшийся safe live-spec harness |
+| T17 | MERGED | Bulk/CSV; PR #3721 merged after the user's confirmation |
+| T18 | IN_PROGRESS / PARTIAL | T18.10 and RQ-18 PASS on recorded app SHA; current-source T18.1–5 and T18.8–9, compatible legacy live-spec harness, final QA/runbook evidence remain |
 
 ### Неопределённости и условия их закрытия
 
