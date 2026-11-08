@@ -50,6 +50,9 @@ export const initialState: EmrState = {
     history: [],
     future: [],
     error: null,
+    // EMRSAVE-FE-001 (audit 3886 round 17): edit/save epoch bookkeeping
+    editEpoch: 0,
+    saveEpoch: 0,
 };
 
 /**
@@ -134,6 +137,10 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
                     [field]: value,
                 },
                 isDirty: true,
+                // EMRSAVE-FE-001: a local edit invalidates any in-flight
+                // save ACK — the ACK for the older snapshot must not clear
+                // the dirty flag for these newer edits.
+                editEpoch: state.editEpoch + 1,
                 history: pushHistory(state.history, state.data),
                 future: [],
                 error: null,
@@ -150,6 +157,8 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
                 ...state,
                 data: setNestedValue(state.data, path, value),
                 isDirty: true,
+                // EMRSAVE-FE-001: same epoch rule as SET_FIELD.
+                editEpoch: state.editEpoch + 1,
                 history: pushHistory(state.history, state.data),
                 future: [],
                 error: null,
@@ -163,6 +172,8 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
             return applyEmrTransition({
                 ...state,
                 error: null,
+                // EMRSAVE-FE-001: snapshot the edit epoch this save covers.
+                saveEpoch: state.editEpoch,
             }, 'saving');
 
         // =========================================================================
@@ -170,12 +181,20 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
         // =========================================================================
         case EMR_ACTIONS.SAVE_SUCCESS: {
             const emr: EmrRecord = action.payload.emr;
+            // EMRSAVE-FE-001 (audit 3886 round 17): the ACK may only clear
+            // the dirty flag when NO local edit happened after the save
+            // started. If the doctor kept typing while the request was in
+            // flight (editEpoch moved past saveEpoch), the newer edits stay
+            // dirty and the autosave scheduler will persist them in a
+            // follow-up save. A completed-save indicator must never mask
+            // unsaved clinical text.
+            const editsAfterSaveStart = state.editEpoch !== state.saveEpoch;
             return applyEmrTransition({
                 ...state,
                 emr,
                 version: emr.version ?? state.version,
                 rowVersion: emr.row_version ?? state.rowVersion,
-                isDirty: false,
+                isDirty: editsAfterSaveStart ? true : false,
                 lastSaved: new Date().toISOString(),
                 error: null,
                 conflict: null,
@@ -226,6 +245,17 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
         // pre-conflict version), and clears `error`.
         case EMR_ACTIONS.CONFLICT_RESOLVED: {
             const payload = action.payload;
+            // EMRCONFLICT-FE-001 (audit 3886 round 17): the resolution type
+            // decides the dirty semantics. 'discard' means the doctor chose
+            // «Загрузить новую версию (мои изменения будут потеряны)» — the
+            // freshly loaded canonical server snapshot IS the current
+            // document, so the state must be clean and must NOT schedule a
+            // new write (the old behavior marked it dirty and the autosave
+            // immediately re-wrote the just-loaded content as a new
+            // revision). 'merge' (or a re-applied local document) keeps the
+            // dirty flag because the local document genuinely differs from
+            // the server snapshot and needs an explicit save.
+            const isDiscard = payload?.resolution === 'discard';
             return applyEmrTransition({
                 ...state,
                 conflict: null,
@@ -233,7 +263,7 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
                 ...(payload?.rowVersion ? { rowVersion: payload.rowVersion } : {}),
                 history: [],
                 future: [],
-                isDirty: true,
+                isDirty: isDiscard ? false : true,
                 error: null,
             }, 'idle');
         }
@@ -255,6 +285,10 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
                 history: newHistory,
                 future: [state.data, ...state.future].slice(0, MAX_HISTORY_SIZE),
                 isDirty: true,
+                // EMRSAVE-FE-001: undo/redo are local edits too — an
+                // in-flight save ACK for the pre-undo snapshot must not
+                // clear the dirty flag.
+                editEpoch: state.editEpoch + 1,
             };
         }
 
@@ -275,6 +309,8 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
                 history: [...state.history, state.data].slice(-MAX_HISTORY_SIZE),
                 future: newFuture,
                 isDirty: true,
+                // EMRSAVE-FE-001: see UNDO.
+                editEpoch: state.editEpoch + 1,
             };
         }
 
@@ -338,9 +374,10 @@ export const emrActions = {
     conflictResolved: (
       data: Record<string, unknown> | null = null,
       rowVersion: number | null = null,
+      resolution: 'discard' | 'merge' = 'merge',
     ): EmrAction => ({
         type: EMR_ACTIONS.CONFLICT_RESOLVED,
-        payload: { data, rowVersion },
+        payload: { data, rowVersion, resolution },
     }),
 
     undo: (): EmrAction => ({ type: EMR_ACTIONS.UNDO }),
