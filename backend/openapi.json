@@ -86451,26 +86451,27 @@
             "title": "Target Version",
             "description": "Version to restore to"
           },
+          "row_version": {
+            "type": "integer",
+            "title": "Row Version",
+            "description": "Current row version (optimistic locking)"
+          },
           "reason": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 10,
             "title": "Reason",
-            "description": "Reason for restore"
+            "description": "Reason for restore (required, min 10 chars)"
           }
         },
         "type": "object",
         "required": [
-          "target_version"
+          "target_version",
+          "row_version",
+          "reason"
         ],
         "title": "EMRRestoreRequest",
-        "description": "Schema for restoring to specific version"
+        "description": "Schema for restoring to specific version.\n\nEMRRESTORE-FE-001/002 (audit 3886 round 16): restore is a guarded\nclinical-history operation - it requires an explicit reason (min 10\nchars, same policy as an amendment) and the caller's current\nrow_version so a stale view cannot silently overwrite newer edits."
       },
       "EMRRevisionOut": {
         "properties": {

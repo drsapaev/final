@@ -29269,7 +29269,12 @@ export type components = {
         };
         /**
          * EMRRestoreRequest
-         * @description Schema for restoring to specific version
+         * @description Schema for restoring to specific version.
+         *
+         *     EMRRESTORE-FE-001/002 (audit 3886 round 16): restore is a guarded
+         *     clinical-history operation - it requires an explicit reason (min 10
+         *     chars, same policy as an amendment) and the caller's current
+         *     row_version so a stale view cannot silently overwrite newer edits.
          */
         EMRRestoreRequest: {
             /**
@@ -29278,10 +29283,15 @@ export type components = {
              */
             target_version: number;
             /**
-             * Reason
-             * @description Reason for restore
+             * Row Version
+             * @description Current row version (optimistic locking)
              */
-            reason?: string | null;
+            row_version: number;
+            /**
+             * Reason
+             * @description Reason for restore (required, min 10 chars)
+             */
+            reason: string;
         };
         /**
          * EMRRevisionOut

@@ -220,6 +220,11 @@ class EMRV2Service:
             status="draft" if is_draft else "in_progress",
             created_by=user_id,
             created_at=datetime.now(UTC),
+            # EMRLOCK-FE-001 (audit 3886 round 16): the creator is also the
+            # last updater at creation time — required for the idempotent
+            # duplicate-retry detection in _update_emr to recognize a
+            # same-session retry of the initial content.
+            updated_by=user_id,
             row_version=1,
             last_client_session_id=client_session_id,
         )
@@ -300,32 +305,50 @@ class EMRV2Service:
             data,
             fallback_specialty=(emr.data or {}).get("specialty"),
         )
-        # ✅ CRITICAL: Signed EMRs cannot be modified via save - must use amend
-        if emr.status == "signed":
-            raise EMRSignedError("Cannot edit signed EMR. Use amend endpoint instead.")
+        # ✅ CRITICAL: Signed EMRs cannot be modified via save - must use amend.
+        # EMRAMEND-FE-002 (audit 3886 round 16): "amended" is a finalized
+        # state exactly like "signed" — the ordinary save/sign path must not
+        # edit an already signed-and-amended record without a new reasoned
+        # amendment. A repeat correction goes through amend() again.
+        if emr.status in ("signed", "amended"):
+            raise EMRSignedError(
+                "Cannot edit signed or amended EMR. Use amend endpoint instead."
+            )
 
         # EMR-AUDIT-28 P0-3: row_version=0 больше не обходить optimistic
         # locking. Раньше frontend отправлял row_version=0 при force=true,
         # что позволяло перезаписать чужие изменения без конфликт-чек.
         # Теперь row_version обязателен и всегда проверяется.
+        #
+        # EMRLOCK-FE-001 (audit 3886 round 16): same-user/same-session equality
+        # is NO LONGER a license to overwrite a newer committed revision with a
+        # stale one. A late older write with different content must fail closed
+        # with 409 exactly like a cross-session conflict. The only accepted
+        # same-session exception is a byte-identical duplicate retry of the
+        # current revision (idempotent no-op, no new revision, no version bump).
         if row_version is not None and emr.row_version != row_version:
-            # Smart conflict resolution: same user with same session = OK
-            if (
-                client_session_id
+            identical_duplicate_retry = (
+                client_session_id is not None
                 and emr.last_client_session_id == client_session_id
                 and emr.updated_by == user_id
-            ):
-                # Same session, same user - autosave conflict, allow
-                logger.debug(f"Same-session conflict resolved for EMR {emr.id}")
-            else:
-                # Different user or session - real conflict
-                raise ConcurrencyError(
-                    message="EMR was modified by another user",
-                    current_version=emr.row_version,
-                    your_version=row_version,
-                    last_edited_by=emr.updated_by or emr.created_by,
-                    last_edited_at=emr.updated_at or emr.created_at,
+                and normalized_data == emr.data
+            )
+            if identical_duplicate_retry:
+                logger.debug(
+                    f"Idempotent duplicate save for EMR {emr.id} "
+                    f"(same session, identical data); no-op"
                 )
+                db.rollback()
+                db.refresh(emr)
+                return emr
+            # Stale version with different content — real conflict, fail closed
+            raise ConcurrencyError(
+                message="EMR was modified by another user",
+                current_version=emr.row_version,
+                your_version=row_version,
+                last_edited_by=emr.updated_by or emr.created_by,
+                last_edited_at=emr.updated_at or emr.created_at,
+            )
 
         # Generate change summary
         change_summary = change_summary_override or self._generate_change_summary(
@@ -403,7 +426,11 @@ class EMRV2Service:
         if not emr:
             raise EMRNotFoundException(f"EMR for visit {visit_id} not found")
 
-        if emr.status == "signed":
+        # EMRAMEND-FE-002 (audit 3886 round 16): an amended record is already
+        # finalized (signed + reasoned amendment). Re-signing it as if it were
+        # an unsigned draft would forge signature provenance. Further changes
+        # must go through the reasoned amend() workflow again.
+        if emr.status in ("signed", "amended"):
             raise EMRSignedError("EMR is already signed")
 
         signed_at = datetime.now(UTC)
@@ -526,7 +553,12 @@ class EMRV2Service:
             fallback_specialty=(emr.data or {}).get("specialty"),
         )
 
-        if emr.status != "signed":
+        # EMRAMEND-FE-002 (audit 3886 round 16): amendments are allowed on both
+        # finalized states — "signed" (first amendment) and "amended" (repeat
+        # reasoned correction). Every amendment still requires a reason of at
+        # least 10 characters and the current row_version, so the correction
+        # pathway stays explicit, versioned and auditable.
+        if emr.status not in ("signed", "amended"):
             raise ValueError("Can only amend signed EMRs")
 
         if not reason or len(reason.strip()) < 10:
@@ -599,12 +631,43 @@ class EMRV2Service:
         visit_id: int,
         target_version: int,
         user_id: int,
+        row_version: int | None = None,
         reason: str | None = None,
     ) -> EMRRecord:
-        """Restore EMR to a specific version"""
+        """Restore EMR to a specific version.
+
+        EMRRESTORE-FE-001/002 (audit 3886 round 16):
+        - finalized states (signed/amended) can never be replaced via restore:
+          changing signed clinical content requires the reasoned amend flow,
+          not a silent rollback under the original signature metadata;
+        - a restore requires an explicit reason of at least 10 characters
+          (same policy as an amendment);
+        - restore honors optimistic locking: the caller must present the
+          current row_version, so a stale view cannot silently overwrite
+          concurrent edits (409 instead).
+        """
         emr = self.get_by_visit(db, visit_id)
         if not emr:
             raise EMRNotFoundException(f"EMR for visit {visit_id} not found")
+
+        if emr.status in ("signed", "amended"):
+            raise EMRSignedError(
+                "Cannot restore a signed or amended EMR. "
+                "Use the amendment workflow instead."
+            )
+
+        if not reason or len(reason.strip()) < 10:
+            raise ValueError("Restore reason must be at least 10 characters")
+
+        # EMRRESTORE-FE-002: optimistic locking — fail closed on a stale view
+        if row_version is not None and emr.row_version != row_version:
+            raise ConcurrencyError(
+                message="EMR was modified by another user",
+                current_version=emr.row_version,
+                your_version=row_version,
+                last_edited_by=emr.updated_by or emr.created_by,
+                last_edited_at=emr.updated_at or emr.created_at,
+            )
 
         # Get target revision
         target_revision = self.get_revision(db, emr.id, target_version)
@@ -617,7 +680,7 @@ class EMRV2Service:
 
         # Create restore revision
         new_version = emr.version + 1
-        restore_reason = reason or f"Restored to version {target_version}"
+        restore_reason = reason.strip()
 
         revision = EMRRevision(
             emr_id=emr.id,
