@@ -1,3 +1,13 @@
+## T18.10 PR #3925 exact-head CI after main synchronization — 2026-11-08T09:41:59+05:00
+
+- Code candidate under test: PR HEAD `6001e13dc2c7ea74ec66b990d6f14ad3958a5f2d`; base/current main `9d1b0e808563509e553f990dd0fbb893d2a7c723`. Source fix remains `404ba482a26085ee740ee10d16959b2504c9bd72`; synchronized branch includes merge commit `54873073`.
+- PR state at check: #3925 OPEN, non-draft, `CLEAN`, mergeable. PR description updated to reflect the base sync, current commit chain, scope and remaining acceptance.
+- Unified CI run `42446723687`: SUCCESS, 7 success / 14 skipped. Frontend unit, build, lint, E2E, and PR Required Gate passed. PR Review Quality Gate `42447162359` and lifecycle recommendation `42447162383` passed after description update. Regression Audit, i18n, security, Gitleaks, CodeQL, GitGuardian, Python formatting/lint reports, and Linux/Windows scratch guards passed. Backend, integration, Docker, readiness, parity, k6, DAST and unrelated jobs were skipped by path/scope; skipped results are not PASS.
+- Local post-sync checks at `54873073`: focused Vitest 25/25 PASS; scoped ESLint PASS; `git diff --check` PASS before this journal-only follow-up. Frontend build had passed on the unchanged frontend source/test commit with a 1 GiB heap cap.
+- Environment: GitHub hosted runners for CI; local isolated Windows worktree for focused checks. No application staging was started. The host check showed 1.69 GiB free RAM and Ubuntu-24.04 stopped, so WSL/Docker was not started.
+- Scope: only the three T18 journals changed after the tested code candidate; no source/test, staging, production, merge, or deployment changes. This journal-only update will advance the PR head and must pass its applicable exact-head checks before user merge.
+- Remaining: live T18.10 Admin/2FA flow, current-source RQ-18 public join, full `STAGING_VALIDATION.md`, canonical served-build provenance, final T18 evidence reconciliation, and unresolved console diagnostics remain open. Overall T18/Tier-2 remain PARTIAL.
+
 ## T18.10 PR #3925 synchronization and post-sync validation — 2026-11-08T09:22:29+05:00
 
 - Source/test commit under test: `404ba482a26085ee740ee10d16959b2504c9bd72`; synchronized PR branch commit: `54873073`.

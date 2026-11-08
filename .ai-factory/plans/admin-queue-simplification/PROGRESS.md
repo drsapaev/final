@@ -2,13 +2,13 @@
 
 Plan version: 1.0
 Current task: T18.10 selected-profile return-context repair and remaining T18 acceptance
-Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN and non-draft; branch synchronized locally with `origin/main` `9d1b0e808563509e553f990dd0fbb893d2a7c723` in merge commit `54873073`; local focused checks pass after synchronization; exact-head CI is pending for the synchronized branch; T18.10 browser acceptance and current-source RQ-18 remain NOT_RUN; overall T18/Tier-2 remain PARTIAL; user owns merge/deployment
+Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN, non-draft, CLEAN and mergeable; code candidate HEAD `6001e13dc2c7ea74ec66b990d6f14ad3958a5f2d` passed exact-head Unified CI and PR gates after sync with `origin/main` `9d1b0e808563509e553f990dd0fbb893d2a7c723`; this follow-up changes only T18 journals and requires new path-aware checks; T18.10 browser acceptance and current-source RQ-18 remain NOT_RUN; overall T18/Tier-2 remain PARTIAL; user owns merge/deployment
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`
 Branch: `codex/aqs-t18-selected-profile-context-20261108`
 Source/test commit: `404ba482a26085ee740ee10d16959b2504c9bd72`
 Previous PR HEAD: `f7c3cbde67c6952edb2416850bccfe835537862d`; GitHub reported `BEHIND` before synchronization
 Current `origin/main`: `9d1b0e808563509e553f990dd0fbb893d2a7c723`
-Last updated: 2026-11-08T09:22:29+05:00
+Last updated: 2026-11-08T09:41:59+05:00
 
 ## Current checkpoint — PR #3925 synchronized; T18 acceptance remains open
 
@@ -16,7 +16,7 @@ Last updated: 2026-11-08T09:22:29+05:00
 |------|--------|----------|
 | T00–T17 | MERGED | Existing plan journals; latest merge on this worktree is #3897 at `569d5fe5` |
 | T18 scenarios 1–9 | VALIDATED on recorded source revisions | Historical scenario evidence remains revision-scoped; reconcile against final candidate before claiming integrated completion |
-| T18.10 selected-profile source fix | VALIDATED locally, committed `404ba482` | Universal editor links now preserve URL-owned `profile=specialists`; focused test checks `setupProfile`, day, section, return marker, and absence of entity binding; verified unchanged after sync commit `54873073` |
+| T18.10 selected-profile source fix | VALIDATED locally and by exact-head checks on `6001e13d` | Universal editor links preserve URL-owned `profile=specialists`; focused test checks `setupProfile`, day, section, return marker, and absence of entity binding; no live Admin/2FA acceptance yet |
 | T18.10 synthetic Admin/2FA flow | NOT_RUN on candidate | Must verify actual `specialists` row and editor return/reload/Back/Forward plus protected DELETE 409 on the candidate commit |
 | Current-source RQ-18 | NOT_RUN | Earlier Session is tied to an older runtime; rerun only when safe staging resources are available |
 | Full staging runbook / served-build provenance | PARTIAL / NOT_RUN | `STAGING_VALIDATION.md` and canonical served-revision attestation remain outstanding |
@@ -24,11 +24,12 @@ Last updated: 2026-11-08T09:22:29+05:00
 
 ### Candidate work and local validation
 
-- PR #3925 carries source/test commit `404ba482a26085ee740ee10d16959b2504c9bd72`. After GitHub reported the previous PR HEAD `f7c3cbde67c6952edb2416850bccfe835537862d` as `BEHIND`, the clean PR worktree merged fresh `origin/main` `9d1b0e808563509e553f990dd0fbb893d2a7c723` in commit `54873073`; the merge had no conflicts. Incoming changes were limited to backend file-security code/tests and did not touch the PR's frontend source or focused test. This journal-only follow-up records the synchronization and post-sync validation.
+- PR #3925 code candidate HEAD `6001e13dc2c7ea74ec66b990d6f14ad3958a5f2d`, based on current main `9d1b0e808563509e553f990dd0fbb893d2a7c723`, is OPEN, non-draft, CLEAN and mergeable. The code/test commit is `404ba482a26085ee740ee10d16959b2504c9bd72`; main-sync commit `54873073` integrated the two incoming main commits without conflicts. They touched only backend file-security code/tests, not this PR's frontend.
 - Mandatory launcher was run from `ai/langgraph` with the confirmed root and five exact reviewed source/journal paths. It returned `Result: narrow_override`, `gate_misroute: no`, `override_used: yes`, and `Handoff required: yes`; the execution prompt was read and followed.
-- Post-sync focused Vitest: 25/25 PASS. Scoped ESLint on `AdminSetupDirections.tsx` and its focused test: PASS. `git diff --check`: PASS before this journal-only update. The earlier frontend build at source/test commit `404ba482` passed with a 1 GiB heap cap; it was not rerun after synchronization because incoming changes did not touch frontend files.
-- Before synchronization, exact-head PR checks at `f7c3cbde` included Unified CI success and a successful later PR Review Quality Gate/lifecycle rerun; those results do not validate the newly synchronized HEAD. New exact-head CI and PR gates must pass before merge.
+- Post-sync focused Vitest: 25/25 PASS. Scoped ESLint on `AdminSetupDirections.tsx` and its focused test: PASS. `git diff --check`: PASS before this journal-only update. Frontend build passed at unchanged source/test commit `404ba482` with a 1 GiB heap cap.
+- Exact-head Unified CI `42446723687` on code candidate `6001e13d`: SUCCESS (7 jobs success, 14 skipped). Frontend unit tests, build, lint, E2E and PR Required Gate passed. PR Review Quality Gate `42447162359`, lifecycle recommendation `42447162383`, Regression Audit, i18n, security, Gitleaks, CodeQL, GitGuardian and scratch guards passed. Backend, integration, Docker, staging/production readiness, parity, k6 and DAST jobs were skipped by scope and are not counted as passed. This checkpoint is a docs-only follow-up; its new head must receive its own applicable gates.
 - The gate for this journal-only checkpoint used known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` and exactly the three journal paths. Result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; the generated execution prompt was read. No source, test, gate, or router files were edited in this checkpoint.
+- At the latest host check, free RAM was 1.69 GiB and Ubuntu-24.04 WSL was stopped. No staging, Docker or WSL startup was attempted in this checkpoint. Recheck resources before the remaining Tier-2 session; do not reuse or remove another task's resources.
 - The worktree initially had no `frontend/node_modules`; 900 packages were installed from its unchanged lockfile for local validation. The validation `frontend/node_modules` and generated `frontend/dist` are ignored worktree artifacts. Cleanup was attempted only after resolving target paths inside this worktree, but the host command policy blocked recursive removal; do not bypass it.
 - No staging, Docker, WSL, backend test, production, PR merge, or deployment action was performed in this synchronization slice.
 
