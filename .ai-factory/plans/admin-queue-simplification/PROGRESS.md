@@ -2,15 +2,15 @@
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance, source reconciliation and evidence PR
-Current status: IN_PROGRESS; T00–T17 MERGED. T18.10/RQ-18 passed on app SHA 16e04af35e47663481a08923d8625d94a1c9d010; 68/68 observed assets matched and owned teardown passed. PR #3937 is OPEN/Ready at HEAD 9a97b304e6db388a62ac133388acf9c9718d2760, based on main #3938 8edd6a25ed6b88ba4fddcf247dae2e397848d8cc. Exact-head Unified CI and applicable security/body gates PASS; backend/integration/Docker/readiness checks were SKIPPED by scope. Reviews and threads are empty; user owns merge. T18.1–5 remains NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. T18/Tier-2 PARTIAL.
+Current status: IN_PROGRESS; T00–T17 MERGED. T18.10/RQ-18 passed on app SHA 16e04af35e47663481a08923d8625d94a1c9d010; 68/68 observed assets matched and owned teardown passed. PR #3937 was OPEN/Ready at code/evidence HEAD 8aa45a453909a542a55467175b4b4f2768b355e0, based on main #3938 8edd6a25ed6b88ba4fddcf247dae2e397848d8cc. On that HEAD, Unified CI, applicable security gates and the corrected PR Review Quality Gate PASS; backend/integration/Docker/readiness checks were SKIPPED by scope. Reviews and threads are empty; user owns merge. This checkpoint-only update will create a new PR HEAD whose exact-head checks must pass before merge. T18.1–5 remains NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. T18/Tier-2 PARTIAL.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`
 Branch: `codex/aqs-t18-completion-20261108`
 Base commit: fresh `origin/main` `8edd6a25ed6b88ba4fddcf247dae2e397848d8cc` (#3938)
 Application commit under test: `16e04af35e47663481a08923d8625d94a1c9d010`
 Validated E2E working-copy SHA-256: `BC14D2F70A9145A6EB8949E05091CDF2F95E691049ECF06C96C006CFA078AF54`
-Last updated: 2026-11-08T23:34:18+05:00
+Last updated: 2026-11-09T00:00:15+05:00
 
-## Current checkpoint — PR #3937 exact-head CI PASS; T18 final acceptance remains partial
+## Current checkpoint — PR #3937 code/evidence HEAD checks PASS; final acceptance remains partial
 
 | Task | Status | Evidence |
 |------|--------|----------|
@@ -19,7 +19,7 @@ Last updated: 2026-11-08T23:34:18+05:00
 | T18.10 specialists navigation | PASS on app source `16e04af3` | Normal Admin password + TOTP; four legacy entry paths; selected profile/day; typed editor return; tab switch; reload; Back/Forward; real linked profile DELETE returns `409`, row retained |
 | Current-source RQ-18 lifecycle | PASS on app source `16e04af3` | Hidden profile, explicit publish, permanent QR, anonymous resource-owned booking, deactivation/archive/reactivation; Playwright 1 passed |
 | T18.1–T18.5 current-source browser attempt | INTERRUPTED / NOT_RUN | Preflight PASS (WSL 3,231 MiB); host free RAM fell 1.76→0.13 GiB during image build, so the Session was interrupted before a verifiable Playwright report. Canonical cleanup removed all 5 containers, 3 volumes, 1 network and 3 images; post-audit zero resources/listeners. |
-| PR #3937 | OPEN / Ready / mergeable | HEAD `9a97b304`; base #3938 `8edd6a25`; Unified CI `42508743504`, PR Review Quality Gate `42508823261`, Lifecycle `42508823089`, Security `42508743406`, Gitleaks `42508743500`, and Agent Workflow Guards `42508743441` PASS. Backend/integration/Docker and path-aware readiness checks were SKIPPED, not passed. Reviews=[]; threads=[]. User owns merge. |
+| PR #3937 | OPEN / Ready / mergeable | Code/evidence HEAD `8aa45a45`; base #3938 `8edd6a25`; Unified CI `42510937244`, PR Required Gate, Security `42510937197`, Gitleaks `42510937148`, Agent Workflow Guards `42510937154`, Lifecycle `42512483552`, and corrected PR Review Quality Gate `42512483623` PASS. Backend/integration/Docker/readiness checks were SKIPPED, not passed. Reviews=[]; threads=[]. A new checkpoint-only commit is being added; its exact-head checks will be required. User owns merge. |
 | Observed frontend provenance | PASS, scoped to this synthetic Session | 67 browser-observed JS/CSS paths plus `/sw.js`; 68/68 byte hashes matched the owned frontend container; service worker contains full tested SHA. Generic `served_revision_verified` remains `false` |
 | Owned staging cleanup | PASS with one local env pending | Prior projects and interrupted `clinic-aqs-t18-final4-20261108` were audited at zero containers/images/volumes/networks/listeners. The exact env file `staging-final4.env` remains because local deletion policy rejected its removal; request manual removal. |
 | Frontend local checks | PASS with warning | Scoped ESLint: 0 errors, 1 raw-fetch warning; type-check, build, Playwright collection (1 test), `git diff --check` passed |
@@ -38,7 +38,7 @@ The app commit `16e04af3` was tested before main #3938; the intervening #3938 ch
 
 ### Remaining before T18 can close
 
-1. Obtain an independent review of #3937; exact-head checks are green and there are no inline threads. The user performs the merge.
+1. Complete exact-head checks for the checkpoint-only commit; obtain an independent review of #3937. User performs the merge.
 2. After that PR cycle, open a staging-only PR for a memory-safe canonical frontend artifact path: exact-source SHA and checksum, configurable owned-project API/WS origin, and Compose consumption without compiling inside WSL. Do not reuse the incompatible hosted artifact path as-is.
 3. After that PR is merged, retry current-source T18.1–5 profile/setup/Department UI flows and T18.8–9 browser join/replay paths. Carry forward T18.6/7 and unchanged backend portions only where source owners still match. The latest T18.1–5 attempt had no verifiable test result.
 4. Finish affected keyboard/focus, forms/errors/empty/retry, languages, viewports 375/768/1280/1920 and latency waterfalls. Resolve or explicitly classify two of 11 historical console events that were not reproduced and eight unmapped minified-bundle call sites.
