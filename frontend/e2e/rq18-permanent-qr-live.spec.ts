@@ -499,8 +499,13 @@ async function waitForPublicForm(page: Page) {
   await expect(page.locator('#queue-phone')).toBeVisible();
 }
 
-async function setSyntheticProfileArchived(page: Page, archived: boolean) {
+async function setSyntheticProfileArchived(
+  page: Page,
+  archived: boolean,
+  flushAssetPage: (page: Page) => Promise<void>,
+) {
   markRq18Phase('profile-lifecycle-navigation');
+  await flushAssetPage(page);
   await page.goto('/admin/services?servicesTab=queue-profiles');
   const row = page.locator('tr').filter({ hasText: profileTitle });
   await expect(row).toHaveCount(1, { timeout: 30_000 });
@@ -659,6 +664,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   markRq18Phase('admin-login');
   await loginAdminWithRequiredTwoFactor(page);
   markRq18Phase('admin-setup-page');
+  await servedAssets.flushPage(page);
   await page.goto('/admin/setup-directions');
   await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
   const appOrigin = new URL(page.url()).origin;
@@ -737,6 +743,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
     throw new Error('Admin QR block and permanent-address response did not identify the same route.');
   }
 
+  await servedAssets.flushPage(page);
   await page.reload();
   const restoredBlock = await openPermanentQrBlock(page);
   const showButton = restoredBlock.getByTestId('setup-qr-show-' + queueTag);
@@ -816,6 +823,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   }
 
   markRq18Phase('deactivate-resource-preserving-current-queue');
+  await servedAssets.flushPage(page);
   await page.goto('/admin/setup-directions?section=resources');
   await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
   await page.getByTestId('setup-view-resources').click();
@@ -858,7 +866,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   }
   markRq18Phase('inactive-resource-clinic-day-booking-closed');
 
-  await setSyntheticProfileArchived(page, true);
+  await setSyntheticProfileArchived(page, true, servedAssets.flushPage);
   markRq18Phase('archive-published-profile');
   facts = await readAdminDirections(page, profileKey);
   direction = directionByKey(facts, profileKey);
@@ -883,6 +891,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   }
 
   markRq18Phase('reactivate-resource');
+  await servedAssets.flushPage(page);
   await page.goto('/admin/setup-directions?section=resources');
   await page.getByTestId('setup-view-resources').click();
   resourceRow = page.locator('[data-testid^="qr-resource-row-"]').filter({ hasText: resourceName });
@@ -890,7 +899,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
   await resourceRow.locator('[data-testid^="qr-resource-toggle-"]').click();
   await expect(resourceRow.getByTestId('qr-resource-badge-active')).toBeVisible({ timeout: 20_000 });
 
-  await setSyntheticProfileArchived(page, false);
+  await setSyntheticProfileArchived(page, false, servedAssets.flushPage);
   markRq18Phase('restore-published-profile');
   facts = await readAdminDirections(page, profileKey);
   direction = directionByKey(facts, profileKey);
