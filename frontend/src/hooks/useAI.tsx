@@ -25,9 +25,15 @@ import logger from '../utils/logger';
 // without `@ts-nocheck`. This mirrors the W3C SpeechRecognition surface
 // used by Chromium-based browsers (`webkitSpeechRecognition`).
 // NOTE: These are DOM API polyfills, NOT domain types — they stay here.
-interface SpeechRecognitionResult {
+interface SpeechRecognitionAlternative {
   transcript: string;
   confidence: number;
+}
+
+interface SpeechRecognitionResult {
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
 }
 
 interface SpeechRecognitionResultList {
@@ -265,7 +271,7 @@ export const useAIAssistant = (options: UseAIAssistantOptions = {}): UseAIAssist
     recognition.lang = 'ru-RU';
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[0]?.transcript ?? '';
+      const transcript = event.results[0]?.[0]?.transcript ?? '';
       void sendMessage(transcript);
     };
 

@@ -51,6 +51,22 @@ class DermaApiService:
                 "Данная услуга не разрешает изменение цены врачом",
             )
 
+        # DERMAPRICE-BE-001 (audit #3892, group 15): the requested service
+        # must be ATTACHED to the selected visit (VisitService is the real
+        # visit↔service association). Without this check a request for an
+        # unattached catalogue service entered the pending-review workflow
+        # and the shared approval then marked it approved while silently
+        # skipping the price update — a false-positive financial workflow.
+        visit_service = self.repository.get_visit_service(
+            visit_id=override_data.visit_id,
+            service_id=override_data.service_id,
+        )
+        if visit_service is None:
+            raise DermaApiDomainError(
+                409,
+                "Услуга не привязана к выбранному визиту",
+            )
+
         doctor = self.repository.get_doctor_by_user_id(user_id)
         if not doctor:
             raise DermaApiDomainError(404, "Врач не найден")
@@ -71,6 +87,10 @@ class DermaApiService:
             new_price=override_data.new_price,
             reason=override_data.reason,
             details=override_data.details,
+            # DERMAPRICE-BE-002: capture the visit's ACTUAL price for the
+            # truthful before-reference; original_price keeps its immutable
+            # catalogue-reference semantics.
+            visit_price_before=visit_service.price,
         )
 
     def get_price_overrides(
@@ -80,9 +100,22 @@ class DermaApiService:
         visit_id: int | None,
         status: str | None,
         limit: int,
+        is_admin: bool = False,
     ):
         doctor = self.repository.get_doctor_by_user_id(user_id)
         if not doctor:
+            if is_admin:
+                # DERMAPRICE-BE-004 (audit #3892, group 15): DERMA_ROLES
+                # includes Admin for the LIST route — an administrator
+                # without a linked Doctor row gets the authorized aggregated
+                # view instead of a domain 404 from doctor resolution.
+                # CREATE stays dermatologist-profile-gated by design.
+                return self.repository.list_price_overrides(
+                    doctor_id=None,
+                    visit_id=visit_id,
+                    status=status,
+                    limit=limit,
+                )
             raise DermaApiDomainError(404, "Врач не найден")
 
         return self.repository.list_price_overrides(
