@@ -79,6 +79,10 @@ export interface EchoFormProps {
   [key: string]: unknown;
 }
 
+/** UI_AUDIT_PLAN Phase 0 ratchet: shared style constant instead of
+ * another inline `style={{…}}` literal. */
+const ALERT_MARGIN_STYLE: React.CSSProperties = { marginBottom: 16 };
+
 const DEFAULT_ECHO_DATA = {
   // Левый желудочек
   leftVentricle: {
@@ -452,7 +456,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
 
         {/* ECHO-FE-001: hydration/no-change status is informational. */}
         {info && !success && !error &&
-        <Alert severity="info" style={{ marginBottom: 16 }}>
+        <Alert severity="info" style={ALERT_MARGIN_STYLE}>
             {info}
           </Alert>
         }

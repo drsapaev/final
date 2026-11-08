@@ -83,6 +83,59 @@ function toNumberOrNull(raw: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/** Style factories (UI_AUDIT_PLAN Phase 0 ratchet: no inline `style={{…}}`
+ * literals and no raw `var(--mac-*)` without fallback in JSX — theme
+ * values flow through the useTheme getters). */
+interface ThemeGetters {
+  getColor: (key: string, shade?: number) => string;
+  getFontSize: (key: string) => string;
+  getSpacing: (key: string) => string;
+}
+
+const sectionHeaderStyle = (g: ThemeGetters): React.CSSProperties => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: g.getSpacing('sm'),
+  margin: 0,
+  fontSize: g.getFontSize('lg'),
+  fontWeight: '500',
+  color: g.getColor('text'),
+});
+
+const hintStyle = (g: ThemeGetters): React.CSSProperties => ({
+  margin: `0 0 ${g.getSpacing('lg')}`,
+  fontSize: g.getFontSize('sm'),
+  color: g.getColor('textSecondary'),
+});
+
+const columnFormStyle = (g: ThemeGetters): React.CSSProperties => ({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: g.getSpacing('lg'),
+});
+
+const gridGapStyle = (g: ThemeGetters): React.CSSProperties => ({ gap: g.getSpacing('lg') });
+
+const alertStyle = (g: ThemeGetters): React.CSSProperties => ({
+  fontSize: g.getFontSize('xs'),
+  color: g.getColor('danger'),
+  fontWeight: '500',
+});
+
+const textareaStyle = (g: ThemeGetters, base: React.CSSProperties): React.CSSProperties => ({
+  ...base,
+  minHeight: 80,
+  padding: g.getSpacing('sm'),
+});
+
+const iconStyle = (color: string): React.CSSProperties => ({ color });
+
+const actionsRowStyle = (g: ThemeGetters): React.CSSProperties => ({
+  display: 'flex',
+  gap: g.getSpacing('sm'),
+  justifyContent: 'flex-end',
+});
+
 export function ManualEcgForm({
   patientId,
   visitId,
@@ -192,9 +245,9 @@ export function ManualEcgForm({
   };
 
   const inputStyle = (invalid: boolean): React.CSSProperties => ({
-    border: `1px solid ${invalid ? 'var(--mac-error)' : getColor('border')}`,
-    backgroundColor: invalid ? 'var(--mac-error-bg)' : getColor('surface'),
-    color: invalid ? 'var(--mac-error)' : getColor('text'),
+    border: `1px solid ${invalid ? getColor('danger') : getColor('border')}`,
+    backgroundColor: invalid ? getColor('surfaceSecondary') : getColor('surface'),
+    color: invalid ? getColor('danger') : getColor('text'),
   });
 
   const renderNumericField = (field: keyof EcgManualFormState, label: string, placeholder: string) => {
@@ -219,11 +272,13 @@ export function ManualEcgForm({
     );
   };
 
+  const themeGetters = { getColor, getFontSize, getSpacing };
+
   return (
     <Card className="cardio-card-padded">
-      <div className="cardio-flex-between" style={{ marginBottom: getSpacing('lg') }}>
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm'), margin: 0, fontSize: getFontSize('lg'), fontWeight: '500', color: getColor('text') }}>
-          <HeartPulse size={20} style={{ color: getColor('secondary', 600) }} />
+      <div className="cardio-flex-between" style={gridGapStyle(themeGetters)}>
+        <h3 style={sectionHeaderStyle(themeGetters)}>
+          <HeartPulse size={20} style={iconStyle(getColor('secondary', 600))} />
           {t('cardio.cardio_panel_add_ecg_title')}
         </h3>
         <Button variant="outline" size="small" onClick={onCancel}>
@@ -231,12 +286,12 @@ export function ManualEcgForm({
         </Button>
       </div>
 
-      <p style={{ margin: `0 0 ${getSpacing('lg')}`, fontSize: getFontSize('sm'), color: getColor('textSecondary') }}>
+      <p style={hintStyle(themeGetters)}>
         {t('cardio.cardio_manual_ecg_hint')}
       </p>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }} noValidate>
-        <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
+      <form onSubmit={handleSubmit} style={columnFormStyle(themeGetters)} noValidate>
+        <div className="grid grid-cols-1 md:grid-cols-3" style={gridGapStyle(themeGetters)}>
           <div>
             <label className="cardio-form-label" htmlFor="manual-ecg-date">{t('cardio.cardio_manual_ecg_date_label')}</label>
             <input
@@ -256,7 +311,7 @@ export function ManualEcgForm({
           {renderNumericField('qt_interval', t('cardio.cardio_ecg_qt_interval'), t('cardio.cardio_manual_ecg_ms_ph'))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: getSpacing('lg') }}>
+        <div className="grid grid-cols-1 md:grid-cols-2" style={gridGapStyle(themeGetters)}>
           <div>
             <label className="cardio-form-label" htmlFor="manual-ecg-rhythm">{t('cardio.cardio_manual_ecg_rhythm_label')}</label>
             <input
@@ -293,19 +348,19 @@ export function ManualEcgForm({
             value={form.interpretation}
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setField('interpretation', e.target.value)}
             className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
-            style={{ ...inputStyle(false), minHeight: 80, padding: getSpacing('sm') }}
+            style={textareaStyle(themeGetters, inputStyle(false))}
             placeholder={t('cardio.cardio_manual_ecg_interpretation_ph')}
             rows={4}
           />
         </div>
 
         {(validationMessage || fieldWarning) && (
-          <div role="alert" style={{ fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: '500' }}>
+          <div role="alert" style={alertStyle(themeGetters)}>
             {validationMessage || fieldWarning}
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: getSpacing('sm'), justifyContent: 'flex-end' }}>
+        <div style={actionsRowStyle(themeGetters)}>
           <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
             {t('cardio.cardio_panel_close')}
           </Button>
