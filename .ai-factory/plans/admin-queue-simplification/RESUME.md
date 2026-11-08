@@ -1,4 +1,16 @@
-# Current resume — code CI passed; T18 staging remains — 2026-11-08T11:02:02+05:00
+# Current resume — synced to main #3929; exact-head checks pending — 2026-11-08T11:28:50+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`, branch `codex/aqs-t18-selected-profile-context-20261108`. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.
+
+PR #3925's previously pushed head `bd202edd4311e95c6e4409ad89e9b27afffeb9b2` passed its applicable configured CI but was behind `main`. Current `origin/main` is #3929 at `52deec0716f2edb4ba3fee79cd2e6de39d31cec7`; it is merged without conflicts in local candidate `cf2e397205862ce475f79d5db4741f3deae90fa7`. Incoming main changes are EMR-only and do not overlap this PR's setup source/test or T18 journals. Local focused Vitest on `adminSetupDirections.textPin.test.tsx` passed 25/25; scoped ESLint and pre-journal `git diff --check` passed. The current merge candidate has not been pushed, so its hosted checks remain pending.
+
+The three-journal checkpoint records the merge, CI on `bd202edd`, and this turn's canonical journal gate result. Allowed files remain only `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`; no runtime, API, DB, auth/RBAC, staging, production, merge or deployment changes. No WSL/Docker/staging started. Last known free RAM was 1.83 GiB; run canonical Preflight before the final authorized staging session.
+
+Remaining after the current PR cycle: push the journal/main-sync checkpoint; update #3925's description and verify exact-head checks and review; user merges. Then, in one isolated synthetic session, finish T18.10 Admin/2FA, current-source RQ-18, changed profile/QR behaviors, remaining `STAGING_VALIDATION.md` checks, viewport/keyboard/language/latency checks, console diagnosis, exact served-asset provenance and teardown. Reconcile old T18.1–T18.9 evidence to final source. Do not mark the plan complete while required checks remain NOT_RUN.
+
+---
+
+## Previous resume — code CI passed; T18 staging remains — 2026-11-08T11:02:02+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`, branch `codex/aqs-t18-selected-profile-context-20261108`. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.
 
