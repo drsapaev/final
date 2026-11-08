@@ -1,16 +1,42 @@
 # Progress — T18 final acceptance
 
+## PR #3937 review fixes — pre-edit checkpoint — 2026-11-09T00:56:06+05:00
+
+- Task: continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`; address the two P2 findings on PR #3937 HEAD `377b0f5451175135a83d908a62b5e76cfbbdefbd`.
+- Execution mode: `gate_known_root_cause`. Canonical launcher was run from `ai/langgraph` with root `frontend/e2e/rq18-permanent-qr-live.spec.ts` and the exact allowed scope below. Gate result: `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. The user-provided human review explicitly requires fixing both findings before merge and supplies the narrow outcome basis.
+- Root cause / risk: the E2E provenance helper hashes a second HTTP fetch instead of browser response bytes; its service-binding guard relies on submitted payload and aggregate existing links rather than the exact newly persisted Service. Test-only acceptance integrity risk; no product runtime behavior changes.
+- Canonical anchors: current RQ-18 test, `ServiceOut` / `GET /api/v1/services/{service_id}`, `queue_profile_link_counts` and QueueProfile impact preview; this file's T18 evidence and the PR #3937 review findings `4507545518` and `4507545521`.
+- Reference-only: backend service/profile API source, service and QueueProfile schemas, Playwright configuration, the reviewed PR diff and the existing synthetic staging runner.
+- First-touch and allowed tracked paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts`, `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. Scratch is limited to this worktree's existing ignored `.scratch/` and `.gate_artifacts/`; no new credentials or patient data.
+- Denied: application/runtime, backend, API contracts, schema/migrations, queue/auth/RBAC semantics, staging/deployment configuration, production, foreign Compose projects, gate/router changes, merge and unrelated worktrees.
+- Validation target: frontend build (gate target), focused RQ-18 Playwright regression(s) in a safe local/synthetic context, scoped lint/type check, and `git diff --check`; report full synthetic staging as NOT_RUN unless a complete authorized Session is actually executed.
+- First stop condition: any need to change runtime/API/auth/queue semantics, an unclear persisted service contract, inability to safely isolate the browser regression, a failed required gate, or any need to use production/foreign staging.
+
 Plan version: 1.0
 Current task: T18 final synthetic acceptance, source reconciliation and evidence PR
-Current status: IN_PROGRESS; T00–T17 MERGED. T18.10/RQ-18 passed on app SHA 16e04af35e47663481a08923d8625d94a1c9d010; 68/68 observed assets matched and owned teardown passed. PR #3937 was OPEN/Ready at code/evidence HEAD 8aa45a453909a542a55467175b4b4f2768b355e0, based on main #3938 8edd6a25ed6b88ba4fddcf247dae2e397848d8cc. On that HEAD, Unified CI, applicable security gates and the corrected PR Review Quality Gate PASS; backend/integration/Docker/readiness checks were SKIPPED by scope. Reviews and threads are empty; user owns merge. This checkpoint-only update will create a new PR HEAD whose exact-head checks must pass before merge. T18.1–5 remains NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. T18/Tier-2 PARTIAL.
+Current status: IN_PROGRESS; T00–T17 MERGED. PR #3937 is being updated for two P2 review findings on HEAD 377b0f5451175135a83d908a62b5e76cfbbdefbd. Both fixes are implemented in the local RQ-18 E2E working tree; exact new-head CI, push/review, and full live RQ-18 staging rerun remain pending. Final candidate type-check and isolated browser-byte regression passed; frontend build passed for unchanged product code. Scoped ESLint passed before a final test-resource-cleanup-only edit (0 errors, 2 direct-fetch warnings). T18.1–5 remains NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. T18/Tier-2 PARTIAL. User owns merge.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`
 Branch: `codex/aqs-t18-completion-20261108`
 Base commit: fresh `origin/main` `8edd6a25ed6b88ba4fddcf247dae2e397848d8cc` (#3938)
 Application commit under test: `16e04af35e47663481a08923d8625d94a1c9d010`
 Validated E2E working-copy SHA-256: `BC14D2F70A9145A6EB8949E05091CDF2F95E691049ECF06C96C006CFA078AF54`
-Last updated: 2026-11-09T00:00:15+05:00
+Last updated: 2026-11-09T01:10:44+05:00
 
-## Current checkpoint — PR #3937 code/evidence HEAD checks PASS; final acceptance remains partial
+## Current checkpoint — PR #3937 review fixes in working tree — 2026-11-09T01:10:44+05:00
+
+| Task | Status | Evidence |
+|------|--------|----------|
+| T00–T17 | MERGED | Current base remains `origin/main` #3938 at `8edd6a25` |
+| PR #3937 review finding 4507545518 | FIXED LOCALLY | Recorder hashes `Response.body()` from the browser's response event; 304/errors/body-read failures and conflicting bodies fail closed. An isolated regression deliberately returns different bytes to the browser and independent HTTP client and verifies the reported SHA matches the browser response. |
+| PR #3937 review finding 4507545521 | FIXED LOCALLY | The test reads back the exact Service ID through Admin `GET /api/v1/services/{id}`, checks its persisted queue tag and confirms the target profile's service-link count increased by exactly one over its pre-create count before checking the delete guard. |
+| Local validation | PASS / SCOPE NOTED | Final candidate: `npm.cmd run type-check`; isolated Chromium regression (1/1); `git diff --check`. `npm.cmd run build` passed; product/runtime source is unchanged by this E2E-only patch. Scoped ESLint passed before the final test-resource-cleanup-only edit (0 errors, 2 raw-fetch warnings). Build emitted existing third-party CSS-comment/property warnings. |
+| Full RQ-18/Admin staging flow on corrected test | NOT_RUN | No staging build/session was started. The current harness still builds inside WSL and has previously exhausted host RAM; use the planned memory-safe artifact path before a full synthetic rerun. |
+| PR #3937 | OPEN / review remediation in progress | Source base HEAD `377b0f545117`; two P2s are fixed locally but not yet pushed. User owns merge. |
+| T18 / Tier-2 | PARTIAL | No full T18 completion is claimed. |
+
+Pre-edit mode was `gate_known_root_cause`; canonical gate result was `narrow_override`, with `gate_misroute=true`, `override_used=true`, and `handoff_required=true`. The known root was `frontend/e2e/rq18-permanent-qr-live.spec.ts`; user-provided review #5819382573 explicitly requires these two narrow test corrections before merge. Tracked scope is this E2E file plus the three T18 journals. No application/runtime, backend, API, schema, staging configuration, production, or foreign worktree changes are allowed.
+
+## Previous checkpoint — PR #3937 code/evidence HEAD checks PASS; final acceptance remains partial
 
 | Task | Status | Evidence |
 |------|--------|----------|

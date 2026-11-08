@@ -6483,3 +6483,23 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Validation on this evidence entry: `git diff --check` and manual review of exact scope before commit; commit hooks and exact-head GitHub checks must pass for the resulting checkpoint commit. No local product tests were run because no product/test source changed.
 - Stop conditions: do not proceed to another PR cycle until #3937 is green and merged; do not start staging while the task-owned synthetic env file remains; do not classify skipped/NOT_RUN items as PASS.
 - Next: check exact-head CI/body gates for this checkpoint-only commit; obtain independent review and let the user merge #3937. Then begin the separate staging-artifact PR from refreshed `origin/main`.
+## PR #3937 review P2 corrections — 2026-11-09T01:10:44+05:00
+
+- Commit under test: base `377b0f5451175135a83d908a62b5e76cfbbdefbd`; fixes currently in the worktree and not yet committed.
+- Environment: Windows worktree `aqs-t18-report-fix`; no WSL, Docker, Compose or production services started for this slice.
+- Execution mode: `gate_known_root_cause`; canonical gate result `narrow_override`, `gate_misroute=true`, `override_used=true`, `handoff_required=true`. The generated execution prompt was read. Basis: human review #5819382573 explicitly requested correction of these two test findings before merge.
+- Allowed paths: `frontend/e2e/rq18-permanent-qr-live.spec.ts` and T18 journals `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`. Denied paths: application/runtime, backend/API, schema/migrations, staging config, production, foreign worktrees and merge.
+- Actual changed paths so far: `frontend/e2e/rq18-permanent-qr-live.spec.ts`, `PROGRESS.md`, `RESUME.md`; this evidence entry is part of the same record.
+- Original findings: the provenance helper hashed a second HTTP request rather than the response body delivered to the browser; the specialists delete-guard scenario could pass because unrelated pre-existing profile links already made DELETE return 409.
+- Corrections: capture and SHA-256 hash `Response.body()` from same-origin browser response events; reject non-200/body-unavailable/conflicting bodies; no independent asset refetch. The test now rereads the created Service by its returned ID, verifies persisted `queue_tag`, and checks the target profile's `services` link count increased by exactly one relative to a pre-create snapshot before asserting the delete guard.
+- Validation commands/results:
+  - `npm.cmd run type-check` — PASS.
+  - `npm.cmd run build` — PASS; existing third-party Rollup/CSS warnings were emitted. The runtime/application source is unchanged by this patch.
+  - `npm.cmd exec -- eslint e2e/rq18-permanent-qr-live.spec.ts` — PASS, 0 errors and 2 warnings for direct-fetch usage; this run preceded a final test-only resource-cleanup adjustment. No final ESLint rerun was done because free host RAM was 1.18 GiB after type-checking; final candidate type-check and targeted Playwright regression did run.
+  - `node node_modules/@playwright/test/cli.js test e2e/rq18-permanent-qr-live.spec.ts --config=playwright.cardio-fix.config.js --project=chromium --grep "provenance hashes the response body delivered to the browser"` — PASS, 1/1. A local ephemeral server deliberately returns different bodies to the browser route and independent API request; recorder output matches the browser body SHA, not the independent response.
+  - `git diff --check` — PASS before the final E2E cleanup adjustment; rerun before commit.
+- Result: both P2 findings are corrected in source; the isolated browser-byte regression is executed and passes. The full RQ-18 Admin/2FA/database live flow using the revised persisted-Service checks is **NOT_RUN**; the prior RQ-18 PASS applies to the earlier test revision only.
+- Scope check: no app/runtime/API/schema/staging/production change. No secrets, patient data, or persistent test artifacts were created. The regression server and browser context were closed in `finally`.
+- Remaining limitation: do not treat this isolated test or the prior staging run as full Tier-2 for the corrected test. A safe full live rerun awaits the planned memory-safe staging artifact path; prior WSL image builds reduced host free memory below safe levels.
+- PR: #3937; unresolved review comments `4507545518` and `4507545521` await updated HEAD and reviewer disposition. User owns merge.
+- Merge commit: pending user action.

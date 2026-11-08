@@ -8,7 +8,17 @@
  * patient input, screenshot, trace, video, or raw response is persisted.
  */
 import crypto from 'node:crypto';
-import { expect, request, test, type APIRequestContext, type Browser, type Page, type Response } from '@playwright/test';
+import { createServer } from 'node:http';
+import {
+  expect,
+  request,
+  test,
+  type APIRequestContext,
+  type Browser,
+  type BrowserContext,
+  type Page,
+  type Response,
+} from '@playwright/test';
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 
@@ -244,6 +254,53 @@ function serviceQueueTagOptions(profiles: QueueProfileRow[]) {
   return options;
 }
 
+type QueueProfileLinkCounts = Record<string, number>;
+
+async function readQueueProfileLinkCounts(page: Page, targetProfileKey: string) {
+  const result = await page.evaluate(async (key) => {
+    const token = sessionStorage.getItem('auth_token');
+    const response = await fetch(`/api/v1/queues/profiles/${encodeURIComponent(key)}/impact-preview`, {
+      cache: 'no-store',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const body = await response.json().catch(() => null) as {
+      profile?: { key?: string };
+      links?: QueueProfileLinkCounts;
+    } | null;
+    return { status: response.status, profileKey: body?.profile?.key, links: body?.links || null };
+  }, targetProfileKey);
+  if (result.status !== 200 || result.profileKey !== targetProfileKey || !result.links) {
+    throw new Error('QueueProfile impact preview could not confirm persisted service links.');
+  }
+  return result.links;
+}
+
+async function readPersistedDoctorlessService(page: Page, serviceId: number) {
+  const result = await page.evaluate(async (id) => {
+    const token = sessionStorage.getItem('auth_token');
+    const response = await fetch(`/api/v1/services/${id}`, {
+      cache: 'no-store',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const service = await response.json().catch(() => null) as {
+      id?: number;
+      queue_tag?: string | null;
+      doctor_id?: number | null;
+      requires_doctor?: boolean | null;
+    } | null;
+    return { status: response.status, service };
+  }, serviceId);
+  const service = result.service;
+  if (result.status !== 200
+      || service?.id !== serviceId
+      || service.queue_tag == null
+      || service.doctor_id != null
+      || service.requires_doctor !== false) {
+    throw new Error('The created doctorless Service could not be reread with its persisted queue binding.');
+  }
+  return service;
+}
+
 async function createHiddenQueueProfile(page: Page) {
   markRq18Phase('queue-profile-setup-navigation');
   await page.goto('/admin/setup-directions');
@@ -304,7 +361,13 @@ async function createDoctorlessService(
     queueTag,
     serviceName,
   },
-) {
+): Promise<{ serviceId: number; initialServiceLinks: number }> {
+  const initialLinks = await readQueueProfileLinkCounts(page, target.profileKey);
+  const initialServiceLinks = initialLinks.services;
+  if (!Number.isInteger(initialServiceLinks) || initialServiceLinks < 0) {
+    throw new Error('QueueProfile impact preview returned an invalid initial service-link count.');
+  }
+
   await page.getByRole('button', { name: /Добавить услугу|Add service|Xizmat qoʻshish/i }).first().click();
   const editor = page.getByRole('heading', { name: /Добавление услуги|Add service|Xizmat qoʻshish/i }).locator('..');
   const form = editor.locator('form').last();
@@ -350,7 +413,21 @@ async function createDoctorlessService(
   if (!body || body.queue_tag !== target.queueTag || body.doctor_id != null || body.requires_doctor !== false) {
     throw new Error('Synthetic Service did not preserve the expected doctorless queue mapping.');
   }
+  const created = await createResponse.json() as { id?: number };
+  if (!Number.isInteger(created.id) || (created.id ?? 0) <= 0) {
+    throw new Error('Synthetic Service creation response did not expose its persisted ID.');
+  }
+  const serviceId = created.id as number;
+  const persistedService = await readPersistedDoctorlessService(page, serviceId);
+  if (persistedService.queue_tag !== target.queueTag) {
+    throw new Error('The created Service was not persisted with the selected QueueProfile tag.');
+  }
+  const updatedLinks = await readQueueProfileLinkCounts(page, target.profileKey);
+  if (updatedLinks.services !== initialServiceLinks + 1) {
+    throw new Error('The exact new Service did not add one persisted link to its target QueueProfile.');
+  }
   await expect(page.getByText(target.serviceName, { exact: true })).toBeVisible();
+  return { serviceId, initialServiceLinks };
 }
 
 function clinicTodayTashkent(): string {
@@ -374,7 +451,7 @@ async function verifyT18SpecialistsNavigation(page: Page) {
   }
 
   const specialistsService = `SYNTHETIC-RQ18 profile guard ${suffixKey}`;
-  await createDoctorlessService(page, profiles, {
+  const createdSpecialistsService = await createDoctorlessService(page, profiles, {
     profileKey: key,
     queueTag: 'cardiology',
     serviceName: specialistsService,
@@ -446,25 +523,13 @@ async function verifyT18SpecialistsNavigation(page: Page) {
   markRq18Phase('t18-specialists-delete-guard-preview');
   await page.goto('/admin/services?servicesTab=queue-profiles');
   await expect(specialistsRow).toHaveCount(1);
-  const impact = await page.evaluate(async (profileKey) => {
-    const token = sessionStorage.getItem('auth_token');
-    const response = await fetch(`/api/v1/queues/profiles/${encodeURIComponent(profileKey)}/impact-preview`, {
-      cache: 'no-store',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    const body = await response.json().catch(() => null) as {
-      profile?: { key?: string };
-      links?: Record<string, unknown>;
-      can_hard_delete?: boolean;
-    } | null;
-    const linkCount = Object.values(body?.links || {}).reduce(
-      (total: number, value) => total + (typeof value === 'number' ? value : 0),
-      0,
-    );
-    return { status: response.status, profileKey: body?.profile?.key, canHardDelete: body?.can_hard_delete, linkCount };
-  }, key);
-  if (impact.status !== 200 || impact.profileKey !== key || impact.canHardDelete !== false || impact.linkCount < 1) {
-    throw new Error('The specialists profile lacks the confirmed synthetic link needed for a safe 409 delete-guard check.');
+  const persistedService = await readPersistedDoctorlessService(page, createdSpecialistsService.serviceId);
+  const impactLinks = await readQueueProfileLinkCounts(page, key);
+  const linkCount = Object.values(impactLinks).reduce((total, value) => total + value, 0);
+  if (persistedService.queue_tag !== 'cardiology'
+      || impactLinks.services !== createdSpecialistsService.initialServiceLinks + 1
+      || linkCount < 1) {
+    throw new Error('The specialists delete-guard check lacks a verified persisted Service binding created by this run.');
   }
 
   const deleteResponsePromise = page.waitForResponse((response) => {
@@ -663,83 +728,85 @@ function markRq18Phase(phase: string) {
 }
 
 function createServedAssetRecorder() {
-  const observedAssetUrls = new Set<string>();
+  const capturedAssetHashes = new Map<string, string>();
   const captureFailures = new Map<string, string>();
+  const pendingCaptures = new Set<Promise<void>>();
 
   const recordPage = (assetPage: Page) => {
-    const recordAssetUrl = (rawUrl: string, status: number | null) => {
+    const assetKeyFor = (rawUrl: string, resourceType: string) => {
       let url: URL;
       try {
         url = new URL(rawUrl);
       } catch {
-        captureFailures.set('invalid-static-response-url', 'invalid-url');
-        return;
+        return null;
       }
-      if (!url.pathname.startsWith('/assets/') && url.pathname !== '/sw.js') return;
-
-      const key = url.origin + url.pathname;
-      if (status === 304) {
-        observedAssetUrls.add(key);
-        return;
-      }
-      if (status === null) {
-        captureFailures.set(key, 'request-failed');
-        return;
-      }
-      if (status !== 200) {
-        captureFailures.set(key, 'http-' + status);
-        return;
-      }
-      observedAssetUrls.add(key);
+      if (url.pathname !== '/sw.js'
+          && (!url.pathname.startsWith('/assets/')
+            || (resourceType !== 'script' && resourceType !== 'stylesheet'))) return null;
+      return { key: url.origin + url.pathname, path: url.pathname };
     };
 
-    assetPage.on('response', (response) => {
+    const captureBrowserResponse = (response: Response) => {
       const resourceType = response.request().resourceType();
-      if (resourceType !== 'script' && resourceType !== 'stylesheet') return;
-      recordAssetUrl(response.url(), response.status());
-    });
+      const asset = assetKeyFor(response.url(), resourceType);
+      if (!asset) return;
+      if (response.status() !== 200) {
+        captureFailures.set(asset.key, 'http-' + response.status());
+        return;
+      }
+
+      const capture = response.body()
+        .then((body) => {
+          const sha256 = crypto.createHash('sha256').update(body).digest('hex');
+          const previous = capturedAssetHashes.get(asset.key);
+          if (previous && previous !== sha256) {
+            captureFailures.set(asset.key, 'multiple-browser-response-bodies');
+            return;
+          }
+          capturedAssetHashes.set(asset.key, sha256);
+        })
+        .catch(() => {
+          captureFailures.set(asset.key, 'browser-response-body-unavailable');
+        });
+      pendingCaptures.add(capture);
+      void capture.then(() => pendingCaptures.delete(capture));
+    };
+
+    const recordFailedRequest = (rawUrl: string, resourceType: string) => {
+      const asset = assetKeyFor(rawUrl, resourceType);
+      if (asset) captureFailures.set(asset.key, 'request-failed');
+    };
+
+    assetPage.on('response', captureBrowserResponse);
     assetPage.on('requestfailed', (failedRequest) => {
-      const resourceType = failedRequest.resourceType();
-      if (resourceType !== 'script' && resourceType !== 'stylesheet') return;
-      recordAssetUrl(failedRequest.url(), null);
+      recordFailedRequest(failedRequest.url(), failedRequest.resourceType());
     });
   };
 
-  const reportForOrigin = async (expectedOrigin: string, assetRequest: APIRequestContext) => {
+  const reportForOrigin = async (expectedOrigin: string) => {
+    while (pendingCaptures.size > 0) {
+      await Promise.all(Array.from(pendingCaptures));
+    }
+    const origin = new URL(expectedOrigin).origin;
     const failures = Array.from(captureFailures.entries())
-      .filter(([key]) => key === 'invalid-static-response-url'
-        || key.startsWith(expectedOrigin + '/'))
+      .filter(([key]) => key.startsWith(origin + '/'))
       .map(([key, reason]) => {
-        const path = key === 'invalid-static-response-url'
-          ? 'invalid-url'
-          : key.slice(expectedOrigin.length);
+        const path = key.slice(origin.length);
         return path + ':' + reason;
       })
       .sort();
     if (failures.length > 0) {
-      throw new Error('Same-run static assets could not be hashed: ' + failures.join(', '));
+      throw new Error('Browser-served asset bodies could not be verified: ' + failures.join(', '));
     }
-    const browserAssetPaths = Array.from(observedAssetUrls)
-      .filter((key) => key.startsWith(expectedOrigin + '/'))
-      .map((key) => key.slice(expectedOrigin.length))
+    const records = Array.from(capturedAssetHashes.entries())
+      .filter(([key]) => key.startsWith(origin + '/'))
+      .map(([key, sha256]) => ({ path: key.slice(origin.length), sha256 }))
+      .sort((left, right) => left.path.localeCompare(right.path));
+    const browserAssetPaths = records
+      .map((record) => record.path)
       .filter((path) => path.startsWith('/assets/'));
     if (browserAssetPaths.length === 0) {
       throw new Error('No same-origin JavaScript or CSS assets were captured.');
-    }
-
-    const pathsToHash = Array.from(new Set([...browserAssetPaths, '/sw.js']))
-      .sort((left, right) => left.localeCompare(right));
-    const records = [];
-    for (const path of pathsToHash) {
-      const response = await assetRequest.get(path, { timeout: 15_000 });
-      if (response.status() !== 200) {
-        throw new Error('Same-run asset fetch failed: ' + path + ':http-' + response.status());
-      }
-      const body = await response.body();
-      records.push({
-        path,
-        sha256: crypto.createHash('sha256').update(body).digest('hex'),
-      });
     }
 
     process.stdout.write('RQ18_BROWSER_ASSET_PATH_COUNT=' + browserAssetPaths.length + '\n');
@@ -747,10 +814,76 @@ function createServedAssetRecorder() {
     for (const record of records) {
       process.stdout.write('RQ18_ASSET_SHA256=' + record.path + ' ' + record.sha256 + '\n');
     }
+    process.stdout.write('RQ18_BROWSER_SW_CAPTURED=' + (records.some((record) => record.path === '/sw.js') ? '1' : '0') + '\n');
+    return records;
   };
 
   return { recordPage, reportForOrigin };
 }
+
+test('RQ-18 provenance hashes the response body delivered to the browser', async ({ browser }) => {
+  test.setTimeout(60_000);
+  const probePath = `/assets/rq18-browser-response-${suffixKey}.js`;
+  const browserBody = `window.__rq18BrowserResponse = '${suffixKey}';`;
+  const independentBody = `window.__rq18IndependentResponse = '${suffixKey}';`;
+  const browserHash = crypto.createHash('sha256').update(browserBody).digest('hex');
+  const server = createServer((incoming, outgoing) => {
+    outgoing.statusCode = 200;
+    if (incoming.url === '/') {
+      outgoing.setHeader('content-type', 'text/html; charset=utf-8');
+      outgoing.end('<!doctype html><html><head></head><body></body></html>');
+      return;
+    }
+    outgoing.setHeader('content-type', 'application/javascript; charset=utf-8');
+    outgoing.end(independentBody);
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    throw new Error('Could not start local browser-byte regression server.');
+  }
+  const origin = `http://127.0.0.1:${address.port}`;
+  const probeUrl = new URL(probePath, origin).toString();
+  let context: BrowserContext | undefined;
+  let independentRequest: APIRequestContext | undefined;
+
+  try {
+    context = await browser.newContext({ serviceWorkers: 'block' });
+    const page = await context.newPage();
+    const servedAssets = createServedAssetRecorder();
+    servedAssets.recordPage(page);
+    independentRequest = await request.newContext();
+    await page.route(probeUrl, (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/javascript',
+      headers: { 'cache-control': 'no-store' },
+      body: browserBody,
+    }));
+    await page.goto(origin, { waitUntil: 'domcontentloaded' });
+    const browserResponsePromise = page.waitForResponse((response) => response.url() === probeUrl);
+    await page.addScriptTag({ url: probeUrl });
+    const browserResponse = await browserResponsePromise;
+    expect(browserResponse.status()).toBe(200);
+    expect(await browserResponse.body()).toEqual(Buffer.from(browserBody));
+
+    const independentResponse = await independentRequest.get(probeUrl);
+    const independentHash = crypto.createHash('sha256').update(await independentResponse.body()).digest('hex');
+    expect(independentHash).not.toBe(browserHash);
+
+    const records = await servedAssets.reportForOrigin(origin);
+    expect(records).toContainEqual({ path: probePath, sha256: browserHash });
+  } finally {
+    await independentRequest?.dispose();
+    await context?.close();
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    });
+  }
+});
 
 test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', async ({ browser, page }) => {
   test.setTimeout(600_000);
@@ -1026,13 +1159,5 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
 
   markRq18Phase('completed');
   if (pageErrors !== 0) throw new Error('Unexpected uncaught Admin browser errors were observed.');
-  const assetRequest = await request.newContext({
-    baseURL: appOrigin,
-    extraHTTPHeaders: { 'Cache-Control': 'no-cache' },
-  });
-  try {
-    await servedAssets.reportForOrigin(appOrigin, assetRequest);
-  } finally {
-    await assetRequest.dispose();
-  }
+  await servedAssets.reportForOrigin(appOrigin);
 });
