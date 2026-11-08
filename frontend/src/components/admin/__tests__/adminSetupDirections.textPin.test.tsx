@@ -381,9 +381,13 @@ describe('AdminSetupDirections — setup entry points', () => {
     }
   });
 
-  it('keeps editor links available when a direction is already ready', async () => {
-    mockReadSide(response({ ...direction, allowed_next_actions: [] }));
-    renderScreen();
+  it('keeps editor links available and preserves the selected specialists profile context', async () => {
+    mockReadSide(response({
+      ...direction,
+      profile: { ...direction.profile, key: 'specialists' },
+      allowed_next_actions: [],
+    }));
+    renderScreen(['/admin/setup-directions?section=checklist&day=2026-10-17&profile=specialists']);
 
     expect(await screen.findByTestId('setup-checklist-row-lab')).toBeVisible();
     const links = within(screen.getByTestId('setup-editor-links')).getAllByRole('link');
@@ -399,6 +403,9 @@ describe('AdminSetupDirections — setup entry points', () => {
     for (const url of urls) {
       expect(url.searchParams.get('setupReturn')).toBe('queue-directions-v1');
       expect(url.searchParams.get('setupSection')).toBe('checklist');
+      expect(url.searchParams.get('setupProfile')).toBe('specialists');
+      expect(url.searchParams.get('setupDay')).toBe('2026-10-17');
+      expect(url.searchParams.has('setupEntityKind')).toBe(false);
     }
   });
 
