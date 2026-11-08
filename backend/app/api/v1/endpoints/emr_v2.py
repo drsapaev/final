@@ -398,9 +398,14 @@ async def save_emr(
     Creates new EMR if none exists, otherwise updates with new version.
     Uses optimistic locking via row_version to detect concurrent edits.
 
-    **Conflict Resolution:**
-    - If row_version mismatch and different user: returns 409 Conflict
-    - If row_version mismatch but same user/session: allows (autosave)
+    **Conflict Resolution (EMRLOCK-FE-001, audit 3886 round 16):**
+    - If row_version mismatch: returns 409 Conflict (fail closed) — even
+      for the same user/session, because a stale write must never
+      overwrite a newer committed revision.
+    - Only a byte-identical duplicate retry from the same session is
+      accepted as an idempotent no-op (no new revision, no version bump).
+    - Finalized records (signed/amended) are rejected with 409 — use the
+      reasoned amend endpoint instead.
     """
     ensure_emr_visit_access(db, visit_id, current_user)
 
@@ -443,6 +448,18 @@ async def save_emr(
                 "your_version": e.your_version,
                 "last_edited_by": e.last_edited_by,
                 "last_edited_at": e.last_edited_at.isoformat(),
+            },
+        )
+    except EMRSignedError:
+        # EMRAMEND-FE-002 (audit 3886 round 16): ordinary save on a
+        # finalized (signed/amended) record is a state conflict, not a
+        # server error — structured 409 so the client can route the doctor
+        # to the amendment workflow instead of a generic failure.
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "FINALIZED_STATE",
+                "message": "Cannot edit signed or amended EMR. Use amend endpoint instead.",
             },
         )
     except ValueError:
@@ -577,6 +594,10 @@ async def restore_emr(
 
     Creates a new version with data from the target version.
     The restore is recorded in the revision history.
+
+    EMRRESTORE-FE-001/002 (audit 3886 round 16): restore is rejected for
+    finalized (signed/amended) records, requires an explicit reason and
+    honors optimistic locking via the caller's current row_version.
     """
     ensure_emr_visit_access(db, visit_id, current_user)
 
@@ -586,13 +607,32 @@ async def restore_emr(
             visit_id=visit_id,
             target_version=payload.target_version,
             user_id=current_user.id,
+            row_version=payload.row_version,
             reason=payload.reason,
         )
         return emr
     except EMRNotFoundException:
         raise HTTPException(status_code=404, detail="EMR not found")
+    except EMRSignedError:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "FINALIZED_STATE",
+                "message": "Cannot restore a signed or amended EMR",
+            },
+        )
     except ValueError:
         raise HTTPException(status_code=400, detail="Internal server error")
+    except ConcurrencyError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "CONFLICT",
+                "message": str(e),
+                "current_version": e.current_version,
+                "your_version": e.your_version,
+            },
+        )
 
 
 
