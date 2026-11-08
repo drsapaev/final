@@ -1,3 +1,25 @@
+## T18.1–T18.9 source reconciliation — read-only — 2026-11-08T20:54:40+05:00
+
+- App commit compared: `16e04af35e47663481a08923d8625d94a1c9d010`; current `origin/main` #3935: `8299d7d6897621bc284051004309b39acbef6adc`. The app commit is a merge commit with current main as its second parent.
+- Historical scenario source bases compared: `bfc33837`, `64a7c0b9`, `e7cf5b47`, and `ee7763e7`.
+- Scope: selected Admin profile/setup, queue join, queue-settings/cabinet and queue-admission owner paths; no test, runtime, database or staging action.
+- Source comparison result: the selected owner paths have no diff from tested app `16e04af3` to current main `8299d7d6`. From each historical base to the tested app, the only changed paths in this selected set are `AdminSetupDirections.tsx`, `QueueProfilesManager.tsx`, `useQueueManager.ts`, `QueueJoin.tsx`, and `services/queue.ts`.
+- Carry-forward: recorded T18.6 settings and T18.7 cabinet results remain applicable where their relevant UI/backend owners are byte-identical. Backend portions of T18.5 and T18.8–9 also match; preserve their previously recorded results and SHA rather than rerunning unchanged PostgreSQL coverage.
+- Still requires current-source live checks: profile setup/edit/publish/hide/archive and Department off/on/manual archive flows (T18.1–5) because the Admin profile/setup frontend changed; browser admission/replay flows (T18.8–9) because the queue join consumer changed. The current RQ-18 PASS proves a normal resource-owned join and permanent-address lifecycle, not a last-slot race, lost-response replay, or Department old-token refusal.
+- Runbook count correction: `docs/runbooks/STAGING_VALIDATION.md` contains Check 0 through Check 10. The current checkpoint must cover all 11 check sections; no check is inferred PASS by this source comparison.
+- Result: source-delta classification PASS; behavioral reruns remain NOT_RUN as above. No production, external integrations, merge, or deployment action.
+
+## PR #3937 exact-head CI and review status — 2026-11-08T20:48:04+05:00
+
+- Commit under check: `8bac0d25c969c78b23a99be0ca79d294431c3e97`; base `origin/main` #3935, `8299d7d6897621bc284051004309b39acbef6adc`.
+- Environment: GitHub Actions Unified workflow [#42494733059](https://github.com/drsapaev/final/actions/runs/42494733059); PR #3937 is OPEN, Ready for review, mergeable, 6 commits / 5 files. Review submissions: none; no independent approval recorded.
+- Source check: the failing `frontend/src/components/emr-v2/sections/__tests__/LabResultsSection.identity.test.tsx` and `LabResultsSection.tsx` are unchanged versus `origin/main`.
+- Result: Frontend E2E **PASS**; Frontend unit tests **FAIL** at `LabResultsSection.identity.test.tsx:226`, expecting a PDF button while the “Результаты анализов” accordion is collapsed; PR Required Gate **FAIL**. Frontend build, lint, CodeQL, Gitleaks, GitGuardian and the applicable review/security/scratch guards passed. Backend tests, Docker and parity jobs were **SKIPPED** by path conditions, not passed.
+- Validation source: connected GitHub check diagnostics at the exact HEAD; E2E job steps ended successfully. The failing assertion is outside the PR's queue test/evidence paths. No product or EMR file was changed.
+- Scope decision: a one-test-only correction to this unrelated EMR assertion was requested from the user and is still pending. Do not edit that file unless approved; if declined, keep #3937 on hold.
+- Scope check: only T18 plan/evidence checkpoint files were corrected locally to reflect the live PR and exact CI state. No new tests, staging, runtime changes, review submission, thread resolution, merge or deployment were performed in this status-reconciliation step.
+- PR: [#3937](https://github.com/drsapaev/final/pull/3937). Merge commit: none; user retains merge authority.
+
 ## T18.10 specialists navigation + current-source RQ-18 — 2026-11-08T20:10:12+05:00
 
 - Application commit under test: `16e04af35e47663481a08923d8625d94a1c9d010`; fresh base/current `origin/main`: `8299d7d6897621bc284051004309b39acbef6adc` (#3935). The browser test ran from the working copy containing the exact E2E patch whose SHA-256 was `BC14D2F70A9145A6EB8949E05091CDF2F95E691049ECF06C96C006CFA078AF54`; application/runtime source was unchanged from the tested app commit.

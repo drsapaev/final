@@ -2,27 +2,30 @@
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance, source reconciliation and evidence PR
-Current status: IN_PROGRESS; T00–T17 MERGED; current-source T18.10 and RQ-18 passed in one synthetic Admin/2FA Session on application source `16e04af35e47663481a08923d8625d94a1c9d010`; exact observed frontend assets matched 68/68 and service-worker marker matched. Canonical teardown PASS. T18/Tier-2 remain PARTIAL pending scenario reconciliation, remaining QA/runbook evidence and PR merge. User owns merge/deployment.
+Current status: IN_PROGRESS; T00–T17 MERGED; T18.10 and RQ-18 passed in one synthetic Admin/2FA Session on application source `16e04af35e47663481a08923d8625d94a1c9d010`; exact observed frontend assets matched 68/68 and the service-worker marker matched. Canonical teardown PASS. Read-only source reconciliation classifies T18.1–T18.9 and identifies impacted live paths. PR #3937 is OPEN/Ready/mergeable at `8bac0d25c969c78b23a99be0ca79d294431c3e97` against #3935 `8299d7d6897621bc284051004309b39acbef6adc`; Frontend E2E PASS, Frontend unit FAIL, PR Required Gate FAIL, independent review absent. T18/Tier-2 remain PARTIAL pending this PR cycle, impacted live checks and remaining QA/runbook evidence. User owns merge/deployment.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`
 Branch: `codex/aqs-t18-completion-20261108`
 Base commit: fresh `origin/main` `8299d7d6897621bc284051004309b39acbef6adc` (#3935)
 Application commit under test: `16e04af35e47663481a08923d8625d94a1c9d010`
 Validated E2E working-copy SHA-256: `BC14D2F70A9145A6EB8949E05091CDF2F95E691049ECF06C96C006CFA078AF54`
-Last updated: 2026-11-08T20:10:12+05:00
+Last updated: 2026-11-08T20:55:32+05:00
 
 ## Current checkpoint — T18.10 and RQ-18 PASS; final acceptance remains partial
 
 | Task | Status | Evidence |
 |------|--------|----------|
 | T00–T17 | MERGED | Plan PRs merged; current base is `origin/main` #3935 at `8299d7d6` |
-| T18.1–T18.9 | Historical PASS; current-source reconciliation IN_PROGRESS | Keep each prior result tied to its SHA; inspect source deltas and rerun impacted assertions only |
+| T18.1–T18.9 | Historical PASS; read-only source reconciliation complete, impacted live checks remain | Against app `16e04af3`, only `AdminSetupDirections.tsx`, `QueueProfilesManager.tsx`, `useQueueManager.ts`, `QueueJoin.tsx` and `services/queue.ts` differ from the recorded bases. T18.6 settings and T18.7 cabinet owner paths match their tested source; backend portions of T18.5/8/9 match. Revalidate live profile/Department paths (1–5) and browser join/replay paths (8–9). |
 | T18.10 specialists navigation | PASS on app source `16e04af3` | Normal Admin password + TOTP; four legacy entry paths; selected profile/day; typed editor return; tab switch; reload; Back/Forward; real linked profile DELETE returns `409`, row retained |
 | Current-source RQ-18 lifecycle | PASS on app source `16e04af3` | Hidden profile, explicit publish, permanent QR, anonymous resource-owned booking, deactivation/archive/reactivation; Playwright 1 passed |
+| PR #3937 | OPEN / Ready / mergeable | Exact HEAD `8bac0d25`; Frontend E2E PASS; Frontend unit FAIL in unchanged EMR test; PR Required Gate FAIL; no independent review submission |
 | Observed frontend provenance | PASS, scoped to this synthetic Session | 67 browser-observed JS/CSS paths plus `/sw.js`; 68/68 byte hashes matched the owned frontend container; service worker contains full tested SHA. Generic `served_revision_verified` remains `false` |
 | Owned staging cleanup | PASS | Canonical teardown removed 5 containers, 3 volumes and 1 network; exact audits of all four task-owned projects found zero containers/images/volumes/networks and zero listening sockets |
 | Frontend local checks | PASS with warning | Scoped ESLint: 0 errors, 1 raw-fetch warning; type-check, build, Playwright collection (1 test), `git diff --check` passed |
 | Full `STAGING_VALIDATION.md` / cross-cutting UI / console / latency | PARTIAL / NOT_RUN | Per-check statuses and remaining work below; no full-system or production-readiness claim |
-| T18 / Tier-2 overall | PARTIAL | Current T18.10/RQ-18 acceptance passed, but final-source reconciliation and required evidence remain open |
+| T18 / Tier-2 overall | PARTIAL | T18.10/RQ-18 passed; source comparison is complete, but changed UI behavior and required final QA/runbook evidence remain open |
+
+The app commit `16e04af3` is a merge commit with current `origin/main` #3935 (`8299d7d6`) as its second parent. A targeted owner-path comparison found no differences between the tested app and that main commit. T18.6/7 and the T18.5/8/9 backend subchecks can retain their recorded results where their relevant owners match; the changed frontend flows remain to be exercised.
 
 ### Session evidence and harness corrections
 
@@ -34,16 +37,16 @@ Last updated: 2026-11-08T20:10:12+05:00
 
 ### Remaining before T18 can close
 
-1. Review and publish the focused E2E/evidence PR; obtain exact-head CI and independent review. The current branch is five commits ahead of `origin/main`, with the T18.10 E2E change still uncommitted; no PR or hosted CI is claimed. User retains merge authority.
-2. After that PR cycle, reconcile T18.1–T18.9 to current source. Revalidate changed setup/profile editor paths, relevant cold/revisit row timing, and any assertions affected by source changes; do not promote older SHA evidence to current-source PASS without analysis.
+1. Finish the existing PR #3937 cycle. Exact-head Frontend E2E passed, but Frontend unit tests failed in `LabResultsSection.identity.test.tsx` and PR Required Gate consequently failed. That EMR test and component are unchanged from `origin/main`; the proposed one-test-only adjustment is awaiting the user's explicit scope decision. After the decision, resolve the failure or retain the PR on hold, rerun exact-head checks, and obtain independent review. User retains merge authority.
+2. After that PR cycle, run the current-source checks identified by the source comparison: T18.1–5 profile/setup/Department UI flows and T18.8–9 browser join/replay paths. Carry forward T18.6/7 and unchanged backend portions only with their recorded source evidence; do not rerun those unchanged owners without a new reason.
 3. Finish keyboard/focus, forms/errors/empty/retry, language and viewport checks for affected paths; complete the latency waterfall on changed screens. Earlier checks on `cbd8c642` remain revision-scoped.
 4. Resolve or explicitly classify the remaining console investigation: two of 11 historical events were not reproduced, and eight minified-bundle call sites remain unmapped.
-5. Reconcile every applicable prerequisite and check 0–9 in `docs/runbooks/STAGING_VALIDATION.md` as PASS/FAIL/NOT_RUN/DEFERRED with its SHA. Dedicated external Sentry/AI/Telegram/live telemetry checks are not silently passed; checks requiring external systems remain pending safe applicability/authorization.
+5. Reconcile every applicable prerequisite and Check 0–10 in `docs/runbooks/STAGING_VALIDATION.md` as PASS/FAIL/NOT_RUN/DEFERRED with its SHA. Dedicated external Sentry/AI/Telegram/live telemetry checks are not silently passed; checks requiring external systems remain pending safe applicability/authorization.
 6. After merge, continue from fresh `origin/main`, update the top-level plan and journals, and leave any pre-deploy items explicitly open until evidence exists. Full production validation, deployment and v1-flag activation are separate and not authorized.
 
 ## Next exact action
 
-Review the final E2E and journal diff, record this successful Session in `EVIDENCE.md`/`RESUME.md` and the plan, run `git diff --check`, clean only this task's verified scratch, then commit/push/open the focused PR. Do not start another PR cycle until this one is reviewed and merged.
+Continue within PR #3937: record the exact-head CI result and pending test-scope decision, then proceed only within the approved scope. Do not start another PR cycle until #3937 is green, reviewed and merged by the user. After merge, run the impacted T18.1–5 and T18.8–9 UI scenarios, finish affected UI/latency/console checks, and complete applicable `STAGING_VALIDATION.md` Checks 0–10 before closing T18.
 ## Previous checkpoint — #3930 synchronized locally; journal commit and exact-head CI pending
 
 | Task | Status | Evidence |
