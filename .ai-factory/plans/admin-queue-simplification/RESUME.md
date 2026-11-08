@@ -1,3 +1,22 @@
+# Current resume — RQ-18 and observed asset provenance pass; T18 partial — 2026-11-08T18:58:05+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. Base/current `origin/main` is #3927 at `404043bb62a4b8081242c453957ae939ed4b06ff`; local candidate HEAD `e003ab787a93dd72c49e632c63e323ee42842d3b` is three commits ahead. The test and journal work is not pushed; no PR or hosted CI is claimed. User owns merge and deployment.
+
+Current-source RQ-18 passed in canonical synthetic `Preflight → Session`: normal Admin password + TOTP; hidden QueueProfile, doctorless Service and QueueResource; explicit publication; permanent QR provision/reload; anonymous booking to a resource-owned queue; deactivation preserving the queue and closing new booking; profile archive/reactivation and reopening the same address. The browser observed 49 JS/CSS paths plus `/sw.js`; all 50 SHA-256 values matched the owned frontend container and the service worker carried the full tested commit SHA. The helper still reports `served_revision_verified=false`; do not rewrite that field. Teardown PASS removed 5 containers, 3 volumes and 1 network; no project containers/volumes/networks remained.
+
+The test-only asset capture change is in commit `e003ab7`; local scoped ESLint, TypeScript, Playwright collection and commit hooks passed. Preceding run `q18d` reached the scenario end but the temporary runner failed to parse a marker line; the runner was corrected and final `q18e` passed. Evidence is recorded in the current top section of `PROGRESS.md` and `EVIDENCE.md`. No runtime or production code changed.
+
+## Next exact actions
+
+1. Review the focused three-commit diff and the new journal checkpoint; verify history remains intact and run `git diff --check`.
+2. Remove only this task's private `.scratch/t18-final-acceptance-20261108` after confirming the path resolves inside this worktree. It contains synthetic credentials and raw Playwright output. Remove the temporary `frontend/node_modules` junction only if its link target is still the previously verified sibling dependency cache; preserve the target.
+3. Commit the journal update with the E2E test change, push the branch, open a focused PR, and verify exact-head CI and independent review. Leave merge to the user.
+4. After merge, fetch fresh `origin/main` into a new worktree. Complete current-source T18.10 live Admin/2FA `specialists` navigation/return/history/legacy URL/guarded-delete assertions, then close the remaining applicable `STAGING_VALIDATION.md` items and reconcile scenarios T18.1–T18.9. Keep T18/Tier-2 `PARTIAL` until every mandatory item has evidence.
+
+Remaining acceptance gaps: T18.10 current-source live flow; full runbook; final-source reconciliation. Keyboard/focus, form/empty/error, five-language, viewport 375/768/1280/1920, and cold/repeat checks previously passed on `cbd8c642`; current main is not descended from that SHA and later changed the selected-profile setup link and QueueProfilesManager dirty-edit behavior, so revalidate those affected flows and reconcile unaffected results by source. Two earlier console events remain unreproduced and eight bundle call sites unmapped. Do not claim whole-system health, production readiness or completed T18 from the RQ-18 pass alone.
+
+---
+
 # Current resume — #3930 synced locally; journal commit and exact-head checks pending — 2026-11-08T12:08:30+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`, branch `codex/aqs-t18-selected-profile-context-20261108`. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.

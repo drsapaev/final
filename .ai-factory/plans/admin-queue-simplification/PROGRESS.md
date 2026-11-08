@@ -1,17 +1,46 @@
-# Progress — T18.10 selected-profile context repair
+# Progress — T18 final acceptance
 
 Plan version: 1.0
-Current task: T18.10 selected-profile return-context repair and remaining T18 acceptance
-Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN/non-draft; remote head `f8f4e71620fe29d9a79aea031de848fd239e2607` has applicable CI success after one failed E2E job was rerun; latest `origin/main` #3930 `fe4943d046e5a23fe37b902782cde5c56e71e706` is merged locally at `ddb35b5183df66e10d471896ef99caea303f160a7` without conflicts; focused test 25/25, scoped ESLint and diff check pass on this candidate; journal-only sync checkpoint, push, PR description refresh and exact-head hosted checks are pending; no independent GitHub review is recorded; T18.10 live Admin/2FA and current-source RQ-18 remain NOT_RUN; Tier-2/T18 PARTIAL; user owns merge/deployment
-Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`
-Branch: `codex/aqs-t18-selected-profile-context-20261108`
-Source/test commit: `404ba482a26085ee740ee10d16959b2504c9bd72`
-Last exact-head CI candidate: `f8f4e71620fe29d9a79aea031de848fd239e2607` (applicable configured CI PASS after failed E2E job retry)
-Current local candidate: `ddb35b5183df66e10d471896ef99caea303f160a7` (merged latest `origin/main`; local targeted checks PASS; hosted CI pending)
-Current `origin/main`: `fe4943d046e5a23fe37b902782cde5c56e71e706` (#3930)
-Last updated: 2026-11-08T12:08:30+05:00
+Current task: T18 final synthetic acceptance and evidence reconciliation
+Current status: IN_PROGRESS; T00–T17 MERGED; current-source RQ-18 browser flow and observed frontend-asset provenance PASS on test commit `e003ab787a93dd72c49e632c63e323ee42842d3b`; ordinary synthetic Admin password + TOTP PASS; current-source T18.10 `specialists` live navigation NOT_RUN; full `STAGING_VALIDATION.md` and remaining T18 reconciliation/QA are PARTIAL; overall T18/Tier-2 PARTIAL; user owns PR merges and deployment
+Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`
+Branch: `codex/aqs-t18-completion-20261108`
+Base commit: `origin/main` `404043bb62a4b8081242c453957ae939ed4b06ff` (#3927)
+Current commit: `e003ab787a93dd72c49e632c63e323ee42842d3b`
+Current `origin/main`: `404043bb62a4b8081242c453957ae939ed4b06ff`
+Last updated: 2026-11-08T18:58:05+05:00
 
-## Current checkpoint — #3930 synchronized locally; journal commit and exact-head CI pending
+## Current checkpoint — RQ-18 and observed frontend provenance pass; full T18 remains partial
+
+| Task | Status | Evidence |
+|------|--------|----------|
+| T00–T17 | MERGED | Existing plan journals; current base is `origin/main` #3927 at `404043bb` |
+| T18 scenarios 1–9 | VALIDATED on recorded source revisions; final-source reconciliation IN_PROGRESS | Keep every earlier result tied to its tested SHA; reconcile changed paths without replaying unaffected scenarios |
+| T18.10 selected-profile source fix | MERGED; focused tests and applicable CI recorded | Live current-source Admin/2FA flow for the `specialists` row, editor return/history, legacy URLs and guarded DELETE remains NOT_RUN |
+| Current-source RQ-18 permanent QR lifecycle | PASS on `e003ab787a93dd72c49e632c63e323ee42842d3b` | Synthetic Admin/TOTP, publish, permanent address, anonymous booking, resource ownership, deactivation/archive and reactivation; canonical Session PASS |
+| Observed served frontend bytes | PASS for this RQ-18 run: 50/50 observed JS/CSS + `sw.js` hashes match the owned frontend container; exact commit marker in `sw.js` | The generic launcher field `served_revision_verified` remains `false`; this evidence covers browser-observed files for this run only |
+| Full `STAGING_VALIDATION.md` and broader UI/console/latency checks | PARTIAL / NOT_RUN | See open items below and prior evidence; do not report whole-system or production readiness |
+| T18 overall / Tier-2 | PARTIAL | Required T18.10 live flow, full runbook reconciliation, and final-source evidence closure remain open |
+
+### Current RQ-18 test and Session
+
+- The current local branch is three commits ahead of `origin/main`; current HEAD is `e003ab787a93dd72c49e632c63e323ee42842d3b`. The RQ-18 test/capture changes are local and not yet pushed; no PR or hosted CI is claimed for this candidate.
+- On the exact clean test commit, scoped ESLint, `npm run type-check`, and Playwright `--list` passed; one Chromium RQ-18 test was collected. Commit hooks passed, including whitespace/conflict and Gitleaks checks.
+- Canonical `Preflight → Session` on owned synthetic project `clinic-aqs-t18-rq18e-20261108`: Preflight PASS, WSL available memory 3,201 MiB, backing-volume free space 26 GiB, worktree-volume free space 13 GiB, no warnings. No production or foreign project was used.
+- Browser session: one RQ-18 scenario completed successfully. Admin password login and TOTP enrollment/verification passed; the hidden profile, doctorless service and resource were created; publication and permanent QR address were verified; anonymous booking produced a resource-owned queue; deactivation preserved the existing queue while closing new public booking; archive and reactivation behaved as expected and reused the permanent address.
+- Provenance: 49 browser-observed JS/CSS paths plus `/sw.js` were hashed through the same synthetic frontend endpoint with cache bypass. All 50 hashes matched the exact owned frontend container; `/sw.js` contained the full tested commit SHA. This does not change the launcher's generic `served_revision_verified=false` field or attest production.
+- Teardown: canonical Session PASS; 5 containers, 3 volumes and 1 network removed; owned containers, volumes and networks remaining: 0; local images were handled with Compose `--rmi local`. No patient data, public QR code, token, screenshot, trace or video was retained in the evidence.
+- A preceding run reached the final functional phase but the temporary PowerShell runner failed to recognize the service-worker marker line. The runner was changed to check the marker with a separate exact `grep` call. The final run above passed; both sessions reported canonical teardown PASS. This was a validation-harness issue, not evidence of an application defect.
+
+### Remaining before T18 can close
+
+1. Validate T18.10 on the current source in a synthetic Admin/2FA session: real `specialists` profile row, the four compatible entry URLs, editor link and typed return context, reload, Back/Forward, and protected DELETE `409` with the row retained.
+2. Reconcile scenarios T18.1–T18.9 against the final source and account for every applicable item in `docs/runbooks/STAGING_VALIDATION.md`, preserving explicit PASS/FAIL/NOT_RUN for checks 0–10 and their prerequisites.
+3. The earlier cross-cutting Session on `cbd8c642` passed keyboard/focus, form validation, empty state, synthetic 503/retry, five language headings, viewports 375/768/1280/1920, cold/repeat row appearance (1,190/944 ms), and zero page errors. Current `origin/main` is not descended from that test SHA and later changed `AdminSetupDirections.tsx` (selected-profile context) and `QueueProfilesManager.tsx` (dirty-field edit payload and shared default color). Revalidate those changed editor/profile flows and the relevant cold/repeat path; do not repeat unaffected keyboard/viewport checks without a source delta.
+4. Finish the existing console investigation: two of the earlier 11 events were not reproduced, and eight minified-bundle call sites remain unmapped. Keep the result partial until each is explained or explicitly classified as unresolved.
+5. Review, commit and publish this RQ-18 test/evidence change as one focused PR; verify exact-head CI and independent review. The user retains merge authority. After merge, continue T18 from fresh `origin/main` without replaying unchanged checks.
+
+## Previous checkpoint — #3930 synchronized locally; journal commit and exact-head CI pending
 
 | Task | Status | Evidence |
 |------|--------|----------|
