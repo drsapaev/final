@@ -73,6 +73,17 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     const isMountedRef = useRef(true);
     const writeAccessDeniedRef = useRef(false);
     const [writeAccessDenied, setWriteAccessDenied] = useState(false);
+    // EMRSIGN-FE-001 (audit 3886 round 17): save/sign/amend callbacks below
+    // used to serialize the `state.data` captured in their closure at the
+    // render they were created in. When a save-and-sign started at snapshot A
+    // and the doctor (or any programmatic edit) changed the document to B
+    // while the save request was in flight, the follow-up SIGN request still
+    // serialized the stale A and finalized it as the signed clinical record.
+    // This ref always holds the latest reducer state so every write request
+    // carries the document that is on screen at the moment the request is
+    // built, never a stale render snapshot.
+    const stateRef = useRef(state);
+    stateRef.current = state;
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -234,8 +245,10 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
 
         try {
             const payload = {
-                data: normalizeEMRData(state.data, specialty),
-                row_version: force ? 0 : state.rowVersion, // 0 = skip lock check
+                // EMRSIGN-FE-001: serialize the LATEST document, not the
+                // closure snapshot from the render this callback was created in.
+                data: normalizeEMRData(stateRef.current.data, specialty),
+                row_version: force ? 0 : stateRef.current.rowVersion, // 0 = skip lock check
                 client_session_id: clientSessionId.current,
                 is_draft: isDraft,
             };
@@ -274,7 +287,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             dispatch(emrActions.saveError(apiError.message || 'Ошибка сохранения'));
             throw error;
         }
-    }, [handleAccessDenied, specialty, visitId, state.data, state.rowVersion]);
+    }, [handleAccessDenied, specialty, visitId]);
 
     // =========================================================================
     // SIGN EMR
@@ -296,8 +309,11 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
 
         try {
             const payload = {
-                data: normalizeEMRData(state.data, specialty),
-                row_version: options.rowVersion ?? state.rowVersion,
+                // EMRSIGN-FE-001: the signed revision must equal the latest
+                // explicitly approved clinical snapshot — serialize the live
+                // document, never a stale render closure.
+                data: normalizeEMRData(stateRef.current.data, specialty),
+                row_version: options.rowVersion ?? stateRef.current.rowVersion,
                 client_session_id: clientSessionId.current,
             };
 
@@ -325,7 +341,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             dispatch(emrActions.saveError(apiError.message || 'Ошибка подписания'));
             throw error;
         }
-    }, [handleAccessDenied, specialty, visitId, state.data, state.rowVersion]);
+    }, [handleAccessDenied, specialty, visitId]);
 
     // =========================================================================
     // AMEND EMR
@@ -353,9 +369,10 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
 
         try {
             const payload = {
-                data: normalizeEMRData(state.data, specialty),
+                // EMRSIGN-FE-001: amendments serialize the live document too.
+                data: normalizeEMRData(stateRef.current.data, specialty),
                 reason: reason.trim(),
-                row_version: state.rowVersion,
+                row_version: stateRef.current.rowVersion,
             };
 
             const response = await apiClient.post(`/v2/emr/${visitId}/amend`, payload);
@@ -370,7 +387,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             dispatch(emrActions.saveError(apiError.message || 'Ошибка внесения поправки'));
             throw error;
         }
-    }, [handleAccessDenied, specialty, visitId, state.data, state.rowVersion]);
+    }, [handleAccessDenied, specialty, visitId]);
 
     // =========================================================================
     // CONFLICT RESOLUTION
@@ -380,12 +397,15 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         if (result?.accessDenied) {
             return result;
         }
-        dispatch(emrActions.conflictResolved());
+        // EMRCONFLICT-FE-001 (audit 3886 round 17): this is the explicit
+        // «discard my edits» path. The LOAD above already replaced the whole
+        // reducer state with the canonical server snapshot (fresh history,
+        // clean dirty flag). Resolving as 'discard' keeps that clean state —
+        // the old code unconditionally marked the state dirty, so the
+        // autosave immediately wrote the just-loaded server content back as
+        // a brand-new revision the doctor never asked for.
+        dispatch(emrActions.conflictResolved(null, null, 'discard'));
     }, [loadEMR]);
-
-    const forceOverwrite = useCallback(async () => {
-        return saveEMR({ force: true });
-    }, [saveEMR]);
 
     // =========================================================================
     // FIELD SETTERS
@@ -458,7 +478,6 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
 
         // Conflict resolution
         reloadFromServer,
-        forceOverwrite,
 
         // Session
         clientSessionId: clientSessionId.current,
