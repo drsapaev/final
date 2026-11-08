@@ -376,6 +376,19 @@ pytest_add_cli_args_test_selection = [
     # incompatible with the mutmut sandbox (module-identity / session-graph
     # visibility). Green in normal CI (real PG) and locally.
     "--deselect", "tests/unit/test_schedule_department_contract.py",
+    # tests/integration/test_force_majeure_refund_claim_lifecycle_migration_pg.py
+    # — whole-file deselect (nightly 2026-11-08 run 42464162363, issue #3931;
+    # first full-suite stats collection after the mutmut 3.8.1 bump in #3912):
+    # the migration proof shells out to `python -m alembic` with
+    # cwd=BACKEND_ROOT, which under the sandbox resolves to backend/backend/
+    # (alembic/ + alembic.ini copied there for the other parents-traversal
+    # readers; no app/ package at that depth) - ModuleNotFoundError: No
+    # module named 'app' before mutations run. Full alembic-chain prover on
+    # a scratch PG database; zero mutation value (only_mutate = the four
+    # crud modules). The file's other test is a pure parametrized check of
+    # the module's own admin-URL validator. Both keep running green in the
+    # normal backend-tests CI job (real PG).
+    "--deselect", "tests/integration/test_force_majeure_refund_claim_lifecycle_migration_pg.py",
 ]
 only_mutate = [
     "app/crud/appointment.py",
