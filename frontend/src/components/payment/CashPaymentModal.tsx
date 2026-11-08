@@ -92,8 +92,33 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymen
     // on re-render and must not trigger one.
     const clientRequestIdRef = useRef(generateCashierClientRequestId());
 
+    // RETRO-FIN-001 (retrospective of #3864): a CHANGED appointment is a
+    // deliberate NEW payment intent. The modal may stay mounted while the
+    // parent swaps the appointment prop (queue-style flows); without key
+    // rotation the same key would be submitted for a different
+    // visit/patient/amount. The server now binds keys to the request
+    // fingerprint and rejects such reuse with 409 — rotating the key here
+    // keeps the legitimate new intent chargeable instead of rejected.
+    // Identity = appointment id: the amount-only effect below must NOT
+    // rotate the key (a failed submit leaves no server anchor, so an
+    // in-place amount fix + retry with the same key is still correct).
+    const appointmentIdentity = (
+        source?: Record<string, unknown> | null,
+    ): number | string | null => {
+        const id = source?.id;
+        return typeof id === 'number' || typeof id === 'string' ? id : null;
+    };
+    const lastAppointmentIdRef = useRef<number | string | null>(
+        appointmentIdentity(appointment),
+    );
+
     // Update amount when appointment changes
     useEffect(() => {
+        const nextAppointmentId = appointmentIdentity(appointment);
+        if (nextAppointmentId !== lastAppointmentIdRef.current) {
+            lastAppointmentIdRef.current = nextAppointmentId;
+            clientRequestIdRef.current = generateCashierClientRequestId();
+        }
         const newAmount = appointment?.remaining_amount ??
             appointment?.total_amount ??
             appointment?.payment_amount ??
