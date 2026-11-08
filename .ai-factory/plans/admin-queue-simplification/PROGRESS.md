@@ -2,19 +2,21 @@
 
 Plan version: 1.0
 Current task: T18.10 selected-profile return-context repair and remaining T18 acceptance
-Current status: IN_PROGRESS; T00–T17 MERGED; PR #3897 merged at `569d5fe5f5f0c24f1e8aa72a782aaf73ed44bbe3`; selected-profile link fix committed as `404ba482a26085ee740ee10d16959b2504c9bd72` and focused checks pass locally; PR not yet opened; T18.10 browser acceptance and current-source RQ-18 remain NOT_RUN; overall T18/Tier-2 remain PARTIAL; user owns merge/deployment
+Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN and non-draft; branch synchronized locally with `origin/main` `9d1b0e808563509e553f990dd0fbb893d2a7c723` in merge commit `54873073`; local focused checks pass after synchronization; exact-head CI is pending for the synchronized branch; T18.10 browser acceptance and current-source RQ-18 remain NOT_RUN; overall T18/Tier-2 remain PARTIAL; user owns merge/deployment
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`
 Branch: `codex/aqs-t18-selected-profile-context-20261108`
-Base / current `origin/main`: `289c281a0ec2e2ae87abfd5d0b0103e5725e22bc`
-Last updated: 2026-11-08T08:56:11+05:00
+Source/test commit: `404ba482a26085ee740ee10d16959b2504c9bd72`
+Previous PR HEAD: `f7c3cbde67c6952edb2416850bccfe835537862d`; GitHub reported `BEHIND` before synchronization
+Current `origin/main`: `9d1b0e808563509e553f990dd0fbb893d2a7c723`
+Last updated: 2026-11-08T09:22:29+05:00
 
-## Current checkpoint — source fix validated locally; T18 acceptance remains open
+## Current checkpoint — PR #3925 synchronized; T18 acceptance remains open
 
 | Task | Status | Evidence |
 |------|--------|----------|
 | T00–T17 | MERGED | Existing plan journals; latest merge on this worktree is #3897 at `569d5fe5` |
 | T18 scenarios 1–9 | VALIDATED on recorded source revisions | Historical scenario evidence remains revision-scoped; reconcile against final candidate before claiming integrated completion |
-| T18.10 selected-profile source fix | VALIDATED locally, committed `404ba482` | Universal editor links now preserve URL-owned `profile=specialists`; focused test checks `setupProfile`, day, section, return marker, and absence of entity binding |
+| T18.10 selected-profile source fix | VALIDATED locally, committed `404ba482` | Universal editor links now preserve URL-owned `profile=specialists`; focused test checks `setupProfile`, day, section, return marker, and absence of entity binding; verified unchanged after sync commit `54873073` |
 | T18.10 synthetic Admin/2FA flow | NOT_RUN on candidate | Must verify actual `specialists` row and editor return/reload/Back/Forward plus protected DELETE 409 on the candidate commit |
 | Current-source RQ-18 | NOT_RUN | Earlier Session is tied to an older runtime; rerun only when safe staging resources are available |
 | Full staging runbook / served-build provenance | PARTIAL / NOT_RUN | `STAGING_VALIDATION.md` and canonical served-revision attestation remain outstanding |
@@ -22,12 +24,13 @@ Last updated: 2026-11-08T08:56:11+05:00
 
 ### Candidate work and local validation
 
-- Source/test commit `404ba482a26085ee740ee10d16959b2504c9bd72` is based on clean `origin/main` `289c281a0ec2e2ae87abfd5d0b0103e5725e22bc`; the current follow-up changes only T18 journals. No remote PR exists yet.
+- PR #3925 carries source/test commit `404ba482a26085ee740ee10d16959b2504c9bd72`. After GitHub reported the previous PR HEAD `f7c3cbde67c6952edb2416850bccfe835537862d` as `BEHIND`, the clean PR worktree merged fresh `origin/main` `9d1b0e808563509e553f990dd0fbb893d2a7c723` in commit `54873073`; the merge had no conflicts. Incoming changes were limited to backend file-security code/tests and did not touch the PR's frontend source or focused test. This journal-only follow-up records the synchronization and post-sync validation.
 - Mandatory launcher was run from `ai/langgraph` with the confirmed root and five exact reviewed source/journal paths. It returned `Result: narrow_override`, `gate_misroute: no`, `override_used: yes`, and `Handoff required: yes`; the execution prompt was read and followed.
-- Focused Vitest: 25/25 PASS with one worker. Scoped ESLint: PASS. Frontend build: PASS with `NODE_OPTIONS=--max-old-space-size=1024`; existing CSS/Rollup warnings were emitted. An earlier build under a 768 MiB heap limit exited at that artificial heap cap; it is superseded by the successful bounded build.
-- `git diff --check`: PASS after the journal updates. First Vitest invocation used unsupported `--minWorkers`; it ran zero tests, then the supported single-worker command passed.
+- Post-sync focused Vitest: 25/25 PASS. Scoped ESLint on `AdminSetupDirections.tsx` and its focused test: PASS. `git diff --check`: PASS before this journal-only update. The earlier frontend build at source/test commit `404ba482` passed with a 1 GiB heap cap; it was not rerun after synchronization because incoming changes did not touch frontend files.
+- Before synchronization, exact-head PR checks at `f7c3cbde` included Unified CI success and a successful later PR Review Quality Gate/lifecycle rerun; those results do not validate the newly synchronized HEAD. New exact-head CI and PR gates must pass before merge.
+- The gate for this journal-only checkpoint used known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` and exactly the three journal paths. Result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; the generated execution prompt was read. No source, test, gate, or router files were edited in this checkpoint.
 - The worktree initially had no `frontend/node_modules`; 900 packages were installed from its unchanged lockfile for local validation. The validation `frontend/node_modules` and generated `frontend/dist` are ignored worktree artifacts. Cleanup was attempted only after resolving target paths inside this worktree, but the host command policy blocked recursive removal; do not bypass it.
-- No staging, Docker, WSL, backend, production, merge, or deployment action was performed in this slice.
+- No staging, Docker, WSL, backend test, production, PR merge, or deployment action was performed in this synchronization slice.
 
 ## Previous checkpoint — stale #3897 state (historical; superseded above)
 
