@@ -27428,6 +27428,8 @@ export type components = {
             service_id: number;
             /** Original Price */
             original_price: string;
+            /** Visit Price Before */
+            visit_price_before?: string | null;
             /** New Price */
             new_price: string;
             /** Reason */
@@ -35877,6 +35879,8 @@ export type components = {
             service_id: number;
             /** Original Price */
             original_price: string;
+            /** Visit Price Before */
+            visit_price_before?: string | null;
             /** New Price */
             new_price: string;
             /** Reason */
