@@ -6,9 +6,9 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "frontend/src/App.jsx"
-      - "frontend/src/pages/Login.jsx"
-      - "frontend/src/pages/UserSelect.jsx"
+      - "frontend/src/App.tsx"
+      - "frontend/src/components/auth/LoginFormStyled.tsx"
+      - "frontend/src/pages/UserSelect.tsx"
       - "backend/app/api/v1/endpoints/*.py"
       - "backend/app/core/role_validation.py"
       - "backend/tests/integration/test_rbac_matrix.py"
