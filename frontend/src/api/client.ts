@@ -754,9 +754,8 @@ async function me(): Promise<UserDto> {
  *                                no pending_2fa_token
  *
  * If the backend violates ЗАКОН 2, parseLoginResponse throws
- * AuthInvariantViolationError. The error is logged here and re-thrown so
- * callers can surface it to the user (and the team can surface it to the
- * backend owner).
+ * AuthInvariantViolationError. The stable invariant identifier is logged
+ * here without the response DTO or error message, then the error is re-thrown.
  *
  * Caller should call setToken(result.access_token) to persist tokens
  * (only valid in the `requires_2fa === false` branch).
@@ -775,8 +774,9 @@ async function login(username: string, password: string): Promise<LoginResult> {
     return parseLoginResponse(dto);
   } catch (err) {
     if (err instanceof AuthInvariantViolationError) {
-      // Log the invariant violation loudly — backend bugs must be visible.
-      logger.error('[api/client] login() backend violated auth invariant:', err.invariant, err.message, err.dto);
+      // The DTO may contain access or pending-2FA credentials. Log only the
+      // stable invariant identifier so logger sanitization is not the boundary.
+      logger.error('[api/client] login() backend violated auth invariant:', err.invariant);
     }
     throw err;
   }

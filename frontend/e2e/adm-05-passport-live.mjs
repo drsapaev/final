@@ -31,15 +31,7 @@ const patient = {
   passport: `AA${suffix.slice(-7).padStart(7, '0')}`
 };
 
-const evidence: {
-  caseId: string;
-  baseUrl: string;
-  patient: typeof patient;
-  primarySourceOfTruth: Record<string, unknown> | null;
-  secondarySourceOfTruth: Record<string, unknown> | null;
-  authBootstrap?: unknown;
-  formValidity?: unknown;
-} = {
+const evidence = {
   caseId: 'ADM-05-FIX',
   baseUrl,
   patient,
@@ -47,7 +39,7 @@ const evidence: {
   secondarySourceOfTruth: null
 };
 
-function artifact(name: string): string {
+function artifact(name) {
   return path.join(artifactsDir, name);
 }
 
@@ -100,11 +92,7 @@ async function main() {
   try {
     await page.goto(`${baseUrl}/login`, { waitUntil: 'networkidle' });
     const authBootstrap = await page.evaluate(
-      async ({ currentApiOrigin, currentUsername, currentPassword }: {
-        currentApiOrigin: string;
-        currentUsername: string;
-        currentPassword: string | undefined;
-      }) => {
+      async ({ currentApiOrigin, currentUsername, currentPassword }) => {
         const response = await fetch(`${currentApiOrigin}/api/v1/auth/minimal-login`, {
           method: 'POST',
           headers: {
@@ -161,11 +149,11 @@ async function main() {
       fullPage: true
     });
 
-    const formValidity = await form.evaluate((formElement: HTMLFormElement) => ({
+    const formValidity = await form.evaluate((formElement) => ({
       isValid: formElement.checkValidity(),
       invalidControls: Array.from(formElement.elements)
-        .filter((element): element is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
-          typeof (element as HTMLInputElement).checkValidity === 'function' && !(element as HTMLInputElement).checkValidity())
+        .filter((element) =>
+          typeof element.checkValidity === 'function' && !element.checkValidity())
         .map((element) => ({
           tagName: element.tagName,
           type: element.getAttribute('type'),
@@ -188,7 +176,7 @@ async function main() {
       { timeout: 15000 }
     ).catch(() => null);
 
-    await form.evaluate((formElement: HTMLFormElement) => formElement.requestSubmit());
+    await form.evaluate((formElement) => formElement.requestSubmit());
     const patientCreateResponse = await createResponsePromise;
     await page.waitForLoadState('networkidle');
 

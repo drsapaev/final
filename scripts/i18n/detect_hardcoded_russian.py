@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Detect hardcoded Russian text in JSX/JS files.
+Detect hardcoded Russian text in JavaScript and TypeScript source files.
 Counts Cyrillic string literals that should be migrated to i18n.
 """
 import os
@@ -12,7 +12,8 @@ SRC_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'src')
 CYRILLIC_PATTERN = re.compile(r"['\"`][^'\"`]*[А-Яа-яЁё][^'\"`]*['\"`]")
 
 EXCLUDE_DIRS = {'__tests__', 'node_modules', 'dist', 'locales', '.git'}
-EXCLUDE_FILES = {'labTranslations.js', 'registrarTranslations.js', 'useTranslation.jsx'}
+EXCLUDE_FILES = {'labTranslations.js', 'registrarTranslations.js', 'useTranslation.jsx', 'useTranslation.ts'}
+SOURCE_EXTENSIONS = ('.jsx', '.js', '.tsx', '.ts')
 
 def scan_file(filepath):
     violations = []
@@ -31,6 +32,14 @@ def scan_file(filepath):
                 violations.append((i, text[:60]))
     return violations
 
+def iter_source_files(source_dir=SRC_DIR):
+    for root, dirs, files in os.walk(source_dir):
+        dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+        for filename in files:
+            if filename in EXCLUDE_FILES or not filename.endswith(SOURCE_EXTENSIONS):
+                continue
+            yield os.path.join(root, filename)
+
 def main():
     parser = argparse.ArgumentParser(description='Detect hardcoded Russian text')
     parser.add_argument('--max-violations', type=int, default=2300, help='Maximum allowed violations')
@@ -40,22 +49,15 @@ def main():
     total_violations = 0
     files_with_violations = 0
 
-    for root, dirs, files in os.walk(SRC_DIR):
-        dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-        for filename in files:
-            if filename in EXCLUDE_FILES:
-                continue
-            if not filename.endswith(('.jsx', '.js')):
-                continue
-            filepath = os.path.join(root, filename)
-            violations = scan_file(filepath)
-            if violations:
-                files_with_violations += 1
-                total_violations += len(violations)
-                if args.verbose:
-                    rel_path = os.path.relpath(filepath, SRC_DIR)
-                    for line_num, text in violations[:3]:
-                        print(f"  {rel_path}:{line_num}: {text}")
+    for filepath in iter_source_files():
+        violations = scan_file(filepath)
+        if violations:
+            files_with_violations += 1
+            total_violations += len(violations)
+            if args.verbose:
+                rel_path = os.path.relpath(filepath, SRC_DIR)
+                for line_num, text in violations[:3]:
+                    print(f"  {rel_path}:{line_num}: {text}")
 
     print(f"\nTotal hardcoded Russian strings: {total_violations}")
     print(f"Files with violations: {files_with_violations}")
