@@ -80967,6 +80967,8 @@
           },
           "reason": {
             "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
             "title": "Reason"
           },
           "details": {
@@ -81013,6 +81015,18 @@
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Original Price"
+          },
+          "visit_price_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Price Before"
           },
           "new_price": {
             "type": "string",
@@ -103811,6 +103825,8 @@
           },
           "reason": {
             "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
             "title": "Reason"
           },
           "details": {
@@ -103852,6 +103868,18 @@
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Original Price"
+          },
+          "visit_price_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Price Before"
           },
           "new_price": {
             "type": "string",
