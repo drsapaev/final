@@ -30,6 +30,7 @@ export const EMR_ACTIONS = {
     UNDO: 'UNDO',
     REDO: 'REDO',
     RESET_DIRTY: 'RESET_DIRTY',
+    CONTEXT_RESET: 'CONTEXT_RESET',
 } as const;
 
 // Max history size for undo/redo (memory-conscious)
@@ -323,6 +324,17 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
                 isDirty: false,
             };
 
+        // =========================================================================
+        // CONTEXT_RESET - visit identity changed on a mounted hook
+        // =========================================================================
+        // EMRCTX-FE-001 (audit 3886 round 18): switching the visit (or patient)
+        // while the hook stays mounted must never keep the previous visit's
+        // clinical data, dirty flag, undo history or conflict state — the new
+        // visit's editor starts from a clean slate until its own authoritative
+        // LOAD arrives (guarded by the visit epoch in useEMR).
+        case EMR_ACTIONS.CONTEXT_RESET:
+            return { ...initialState };
+
         default:
             return state;
     }
@@ -383,4 +395,5 @@ export const emrActions = {
     undo: (): EmrAction => ({ type: EMR_ACTIONS.UNDO }),
     redo: (): EmrAction => ({ type: EMR_ACTIONS.REDO }),
     resetDirty: (): EmrAction => ({ type: EMR_ACTIONS.RESET_DIRTY }),
+    contextReset: (): EmrAction => ({ type: EMR_ACTIONS.CONTEXT_RESET }),
 };

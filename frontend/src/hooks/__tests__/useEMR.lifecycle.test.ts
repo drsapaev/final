@@ -24,6 +24,7 @@ vi.mock('../../api/client', () => ({
         get: vi.fn(),
         post: vi.fn(),
     },
+    setSessionInvalidationListener: vi.fn(),
 }));
 
 import { apiClient } from '../../api/client';

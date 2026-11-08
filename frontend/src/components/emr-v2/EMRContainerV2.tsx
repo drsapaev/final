@@ -260,6 +260,7 @@ interface EMRHookResult {
     signEMR: (opts?: { rowVersion?: number }) => Promise<unknown>;
     amendEMR: (reason: string, opts?: Record<string, unknown>) => Promise<unknown>;
     setField: (field: string, value: unknown) => void;
+    setNestedField: (path: string, value: unknown) => void;
     undo: () => void;
     redo: () => void;
     reloadFromServer: () => Promise<unknown>;
@@ -306,6 +307,7 @@ export function EMRContainerV2({
         signEMR,
         amendEMR,
         setField,
+        setNestedField,
         undo,
         redo,
         reloadFromServer,
@@ -683,6 +685,34 @@ export function EMRContainerV2({
         setField(field, value);
     }, [setField]);
 
+    const handleNestedFieldChange = useCallback((path: string) => (value: unknown) => {
+        setNestedField(path, value);
+    }, [setNestedField]);
+
+    // EMRDIAG-FE-001/002 (audit 3886 round 18): the visible ICD-10 field must
+    // read and write the CANONICAL nested diagnosis.icd10_code (the backend
+    // prefers it when materializing the searchable code), mirror to the legacy
+    // flat field so older consumers stay in agreement, and never clobber
+    // diagnosis.main / secondary[]. A legacy string diagnosis is migrated to
+    // the structured shape on first edit.
+    const structuredDiagnosis = data && typeof (data as Record<string, unknown>).diagnosis === 'object'
+        && (data as Record<string, unknown>).diagnosis !== null
+        ? (data as Record<string, unknown>).diagnosis as Record<string, unknown>
+        : null;
+    const canonicalIcd10Code = (structuredDiagnosis?.icd10_code as string | undefined)
+        || ((data as Record<string, unknown> | null)?.icd10_code as string | undefined)
+        || '';
+    const handleCanonicalIcd10Change = useCallback((value: string) => {
+        const currentDiagnosis = (data as Record<string, unknown> | null)?.diagnosis;
+        if (typeof currentDiagnosis === 'string') {
+            // Legacy flat diagnosis string — migrate to the structured shape,
+            // preserving the visible main text, before setting the code.
+            setNestedField('diagnosis', { main: currentDiagnosis });
+        }
+        setNestedField('diagnosis.icd10_code', value);
+        setField('icd10_code', value);
+    }, [data, setNestedField, setField]);
+
     const refreshParentStatus = useCallback(async () => {
         try {
             await onPersisted?.();
@@ -1051,9 +1081,9 @@ export function EMRContainerV2({
 
                     <DiagnosisSection
                         diagnosis={data?.diagnosis}
-                        icd10Code={data?.icd10_code}
-                        onDiagnosisChange={handleFieldChange('diagnosis')}
-                        onIcd10Change={handleFieldChange('icd10_code')}
+                        icd10Code={canonicalIcd10Code}
+                        onDiagnosisChange={handleNestedFieldChange('diagnosis.main')}
+                        onIcd10Change={handleCanonicalIcd10Change}
                         disabled={editingDisabled}
                         ICD10Component={ICD10Component}
                         doctorId={doctorId}
