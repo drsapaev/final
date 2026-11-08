@@ -323,3 +323,346 @@ def test_keyed_payment_still_rejects_registrar_role(
         "client_request_id": str(uuid4()),
     })
     assert response.status_code == 403, response.text
+
+
+# ── RETRO-FIN-001 (retrospective audit of #3803–#3919): intent binding ──────
+
+
+def test_same_key_different_visit_is_rejected_without_replay_or_charge(
+    client, db_session, admin_auth_headers
+):
+    """RETRO-FIN-001 fail-first: a key REUSED for a different visit must be
+    refused with 409 instead of replaying the original success (the audited
+    false-positive-success defect: the cashier sees visit A's payment
+    metadata as if visit B had been charged)."""
+    patient = _make_patient(db_session, phone="+998900550021")
+    visit_a = _make_visit(db_session, patient, 100000, name="SYNTHETIC-rfin-A")
+    visit_b = _make_visit(db_session, patient, 100000, name="SYNTHETIC-rfin-B")
+    key = str(uuid4())
+
+    first = client.post(
+        SINGLE_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_id": visit_a.id,
+            "amount": 40000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert first.status_code == 200, first.text
+
+    different_visit = client.post(
+        SINGLE_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_id": visit_b.id,
+            "amount": 40000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert different_visit.status_code == 409, different_visit.text
+    assert (
+        different_visit.json()["detail"]["reason"]
+        == "client_request_id_intent_mismatch"
+    )
+
+    db_session.expire_all()
+    assert len(_paid_rows(db_session, visit_a)) == 1
+    assert (
+        len(_paid_rows(db_session, visit_b)) == 0
+    ), "the refused replay must not charge the new intent"
+
+
+def test_same_key_cross_patient_is_rejected_without_replay(
+    client, db_session, admin_auth_headers
+):
+    """RETRO-FIN-001: cross-patient key reuse is the strongest intent change —
+    same 409, no replay, no second charge."""
+    patient_a = _make_patient(db_session, phone="+998900550022")
+    patient_b = _make_patient(db_session, phone="+998900550023")
+    visit_a = _make_visit(db_session, patient_a, 100000, name="SYNTHETIC-rfin-C")
+    visit_b = _make_visit(db_session, patient_b, 100000, name="SYNTHETIC-rfin-D")
+    key = str(uuid4())
+
+    first = client.post(
+        SINGLE_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_id": visit_a.id,
+            "amount": 50000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert first.status_code == 200, first.text
+
+    cross_patient = client.post(
+        SINGLE_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_id": visit_b.id,
+            "amount": 50000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert cross_patient.status_code == 409, cross_patient.text
+    assert (
+        cross_patient.json()["detail"]["reason"] == "client_request_id_intent_mismatch"
+    )
+
+    db_session.expire_all()
+    assert len(_paid_rows(db_session, visit_a)) == 1
+    assert len(_paid_rows(db_session, visit_b)) == 0
+
+
+def test_same_key_different_amount_or_method_is_rejected(
+    client, db_session, admin_auth_headers
+):
+    """RETRO-FIN-001: amount and method are part of the canonical intent —
+    a same-key repeat with either changed is 409, not a false replay."""
+    patient = _make_patient(db_session, phone="+998900550024")
+    visit = _make_visit(db_session, patient, 100000, name="SYNTHETIC-rfin-E")
+    key = str(uuid4())
+
+    first = client.post(
+        SINGLE_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_id": visit.id,
+            "amount": 40000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert first.status_code == 200, first.text
+
+    different_amount = client.post(
+        SINGLE_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_id": visit.id,
+            "amount": 60000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert different_amount.status_code == 409, different_amount.text
+
+    different_method = client.post(
+        SINGLE_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_id": visit.id,
+            "amount": 40000,
+            "method": "card",
+            "client_request_id": key,
+        },
+    )
+    assert different_method.status_code == 409, different_method.text
+
+    db_session.expire_all()
+    rows = _paid_rows(db_session, visit)
+    assert len(rows) == 1
+    assert rows[0].amount == Decimal("40000")
+
+
+def test_same_key_equivalent_amount_formatting_still_replays(
+    client, db_session, admin_auth_headers
+):
+    """RETRO-FIN-001: amount canonicalization is VALUE-based — 40000 and
+    40000.00 are the same intent, so the legitimate retry (client resends
+    the amount with different JSON formatting) keeps the 200 replay."""
+    patient = _make_patient(db_session, phone="+998900550025")
+    visit = _make_visit(db_session, patient, 100000, name="SYNTHETIC-rfin-F")
+    key = str(uuid4())
+
+    first = client.post(
+        SINGLE_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_id": visit.id,
+            "amount": 40000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert first.status_code == 200, first.text
+
+    equivalent = client.post(
+        SINGLE_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_id": visit.id,
+            "amount": 40000.00,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert equivalent.status_code == 200, equivalent.text
+    assert equivalent.json() == first.json()
+
+    db_session.expire_all()
+    assert len(_paid_rows(db_session, visit)) == 1
+
+
+def test_same_key_grouped_visit_order_is_irrelevant_for_replay(
+    client, db_session, admin_auth_headers
+):
+    """RETRO-FIN-001: grouped visit_ids are canonicalized (dedup + sort) —
+    the allocation is backend-owned, so [B, A] and [A, B] are the same
+    intent and the retry keeps the 200 replay."""
+    patient = _make_patient(db_session, phone="+998900550026")
+    visit_a = _make_visit(db_session, patient, 60000, name="SYNTHETIC-rfin-G")
+    visit_b = _make_visit(db_session, patient, 40000, name="SYNTHETIC-rfin-H")
+    key = str(uuid4())
+
+    first = client.post(
+        GROUPED_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_ids": [visit_a.id, visit_b.id],
+            "amount": 100000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert first.status_code == 200, first.text
+
+    reordered = client.post(
+        GROUPED_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_ids": [visit_b.id, visit_a.id],
+            "amount": 100000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert reordered.status_code == 200, reordered.text
+    assert reordered.json() == first.json()
+
+    db_session.expire_all()
+    total_rows = (
+        db_session.query(Payment)
+        .filter(Payment.visit_id.in_([visit_a.id, visit_b.id]))
+        .filter(Payment.status.in_(["paid", "completed"]))
+        .count()
+    )
+    assert total_rows == 2
+
+
+def test_same_key_different_grouped_visit_set_is_rejected(
+    client, db_session, admin_auth_headers
+):
+    """RETRO-FIN-001: a grouped key reused for a different visit set is a
+    different allocation intent — 409 without a second allocation."""
+    patient = _make_patient(db_session, phone="+998900550027")
+    visit_a = _make_visit(db_session, patient, 60000, name="SYNTHETIC-rfin-I")
+    visit_b = _make_visit(db_session, patient, 40000, name="SYNTHETIC-rfin-J")
+    visit_c = _make_visit(db_session, patient, 30000, name="SYNTHETIC-rfin-K")
+    key = str(uuid4())
+
+    first = client.post(
+        GROUPED_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_ids": [visit_a.id, visit_b.id],
+            "amount": 100000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert first.status_code == 200, first.text
+
+    different_set = client.post(
+        GROUPED_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_ids": [visit_a.id, visit_c.id],
+            "amount": 90000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert different_set.status_code == 409, different_set.text
+    assert (
+        different_set.json()["detail"]["reason"] == "client_request_id_intent_mismatch"
+    )
+
+    db_session.expire_all()
+    visit_c_rows = _paid_rows(db_session, visit_c)
+    assert len(visit_c_rows) == 0, "refused replay must not touch visit_c"
+
+
+def test_same_key_from_another_user_is_rejected(client, db_session, admin_auth_headers):
+    """RETRO-FIN-001: the replay path is owner-bound — another authorized
+    account replaying someone else's key gets 409, not the stored payment
+    metadata (the audited missing request-owner check)."""
+    from app.core.security import get_password_hash
+    from app.models.user import User
+    from tests.conftest import mint_access_token
+
+    patient = _make_patient(db_session, phone="+998900550028")
+    visit = _make_visit(db_session, patient, 100000, name="SYNTHETIC-rfin-L")
+    key = str(uuid4())
+
+    first = client.post(
+        SINGLE_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_id": visit.id,
+            "amount": 40000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert first.status_code == 200, first.text
+
+    other_cashier = User(
+        username="rfin_other_cashier",
+        email="rfin_other_cashier@test.com",
+        full_name="Other Cashier",
+        hashed_password=get_password_hash("other-cashier-pass-123"),
+        role="Cashier",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(other_cashier)
+    db_session.commit()
+    db_session.refresh(other_cashier)
+    other_headers = {"Authorization": f"Bearer {mint_access_token(other_cashier)}"}
+
+    other_user_replay = client.post(
+        SINGLE_URL,
+        headers=other_headers,
+        json={
+            "visit_id": visit.id,
+            "amount": 40000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert other_user_replay.status_code == 409, other_user_replay.text
+    assert (
+        other_user_replay.json()["detail"]["reason"]
+        == "client_request_id_owner_mismatch"
+    )
+
+    # The original owner's legitimate retry still replays.
+    owner_retry = client.post(
+        SINGLE_URL,
+        headers=admin_auth_headers,
+        json={
+            "visit_id": visit.id,
+            "amount": 40000,
+            "method": "cash",
+            "client_request_id": key,
+        },
+    )
+    assert owner_retry.status_code == 200, owner_retry.text
+
+    db_session.expire_all()
+    assert len(_paid_rows(db_session, visit)) == 1

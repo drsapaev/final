@@ -549,7 +549,9 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
             ).scalars()
         )
 
-    assert revision == "0090_payment_client_request"
+    # Head pin follows the latest migration (0091 — RETRO-FIN-001
+    # payment request fingerprint).
+    assert revision == "0091_payment_request_fingerprint"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",
