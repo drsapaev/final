@@ -771,7 +771,11 @@ class TestFileSecurity:
         )
         assert pair_upload.status_code == 200, pair_upload.text
         assert "dermatology-photo:v1" in pair_upload.json()["tags"]
-        assert set(pair_upload.json()["tags"]) >= {"dermatology", "photo", "examination"}
+        assert set(pair_upload.json()["tags"]) >= {
+            "dermatology",
+            "photo",
+            "examination",
+        }
 
         # Идемпотентность: повторная загрузка с уже проставленным штампом
         # не дублирует его.
@@ -909,9 +913,7 @@ class TestFileSecurity:
         )
         assert generic_preview.status_code == 403, generic_preview.text
 
-        generic_shares = client.get(
-            f"/api/v1/files/{photo_id}/shares", headers=headers
-        )
+        generic_shares = client.get(f"/api/v1/files/{photo_id}/shares", headers=headers)
         assert generic_shares.status_code == 403, generic_shares.text
 
         generic_share = client.post(
@@ -944,9 +946,7 @@ class TestFileSecurity:
         )
         assert generic_replace.status_code == 403, generic_replace.text
 
-        generic_delete = client.delete(
-            f"/api/v1/files/{photo_id}", headers=headers
-        )
+        generic_delete = client.delete(f"/api/v1/files/{photo_id}", headers=headers)
         assert generic_delete.status_code == 403, generic_delete.text
 
         generic_export = client.post(
@@ -1059,14 +1059,28 @@ class TestFileSecurity:
             suffix=secrets.token_hex(8),
         )
 
-        same_visit_private_upload = _upload_test_photo(
+        # DERMAFILE-BE-001 remediation: a generic Doctor can no longer upload
+        # into the dermatologist's visit (that upload used to be the setup for
+        # this test and codified the cross-visit defect). The private-file
+        # isolation below now uses the generic doctor's OWN visit instead —
+        # the assertion's intent (derma cannot access another doctor's files)
+        # is unchanged.
+        cross_visit_private_upload = _upload_test_photo(
             client,
             headers=other_doctor_headers,
             patient_id=test_patient.id,
             visit_id=own_visit.id,
         )
-        assert same_visit_private_upload.status_code == 200
-        private_file_id = same_visit_private_upload.json()["id"]
+        assert cross_visit_private_upload.status_code == 404
+
+        own_visit_private_upload = _upload_test_photo(
+            client,
+            headers=other_doctor_headers,
+            patient_id=test_patient.id,
+            visit_id=other_visit.id,
+        )
+        assert own_visit_private_upload.status_code == 200
+        private_file_id = own_visit_private_upload.json()["id"]
         assert (
             client.get(
                 f"/api/v1/files/{private_file_id}", headers=derma_headers
@@ -1112,3 +1126,69 @@ class TestFileSecurity:
         )
         assert own_visit_list.status_code == 200
         assert file_id not in {item["id"] for item in own_visit_list.json()["files"]}
+
+    def test_generic_doctor_upload_requires_owned_visit_context(
+        self, client: TestClient, db_session: Session, test_patient
+    ):
+        """DERMAFILE-BE-001 (audit #3892, group 13).
+
+        A generic Doctor must own the submitted ``visit_id`` itself: holding
+        *any* visit for the same patient (or omitting ``patient_id`` entirely,
+        which skips the patient authorization block) must not allow attaching
+        a file to another doctor's visit of that patient.
+        """
+        _, doctor_row, own_visit, doctor_headers = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="Doctor",
+            suffix=secrets.token_hex(8),
+        )
+        _, other_doctor_row, other_visit, _ = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="Doctor",
+            suffix=secrets.token_hex(8),
+        )
+        assert other_doctor_row.id != doctor_row.id
+
+        # Positive control: upload to the doctor's OWN visit stays allowed.
+        own_upload = _upload_test_photo(
+            client,
+            headers=doctor_headers,
+            patient_id=test_patient.id,
+            visit_id=own_visit.id,
+        )
+        assert own_upload.status_code == 200
+        own_file_id = own_upload.json()["id"]
+
+        # Same patient, another doctor's visit: fail closed, no File row.
+        cross_visit_upload = _upload_test_photo(
+            client,
+            headers=doctor_headers,
+            patient_id=test_patient.id,
+            visit_id=other_visit.id,
+        )
+        assert cross_visit_upload.status_code == 404
+        assert (
+            db_session.query(File).filter(File.visit_id == other_visit.id).count() == 0
+        )
+
+        # visit_id only (patient_id omitted — patient check skipped entirely):
+        # still fail closed, no File row anywhere for this actor.
+        bare_visit_upload = _upload_test_photo(
+            client,
+            headers=doctor_headers,
+            patient_id=None,
+            visit_id=other_visit.id,
+        )
+        assert bare_visit_upload.status_code == 404
+        assert (
+            db_session.query(File).filter(File.visit_id == other_visit.id).count() == 0
+        )
+
+        # The positive-control upload is attributed to the OWN visit only.
+        own_visit_files = db_session.query(File).filter(File.visit_id == own_visit.id)
+        assert own_visit_files.count() == 1
+        assert [f.id for f in own_visit_files][0] == own_file_id
