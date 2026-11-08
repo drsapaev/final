@@ -428,6 +428,7 @@ async function openPublicAddress(
   origin: string,
   publicCode: string,
   recordAssetPage: (page: Page) => void,
+  flushAssetPage: (page: Page) => Promise<void>,
 ): Promise<{
   context: Awaited<ReturnType<Browser['newContext']>>;
   page: Page;
@@ -447,12 +448,12 @@ async function openPublicAddress(
   try {
     await page.goto('/q/' + publicCode, { waitUntil: 'domcontentloaded' });
   } catch {
-    await context.close().catch(() => undefined);
+    await closePublicContext(context, page, flushAssetPage);
     throw new Error('Anonymous permanent QR navigation failed.');
   }
   const response = await responsePromise;
   if (!response) {
-    await context.close().catch(() => undefined);
+    await closePublicContext(context, page, flushAssetPage);
     throw new Error('Anonymous permanent QR did not request exactly one short session.');
   }
   let targetDate: string | null = null;
@@ -467,6 +468,18 @@ async function openPublicAddress(
     status: response.status(),
     targetDate,
   };
+}
+
+async function closePublicContext(
+  context: Awaited<ReturnType<Browser['newContext']>>,
+  page: Page,
+  flushAssetPage: (page: Page) => Promise<void>,
+) {
+  try {
+    await flushAssetPage(page);
+  } finally {
+    await context.close().catch(() => undefined);
+  }
 }
 
 async function waitForPublicForm(page: Page) {
@@ -519,11 +532,15 @@ function markRq18Phase(phase: string) {
 
 function createServedAssetRecorder() {
   const hashesByOriginAndPath = new Map<string, Set<string>>();
-  const pending: Promise<void>[] = [];
-  const captureFailures = new Set<string>();
+  const pending = new Set<Promise<void>>();
+  const pendingByPage = new WeakMap<Page, Set<Promise<void>>>();
+  const captureFailures = new Map<string, string>();
   const notModifiedResponses = new Set<string>();
+  const responseBodyTimeoutMs = 15_000;
 
   const recordPage = (assetPage: Page) => {
+    const pagePending = new Set<Promise<void>>();
+    pendingByPage.set(assetPage, pagePending);
     assetPage.on('response', (response) => {
       const resourceType = response.request().resourceType();
       if (resourceType !== 'script' && resourceType !== 'stylesheet') return;
@@ -532,7 +549,7 @@ function createServedAssetRecorder() {
       try {
         url = new URL(response.url());
       } catch {
-        captureFailures.add('invalid-static-response-url');
+        captureFailures.set('invalid-static-response-url', 'invalid-url');
         return;
       }
       if (!url.pathname.startsWith('/assets/') && url.pathname !== '/sw.js') return;
@@ -543,26 +560,65 @@ function createServedAssetRecorder() {
         return;
       }
       if (response.status() !== 200) {
-        captureFailures.add(key);
+        captureFailures.set(key, 'http-' + response.status());
         return;
       }
 
-      pending.push(response.body().then((body) => {
+      let timedOut = false;
+      const bodyCapture = response.body().then((body) => {
+        if (timedOut) return;
         const digest = crypto.createHash('sha256').update(body).digest('hex');
         const hashes = hashesByOriginAndPath.get(key) || new Set<string>();
         hashes.add(digest);
         hashesByOriginAndPath.set(key, hashes);
       }).catch(() => {
-        captureFailures.add(key);
-      }));
+        if (!timedOut) captureFailures.set(key, 'body-rejected');
+      });
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<'timeout'>((resolve) => {
+        timeoutId = setTimeout(() => resolve('timeout'), responseBodyTimeoutMs);
+      });
+      const captureTask: Promise<void> = Promise.race([
+        bodyCapture.then(() => 'captured' as const),
+        timeout,
+      ]).then((result) => {
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
+        if (result === 'timeout') {
+          timedOut = true;
+          captureFailures.set(key, 'body-timeout');
+        }
+      }).finally(() => {
+        pending.delete(captureTask);
+        pagePending.delete(captureTask);
+      });
+      pending.add(captureTask);
+      pagePending.add(captureTask);
     });
   };
 
+  const flushPage = async (assetPage: Page) => {
+    const pagePending = pendingByPage.get(assetPage);
+    while (pagePending?.size) {
+      await Promise.all(Array.from(pagePending));
+    }
+  };
+
   const reportForOrigin = async (expectedOrigin: string) => {
-    await Promise.all(pending);
-    if (Array.from(captureFailures).some((key) => key === 'invalid-static-response-url'
-        || key.startsWith(expectedOrigin + '/'))) {
-      throw new Error('One or more same-run static asset responses could not be hashed.');
+    while (pending.size) {
+      await Promise.all(Array.from(pending));
+    }
+    const failures = Array.from(captureFailures.entries())
+      .filter(([key]) => key === 'invalid-static-response-url'
+        || key.startsWith(expectedOrigin + '/'))
+      .map(([key, reason]) => {
+        const path = key === 'invalid-static-response-url'
+          ? 'invalid-url'
+          : key.slice(expectedOrigin.length);
+        return path + ':' + reason;
+      })
+      .sort();
+    if (failures.length > 0) {
+      throw new Error('Same-run static assets could not be hashed: ' + failures.join(', '));
     }
     if (Array.from(notModifiedResponses).some((key) => key.startsWith(expectedOrigin + '/')
         && !hashesByOriginAndPath.has(key))) {
@@ -589,7 +645,7 @@ function createServedAssetRecorder() {
     }
   };
 
-  return { recordPage, reportForOrigin };
+  return { recordPage, flushPage, reportForOrigin };
 }
 
 test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', async ({ browser, page }) => {
@@ -703,7 +759,9 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
 
   let bookingTargetDate = '';
   markRq18Phase('anonymous-booking-and-resource-ownership');
-  const booking = await openPublicAddress(browser, appOrigin, publicCode, servedAssets.recordPage);
+  const booking = await openPublicAddress(
+    browser, appOrigin, publicCode, servedAssets.recordPage, servedAssets.flushPage,
+  );
   try {
     if (booking.status !== 200 || booking.startCount.value !== 1) {
       throw new Error('Available permanent QR did not open exactly one anonymous short session.');
@@ -741,18 +799,20 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
     }
     markRq18Phase('anonymous-resource-ownership-confirmed');
   } finally {
-    await booking.context.close().catch(() => undefined);
+    await closePublicContext(booking.context, booking.page, servedAssets.flushPage);
   }
 
   markRq18Phase('reopen-permanent-address');
-  const reopen = await openPublicAddress(browser, appOrigin, publicCode, servedAssets.recordPage);
+  const reopen = await openPublicAddress(
+    browser, appOrigin, publicCode, servedAssets.recordPage, servedAssets.flushPage,
+  );
   try {
     if (reopen.status !== 200 || reopen.startCount.value !== 1) {
       throw new Error('Reopening the permanent QR did not create one fresh short session.');
     }
     await waitForPublicForm(reopen.page);
   } finally {
-    await reopen.context.close().catch(() => undefined);
+    await closePublicContext(reopen.context, reopen.page, servedAssets.flushPage);
   }
 
   markRq18Phase('deactivate-resource-preserving-current-queue');
@@ -806,7 +866,9 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
     throw new Error('QueueProfile archival did not close public booking while preserving the permanent QR address.');
   }
 
-  const archived = await openPublicAddress(browser, appOrigin, publicCode, servedAssets.recordPage);
+  const archived = await openPublicAddress(
+    browser, appOrigin, publicCode, servedAssets.recordPage, servedAssets.flushPage,
+  );
   try {
     if (archived.status !== 404 || archived.startCount.value !== 1) {
       throw new Error('Archived direction did not fail closed through the anonymous start-session route.');
@@ -817,7 +879,7 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
       throw new Error('Anonymous refusal exposed internal direction details.');
     }
   } finally {
-    await archived.context.close().catch(() => undefined);
+    await closePublicContext(archived.context, archived.page, servedAssets.flushPage);
   }
 
   markRq18Phase('reactivate-resource');
@@ -845,14 +907,16 @@ test('RQ-18: current permanent QR booking and archive/reactivation lifecycle', a
     throw new Error('Resource and profile restoration did not restore availability for the same permanent QR address.');
   }
 
-  const reactivated = await openPublicAddress(browser, appOrigin, publicCode, servedAssets.recordPage);
+  const reactivated = await openPublicAddress(
+    browser, appOrigin, publicCode, servedAssets.recordPage, servedAssets.flushPage,
+  );
   try {
     if (reactivated.status !== 200 || reactivated.startCount.value !== 1) {
       throw new Error('Reactivated permanent QR did not open a fresh anonymous short session.');
     }
     await waitForPublicForm(reactivated.page);
   } finally {
-    await reactivated.context.close().catch(() => undefined);
+    await closePublicContext(reactivated.context, reactivated.page, servedAssets.flushPage);
   }
 
   markRq18Phase('completed');
