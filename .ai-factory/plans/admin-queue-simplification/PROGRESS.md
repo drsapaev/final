@@ -2,21 +2,22 @@
 
 Plan version: 1.0
 Current task: T18.10 selected-profile return-context repair and remaining T18 acceptance
-Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN, non-draft, CLEAN and mergeable; code candidate HEAD `6001e13dc2c7ea74ec66b990d6f14ad3958a5f2d` passed exact-head Unified CI and PR gates after sync with `origin/main` `9d1b0e808563509e553f990dd0fbb893d2a7c723`; this follow-up changes only T18 journals and requires new path-aware checks; T18.10 browser acceptance and current-source RQ-18 remain NOT_RUN; overall T18/Tier-2 remain PARTIAL; user owns merge/deployment
+Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN, non-draft; remote HEAD `af0eedb6e496812780c67737037f168021155b97` has successful applicable CI but is behind `origin/main`; local branch is synchronized to `origin/main` `5e6fb56e3f47f6e16f2590a3333ddd74e1680869` at `653fae5137d125a085f18ba158d908d506da70b5`, not yet pushed; T18.10 browser acceptance and current-source RQ-18 remain NOT_RUN; overall T18/Tier-2 remain PARTIAL; user owns merge/deployment
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`
 Branch: `codex/aqs-t18-selected-profile-context-20261108`
 Source/test commit: `404ba482a26085ee740ee10d16959b2504c9bd72`
-Previous PR HEAD: `f7c3cbde67c6952edb2416850bccfe835537862d`; GitHub reported `BEHIND` before synchronization
-Current `origin/main`: `9d1b0e808563509e553f990dd0fbb893d2a7c723`
-Last updated: 2026-11-08T09:41:59+05:00
+Remote PR HEAD before latest sync: `af0eedb6e496812780c67737037f168021155b97`
+Current local candidate: `653fae5137d125a085f18ba158d908d506da70b5` (merge of latest `origin/main`; push pending)
+Current `origin/main`: `5e6fb56e3f47f6e16f2590a3333ddd74e1680869`
+Last updated: 2026-11-08T10:02:24+05:00
 
-## Current checkpoint — PR #3925 synchronized; T18 acceptance remains open
+## Current checkpoint — latest main merged locally; PR push and T18 acceptance remain open
 
 | Task | Status | Evidence |
 |------|--------|----------|
 | T00–T17 | MERGED | Existing plan journals; latest merge on this worktree is #3897 at `569d5fe5` |
 | T18 scenarios 1–9 | VALIDATED on recorded source revisions | Historical scenario evidence remains revision-scoped; reconcile against final candidate before claiming integrated completion |
-| T18.10 selected-profile source fix | VALIDATED locally and by exact-head checks on `6001e13d` | Universal editor links preserve URL-owned `profile=specialists`; focused test checks `setupProfile`, day, section, return marker, and absence of entity binding; no live Admin/2FA acceptance yet |
+| T18.10 selected-profile source fix | VALIDATED locally and by exact-head CI on prior source candidate `6001e13d`; focused checks also pass after latest main sync | Universal editor links preserve URL-owned `profile=specialists`; focused test checks `setupProfile`, day, section, return marker, and absence of entity binding; no live Admin/2FA acceptance yet |
 | T18.10 synthetic Admin/2FA flow | NOT_RUN on candidate | Must verify actual `specialists` row and editor return/reload/Back/Forward plus protected DELETE 409 on the candidate commit |
 | Current-source RQ-18 | NOT_RUN | Earlier Session is tied to an older runtime; rerun only when safe staging resources are available |
 | Full staging runbook / served-build provenance | PARTIAL / NOT_RUN | `STAGING_VALIDATION.md` and canonical served-revision attestation remain outstanding |
@@ -24,14 +25,16 @@ Last updated: 2026-11-08T09:41:59+05:00
 
 ### Candidate work and local validation
 
-- PR #3925 code candidate HEAD `6001e13dc2c7ea74ec66b990d6f14ad3958a5f2d`, based on current main `9d1b0e808563509e553f990dd0fbb893d2a7c723`, is OPEN, non-draft, CLEAN and mergeable. The code/test commit is `404ba482a26085ee740ee10d16959b2504c9bd72`; main-sync commit `54873073` integrated the two incoming main commits without conflicts. They touched only backend file-security code/tests, not this PR's frontend.
+- PR #3925 remote HEAD `af0eedb6e496812780c67737037f168021155b97` is OPEN/non-draft, mergeable, and currently BEHIND. Its exact-head Unified CI run `42447963219` completed SUCCESS, including Frontend E2E, unit tests, build, lint, PR Required Gate, and applicable quality/security checks. Path-aware backend, Docker, parity and other jobs were skipped, not passed. No GitHub review submission is present yet.
+- Latest `origin/main` is `5e6fb56e3f47f6e16f2590a3333ddd74e1680869` (#3926 plus its migration follow-up). It was merged into the clean owned PR branch without conflicts at local candidate `653fae5137d125a085f18ba158d908d506da70b5`. Incoming changes are payment idempotency/model/migration/tests and the payment modal; they do not overlap the selected-profile source/test paths. The branch is four commits ahead of its remote and the sync is not yet pushed.
 - Mandatory launcher was run from `ai/langgraph` with the confirmed root and five exact reviewed source/journal paths. It returned `Result: narrow_override`, `gate_misroute: no`, `override_used: yes`, and `Handoff required: yes`; the execution prompt was read and followed.
-- Post-sync focused Vitest: 25/25 PASS. Scoped ESLint on `AdminSetupDirections.tsx` and its focused test: PASS. `git diff --check`: PASS before this journal-only update. Frontend build passed at unchanged source/test commit `404ba482` with a 1 GiB heap cap.
-- Exact-head Unified CI `42446723687` on code candidate `6001e13d`: SUCCESS (7 jobs success, 14 skipped). Frontend unit tests, build, lint, E2E and PR Required Gate passed. PR Review Quality Gate `42447162359`, lifecycle recommendation `42447162383`, Regression Audit, i18n, security, Gitleaks, CodeQL, GitGuardian and scratch guards passed. Backend, integration, Docker, staging/production readiness, parity, k6 and DAST jobs were skipped by scope and are not counted as passed. This checkpoint is a docs-only follow-up; its new head must receive its own applicable gates.
+- Focused Vitest at `653fae5137d125a085f18ba158d908d506da70b5`: 25/25 PASS. Scoped ESLint on `AdminSetupDirections.tsx` and its focused test: PASS. `git diff --check`: PASS after the latest-main merge and before this journal update. The new candidate has not yet received remote CI.
+- Previous exact-head Unified CI `42446723687` on `6001e13d` and current remote-head Unified CI `42447963219` on `af0eedb6`: SUCCESS; the latter's Frontend E2E has now completed successfully. The locally synchronized candidate `653fae5` still needs push and exact-head checks.
 - The gate for this journal-only checkpoint used known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md` and exactly the three journal paths. Result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; the generated execution prompt was read. No source, test, gate, or router files were edited in this checkpoint.
-- At the latest host check, free RAM was 1.69 GiB and Ubuntu-24.04 WSL was stopped. No staging, Docker or WSL startup was attempted in this checkpoint. Recheck resources before the remaining Tier-2 session; do not reuse or remove another task's resources.
+- Latest host check in this turn: 1.87 GiB free RAM. No staging, Docker or WSL startup was attempted. Recheck resources before the remaining Tier-2 session; do not reuse or remove another task's resources.
 - The worktree initially had no `frontend/node_modules`; 900 packages were installed from its unchanged lockfile for local validation. The validation `frontend/node_modules` and generated `frontend/dist` are ignored worktree artifacts. Cleanup was attempted only after resolving target paths inside this worktree, but the host command policy blocked recursive removal; do not bypass it.
-- No staging, Docker, WSL, backend test, production, PR merge, or deployment action was performed in this synchronization slice.
+- No staging, Docker, production, PR merge, or deployment action was performed in this synchronization slice. A read-only WSL running-list check returned garbled console encoding, so current distro running state is not recorded.
+- Next exact action: add this corrected checkpoint to the existing PR branch, push its latest-main sync, and verify exact-head checks plus independent review. If green, leave merge to the user. After user merge, run one bounded synthetic staging Session for the missing T18.10 and current-source RQ-18 checks, then finish only outstanding runbook items and reconcile final evidence.
 
 ## Previous checkpoint — stale #3897 state (historical; superseded above)
 
