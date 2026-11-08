@@ -2,16 +2,38 @@
 
 Plan version: 1.0
 Current task: T18.10 selected-profile return-context repair and remaining T18 acceptance
-Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN/non-draft at remote HEAD `afd968641c79eec0ed5484d2b291abca392d29e9` (base `5e6fb56e3f47f6e16f2590a3333ddd74e1680869`); local branch includes latest `origin/main` `372d6924e964613524c5c9e77fd8f456f4d1f2e4` at candidate `f47e27f3a06c5a7be48267839ab0323fe84dffb6`, two commits ahead of remote; focused local test, ESLint, and diff check PASS on this candidate; exact-head hosted checks and independent review pending; T18.10 live Admin/2FA and current-source RQ-18 remain NOT_RUN; Tier-2/T18 PARTIAL; user owns merge/deployment
+Current status: IN_PROGRESS; T00–T17 MERGED; PR #3925 OPEN/non-draft; validated code candidate `fd724c42319c8987c1438e14ec7aabe3d550b41b` is based on current main `372d6924e964613524c5c9e77fd8f456f4d1f2e4` and its applicable exact-head CI passed; current checkpoint is journal-only; no independent GitHub review is recorded; T18.10 live Admin/2FA and current-source RQ-18 remain NOT_RUN; Tier-2/T18 PARTIAL; user owns merge/deployment
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`
 Branch: `codex/aqs-t18-selected-profile-context-20261108`
 Source/test commit: `404ba482a26085ee740ee10d16959b2504c9bd72`
-Remote PR HEAD before latest sync: `af0eedb6e496812780c67737037f168021155b97`
-Current local candidate: `f47e27f3a06c5a7be48267839ab0323fe84dffb6` (merge of latest `origin/main`; push pending)
+Last validated code candidate: `fd724c42319c8987c1438e14ec7aabe3d550b41b` (latest code tree synced with `origin/main`; CI PASS; this checkpoint adds only journal updates)
 Current `origin/main`: `372d6924e964613524c5c9e77fd8f456f4d1f2e4`
-Last updated: 2026-11-08T10:40:31+05:00
+Last updated: 2026-11-08T11:02:02+05:00
 
-## Current checkpoint — #3923 main sync merged locally; PR update and T18 acceptance remain open
+## Current checkpoint — PR #3925 code CI passed; T18 acceptance remains open
+
+| Task | Status | Evidence |
+|------|--------|----------|
+| T00–T17 | MERGED | Existing plan journals; latest queue-plan PR #3897 merged at `569d5fe5` |
+| T18 scenarios 1–9 | VALIDATED on recorded source revisions; final-source reconciliation IN_PROGRESS | Historical evidence remains tied to each tested revision; inspected code deltas do not justify upgrading the old Session SHA to a final-candidate PASS |
+| T18.10 selected-profile source fix | VALIDATED by focused test and applicable CI on code candidate `fd724c4` | All three editor links retain the URL-owned `specialists` profile and selected day; live Admin/2FA acceptance remains NOT_RUN |
+| T18.10 synthetic Admin/2FA flow | NOT_RUN | Verify actual `specialists` profile, editor navigation/return, reload, Back/Forward, old URLs, and protected DELETE 409 with row retained |
+| Current-source RQ-18 | NOT_RUN | Previous live run used `5363a9ca`; QueueJoin/queue consumers changed in #3899/#3901/#3904, so repeat on final source |
+| Full staging runbook / served-build provenance | PARTIAL / NOT_RUN | Required `STAGING_VALIDATION.md` checks and canonical current-build attestation remain incomplete |
+| T18 overall / Tier-2 | PARTIAL | Do not claim full acceptance, production readiness, or system health |
+
+### PR #3925 exact-code validation and source reconciliation
+
+- PR #3925 was OPEN, non-draft, mergeable at code HEAD `fd724c42319c8987c1438e14ec7aabe3d550b41b`, based on `372d6924e964613524c5c9e77fd8f456f4d1f2e4` (#3923). The PR body was refreshed after this commit. Review submissions and inline threads were empty at the latest read; no independent approval is claimed.
+- Unified CI run `42451815636` completed SUCCESS on `fd724c4`: Frontend lint, unit, build, E2E, PR Required Gate, and Notifications PASS. Frontend E2E's Registrar, UX/visual, Lab dirty-guard, Lab full-path, Business/Security/Concurrency, and Load/Chaos groups all completed successfully. PR Review Quality Gate `42451896992`, Lifecycle Recommendation `42451896829`, Regression Audit `42451815618`, i18n `42451815657`, Security `42451815700`, Gitleaks `42451815615`, and Agent Workflow Guards `42451815678` also passed. Backend, integration, Docker, frontend/backend parity, Code Quality, Metadata, Telegram release, Context Boundary, documentation generation, staging/production readiness, k6 and DAST jobs were SKIPPED by path/scope, not passed.
+- Local validation on the merged source tree before the journal-only commit: focused Vitest `adminSetupDirections.textPin.test.tsx` — 25/25 PASS; scoped ESLint — PASS; `git diff --check` — PASS. Pre-commit conflict, whitespace, and Gitleaks checks passed when `fd724c4` was created.
+- Read-only T18 reconciliation: the inspected QueueProfile/read/cabinet/quota backend paths have no later implementation commits between their recorded `bfc33837`/`64a7c0b9` T18 source revisions and current `main`. The relevant UI delta is #3884 (`1e7e43dc`): `QueueProfilesManager` now submits only dirty fields and has explicit-availability tests; the current candidate frontend unit suite passed, but T18.3/T18.4's integrated staging behavior is not upgraded to PASS without a live check. Public QR/queue consumers changed after the prior live RQ-18 runtime `5363a9ca` in #3899 (`2093745a`), #3901 (`f456868a`), and #3904 (`539e030`); current-source RQ-18 still requires a live run.
+- Host resources: latest read showed 1.83 GiB free RAM of 7.69 GiB. No WSL, Docker, Compose, or staging was started. Recheck before the single combined synthetic session; do not create repeated per-scenario projects.
+- Current source review of the selected-profile diff confirmed `setupEditorLink()` passes `selectedProfileKey`; focused regression asserts all destinations retain `setupProfile`, day, section, return marker, and no entity binding. No new P0/P1/P2 was found in that narrow source/test diff. This is not an independent GitHub review.
+- This checkpoint's allowed files remain the three T18 journals. Runtime, source/test, gate/router, shared staging configuration, production, merge, and deployment are outside this journal-only slice. The exact current journal PR tip must pass its own applicable checks before merge.
+- Next: finish this journal checkpoint and inspect it; commit/push it to #3925 and confirm exact-head documentation gates. Obtain the repository-required independent review; leave merge to the user. After merge, execute one bounded synthetic session for T18.10, current-source RQ-18, affected profile/Qr interactions, runbook items, viewport/keyboard checks, diagnostics, exact asset provenance, and cleanup; reconcile unchanged T18.1–T18.9 evidence without replaying their scenarios unnecessarily.
+
+## Previous checkpoint — #3923 main sync merged locally; before exact-head CI completed
 
 | Task | Status | Evidence |
 |------|--------|----------|

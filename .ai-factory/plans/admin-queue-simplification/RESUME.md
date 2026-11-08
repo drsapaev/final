@@ -1,4 +1,18 @@
-# Current resume — #3923 sync is local; PR push and T18 acceptance remain — 2026-11-08T10:40:31+05:00
+# Current resume — code CI passed; T18 staging remains — 2026-11-08T11:02:02+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`, branch `codex/aqs-t18-selected-profile-context-20261108`. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.
+
+PR #3925's validated code candidate is `fd724c42319c8987c1438e14ec7aabe3d550b41b`, based on current main `372d6924e964613524c5c9e77fd8f456f4d1f2e4` (#3923). Its exact-code Unified CI, Frontend lint/unit/build/E2E and PR Required Gate passed, as did the latest PR Review Quality Gate, lifecycle, Regression Audit, i18n, Security, Gitleaks and Agent Workflow Guards. Backend, integration, Docker, parity, readiness, k6, DAST and other path-aware jobs were skipped. The PR is OPEN/non-draft and mergeable; no independent review submission or inline thread exists. The current journal-only update must be committed/pushed and its applicable gates verified before merge.
+
+Local checks on the merged code tree: focused Vitest 25/25 PASS, scoped ESLint PASS, `git diff --check` PASS, and pre-commit conflict/whitespace/Gitleaks checks PASS. Read-only source comparison found #3884 changed QueueProfilesManager's edit payload (dirty fields); its current frontend tests pass, but T18.3/T18.4 integrated behavior remains for the staging session. Public QR/queue behavior changed after the previous live RQ-18 run in #3899/#3901/#3904, so current-source RQ-18 is NOT_RUN and must be retested.
+
+T18.10 live Admin/2FA, current-source RQ-18, full `STAGING_VALIDATION.md`, final asset provenance, viewport/keyboard/cross-language checks and current console diagnosis remain open. Earlier 9/11 console events were reproduced; two remain unexplained and eight bundle call sites unmapped. T18.1–T18.9 are PASS only on their recorded source revisions and require final-source reconciliation. Last known free RAM was 1.83 GiB; no staging started.
+
+Next: finalize and push the three-journal update, verify exact-head docs gates, and obtain the repository-required independent review; user merges. After merge, recheck resources and run one owned synthetic staging session that combines the outstanding T18 and runbook assertions; verify served bytes against exact source and tear down all owned resources. Do not mark T18 complete while any required item remains NOT_RUN.
+
+---
+
+## Previous resume — #3923 sync before exact-head CI completed — 2026-11-08T10:40:31+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`, branch `codex/aqs-t18-selected-profile-context-20261108`. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.
 
