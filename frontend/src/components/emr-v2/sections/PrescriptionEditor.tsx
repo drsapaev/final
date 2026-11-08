@@ -9,7 +9,7 @@
  * 4. Удалять/Редактировать
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Pill } from 'lucide-react';
 import './PrescriptionEditor.css';
 import { Input } from '../../ui/macos';
@@ -38,7 +38,40 @@ export interface PrescriptionEditorProps {
   isEditable?: boolean;
   /** Called when the field is first touched. */
   onFieldTouch?: (fieldName?: string) => void;
+  /**
+   * EMRPRES-FE-001 (audit 3886, round 19): canonical visit identity that
+   * owns the uncommitted draft form. When the parent re-renders this
+   * component for ANOTHER visit/patient (in-place prop change, e.g. the
+   * dermatologist panel without a remount key), the half-typed medication
+   * draft of the previous visit is discarded so «Добавить» can never commit
+   * visit A's drug into visit B's structured list.
+   */
+  visitKey?: string | number | null;
   [key: string]: unknown;
+}
+
+// EMRPRES-FE-003 (audit 3886, round 19): Date.now()-derived ids collide when
+// two Add events land in the same millisecond (or under a mocked/frozen
+// clock) — the delete filter then removed BOTH rows and React saw duplicate
+// keys. Client ids are now monotonic per module instance + carry a random
+// suffix, so they stay unique even with a frozen clock and across remounts.
+let rxClientSeq = 0;
+function nextClientId(): string {
+  rxClientSeq += 1;
+  return `rx-${Date.now().toString(36)}-${rxClientSeq}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// EMRPRES-FE-004 (audit 3886, round 19): the DTO explicitly permits alias
+// fields (name|drug, dose|dosage, frequency|freq). Canonicalize at the
+// display boundary; the original record is never mutated.
+function displayName(p: PrescriptionItem): string {
+  return String(p.name ?? p.drug ?? '');
+}
+function displayDose(p: PrescriptionItem): string {
+  return String(p.dose ?? p.dosage ?? '');
+}
+function displayFrequency(p: PrescriptionItem): string {
+  return String(p.frequency ?? p.freq ?? '');
 }
 
 type TFunc = (key: string, options?: Record<string, unknown>) => string;
@@ -64,7 +97,8 @@ const PrescriptionEditor = ({
   prescriptions = [],
   onChange,
   isEditable = true,
-  onFieldTouch
+  onFieldTouch,
+  visitKey
 }: PrescriptionEditorProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   const [isAdding, setIsAdding] = useState(false);
@@ -76,6 +110,22 @@ const PrescriptionEditor = ({
     note: ''
   });
   const [suggestions, setSuggestions] = useState<DrugSuggestion[]>([]);
+
+  // EMRPRES-FE-001 (audit 3886, round 19): the draft form belongs to the
+  // visit it was started in. A visit-identity change (different patient/
+  // visit reusing this mounted component) resets the uncommitted draft:
+  // half-typed values of visit A can neither stay visible nor be committed
+  // into visit B's list. A temporary read-only phase inside the SAME visit
+  // (autosave locking the fields) intentionally keeps the draft — only a
+  // context switch discards it.
+  const lastVisitKeyRef = useRef<string | number | null | undefined>(visitKey);
+  useEffect(() => {
+    if (lastVisitKeyRef.current === visitKey) return;
+    lastVisitKeyRef.current = visitKey;
+    setNewItem({ name: '', dose: '', frequency: '', duration: '', note: '' });
+    setIsAdding(false);
+    setSuggestions([]);
+  }, [visitKey]);
 
   // Handlers
   const handleInputChange = (field: string, value: string) => {
@@ -107,7 +157,8 @@ const PrescriptionEditor = ({
   const handleAdd = () => {
     if (!newItem.name) return;
 
-    const updated = [...prescriptions, { ...newItem, id: Date.now() }];
+    // EMRPRES-FE-003: collision-resistant client id (see nextClientId).
+    const updated = [...prescriptions, { ...newItem, id: nextClientId() }];
     onChange?.(updated);
     onFieldTouch?.('prescriptions');
 
@@ -116,8 +167,14 @@ const PrescriptionEditor = ({
     setIsAdding(false);
   };
 
-  const handleDelete = (id: string | number) => {
-    const updated = prescriptions.filter((p) => p.id !== id);
+  // EMRPRES-FE-002 (audit 3886, round 19): deletion no longer requires an
+  // id. The old handler was `p.id !== undefined && handleDelete(p.id)`, so
+  // valid ID-less imported/legacy prescriptions rendered a working-looking
+  // Trash button that silently did nothing. Rows are now removed by exact
+  // object identity from the current list — duplicates by name (or rows
+  // sharing a colliding id) can no longer delete each other.
+  const handleDeleteItem = (item: PrescriptionItem) => {
+    const updated = prescriptions.filter((p) => p !== item);
     onChange?.(updated);
     onFieldTouch?.('prescriptions');
   };
@@ -128,13 +185,13 @@ const PrescriptionEditor = ({
             {prescriptions.length > 0 &&
       <div className="prescription-list">
                     {prescriptions.map((p, idx) =>
-        <div key={p.id || idx} className="prescription-item">
+        <div key={p.id ?? `row-${idx}`} className="prescription-item">
                             <Pill size={16} className="prescription-item__icon" />
                             <div className="prescription-item__content">
-                                <span className="prescription-item__name">{p.name}</span>
+                                <span className="prescription-item__name">{displayName(p)}</span>
                                 <span className="prescription-item__details">
-                                    {p.dose && `${p.dose} `}
-                                    {p.frequency && `• ${p.frequency} `}
+                                    {displayDose(p) && `${displayDose(p)} `}
+                                    {displayFrequency(p) && `• ${displayFrequency(p)} `}
                                     {p.duration && `• ${p.duration}`}
                                 </span>
                             </div>
@@ -142,7 +199,7 @@ const PrescriptionEditor = ({
           <div className="prescription-item__actions">
                                     <button
               className="prescription-action-btn prescription-action-btn--delete"
-              onClick={() => p.id !== undefined && handleDelete(p.id)}
+              onClick={() => handleDeleteItem(p)}
               title={t('misc.pe_udalit')}
               aria-label={t('misc.pe_udalit_naznachenie')}>
               

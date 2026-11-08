@@ -57,6 +57,12 @@ interface TreatmentSectionProps {
   doctorId?: string | number | null | undefined;
   experimentalGhostMode?: boolean;
   onTelemetry?: ((payload: Record<string, unknown>) => void) | undefined;
+  /**
+   * EMRPRES-FE-001 (audit 3886, round 19): canonical visit identity for the
+   * structured prescription editor — passed down so the uncommitted draft
+   * form is discarded when the mounted editor switches to another visit.
+   */
+  visitKey?: string | number | null;
 }
 
 
@@ -78,7 +84,8 @@ export function TreatmentSection({
   onRequestAI,
   doctorId,
   experimentalGhostMode = false,
-  onTelemetry
+  onTelemetry,
+  visitKey
 }: TreatmentSectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
   const [showTemplates, setShowTemplates] = useState(false);
@@ -231,7 +238,8 @@ export function TreatmentSection({
                 <PrescriptionEditor
           prescriptions={(medications || []) as import('./PrescriptionEditor').PrescriptionItem[]}
           onChange={onMedicationsChange}
-          isEditable={!disabled} />
+          isEditable={!disabled}
+          visitKey={visitKey} />
         
             </div>
 

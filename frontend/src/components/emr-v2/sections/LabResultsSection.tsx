@@ -104,6 +104,16 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
   // предыдущие строки.
   const requestEpochRef = useRef(0);
 
+  // EMRORDER-FE-001 (audit 3886, round 19): the mounted section can be
+  // re-rendered in place for ANOTHER patient/visit while a confirmation
+  // dialog or template fetch is pending. The latest mounted context is
+  // tracked in a ref; every async completion (confirm resolution, template
+  // list, createOrder ACK) re-checks it against the context the intent was
+  // STARTED in and drops stale intents instead of dispatching them under
+  // the new visit's header.
+  const contextRef = useRef({ patientId, visitId });
+  contextRef.current = { patientId, visitId };
+
   const loadInstances = useCallback(async (epoch: number) => {
     if (epoch !== requestEpochRef.current) return;
     if (!patientId && !visitId) {
@@ -204,16 +214,39 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
     }
   };
 
+  // EMRORDER-FE-001 (audit 3886, round 19): a patient/visit switch
+  // invalidates the order-modal state — the pending confirmation intent
+  // and the async template list belonged to the PREVIOUS visit and must
+  // not survive into the new context's UI. (The confirm promise itself is
+  // resolved by the shared dialog; the recheck in handleOrder drops it.)
+  useEffect(() => {
+    setShowOrderModal(false);
+    setTemplates([]);
+    setTemplatesLoading(false);
+  }, [patientId, visitId]);
+
   // P1 fix: Order lab tests — opens a modal listing published templates.
   const handleOpenOrderModal = async () => {
+    const startContext = contextRef.current;
     setShowOrderModal(true);
     setTemplatesLoading(true);
     try {
       const result = await labReportingApi.listTemplates();
+      // EMRORDER-FE-001: the modal was (re)opened under `startContext` —
+      // a template list resolving after a context switch stays attached to
+      // the old visit and is dropped.
+      if (contextRef.current.patientId !== startContext.patientId
+        || contextRef.current.visitId !== startContext.visitId) {
+        return;
+      }
       const list = Array.isArray(result) ? result : ((result as Record<string, unknown>)?.items || []);
       // Only show templates that have a published version.
       setTemplates((list as LabTemplate[]).filter((tpl) => tpl.published_version_id));
     } catch (err: unknown) {
+      if (contextRef.current.patientId !== startContext.patientId
+        || contextRef.current.visitId !== startContext.visitId) {
+        return;
+      }
       const errShape = err as { message?: string };
       logger.warn('[LabResultsSection] Failed to load templates', { error: errShape?.message });
       setTemplates([]);
@@ -223,6 +256,8 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
   };
 
   const handleOrder = async (templateId: string | number, templateName: string) => {
+    // The intent is bound to the context it was started in.
+    const startContext = contextRef.current;
     // UX-AUDIT-FIX9: подтверждение перед созданием заказа.
     // STRAT#12: строки мигрированы на t() / tInterpolate() из labTranslations.
     const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
@@ -234,6 +269,18 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
       intent: 'primary',
     });
     if (!ok) return;
+    // EMRORDER-FE-001: recheck before the irreversible createOrder — the
+    // mounted EMR must still belong to the patient/visit the intent was
+    // started in; a late confirm of visit A must not create A's order (and
+    // show a success toast) inside visit B's active EMR.
+    if (contextRef.current.patientId !== startContext.patientId
+      || contextRef.current.visitId !== startContext.visitId) {
+      logger.info('[LabResultsSection] Dropped stale order intent', {
+        templateId: String(templateId),
+        // No PHI in logs: template ids only, never patient/visit ids.
+      });
+      return;
+    }
     setOrdering(true);
     try {
       await labReportingApi.createOrder({
@@ -241,6 +288,13 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
         patient_id: patientId,
         visit_id: visitId,
       });
+      // Second recheck: if the context switched while the POST was in
+      // flight, the order exists server-side, but its success must not be
+      // celebrated inside the new visit's EMR.
+      if (contextRef.current.patientId !== startContext.patientId
+        || contextRef.current.visitId !== startContext.visitId) {
+        return;
+      }
       notify.success(`Заказ «${templateName}» создан. Лаборатория увидит его в очереди.`);
       setShowOrderModal(false);
     } catch (err: unknown) {
