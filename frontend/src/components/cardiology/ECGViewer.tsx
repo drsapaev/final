@@ -4,7 +4,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Просмотр и анализ ЭКГ файлов
  * Согласно MASTER_TODO_LIST строка 247
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   Alert,
@@ -281,6 +281,44 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   const [uploadProgress, setUploadProgress] = useState(0);
   const [ecgParameters, setEcgParameters] = useState<EcgParameters | null>(null);
 
+  // ECGVIEW-FE-002 (audit 3886 round 20): the viewer's local stores (file
+  // list, selected preview, parsed parameters, AI analysis) belong to one
+  // patient/visit context. When that context changes, the previous
+  // patient's local files and previews must disappear and any in-flight
+  // async work started for the old context must not commit into the new
+  // one. Async callbacks capture the epoch at request start and compare it
+  // against the live ref before every commit.
+  const ownerKey = `${String(patientId ?? 'none')}|${String(visitId ?? 'none')}`;
+  const ownerEpochRef = useRef(0);
+  const ownerKeyRef = useRef(ownerKey);
+  if (ownerKeyRef.current !== ownerKey) {
+    ownerKeyRef.current = ownerKey;
+    ownerEpochRef.current += 1;
+  }
+  const isStaleContext = (epochAtStart: number) => epochAtStart !== ownerEpochRef.current;
+
+  useEffect(() => {
+    // ECGVIEW-FE-002: reset every patient-scoped local store when the
+    // owner context changes (the tab may stay mounted across selections —
+    // EcgTab additionally keys this component by patient/visit).
+    setEcgFiles([]);
+    setSelectedFile(null);
+    setAnalysisResult(null);
+    setEcgParameters(null);
+    setAnalyzing(false);
+    setUploadProgress(0);
+    setViewerError('');
+    setViewerLoading(false);
+    setViewerOpen(false);
+    // viewerBlobUrl cleanup is handled by its own revoke effect below.
+    setViewerBlobUrl((prev) => {
+      if (prev) {
+        window.URL.revokeObjectURL(prev);
+      }
+      return null;
+    });
+  }, [ownerKey]);
+
   useEffect(() => () => {
     if (viewerBlobUrl) {
       window.URL.revokeObjectURL(viewerBlobUrl);
@@ -288,22 +326,39 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   }, [viewerBlobUrl]);
 
   // Поддерживаемые форматы
+  // ECGVIEW-FE-003 (audit 3886 round 20): `.xml` is accepted regardless of
+  // the MIME the browser reports (`text/xml`, `application/xml` or empty) —
+  // the parser dispatches by extension, so the upload gate must too.
   const acceptedFormats = {
     'application/pdf': ['.pdf'],
     'text/xml': ['.xml'],
+    'application/xml': ['.xml'],
     'application/scp': ['.scp'],
     'image/jpeg': ['.jpg', '.jpeg'],
     'image/png': ['.png'],
   };
 
+  // ECGVIEW-FE-003: extension-driven dispatch — a valid `.xml` file must
+  // reach the parser even when the browser tags it `application/xml` or
+  // leaves the MIME empty. MIME-only gating silently skipped parsing.
+  const shouldParseEcgFile = (file: File) => {
+    const name = file.name.toLowerCase();
+    return name.endsWith('.xml') || name.endsWith('.scp');
+  };
+
   // Загрузка файлов
   const onDrop = async (acceptedFiles: File[]) => {
     for (const file of acceptedFiles) {
+      const epochAtStart = ownerEpochRef.current;
       setUploadProgress(0);
       
       try {
         const formData = new FormData();
-        formData.append('file', String(file));
+        // ECGVIEW-FE-001 (audit 3886 round 20): append the real binary File
+        // part (with its filename). `String(file)` serialized to the literal
+        // text "[object File]" and could never satisfy the backend's
+        // `UploadFile` multipart contract.
+        formData.append('file', file, file.name);
         formData.append('file_type', 'medical_record');
         formData.append('title', file.name);
         formData.append('tags', 'ecg,cardiology');
@@ -324,6 +379,10 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
           },
         });
         
+        // ECGVIEW-FE-002: the owner context may have changed while the
+        // upload was in flight — do not surface the old patient's file.
+        if (isStaleContext(epochAtStart)) return;
+        
         const responseData = response.data as Record<string, unknown>;
         const newFile: EcgFile = {
           id: responseData.id as string | number,
@@ -336,15 +395,17 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
         
         setEcgFiles(prev => [...prev, newFile]);
         
-        // Если это SCP/XML, пытаемся парсить
-        if (file.type === 'text/xml' || file.name.endsWith('.scp')) {
+        // Если это SCP/XML, пытаемся парсить (ECGVIEW-FE-003: по расширению)
+        if (shouldParseEcgFile(file)) {
           await parseECGFileData(file, newFile);
         }
 
+        if (isStaleContext(epochAtStart)) return;
         setUploadProgress(0);
         onDataUpdate?.(undefined);
         
       } catch (error) {
+        if (isStaleContext(epochAtStart)) return;
         logger.error('Ошибка загрузки ЭКГ:', error);
         notify.error(getErrorMessage(error, t('cardio.cardio_ecg_upload_failed')));
         setUploadProgress(0);
@@ -360,6 +421,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
 
   // Парсинг ЭКГ файла
   const parseECGFileData = async (originalFile: File, uploadedFile: EcgFile) => {
+    const epochAtStart = ownerEpochRef.current;
     try {
       // Сначала пробуем локальный парсинг
       const parseResult = await parseECGFile(originalFile) as Record<string, unknown>;
@@ -371,6 +433,9 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
           ...analysis,
         };
         
+        // ECGVIEW-FE-002: a parse that started under patient A must not
+        // populate parameters or persist records after the context moved.
+        if (isStaleContext(epochAtStart)) return;
         setEcgParameters(enrichedParams as EcgParameters);
         
         // Обновляем файл с параметрами
@@ -407,14 +472,17 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
               source: 'device',
               parameters: enrichedParams,
             });
+            if (isStaleContext(epochAtStart)) return;
             notify.success(t('final.ecg_saved'));
           } catch (persistError) {
+            if (isStaleContext(epochAtStart)) return;
             logger.error('Не удалось сохранить ЭКГ в истории пациента:', persistError);
             notify.error(t('final.ecg_not_saved'));
           }
         }
       }
     } catch (error) {
+      if (isStaleContext(epochAtStart)) return;
       logger.error('Ошибка парсинга ЭКГ:', error);
       notify.warning(t('final.ecg_parse_warning'));
     }
@@ -450,6 +518,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
 
   // AI анализ ЭКГ
   const analyzeECG = async (file: EcgFile) => {
+    const epochAtStart = ownerEpochRef.current;
     setAnalyzing(true);
     setAnalysisResult(null);
     
@@ -460,21 +529,28 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
         patient_id: patientId,
       })) as import('axios').AxiosResponse<Record<string, unknown>>;
       
+      // ECGVIEW-FE-002: an analysis for the previous patient's file must
+      // not render under the new context.
+      if (isStaleContext(epochAtStart)) return;
       setAnalysisResult(response.data as unknown as AnalysisResult);
       onDataUpdate?.(undefined);
       
     } catch (error) {
+      if (isStaleContext(epochAtStart)) return;
       logger.error('Ошибка AI анализа:', error);
       setAnalysisResult({
         error: t('cardio.cardio_ecg_ai_failed'),
       });
     } finally {
-      setAnalyzing(false);
+      if (!isStaleContext(epochAtStart)) {
+        setAnalyzing(false);
+      }
     }
   };
 
   // Открыть просмотрщик
   const openViewer = async (file: EcgFile) => {
+    const epochAtStart = ownerEpochRef.current;
     setSelectedFile(file);
     setViewerOpen(true);
     setViewerLoading(true);
@@ -490,13 +566,22 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
       }
 
       const blobUrl = await openFileBlobUrl(file.id, 'preview');
+      // ECGVIEW-FE-002: a preview fetched for the previous patient must
+      // not open under the new context.
+      if (isStaleContext(epochAtStart)) {
+        window.URL.revokeObjectURL(blobUrl);
+        return;
+      }
       setViewerBlobUrl(blobUrl);
     } catch (error) {
+      if (isStaleContext(epochAtStart)) return;
       logger.info('Предпросмотр файла недоступен, используем только скачивание:', error);
       setViewerBlobUrl(null);
       setViewerError(t('cardio.cardio_ecg_preview_unavailable'));
     } finally {
-      setViewerLoading(false);
+      if (!isStaleContext(epochAtStart)) {
+        setViewerLoading(false);
+      }
     }
   };
 
@@ -512,11 +597,14 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
 
   // Удалить файл
   const deleteFile = async (fileId: string | number) => {
+    const epochAtStart = ownerEpochRef.current;
     try {
       await api.delete(`/files/${fileId}`);
+      if (isStaleContext(epochAtStart)) return;
       setEcgFiles(prev => prev.filter(f => f.id !== fileId));
       onDataUpdate?.(undefined);
     } catch (error) {
+      if (isStaleContext(epochAtStart)) return;
       logger.error('Ошибка удаления файла:', error);
       notify.error(t('final.ecg_delete_failed'));
     }
