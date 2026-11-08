@@ -1,6 +1,6 @@
-# Current resume — PR #3937 exact-head CI PASS; artifact path diagnosis recorded — 2026-11-08T22:43:23+05:00
+# Current resume — T18 artifact-path diagnosis; journal checkpoint pushed — 2026-11-08T22:48:28+05:00
 
-Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final, branch codex/aqs-t18-completion-20261108. T00–T17 are merged. PR #3937 was last read OPEN, Ready and mergeable at HEAD 2c285e44a30d6290db8b00c198c4384f11e8507d, based on #3935 8299d7d6897621bc284051004309b39acbef6adc. Applicable checks passed on that head; backend/integration/Docker/readiness jobs were skipped, and no independent review or inline threads were recorded. New journal-only changes are local and require push plus exact-head CI. User owns merge and deployment.
+Continue umbrella task bd2f7564-bd3d-449d-8d85-5a9325722a80 in worktree C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final, branch codex/aqs-t18-completion-20261108. T00–T17 are merged. PR #3937 was last read OPEN, Ready and mergeable at HEAD 2c285e44a30d6290db8b00c198c4384f11e8507d, based on #3935 8299d7d6897621bc284051004309b39acbef6adc. Applicable checks passed on that head; backend/integration/Docker/readiness jobs were skipped, and no independent review or inline threads were recorded. The artifact-path journal follow-up is pushed. Read the live PR head/body/checks before further GitHub action; user owns merge. User owns merge and deployment.
 
 The PR description now reflects exact-head results. The earlier body-format gate failure was corrected; the latest PR Review Quality Gate passed. Frontend E2E passed as general CI, but its logged suite commands did not include the T18 live specs. Do not use it as proof of current-source T18.1–5 or T18.8–9.
 
@@ -11,7 +11,7 @@ T18.1–5 remains NOT_RUN: the latest canonical Session was interrupted during f
 Current resource sample: Windows free RAM 1.70 GiB; WSL available memory 3,177 MiB. No new build/staging was started. The hosted staging-frontend-artifact workflow is not usable as-is: API/WS origins are fixed to port 18082, it omits the embedded commit marker, and Compose has no artifact mount/image selection. Do not use it as a workaround until a canonical, checksum-verifying artifact path is implemented and tested. A private synthetic env file .scratch/t18-final-acceptance-20261108/staging-final4.env is still pending manual removal because local policy blocked deletion. Do not bypass that policy.
 
 Next:
-1. Push the four-file journal follow-up to #3937, verify exact-head CI, then obtain independent review; user merges.
+1. Read the live #3937 head/body/checks/reviews; update the body if needed, then obtain independent review; user merges.
 2. Start the next T18 validation cycle from the merged main. First add and validate a staging-only canonical path that serves a checksum-verified, exact-source frontend artifact without compiling it inside WSL; then run only current-source T18.1–5 and T18.8–9 plus applicable missing assertions.
 3. Finish affected keyboard/focus/forms/errors/empty/retry/languages/viewports/latency checks; classify two unreproduced historical console events and eight unmapped bundle call sites.
 4. Mark each applicable prerequisite and STAGING_VALIDATION.md Check 0–10 PASS/FAIL/NOT_RUN/DEFERRED with its tested SHA. Keep T18/Tier-2 PARTIAL until all applicable evidence is complete. Production, deployment and v1 flag activation remain separate.

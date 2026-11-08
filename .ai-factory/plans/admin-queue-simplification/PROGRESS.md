@@ -2,13 +2,13 @@
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance, source reconciliation and evidence PR
-Current status: IN_PROGRESS; T00–T17 MERGED. T18.10 and current-source RQ-18 passed on app SHA 16e04af35e47663481a08923d8625d94a1c9d010; 68/68 observed assets matched and owned teardown passed. PR #3937 was last read OPEN/Ready/mergeable at HEAD 2c285e44 with applicable CI PASS and no reviews/threads. New journal-only source findings remain local and require push plus exact-head CI. T18.1–5 remains NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. T18/Tier-2 remain PARTIAL; user owns merge/deployment.
+Current status: IN_PROGRESS; T00–T17 MERGED. T18.10/RQ-18 passed on app SHA 16e04af35e47663481a08923d8625d94a1c9d010; 68/68 observed assets matched and owned teardown passed. PR #3937 remains OPEN/Ready; the artifact-path journal follow-up is committed and pushed. Read current PR checks/reviews from GitHub; user owns merge. T18.1–5 remains NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. T18/Tier-2 PARTIAL.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`
 Branch: `codex/aqs-t18-completion-20261108`
 Base commit: fresh `origin/main` `8299d7d6897621bc284051004309b39acbef6adc` (#3935)
 Application commit under test: `16e04af35e47663481a08923d8625d94a1c9d010`
 Validated E2E working-copy SHA-256: `BC14D2F70A9145A6EB8949E05091CDF2F95E691049ECF06C96C006CFA078AF54`
-Last updated: 2026-11-08T22:43:23+05:00
+Last updated: 2026-11-08T22:48:28+05:00
 
 ## Current checkpoint — T18.10/RQ-18 PASS; T18.1–T18.5 attempt interrupted; final acceptance remains partial
 
@@ -19,7 +19,7 @@ Last updated: 2026-11-08T22:43:23+05:00
 | T18.10 specialists navigation | PASS on app source `16e04af3` | Normal Admin password + TOTP; four legacy entry paths; selected profile/day; typed editor return; tab switch; reload; Back/Forward; real linked profile DELETE returns `409`, row retained |
 | Current-source RQ-18 lifecycle | PASS on app source `16e04af3` | Hidden profile, explicit publish, permanent QR, anonymous resource-owned booking, deactivation/archive/reactivation; Playwright 1 passed |
 | T18.1–T18.5 current-source browser attempt | INTERRUPTED / NOT_RUN | Preflight PASS (WSL 3,231 MiB); host free RAM fell 1.76→0.13 GiB during image build, so the Session was interrupted before a verifiable Playwright report. Canonical cleanup removed all 5 containers, 3 volumes, 1 network and 3 images; post-audit zero resources/listeners. |
-| PR #3937 | OPEN / Ready / mergeable at last read | Head `2c285e44` and applicable checks passed before the new local journal follow-up; push and exact-head CI are pending. No review submissions/threads at last read; user owns merge. |
+| PR #3937 | OPEN / Ready | Journal follow-up pushed; always inspect current exact-head checks/reviews on GitHub. User owns merge. |
 | Observed frontend provenance | PASS, scoped to this synthetic Session | 67 browser-observed JS/CSS paths plus `/sw.js`; 68/68 byte hashes matched the owned frontend container; service worker contains full tested SHA. Generic `served_revision_verified` remains `false` |
 | Owned staging cleanup | PASS with one local env pending | Prior projects and interrupted `clinic-aqs-t18-final4-20261108` were audited at zero containers/images/volumes/networks/listeners. The exact env file `staging-final4.env` remains because local deletion policy rejected its removal; request manual removal. |
 | Frontend local checks | PASS with warning | Scoped ESLint: 0 errors, 1 raw-fetch warning; type-check, build, Playwright collection (1 test), `git diff --check` passed |
@@ -38,7 +38,7 @@ The app commit `16e04af3` is a merge commit with current `origin/main` #3935 (`8
 
 ### Remaining before T18 can close
 
-1. Push the scoped journal follow-up and verify exact-head CI; obtain independent review. User retains merge authority.
+1. Check PR #3937’s live head/body/CI/review state and update the description if stale; user retains merge authority.
 2. After that PR cycle, retry current-source T18.1–5 profile/setup/Department UI flows and T18.8–9 browser join/replay paths only after adjusting the staging build approach so it can complete without exhausting host RAM. The latest attempt produced no verifiable test result. Carry forward T18.6/7 and unchanged backend portions only with their recorded source evidence; do not rerun unchanged owners without a new reason.
 3. Finish keyboard/focus, forms/errors/empty/retry, language and viewport checks for affected paths; complete the latency waterfall on changed screens. Earlier checks on `cbd8c642` remain revision-scoped.
 4. Resolve or explicitly classify the remaining console investigation: two of 11 historical events were not reproduced, and eight minified-bundle call sites remain unmapped.
@@ -47,7 +47,7 @@ The app commit `16e04af3` is a merge commit with current `origin/main` #3935 (`8
 
 ## Next exact action
 
-Push the four-file journal follow-up to PR #3937, verify the exact-head checks, then leave merge to the user. After merge, implement and prove the memory-safe artifact path before resuming T18.1–5 and T18.8–9.
+Read the latest PR #3937 state; keep its body aligned with the pushed journal checkpoint, verify exact-head checks and independent review, then leave merge to the user. After merge, add and validate the memory-safe artifact path before resuming T18.1–5 and T18.8–9.
 ## Previous checkpoint — #3930 synchronized locally; journal commit and exact-head CI pending
 
 | Task | Status | Evidence |

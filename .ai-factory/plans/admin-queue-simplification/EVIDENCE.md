@@ -1,3 +1,10 @@
+## PR #3937 journal checkpoint push — 2026-11-08T22:48:28+05:00
+
+- Commit `8ef2302065d93d5f4eff512016d8572e4e6e18f2` was pushed to `codex/aqs-t18-completion-20261108`; four changed paths are the plan, PROGRESS, EVIDENCE, and RESUME journals only.
+- Commit hooks and `git diff --check` passed. No application, test, staging, production, or gate source changed.
+- At the immediate GitHub read, PR #3937 was OPEN/Ready/mergeable at `8ef2302065d93d5f4eff512016d8572e4e6e18f2`; PR Review Quality Gate and lifecycle recommendation passed, while Unified CI, security, Gitleaks, and Agent Workflow Guards were still in progress. Reviews and inline threads were empty.
+- The PR description still referenced the previous head at that read; refresh it only after confirming the current head. The user retains merge authority.
+
 ## T18 memory-safe staging artifact path — source trace — 2026-11-08T22:41:39+05:00
 
 - Relationship traced: `scripts/wsl_staging.py` pins `ops/compose.staging.yml` and uses `compose up --build` unless `--no-build`; the `frontend` Compose service has a build-only definition from `frontend/Dockerfile.staging`, with no image pin or static-directory mount. That Dockerfile runs `npm ci` and `npm run build` in the staging image.
