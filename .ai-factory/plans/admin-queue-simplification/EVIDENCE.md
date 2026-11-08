@@ -1,3 +1,26 @@
+## PR #3937 exact-head CI — 2026-11-08T21:45:42+05:00
+
+- Pull request: `https://github.com/drsapaev/final/pull/3937`.
+- Commit under test: `a166befeadbac7fea69164bf434c937a98b6dc23`; base/current `origin/main`: #3935 `8299d7d6897621bc284051004309b39acbef6adc`.
+- GitHub Actions run: [42499361900](https://github.com/drsapaev/final/actions/runs/42499361900).
+- Result: Frontend build, frontend unit tests, frontend lint, frontend E2E, PR Required Gate, PR Review Quality Gate, CodeQL, Gitleaks, GitGuardian secret scan, security scan, CI Scope, lifecycle recommendation, Git scratch guards, and applicable workflow checks completed successfully.
+- Skipped by path/trigger: backend tests, integration tests, Docker build, staging readiness, production readiness, k6, DAST, Telegram release, Supabase preview, and unrelated documentation generation. Skipped jobs are not reported as passed.
+- PR state at verification: OPEN, Ready for review, mergeable; review submissions `[]`; inline review-thread count not checked in this record.
+- Scope: hosted CI passed for the E2E/evidence documentation PR. It does not prove the interrupted local T18.1–T18.5 browser scenario or complete Tier-2/T18 acceptance.
+- Limitation: this exact-head result predates the current uncommitted journal reconciliation; a push of that reconciliation requires a fresh exact-head check.
+
+## T18.1–T18.5 current-source staging attempt — interrupted — 2026-11-08T21:37:10+05:00
+
+- Application source under test: `origin/main` #3935, `8299d7d6897621bc284051004309b39acbef6adc`; the staging env's service-worker marker targeted this exact application commit. The PR branch adds tests and evidence only.
+- Environment: this worktree on Windows + `Ubuntu-24.04`; fresh owned synthetic project `clinic-aqs-t18-final4-20261108`, owner `codex-aqs-t18-final-20261108`, expiry `2026-11-09T01:30:00+05:00`, ports 18731/18732/55731. No production host, real clinic data, foreign project or external integration was used.
+- Mode: `gate_known_root_cause`; canonical launcher returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated prompt was read. Exact tracked first-touch scope remained the four T18 plan/evidence journals; staging, app/runtime and test source were operational/read-only.
+- Preflight: PASS; backing storage 26 GiB free, worktree disk 13 GiB free, WSL reported 3,231 MiB available, warnings none, runtime readiness NOT_RUN. Windows host had 1.76 GiB free physical RAM before Session.
+- Validation command: canonical `ops/scripts/wsl_staging.ps1 -Action Session` wrapping the task-local `validate-rq17.ps1`; Session began its image build. While it was running, Windows free physical RAM fell to 0.13 GiB. The session was interrupted to avoid continued host exhaustion and exited 1.
+- Result: T18.1–T18.5 browser assertions are `NOT_RUN / no verifiable report`; no PASS or product FAIL is inferred. No current Playwright log was produced; the existing `.last-run.json` predates this attempt, so the child test outcome cannot be established. The app code was not edited.
+- Cleanup: WSL boot ID remained `71510fac-5383-4b35-8734-fb2a821ae09d`. Before teardown, all project/container/volume/network labels matched the exact project, owner and expiry. `scripts/staging_down.ps1 -ProjectName clinic-aqs-t18-final4-20261108 -EnvFile .scratch/t18-final-acceptance-20261108/staging-final4.env` completed successfully and removed 5 containers, 3 volumes, 1 network and 3 local images. Follow-up audit: 0 project containers/volumes/networks/images and 0 listeners on owned ports.
+- Cleanup limitation: deletion of only the newly created synthetic-credential env `.scratch/t18-final-acceptance-20261108/staging-final4.env` and task-local runner was rejected by local policy before PowerShell started. Do not retry through another tool; the env file needs manual removal. No other scratch file was removed.
+- Scope check: no runtime, API, database, auth policy, product test, production, merge or deployment change. The staging resource cleanup passed; behavioral checks remain NOT_RUN.
+
 ## T18.1–T18.9 source reconciliation — read-only — 2026-11-08T20:54:40+05:00
 
 - App commit compared: `16e04af35e47663481a08923d8625d94a1c9d010`; current `origin/main` #3935: `8299d7d6897621bc284051004309b39acbef6adc`. The app commit is a merge commit with current main as its second parent.

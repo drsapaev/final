@@ -1,4 +1,16 @@
-# Current resume — PR #3937 exact-head CI result; T18 remains partial — 2026-11-08T20:55:32+05:00
+# Current resume — PR #3937 CI green; current-source T18 staging interrupted — 2026-11-08T21:45:42+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. T00–T17 are merged. PR #3937 is OPEN, Ready for review and mergeable at HEAD `a166befeadbac7fea69164bf434c937a98b6dc23`, based on current `origin/main` #3935 `8299d7d6897621bc284051004309b39acbef6adc`. Exact-head Frontend build/unit/lint/E2E, PR Required Gate, PR Review Quality Gate, CodeQL, Gitleaks and security checks passed. Path-aware Backend/integration/Docker/readiness checks were skipped. No independent review has been submitted; user owns merge/deployment.
+
+T18.10 (`specialists` navigation, four legacy Admin routes, typed return context, reload/Back/Forward and guarded DELETE 409) and current-source RQ-18 (publish, permanent QR, anonymous resource-owned booking, deactivation/archive/reactivation) passed in synthetic Admin/2FA Session on app source `16e04af35e47663481a08923d8625d94a1c9d010`. Observed JS/CSS/service-worker assets matched 68/68; the generic launcher still reports `served_revision_verified=false`. Canonical teardown and prior owned-project audits passed.
+
+The 2026-11-08 T18.1–T18.5 current-source Session is `INTERRUPTED / NOT_RUN`: Preflight passed, but Windows free RAM dropped from 1.76 GiB to 0.13 GiB during image build before any verifiable Playwright report existed. The exact synthetic Compose project was torn down and audited empty (5 containers, 3 volumes, 1 network, 3 images removed; zero owned resources/listeners afterwards). A newly created private env `.scratch/t18-final-acceptance-20261108/staging-final4.env` remains because local policy rejected deletion; it requires manual removal. Do not bypass that policy.
+
+Local uncommitted changes now reconcile EVIDENCE/PROGRESS/RESUME/top-level plan with this attempt and the completed CI result. Next: run `git diff --check`, commit/push only the allowed four journal files, update PR #3937's body, and recheck exact-head CI. Then complete current-source T18.1–5 and T18.8–9 with a staging build approach that does not exhaust host RAM; finish affected keyboard/focus/forms/language/viewports/latency/console checks and disposition each applicable `STAGING_VALIDATION.md` Check 0–10. T18/Tier-2 remain PARTIAL until evidence closes those gaps. Production, deployment and v1 flag activation remain separate.
+
+---
+
+# Previous resume — PR #3937 exact-head CI pending; T18 remains partial — 2026-11-08T20:55:32+05:00
 
 # Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. PR #3937 is OPEN, Ready for review and mergeable at HEAD `8bac0d25c969c78b23a99be0ca79d294431c3e97`, based on fresh `origin/main` #3935 `8299d7d6897621bc284051004309b39acbef6adc`. On this exact HEAD, Frontend E2E passed; Frontend unit tests failed in unchanged `LabResultsSection.identity.test.tsx`; PR Required Gate failed as a result. Frontend lint/build and security checks passed; path-aware backend/Docker jobs were skipped. Review submissions: none. User owns merge and deployment.
 
