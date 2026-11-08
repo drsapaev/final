@@ -14,6 +14,23 @@
  *   пациента/визита и размонтировании;
  * - загрузка (upload) не запускает AI-анализ;
  * - удаление через DELETE /files/{id} со сбросом списка.
+ *
+ * Регрессии аудита 3892 (fail-first):
+ * - DERMAGALLERY-FE-001: смена пациента/визита синхронно убирает старые
+ *   карточки/действия до разрешения нового GET;
+ * - DERMAGALLERY-FE-002: позднее завершение upload/delete из A не перечитывает
+ *   и не перезаписывает галерею под B;
+ * - DERMAGALLERY-FE-003: застрявший loadingMore сбрасывается при смене контекста;
+ * - DERMAGALLERY-FE-004: пагинация доступна и в пустой локально категории;
+ * - DERMAGALLERY-FE-005: частично успешная загрузка перечитывает список и
+ *   честно сообщает о частичном результате;
+ * - DERMAGALLERY-FE-006: DELETE только со второго явного подтверждения;
+ * - DERMAGALLERY-FE-007: зависшее превью не блокирует остальные превью и
+ *   пагинацию; кнопка «Показать ещё» честно отключена во время загрузки;
+ * - DERMAAI-FE-001: поздний AI-ответ после смены контекста не показывается;
+ * - DERMAAI-FE-002: HTTP 200 с каноническим status='error' — ошибка, не успех;
+ * - DERMAAI-FE-004: подсказка AI удалённого файла исчезает и не «воскрешается»;
+ * - DERMAAI-FE-005: панель подсказки называет фото-источник при смене категории.
  */
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -60,8 +77,21 @@ function fileList(files: File[]): FileList {
 
 const imageBlob = new Blob(['synthetic-image'], { type: 'image/jpeg' });
 
-function listResponse(files: Array<Record<string, unknown>>) {
-  return { data: { files, total: files.length } };
+function listResponse(files: Array<Record<string, unknown>>, total?: number) {
+  return { data: { files, total: total ?? files.length } };
+}
+
+/** Отложенный ответ: позволяет разрешать запросы в контролируемом порядке. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => { resolve = res; });
+  return { promise, resolve };
+}
+
+/** Параметры GET /files/ конкретного пациента (для стражей контекста). */
+function listCallsFor(patientId: number): Array<unknown[]> {
+  return apiState.get.mock.calls.filter((call: unknown[]) =>
+    call[0] === '/files/' && (call[1] as { params?: { patient_id?: number } } | undefined)?.params?.patient_id === patientId);
 }
 
 describe('DermaVisitGallery', () => {
@@ -72,6 +102,10 @@ describe('DermaVisitGallery', () => {
     apiState.get.mockReset();
     apiState.post.mockReset();
     apiState.delete.mockReset();
+    vi.mocked(notify.success).mockReset();
+    vi.mocked(notify.error).mockReset();
+    vi.mocked(notify.warning).mockReset();
+    vi.mocked(notify.info).mockReset();
     // jsdom не реализует URL.createObjectURL — подставляем детерминированный mock.
     createObjectURLMock = vi.fn(() => `blob:mock-${Math.random().toString(36).slice(2)}`);
     revokeObjectURLMock = vi.fn();
@@ -197,11 +231,12 @@ describe('DermaVisitGallery', () => {
     expect(body.get('tags')).toBe('dermatology,photo,after');
   });
 
-  it('deletes a photo and refreshes the list', async () => {
+  it('deletes a photo only after an explicit confirmation and refreshes the list (DERMAGALLERY-FE-006)', async () => {
+    let files = [
+      { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+    ];
     apiState.get.mockImplementation(async (url: string) => {
-      if (url === '/files/') return listResponse([
-        { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
-      ]);
+      if (url === '/files/') return listResponse(files);
       if (url === '/files/5/preview') return { data: imageBlob };
       throw new Error(`unexpected GET ${url}`);
     });
@@ -212,13 +247,45 @@ describe('DermaVisitGallery', () => {
       expect(screen.getByRole('img')).toBeTruthy();
     });
 
+    // Первый клик только взводит подтверждение: DELETE не уходит
     fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_delete_aria:derma.derma_gallery_category_examination' }));
+    expect(apiState.delete).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'derma.derma_gallery_delete_confirm_yes' })).toBeTruthy();
+
+    // Явное подтверждение выполняет DELETE
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_delete_confirm_yes' }));
     await waitFor(() => {
       expect(apiState.delete).toHaveBeenCalledWith('/files/5');
     });
+    files = [];
     await waitFor(() => {
       expect(apiState.get.mock.calls.filter((call: unknown[]) => call[0] === '/files/').length).toBeGreaterThanOrEqual(2);
     });
+  });
+
+  it('canceling the delete confirmation never sends DELETE (DERMAGALLERY-FE-006)', async () => {
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') return listResponse([
+        { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+      ]);
+      if (url === '/files/5/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_delete_aria:derma.derma_gallery_category_examination' }));
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_delete_cancel' }));
+
+    // Подтверждение снято, DELETE не было, фото осталось
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'derma.derma_gallery_delete_confirm_yes' })).toBeNull();
+    });
+    expect(apiState.delete).not.toHaveBeenCalled();
+    expect(screen.getByRole('img')).toBeTruthy();
   });
 
   it('appends the next page without duplicates and hides the button when everything is loaded', async () => {
@@ -301,11 +368,9 @@ describe('DermaVisitGallery', () => {
     let filesById: Record<number, Array<Record<string, unknown>>> = {
       42: [{ id: 1, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] }],
     };
-    apiState.get.mockImplementation(async (url: string) => {
+    apiState.get.mockImplementation(async (url: string, config?: { params?: { patient_id?: number } }) => {
       if (url === '/files/') {
-        const pid = Number(new URLSearchParams().get('x')); // always null — params приходят в config
-        void pid;
-        return listResponse(filesById[42] ?? []);
+        return listResponse(filesById[config?.params?.patient_id ?? 42] ?? []);
       }
       if (/^\/files\/\d+\/preview$/.test(url)) return { data: imageBlob };
       throw new Error(`unexpected GET ${url}`);
@@ -325,6 +390,301 @@ describe('DermaVisitGallery', () => {
     });
     await waitFor(() => {
       expect(apiState.get).toHaveBeenCalledWith('/files/', { params: { patient_id: 77, visit_id: 901, size: 100, page: 1 } });
+    });
+  });
+
+  it('clears the previous patient\'s photos and actions synchronously before the new list resolves (DERMAGALLERY-FE-001)', async () => {
+    const bList = deferred<{ data: { files: Array<Record<string, unknown>>; total: number } }>();
+    apiState.get.mockImplementation(async (url: string, config?: { params?: { patient_id?: number } }) => {
+      if (url === '/files/') {
+        if (config?.params?.patient_id === 77) return bList.promise;
+        return listResponse([
+          { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'], title: 'a-photo.jpg' },
+        ]);
+      }
+      if (url === '/files/5/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+
+    const { rerender } = render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+
+    // Смена контекста: GET пациента B подвешен — старые карточки и действия A
+    // уже недоступны, галерея в состоянии загрузки B.
+    rerender(<DermaVisitGallery patientId={77} visitId={901} />);
+    await waitFor(() => {
+      expect(screen.queryByRole('img')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'derma.derma_gallery_delete_aria:derma.derma_gallery_category_examination' })).toBeNull();
+      expect(screen.getByText('derma.derma_gallery_loading')).toBeTruthy();
+    });
+
+    bList.resolve({ data: { files: [], total: 0 } });
+    await waitFor(() => {
+      expect(screen.queryByText('derma.derma_gallery_loading')).toBeNull();
+      expect(screen.getByText('derma.derma_gallery_empty')).toBeTruthy();
+    });
+  });
+
+  it('does not let a late upload completion from patient A refresh the list under patient B (DERMAGALLERY-FE-002)', async () => {
+    const uploadPost = deferred<{ data: { id: number } }>();
+    apiState.get.mockImplementation(async (url: string, config?: { params?: { patient_id?: number } }) => {
+      if (url === '/files/') {
+        if (config?.params?.patient_id === 42) {
+          return listResponse([
+            { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+          ]);
+        }
+        return listResponse([]);
+      }
+      if (url === '/files/5/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+    apiState.post.mockImplementation(async () => uploadPost.promise);
+
+    const { rerender } = render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+
+    // Начата загрузка файла под A; POST подвешен.
+    const input = screen.getByLabelText('derma.derma_gallery_upload_aria') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: fileList([new File(['synthetic'], 'a.jpg', { type: 'image/jpeg' })]) } });
+
+    // Пациент сменился на B, список B разрешился пустым.
+    rerender(<DermaVisitGallery patientId={77} visitId={901} />);
+    await waitFor(() => {
+      expect(apiState.get).toHaveBeenCalledWith('/files/', { params: { patient_id: 77, visit_id: 901, size: 100, page: 1 } });
+    });
+    await waitFor(() => {
+      expect(screen.getByText('derma.derma_gallery_empty')).toBeTruthy();
+    });
+
+    // Позднее завершение POST'а A: перезагрузки списка A под B не происходит.
+    uploadPost.resolve({ data: { id: 9 } });
+    await new Promise((resolve) => { setTimeout(resolve, 30); });
+    expect(listCallsFor(42).length).toBe(1);
+    expect(screen.getByText('derma.derma_gallery_empty')).toBeTruthy();
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('does not let a late delete completion from patient A refresh the list under patient B (DERMAGALLERY-FE-002)', async () => {
+    const deleteRequest = deferred<{ data: { success: boolean } }>();
+    apiState.get.mockImplementation(async (url: string, config?: { params?: { patient_id?: number } }) => {
+      if (url === '/files/') {
+        if (config?.params?.patient_id === 42) {
+          return listResponse([
+            { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+          ]);
+        }
+        return listResponse([]);
+      }
+      if (url === '/files/5/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+    apiState.delete.mockImplementation(async () => deleteRequest.promise);
+
+    const { rerender } = render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+
+    // Двухшаговое удаление: взводим и подтверждаем — DELETE подвешен.
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_delete_aria:derma.derma_gallery_category_examination' }));
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_delete_confirm_yes' }));
+    await waitFor(() => {
+      expect(apiState.delete).toHaveBeenCalledWith('/files/5');
+    });
+
+    rerender(<DermaVisitGallery patientId={77} visitId={901} />);
+    await waitFor(() => {
+      expect(apiState.get).toHaveBeenCalledWith('/files/', { params: { patient_id: 77, visit_id: 901, size: 100, page: 1 } });
+    });
+
+    deleteRequest.resolve({ data: { success: true } });
+    await new Promise((resolve) => { setTimeout(resolve, 30); });
+    expect(listCallsFor(42).length).toBe(1);
+  });
+
+  it('re-enables Load More for the next patient after a stale page request (DERMAGALLERY-FE-003)', async () => {
+    const stalePage = deferred<{ data: { files: Array<Record<string, unknown>>; total: number } }>();
+    apiState.get.mockImplementation(async (url: string, config?: { params?: { patient_id?: number; page?: number } }) => {
+      if (url === '/files/') {
+        if (config?.params?.patient_id === 42) {
+          if (config?.params?.page === 2) return stalePage.promise;
+          return { data: { files: [
+            { id: 1, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+            { id: 2, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+          ], total: 5 } };
+        }
+        // Пациент B: первая страница уже длиннее одной карточки
+        return { data: { files: Array.from({ length: 10 }, (_, i) => ({
+          id: 100 + i, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'],
+        })), total: 25 } };
+      }
+      if (/^\/files\/\d+\/preview$/.test(url)) return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+
+    const { rerender } = render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(2);
+    });
+
+    // Страница 2 пациента A запрошена и подвешена (loadingMore=true).
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_load_more' }));
+    await waitFor(() => {
+      expect(apiState.get).toHaveBeenCalledWith('/files/', { params: { patient_id: 42, visit_id: 900, size: 100, page: 2 } });
+    });
+
+    // Смена на B: флаг постраничной загрузки сброшен, кнопка доступна.
+    rerender(<DermaVisitGallery patientId={77} visitId={901} />);
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(10);
+    });
+    const loadMoreButton = screen.getByRole('button', { name: 'derma.derma_gallery_load_more' }) as HTMLButtonElement;
+    expect(loadMoreButton.disabled).toBe(false);
+
+    // Поздняя страница A игнорируется: список B не загрязняется чужими рядами,
+    // кнопка остаётся доступной.
+    stalePage.resolve({ data: { files: [
+      { id: 3, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+    ], total: 5 } });
+    await new Promise((resolve) => { setTimeout(resolve, 30); });
+    expect(screen.getAllByRole('img').length).toBe(10);
+    expect((screen.getByRole('button', { name: 'derma.derma_gallery_load_more' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('keeps pagination reachable when the selected category is locally empty (DERMAGALLERY-FE-004)', async () => {
+    let page = 1;
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') {
+        if (page === 1) {
+          // Первая страница — только фото осмотра; total больше: страница 2
+          // содержит фото категории «до».
+          return { data: { files: [
+            { id: 1, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+          ], total: 2 } };
+        }
+        return { data: { files: [
+          { id: 2, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'before'], title: 'before-page2.jpg' },
+        ], total: 2 } };
+      }
+      if (/^\/files\/\d+\/preview$/.test(url)) return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+
+    // Пустая локально категория «до»: честное сообщение И доступная пагинация.
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_category_before' }));
+    await waitFor(() => {
+      expect(screen.getByText('derma.derma_gallery_empty_category')).toBeTruthy();
+    });
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.getByRole('button', { name: 'derma.derma_gallery_load_more' })).toBeTruthy();
+
+    // Страница 2 подтягивает фото «до» — оно становится видимым.
+    page = 2;
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_load_more' }));
+    await waitFor(() => {
+      expect(apiState.get).toHaveBeenCalledWith('/files/', { params: { patient_id: 42, visit_id: 900, size: 100, page: 2 } });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'derma.derma_gallery_load_more' })).toBeNull();
+    });
+  });
+
+  it('reloads the list and reports partial success when some uploads fail (DERMAGALLERY-FE-005)', async () => {
+    let uploaded = false;
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') {
+        if (uploaded) {
+          return listResponse([
+            { id: 9, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'], title: 'a.jpg' },
+          ]);
+        }
+        return listResponse([]);
+      }
+      if (url === '/files/9/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+    apiState.post.mockImplementation(async (_url: string, formData: FormData) => {
+      const name = String(formData.get('file') instanceof File ? (formData.get('file') as File).name : '');
+      if (name === 'a.jpg') {
+        uploaded = true;
+        return { data: { id: 9 } };
+      }
+      throw new Error('upload rejected');
+    });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByText('derma.derma_gallery_empty')).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText('derma.derma_gallery_upload_aria') as HTMLInputElement;
+    fireEvent.change(input, {
+      target: { files: fileList([
+        new File(['synthetic'], 'a.jpg', { type: 'image/jpeg' }),
+        new File(['synthetic'], 'b.jpg', { type: 'image/jpeg' }),
+      ]) },
+    });
+
+    // Частичный результат: предупреждение вместо «успеха», список перечитан,
+    // успешно сохранённый файл виден.
+    await waitFor(() => {
+      expect(notify.warning).toHaveBeenCalledWith('derma.derma_gallery_upload_partial');
+    });
+    expect(notify.success).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+    await waitFor(() => {
+      expect(apiState.get.mock.calls.filter((call: unknown[]) => call[0] === '/files/').length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it('does not block other previews or the Load More button while one preview hangs (DERMAGALLERY-FE-007)', async () => {
+    const hanging = deferred<{ data: Blob }>();
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') {
+        return { data: { files: [
+          { id: 1, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+          { id: 2, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+        ], total: 3 } };
+      }
+      if (url === '/files/1/preview') return hanging.promise;
+      if (url === '/files/2/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+
+    // Превью файла 2 доступно, хотя превью файла 1 зависло: запросы идут
+    // параллельно, карточка 1 остаётся с заглушкой.
+    await waitFor(() => {
+      expect(apiState.get).toHaveBeenCalledWith('/files/2/preview', { responseType: 'blob' });
+    });
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(1);
+    });
+
+    // Загрузка списка завершена despite зависшее превью: пагинация доступна
+    // и честно включена (total=3 > загружено=2).
+    const loadMoreButton = screen.getByRole('button', { name: 'derma.derma_gallery_load_more' }) as HTMLButtonElement;
+    expect(loadMoreButton.disabled).toBe(false);
+
+    hanging.resolve({ data: imageBlob });
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(2);
     });
   });
 
@@ -404,6 +764,9 @@ describe('DermaVisitGallery', () => {
       expect(screen.getByText('derma.derma_gallery_ai_confirmation')).toBeTruthy();
       expect(screen.getByText('AI suggestions are advisory only')).toBeTruthy();
     });
+    // DERMAAI-FE-005: панель называет фото-источник подсказки — атрибуция
+    // задана именем фото-источника (#5: файл без title).
+    expect(screen.getByText('#5')).toBeTruthy();
   });
 
   it('keeps photos accessible when AI analysis fails with 503', async () => {
@@ -428,5 +791,152 @@ describe('DermaVisitGallery', () => {
     // Фото остаётся доступным после ошибки/503
     expect(screen.getByRole('img')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'derma.derma_gallery_delete_aria:derma.derma_gallery_category_examination' })).toBeTruthy();
+  });
+
+  it('treats HTTP 200 with canonical status="error" as an analysis error, not a success (DERMAAI-FE-002)', async () => {
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') return listResponse([
+        { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+      ]);
+      if (url === '/files/5/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+    // Бэкенд-контракт: gateway-ошибка возвращается HTTP 200 со status='error'.
+    apiState.post.mockResolvedValueOnce({
+      data: { status: 'error', ai_notice: 'AI gateway degraded', data: {} },
+    });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_ai_button_aria:derma.derma_gallery_category_examination' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('derma.derma_gallery_ai_error')).toBeTruthy();
+    });
+    // Панель успеха не показывается
+    expect(screen.queryByText('derma.derma_gallery_ai_confirmation')).toBeNull();
+    expect(screen.queryByText('derma.derma_gallery_ai_empty')).toBeNull();
+    // Фото остаётся доступным
+    expect(screen.getByRole('img')).toBeTruthy();
+  });
+
+  it('discards a late AI response after the patient context switch (DERMAAI-FE-001)', async () => {
+    const analyze = deferred<{ data: { status: string; data: { content: string } } }>();
+    apiState.get.mockImplementation(async (url: string, config?: { params?: { patient_id?: number } }) => {
+      if (url === '/files/') {
+        if (config?.params?.patient_id === 42) {
+          return listResponse([
+            { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+          ]);
+        }
+        return listResponse([]);
+      }
+      if (url === '/files/5/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+    apiState.post.mockImplementation(async () => analyze.promise);
+
+    const { rerender } = render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+
+    // Запрос анализа A отправлен и подвешен (панель «Анализ…»).
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_ai_button_aria:derma.derma_gallery_category_examination' }));
+    await waitFor(() => {
+      expect(screen.getByText('derma.derma_gallery_ai_analyzing')).toBeTruthy();
+    });
+
+    // Смена контекста: анализ A сброшен вместе с остальным состоянием A.
+    rerender(<DermaVisitGallery patientId={77} visitId={901} />);
+    await waitFor(() => {
+      expect(screen.queryByText('derma.derma_gallery_ai_analyzing')).toBeNull();
+      expect(screen.getByText('derma.derma_gallery_empty')).toBeTruthy();
+    });
+
+    // Поздний ответ A не «воскрешает» подсказку под B.
+    analyze.resolve({ data: { status: 'success', data: { content: 'A SUGGESTION' } } });
+    await new Promise((resolve) => { setTimeout(resolve, 30); });
+    expect(screen.queryByText('A SUGGESTION')).toBeNull();
+    expect(screen.queryByText('derma.derma_gallery_ai_analyzing')).toBeNull();
+  });
+
+  it('clears the AI suggestion when its photo is deleted and never resurrects it (DERMAAI-FE-004)', async () => {
+    const analyze = deferred<{ data: { status: string; data: { content: string } } }>();
+    let files = [
+      { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+    ];
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') return listResponse(files);
+      if (url === '/files/5/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+    apiState.post.mockImplementation(async () => analyze.promise);
+    apiState.delete.mockResolvedValue({ data: { success: true } });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+
+    // Анализ файла 5 запущен и подвешен.
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_ai_button_aria:derma.derma_gallery_category_examination' }));
+    await waitFor(() => {
+      expect(screen.getByText('derma.derma_gallery_ai_analyzing')).toBeTruthy();
+    });
+
+    // Файл удалён (двухшаговое подтверждение), список перечитан без файла.
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_delete_aria:derma.derma_gallery_category_examination' }));
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_delete_confirm_yes' }));
+    files = [];
+    await waitFor(() => {
+      expect(apiState.delete).toHaveBeenCalledWith('/files/5');
+      expect(screen.queryByRole('img')).toBeNull();
+    });
+    // Панель «Анализ…» исчезла вместе с фото
+    await waitFor(() => {
+      expect(screen.queryByText('derma.derma_gallery_ai_analyzing')).toBeNull();
+    });
+
+    // Поздний ответ AI по удалённому файлу не показывает подсказку.
+    analyze.resolve({ data: { status: 'success', data: { content: 'LATE SUGGESTION' } } });
+    await new Promise((resolve) => { setTimeout(resolve, 30); });
+    expect(screen.queryByText('LATE SUGGESTION')).toBeNull();
+    expect(screen.queryByText('derma.derma_gallery_ai_analyzing')).toBeNull();
+  });
+
+  it('labels the AI suggestion with its source photo across category switches (DERMAAI-FE-005)', async () => {
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') return listResponse([
+        { id: 11, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'], title: 'photo-11.jpg' },
+        { id: 12, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'after'], title: 'photo-12.jpg' },
+      ]);
+      if (url === '/files/11/preview' || url === '/files/12/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+    apiState.post.mockResolvedValueOnce({
+      data: { status: 'success', data: { content: 'EXAMINATION PHOTO SUGGESTION' } },
+    });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(1); // категория «осмотр»: фото 11
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_ai_button_aria:derma.derma_gallery_category_examination' }));
+    await waitFor(() => {
+      expect(screen.getByText('EXAMINATION PHOTO SUGGESTION')).toBeTruthy();
+    });
+
+    // Смена категории: показано фото 12, но подсказка явно приписана фото 11.
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_category_after' }));
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(1); // категория «после»: фото 12
+    });
+    expect(screen.getByText('EXAMINATION PHOTO SUGGESTION')).toBeTruthy();
+    expect(screen.getByText('photo-11.jpg')).toBeTruthy();
   });
 });
