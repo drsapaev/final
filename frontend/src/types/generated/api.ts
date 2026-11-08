@@ -22988,9 +22988,14 @@ export type paths = {
          *     Creates new EMR if none exists, otherwise updates with new version.
          *     Uses optimistic locking via row_version to detect concurrent edits.
          *
-         *     **Conflict Resolution:**
-         *     - If row_version mismatch and different user: returns 409 Conflict
-         *     - If row_version mismatch but same user/session: allows (autosave)
+         *     **Conflict Resolution (EMRLOCK-FE-001, audit 3886 round 16):**
+         *     - If row_version mismatch: returns 409 Conflict (fail closed) — even
+         *       for the same user/session, because a stale write must never
+         *       overwrite a newer committed revision.
+         *     - Only a byte-identical duplicate retry from the same session is
+         *       accepted as an idempotent no-op (no new revision, no version bump).
+         *     - Finalized records (signed/amended) are rejected with 409 — use the
+         *       reasoned amend endpoint instead.
          */
         post: operations["save_emr_api_v1_v2_emr__visit_id__post"];
         delete?: never;
@@ -23148,6 +23153,10 @@ export type paths = {
          *
          *     Creates a new version with data from the target version.
          *     The restore is recorded in the revision history.
+         *
+         *     EMRRESTORE-FE-001/002 (audit 3886 round 16): restore is rejected for
+         *     finalized (signed/amended) records, requires an explicit reason and
+         *     honors optimistic locking via the caller's current row_version.
          */
         post: operations["restore_emr_api_v1_v2_emr__visit_id__restore_post"];
         delete?: never;
