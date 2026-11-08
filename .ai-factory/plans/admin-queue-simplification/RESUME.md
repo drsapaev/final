@@ -1,3 +1,19 @@
+## Current resume — selected-profile context fix validated locally; T18 remains PARTIAL — 2026-11-08T08:49:26+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`, branch `codex/aqs-t18-selected-profile-context-20261108`. Fresh `origin/main` and worktree base are `289c281a0ec2e2ae87abfd5d0b0103e5725e22bc`. PR #3897 was merged at `569d5fe5f5f0c24f1e8aa72a782aaf73ed44bbe3`. T00–T17 are merged; user owns all merges and deployment.
+
+T18.10 source defect is fixed in the local candidate: universal editor links now carry the selected profile key. The regression test uses `specialists` and asserts typed return context plus the selected day for all three editor destinations. Focused Vitest passed 25/25 with one worker; scoped ESLint passed; `npm run build` passed with a 1 GiB heap limit and existing Rollup/CSS warnings; `git diff --check` passed before journal edits. The first 768 MiB build failed at its artificial heap limit; the bounded 1 GiB retry passed. Gate result was `narrow_override` with `gate_misroute=false`, `override_used=true`, `handoff_required=true`; the prompt and exact scope are recorded in `EVIDENCE.md`.
+
+The fix has not yet been committed, pushed, or opened as a PR. Next: inspect the full tracked diff, commit and push the narrow source/test/journal changes, create a PR, then verify exact-head hosted CI. Do not merge; the user retains that authority.
+
+After the user merges, run the missing T18.10 normal Admin/2FA synthetic assertions on the exact candidate: actual `specialists` row, editor transition and return, reload, Back/Forward, four compatible URLs, and a readable protected DELETE 409 with the row preserved. Then resume current-source RQ-18 and the outstanding `STAGING_VALIDATION.md` checks when safe memory headroom is available. Existing scenario evidence is tied to its recorded source revision; do not replay all nine scenarios without a code change or evidence gap.
+
+Open acceptance remains: current-source RQ-18 browser run; complete T18.10 staging flow; final-candidate evidence reconciliation; full staging runbook; global served-frontend provenance; and the existing partial console diagnostics (2/11 events unreproduced, eight bundle call sites unmapped). Keep T18/Tier-2 `PARTIAL`; do not claim production readiness or system health.
+
+Local validation installed dependencies in ignored `frontend/node_modules` and produced ignored `frontend/dist`. Host policy blocked recursive cleanup after containment checks; no alternate method was used. Do not start Docker/WSL staging until RAM is checked again.
+
+# Previous resumes (historical)
+
 ## Current resume — #3897 gates green; T18 remains partial — 2026-11-07T02:39:59+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-rq18-current-20261106/final`, branch `codex/aqs-t18-rq18-current-20261106`. T00–T17 are merged; T18/Tier-2 remain PARTIAL. User owns merge and deployment.

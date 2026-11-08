@@ -1,3 +1,19 @@
+## T18.10 selected-profile return-context source fix — local validation — 2026-11-08T08:49:26+05:00
+
+- Commit under test: base `289c281a0ec2e2ae87abfd5d0b0103e5725e22bc` plus the uncommitted two-file source/test diff; PR not yet opened.
+- Environment: isolated Windows worktree `aqs-t18-selected-profile-context-20261108`; current `origin/main` equals the worktree base. No staging or production environment used.
+- Execution mode: `gate_known_root_cause`. Canonical launcher invoked from `ai/langgraph` with `--known-root-cause frontend/src/components/admin/AdminSetupDirections.tsx` and exact scopes for that source, its focused test, and the three T18 journals. Gate output: `Result: narrow_override`; `gate_misroute: no`; `override_used: yes`; `handoff_required: yes`. The generated execution prompt was read before editing. The outcome was the exact reviewed source scope; no gate/router changes.
+- Allowed paths: `frontend/src/components/admin/AdminSetupDirections.tsx`; `frontend/src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx`; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md`; worktree `.scratch/` scope note and generated `.gate_artifacts/` only.
+- Actual tracked changes: `AdminSetupDirections.tsx`; `adminSetupDirections.textPin.test.tsx`; this evidence entry and the T18 checkpoint/resume journals.
+- Original failure: `setupEditorLink()` set `profileKey: null`, so shared catalog/profile/user editor links dropped the selected `specialists` key from the typed return context.
+- Fix: universal editor links now serialize the current URL-owned selected profile. The regression test supplies a real `specialists` profile and selected day, then verifies all three destinations retain `setupProfile`, `setupDay`, `setupSection`, and `setupReturn`, with no entity binding.
+- Validation: focused Vitest `npm.cmd run test:run -- src/components/admin/__tests__/adminSetupDirections.textPin.test.tsx --maxWorkers=1 --no-file-parallelism` — PASS, 25/25. Scoped ESLint on the two changed frontend files — PASS. `npm.cmd run build` with a 1 GiB Node heap cap — PASS; existing Rollup annotation and CSS property warnings only. `git diff --check` — PASS before journal additions.
+- Validation note: first Vitest attempt used unsupported `--minWorkers` and ran zero tests; corrected single-worker invocation passed. First build under a 768 MiB Node heap cap failed at that cap; the 1 GiB bounded retry completed successfully.
+- Scope check: no backend/API/schema/auth/RBAC, clinical data, production, deployment, other worktree, merge, or staging changes. T18.10 browser flow on this candidate remains NOT_RUN.
+- Remaining limitation: exact-head hosted CI awaits PR creation. The required synthetic Admin/2FA T18.10 assertions, current-source RQ-18, full staging validation, and complete served-build provenance are still outstanding. T18/Tier-2 remain PARTIAL.
+- Cleanup: local dependency install and build output are in ignored paths `frontend/node_modules` and `frontend/dist`. Recursive cleanup was blocked by local host policy after path containment was checked; no alternate deletion mechanism was used.
+- Next: inspect the full diff, commit/push this narrow change, create a PR, verify exact-head required CI, then let the user merge. After merge, run only the remaining T18.10 synthetic assertions and continue the T18 acceptance matrix when staging resources permit.
+
 ## T18 RQ-18 post-#3899 local regression; live staging NOT_RUN — 2026-11-07T01:11:21+05:00
 
 - Commit under test: local worktree HEAD `4c40355b95844a4f779c582ff81f1685034be163`; it contains current `origin/main` `2093745a7d1082907f3d118fc6d90bc2e061af53` from #3899. The published PR #3897 still points to `ea1a9011f86a8e3f9d663e3b6e7b272cefd93264`, based on `5363a9ca53234539c5022b587250374a452a91a0`; local branch is ahead by three commits.

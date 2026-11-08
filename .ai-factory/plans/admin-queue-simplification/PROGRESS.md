@@ -1,4 +1,35 @@
-# Progress — T18 integrated synthetic acceptance
+# Progress — T18.10 selected-profile context repair
+
+Plan version: 1.0
+Current task: T18.10 selected-profile return-context repair and remaining T18 acceptance
+Current status: IN_PROGRESS; T00–T17 MERGED; PR #3897 merged at `569d5fe5f5f0c24f1e8aa72a782aaf73ed44bbe3`; selected-profile link fix and focused checks pass locally on the new candidate diff; PR not yet opened; T18.10 browser acceptance and current-source RQ-18 remain NOT_RUN; overall T18/Tier-2 remain PARTIAL; user owns merge/deployment
+Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-selected-profile-context-20261108/final`
+Branch: `codex/aqs-t18-selected-profile-context-20261108`
+Base / current `origin/main`: `289c281a0ec2e2ae87abfd5d0b0103e5725e22bc`
+Last updated: 2026-11-08T08:49:26+05:00
+
+## Current checkpoint — source fix validated locally; T18 acceptance remains open
+
+| Task | Status | Evidence |
+|------|--------|----------|
+| T00–T17 | MERGED | Existing plan journals; latest merge on this worktree is #3897 at `569d5fe5` |
+| T18 scenarios 1–9 | VALIDATED on recorded source revisions | Historical scenario evidence remains revision-scoped; reconcile against final candidate before claiming integrated completion |
+| T18.10 selected-profile source fix | VALIDATED locally, awaiting PR | Universal editor links now preserve URL-owned `profile=specialists`; focused test checks `setupProfile`, day, section, return marker, and absence of entity binding |
+| T18.10 synthetic Admin/2FA flow | NOT_RUN on candidate | Must verify actual `specialists` row and editor return/reload/Back/Forward plus protected DELETE 409 on the candidate commit |
+| Current-source RQ-18 | NOT_RUN | Earlier Session is tied to an older runtime; rerun only when safe staging resources are available |
+| Full staging runbook / served-build provenance | PARTIAL / NOT_RUN | `STAGING_VALIDATION.md` and canonical served-revision attestation remain outstanding |
+| T18 overall / Tier-2 | PARTIAL | Do not claim full acceptance, production readiness, or system health |
+
+### Candidate work and local validation
+
+- Code diff is based on clean `origin/main` `289c281a0ec2e2ae87abfd5d0b0103e5725e22bc`; current uncommitted patch is limited to `AdminSetupDirections.tsx` and its focused test.
+- Mandatory launcher was run from `ai/langgraph` with the confirmed root and five exact reviewed source/journal paths. It returned `Result: narrow_override`, `gate_misroute: no`, `override_used: yes`, and `Handoff required: yes`; the execution prompt was read and followed.
+- Focused Vitest: 25/25 PASS with one worker. Scoped ESLint: PASS. Frontend build: PASS with `NODE_OPTIONS=--max-old-space-size=1024`; existing CSS/Rollup warnings were emitted. An earlier build under a 768 MiB heap limit exited at that artificial heap cap; it is superseded by the successful bounded build.
+- `git diff --check`: PASS before this journal update. First Vitest invocation used unsupported `--minWorkers`; it ran zero tests, then the supported single-worker command passed.
+- The worktree initially had no `frontend/node_modules`; 900 packages were installed from its unchanged lockfile for local validation. The validation `frontend/node_modules` and generated `frontend/dist` are ignored worktree artifacts. Cleanup was attempted only after resolving target paths inside this worktree, but the host command policy blocked recursive removal; do not bypass it.
+- No staging, Docker, WSL, backend, production, merge, or deployment action was performed in this slice.
+
+## Previous checkpoint — stale #3897 state (historical; superseded above)
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance and evidence reconciliation
