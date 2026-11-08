@@ -311,7 +311,7 @@
 .derma-gallery-delete-confirm {
   display: inline-flex;
   align-items: center;
-  gap: var(--mac-spacing-1);
+  gap: var(--mac-spacing-1, 4px);
 }
 
 .derma-gallery-delete-confirm .derma-gallery-delete {
@@ -324,30 +324,30 @@
   justify-content: center;
   width: 26px;
   height: 26px;
-  border: 1px solid var(--mac-border);
-  border-radius: var(--mac-radius-full);
-  background: var(--mac-background-secondary);
-  color: var(--mac-text-secondary);
+  border: 1px solid var(--mac-border, currentcolor);
+  border-radius: var(--mac-radius-full, 9999px);
+  background: var(--mac-background-secondary, transparent);
+  color: var(--mac-text-secondary, inherit);
   cursor: pointer;
   opacity: 1;
-  transition: background var(--mac-duration-normal) var(--mac-ease),
-    color var(--mac-duration-normal) var(--mac-ease);
+  transition: background var(--mac-duration-normal, 200ms) var(--mac-ease, cubic-bezier(0.25, 0.46, 0.45, 0.94)),
+    color var(--mac-duration-normal, 200ms) var(--mac-ease, cubic-bezier(0.25, 0.46, 0.45, 0.94));
 }
 
 .derma-gallery-delete-cancel:hover,
 .derma-gallery-delete-cancel:focus-visible {
-  background: var(--mac-card-hover-bg);
-  color: var(--mac-text-primary);
+  background: var(--mac-card-hover-bg, transparent);
+  color: var(--mac-text-primary, inherit);
 }
 
 /* DERMAAI-FE-005: панель подсказки AI всегда называет фото-источник. */
 .derma-gallery-analysis-source {
   margin: 0;
-  font-size: var(--mac-font-size-sm);
-  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm, 12px);
+  color: var(--mac-text-secondary, inherit);
 }
 
 .derma-gallery-analysis-source-name {
-  font-weight: var(--mac-font-weight-medium);
-  color: var(--mac-text-primary);
+  font-weight: var(--mac-font-weight-medium, 500);
+  color: var(--mac-text-primary, inherit);
 }
