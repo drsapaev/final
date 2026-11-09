@@ -1,5 +1,22 @@
 # Progress — T18 final acceptance
 
+## PR #3946 sync with #3957 — validation checkpoint — 2026-11-09T19:49:30+05:00
+
+Local candidate `3339565dbe7eb926cac991ea06fcbf56842b12f5` merges fresh `origin/main` #3957 `6fee1cf957a312970142fd36486b944aaabe6f45` without conflict. The PR diff remains the seven approved staging/runbook/test/T18-journal paths. Python compile, focused guard (1 passed, 282 deselected), and diff checks passed. Push and exact-head CI for this candidate remain pending. The known-root gate returned `narrow_override`, `gate_misroute=true`, `override_used=true`, handoff required; prompt read. T18/Tier-2 remains PARTIAL; no deferral. Leave merge to the user.
+
+Next: record this result in EVIDENCE/RESUME, commit and push the same branch, then verify exact-head CI and current PR mergeability. After user merge, start the next isolated/gated RQ-18 correction.
+
+## PR #3946 sync with #3957 — pre-work checkpoint — 2026-11-09T19:48:08+05:00
+
+- Objective: bring the existing staging-only PR branch up to fresh `origin/main`; do not create another PR or merge to main.
+- Current state: local PR branch `8c9835b66cd1061b99e148f62fad205a2c6784d6`; fresh `origin/main` #3957 `6fee1cf957a312970142fd36486b944aaabe6f45`; merge base `38c929e220246e4c2f748eddc08c25ab7edf1208`.
+- Scope/ownership: PR changes remain seven staging/runbook/test/T18-journal paths. Incoming #3957 changes finreg/doctor pricing files; no overlap. `git merge-tree --write-tree HEAD origin/main` reports a clean merge tree.
+- Mode/gate: mandatory `gate_known_root_cause` for `frontend/Dockerfile.staging`, all seven PR paths; result `narrow_override`, `gate_misroute=true`, `override_used=true`, handoff required. Generated prompt read; bounded basis is the user's standing authorization to continue the T18 scope.
+- Allowed: merge fresh main into this PR branch; update T18 journals; run focused compile/guard/diff checks and exact-head GitHub checks.
+- Denied: runtime/API/DB/auth/dependency edits, staging/Compose, production, deployment, new PR, or merge to main.
+- Stop: any conflict or required edit beyond the seven owned paths.
+- Next: merge `origin/main`, repeat focused checks, record the exact result, then push and verify the refreshed PR.
+
 ## PR #3946 sync candidate — 2026-11-09T18:34:42+05:00
 
 Current candidate: local merge commit `12cfd0d29b41e667fddbc68b78c60d11cc3c4e2b` includes fresh `origin/main` #3945 `38c929e220246e4c2f748eddc08c25ab7edf1208`; merge had no conflicts. The PR diff remains the seven staging/runbook/test/T18-journal paths. Python compile, focused guard (1 passed, 282 deselected), and diff checks passed. Push and exact-head CI are pending. The bounded known-root gate returned `narrow_override` with `gate_misroute=true`, `override_used=true`, handoff required; prompt read. T18/Tier-2 remains PARTIAL; no deferral. Leave merge to the user.

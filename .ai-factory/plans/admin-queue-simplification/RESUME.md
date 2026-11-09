@@ -1,4 +1,14 @@
-## Current resume — PR #3946 sync with #3945 — 2026-11-09T18:34:42+05:00
+## Current resume — PR #3946 synced with #3957 — 2026-11-09T19:49:30+05:00
+
+Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. Local candidate `3339565dbe7eb926cac991ea06fcbf56842b12f5` merges fresh `origin/main` #3957 `6fee1cf957a312970142fd36486b944aaabe6f45` without conflict; the seven-file PR scope is preserved. Python compile, focused staging guard (1 passed, 282 deselected), and diff checks passed. Push and exact-head CI are pending; merge remains user-owned.
+
+T18/Tier-2 remains PARTIAL. RQ-18 asset-body capture and the full `STAGING_VALIDATION.md` checklist are incomplete; `served_revision_verified=false`. No deferral is claimed. The previous remote #3946 head's checks are superseded by this main sync.
+
+Next: commit/push this sync checkpoint and verify exact-head CI. After the user merges #3946, fetch fresh `origin/main`, create a clean worktree, and gate the focused RQ-18 response-body recorder correction.
+
+---
+
+## Previous checkpoint — PR #3946 sync with #3945 — 2026-11-09T18:34:42+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. Local candidate `12cfd0d29b41e667fddbc68b78c60d11cc3c4e2b` merges fresh `origin/main` #3945 `38c929e220246e4c2f748eddc08c25ab7edf1208` without conflict; the PR's seven-path scope is preserved. Python compile, focused guard (1 passed, 282 deselected), and diff checks passed. Gate returned the bounded `narrow_override` and prompt was read. Push and exact-head CI are pending. T18/Tier-2 remains PARTIAL; no deferral. Keep merge user-owned.
 
