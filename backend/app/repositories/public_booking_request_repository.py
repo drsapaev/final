@@ -8,11 +8,25 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.models.appointment import Appointment
 from app.models.clinic import ClinicSettings, Doctor
+from app.models.enums import AppointmentStatus
+from app.models.patient import Patient
 from app.models.public_booking_request import (
     PublicBookingRequest,
     PublicBookingRequestEvent,
 )
+
+
+def _future_or_unknown_time(value: str | None, after_time: time) -> bool:
+    if not isinstance(value, str):
+        return True
+    for time_format in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(value, time_format).time() > after_time
+        except ValueError:
+            continue
+    return True
 
 
 class PublicBookingRequestRepository:
@@ -33,6 +47,17 @@ class PublicBookingRequestRepository:
             .filter(ClinicSettings.key == key)
             .populate_existing()
             .with_for_update()
+            .first()
+        )
+
+    def lock_patient_for_booking(self, *, patient_id: int) -> Patient | None:
+        """Serialize patient quotas without blocking foreign-key key shares."""
+        return (
+            self.db.query(Patient)
+            .filter(Patient.id == patient_id)
+            .populate_existing()
+            # SQLAlchemy renders FOR NO KEY UPDATE for PostgreSQL.
+            .with_for_update(key_share=True)
             .first()
         )
 
@@ -63,10 +88,15 @@ class PublicBookingRequestRepository:
             query = query.filter(PublicBookingRequest.id != excluding_request_id)
         return query.first() is not None
 
-    def count_patient_requests_since(
+    def count_patient_booking_creations_since(
         self, *, patient_id: int, created_since: datetime
     ) -> int:
-        return int(
+        linked_request = (
+            self.db.query(PublicBookingRequest.id)
+            .filter(PublicBookingRequest.appointment_id == Appointment.id)
+            .exists()
+        )
+        request_count = int(
             self.db.query(func.count(PublicBookingRequest.id))
             .filter(
                 PublicBookingRequest.patient_id == patient_id,
@@ -74,6 +104,46 @@ class PublicBookingRequestRepository:
             )
             .scalar()
             or 0
+        )
+        appointment_count = int(
+            self.db.query(func.count(Appointment.id))
+            .filter(
+                Appointment.patient_id == patient_id,
+                Appointment.created_at >= created_since,
+                ~linked_request,
+            )
+            .scalar()
+            or 0
+        )
+        return request_count + appointment_count
+
+    def count_active_future_appointments(
+        self, *, patient_id: int, from_date: date, after_time: time
+    ) -> int:
+        """Count nonterminal appointments whose local start is in the future.
+
+        Unknown statuses normalize to pending in the appointment lifecycle.
+        A missing or invalid time on today's appointment is counted as active.
+        """
+        active_status = Appointment.status.notin_(
+            (
+                AppointmentStatus.COMPLETED.value,
+                AppointmentStatus.CANCELLED.value,
+                AppointmentStatus.NO_SHOW.value,
+            )
+        )
+        # A single statement avoids mixing snapshots if a visit is rescheduled.
+        appointments = self.db.query(
+            Appointment.appointment_date, Appointment.appointment_time
+        ).filter(
+            Appointment.patient_id == patient_id,
+            Appointment.appointment_date >= from_date,
+            active_status,
+        )
+        return sum(
+            appointment_date > from_date
+            or _future_or_unknown_time(appointment_time, after_time)
+            for appointment_date, appointment_time in appointments
         )
 
     def get_event_by_idempotency_key_hash(

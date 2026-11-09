@@ -145,6 +145,7 @@ class PublicBookingRequestErrorDetail(BaseModel):
         "booking_request_idempotency_conflict",
         "booking_request_duplicate",
         "booking_request_rate_limited",
+        "booking_active_appointment_limit",
         "booking_request_unavailable",
     ]
 
