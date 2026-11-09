@@ -1,4 +1,4 @@
-# Current resume — asset recorder diagnosis needed — 2026-11-09T10:41:00+05:00
+# Current resume — diagnostic harness ready; next is fresh r4 Session — 2026-11-09T10:47:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`.
 
@@ -12,9 +12,11 @@ The first failed session's root cause was the harness (conflicting color flags p
 
 The untracked diagnostic copy ran in fresh r3. T18.10 passed, but the RQ-18 test stopped in its asset recorder: 13 JS body reads returned `browser-response-body-unavailable`; the recorder threw before the final page-error guard or actual asset hashes. The one printed hash was from the synthetic probe and is not artifact evidence. Canonical teardown passed and removed r3. The original r2 page-error failure is still unresolved.
 
-Next: adjust the task-local diagnostic copy to summarize asset-body failures rather than aborting and to instrument the exact Admin pageerror listener using only error class, phase, and JS filename/line. Then use a fresh synthetic project and canonical Preflight → Start → one Session. If any pageerror points to app behavior, run the required source gate before proposing a code fix. Keep actual browser asset provenance `NOT_RUN` until real loaded app-asset hashes match the manifest.
+The task-local diagnostic copy and wrapper are ready. They keep body-capture failures separate from manifest matches and expose only page-error class, static phase and JS basename/line. PowerShell parsing and `--list` both passed; two tests were discovered and none ran in that check. Tracked application and test sources are unchanged.
 
-Validation already reported: focused guard test 1 passed/282 deselected; Python compile passed; `git diff --check` and commit hooks passed; hosted artifact source/checksums passed; `--list` found exactly two RQ-18 tests. First Session was a wrapper failure and teardown passed. Second project: T18.10 passed; original RQ-18 reached its final phase but failed the page-error guard; teardown passed. Third project: diagnostic RQ-18 reached the end phase but recorder failed on 13 JS bodies before actual asset hashes or page-error guard; teardown passed. No T18 completion claim.
+Next: use one fresh synthetic project with fresh backend/PostgreSQL ports and frontend port 18082, then canonical Preflight → Start → one Session. If pageerror identifies app behavior, run the required source gate before proposing a source fix. Keep browser asset provenance `NOT_RUN` until all loaded app-asset hashes match the verified manifest.
+
+Validation already reported: focused guard test 1 passed/282 deselected; Python compile passed; `git diff --check` and commit hooks passed; hosted artifact source/checksums passed; diagnostic `--list` found exactly two RQ-18 tests. First Session was a wrapper failure and teardown passed. Second project: T18.10 passed; original RQ-18 reached its final phase but failed the page-error guard; teardown passed. Third project: diagnostic RQ-18 reached the end phase but recorder failed on 13 JS bodies before actual asset hashes or page-error guard; teardown passed. Updated harness discovery only; fresh r4 Preflight/Start/Session not yet run. No T18 completion claim.
 
 ---
 

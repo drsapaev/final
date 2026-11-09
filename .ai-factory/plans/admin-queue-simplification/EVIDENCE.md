@@ -6595,3 +6595,10 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Failure: the diagnostic copy's browser-response recorder rejected before printing the actual app-asset hashes. It recorded 13 `/assets/*.js` body reads as `browser-response-body-unavailable`; the reported `1` asset belongs only to the synthetic probe in the isolated provenance test and is explicitly excluded from artifact matching. Thus actual app assets matched `0/0`; served artifact provenance remains `NOT_RUN`. The page-error guard was not reached on this diagnostic copy, so the earlier r2 page-error result remains unresolved.
 - Teardown: canonical Session result FAIL for the test command, teardown PASS; r3 project removed. No tracked source/test changes, no secrets or response contents recorded.
 - Next: on a task-local copy only, summarize recorder failures instead of throwing before the final guard and instrument the exact Admin pageerror listener to emit only error class, active static phase, and JS basename/line. Then run a fresh canonical synthetic Preflight → Start → Session. No product conclusion or source edit until the diagnostic distinguishes recorder behavior from application behavior.
+
+## T18 diagnostic harness adjustment — discovery only — 2026-11-09T10:47:00+05:00
+
+- Commit under test remains `6ec5c1e67...`; no tracked changes were made. The diagnostic copy in `.scratch/t18-memory-safe-staging-20261109/` now summarizes browser response-body errors without aborting before the final guard and instruments the Admin pageerror callback with only class, static phase and script basename/line.
+- The wrapper checks asset capture-failure count and artifact manifest equality separately, so partial asset capture cannot be mislabeled as a provenance PASS.
+- PowerShell parser check PASS. Playwright `--list` PASS: exactly two diagnostic tests discovered, zero executed. This does not validate runtime behavior.
+- Next: one fresh synthetic project with canonical Preflight → Start → Session; use frontend port 18082 required by the artifact and fresh backend/PostgreSQL ports. Inspect only the sanitized diagnostic summary, then teardown.
