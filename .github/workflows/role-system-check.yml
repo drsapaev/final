@@ -9,6 +9,8 @@ on:
       - "frontend/src/App.tsx"
       - "frontend/src/components/auth/LoginFormStyled.tsx"
       - "frontend/src/pages/UserSelect.tsx"
+      - "frontend/src/routing/**"
+      - ".github/workflows/role-system-check.yml"
       - "backend/app/api/v1/endpoints/*.py"
       - "backend/app/core/role_validation.py"
       - "backend/tests/integration/test_rbac_matrix.py"
