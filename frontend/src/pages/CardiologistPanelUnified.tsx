@@ -141,6 +141,13 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   // dialog, network) before the irreversible POST and the clinical UI reset.
   const selectedPatientRef = useRef(selectedPatient);
   selectedPatientRef.current = selectedPatient;
+  // CARDVISIT-FE-001 (audit 3886 round 24): one navigation-intent epoch for
+  // every entry path that resolves a canonical visit id before selecting
+  // the patient (appointment row click, view_emr action, complete action).
+  // The latest intent wins: a delayed canonical-visit lookup for patient A
+  // cannot switch the selected patient, EMR and active tab after the
+  // doctor already moved to patient B.
+  const navigationEpochRef = useRef(0);
   const [selectedServices, setSelectedServices] = useState<unknown[]>([]);
   const [visitData, setVisitData] = useState({
     complaint: '',
@@ -163,6 +170,15 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   tI18nRef.current = tI18n;
   const [scheduleNextModal, setScheduleNextModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null }>({ open: false, patient: null });
   const [editPatientModal, setEditPatientModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null; loading: boolean }>({ open: false, patient: null, loading: false });
+  // CARDPAT-FE-003 (audit 3886 round 24): request-generation guard for the
+  // edit-patient modal. Every handleEditPatient run takes a ticket; a late
+  // fetch for row A may not overwrite a newer edit (row B) or reopen a
+  // modal the doctor already closed.
+  const editPatientEpochRef = useRef(0);
+  const closeEditPatientModal = useCallback(() => {
+    editPatientEpochRef.current += 1;
+    setEditPatientModal({ open: false, patient: null, loading: false });
+  }, []);
   // P-016 (UX audit): settings persist in localStorage across reloads.
   // Cardioplan slice 5: only the LDL threshold remains — it is the single
   // setting actually consumed by the panel (blood-tab critical values).
@@ -766,12 +782,19 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   }, []);
 
   // Загрузка записей текущего кардиолога по каноническому Doctor.id.
+  // CARDAPPT-FE-001 (audit 3886 round 24): sequence guard — every load takes
+  // a generation ticket; a stale snapshot (poll, event, or refresh response
+  // that resolves after a newer one) can no longer overwrite the newer
+  // appointments state, error flag or loading flag.
+  const appointmentsEpochRef = useRef(0);
   const loadMacOSCardiologyAppointments = useCallback(async (_silent?: boolean) => {
+    const epoch = ++appointmentsEpochRef.current;
     setAppointmentsLoading(true);
     setAppointmentsError(false);
     try {
       const currentDoctorId = await resolveCurrentDoctorId();
       const { data } = await apiClient.get('/registrar/queues/today');
+      if (epoch !== appointmentsEpochRef.current) return;
       const selectedEntries = selectEntriesForSpecialist(data, currentDoctorId);
       const seenIds = new Set<string>();
       const appointmentsData: Record<string, unknown>[] = [];
@@ -840,11 +863,26 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
 
       setAppointments(enrichedAppointmentsData);
     } catch {
-      setAppointmentsError(true);
+      if (epoch === appointmentsEpochRef.current) setAppointmentsError(true);
     } finally {
-      setAppointmentsLoading(false);
+      if (epoch === appointmentsEpochRef.current) setAppointmentsLoading(false);
     }
   }, [getAllPatientServicesCb, resolveCurrentDoctorId]);
+
+  // CARDAPPT-FE-001: one coalesced refresh per queueUpdated burst — a
+  // debounced single reload (the 500 ms delay gives the backend time to
+  // settle statuses) that replaces any pending timer instead of stacking
+  // an immediate call plus an uncancellable delayed one.
+  const appointmentsRefreshTimerRef = useRef<number | null>(null);
+  const scheduleAppointmentsRefresh = useCallback(() => {
+    if (appointmentsRefreshTimerRef.current !== null) {
+      window.clearTimeout(appointmentsRefreshTimerRef.current);
+    }
+    appointmentsRefreshTimerRef.current = window.setTimeout(() => {
+      appointmentsRefreshTimerRef.current = null;
+      loadMacOSCardiologyAppointments();
+    }, 500);
+  }, [loadMacOSCardiologyAppointments]);
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
@@ -853,39 +891,35 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     }
 
     // Слушаем глобальные события обновления очереди
-    const handleQueueUpdate = (event: Event) => {
-      const detail = (event as unknown as { detail?: { action?: string } }).detail || {};
-      const { action } = detail;
-
-      // Автоматически обновляем список appointments после завершения приёма
-      if (action === 'visitCompleted' || action === 'nextPatientCalled') {
-        if (activeTab === 'patients' || activeTab === 'appointments' || shouldHydrateAppointmentContext) {
-          loadMacOSCardiologyAppointments();
-        }
-      }
-
-      // Обновляем при любых изменениях, если открыта вкладка appointments
+    // CARDAPPT-FE-001: coalesced — every queueUpdated event (including
+    // visitCompleted / nextPatientCalled) schedules exactly ONE debounced
+    // refresh while the appointments context is active. The epoch guard in
+    // the loader drops out-of-order snapshots; the cleanup cancels a
+    // pending timer on tab switch or unmount.
+    const handleQueueUpdate = () => {
       if (activeTab === 'patients' || activeTab === 'appointments' || shouldHydrateAppointmentContext) {
-        // Небольшая задержка, чтобы дать бэкенду время обновить статусы
-        setTimeout(() => {
-          loadMacOSCardiologyAppointments();
-        }, 500);
+        scheduleAppointmentsRefresh();
       }
     };
     window.addEventListener('queueUpdated', handleQueueUpdate);
 
     return () => {
       window.removeEventListener('queueUpdated', handleQueueUpdate);
+      if (appointmentsRefreshTimerRef.current !== null) {
+        window.clearTimeout(appointmentsRefreshTimerRef.current);
+        appointmentsRefreshTimerRef.current = null;
+      }
     };
-  }, [activeTab, loadMacOSCardiologyAppointments, shouldHydrateAppointmentContext]);
+  }, [activeTab, loadMacOSCardiologyAppointments, scheduleAppointmentsRefresh, shouldHydrateAppointmentContext]);
 
   // Функция для получения данных пациента по ID
+  // CARDPAT-FE-001 (audit 3886 round 24): the numeric threshold (IDs at or
+  // above 1000) «demo patient» shortcut is removed. Backend patient IDs are
+  // unbounded integers and the backend is the only authority on whether a
+  // patient exists (REG-FE-036 precedent): a legal patient must actually be
+  // fetched, and a 404 or a network failure is an explicit backend answer,
+  // never a silent demo classification.
   const fetchPatientData = useCallback(async (patientId: string | number) => {
-    // Проверяем, является ли это демо-пациентом (ID >= 1000)
-    if (Number(patientId) >= 1000) {
-      return null;
-    }
-
     const token = tokenManager.getAccessToken();
     if (!token) return null;
 
@@ -904,27 +938,35 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   }, []);
 
   // Функция для преобразования данных пациента из формата API в формат PatientModal
+  // CARDPAT-FE-002 (audit 3886 round 24): emits the FLAT edit contract that
+  // EditPatientModal → AppointmentWizardV2 actually reads in edit mode
+  // (patient_fio / patient_birth_date / patient_birth_year / patient_id).
+  // The previous camelCase-only shape (firstName/lastName/birthDate) was
+  // never read by the modal or the wizard, so a fully hydrated patient
+  // opened the edit form with a blank FIO and birth date and an unchanged
+  // save was blocked by FIO validation. Backend GET /patients/{id} stays
+  // the SSOT; nothing is invented here.
   const transformPatientData = useCallback((apiPatient: Record<string, unknown> | null) => {
     if (!apiPatient) return null;
 
+    const fio = [apiPatient.last_name, apiPatient.first_name, apiPatient.middle_name]
+      .map((part) => String(part ?? '').trim())
+      .filter(Boolean)
+      .join(' ');
+    const birthDate = apiPatient.birth_date ? String(apiPatient.birth_date) : '';
+
     return {
       id: apiPatient.id,
-      firstName: apiPatient.first_name || '',
-      lastName: apiPatient.last_name || '',
-      middleName: apiPatient.middle_name || '',
-      email: apiPatient.email || '',
+      patient_id: apiPatient.id,
+      patient_fio: fio,
+      patient_birth_date: birthDate,
+      patient_birth_year: birthDate ? Number.parseInt(birthDate.slice(0, 4), 10) || null : null,
       phone: apiPatient.phone || '',
-      birthDate: apiPatient.birth_date || '',
-      gender: apiPatient.sex === 'M' ? 'male' : apiPatient.sex === 'F' ? 'female' : '',
       address: apiPatient.address || '',
-      passport: apiPatient.doc_number || '',
-      insuranceNumber: '', // Это поле может отсутствовать в API
-      emergencyContact: '', // Это поле может отсутствовать в API
-      emergencyPhone: '', // Это поле может отсутствовать в API
-      bloodType: '', // Это поле может отсутствовать в API
-      allergies: '', // Это поле может отсутствовать в API
-      chronicDiseases: '', // Это поле может отсутствовать в API
-      notes: '' // Это поле может отсутствовать в API
+      gender: apiPatient.sex === 'M' ? 'male' : apiPatient.sex === 'F' ? 'female' : '',
+      sex: apiPatient.sex ?? '',
+      email: apiPatient.email || '',
+      passport: apiPatient.doc_number || ''
     };
   }, []);
 
@@ -946,6 +988,10 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
 
   // Обработчик редактирования пациента
   const handleEditPatient = useCallback(async (row: Record<string, unknown>) => {
+    // CARDPAT-FE-003: this run's ticket. A newer edit intent or a modal
+    // close bumps the epoch and invalidates every pending resolution below.
+    const epoch = ++editPatientEpochRef.current;
+
     // Если нет patient_id (QR-пациент), используем частичные данные из row
     if (!row.patient_id) {
       const partialPatient = createPartialPatientFromRow(row);
@@ -959,6 +1005,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
 
       // Загружаем полные данные пациента
       const apiPatient = await fetchPatientData(row.patient_id as string | number);
+      if (epoch !== editPatientEpochRef.current) return;
 
       if (!apiPatient) {
         // Если не удалось загрузить, используем данные из row (частичные)
@@ -973,6 +1020,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       setEditPatientModal({ open: true, patient: transformedPatient, loading: false });
 
     } catch (error: unknown) {
+      if (epoch !== editPatientEpochRef.current) return;
       const partialPatient = createPartialPatientFromRow(row);
       setEditPatientModal({ open: true, patient: partialPatient, loading: false });
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_card_load_failed')));
@@ -984,8 +1032,11 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
       preloadVisitTab();
+      // CARDVISIT-FE-001: this click's navigation ticket.
+      const epoch = ++navigationEpochRef.current;
       const appointmentId = row.appointment_id || null;
       const visitId = await ensureCanonicalVisitId(row);
+      if (epoch !== navigationEpochRef.current) return;
       if (!visitId) {
         notify.error(tI18n('cardio.no_visit_id'));
         return;
@@ -1076,8 +1127,11 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       case 'view_emr':{
           preloadVisitTab();
           // Просмотр EMR для завершённой записи
+          // CARDVISIT-FE-001: this action's navigation ticket.
+          const epoch = ++navigationEpochRef.current;
           const appointmentId = row.appointment_id || null;
           const visitId = await ensureCanonicalVisitId(row);
+          if (epoch !== navigationEpochRef.current) break;
           if (!visitId) {
             notify.error(tI18n('cardio.emr_no_visit_id'));
             break;
@@ -1157,8 +1211,11 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       case 'complete':{
           preloadVisitTab();
           // Завершить приём
+          // CARDVISIT-FE-001: this action's navigation ticket.
+          const epoch = ++navigationEpochRef.current;
           try {
             const visitId = await ensureCanonicalVisitId(row);
+            if (epoch !== navigationEpochRef.current) break;
             if (!visitId) {
               notify.error(tI18n('cardio.no_visit_id_for_complete'));
               break;
@@ -2074,11 +2131,11 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         }>
           <EditPatientModal
             isOpen={editPatientModal.open}
-            onClose={() => setEditPatientModal({ open: false, patient: null, loading: false })}
+            onClose={closeEditPatientModal}
             patient={editPatientModal.patient ?? undefined}
             onSave={async () => {
               await loadMacOSCardiologyAppointments();
-              setEditPatientModal({ open: false, patient: null, loading: false });
+              closeEditPatientModal();
             }}
             loading={editPatientModal.loading}
             theme={{ isDark, getColor, getSpacing, getFontSize }} />

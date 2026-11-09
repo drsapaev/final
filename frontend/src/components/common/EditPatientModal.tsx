@@ -35,11 +35,27 @@ const EditPatientModal = ({ isOpen, onClose, patient, onSave, loading = false, t
   // in edit mode. The wizard is tolerant of missing fields — it normalizes
   // internally — but we at least make sure the queue entry id and patient
   // identity are passed through when available.
+  // CARDPAT-FE-002 (audit 3886 round 24): the wizard's edit-mode initializer
+  // reads the FLAT fields first (patient_fio / patient_birth_date /
+  // patient_birth_year / phone / address / gender) and only falls back to
+  // the nested patient object. The nested-only mapping silently dropped
+  // FIO and birth date for every caller that passed a fully hydrated
+  // patient. Pass both shapes through; values come from the same
+  // authoritative sources, so this is additive for all callers.
   const initialData = patient
     ? {
         id: patient?.id ?? patient?.appointment_id ?? patient?.queue_entry_id ?? null,
         queue_entry_id:
           patient?.queue_entry_id ?? patient?.queueEntryId ?? patient?.id ?? null,
+        patient_fio: patient?.patient_fio ?? patient?.fio ?? patient?.fullName ?? '',
+        patient_birth_date:
+          patient?.patient_birth_date ?? patient?.birth_date ?? patient?.birthday ?? '',
+        patient_birth_year: patient?.patient_birth_year ?? null,
+        phone: patient?.phone ?? '',
+        patient_phone: patient?.patient_phone ?? patient?.phone ?? '',
+        address: patient?.address ?? '',
+        gender: patient?.gender ?? '',
+        sex: patient?.sex ?? '',
         patient: {
           id: patient?.patient_id ?? patient?.id ?? null,
           fio: patient?.patient_fio ?? patient?.fio ?? patient?.fullName ?? '',
