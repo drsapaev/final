@@ -72,9 +72,13 @@
     color: var(--mac-error);
 }
 
-/* EMRVITAL-FE-001 (audit 3886, round 21): explicit out-of-range feedback */
-.emr-vitals__field--invalid input {
-    border-color: var(--mac-error) !important;
+/* EMRVITAL-FE-001 (audit 3886, round 21): explicit out-of-range feedback.
+   No !important: the compound selectors outrank the base field rule (0,1,1)
+   and the :focus variant (0,2,1) by matching specificity-later ordering, so
+   the error border survives focus without escalating cascade priority. */
+.emr-vitals__field--invalid input,
+.emr-vitals__field--invalid input:focus {
+    border-color: var(--mac-error, currentcolor);
 }
 
 .emr-vitals__invalid-hint {
@@ -82,7 +86,7 @@
     left: 0;
     bottom: -14px;
     font-size: 10px;
-    color: var(--mac-error);
+    color: var(--mac-error, currentcolor);
     white-space: nowrap;
 }
 
