@@ -112683,6 +112683,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Confirmation"
+          },
+          "idempotent_replay": {
+            "type": "boolean",
+            "title": "Idempotent Replay",
+            "description": "True, когда идентичный intent уже был зафиксирован в окне дедупликации и ответ перестроен из СОХРАНЁННОГО визита (второй визит/токен не создавались).",
+            "default": false
           }
         },
         "type": "object",

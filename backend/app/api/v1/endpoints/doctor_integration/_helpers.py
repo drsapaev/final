@@ -6,12 +6,18 @@ API endpoints для интеграции панелей врачей с сис�
 """
 
 import logging  # noqa: F401
+import re  # noqa: F401
 import uuid  # noqa: F401
 from datetime import UTC, date, datetime, timedelta  # noqa: F401
 from typing import Any  # noqa: F401
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
-from pydantic import BaseModel, Field, model_validator  # noqa: F401
+from pydantic import (  # noqa: F401
+    BaseModel,
+    Field,
+    field_validator,
+    model_validator,
+)
 from sqlalchemy import and_, or_  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
@@ -287,6 +293,10 @@ class ScheduleNextVisitRequest(BaseModel):
     services: list[ScheduleNextVisitService] = Field(default_factory=list)
     service_ids: list[int] | None = None
     visit_date: date
+    # DOCSCHED-BE-005 (audit #3892, group 18): visit_time — канонический
+    # zero-padded HH:MM (HTML time input) или отсутствие (дневная запись без
+    # времени). Произвольные строки ('29:99', 'notime', '9:00') больше не
+    # попадают в pending-подтверждение и очередь.
     visit_time: str | None = None
     discount_mode: str = Field(
         default="none", pattern="^(none|repeat|benefit|all_free)$"
@@ -296,6 +306,21 @@ class ScheduleNextVisitRequest(BaseModel):
     confirmation_channel: str = Field(
         default="phone", pattern="^(phone|telegram|pwa|auto)$"
     )
+
+    @field_validator("visit_time")
+    @classmethod
+    def _validate_visit_time_hh_mm(cls, value: str | None) -> str | None:
+        """DOCSCHED-BE-005: canonical HH:MM contract (00:00–23:59)."""
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", normalized):
+            raise ValueError(
+                "visit_time должен быть временем в формате HH:MM (00:00–23:59)"
+            )
+        return normalized
 
     @model_validator(mode="after")
     def normalize_services_payload(self):
@@ -318,6 +343,17 @@ class ScheduleNextVisitResponse(BaseModel):
     visit_id: int
     status: str  # pending_confirmation
     confirmation: dict[str, Any]
+    # DOCSCHED-BE-001 (audit #3892, group 18): True, когда идентичный
+    # intent уже был зафиксирован в окне дедупликации и ответ перестроен
+    # из СОХРАНЁННОГО визита (второй визит/токен не создавались).
+    idempotent_replay: bool = Field(
+        default=False,
+        description=(
+            "True, когда идентичный intent уже был зафиксирован в окне "
+            "дедупликации и ответ перестроен из СОХРАНЁННОГО визита "
+            "(второй визит/токен не создавались)."
+        ),
+    )
 
 
 # ===================== ОЧЕРЕДЬ ВРАЧА =====================

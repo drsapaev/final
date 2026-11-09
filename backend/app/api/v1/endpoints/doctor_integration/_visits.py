@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import math  # noqa: F401 — DOCVISIT-BE-002 finite-price validation
 
+from sqlalchemy import text
+
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     DOCTOR_QUEUE_ALLOWED_TAGS,
@@ -27,10 +29,145 @@ from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     _visit_filter_doctor_id,
     router,
 )
+from app.crud.clinic import clinic_today
+from app.models.patient import Patient
 from app.services.appointment_duration_snapshot import (
     duration_snapshot_for_service_id,
 )
 from app.services.payment_invariant_service import PaymentInvariantService
+
+# DOCSCHED-BE-001..005 (audit #3892, group 18): the doctor schedule-next
+# visit-creation plane. A repeated identical intent inside the dedup
+# window replays the ORIGINAL visit/token instead of creating a second
+# pending_confirmation visit; the all_free business field is canonical
+# (visit, service rows, confirmation and billing agree); the past-date
+# check follows the CLINIC's calendar (clinic_today SSOT), not the UTC
+# host's date.today(); a non-doctor principal no longer writes its
+# users.id into the doctors.id foreign key (unowned visit instead).
+
+# DOCSCHED-BE-001: окно дедупликации повторного schedule-next intent'а.
+# Покрывает повтор из-за потерянного HTTP-ответа/двойного нажатия;
+# осознанная повторная запись пациента выполняется после истечения окна
+# (или с другим intent'ом — время/услуги/скидка) и создаёт новый визит.
+_SCHEDULE_NEXT_DEDUP_WINDOW_SECONDS = 10
+
+
+def _acquire_schedule_next_dedup_lock(
+    db: Session, *, patient_id: int, visit_date: date
+) -> None:
+    """DOCSCHED-BE-001: транзакционный PostgreSQL advisory-lock на intent
+    (пациент + дата визита) — сериализует конкурирующие идентичные
+    POST'ы между воркерами ДО check-before-write дедупликации (та же
+    парадигма, что ``lock_owner_config_scope``/``acquire_phone_scope_lock``).
+    SQLite (локальные тесты) advisory-локов не имеет — no-op.
+    """
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
+        {"k": f"schedule_next:{patient_id}:{visit_date.isoformat()}"},
+    )
+
+
+def _schedule_next_service_lines_match(
+    stored_lines: list[VisitService],
+    intended: list[tuple[int, int, float]],
+) -> bool:
+    """DOCSCHED-BE-001: строки услуг совпадают с intent'ом (multiset по
+    (service_id, qty, effective price)) — цена сравнивается допуском на
+    копеечные различия float."""
+    if len(stored_lines) != len(intended):
+        return False
+    stored = sorted(
+        (line.service_id, line.qty or 0, float(line.price or 0))
+        for line in stored_lines
+    )
+    wanted = sorted(
+        (service_id, qty, float(price)) for service_id, qty, price in intended
+    )
+    return all(
+        left[0] == right[0]
+        and left[1] == right[1]
+        and math.isclose(left[2], right[2], abs_tol=0.01)
+        for left, right in zip(stored, wanted, strict=False)
+    )
+
+
+def _find_recent_identical_schedule_next(
+    db: Session,
+    *,
+    patient_id: int,
+    doctor_id: int | None,
+    visit_date: date,
+    visit_time: str | None,
+    discount_mode: str,
+    notes: str | None,
+    service_lines: list[tuple[int, int, float]],
+) -> Visit | None:
+    """DOCSCHED-BE-001: недавний идентичный pending_confirmation визит.
+
+    Совпадение полного intent'а: пациент, врач (или его отсутствие), дата,
+    время, каноничный discount_mode, заметки и все строки услуг с их
+    эффективными ценами. Возвращённый визит — основа для replay-ответа;
+    новый визит и токен подтверждения НЕ создаются.
+    """
+    cutoff = datetime.now(UTC) - timedelta(seconds=_SCHEDULE_NEXT_DEDUP_WINDOW_SECONDS)
+    query = (
+        db.query(Visit)
+        .filter(
+            Visit.patient_id == patient_id,
+            Visit.visit_date == visit_date,
+            Visit.status == "pending_confirmation",
+            Visit.discount_mode == discount_mode,
+            Visit.created_at >= cutoff,
+        )
+    )
+    if doctor_id is None:
+        query = query.filter(Visit.doctor_id.is_(None))
+    else:
+        query = query.filter(Visit.doctor_id == doctor_id)
+    candidates = query.order_by(Visit.id.desc()).all()
+    for candidate in candidates:
+        if (candidate.visit_time or None) != (visit_time or None):
+            continue
+        if (candidate.notes or None) != (notes or None):
+            continue
+        stored_lines = (
+            db.query(VisitService)
+            .filter(VisitService.visit_id == candidate.id)
+            .all()
+        )
+        if _schedule_next_service_lines_match(stored_lines, service_lines):
+            return candidate
+    return None
+
+
+def _schedule_next_confirmation_data(
+    *,
+    visit: Visit,
+    patient: Patient,
+    channel: str,
+    total_amount: float,
+    services_count: int,
+    notification_sent: bool,
+) -> dict[str, Any]:
+    """Единая сборка confirmation-блока ответа schedule-next (и для fresh,
+    и для DOCSCHED-BE-001 replay-ответа из сохранённого визита)."""
+    return {
+        "token": visit.confirmation_token,
+        "channel": channel,
+        "expires_at": (
+            visit.confirmation_expires_at.isoformat()
+            if visit.confirmation_expires_at
+            else None
+        ),
+        "patient_name": patient.short_name(),
+        "visit_date": visit.visit_date.isoformat() if visit.visit_date else None,
+        "visit_time": visit.visit_time,
+        "total_amount": total_amount,
+        "services_count": services_count,
+        "notification_sent": notification_sent,
+    }
 
 # DOCVISIT-BE-001/002/003 (audit #3892, group 17): the doctor-side
 # visit-service mutation plane. The persisted ``VisitService.price`` IS the
@@ -133,6 +270,15 @@ async def schedule_next_visit(
     Номер будет присвоен только после подтверждения пациентом
     """
     try:
+        # DOCSCHED-BE-002 follow-up (группа 18): валидация финансовых
+        # входов ДО любой персистентности — тот же контракт, что у
+        # doctor add-service (DOCVISIT-BE-002), через второй вход.
+        for service_req in request.services:
+            _validate_add_service_inputs(
+                quantity=service_req.quantity,
+                custom_price=service_req.custom_price,
+            )
+
         # Получаем врача
         doctor = (
             db.query(Doctor)
@@ -145,16 +291,18 @@ async def schedule_next_visit(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Профиль врача не найден"
             )
 
-        # Проверяем что дата не в прошлом
-        if request.visit_date < date.today():
+        # DOCSCHED-BE-003: прошедшая дата определяется по календарю
+        # КЛИНИКИ (clinic_today SSOT, таймзона настроек очередей), а не по
+        # host-UTC date.today(): на UTC-хосте между 19:00 и полночью
+        # клинический день Asia/Tashkent уже наступил, и host-проверка
+        # пропускала прошедшую для клиники дату.
+        if request.visit_date < clinic_today(db):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Нельзя назначить визит на прошедшую дату",
             )
 
         # Проверяем существование пациента
-        from app.models.patient import Patient
-
         patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
         if not patient:
             raise HTTPException(
@@ -178,6 +326,91 @@ async def schedule_next_visit(
                 detail="Некоторые услуги не найдены",
             )
 
+        # DOCSCHED-BE-002: канонизация бизнес-поля. discount_mode='all_free'
+        # и all_free=True — ОДИН и тот же intent: все строки нулевые, визит
+        # хранит discount_mode='all_free'. Прежний код принимал
+        # mode='all_free' при ненулевых ценах (режим «все бесплатно» с
+        # каталоговыми суммами в подтверждении и биллинге).
+        effective_all_free = request.all_free or request.discount_mode == "all_free"
+        normalized_discount_mode = (
+            "all_free" if effective_all_free else request.discount_mode
+        )
+
+        # Вычисляем эффективные строки услуг ЗАРАНЕЕ: они нужны и для
+        # DOCSCHED-BE-001 дедупликации intent'а, и для создания визита.
+        services_by_id = {service.id: service for service in services}
+        intended_lines: list[tuple[int, int, float]] = []
+        for service_req in request.services:
+            service = services_by_id[service_req.service_id]
+
+            # DOCSCHED-BE-002 follow-up: явный custom_price=0 — осознанная
+            # бесплатная цена, а не falsy-fallback на каталог.
+            if service_req.custom_price is not None:
+                service_price = float(service_req.custom_price)
+            else:
+                service_price = float(service.price) if service.price else 0
+
+            # Применяем скидки для консультаций
+            if service.is_consultation:
+                if request.discount_mode in ["repeat", "benefit"] or effective_all_free:
+                    service_price = 0
+
+            # All Free делает всё бесплатным
+            if effective_all_free:
+                service_price = 0
+
+            intended_lines.append((service.id, service_req.quantity, service_price))
+
+        # DOCSCHED-BE-001: идемпотентность уровня операции. Повторный
+        # идентичный intent (потерянный HTTP-ответ, двойное нажатие) в
+        # окне дедупликации возвращает ИСХОДНЫЙ визит и токен — второй
+        # pending_confirmation визит не создаётся. Advisory-lock
+        # сериализует конкурирующие воркеры до check-before-write.
+        _acquire_schedule_next_dedup_lock(
+            db, patient_id=request.patient_id, visit_date=request.visit_date
+        )
+        replay_visit = _find_recent_identical_schedule_next(
+            db,
+            patient_id=request.patient_id,
+            doctor_id=doctor.id if doctor else None,
+            visit_date=request.visit_date,
+            visit_time=request.visit_time,
+            discount_mode=normalized_discount_mode,
+            notes=request.notes,
+            service_lines=intended_lines,
+        )
+        if replay_visit is not None:
+            stored_lines = (
+                db.query(VisitService)
+                .filter(VisitService.visit_id == replay_visit.id)
+                .all()
+            )
+            replay_total = sum(
+                float(line.price or 0) * (line.qty or 0) for line in stored_lines
+            )
+            confirmation_data = _schedule_next_confirmation_data(
+                visit=replay_visit,
+                patient=patient,
+                channel=request.confirmation_channel,
+                total_amount=replay_total,
+                services_count=len(stored_lines),
+                # Приглашение уже отправлено исходным запросом (результат
+                # недоступен replay'у) — не заявляем доставку, которой не
+                # видели, и не спамим пациента повторной отправкой.
+                notification_sent=False,
+            )
+            return ScheduleNextVisitResponse(
+                success=True,
+                message=(
+                    "Визит уже создан этим же запросом — повторная отправка "
+                    "не создала второй визит и не повторила приглашение."
+                ),
+                visit_id=replay_visit.id,
+                status="pending_confirmation",
+                confirmation=confirmation_data,
+                idempotent_replay=True,
+            )
+
         # Генерируем токен подтверждения
         confirmation_token = str(uuid.uuid4())
         expires_at = datetime.now(UTC) + timedelta(
@@ -185,14 +418,20 @@ async def schedule_next_visit(
         )  # 48 часов на подтверждение
 
         # Создаем визит со статусом pending_confirmation
+        # DOCSCHED-BE-004: doctor_id — это doctors.id (FK), а НЕ users.id.
+        # Прежний fallback «doctor_id=current_user.id» для персонала без
+        # профиля врача писал users.id в FK: на PostgreSQL — IntegrityError
+        # (500), а при числовом совпадении с чужим Doctor.id — тихая
+        # привязка визита к постороннему врачу. Визит без врача —
+        # поддерживаемое состояние (выдача номера падает fail-closed по
+        # D-08, решение за оператором).
         visit = Visit(
             patient_id=request.patient_id,
-            # Backward compatibility for admin/test flows without Doctor profile.
-            doctor_id=doctor.id if doctor else current_user.id,
+            doctor_id=doctor.id if doctor else None,
             visit_date=request.visit_date,
             visit_time=request.visit_time,
             status="pending_confirmation",  # Ожидает подтверждения
-            discount_mode=request.discount_mode,
+            discount_mode=normalized_discount_mode,
             department="mixed",  # Будет определен по услугам
             notes=request.notes,
             confirmation_token=confirmation_token,
@@ -205,23 +444,8 @@ async def schedule_next_visit(
 
         # Добавляем услуги к визиту
         total_amount = 0
-        for service_req in request.services:
-            service = next(s for s in services if s.id == service_req.service_id)
-
-            # Вычисляем цену
-            service_price = service_req.custom_price or (
-                float(service.price) if service.price else 0
-            )
-
-            # Применяем скидки для консультаций
-            if service.is_consultation:
-                if request.discount_mode in ["repeat", "benefit"] or request.all_free:
-                    service_price = 0
-
-            # All Free делает всё бесплатным
-            if request.all_free:
-                service_price = 0
-
+        for service_id, quantity, service_price in intended_lines:
+            service = services_by_id[service_id]
             visit_service = VisitService(
                 visit_id=visit.id,
                 service_id=service.id,
@@ -231,13 +455,13 @@ async def schedule_next_visit(
                 name=service.name,
                 # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
                 code=service.service_code or get_service_code(service.id, db),
-                qty=service_req.quantity,
+                qty=quantity,
                 price=service_price,
                 currency="UZS",
             )
             db.add(visit_service)
 
-            total_amount += service_price * service_req.quantity
+            total_amount += service_price * quantity
 
         db.commit()
         db.refresh(visit)
@@ -267,21 +491,18 @@ async def schedule_next_visit(
             # Не прерываем выполнение, визит уже создан
 
         # Формируем ответ
-        confirmation_data = {
-            "token": confirmation_token,
-            "channel": request.confirmation_channel,
-            "expires_at": expires_at.isoformat(),
-            "patient_name": patient.short_name(),
-            "visit_date": request.visit_date.isoformat(),
-            "visit_time": request.visit_time,
-            "total_amount": total_amount,
-            "services_count": len(request.services),
-            "notification_sent": (
+        confirmation_data = _schedule_next_confirmation_data(
+            visit=visit,
+            patient=patient,
+            channel=request.confirmation_channel,
+            total_amount=total_amount,
+            services_count=len(request.services),
+            notification_sent=(
                 notification_result.get("success", False)
                 if "notification_result" in locals()
                 else False
             ),
-        }
+        )
 
         return ScheduleNextVisitResponse(
             success=True,
@@ -289,6 +510,7 @@ async def schedule_next_visit(
             visit_id=visit.id,
             status="pending_confirmation",
             confirmation=confirmation_data,
+            idempotent_replay=False,
         )
 
     except HTTPException:
