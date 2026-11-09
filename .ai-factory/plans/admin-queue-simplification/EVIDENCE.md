@@ -10,8 +10,8 @@
 - Relevant artifact: `.scratch/t18-memory-safe-staging-20261109/response-body-navigation-probe.cjs`.
 - Actual changed paths: the three T18 journal files only. No source or Compose changes.
 - Scope check: all network requests were served by the test's loopback server; no external host, production, or clinic data was involved.
-- Remaining limitation: this confirms the Playwright/CDP navigation race in a synthetic page, not successful capture of the actual application's assets. T18/Tier-2 remains PARTIAL; the exact RQ-18 staging rerun is still required after a focused recorder fix. The frontend build failure is specific to the shared worktree dependency junction and remains unresolved; exact-head GitHub build on the previous PR HEAD had passed, but the journal update's new PR head has not yet received fresh CI.
-- PR: #3946 was OPEN / Ready for review, HEAD `65c4dc0905f74bd65da81585497983b8f0cc600c` at the last check; merge is user-owned. This journal diff is pending commit/push and fresh checks.
+- Remaining limitation: this confirms the Playwright/CDP navigation race in a synthetic page, not successful capture of the actual application's assets. T18/Tier-2 remains PARTIAL; the exact RQ-18 staging rerun is still required after a focused recorder fix. The local frontend build failure is specific to the shared worktree dependency junction and remains unresolved; exact-head GitHub frontend build/unit/lint all passed on PR HEAD `94a7c45`.
+- PR: #3946 was OPEN / Ready for review, HEAD `94a7c45faf07dfedc36d2c9c6c8b959665de3eb7` at the last exact check; all applicable checks passed and path/trigger-skipped jobs are not counted as passing. This final journal-only follow-up is on the branch; query GitHub for its resulting exact HEAD/checks. Merge is user-owned.
 
 ## PR #3946 sync to current main and exact-head CI — 2026-11-09T15:50:04+05:00
 
