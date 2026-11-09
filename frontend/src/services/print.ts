@@ -25,6 +25,31 @@ const normalizePrintError = (error: unknown, fallbackMessage: string) => ({
   error: getErrorMessage(error) || fallbackMessage
 });
 
+/**
+ * RETRO-3921-01 (consolidated post-merge review of PR 3921):
+ * distinguish a DEFINITE negative answer from an UNKNOWN transport result.
+ *
+ * A rejection is a definite failure ONLY when the server answered (an HTTP
+ * error status reached the client): the print pipeline refused the job, so
+ * the operator-driven PDF fallback may proceed. A rejection WITHOUT a
+ * response — client timeout, dropped connection mid-flight, abort — is an
+ * UNKNOWN outcome: the server may have already accepted and queued the
+ * physical job, so the result is reported ambiguous and the caller must
+ * NOT open a second print route.
+ */
+const isUnknownTransportOutcome = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') {
+    return true;
+  }
+  const err = error as { response?: unknown };
+  // A server answer (even an error status) is a definite negative ACK.
+  if (err.response !== undefined && err.response !== null) {
+    return false;
+  }
+  // No response at all: timeout, connection lost, abort — unknown fate.
+  return true;
+};
+
 export const printService = {
   /**
    * Получение списка принтеров
@@ -120,6 +145,20 @@ export const printService = {
         data: payload,
       };
     } catch (error) {
+      // RETRO-3921-01: a missing transport result (timeout, connection
+      // dropped after the server may have queued the job, abort) is NOT a
+      // definite refusal — report it ambiguous so the caller stops the
+      // fallback instead of opening a second print route. Only a
+      // server-RETURNED error (definite negative ACK / validation refusal)
+      // remains a known failure.
+      if (isUnknownTransportOutcome(error)) {
+        return {
+          success: false,
+          ambiguous: true,
+          error: 'print_ack_unconfirmed',
+          data: null,
+        };
+      }
       // Известный отказ транспорта — не ambiguous.
       return { ...normalizePrintError(error, 'Ошибка печати лабораторных результатов'), ambiguous: false };
     }

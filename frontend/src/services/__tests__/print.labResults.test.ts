@@ -74,11 +74,53 @@ describe('LABPRINT-FE-003: printLabResults strict ACK', () => {
     expect((result as { error?: string }).error).toBe('no printer attached');
   });
 
-  it('a transport error is a KNOWN failure', async () => {
-    mockedPost.mockRejectedValueOnce(new Error('network down'));
+  // ── RETRO-3921-01 (consolidated post-merge review of #3921, PR #3944) ──
+  // The old contract treated EVERY rejection as a definite failure
+  // (ambiguous:false), so a client timeout / dropped connection AFTER the
+  // server had accepted and queued the job fell through to the automatic
+  // PDF fallback — a second print route for a job that may already be
+  // queued. Only a server-RETURNED error is a definite refusal; a missing
+  // transport result is an UNKNOWN outcome (ambiguous) and must stop the
+  // fallback.
+
+  it('RETRO-3921-01: a client timeout after the server may have queued the job is AMBIGUOUS', async () => {
+    const timeoutError = Object.assign(new Error('timeout of 15000ms exceeded'), {
+      code: 'ECONNABORTED',
+    });
+    mockedPost.mockRejectedValueOnce(timeoutError);
     const result = await printService.printLabResults({ report_instance_id: 5 });
     expect(result.success).toBe(false);
+    expect((result as { ambiguous?: boolean }).ambiguous).toBe(true);
+  });
+
+  it('RETRO-3921-01: a dropped connection (no server response) is AMBIGUOUS, not a definite failure', async () => {
+    const networkError = Object.assign(new Error('Network Error'), {
+      code: 'ERR_NETWORK',
+    });
+    mockedPost.mockRejectedValueOnce(networkError);
+    const result = await printService.printLabResults({ report_instance_id: 5 });
+    expect(result.success).toBe(false);
+    expect((result as { ambiguous?: boolean }).ambiguous).toBe(true);
+  });
+
+  it('RETRO-3921-01: an aborted request has an UNKNOWN outcome — AMBIGUOUS', async () => {
+    const canceledError = Object.assign(new Error('canceled'), {
+      code: 'ERR_CANCELED',
+    });
+    mockedPost.mockRejectedValueOnce(canceledError);
+    const result = await printService.printLabResults({ report_instance_id: 5 });
+    expect(result.success).toBe(false);
+    expect((result as { ambiguous?: boolean }).ambiguous).toBe(true);
+  });
+
+  it('RETRO-3921-01: a server-RETURNED error status is a definite failure (fallback stays allowed)', async () => {
+    mockedPost.mockRejectedValueOnce({
+      response: { status: 503, data: { detail: 'print service unavailable' } },
+    });
+    const result = await printService.printLabResults({ report_instance_id: 5 });
+    expect(result.success).toBe(false);
+    // The server answered: the job was NOT queued — the operator-driven
+    // PDF fallback may proceed.
     expect((result as { ambiguous?: boolean }).ambiguous).toBe(false);
-    expect((result as { error?: unknown }).error).toBe('network down');
   });
 });

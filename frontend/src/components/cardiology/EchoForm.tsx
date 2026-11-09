@@ -83,6 +83,11 @@ export interface EchoFormProps {
  * another inline `style={{…}}` literal. */
 const ALERT_MARGIN_STYLE: React.CSSProperties = { marginBottom: 16 };
 
+/** RETRO-3941-02: same ratchet rule for the hydration-failure alert's icon
+ * and retry button. */
+const HYDRATION_ALERT_ICON_STYLE: React.CSSProperties = { width: 16, height: 16, marginRight: 8 };
+const RETRY_BUTTON_STYLE: React.CSSProperties = { marginLeft: 12 };
+
 const DEFAULT_ECHO_DATA = {
   // Левый желудочек
   leftVentricle: {
@@ -220,6 +225,15 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   const [info, setInfo] = useState('');
   const dirtyRef = useRef(false);
   const formEpochRef = useRef(0);
+  // RETRO-3941-02 (post-merge review of PR 3941): a hydration failure of the
+  // canonical EMR must fail CLOSED — the stored echo subtree is unknown, so
+  // a blank/partial local form may never overwrite it. Save stays blocked
+  // until a canonical load succeeds (Retry re-runs it via hydrationAttempt).
+  const [hydrationFailed, setHydrationFailed] = useState(false);
+  const [hydrationAttempt, setHydrationAttempt] = useState(0);
+  // RETRO-3941-03: edits are counted per form epoch so a save that lands
+  // AFTER newer edits never clears the dirty flag for them.
+  const editEpochRef = useRef(0);
   const [expandedSections, setExpandedSections] = useState({
     leftVentricle: true,
     rightVentricle: false,
@@ -232,6 +246,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
     // Explicit initialData still wins: callers that own the data pass it.
     if (initialData) {
       setEchoData(deepMerge(DEFAULT_ECHO_DATA as Record<string, unknown>, initialData as Record<string, unknown>) as EchoData);
+      setHydrationFailed(false);
       return;
     }
 
@@ -241,6 +256,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
     if (!visitId) {
       setEchoData(DEFAULT_ECHO_DATA as EchoData);
       setInfo('');
+      setHydrationFailed(false);
       return;
     }
 
@@ -250,6 +266,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
     setInfo('');
     setSuccess('');
     setError('');
+    setHydrationFailed(false);
     loadExistingEmrDraft(visitId)
       .then((existing) => {
         if (epoch !== formEpochRef.current) return; // visit switched mid-flight
@@ -265,20 +282,25 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
       })
       .catch(() => {
         if (epoch !== formEpochRef.current) return;
-        // Hydration failure must not silently block manual entry: the form
-        // stays blank and the doctor's explicit edit becomes a dirty save.
+        // RETRO-3941-02: fail CLOSED. The canonical echo subtree could not
+        // be read (transient 5xx / network error): we do not know what is
+        // stored, so the blank local form must not be savable — a save
+        // would overwrite every stored field it did not hydrate. Surface
+        // the failure, block Save and offer an explicit retry.
         setEchoData(DEFAULT_ECHO_DATA as EchoData);
         dirtyRef.current = false;
+        setHydrationFailed(true);
       })
       .finally(() => {
         if (epoch === formEpochRef.current) {
           setHydrating(false);
         }
       });
-  }, [visitId, initialData]);
+  }, [visitId, initialData, hydrationAttempt]);
 
   const handleChange = (section: string, field: string, value: unknown) => {
     dirtyRef.current = true;
+    editEpochRef.current += 1; // RETRO-3941-03: count every edit
     setInfo('');
     setEchoData((prev) => ({
       ...prev,
@@ -300,6 +322,10 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
 
   const handleSave = async () => {
     const epoch = formEpochRef.current;
+    // RETRO-3941-03: snapshot the edit counter at submission start. If the
+    // doctor edits while the GET/POST is in flight, the request persists
+    // this submitted snapshot — the newer values must stay marked unsaved.
+    const editEpochAtSubmit = editEpochRef.current;
     try {
       setLoading(true);
       setError('');
@@ -317,7 +343,9 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
       // ECHO-FE-001: a blank/unhydrated form must never be able to
       // overwrite the stored echo subtree — block Save until the canonical
       // EMR state for this visit has been loaded.
-      if (hydrating) {
+      // RETRO-3941-02: a FAILED hydration is just as unknown as a pending
+      // one — Save stays blocked until Retry loads the canonical state.
+      if (hydrating || hydrationFailed) {
         setInfo(t('cardio.cardio_echo_loading_existing'));
         return;
       }
@@ -340,6 +368,16 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
       if (epoch !== formEpochRef.current) return; // visit switched mid-save
 
       if (response.status === 200) {
+        if (editEpochRef.current !== editEpochAtSubmit) {
+          // RETRO-3941-03: edits happened after the submission started. The
+          // POST persisted the submitted snapshot, NOT the values now on
+          // screen: keep the form dirty, say so honestly, and require a
+          // follow-up save. Never clear dirty tracking for edits the
+          // request could not have carried.
+          dirtyRef.current = true;
+          setInfo(t('cardio.cardio_echo_saved_stale_edit'));
+          return;
+        }
         // The server-side state now matches the form: reset dirty tracking.
         dirtyRef.current = false;
         setSuccess(t('cardio.cardio_echo_saved_success'));
@@ -432,7 +470,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={loading || hydrating}>
+              disabled={loading || hydrating || hydrationFailed}>
               
               <Save style={{ width: 16, height: 16, marginRight: 8 }} />
               {hydrating ? t('cardio.cardio_echo_loading_existing') : t('cardio.cardio_echo_save_button')}
@@ -458,6 +496,22 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         {info && !success && !error &&
         <Alert severity="info" style={ALERT_MARGIN_STYLE}>
             {info}
+          </Alert>
+        }
+
+        {/* RETRO-3941-02: a failed canonical load fails closed — visible
+            failure + explicit retry, Save blocked in between. */}
+        {hydrationFailed &&
+        <Alert severity="error" style={ALERT_MARGIN_STYLE}>
+            <AlertTriangle style={HYDRATION_ALERT_ICON_STYLE} />
+            {t('cardio.cardio_echo_hydration_error')}
+            <Button
+              variant="outline"
+              size="small"
+              style={RETRY_BUTTON_STYLE}
+              onClick={() => setHydrationAttempt((attempt) => attempt + 1)}>
+              {t('cardio.cardio_echo_retry')}
+            </Button>
           </Alert>
         }
 
@@ -544,6 +598,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
             value={echoData.conclusion}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               dirtyRef.current = true;
+              editEpochRef.current += 1; // RETRO-3941-03: count every edit
               setInfo('');
               setEchoData((prev) => ({ ...prev, conclusion: e.target.value }));
             }}
