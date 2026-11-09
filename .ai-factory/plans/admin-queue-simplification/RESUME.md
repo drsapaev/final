@@ -1,3 +1,17 @@
+## Current resume — #3946 journals reconciled; browser-body race reproduced — 2026-11-09T16:26:00+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. T00–T17 are merged. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 is OPEN / Ready for review / mergeable at HEAD `65c4dc0905f74bd65da81585497983b8f0cc600c`, base/current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`; merge remains user-owned.
+
+The latest progress journal previously named stale PR HEAD `ab23f1e`; the current checkpoint reconciles it to exact GitHub HEAD `65c4dc0` as of the last check. Applicable exact-head CI on `65c4dc0` is green; backend/integration/E2E/Docker/staging-readiness/load checks were skipped by path/trigger and are not claimed as passes. A new journal-only diff is pending commit/push and fresh GitHub checks.
+
+The exact tracked RQ-18 synthetic staging run remains 1 passed / 1 failed: 13 browser response-body reads failed, no actual app JS/CSS hashes were emitted, and `served_revision_verified=false`. Canonical teardown passed. A new local loopback Chromium A/B reproduced `resource-id-missing` if navigation cancels an in-flight response body and succeeded when the body was drained before navigation. This narrows the root cause but is not proof of actual application asset provenance and does not close Tier-2.
+
+Next exact action: user reviews/merges #3946. After merge, fetch fresh `origin/main`, start a clean isolated worktree, run the required gate for a focused RQ-18 recorder fix, add regression coverage for pending body capture across document navigation and public QR context closure, run targeted validation, then rerun the exact RQ-18 spec in the owned synthetic staging Session and continue the remaining T18 / `STAGING_VALIDATION.md` checks. Do not repeat the unchanged staging spec.
+
+The scope-gate result for this journal update was `narrow_override` after a confirmed-root-cause retry; `gate_misroute=false`, `override_used=true`, `handoff_required=true`, and the execution prompt was read. Only the three T18 journals changed. `git diff --check` passed. The required local `npm.cmd run build` failed before compilation because the worktree dependency junction points to `C:\final\frontend\node_modules`, where `nitro` is missing; no package install was attempted. The owned Compose project remains torn down; one task-owned ignored scratch directory remains under local workspace deletion policy.
+
+---
+
 ## Current resume — PR #3946 current-main sync and CI pass — 2026-11-09T15:50:04+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged. PR #3946 is OPEN / Ready for review at HEAD `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`, based on current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`; GitHub reports CLEAN / MERGEABLE.

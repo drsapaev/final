@@ -1,34 +1,34 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — PR #3946 synced to current main; exact-head CI passes — 2026-11-09T15:50:04+05:00
+## Current checkpoint — RQ-18 capture diagnosis recorded; journal update pending CI — 2026-11-09T16:26:00+05:00
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance
-Current status: IN_PROGRESS; T00–T17 merged. PR #3937 merged. PR #3946 is OPEN / Ready for review at HEAD `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`, based on current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`. GitHub reports CLEAN / MERGEABLE. All applicable exact-head CI checks pass. Codex review summary has no findings; a formal human review is not recorded. T18/Tier-2 remains PARTIAL.
+Current status: IN_PROGRESS; T00–T17 merged. PR #3937 merged. At the last GitHub check PR #3946 was OPEN / Ready for review at HEAD `65c4dc0905f74bd65da81585497983b8f0cc600c`, based on main #3953 `476c261f848b1d04adec36807837c981a979c8fa`, CLEAN / MERGEABLE. Applicable checks passed on that head; skipped jobs are not passes. A journal-only update is now pending commit and fresh checks. T18/Tier-2 remains PARTIAL.
 Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`
 Branch: `codex/aqs-t18-memory-safe-staging-20261109`
 Base/current main: `476c261f848b1d04adec36807837c981a979c8fa`
-Last pushed PR SHA: `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`
-Current local commit: `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`
-Last updated: 2026-11-09T15:50:04+05:00
+Last verified/pushed PR SHA: `65c4dc0905f74bd65da81585497983b8f0cc600c`
+Current local state: three-file journal-only checkpoint based on verified PR HEAD `65c4dc0905f74bd65da81585497983b8f0cc600c`; resulting commit and fresh CI are pending.
+Last updated: 2026-11-09T16:26:00+05:00
 
 | Work item | Status | Evidence |
 |-----------|--------|----------|
 | T00–T17 | MERGED | Present on current main. |
 | PR #3937 | MERGED | Merge commit `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. |
-| PR #3946 staging artifact path | OPEN / Ready for review | HEAD `ab23f1e`; exact-head applicable CI passed; user owns review and merge. |
-| T18 / Tier-2 | PARTIAL | Browser response-body capture failed for 13 resources; no application asset hashes; `served_revision_verified=false`; canonical teardown passed. |
+| PR #3946 staging artifact path | OPEN / Ready for review at last check | HEAD `65c4dc0` had applicable CI PASS; three-file journal update is pending commit and fresh checks; user owns review and merge. |
+| T18 / Tier-2 | PARTIAL | Exact staging RQ-18 failed on 13 browser response-body reads; no application asset hashes; `served_revision_verified=false`; canonical teardown passed. A local synthetic Chromium probe reproduced navigation cancelling body capture and confirmed that draining the body first succeeds. |
 
 ### Current checkpoint
 
-- Freshness: fetched `origin/main` #3953 `476c261f848b1d04adec36807837c981a979c8fa`. Main advanced by two unrelated commits (#3950 dermatology and #3953 EMR) after prior base #3947. The branch synced cleanly in merge commit `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`; `git diff --name-only origin/main...HEAD` still contains the seven allowed PR paths.
-- Validation: `git diff --check origin/main...HEAD` PASS. Local focused `pytest` was attempted but is `NOT_RUN`: Windows has no configured Python 3.11+; Ubuntu Python 3.12 has no pytest module. No packages or environment changes were made.
-- Exact-head CI on `ab23f1e`: PR Required Gate, PR Review Quality Gate, frontend unit/build/lint, Python/JavaScript/Actions analysis, security, CodeQL, Gitleaks, secret scan, Git scratch guards, GitGuardian, lifecycle, metadata, notifications, and CI Scope — PASS. Backend, integration, E2E, Docker, staging/production readiness, load, DAST and other path/trigger-dependent jobs were SKIPPED, not passed.
-- PR state: OPEN, Ready for review, CLEAN / MERGEABLE. The latest Codex review summary records no findings; no formal human approval is present. Merge remains user-owned.
-- T18 result is unchanged: the exact tracked RQ-18 test on the r5 artifact had 1 passed and 1 failed because 13 browser response bodies were unavailable. No application asset hashes were emitted, `served_revision_verified=false`, and T18/Tier-2 remains PARTIAL. Canonical teardown passed; do not repeat the unchanged test.
+- Freshness: fetched `origin/main` #3953 `476c261f848b1d04adec36807837c981a979c8fa`. Main advanced by two unrelated commits (#3950 dermatology and #3953 EMR) after prior base #3947. The branch sync is present; latest exact PR HEAD is `65c4dc0905f74bd65da81585497983b8f0cc600c`. The tracked PR delta remains the seven allowed staging/runbook/test/journal paths.
+- Validation: current `git diff --check` passes. Local focused `pytest` was attempted but is `NOT_RUN`: Windows has no configured Python 3.11+; Ubuntu Python 3.12 has no pytest module. The mandated `npm.cmd run build` check failed before compilation because the worktree's `frontend/node_modules` junction targets `C:\final\frontend\node_modules`, where the `nitro` package imported by `vite.config.ts` is absent. No dependency installation or external workspace mutation was performed. The separate local synthetic Chromium comparison passed: immediate navigation caused `resource-id-missing`; draining the response body before navigation hashed the full synthetic asset.
+- Exact-head CI on `65c4dc0` before this journal-only diff: PR Required Gate, PR Review Quality Gate, frontend unit/build/lint, Python/JavaScript/Actions analysis, security, CodeQL, Gitleaks, secret scan, Git scratch guards, GitGuardian, lifecycle, metadata, notifications, and CI Scope — PASS. Fresh checks for the pending journal commit are not yet run.
+- PR state at last check: OPEN, Ready for review, CLEAN / MERGEABLE. The latest Codex review summary records no findings; no formal human approval is present. Merge remains user-owned; state/checks must be re-read after pushing the journal update.
+- T18 staging result remains: exact tracked RQ-18 on the r5 artifact had 1 passed and 1 failed because 13 browser response bodies were unavailable. No application asset hashes were emitted, `served_revision_verified=false`, and canonical teardown passed. The local synthetic probe supports a navigation/capture race but does not replace an application staging rerun; do not repeat the unchanged test.
 - Scope: only the owned PR branch was synced and pushed; the PR delta remains limited to staging Docker/Compose, focused staging guard, runbook, and T18 journals. No product runtime, production, database, auth, or foreign staging project was changed.
-- Next exact action: user review/merge of #3946. After merge, start a new isolated worktree from fresh `origin/main`, gate a focused correction to the browser response-body recorder, then resume remaining T18 and all `STAGING_VALIDATION.md` checks.
-- One task-owned ignored scratch directory remains because local workspace policy blocked deletion. Owned Compose resources are removed; no alternate cleanup route was used.
+- Next exact action: commit and push this three-file journal correction, verify exact-head PR checks, then leave review/merge of #3946 to the user. After merge, start a new isolated worktree from fresh `origin/main`, gate a focused correction to drain browser response-body captures before document navigation and public QR context closure, then resume remaining T18 and all `STAGING_VALIDATION.md` checks.
+- One task-owned ignored scratch directory remains because local workspace policy blocked deletion. The new local probe is synthetic and contains no credentials. Owned Compose resources are removed; no alternate cleanup route was used.
 
 ## Previous checkpoint — corrected body; exact-head checks pass — 2026-11-09T15:15:52+05:00
 

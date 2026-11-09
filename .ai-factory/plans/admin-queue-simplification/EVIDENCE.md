@@ -1,3 +1,18 @@
+## T18 local synthetic browser-body navigation probe and journal gate — 2026-11-09T16:26:00+05:00
+
+- Commit under test: staging/PR branch `65c4dc0905f74bd65da81585497983b8f0cc600c`; no tracked runtime source changed for this probe.
+- Environment: local Windows Node 24.15, Playwright 1.63.0, bundled headless Chromium, and a synthetic HTTP server bound only to `127.0.0.1` on an ephemeral port.
+- Execution mode: validation-only synthetic probe in `.scratch`; no staging or application data. Separate journal-update gate: initial `gate` stopped because the reviewed scope required the confirmed root-cause file; retry with `--known-root-cause frontend/e2e/rq18-permanent-qr-live.spec.ts` returned `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; the execution prompt was read. Only the three T18 journals were edited; the source file remained unchanged.
+- Allowed paths: `.scratch/t18-memory-safe-staging-20261109/response-body-navigation-probe.cjs` for the disposable probe; `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md` for the checkpoint. Denied: runtime, API, database, production, deployment, Compose, and foreign resources.
+- Original failure: the tracked RQ-18 staging run reported 13 `browser-response-body-unavailable` errors, classified by the diagnostic copy as `resource-id-missing`.
+- Validation commands: `node .scratch/t18-memory-safe-staging-20261109/response-body-navigation-probe.cjs` — PASS; `git diff --check` — PASS for the journal diff; required `npm.cmd run build` — FAIL before compilation because the worktree's `frontend/node_modules` is a junction to `C:\final\frontend\node_modules`, where the Vite config's imported `nitro` package is missing. No install or mutation of the shared dependency tree was attempted.
+- Result: PASS for the synthetic A/B. Navigating away while the synthetic asset body was still in flight produced `unavailable:resource-id-missing`; awaiting the pending body before navigation succeeded and read/hash-processed all 8,388,638 bytes.
+- Relevant artifact: `.scratch/t18-memory-safe-staging-20261109/response-body-navigation-probe.cjs`.
+- Actual changed paths: the three T18 journal files only. No source or Compose changes.
+- Scope check: all network requests were served by the test's loopback server; no external host, production, or clinic data was involved.
+- Remaining limitation: this confirms the Playwright/CDP navigation race in a synthetic page, not successful capture of the actual application's assets. T18/Tier-2 remains PARTIAL; the exact RQ-18 staging rerun is still required after a focused recorder fix. The frontend build failure is specific to the shared worktree dependency junction and remains unresolved; exact-head GitHub build on the previous PR HEAD had passed, but the journal update's new PR head has not yet received fresh CI.
+- PR: #3946 was OPEN / Ready for review, HEAD `65c4dc0905f74bd65da81585497983b8f0cc600c` at the last check; merge is user-owned. This journal diff is pending commit/push and fresh checks.
+
 ## PR #3946 sync to current main and exact-head CI — 2026-11-09T15:50:04+05:00
 
 - Pull request: [#3946](https://github.com/drsapaev/final/pull/3946), HEAD `ab23f1e65c51256d0ea3c3efd866ebee29f04f2b`, base/current main #3953 `476c261f848b1d04adec36807837c981a979c8fa`.
