@@ -1,3 +1,17 @@
+## PR #3946 exact-head review readiness and stale checkpoint reconciliation — 2026-11-09T20:22:16+05:00
+
+- Commit under review at checkpoint start: `41977694f825c14e5360af9e358073fbae882ccc`; base/current `origin/main` #3957 `6fee1cf957a312970142fd36486b944aaabe6f45`. The current documentation patch is confined to the existing PR journals.
+- Actual GitHub state: #3946 OPEN, Ready for review, mergeable; no review submissions and no review requests. Branch protection requires one approving review.
+- Exact-head applicable checks: PR Required Gate, latest PR Review Quality Gate, frontend unit/build/lint, CI Scope, lifecycle recommendation, CodeQL and language analyzers, security/Gitleaks/GitGuardian, scratch guards, metadata, and notifications — PASS. Backend, integration, frontend E2E, Docker, readiness, load, DAST, and other path/trigger-skipped jobs are not counted as passes.
+- Root cause: the top entries of `PROGRESS.md` and `RESUME.md` still said the #3957 sync push and exact-head CI were pending, although the PR had since been pushed and its applicable checks passed. A fresh checkpoint is added above those preserved historical entries.
+- Execution mode: mandatory `gate_known_root_cause`; known root `.ai-factory/plans/admin-queue-simplification/PROGRESS.md`; first-touch scope `PROGRESS.md`, `RESUME.md`, and `EVIDENCE.md`. Result: `narrow_override`, `gate_misroute=false`, `override_used=true`, handoff required; the generated prompt was read. The bounded override uses the user's standing authorization for T18 work within the existing #3946 scope.
+- Allowed: reconcile the three T18 journals in the existing #3946 PR. Denied: product runtime/API/DB/auth, staging/Compose execution, production/deployment, a new PR cycle, or merging.
+- Validation target: manually compare the updated checkpoint with current GitHub state and run `git diff --check`; no application tests are needed for journal-only edits. Push and exact-head CI are pending for the resulting journal commit.
+- T18 result remains PARTIAL: RQ-18 browser response-body capture and `served_revision_verified` remain unconfirmed; remaining T18 scenarios and the full `STAGING_VALIDATION.md` checklist are not complete. No deferral is claimed. No staging or production services were started in this checkpoint.
+- Next: validate this journal-only patch, commit/push it in #3946, verify the new head's required checks, obtain independent approval, then user merges. Continue with the RQ-18 recorder correction in a fresh gated worktree only after merge.
+
+---
+
 ## PR #3946 synchronization with #3957 — 2026-11-09T19:49:30+05:00
 
 - Candidate: local merge commit `3339565dbe7eb926cac991ea06fcbf56842b12f5`; fresh base #3957 `6fee1cf957a312970142fd36486b944aaabe6f45`; prior PR HEAD `8c9835b66cd1061b99e148f62fad205a2c6784d6`; merge base `38c929e220246e4c2f748eddc08c25ab7edf1208`.
@@ -6817,4 +6831,3 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Actual changed paths in the evidence commit: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md` only. No runtime, API, test-source, database, auth, gate, production or deployment change.
 - Remaining limitation: T18/Tier-2 remains PARTIAL. The exact RQ-18 response-body issue, full T18 scenario matrix, keyboard/language/viewport/latency/console checks, full `docs/runbooks/STAGING_VALIDATION.md`, and independent formal review of PR #3946 remain outstanding. No staging deferral is claimed.
 - PR: #3946, still OPEN at HEAD `ade10c2` before this journal update; user retains merge authority.
-- Merge commit: pending user action.

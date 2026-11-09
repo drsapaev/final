@@ -1,6 +1,19 @@
 # Progress — T18 final acceptance
 
-## PR #3946 sync with #3957 — validation checkpoint — 2026-11-09T19:49:30+05:00
+## PR #3946 review readiness — state checked 2026-11-09T20:22:16+05:00
+
+PR #3946 is OPEN, Ready for review, and mergeable at HEAD `41977694f825c14e5360af9e358073fbae882ccc`, based on current `main` #3957 `6fee1cf957a312970142fd36486b944aaabe6f45`. This snapshot was checked before the journal-only reconciliation now being prepared in the same PR. The PR diff remains the seven staging/runbook/test/T18-journal paths.
+
+- Applicable exact-head checks: PR Required Gate, latest PR Review Quality Gate, frontend unit/build/lint, CI Scope, lifecycle, CodeQL/analyzers, security and secret scans, scratch guards, metadata, notifications, and GitGuardian — PASS.
+- Backend, integration, frontend E2E, Docker, staging/production readiness, load, and DAST jobs — SKIPPED by path or trigger, not counted as passes.
+- Review submissions and review requests: none. Branch protection requires one approving review. The PR author cannot satisfy that independent approval.
+- T18/Tier-2 remains PARTIAL. RQ-18 browser response-body provenance, `served_revision_verified`, remaining T18 scenarios, and the complete `STAGING_VALIDATION.md` checklist are unfinished. No deferral is claimed.
+
+Next: commit and push this journal reconciliation within #3946, verify the new exact-head checks, then obtain an independent approval and leave merge to the user. After merge, use a fresh worktree from current `origin/main` and gate the RQ-18 recorder correction before continuing the remaining T18 acceptance.
+
+---
+
+## Previous checkpoint — PR #3946 sync with #3957 — 2026-11-09T19:49:30+05:00
 
 Local candidate `3339565dbe7eb926cac991ea06fcbf56842b12f5` merges fresh `origin/main` #3957 `6fee1cf957a312970142fd36486b944aaabe6f45` without conflict. The PR diff remains the seven approved staging/runbook/test/T18-journal paths. Python compile, focused guard (1 passed, 282 deselected), and diff checks passed. Push and exact-head CI for this candidate remain pending. The known-root gate returned `narrow_override`, `gate_misroute=true`, `override_used=true`, handoff required; prompt read. T18/Tier-2 remains PARTIAL; no deferral. Leave merge to the user.
 
