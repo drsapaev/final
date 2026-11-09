@@ -22122,7 +22122,7 @@
           "doctor-integration"
         ],
         "summary": "Add Service To Visit",
-        "description": "Добавить услугу к визиту",
+        "description": "Добавить услугу к визиту.\n\nDOCVISIT-BE-002: ``quantity``/``custom_price`` валидируются ДО записи —\nнекорректные строки не попадают в биллинг. DOCVISIT-BE-003: мутация\nкоординируется с платёжным легером (каноничный Visit-lock + отказ при\nprocessing-инвойсах и оплаченном остатке). DOCVISIT-BE-001: ответ\nстроится ТОЛЬКО из персистентного состояния — ``price`` и есть\nфактическая цена (кастомная или каталожная), фантомного ``custom_price``\nполя не существует.",
         "operationId": "add_service_to_visit_api_v1_doctor_visits__visit_id__add_service_put",
         "security": [
           {
@@ -22207,7 +22207,7 @@
           "doctor-integration"
         ],
         "summary": "Remove Service From Visit",
-        "description": "Удалить услугу из визита",
+        "description": "Удалить услугу из визита.\n\nDOCVISIT-BE-003: удаление строки услуги оплаченного визита меняет базу\nстоимости под неизменным чеком — отказ (409), как и для добавления.",
         "operationId": "remove_service_from_visit_api_v1_doctor_visits__visit_id__services__visit_service_id__delete",
         "security": [
           {
