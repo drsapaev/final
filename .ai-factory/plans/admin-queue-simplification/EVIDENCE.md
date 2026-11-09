@@ -1,3 +1,11 @@
+## PR #3946 main sync — local validation — 2026-11-09T13:56:00+05:00
+
+- Main freshness: fetched `origin/main` `88012cd0a4a7f1de510541b6660a2a85f18baa62`; PR base was #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`. The main delta adds 17 EMR files and has no overlap with the seven PR paths.
+- Sync candidate: merge commit `77bef757253bdee40b041ac4f1b338c8d2a59536`, merged cleanly into the PR branch. It is local only at this record; push and exact-head hosted CI remain pending.
+- Validation after sync: `scripts/run_python.ps1 -RequireModule pytest -m pytest scripts/tests/test_wsl_staging_guard.py -k prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance -q` — PASS (1 passed, 282 deselected); `git diff --check origin/main...HEAD` — PASS.
+- Prior PR exact-head `08335b295b762986936428b1f6556c231551876b` passed applicable CI. This evidence does not attest the new sync candidate; rerun checks after push.
+- No application, backend, API, database, auth, production, deployment, staging-project, gate or workflow code changed in this sync. T18/Tier-2 remains PARTIAL; merge remains user-owned.
+
 ## PR #3946 Ready-for-review checkpoint — exact-head CI on 535cc — 2026-11-09T13:39:00+05:00
 
 - At verification, PR #3946 was OPEN / Ready for review / mergeable at HEAD `535cc03667cf6f3244c38b66d792a839504e5e90`, based on current main #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`. This checkpoint changes journals only. No review approval or merge is claimed; merge remains user-owned.

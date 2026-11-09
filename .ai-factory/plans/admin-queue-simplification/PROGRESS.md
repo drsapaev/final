@@ -1,6 +1,34 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — PR #3946 Ready for review — 2026-11-09T13:39:00+05:00
+## Current checkpoint — PR #3946 synced to main 88012 — 2026-11-09T13:56:00+05:00
+
+Plan version: 1.0
+Current task: T18 final synthetic acceptance
+Current status: IN_PROGRESS; T00–T17 merged. PR #3937 merged. PR #3946 remains OPEN / Ready for review; its branch is locally synced with current main but the update is not pushed yet. T18/Tier-2 remains PARTIAL.
+Worktree: `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`
+Branch: `codex/aqs-t18-memory-safe-staging-20261109`
+Base/current main: `88012cd0a4a7f1de510541b6660a2a85f18baa62`
+Last pushed PR SHA: `08335b295b762986936428b1f6556c231551876b`
+Local sync merge candidate: `77bef757253bdee40b041ac4f1b338c8d2a59536`
+Last updated: 2026-11-09T13:56:00+05:00
+
+| Work item | Status | Evidence |
+|-----------|--------|----------|
+| T00–T17 | MERGED | Present on current main. |
+| PR #3937 | MERGED | Merge commit `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. |
+| PR #3946 staging artifact path | Ready; sync update pending | Exact CI passed at 08335; local candidate now includes main 88012 with no overlapping paths. Re-run exact-head CI after push. |
+| T18 / Tier-2 | PARTIAL | Exact tracked RQ-18 failed on artifact SHA `215472cadbbdc8cd4046ca2c8eae0e9205594521`; current main #3943 artifact was not tested. Remaining provenance and acceptance checks are open. |
+
+### Current checkpoint
+
+- Freshness: fetched `origin/main` at `88012cd0a4a7f1de510541b6660a2a85f18baa62`. Since PR base #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`, main added 17 EMR files. None overlap the PR's seven staging/runbook/test/journal paths. Sync merge `77bef757253bdee40b041ac4f1b338c8d2a59536` completed without conflicts.
+- Local validation after sync: focused staging guard passed (1 passed, 282 deselected); `git diff --check origin/main...HEAD` passed. The staged PR scope still contains only the seven allowed paths.
+- Previous exact-head CI on 08335 passed, including required/review gates and frontend unit/build/lint; backend, integration, E2E, Docker, staging/production readiness and k6 were skipped. This sync must receive a fresh exact-head run after push.
+- Next exact action: commit and push this three-journal sync checkpoint, refresh PR body to the new base/head, and verify exact-head CI. Keep PR Ready for review; merge remains user-owned.
+- T18 remains PARTIAL; do not repeat the r4 infrastructure session solely for the artifact path. After user merge, continue the exact tracked RQ-18 recorder/page-error discrepancy on an artifact built from current main, then complete remaining T18 and `STAGING_VALIDATION.md` checks.
+- One task-owned ignored scratch folder remains because host policy blocked deletion. Owned r4 Compose project is already removed; no alternate deletion method was attempted.
+
+## Previous checkpoint — PR #3946 Ready for review — 2026-11-09T13:39:00+05:00
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance

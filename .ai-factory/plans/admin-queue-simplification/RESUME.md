@@ -1,4 +1,16 @@
-## Current resume — PR #3946 exact-head CI passed; checkpoint commit next — 2026-11-09T13:23:00+05:00
+## Current resume — PR #3946 sync candidate pending push — 2026-11-09T13:56:00+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3946 remains OPEN / Ready for review. Last pushed HEAD was `08335b295b762986936428b1f6556c231551876b`; its applicable exact-head CI passed. Current main is `88012cd0a4a7f1de510541b6660a2a85f18baa62`, newer than base #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`.
+
+Main adds 17 EMR files with no overlap to PR #3946. The local sync merge candidate is `77bef757253bdee40b041ac4f1b338c8d2a59536`. After the merge, the focused staging guard passed (1 passed, 282 deselected) and `git diff --check` passed. Commit and push the journal checkpoint, update PR metadata, and wait for CI on the new head before the user merges.
+
+The opt-in memory-safe artifact path was exercised by one synthetic r4 Session and teardown. T18/Tier-2 is still PARTIAL: exact tracked RQ-18 did not pass on artifact SHA `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the diagnostic copy is not equivalent, asset response capture was incomplete, and `served_revision_verified=false`. After user merge, refresh main in a new worktree, build/use an artifact from that exact revision, diagnose the tracked recorder/page-error discrepancy, then finish remaining T18 and `STAGING_VALIDATION.md` checks.
+
+The task-owned ignored `.scratch/t18-memory-safe-staging-20261109` remains because local policy blocked removal. The owned Compose project is gone; no alternate deletion method was attempted.
+
+---
+
+## Previous resume — r4 artifact PR creation checkpoint — 2026-11-09T13:23:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. PR #3946 is OPEN / Draft / mergeable, HEAD `da54660bbe8289b644f91621bb32f847bf551666`, based on current main #3943 `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`.
 
