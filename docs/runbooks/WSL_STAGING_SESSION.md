@@ -76,6 +76,47 @@ successful starts. Check Windows connectivity as well as container health:
 the returned checks distinguish a healthy Linux service from a port that
 Windows cannot reach.
 
+### Low-memory host: verified hosted frontend artifact
+
+The normal `runtime` target remains the default and builds the frontend in the
+staging Docker build. For a T18 session on a memory-constrained host, use the
+existing `Build isolated staging frontend artifact` workflow on the exact
+`main` commit being tested. Its artifact contains `source.sha`, static files,
+and `SHA256SUMS`; download and unpack it under the current worktree's ignored
+`.scratch/` directory. Do not put it in another worktree or in the production
+checkout.
+
+Verify `source.sha` equals the selected application commit and verify every
+file with `sha256sum --check SHA256SUMS` from the artifact directory. In the
+private, worktree-local staging env file, set:
+
+```dotenv
+STAGING_FRONTEND_BUILD_TARGET=artifact-runtime
+STAGING_FRONTEND_ARTIFACT_CONTEXT=../.scratch/<session>/frontend-artifact
+VERCEL_GIT_COMMIT_SHA=<same application commit>
+```
+
+The artifact workflow currently embeds the frontend origin
+`http://127.0.0.1:18082` and WebSocket origin `ws://127.0.0.1:18082`; set the
+staging frontend port and public origins to those values only after the
+canonical preflight confirms the port is free. The `artifact-runtime` build
+target checks the embedded source file and all listed checksums, then removes
+the provenance files from the Nginx document root. It copies the prebuilt
+bundle into a small Nginx image and skips `npm ci` and `npm run build` inside
+WSL. Backend/worker image builds still occur, so use normal build-reserve
+Preflight and do not pass `-NoBuild` to `Start` or `Session`.
+
+This opt-in path requires a Docker Compose / BuildKit version that supports
+named build contexts. The canonical `docker compose config` check must pass
+before `Start`; if it does not, keep the staging scenarios `NOT_RUN` and do not
+fall back to another checkout or a foreign daemon.
+
+After the session, compare the actual browser response bytes for its JS/CSS
+assets with the verified artifact manifest. Record the artifact workflow run,
+application SHA, manifest result, served-response result, and teardown result
+in the T18 evidence. A source file or image ID alone is not served-revision
+proof. Unset the artifact variables for the ordinary full frontend build.
+
 The launcher rejects protected host ports `18000`, `5173`, and `5432`, foreign
 project conflicts, source mounts from a different worktree, and foreign or
 ambiguous Windows listeners even when Docker also publishes that port.

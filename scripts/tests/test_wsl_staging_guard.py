@@ -2292,3 +2292,25 @@ def test_powershell_wrapper_preserves_literal_argv_and_exit_code(tmp_path, exit_
         'literal "quote"',
         "literal $()",
     ]
+
+
+def test_prebuilt_frontend_target_is_opt_in_and_verifies_artifact_provenance():
+    repo_root = Path(__file__).parents[2]
+    compose = (repo_root / "ops" / "compose.staging.yml").read_text(
+        encoding="utf-8"
+    )
+    dockerfile = (repo_root / "frontend" / "Dockerfile.staging").read_text(
+        encoding="utf-8"
+    )
+
+    assert "target: ${STAGING_FRONTEND_BUILD_TARGET:-runtime}" in compose
+    assert (
+        "staging_artifact: ${STAGING_FRONTEND_ARTIFACT_CONTEXT:-../frontend/docker}"
+        in compose
+    )
+    assert dockerfile.startswith("# syntax=docker/dockerfile:1.7\n")
+    assert "FROM nginx:1.27-alpine AS artifact-runtime" in dockerfile
+    assert "COPY --from=staging_artifact . /usr/share/nginx/html/" in dockerfile
+    assert 'test "$(cat source.sha)" = "$VERCEL_GIT_COMMIT_SHA"' in dockerfile
+    assert "sha256sum -c SHA256SUMS" in dockerfile
+    assert "rm -f source.sha SHA256SUMS" in dockerfile

@@ -1,3 +1,31 @@
+# Current resume — hosted artifact verified; sync and Preflight next — 2026-11-09T09:53:04+05:00
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`.
+
+PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. The branch is one CI-only commit behind latest `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the intervening diff touches only two GitHub workflow files. Merge the fresh base into this feature branch before staging or pushing.
+
+The memory-safe prebuilt frontend target is implemented and its focused test passes. Existing hosted artifact workflow `42563847059` built the exact latest main source; `source.sha` matched and all 261 artifact checksums passed. The artifact is in ignored `.scratch/t18-memory-safe-staging-20261109/frontend-artifact`. The ordinary full frontend build stays the default. Windows lacks Docker CLI; no local Compose config, WSL, or staging operation has run.
+
+Next: synchronize to latest main, create one ephemeral synthetic env under the same `.scratch` task directory, then run `ops/scripts/wsl_staging.ps1 -Action Preflight`. Preflight must validate Compose config, storage, memory, identity, and selected ports. If it passes, run Start followed by one Session using `artifact-runtime` and the verified artifact; retain canonical teardown. If any resource check fails, stop before Compose mutation and leave the dependent T18 checks `NOT_RUN`.
+
+Validation already reported: focused test 1 passed/282 deselected; Python compile passed; `git diff --check` passed; hosted artifact source/checksums passed. An initial pytest command from the backend runner used an invalid relative path and was corrected; no test ran on that first attempt. Do not claim staging or T18 completion yet.
+
+---
+
+# Current resume — PR #3937 merged; memory-safe staging path in progress — 2026-11-09
+
+Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`, based on merged `origin/main` `3a6d0f72dd72191de32c216dbdb145e0e407ae96` (PR #3937).
+
+T00–T17 are merged. T18/Tier-2 remain PARTIAL. The previous T18 Session stopped during the local frontend image build when host free RAM dropped from 1.76 GiB to 0.13 GiB; it produced no complete browser evidence, and its owned Compose resources were cleaned. Do not reuse another worktree's env or scratch.
+
+Current scope is a single staging-only PR: add a checksum-verified prebuilt frontend target to `frontend/Dockerfile.staging` and `ops/compose.staging.yml`, test the opt-in config, document it in `docs/runbooks/WSL_STAGING_SESSION.md`, and update the three T18 journals. Gate `gate_known_root_cause` returned `narrow_override`, no misroute, override used, handoff required; its prompt was read. No local WSL/Compose run has started.
+
+Next exact action: implement the recorded opt-in target. Preserve `runtime` as default. The artifact context is passed from this worktree's ignored `.scratch/`, and the target must fail closed unless `source.sha` equals the requested source revision and every file matches `SHA256SUMS`; remove verification metadata from the served document root. Then run the focused guard test, Python compile, `docker compose config`, and `git diff --check`; open one PR and let the user merge it. Only after merge, fetch fresh main, acquire the hosted artifact for that exact app commit, and run canonical Preflight → Start → one Session with the remaining T18 checks.
+
+Denied: production/deployment, app runtime/backend/API/auth changes, CI workflow or gate/router changes, foreign worktrees/projects, merge by agent, and unapproved file deletion. If artifact verification fails, named build contexts are unsupported, or Preflight rejects memory/storage/ports, stop that staging attempt and keep the affected checks `NOT_RUN`.
+
+---
+
 # Current resume — #3937 synchronized and pushed; T18 still partial — 2026-11-09T02:11:10+05:00
 
 Continue task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-report-fix/final`, branch `codex/aqs-t18-completion-20261108`. T00–T17 are merged. PR #3937 is synchronized with current `origin/main` #3941 (`34da7981fe6985c1cc33be127fd3b32fd89c8f6f`) by merge commit `e079a61cdbe46f3e9781460fa38d9c57aa8ff449`; the push to PR HEAD `620c3c13313e543f6b290ccd5fa6b2b17971ee59` succeeded. The PR description was refreshed to that base/head. Review #5819382573's two P2 fixes remain in `25d981667a148005f549b102e32b3ffc8470d850`; both threads are resolved. Agent Workflow Guards, Lifecycle Recommendation, corrected PR Review Quality Gate, Security and Gitleaks passed on head `620c3c1`; Unified CI was still in progress at last check. The final candidate type-check, isolated Chromium browser-byte regression (1/1), frontend build and earlier scoped ESLint result are recorded in EVIDENCE; the full RQ-18 synthetic Admin/2FA run is NOT_RUN. Do not treat the isolated regression as full Tier-2.

@@ -6519,3 +6519,23 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Next exact action: finish the final journal status correction, run `git diff --check`, commit and push normally, refresh the PR description to the new documentation-only head, then verify exact-head workflows and review threads. Do not merge.
 - PR: #3937.
 - Merge commit: pending user action.
+## Memory-safe frontend artifact path — pre-edit checkpoint — 2026-11-09T09:39:19+05:00
+
+- Base under review: `origin/main` `3a6d0f72dd72191de32c216dbdb145e0e407ae96` (merge commit for PR #3937).
+- Execution mode: `gate_known_root_cause`; canonical launcher result `narrow_override`; `gate_misroute=false`; `override_used=true`; `handoff_required=true`; execution prompt read.
+- Confirmed cause: normal staging uses the frontend Dockerfile's `npm ci` and `npm run build`; the staging launcher runs Compose with `--build` unless the caller explicitly promises no image build. Earlier T18 evidence records host free RAM falling from 1.76 GiB to 0.13 GiB during that frontend image build.
+- Scope: Dockerfile/Compose opt-in prebuilt path, focused staging guard test, operator runbook, and these T18 journals. No runtime or staging action has been executed in this cycle.
+- Result: `NOT_RUN` for artifact build, WSL Preflight, Compose Start/Session, browser checks, and teardown; this is a pre-edit checkpoint, not a PASS.
+
+## Memory-safe frontend artifact implementation — 2026-11-09T09:53:04+05:00
+
+- Commit under test: feature worktree at base `3a6d0f72dd72191de32c216dbdb145e0e407ae96`; implementation changes are uncommitted at this checkpoint. Latest `origin/main` advanced to `215472cadbbdc8cd4046ca2c8eae0e9205594521`; only `.github/workflows/i18n-quality-gate.yml` and `.github/workflows/role-system-check.yml` differ, so sync before staging and push.
+- Environment / mode: Windows worktree; `gate_known_root_cause`; canonical gate returned `narrow_override`, no misroute, override used, handoff required; prompt read.
+- Allowed paths: `frontend/Dockerfile.staging`, `ops/compose.staging.yml`, `scripts/tests/test_wsl_staging_guard.py`, `docs/runbooks/WSL_STAGING_SESSION.md`, and the T18 `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md` journals.
+- Actual changed paths: the seven allowed paths above.
+- Original failure: prior canonical T18 Session lost Windows free RAM from 1.76 GiB to 0.13 GiB during local frontend image build before producing a browser report; its owned Docker resources were later cleaned.
+- Validation: focused `scripts/run_python.ps1 -m pytest scripts/tests/test_wsl_staging_guard.py -k prebuilt_frontend_target -q` PASS (1 passed, 282 deselected); `scripts/run_python.ps1 -m py_compile scripts/tests/test_wsl_staging_guard.py` PASS; `git diff --check` PASS.
+- Hosted artifact: workflow run `42563847059`, source `215472cadbbdc8cd4046ca2c8eae0e9205594521`, PASS. `source.sha` matched; all 261 listed payload files matched their SHA-256 values, and the manifest covered every downloaded payload file.
+- `docker compose config`: NOT_RUN from Windows because Docker CLI is unavailable. Canonical WSL Preflight will perform this check after latest-main sync. Compose target build, browser tests, full staging Session and teardown: NOT_RUN.
+- Scope check: no application, backend, API, auth/RBAC, database, migration, GitHub workflow, gate/router, production or deployment changes. No WSL or Compose operation was started.
+- Next: sync branch to current `origin/main`; run canonical Preflight with the artifact context; only then run the owned staging Session if resource checks pass.

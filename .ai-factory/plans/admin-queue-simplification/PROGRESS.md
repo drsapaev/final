@@ -1,5 +1,33 @@
 # Progress — T18 final acceptance
 
+## Current checkpoint — hosted frontend artifact verified; staging preflight pending — 2026-11-09T09:53:04+05:00
+
+- Umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`; PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`.
+- Current implementation branch: `codex/aqs-t18-memory-safe-staging-20261109` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`. It is one commit behind latest `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the only intervening paths are two CI workflow files, with no application-source overlap. Sync before push/staging.
+- The opt-in `artifact-runtime` path is implemented in the staging Dockerfile/Compose. The default `runtime` target is unchanged. The build checks `source.sha` and all `SHA256SUMS` entries and removes provenance files before Nginx serves the directory.
+- Hosted artifact workflow `42563847059` completed successfully on app source `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the downloaded artifact matched `source.sha` and all 261 listed files passed SHA-256 verification. Artifact is under this worktree's ignored `.scratch/t18-memory-safe-staging-20261109/frontend-artifact`.
+- Local checks: focused guard test PASS (1 passed, 282 deselected); Python compile PASS; `git diff --check` PASS. An initial pytest invocation used a backend-relative path and found no test; rerun from the repository Python launcher passed. Windows has no Docker CLI, so Compose config is NOT_RUN locally and must be checked through canonical WSL Preflight.
+- Current gate: `gate_known_root_cause` -> `narrow_override`, `gate_misroute=false`, override used, handoff required; execution prompt read. No staging/WSL session has started yet.
+- Allowed tracked paths remain the seven recorded in the pre-edit checkpoint below. Denied: runtime/backend/auth, GitHub workflow, gate/router, production, deployment and foreign staging resources.
+- Next exact action: synchronize this feature branch with `origin/main`, prepare one private synthetic env in the task's `.scratch`, then run canonical Preflight. If it passes, verify the artifact target in one owned Session; if memory/storage/ports fail, stop and retain the remaining checks as `NOT_RUN`.
+
+---
+
+## Current checkpoint — memory-safe frontend artifact path — pre-edit — 2026-11-09T09:39:19+05:00
+
+- Umbrella task: `bd2f7564-bd3d-449d-8d85-5a9325722a80`; PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`; this worktree starts from that exact fresh `origin/main` commit.
+- Objective: make the existing hosted staging frontend artifact usable by canonical local staging so T18 does not repeat the memory-heavy `npm ci`/Vite build inside WSL. Keep the ordinary build path unchanged.
+- Execution mode: `gate_known_root_cause`. Gate result: `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; generated execution prompt was read. Confirmed root cause: `frontend/Dockerfile.staging` installs/builds frontend dependencies and `compose.staging.yml` selects that build on normal `Start`/`Session`; the previous owned Session lost host free RAM from 1.76 GiB to 0.13 GiB during the frontend image build, before a verifiable browser report.
+- Canonical anchors: current `AGENTS.md`; `docs/runbooks/WSL_STAGING_SESSION.md`; `docs/runbooks/AGENT_SESSION_WORKTREES.md`; `docs/runbooks/STAGING_VALIDATION.md`; `frontend/Dockerfile.staging`; `ops/compose.staging.yml`; existing `.github/workflows/staging-frontend-artifact.yml`; `scripts/wsl_staging.py` and its guard tests.
+- Allowed tracked paths: `frontend/Dockerfile.staging`, `ops/compose.staging.yml`, `scripts/tests/test_wsl_staging_guard.py`, `docs/runbooks/WSL_STAGING_SESSION.md`, and this plan's `PROGRESS.md`, `EVIDENCE.md`, `RESUME.md`.
+- Reference-only: `.github/workflows/staging-frontend-artifact.yml`, frontend application source, backend/runtime/API/auth paths, WSL lifecycle/cleanup code, production Compose, other worktrees and other staging projects.
+- Denied: production, deployment, backend or product-runtime changes, auth/RBAC/queue semantics, workflow/gate/router modifications, using foreign staging or Docker resources, copying credentials/data, or deleting another session's files.
+- Intended change: add an opt-in `artifact-runtime` target that checks the artifact's `source.sha` and `SHA256SUMS` inside the image build, removes those metadata files from the served document root, and lets Compose select a named artifact context. Default target remains the current full `runtime` build. Document the hosted artifact and local synthetic flow; add a focused guard regression.
+- Validation: focused guard test, Python compile, Docker Compose config validation, `git diff --check`, then exact-head hosted CI. After the PR is merged, obtain the current-source artifact and run canonical Preflight → Start → Session with the T18 tests; report full `STAGING_VALIDATION.md` checks separately. No staging was started in this checkpoint.
+- First stop conditions: artifact source/checksums do not match the selected app SHA; the installed Compose/BuildKit cannot use named contexts; canonical Preflight rejects memory/storage/ports; or the implementation requires edits outside the allowed list. Do not retry a failed build against the same unmet prerequisite.
+
+---
+
 ## PR #3937 main sync — pre-work checkpoint — 2026-11-09
 
 - Objective: bring the reviewed RQ-18 test PR up to the current `origin/main` before user-owned merge; do not start the next PR cycle.
