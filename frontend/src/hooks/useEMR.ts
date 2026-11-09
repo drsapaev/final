@@ -169,6 +169,18 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         };
     }, [specialty, visitId]);
 
+    // RETRO-3930-01 (post-merge review #3944): a denial that resolves AFTER
+    // the hook moved to another visit must be reported to the ORIGINAL
+    // caller only — the current visit's write access, error state and
+    // conflict UI may never be locked by a stale 401/403 of a previous
+    // visit. Returned shape mirrors handleAccessDenied minus the state
+    // writes, so callers keep their branching contract.
+    const reportStaleAccessDenied = (apiError: EMRApiError) => ({
+        accessDenied: true as const,
+        status: apiError?.response?.status,
+        message: getAccessDeniedMessage(apiError),
+    });
+
     // =========================================================================
     // LOAD EMR
     // =========================================================================
@@ -221,8 +233,6 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                         visitId,
                         specialty,
                     });
-                    writeAccessDeniedRef.current = false;
-                    setWriteAccessDenied(false);
                     const emptyEmr = {
                         data: buildInitialEMRData(specialty),
                         version: 1,
@@ -234,7 +244,11 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                     // authoritative data. Successful writes now refresh the
                     // cache (see saveEMR/signEMR/amendEMR), so a remount after
                     // a save must show the saved content, not this empty draft.
+                    // RETRO-3930-01: the denial-flag clear is visit-scoped too —
+                    // a late A-404 must not re-enable writes for B.
                     if (stillCurrentVisit()) {
+                        writeAccessDeniedRef.current = false;
+                        setWriteAccessDenied(false);
                         dispatch(emrActions.load(emptyEmr));
                     }
                     return emptyEmr;
@@ -244,12 +258,14 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                     ...response.data,
                     data: normalizeEMRData(response.data?.data, specialty),
                 };
-                writeAccessDeniedRef.current = false;
-                setWriteAccessDenied(false);
                 if (canUseCache) {
                     emrCache.set(cacheKey, { data: normalizedEmr, promise: null });
                 }
+                // RETRO-3930-01: same visit-scoped clear — a late A-200 must
+                // not clear B's denial state.
                 if (stillCurrentVisit()) {
+                    writeAccessDeniedRef.current = false;
+                    setWriteAccessDenied(false);
                     dispatch(emrActions.load(normalizedEmr));
                 }
                 return normalizedEmr;
@@ -257,12 +273,19 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 const apiError = toEMRApiError(error);
                 if (isAccessDeniedStatus(apiError?.response?.status)) {
                     emrCache.delete(cacheKey);
+                    // RETRO-3930-01: late 401/403 of a PREVIOUS visit — report
+                    // to the original caller, never lock the current visit.
+                    if (!stillCurrentVisit()) {
+                        return reportStaleAccessDenied(apiError);
+                    }
                     return handleAccessDenied('loadEMR', apiError);
                 }
 
                 logger.error('Failed to load EMR:', error);
                 emrCache.delete(cacheKey);
-                if (isMountedRef.current) {
+                // RETRO-3930-01: late failures of a previous visit must not
+                // write the current visit's error state either.
+                if (stillCurrentVisit()) {
                     dispatch(emrActions.saveError(apiError.message || 'Failed to load EMR'));
                 }
                 throw error;
@@ -335,6 +358,11 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         } catch (error) {
             const apiError = toEMRApiError(error);
             if (isAccessDeniedStatus(apiError?.response?.status)) {
+                // RETRO-3930-01: a stale save denial of a previous visit must
+                // not lock the current visit's writer.
+                if (!stillCurrentVisit()) {
+                    return reportStaleAccessDenied(apiError);
+                }
                 return handleAccessDenied('saveEMR', apiError);
             }
 
@@ -357,12 +385,16 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             if (apiError.response?.status === 400) {
                 const detail = apiError.response.data?.detail;
                 if (typeof detail === 'string' && detail.includes('signed')) {
-                    dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
+                    if (stillCurrentVisit()) {
+                        dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
+                    }
                     return { signed: true };
                 }
             }
 
-            dispatch(emrActions.saveError(apiError.message || 'Ошибка сохранения'));
+            if (stillCurrentVisit()) {
+                dispatch(emrActions.saveError(apiError.message || 'Ошибка сохранения'));
+            }
             throw error;
         }
     }, [handleAccessDenied, specialty, visitId]);
@@ -412,6 +444,10 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         } catch (error) {
             const apiError = toEMRApiError(error);
             if (isAccessDeniedStatus(apiError?.response?.status)) {
+                // RETRO-3930-01: stale sign denial of a previous visit.
+                if (!stillCurrentVisit()) {
+                    return reportStaleAccessDenied(apiError);
+                }
                 return handleAccessDenied('signEMR', apiError);
             }
 
@@ -423,11 +459,17 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                     last_edited_at: string;
                     [key: string]: unknown;
                 };
-                dispatch(emrActions.conflictDetected(conflictData));
+                // RETRO-3930-01: a stale sign conflict must not open the
+                // conflict UI on the current visit.
+                if (stillCurrentVisit()) {
+                    dispatch(emrActions.conflictDetected(conflictData));
+                }
                 return { conflict: true, ...conflictData };
             }
 
-            dispatch(emrActions.saveError(apiError.message || 'Ошибка подписания'));
+            if (stillCurrentVisit()) {
+                dispatch(emrActions.saveError(apiError.message || 'Ошибка подписания'));
+            }
             throw error;
         }
     }, [handleAccessDenied, specialty, visitId]);
@@ -481,10 +523,16 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         } catch (error) {
             const apiError = toEMRApiError(error);
             if (isAccessDeniedStatus(apiError?.response?.status)) {
+                // RETRO-3930-01: stale amend denial of a previous visit.
+                if (!stillCurrentVisit()) {
+                    return reportStaleAccessDenied(apiError);
+                }
                 return handleAccessDenied('amendEMR', apiError);
             }
 
-            dispatch(emrActions.saveError(apiError.message || 'Ошибка внесения поправки'));
+            if (stillCurrentVisit()) {
+                dispatch(emrActions.saveError(apiError.message || 'Ошибка внесения поправки'));
+            }
             throw error;
         }
     }, [handleAccessDenied, specialty, visitId]);

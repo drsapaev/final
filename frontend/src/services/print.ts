@@ -97,6 +97,14 @@ export const printService = {
    * печати. Теперь успех только при success === true; 2xx без
    * положительного ACK — честный ambiguous-отказ (задание могло уже
    * встать в очередь: никакого слепого повтора/автофолбэка).
+   *
+   * RETRO-3921-01 (post-merge review #3944): отказ ТРАНСПОРТА без статуса
+   * сервера (таймаут, потеря ответа, обрыв соединения, отмена) — тоже
+   * ambiguous: запрос МОГ дойти и задание могло встать в очередь, поэтому
+   * вызывающая сторона обязана остановить PDF-фолбэк и потребовать
+   * подтверждения через очередь печати. Однозначный негативный ACK — только
+   * ошибка с HTTP-статусом сервера (отказ валидации/авторизации/сервера
+   * ДО постановки задания) или явный success:false в 2xx-ответе.
    */
   async printLabResults(command: { report_instance_id: number; printer_name?: string | null }) {
     try {
@@ -120,7 +128,19 @@ export const printService = {
         data: payload,
       };
     } catch (error) {
-      // Известный отказ транспорта — не ambiguous.
+      // RETRO-3921-01: без статуса сервера исход физической печати
+      // НЕИЗВЕСТЕН — это ambiguous, а не «известный отказ»: сервер мог уже
+      // принять/поставить задание в очередь до обрыва связи.
+      const serverStatus = (error as { response?: { status?: unknown } })?.response?.status;
+      const hasServerStatus = typeof serverStatus === 'number';
+      if (!hasServerStatus) {
+        return {
+          success: false,
+          ambiguous: true,
+          error: 'print_ack_unconfirmed',
+        };
+      }
+      // Однозначный негативный ACK сервера — задание НЕ встало в очередь.
       return { ...normalizePrintError(error, 'Ошибка печати лабораторных результатов'), ambiguous: false };
     }
   },

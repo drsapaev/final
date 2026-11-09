@@ -73,12 +73,48 @@ describe('LABPRINT-FE-003: printLabResults strict ACK', () => {
     expect((result as { ambiguous?: boolean }).ambiguous).toBe(false);
     expect((result as { error?: string }).error).toBe('no printer attached');
   });
+});
 
-  it('a transport error is a KNOWN failure', async () => {
+describe('RETRO-3921-01: unknown transport outcomes are ambiguous', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('a timeout / lost network response (no server status) is AMBIGUOUS — the job may already be queued', async () => {
+    // Таймаут axios: код ECONNABORTED, ответа нет.
+    const timeoutError = Object.assign(new Error('timeout of 30000ms exceeded'), {
+      code: 'ECONNABORTED',
+    });
+    mockedPost.mockRejectedValueOnce(timeoutError);
+    const result = await printService.printLabResults({ report_instance_id: 5 });
+    expect(result.success).toBe(false);
+    expect((result as { ambiguous?: boolean }).ambiguous).toBe(true);
+  });
+
+  it('a bare network error without a server status is AMBIGUOUS (was wrongly a known failure)', async () => {
     mockedPost.mockRejectedValueOnce(new Error('network down'));
     const result = await printService.printLabResults({ report_instance_id: 5 });
     expect(result.success).toBe(false);
+    expect((result as { ambiguous?: boolean }).ambiguous).toBe(true);
+  });
+
+  it('a request canceled mid-flight (abort) is AMBIGUOUS', async () => {
+    const canceled = Object.assign(new Error('canceled'), { code: 'ERR_CANCELED', name: 'CanceledError' });
+    mockedPost.mockRejectedValueOnce(canceled);
+    const result = await printService.printLabResults({ report_instance_id: 5 });
+    expect(result.success).toBe(false);
+    expect((result as { ambiguous?: boolean }).ambiguous).toBe(true);
+  });
+
+  it('an HTTP error WITH a server status is a KNOWN negative ACK — the job never queued', async () => {
+    // Сервер ответил 422: валидация отвергла команду ДО постановки задания.
+    const refusal = Object.assign(new Error('Request failed with status code 422'), {
+      response: { status: 422, data: { detail: 'printer not found' } },
+    });
+    mockedPost.mockRejectedValueOnce(refusal);
+    const result = await printService.printLabResults({ report_instance_id: 5 });
+    expect(result.success).toBe(false);
     expect((result as { ambiguous?: boolean }).ambiguous).toBe(false);
-    expect((result as { error?: unknown }).error).toBe('network down');
+    expect((result as { error?: unknown }).error).toContain('printer not found');
   });
 });

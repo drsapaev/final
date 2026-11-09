@@ -26,6 +26,11 @@
  * - пагинация доступна и в пустой локально категории (FE-004), состояние
  *   loadMore сбрасывается при смене контекста (FE-003), кнопка «Показать ещё»
  *   честно отключается во время любой загрузки (FE-007);
+ * - RETRO-3942-01 (post-merge review #3944): действительность превью
+ *   определяется контекстом и поколением списка, а НЕ идентификатором
+ *   постраничного запроса — аппенд страницы 2 больше не отменяет ожидающие
+ *   превью страницы 1: карточки прежних страниц получают свои blob-URL,
+ *   когда ответы приходят;
  * - частично успешная загрузка перечитывает список и честно сообщает о
  *   частичном результате (FE-005);
  * - удаление — двухшаговое подтверждение без запроса к серверу на первом шаге (FE-006);
@@ -113,7 +118,19 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
   // подтверждение; DELETE уходит со второго, явного.
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const objectUrlsRef = useRef<Set<string>>(new Set());
-  const loadSeqRef = useRef(0);
+  // RETRO-3942-01 (post-merge review #3944): три независимых счётчика вместо
+  // одного общего seq.
+  //  - contextEpoch — смена пациента/визита (или размонтирование): любая
+  //    асинхронная работа прошлого контекста недействительна целиком;
+  //  - listEpoch — поколение списка: полный перезапуск (loadGallery) строит
+  //    список заново; аппенд «Показать ещё» поколение НЕ меняет и потому
+  //    больше не отменяет ожидающие превью предыдущих страниц;
+  //  - requestSeq — идентификатор последнего запроса, владеет только
+  //    флагами загрузки (loading/loadingMore/loadFailed), чтобы поздний
+  //    finally не сбросил флаг более нового запроса.
+  const contextEpochRef = useRef(0);
+  const listEpochRef = useRef(0);
+  const requestSeqRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // Текущий контекст (пациент:визит) для стражей асинхронных действий
   // (DERMAGALLERY-FE-002, DERMAAI-FE-001): ref обновляется на каждом рендере
@@ -133,18 +150,24 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
 
   // Превью — отдельные авторизованные запросы для переданных файлов
   // (приватные файлы недоступны по прямому URL без заголовков авторизации).
-  // Общий seq-guard: отмена при смене пациента/визита и конкурирующих загрузках.
+  // RETRO-3942-01: действительность превью определяется КОНТЕКСТОМ и
+  // поколением списка (установкой карточки по id файла), а не идентификатором
+  // постраничного запроса: загрузка страницы 2 (апенд того же списка) больше
+  // не инвалидирует ожидающие превью страницы 1 — их карточки получают
+  // свои blob-URL, когда ответы приходят.
   // Запросы идут ограниченными пачками (DERMAGALLERY-FE-007): один зависший
-  // или упавший запрос не блокирует остальные превьи своей пачки, а отказ
+  // или упавший запрос не блокирует остальные превью своей пачки, а отказ
   // одного файла оставляет остальные карточки живыми.
-  const attachPreviews = useCallback(async (files: StoredFile[], seq: number) => {
+  const attachPreviews = useCallback(async (files: StoredFile[], contextEpoch: number, listEpoch: number) => {
     for (let offset = 0; offset < files.length; offset += PREVIEW_CONCURRENCY) {
-      if (seq !== loadSeqRef.current) return;
+      if (contextEpoch !== contextEpochRef.current) return;
+      if (listEpoch !== listEpochRef.current) return;
       const batch = files.slice(offset, offset + PREVIEW_CONCURRENCY);
       await Promise.allSettled(batch.map(async (file) => {
         try {
           const previewResponse = await api.get<Blob>(`/files/${file.id}/preview`, { responseType: 'blob' });
-          if (seq !== loadSeqRef.current) return;
+          if (contextEpoch !== contextEpochRef.current) return;
+          if (listEpoch !== listEpochRef.current) return;
           const url = URL.createObjectURL(previewResponse.data);
           objectUrlsRef.current.add(url);
           setPhotos((prev) => prev.map((photo) => (photo.id === file.id ? { ...photo, previewUrl: url } : photo)));
@@ -157,7 +180,12 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
   }, []);
 
   const loadGallery = useCallback(async () => {
-    const seq = ++loadSeqRef.current;
+    const requestSeq = ++requestSeqRef.current;
+    // RETRO-3942-01: полный перезапуск — новое поколение списка: аппенды и
+    // превью прошлых поколений недействительны (их файлы перезапрашиваются
+    // заново), но загрузка следующей страницы поколения НЕ меняет.
+    const listEpoch = ++listEpochRef.current;
+    const contextEpoch = contextEpochRef.current;
     setLoading(true);
     setLoadFailed(false);
     // Смена контекста (или повторная загрузка) сбрасывает застрявший флаг
@@ -168,7 +196,7 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
       const listResponse = await api.get<{ files?: StoredFile[]; total?: number } | StoredFile[]>('/files/', {
         params: { patient_id: patientId, visit_id: visitId, size: LIST_PAGE_SIZE, page: 1 },
       });
-      if (seq !== loadSeqRef.current) return;
+      if (contextEpoch !== contextEpochRef.current || listEpoch !== listEpochRef.current) return;
       const raw = listResponse.data;
       const files = Array.isArray(raw) ? raw : (raw?.files ?? []);
       const total = Array.isArray(raw) ? files.length : (raw?.total ?? files.length);
@@ -187,14 +215,14 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
       setCurrentPage(1);
       // Превью не блокируют завершение загрузки списка (DERMAGALLERY-FE-007):
       // карточки и пагинация доступны сразу, превьи подтягиваются параллельно.
-      void attachPreviews(imageFiles, seq);
+      void attachPreviews(imageFiles, contextEpoch, listEpoch);
     } catch (error) {
-      if (seq === loadSeqRef.current) {
+      if (contextEpoch === contextEpochRef.current && listEpoch === listEpochRef.current) {
         setLoadFailed(true);
         logger.error('[DermaVisitGallery] list failed:', error);
       }
     } finally {
-      if (seq === loadSeqRef.current) setLoading(false);
+      if (requestSeq === requestSeqRef.current) setLoading(false);
     }
   }, [patientId, visitId, releaseObjectUrls, attachPreviews]);
 
@@ -205,13 +233,19 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
   const handleLoadMore = useCallback(async () => {
     if (loadingMore || loading) return;
     const nextPage = currentPage + 1;
-    const seq = ++loadSeqRef.current;
+    // RETRO-3942-01: аппенд того же списка — контекст и поколение списка
+    // (listEpoch) НЕ меняются: ожидающие превью предыдущих страниц остаются
+    // валидными и будут прикреплены, когда их ответы придут. requestSeq
+    // забирает только владение флагом loadingMore.
+    const requestSeq = ++requestSeqRef.current;
+    const contextEpoch = contextEpochRef.current;
+    const listEpoch = listEpochRef.current;
     setLoadingMore(true);
     try {
       const listResponse = await api.get<{ files?: StoredFile[]; total?: number } | StoredFile[]>('/files/', {
         params: { patient_id: patientId, visit_id: visitId, size: LIST_PAGE_SIZE, page: nextPage },
       });
-      if (seq !== loadSeqRef.current) return;
+      if (contextEpoch !== contextEpochRef.current || listEpoch !== listEpochRef.current) return;
       const raw = listResponse.data;
       const files = Array.isArray(raw) ? raw : (raw?.files ?? []);
       const total = Array.isArray(raw) ? files.length : (raw?.total ?? totalFiles);
@@ -231,14 +265,14 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
       });
       setTotalFiles(total);
       setCurrentPage(nextPage);
-      void attachPreviews(newFiles, seq);
+      void attachPreviews(newFiles, contextEpoch, listEpoch);
     } catch (error) {
-      if (seq === loadSeqRef.current) {
+      if (contextEpoch === contextEpochRef.current && listEpoch === listEpochRef.current) {
         logger.error('[DermaVisitGallery] load more failed:', error);
         notify.error(t('derma.derma_gallery_load_more_failed'));
       }
     } finally {
-      if (seq === loadSeqRef.current) setLoadingMore(false);
+      if (requestSeq === requestSeqRef.current) setLoadingMore(false);
     }
   }, [currentPage, loading, loadingMore, totalFiles, photos, patientId, visitId, attachPreviews, t]);
 
@@ -256,7 +290,10 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
     setLoadFailed(false);
     loadGallery();
     return () => {
-      loadSeqRef.current += 1;
+      // Смена контекста/размонтирование: прошлый контекст недействителен
+      // целиком — включая его ожидающие превью (их blob-URL и так revoked).
+      contextEpochRef.current += 1;
+      requestSeqRef.current += 1;
       releaseObjectUrls();
     };
   }, [loadGallery, releaseObjectUrls]);
