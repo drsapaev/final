@@ -22,7 +22,7 @@
  * The backend stays authoritative for authorization and validation; this
  * form only stops mislabeling blood-test input as ECG measurements.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { HeartPulse, Save } from 'lucide-react';
 import { Button, Card } from '../ui/macos';
 import { api } from '../../api/client';
@@ -151,6 +151,28 @@ export function ManualEcgForm({
   });
   const [submitting, setSubmitting] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
+  // RETRO-3941-01 (post-merge review of PR 3941): the local form state belongs
+  // to the patient/visit the form was opened for. Callers that key the
+  // mount (the cardiology panel does) remount on identity change; callers
+  // that do not must still never get patient A's typed content submitted
+  // under patient B — the identity reset below guarantees it.
+  const identityRef = useRef<{ patientId: string | number | null | undefined; visitId: string | number | null | undefined }>({
+    patientId,
+    visitId,
+  });
+  useEffect(() => {
+    const previous = identityRef.current;
+    const changed = previous.patientId !== patientId || previous.visitId !== visitId;
+    identityRef.current = { patientId, visitId };
+    if (!changed) return;
+    // Identity swapped: discard the previous patient's typed content so no
+    // unsaved A payload can survive into B's context.
+    setForm({
+      ...EMPTY_ECG_FORM,
+      ecg_date: new Date().toISOString().slice(0, 10),
+    });
+    setValidationMessage('');
+  }, [patientId, visitId]);
 
   const fieldWarning = useMemo(() => {
     for (const field of ECG_NUMERIC_FIELDS) {
@@ -232,8 +254,22 @@ export function ManualEcgForm({
     };
 
     setSubmitting(true);
+    // RETRO-3941-01: the payload is attributed to the submit-time identity
+    // (captured above) — the write always lands on the patient it was
+    // entered for, never on the currently selected one.
+    const submitIdentity = { patientId, visitId };
     try {
       await api.post('/cardio/ecg', payload);
+      if (
+        identityRef.current.patientId !== submitIdentity.patientId ||
+        identityRef.current.visitId !== submitIdentity.visitId
+      ) {
+        // The selection changed while the request was in flight: the record
+        // was written under the submit-time patient (correct), but the UI
+        // must not report success for the NEW patient's context.
+        logger.info('[ManualEcgForm] submit resolved after identity change; success feedback suppressed', submitIdentity);
+        return;
+      }
       notify.success(t('cardio.ecg_added'));
       onSaved?.();
     } catch (error) {
