@@ -260,7 +260,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(({
           {...props}
         >
           <span>{selected ? (selected.label ?? String(selected.value)) : <span style={{ color: 'var(--mac-text-secondary)' }}>{placeholder}</span>}</span>
-          <svg width="16" height="16" viewBox="0 0 20 20" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
             <path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>

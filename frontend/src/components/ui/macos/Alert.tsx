@@ -77,7 +77,7 @@ const Alert = ({
         ...variantStyle(effectiveSeverity),
         ...style
       }} {...props}>
-        <Icon size={20} style={{ flexShrink: 0, marginTop: '1px' }} />
+        <Icon size={20} style={{ flexShrink: 0, marginTop: '1px' }} aria-hidden="true" focusable="false" />
         <div style={{ flex: 1, minWidth: 0 }}>
           {title && (
             <div style={{ fontWeight: 600, marginBottom: description ? '4px' : 0, fontSize: 'var(--mac-font-size-base, 14px)' }}>
