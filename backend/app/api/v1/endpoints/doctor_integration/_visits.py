@@ -5,6 +5,8 @@ Split from doctor_integration.py (1900 LOC god file → modular).
 
 from __future__ import annotations
 
+import math  # noqa: F401 — DOCVISIT-BE-002 finite-price validation
+
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     DOCTOR_QUEUE_ALLOWED_TAGS,
@@ -28,6 +30,85 @@ from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
 from app.services.appointment_duration_snapshot import (
     duration_snapshot_for_service_id,
 )
+from app.services.payment_invariant_service import PaymentInvariantService
+
+# DOCVISIT-BE-001/002/003 (audit #3892, group 17): the doctor-side
+# visit-service mutation plane. The persisted ``VisitService.price`` IS the
+# effective (custom or catalogue) price — there is no separate custom_price
+# column, so responses must not fabricate one; inputs are validated before
+# any persistence; and mutations coordinate with the payment ledger (the
+# canonical Visit lock, in-flight invoice reservations and net settled
+# amounts) instead of silently re-basing paid visits.
+
+
+def _assert_visit_services_mutable(db: Session, visit_id: int) -> None:
+    """DOCVISIT-BE-003: guard visit-service mutations against the payment
+    ledger.
+
+    Locks the visit row first (the same ``visits`` → invoice order payment
+    flows use), rejects in-flight ``processing`` invoice reservations and
+    fails closed when the visit has a net settled amount (paid minus
+    completed refunds). Unpaid and fully refunded visits stay mutable.
+    """
+    invariant = PaymentInvariantService(db)
+    invariant.lock_visit_for_payment_change(visit_id)
+    net_settled = invariant.compute_paid_amount(visit_id)
+    if net_settled > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Нельзя изменять услуги визита с проведённой оплатой "
+                "(оплачено с учётом возвратов: "
+                f"{net_settled}). Оформите возврат/пересчёт через кассу."
+            ),
+        )
+
+
+def _validate_add_service_inputs(
+    *, quantity: int, custom_price: float | None
+) -> None:
+    """DOCVISIT-BE-002: quantity must be >= 1 and a custom price must be a
+    finite non-negative amount. Rejected BEFORE any row is persisted."""
+    if quantity < 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Количество услуги должно быть не меньше 1",
+        )
+    if custom_price is not None:
+        if not math.isfinite(custom_price) or custom_price < 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Цена услуги должна быть неотрицательным конечным числом"
+                ),
+            )
+
+
+def _find_recent_identical_add(
+    db: Session,
+    *,
+    visit_id: int,
+    service_id: int,
+    quantity: int,
+    effective_price,
+) -> VisitService | None:
+    """DOCVISIT-BE-001 retry-idempotency: the immediately preceding identical
+    add (same service/quantity/effective price inside the short retry
+    window) is treated as a replay of a lost HTTP response, not as a second
+    clinical line."""
+    cutoff = datetime.now(UTC) - timedelta(seconds=10)
+    return (
+        db.query(VisitService)
+        .filter(
+            VisitService.visit_id == visit_id,
+            VisitService.service_id == service_id,
+            VisitService.qty == quantity,
+            VisitService.price == effective_price,
+            VisitService.created_at >= cutoff,
+        )
+        .order_by(VisitService.id.desc())
+        .first()
+    )
 
 
 @router.post("/doctor/visits/schedule-next", response_model=ScheduleNextVisitResponse)
@@ -265,7 +346,6 @@ def get_today_visits(
                     ),
                     "quantity": vs.quantity,
                     "price": vs.price,
-                    "custom_price": vs.custom_price,
                     "total": vs.price * vs.quantity,
                 }
                 services_data.append(service_data)
@@ -392,7 +472,6 @@ def get_visit_details(
                 ),
                 "quantity": vs.quantity,
                 "price": vs.price,
-                "custom_price": vs.custom_price,
                 "total": vs.price * vs.quantity,
             }
             services_data.append(service_data)
@@ -444,8 +523,20 @@ def add_service_to_visit(
         require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist")
     ),
 ):
-    """Добавить услугу к визиту"""
+    """Добавить услугу к визиту.
+
+    DOCVISIT-BE-002: ``quantity``/``custom_price`` валидируются ДО записи —
+    некорректные строки не попадают в биллинг. DOCVISIT-BE-003: мутация
+    координируется с платёжным легером (каноничный Visit-lock + отказ при
+    processing-инвойсах и оплаченном остатке). DOCVISIT-BE-001: ответ
+    строится ТОЛЬКО из персистентного состояния — ``price`` и есть
+    фактическая цена (кастомная или каталожная), фантомного ``custom_price``
+    поля не существует.
+    """
     try:
+        # DOCVISIT-BE-002: fail BEFORE any persistence.
+        _validate_add_service_inputs(quantity=quantity, custom_price=custom_price)
+
         visit = crud_visit.get_visit(db=db, visit_id=visit_id)
 
         if not visit:
@@ -463,6 +554,37 @@ def add_service_to_visit(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Услуга не найдена"
             )
 
+        # DOCVISIT-BE-003: the mutation must respect the payment ledger.
+        _assert_visit_services_mutable(db, visit_id)
+
+        # DOCVISIT-BE-001 retry-idempotency: an exact repeat of the
+        # immediately preceding add is a replay of a lost response, not a
+        # second clinical line.
+        effective_price = (
+            custom_price if custom_price is not None else (service.price or 0)
+        )
+        replayed = _find_recent_identical_add(
+            db,
+            visit_id=visit_id,
+            service_id=service_id,
+            quantity=quantity,
+            effective_price=effective_price,
+        )
+        if replayed is not None:
+            return {
+                "success": True,
+                "message": "Услуга уже добавлена к визиту (повтор запроса)",
+                "idempotent_replay": True,
+                "visit_service": {
+                    "id": replayed.id,
+                    "service_id": replayed.service_id,
+                    "service_name": service.name,
+                    "quantity": replayed.quantity,
+                    "price": replayed.price,
+                    "total": replayed.price * replayed.quantity,
+                },
+            }
+
         # Добавляем услугу
         visit_service = crud_visit.add_visit_service(
             db=db,
@@ -475,13 +597,13 @@ def add_service_to_visit(
         return {
             "success": True,
             "message": "Услуга добавлена к визиту",
+            "idempotent_replay": False,
             "visit_service": {
                 "id": visit_service.id,
                 "service_id": visit_service.service_id,
                 "service_name": service.name,
                 "quantity": visit_service.quantity,
                 "price": visit_service.price,
-                "custom_price": visit_service.custom_price,
                 "total": visit_service.price * visit_service.quantity,
             },
         }
@@ -507,7 +629,11 @@ def remove_service_from_visit(
         require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist")
     ),
 ):
-    """Удалить услугу из визита"""
+    """Удалить услугу из визита.
+
+    DOCVISIT-BE-003: удаление строки услуги оплаченного визита меняет базу
+    стоимости под неизменным чеком — отказ (409), как и для добавления.
+    """
     try:
         visit = crud_visit.get_visit(db=db, visit_id=visit_id)
 
@@ -534,6 +660,10 @@ def remove_service_from_visit(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Услуга в визите не найдена",
             )
+
+        # DOCVISIT-BE-003: coordinate with the payment ledger before the
+        # destructive mutation.
+        _assert_visit_services_mutable(db, visit_id)
 
         db.delete(visit_service)
         db.commit()
