@@ -1,6 +1,6 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — synced after PR #3937; memory-safe staging path exercised — 2026-11-09T11:17:10+05:00
+## Current checkpoint — synced after PR #3937; staging PR body validated — 2026-11-09T11:23:56+05:00
 
 Plan version: 1.0
 Current task: T18 final synthetic acceptance
@@ -10,7 +10,7 @@ Branch: `codex/aqs-t18-memory-safe-staging-20261109`
 Base commit: current `origin/main` `4b3d2323e6322abebdad8e16fe1b12bbb976d5c2` (#3943)
 Staging code under test: `9d75b1262708c2bf7e68a5d3076305ec4d2bfae1`
 Branch sync commit: `ca8dfe3d8f10e996c1909b768c54f1d260c7285a`
-Last updated: 2026-11-09T11:17:10+05:00
+Last updated: 2026-11-09T11:23:56+05:00
 
 | Work item | Status | Evidence |
 |-----------|--------|----------|
@@ -24,13 +24,13 @@ Last updated: 2026-11-09T11:17:10+05:00
 - The staging-only branch began from fresh `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521`. After the r4 Session, it was synchronized with `origin/main` #3943 (`4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`) in merge commit `ca8dfe3d8f10e996c1909b768c54f1d260c7285a`. Incoming paths are EMR-only and do not overlap the seven-file staging scope. The current PR diff remains seven files: staging Dockerfile, staging Compose file, focused guard test, WSL staging runbook, and the three plan journals. No product runtime or backend changes were made by this task.
 - The opt-in `artifact-runtime` target leaves the ordinary `runtime` build as default. It checks `source.sha` and every `SHA256SUMS` entry in the image build, then removes those metadata files from the served document root.
 - Hosted artifact workflow `42563847059` used application source `215472cadbbdc8cd4046ca2c8eae0e9205594521`; the downloaded artifact matched `source.sha`, and all 261 manifest entries passed SHA-256 verification.
-- Focused staging-guard test passed (1 passed, 282 deselected), including a rerun after main #3943 synchronization; Python compilation and `git diff --check` passed. Canonical Preflight validated named build context and ports on WSL Compose 2.40.3. Canonical Start and Session ran on owned synthetic project `clinic-aqs-t18-memory-20261109-r4`; Start and runtime readiness passed. Session teardown passed and removed the owned project.
+- Focused staging-guard test passed (1 passed, 282 deselected), including a rerun after main #3943 synchronization; Python compilation, `git diff --check`, and the local PR review-body quality gate passed (19 unit tests and live body validation). Canonical Preflight validated named build context and ports on WSL Compose 2.40.3. Canonical Start and Session ran on owned synthetic project `clinic-aqs-t18-memory-20261109-r4`; Start and runtime readiness passed. Session teardown passed and removed the owned project.
 - The r4 Session ran an untracked diagnostic copy of the two RQ-18 browser tests, not the exact tracked test file. Playwright reported `2 passed (48.0s)`; the T18.10 marker and final Admin `pageerror` guard passed in this run. The QR lifecycle reached its final phase.
 - The same diagnostic run recorded 13 browser response-body capture errors (`resource-id-missing`). It captured 63 actual app JS/CSS response hashes and all 63 matched the verified artifact manifest; 5 unique asset paths had no hash (8 capture errors overlapped with paths that also had a successful capture). The canonical launcher still reported `served_revision_verified=false`. Therefore complete browser asset provenance is NOT_RUN/PARTIAL, and the exact tracked RQ-18 test is not marked PASS.
 - The earlier r2 run of the exact tracked spec passed T18.10 but failed the final uncaught-Admin-page-error guard. That failure did not reproduce in the r4 diagnostic copy; its cause remains unresolved, with no confirmed product defect. The r3 diagnostic run stopped earlier on body-capture errors.
 - The scratch wrapper incorrectly surfaced the first `RQ18_ASSET_CAPTURE_FAILURE_COUNT` (the separate synthetic probe's zero) instead of the later main-flow value of 13. Use the raw safe main-flow record, not the wrapper aggregate; do not reuse this wrapper until that parser is corrected.
 - Execution gate for this staging-only scope was already recorded as `gate_known_root_cause` → `narrow_override`, `gate_misroute=false`, `override_used=true`, `handoff_required=true`; the generated prompt was read. Allowed tracked paths remain the seven listed in the pre-edit checkpoint. Denied: product runtime/backend/API/auth, DB/migrations, CI workflow/gate/router, production/deployment, foreign worktrees/projects, and merge by agent.
-- Next exact action: commit the three journal updates, push the synchronized single-purpose branch, and open one PR. Exact-head CI is the next validation gate. The owned r4 Compose project is gone; local ignored scratch deletion was blocked by workspace policy and is recorded in EVIDENCE.md. After the PR is green and the user merges it, continue T18 from fresh `origin/main`; do not repeat r4 solely to obtain the already-recorded infrastructure validation.
+- Next exact action: commit the final journal updates, push the synchronized single-purpose branch, and open one Draft PR. Exact-head CI is the next validation gate; after it passes, mark the PR ready for review. The owned r4 Compose project is gone; local ignored scratch deletion was blocked by workspace policy and is recorded in EVIDENCE.md. After the PR is green and the user merges it, continue T18 from fresh `origin/main`; do not repeat r4 solely to obtain the already-recorded infrastructure validation.
 
 ---
 

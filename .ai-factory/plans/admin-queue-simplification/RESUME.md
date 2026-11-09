@@ -20,7 +20,7 @@ Historical snapshot (superseded): focused guard test 1 passed/282 deselected; Py
 
 ---
 
-# Current resume — r4 diagnostic Session recorded; prepare the staging artifact PR — 2026-11-09T11:17:10+05:00
+# Current resume — r4 diagnostic Session recorded; prepare the staging artifact PR — 2026-11-09T11:23:56+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`. PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. After the r4 Session, this branch was synced with current `origin/main` #3943 (`4b3d2323e6322abebdad8e16fe1b12bbb976d5c2`) in merge commit `ca8dfe3d8f10e996c1909b768c54f1d260c7285a`; the incoming change is EMR-only and does not overlap this staging PR. The r4 Session itself used application/artifact source `215472cadbbdc8cd4046ca2c8eae0e9205594521`.
 
@@ -28,7 +28,7 @@ The memory-safe `artifact-runtime` path preserves the default full frontend buil
 
 The prior exact tracked spec run failed its final Admin page-error guard; the r4 diagnostic copy passed that guard, so the discrepancy remains unresolved. T18/Tier-2 is PARTIAL. Other open work includes current-source T18.1–5 and T18.8–9 browser acceptance, the full `STAGING_VALIDATION.md` checks, and cross-cutting language, keyboard, viewport, latency, and console review.
 
-Next exact action: review the seven-file diff, commit and push this single-purpose branch, then open one PR. The focused staging-guard regression (1 passed, 282 deselected) and `git diff --check` already pass after syncing with main #3943. Wait for exact-head CI; the user owns merge. The r4 Compose project is gone, but workspace policy blocked removal of its one task-owned `.scratch/t18-memory-safe-staging-20261109` folder; no bypass was attempted. After merge, fetch fresh `origin/main` and continue with a separate focused correction/validation for the exact RQ-18 browser recorder and unresolved page-error discrepancy. Do not start another Compose cycle just to repeat r4 infrastructure validation.
+Next exact action: commit the final journal checkpoint, push the seven-file staging branch, and open one Draft PR. The local PR review-body gate passed; exact-head GitHub CI remains pending. After it passes, mark the PR Ready for review; the user owns merge. The r4 Compose project is gone, but workspace policy blocked removal of its one task-owned `.scratch/t18-memory-safe-staging-20261109` folder; no bypass was attempted. After merge, fetch fresh `origin/main` and continue with a separate focused correction/validation for the exact RQ-18 browser recorder and unresolved page-error discrepancy. Do not start another Compose cycle just to repeat r4 infrastructure validation.
 
 ---
 

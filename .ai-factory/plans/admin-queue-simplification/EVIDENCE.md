@@ -6636,3 +6636,10 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Scratch cleanup: the attempted command named only `.scratch/t18-memory-safe-staging-20261109` under this worktree and included guards against paths outside `.scratch` or reparse points. Local workspace policy rejected the command before PowerShell ran, so neither the guard checks nor deletion executed. No alternate deletion route was used; one task-owned scratch folder remains for manual removal. The synthetic Compose project itself was already removed by canonical Session teardown.
 - PR: not yet opened; commit, push, and PR creation are the next action.
 - Result: branch is synchronized and the focused guard passes; the full T18 acceptance remains PARTIAL as in the preceding r4 record.
+
+## T18 staging PR body quality gate — PASS — 2026-11-09T11:23:56+05:00
+
+- Commit under test: current branch code is unchanged from the staging implementation and sync recorded above; only the three T18 journals carry final checkpoint edits.
+- Validation command: `scripts/run_python.ps1 -RequireModule pytest scripts/run_pr_review_gate_checks.py --body-env PR_BODY --author drsapaev` using the existing `C:\final\backend\.venv\Scripts\python.exe`.
+- Result: 19 review-template unit tests passed; both documented sample bodies passed; the proposed staging PR body passed live validation. Its body remains in the task context and was not written into a generated or tracked temp file.
+- Limitation: this is the local description-quality gate, not GitHub exact-head CI or independent code review. The PR has not yet been pushed/opened.
