@@ -39301,6 +39301,12 @@ export type components = {
             confirmation: {
                 [key: string]: unknown;
             };
+            /**
+             * Idempotent Replay
+             * @description True, когда идентичный intent уже был зафиксирован в окне дедупликации и ответ перестроен из СОХРАНЁННОГО визита (второй визит/токен не создавались).
+             * @default false
+             */
+            idempotent_replay: boolean;
         };
         /** ScheduleNextVisitService */
         ScheduleNextVisitService: {
