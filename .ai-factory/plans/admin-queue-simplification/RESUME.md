@@ -1,4 +1,4 @@
-# Current resume — corrected harness; fresh Preflight passed — 2026-11-09T10:22:00+05:00
+# Current resume — T18.10 passed; RQ-18 exposed an Admin page error — 2026-11-09T10:40:00+05:00
 
 Continue umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80` in worktree `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, branch `codex/aqs-t18-memory-safe-staging-20261109`.
 
@@ -6,13 +6,13 @@ PR #3937 is merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`. The feature br
 
 The memory-safe prebuilt frontend target is implemented and its focused test passes. Existing hosted artifact workflow `42563847059` built the exact latest main source; `source.sha` matched and all 261 artifact checksums passed. The artifact is in ignored `.scratch/t18-memory-safe-staging-20261109/frontend-artifact`. The ordinary full frontend build stays the default. Windows lacks Docker CLI; canonical WSL Preflight validated Compose configuration and resources, but Start/Session have not run and no services are up.
 
-The first canonical `Session` ended before test execution because the local wrapper set conflicting `NO_COLOR`/`FORCE_COLOR`; PowerShell promoted Node's stderr warning to a terminating error. There were no Playwright phase markers, so RQ-18 and T18.10 remain `NOT_RUN`. Canonical teardown passed and removed that project; do not reuse it.
+The first canonical Session stopped before tests due to a local PowerShell/Node stderr handling mistake; teardown passed. A corrected run on fresh project `clinic-aqs-t18-memory-20261109-r2` ran both RQ-18 tests. T18.10 passed, including normal Admin 2FA and the protected `specialists` delete guard. The main QR flow reached its completion marker but failed the final page-error guard because at least one Admin `pageerror` occurred. The actual browser asset report was not emitted because the guard comes first. Overall RQ-18 is PARTIAL, and served revision provenance remains `NOT_RUN`. Canonical teardown passed and removed r2.
 
-The wrapper now redirects Node stdout/stderr separately and has passed PowerShell syntax validation. Canonical Preflight passed for new synthetic project `clinic-aqs-t18-memory-20261109-r2` on backend/frontend/PostgreSQL ports 19002/18082/55442; free capacity was C: 13 GiB, WSL backing D: 26 GiB, WSL memory 3206 MiB. The artifact source and embedded frontend origin remain `215472cadbbdc8cd4046ca2c8eae0e9205594521` and `http://127.0.0.1:18082`.
+The first failed session's root cause was the harness (conflicting color flags plus native stderr promotion), not the app. In the successful Playwright launch, the test itself failed specifically at its final `pageErrors !== 0` check. The actual page error has not been diagnosed.
 
-Next: run canonical Start, then one Session using the same env/project and corrected wrapper. Start performs the 10 GiB build-reserve check. Do not mark served revision verified from image ID alone; compare browser-delivered JS/CSS response hashes with the hosted manifest.
+Next: make a task-local diagnostic copy of the RQ-18 spec that records only page-error class, active static phase and sanitized JS frame locations; emit actual browser JS/CSS response hashes before the final page-error guard. Do not change tracked tests or runtime. Then use a fresh project with frontend port 18082 and fresh backend/PostgreSQL ports, and run canonical Preflight → Start → one Session. If the diagnostic indicates app behavior, stop and gate a narrowly scoped source fix.
 
-Validation already reported: focused guard test 1 passed/282 deselected; Python compile passed; `git diff --check` and commit hooks passed; hosted artifact source/checksums passed; `--list` found two RQ-18 tests but executed none. First project Start passed; its Session wrapper failed before tests and teardown passed. Fresh retry Preflight passed; RQ-18/T18.10 behavior remains unverified until the upcoming Session. An initial pytest command from the backend runner used an invalid relative path and was corrected; no test ran on that first attempt. Do not claim staging or T18 completion yet.
+Validation already reported: focused guard test 1 passed/282 deselected; Python compile passed; `git diff --check` and commit hooks passed; hosted artifact source/checksums passed; corrected `--list` found exactly two RQ-18 tests. First project Start passed; wrapper stopped before tests and teardown passed. Second project Start passed; T18.10 passed; RQ-18 failed its final page-error check; teardown passed. Served asset hashes remain unverified. Do not claim staging or T18 completion yet.
 
 ---
 

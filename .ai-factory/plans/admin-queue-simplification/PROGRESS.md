@@ -1,6 +1,6 @@
 # Progress — T18 final acceptance
 
-## Current checkpoint — retry harness fixed; fresh Preflight PASS — 2026-11-09T10:22:00+05:00
+## Current checkpoint — T18.10 PASS; RQ-18 stopped on Admin page error — 2026-11-09T10:40:00+05:00
 
 - Umbrella task `bd2f7564-bd3d-449d-8d85-5a9325722a80`; PR #3937 merged at `3a6d0f72dd72191de32c216dbdb145e0e407ae96`.
 - Current implementation branch: `codex/aqs-t18-memory-safe-staging-20261109` in `C:/Users/DrSapaev/.codex/worktrees/aqs-t18-memory-safe-staging/final`, synchronized with latest `origin/main` `215472cadbbdc8cd4046ca2c8eae0e9205594521` in merge commit `fb7bdfba14a8388b13ffb2c9a595d91475d1ae9f`. The only incoming main paths were two CI workflow files; application source is unchanged.
@@ -14,9 +14,12 @@
 - Local Playwright dependency reuse was read-only verified: `C:\final\frontend\package-lock.json` has the same SHA-256 as this worktree. A worktree-only ignored junction points `frontend/node_modules` at that cache; installed Playwright 1.62.0 and Chromium 1234 are present. The junction is local execution plumbing, not a tracked change.
 - Corrected the ignored wrapper to keep Node streams in redirected files and remove both color overrides. PowerShell parser validation passed; no tests were executed during that check.
 - Fresh canonical Preflight: PASS for new synthetic project `clinic-aqs-t18-memory-20261109-r2`, ports backend 19002/frontend 18082/PostgreSQL 55442. C: free 13 GiB, WSL backing D: free 26 GiB, WSL available memory 3206 MiB, storage reserve 2 GiB for this non-build Preflight, warnings empty; runtime readiness `NOT_RUN`. Frontend stays on 18082 because the verified artifact embeds that origin.
+- Canonical Start: PASS for r2; build reserve 10 GiB, C: 13 GiB free, WSL backing D: 26 GiB free, WSL available memory 3201 MiB, runtime readiness PASS, no warnings.
+- Canonical Session executed both RQ-18 tests: the isolated browser-response provenance regression passed; the live Admin/QR test completed normal password→TOTP enrollment, T18.10 (`specialists`, editor return/history and protected DELETE 409), booking/resource ownership, archival and reactivation phases. It then failed its final uncaught-Admin-page-error guard at `rq18-permanent-qr-live.spec.ts:1162`; an Admin page error was observed, cause not yet identified. Overall live RQ-18 remains PARTIAL/FAIL pending diagnosis; do not interpret all completed phases as a passing test.
+- Actual browser asset hashes were not emitted because the existing spec checks `pageErrors` before calling `reportForOrigin`; therefore browser-served frontend provenance remains `NOT_RUN`. Canonical Session returned FAIL for the child test and teardown PASS, removing r2. The summary stayed sanitized; raw application payloads and credentials were not recorded.
 - Current gate: `gate_known_root_cause` -> `narrow_override`, `gate_misroute=false`, override used, handoff required; execution prompt read.
 - Allowed tracked paths remain the seven recorded in the pre-edit checkpoint below. Denied: runtime/backend/auth, GitHub workflow, gate/router, production, deployment and foreign staging resources.
-- Next exact action: run canonical Start on project `clinic-aqs-t18-memory-20261109-r2`, then one Session using the same env and fixed wrapper. Start applies the 10 GiB build reserve and still builds backend/worker. If Start or the corrected Session fails, use its exact-project teardown result and do not repeat unchanged steps.
+- Next exact action: diagnose the uncaught page error using an untracked copy of the RQ-18 spec that records only error class, active static phase, and sanitized JS frame locations, and emits actual browser asset hashes before the final guard. Do not change tracked app or test code. Then use a fresh synthetic project, retain frontend port 18082 for the artifact, and run canonical Preflight → Start → one Session. If the error points to application behavior, stop and run the required source gate before proposing a fix.
 
 ---
 
